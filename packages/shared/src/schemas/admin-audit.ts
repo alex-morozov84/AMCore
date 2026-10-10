@@ -41,6 +41,7 @@ export const adminAuditQuerySchema = z
         'AI_ASSISTANT',
         'AI_CONVERSATION',
         'RUNTIME_SETTING',
+        'BACKGROUND_WORK',
       ])
       .optional(),
     organizationId: auditDisplayIdSchema.optional(),
@@ -95,6 +96,27 @@ export const auditSummarySchema = z
   })
   .strict()
 
+/** Closed command projection; raw audit metadata is never a public response. */
+export const auditCommandDetailsSchema = z.strictObject({
+  workId: auditDisplayIdSchema.optional(),
+  commandId: z.uuid().optional(),
+  jobId: auditDisplayIdSchema.optional(),
+  operation: z.enum(['retry', 'pause', 'resume', 'cancel', 'cleanup']).optional(),
+  reason: z.string().min(1).max(250).optional(),
+  count: z.number().int().min(0).max(50).optional(),
+  outcome: z
+    .enum(['prepared', 'dispatching', 'applied', 'rejected', 'not_attempted', 'unknown'])
+    .optional(),
+  reasonCode: z
+    .string()
+    .max(64)
+    .regex(/^[A-Z][A-Z0-9_]*$/)
+    .optional(),
+  resolution: z
+    .enum(['none', 'acknowledged_unknown', 'proven_applied', 'proven_no_effect'])
+    .optional(),
+})
+
 export const adminAuditItemSchema = z.object({
   id: auditDisplayIdSchema.nullable(),
   createdAt: utcTime,
@@ -110,6 +132,7 @@ export const adminAuditItemSchema = z.object({
   organizationIdentity: auditOrganizationIdentitySchema.optional(),
   category: z.enum(['SECURITY', 'BUSINESS']),
   summary: auditSummarySchema,
+  commandDetails: auditCommandDetailsSchema.optional(),
 })
 
 export const adminAuditResponseSchema = z

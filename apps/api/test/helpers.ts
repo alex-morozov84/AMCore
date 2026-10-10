@@ -1,6 +1,6 @@
 import type { WorkerHost } from '@nestjs/bullmq'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import type { INestApplication } from '@nestjs/common'
+import { type INestApplication, Module } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { TestingModule, TestingModuleBuilder } from '@nestjs/testing'
@@ -17,9 +17,11 @@ import { Client } from 'pg'
 
 import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
-import { NotificationDispatchProcessor } from '../src/core/notifications/dispatch/notification-dispatch.processor'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
-import { EmailProcessor } from '../src/infrastructure/email/processors/email.processor'
+import {
+  MANAGED_WORKERS,
+  type ManagedWorkerBinding,
+} from '../src/infrastructure/background-work/work-coordinator'
+import type { WorkRegistration } from '../src/infrastructure/background-work/work-definition'
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
@@ -115,6 +117,8 @@ export async function setupE2ETestInfrastructure(): Promise<
  * `AI_TOOLS` token) that must never exist in production DI. Production code paths are untouched.
  */
 export interface E2ESetupOptions {
+  /** Test registrations enter the same production composition, never a parallel inventory/controller. */
+  registrations?: readonly WorkRegistration[]
   /**
    * Register the HTTP pieces in the order, and with the global prefix, `main.ts` uses (board guard,
    * body parser, cookies, Helmet, CORS, `api/v1`) instead of the prefix-less default.
@@ -175,11 +179,21 @@ export async function setupE2ETest(
       process.env.NODE_ENV = previousNodeEnv
       process.env.ENABLE_BULL_BOARD = options.productionAtImport.lateEnableBullBoard
     }
-    const { AppModule } = await import('../src/app.module')
+    let root
+    if (options.registrations) {
+      const { appProviders, coreImports, webImports, workerImports } =
+        await import('../src/app-imports')
+      @Module({
+        imports: [...coreImports('all', options.registrations), ...webImports, ...workerImports()],
+        providers: appProviders,
+      })
+      class ConformanceRoot {}
+      root = ConformanceRoot
+    } else root = (await import('../src/app.module')).AppModule
 
     // Create testing module with real AppModule (no mocks!). Only PinoLogger is
     // overridden to avoid the Jest/ESM logger bootstrap hang described above.
-    const baseBuilder = Test.createTestingModule({ imports: [AppModule] })
+    const baseBuilder = Test.createTestingModule({ imports: [root] })
       .overrideProvider(PinoLogger)
       .useValue(noopPinoLogger)
     moduleFixture = await (configure ? configure(baseBuilder) : baseBuilder).compile()
@@ -251,22 +265,21 @@ export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
 }
 
 async function closeBullWorkers(app: INestApplication): Promise<void> {
-  await Promise.all([
-    closeBullWorker(app, EmailProcessor),
-    closeBullWorker(app, NotificationDispatchProcessor),
-    closeBullWorker(app, AiRunDispatchProcessor),
-  ])
-}
-
-async function closeBullWorker(
-  app: INestApplication,
-  processor: new (...args: never[]) => WorkerHost
-): Promise<void> {
+  let bindings: readonly ManagedWorkerBinding[]
   try {
-    await app.get(processor, { strict: false }).worker.close(true)
+    bindings = app.get(MANAGED_WORKERS, { strict: false })
   } catch {
-    // Processor may be absent in focused test modules or not registered yet.
+    return
   }
+  await Promise.all(
+    bindings.map(async ({ host }) => {
+      try {
+        await app.get<WorkerHost>(host, { strict: false }).worker.close(true)
+      } catch {
+        // Failed startup can leave an unregistered host; focused modules may have none.
+      }
+    })
+  )
 }
 
 /**
@@ -399,12 +412,23 @@ export function signAccessToken(app: INestApplication, payload: Record<string, u
  * (Gotcha #1). Tear down with `closeWebAppContext` BEFORE stopping the shared
  * containers. Bound to 127.0.0.1 to avoid IPv6 `[::1]` fetch quirks.
  */
-export async function startWebAppContext(): Promise<{
+export async function startWebAppContext(
+  options: Pick<E2ESetupOptions, 'registrations'> = {}
+): Promise<{
   app: NestExpressApplication
   baseUrl: string
 }> {
-  const { WebModule } = await import('../src/web.module')
-  const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [WebModule] })
+  let root
+  if (options.registrations) {
+    const { appProviders, coreImports, webImports } = await import('../src/app-imports')
+    @Module({
+      imports: [...coreImports('web', options.registrations), ...webImports],
+      providers: appProviders,
+    })
+    class ConformanceWebRoot {}
+    root = ConformanceWebRoot
+  } else root = (await import('../src/web.module')).WebModule
+  const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [root] })
     .overrideProvider(PinoLogger)
     .useValue(noopPinoLogger)
     .compile()

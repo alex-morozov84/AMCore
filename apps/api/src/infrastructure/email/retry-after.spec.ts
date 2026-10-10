@@ -1,4 +1,4 @@
-import { parseRetryAfterMs } from './retry-after'
+import { parseRetryAfterConstraint, parseRetryAfterMs } from './retry-after'
 
 describe('parseRetryAfterMs', () => {
   const now = new Date('2026-10-05T12:00:00.000Z')
@@ -41,5 +41,19 @@ describe('parseRetryAfterMs', () => {
   it('returns undefined for a missing header', () => {
     expect(parseRetryAfterMs(undefined, now)).toBeUndefined()
     expect(parseRetryAfterMs(null, now)).toBeUndefined()
+  })
+
+  it('preserves an absolute date, explicit zero and unsupported data for interval admission', () => {
+    expect(parseRetryAfterConstraint('Mon, 05 Oct 2026 12:02:00 GMT')).toEqual({
+      kind: 'absolute',
+      timestamp: Date.parse('2026-10-05T12:02:00.000Z'),
+    })
+    expect(parseRetryAfterConstraint('0')).toEqual({ kind: 'duration', milliseconds: 0 })
+    expect(parseRetryAfterConstraint('120')).toEqual({ kind: 'duration', milliseconds: 120000 })
+    expect(parseRetryAfterConstraint('soon')).toEqual({ kind: 'unsupported' })
+    expect(parseRetryAfterConstraint('Mon, 31 Feb 2026 12:00:00 GMT')).toEqual({
+      kind: 'unsupported',
+    })
+    expect(parseRetryAfterConstraint(undefined)).toBeUndefined()
   })
 })

@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu'
 
-import type { AuditCopy } from './audit-copy'
+import { auditActionLabel, type AuditCopy } from './audit-copy'
 
 export function AuditActionPicker({
   selected,
@@ -26,14 +26,14 @@ export function AuditActionPicker({
   locale: string
 }) {
   const labels = [...AUDIT_ACTIONS].sort((left, right) =>
-    copy.actions[left].localeCompare(copy.actions[right], locale)
+    auditActionLabel(copy, left).localeCompare(auditActionLabel(copy, right), locale)
   )
   const unknown = selected.filter((code) => !AUDIT_ACTIONS.some((known) => known === code))
   const caption =
     selected.length === 0
       ? copy.allActions
       : selected.length === 1
-        ? (copy.actions[selected[0] as keyof AuditCopy['actions']] ?? selected[0])
+        ? auditActionLabel(copy, selected[0]!)
         : `${copy.selectedActions}: ${selected.length}`
 
   function toggle(code: string, checked: boolean) {
@@ -71,7 +71,7 @@ export function AuditActionPicker({
                 onCheckedChange={(next) => toggle(code, next)}
                 className="cursor-pointer"
               >
-                {copy.actions[code as keyof AuditCopy['actions']] ?? code}
+                {auditActionLabel(copy, code)}
               </DropdownMenuCheckboxItem>
             )
           })}

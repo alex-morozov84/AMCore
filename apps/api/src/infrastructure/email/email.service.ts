@@ -6,6 +6,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { DEFAULT_LOCALE } from '@amcore/shared'
 
+import { sendEmailJobDataSchema } from './email.schema'
 import type {
   EmailProvider,
   EmailVerificationData,
@@ -21,7 +22,7 @@ import type {
 } from './email.types'
 import { EmailTemplate, QUEUEABLE_EMAIL_TEMPLATES } from './email.types'
 import type { Locale } from './messages'
-import { preparedEmailBodySchema } from './prepared-email'
+import { preparedEmailBodySchema, serializeNotificationEmail } from './prepared-email'
 import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
 import { NotificationEmail } from './templates/notification'
 import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
@@ -36,21 +37,7 @@ import {
   MetricsService,
 } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
-import { DEFAULT_JOB_OPTIONS } from '@/infrastructure/queue/interfaces/job-options.interface'
 import { QueueService } from '@/infrastructure/queue/queue.service'
-
-/**
- * Job options for queued (non-secret) emails (EQS-11).
- *
- * Derived from the single-source `DEFAULT_JOB_OPTIONS`; overrides only the
- * first-retry backoff to 2s — email retries are intentionally gentler than the
- * generic 1s default. A named derived constant removes the duplicate literal
- * without changing retry timing.
- */
-const EMAIL_JOB_OPTIONS = {
-  ...DEFAULT_JOB_OPTIONS,
-  backoff: { type: 'exponential' as const, delay: 2000 },
-}
 
 /**
  * Email Service
@@ -73,6 +60,13 @@ export class EmailService {
       { provider: emailProvider.constructor.name },
       `Email service initialized with ${emailProvider.constructor.name}`
     )
+  }
+
+  /** Frozen queued-email recipe; transport credentials and idempotency key are not serialized. */
+  async prepareQueuedRequest(payload: unknown): Promise<string> {
+    const job = sendEmailJobDataSchema.parse(payload)
+    const rendered = await this.renderTemplate(job.template, job.data, 'worker')
+    return serializeNotificationEmail({ from: this.env.get('EMAIL_FROM'), to: job.to, ...rendered })
   }
 
   /**
@@ -140,7 +134,7 @@ export class EmailService {
         )
       }
 
-      await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData, EMAIL_JOB_OPTIONS)
+      await this.queueService.add(QueueName.EMAIL, JobName.SEND_EMAIL, jobData)
       this.observe(jobData.template, 'dispatch', 'queued', 'success', undefined, startedAt)
       this.logger.info(
         { template: jobData.template, to: redactEmail(jobData.to), userId: jobData.userId },
@@ -187,7 +181,7 @@ export class EmailService {
     await this.queue({
       template: EmailTemplate.WELCOME,
       to: data.email,
-      userId,
+      ...(userId !== undefined ? { userId } : {}),
       data,
     })
   }

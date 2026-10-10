@@ -107,33 +107,38 @@ function PaginationNextButton({ className, label, ...props }: ButtonDirectionPro
   )
 }
 
-interface PaginationButtonsProps {
+type PaginationButtonsProps = {
   page: number
-  pageSize: number
-  total: number
   onPageChange: (page: number) => void
   previousLabel: string
   nextLabel: string
-  /** Disables both buttons in addition to their own start/end-of-range state, e.g. while a page change is still in flight. */
+  pageLabel?: string
+  /** Disables both directions while a page request is in flight. */
   isFetching?: boolean
-}
+} & (
+  | {
+      pageSize: number
+      total: number
+      hasPreviousPage?: never
+      hasNextPage?: never
+    }
+  | {
+      pageSize?: never
+      total?: never
+      hasPreviousPage: boolean
+      hasNextPage: boolean
+    }
+)
 
-/**
- * Composed prev/next pager for callers paging local (non-`href`) state —
- * hides itself when there is nothing to page through. For `href`-driven
- * pagination (server-navigated pages, e.g. Audit), compose `Pagination` +
- * `PaginationPrevious`/`PaginationNext` directly instead.
- */
-function PaginationButtons({
-  page,
-  pageSize,
-  total,
-  onPageChange,
-  previousLabel,
-  nextLabel,
-  isFetching,
-}: PaginationButtonsProps) {
-  if (total <= pageSize) return null
+/** Local-state pager: known totals or explicit directions for a bounded live window. */
+function PaginationButtons(props: PaginationButtonsProps) {
+  const { page, onPageChange, previousLabel, nextLabel, pageLabel, isFetching } = props
+  const knownTotal = props.total !== undefined
+  if (knownTotal && props.total <= props.pageSize) return null
+  const hasPreviousPage = knownTotal ? page > 1 : props.hasPreviousPage
+  const hasNextPage = knownTotal ? page * props.pageSize < props.total : props.hasNextPage
+
+  if (!hasPreviousPage && !hasNextPage) return null
 
   return (
     <Pagination aria-label={`${previousLabel} / ${nextLabel}`} className="justify-end">
@@ -142,14 +147,19 @@ function PaginationButtons({
           <PaginationPreviousButton
             label={previousLabel}
             onClick={() => onPageChange(page - 1)}
-            disabled={page <= 1 || isFetching}
+            disabled={!hasPreviousPage || isFetching}
           />
         </PaginationItem>
+        {pageLabel && (
+          <PaginationItem>
+            <span aria-current="page">{pageLabel}</span>
+          </PaginationItem>
+        )}
         <PaginationItem>
           <PaginationNextButton
             label={nextLabel}
             onClick={() => onPageChange(page + 1)}
-            disabled={page * pageSize >= total || isFetching}
+            disabled={!hasNextPage || isFetching}
           />
         </PaginationItem>
       </PaginationContent>

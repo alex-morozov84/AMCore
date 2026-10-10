@@ -4,10 +4,10 @@ import request from 'supertest'
 
 import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import {
   cleanDatabase,
   cleanOrgData,
@@ -54,7 +54,7 @@ describe('AI multimodal artifact lifecycle (e2e)', () => {
     registry = app.get(AiModelRegistry, { strict: false })
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 120000)
 
   afterAll(async () => {

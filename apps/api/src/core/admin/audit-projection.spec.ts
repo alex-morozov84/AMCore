@@ -90,6 +90,50 @@ describe('audit read projection', () => {
     expect(JSON.stringify(item)).not.toContain(hostile)
   })
 
+  it('exposes only validated command details including operator reason and individual outcome', () => {
+    const metadata = {
+      workId: 'fixture-import',
+      commandId: '019a1234-1234-7123-8123-123456789012',
+      jobId: 'owner-retry',
+      operation: 'retry',
+      reason:
+        '\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0439 \u043f\u043e\u0432\u0442\u043e\u0440',
+      outcome: 'applied',
+      token: 'must-not-leak',
+      payload: { private: 'must-not-leak' },
+    }
+    const item = projectAuditRow(
+      { ...row, action: 'background_work.command_outcome', metadata },
+      new Map(),
+      new Map()
+    )
+    expect(item.commandDetails).toEqual({
+      workId: metadata.workId,
+      commandId: metadata.commandId,
+      jobId: metadata.jobId,
+      operation: 'retry',
+      reason: metadata.reason,
+      outcome: 'applied',
+    })
+    expect(JSON.stringify(item)).not.toContain('must-not-leak')
+    const invalid = projectAuditRow(
+      {
+        ...row,
+        action: 'background_work.command_outcome',
+        metadata: {
+          ...metadata,
+          reason: 'x'.repeat(251),
+          jobId: 'secret/invalid',
+          commandId: 'invalid',
+          operation: 'unknown',
+        },
+      },
+      new Map(),
+      new Map()
+    )
+    expect(invalid.commandDetails).toEqual({ workId: 'fixture-import', outcome: 'applied' })
+  })
+
   it('does not mistake a missing current record for a historical identity', () => {
     const item = projectAuditRow(row, new Map(), new Map())
     expect(item.actorIdentity).toEqual({ status: 'not_found' })

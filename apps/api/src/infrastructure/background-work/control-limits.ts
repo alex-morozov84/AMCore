@@ -1,0 +1,53 @@
+/** Fixed supported contract, shared by admission, retention and diagnostics. */
+export const CONTROL_LIMITS = Object.freeze({
+  registeredWorks: 64,
+  batchTargets: 50,
+  concurrentDispatches: 4,
+  redisDeadlineMs: 5000,
+  batchDeadlineMs: 15000,
+  transactionMs: 3000,
+  lockMs: 1000,
+  statementMs: 1000,
+  ledgerCommands: 50000,
+  ledgerTargets: 250000,
+  ledgerBytes: 512 * 1024 * 1024,
+  commandBytes: 8192,
+  targetBytes: 2048,
+  compactUnknownBytes: 512,
+  active: {
+    global: { commands: 100, targets: 2000 },
+    actor: { commands: 5, targets: 100 },
+    work: { commands: 10, targets: 200 },
+  },
+  unknown: { global: 1000, actor: 100, work: 200 },
+  evidence: {
+    globalRows: 50000,
+    globalBytes: 64 * 1024 * 1024,
+    globalUnresolved: 10000,
+    workRows: 10000,
+    workBytes: 16 * 1024 * 1024,
+    workUnresolved: 2000,
+    rowBytes: 2048,
+  },
+  actorBudgetRows: 50000,
+  retentionMs: 30 * 86400000,
+  outcomeBuffer: { entries: 32, bytes: 32768, ttlMs: 60000, attempts: 3 },
+  maintenance: {
+    intervalMs: 30000,
+    transactionMs: 1000,
+    targets: 100,
+    evidence: 200,
+    idleBudgets: 500,
+    ledgerTargets: 500,
+  },
+})
+
+export const CONTROL_RATES = Object.freeze({
+  globalRequests: { intervalMs: 600, burst: 10 },
+  actorRequests: { intervalMs: 6000, burst: 3 },
+  globalTargets: { intervalMs: 60, burst: 100 },
+  actorWorkTargets: { intervalMs: 600, burst: 50 },
+  actorPause: { intervalMs: 6000, burst: 3 },
+  globalReads: { intervalMs: 100, burst: 100 },
+  actorReads: { intervalMs: 1000, burst: 10 },
+})

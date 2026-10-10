@@ -1,3 +1,4 @@
+import type { Type } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { SwaggerModule } from '@nestjs/swagger'
@@ -5,14 +6,11 @@ import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
 
-import { AppModule } from './app.module'
 import { configureBodyParser } from './bootstrap/configure-body-parser'
 import { configureBullBoardEdge } from './bootstrap/configure-bull-board-edge'
 import { EnvService } from './env/env.service'
 import { ShutdownService } from './shutdown.service'
 import { API_GLOBAL_PREFIX, buildApiDocument } from './swagger.config'
-import { WebModule } from './web.module'
-import { WorkerModule } from './worker.module'
 
 type ProcessRole = 'web' | 'worker' | 'all'
 
@@ -22,15 +20,15 @@ type ProcessRole = 'web' | 'worker' | 'all'
  * ConfigModule) exists. The Zod env schema validates PROCESS_ROLE when the chosen
  * module loads, so an invalid value still fails fast with a clear error.
  */
-function rootModuleFor(role: ProcessRole): typeof AppModule {
+async function rootModuleFor(role: ProcessRole): Promise<Type<unknown>> {
   switch (role) {
     case 'web':
-      return WebModule
+      return (await import('./web.module')).WebModule
     case 'worker':
-      return WorkerModule
+      return (await import('./worker.module')).WorkerModule
     case 'all':
     default:
-      return AppModule
+      return (await import('./app.module')).AppModule
   }
 }
 
@@ -38,7 +36,7 @@ async function bootstrap(): Promise<void> {
   const role = (process.env.PROCESS_ROLE ?? 'all') as ProcessRole
   const isWorker = role === 'worker'
 
-  const app = await NestFactory.create<NestExpressApplication>(rootModuleFor(role), {
+  const app = await NestFactory.create<NestExpressApplication>(await rootModuleFor(role), {
     bufferLogs: true,
     rawBody: true,
   })

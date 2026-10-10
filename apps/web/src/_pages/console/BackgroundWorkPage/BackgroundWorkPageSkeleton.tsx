@@ -1,3 +1,4 @@
+import { Card, CardContent } from '@/shared/ui/card'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 const ROWS = [0, 1, 2, 3]
@@ -16,6 +17,18 @@ export function BackgroundWorkPageSkeleton() {
           <Skeleton className="h-9 w-40" />
           <Skeleton className="h-9 w-28" />
         </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2" aria-hidden="true">
+        {ROWS.map((row) => (
+          <Card key={row}>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-48 max-w-full" />
+              <Skeleton className="h-4 w-64 max-w-full" />
+              <Skeleton className="h-8 w-56 max-w-full" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
       <Skeleton className="h-5 w-72 max-w-full" />
       <div className="hidden rounded-lg border bg-surface-elevated p-4 md:block">

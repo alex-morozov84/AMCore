@@ -1,6 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express'
 
-import { MEMBER_REQUEST_BYTES, ROLE_REQUEST_BYTES } from '@amcore/shared'
+import { MEMBER_REQUEST_BYTES, ROLE_REQUEST_BYTES, WORK_COMMAND_INPUT_BYTES } from '@amcore/shared'
 
 import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary'
 import { isMemberRoleJsonRequest } from './member-role-body-parser'
@@ -23,12 +23,23 @@ import {
  * request the limit bounds the inflated size (a small compressed body that
  * inflates past the limit is still rejected).
  *
- * Except for scoped member role replacement JSON, this ceiling applies to all
+ * Except for the scoped invitation, role and background-control parsers, this ceiling applies to all
  * routes, including raw-body webhook routes (D4): there is no measured
  * payload that justifies a separate, larger webhook limit yet. Multipart uploads
  * are bounded separately by Multer and are unaffected by this value.
  */
 export const REQUEST_BODY_LIMIT_BYTES = 100_000
+
+function isBackgroundControlPath(url: string, prefix: string): boolean {
+  const path = url.split('?')[0] ?? ''
+  const root = `${prefix}/admin/background-work/`
+  return (
+    path.startsWith(root) &&
+    /^(?:commands(?:\/[^/]+\/reconciliation)?|works\/[^/]+\/jobs\/[^/]+\/reconciliation)\/?$/.test(
+      path.slice(root.length)
+    )
+  )
+}
 
 /**
  * Register explicit JSON and urlencoded body-parser limits on the application.
@@ -67,6 +78,23 @@ export function configureBodyParser(app: NestExpressApplication, prefix = '/api/
     limit: ROLE_REQUEST_BYTES,
     extended: true,
     type: (req) => isRoleDefinitionFormRequest(req, prefix),
+  })
+  app.useBodyParser('json', {
+    limit: WORK_COMMAND_INPUT_BYTES,
+    type: (req) =>
+      req.method === 'POST' &&
+      isBackgroundControlPath(req.url ?? '', prefix) &&
+      /^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] ?? ''),
+  })
+  // Even an invalid form command is rejected within the same decoded-byte
+  // ceiling, before the generic form parser could allocate its larger body.
+  app.useBodyParser('urlencoded', {
+    limit: WORK_COMMAND_INPUT_BYTES,
+    extended: false,
+    type: (req) =>
+      req.method === 'POST' &&
+      isBackgroundControlPath(req.url ?? '', prefix) &&
+      /^application\/x-www-form-urlencoded(?:\s*;|$)/i.test(req.headers['content-type'] ?? ''),
   })
   app.useBodyParser('json', { limit: REQUEST_BODY_LIMIT_BYTES })
   app.useBodyParser('urlencoded', { limit: REQUEST_BODY_LIMIT_BYTES, extended: true })

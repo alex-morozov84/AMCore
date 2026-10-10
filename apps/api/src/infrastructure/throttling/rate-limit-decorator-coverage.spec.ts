@@ -45,7 +45,7 @@ import type { RateLimitPolicy } from './rate-limit-policies'
 const SRC_DIR = path.resolve(__dirname, '..', '..')
 
 /**
- * Controllers that must stay fully unthrottled — a class-level skip.
+ * Controllers that must skip the Redis backstop — health and metrics probes.
  * Exported class names, not file paths, since that's what the walk below
  * keys findings on.
  */

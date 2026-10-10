@@ -16,6 +16,12 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
   entry(
+    'console.queue-guide',
+    'apps/api/src/infrastructure/queue/README.md',
+    block('<!-- AMCORE_CONSOLE_QUEUE_GUIDE_START -->', '<!-- AMCORE_CONSOLE_QUEUE_GUIDE_END -->'),
+    ['docs/operations-console/background-work.md']
+  ),
+  entry(
     'console.deploy-doc',
     'docs/operations/deployment.md',
     section('### Operations Console host-mode reference', '## Realtime SSE behind a proxy'),

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   type AdminAuditResponse,
   auditActionCodeSchema,
+  auditCommandDetailsSchema,
   auditDisplayIdSchema,
   auditSummarySchema,
 } from '@amcore/shared'
@@ -72,6 +73,13 @@ export function auditSummary(action: string, metadata: unknown): Item['summary']
           : undefined,
     }
   }
+  if (action.startsWith('background_work.command_')) {
+    const outcomes = ['prepared', 'dispatching', 'applied', 'rejected', 'not_attempted', 'unknown']
+    return {
+      outcome:
+        typeof m.outcome === 'string' && outcomes.includes(m.outcome) ? m.outcome : undefined,
+    }
+  }
   if (
     action.startsWith('ai.approval.') &&
     ['ai.approval.approved', 'ai.approval.rejected', 'ai.approval.expired'].includes(action)
@@ -80,6 +88,32 @@ export function auditSummary(action: string, metadata: unknown): Item['summary']
   }
   if (action === 'ai.tool.invoked') return { outcome: safeCode(m.outcome) }
   return {}
+}
+
+/** Validate each allowlisted field independently so historical malformed fields remain hidden. */
+function commandDetails(action: string, metadata: unknown): Item['commandDetails'] {
+  if (
+    !action.startsWith('background_work.') ||
+    !metadata ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata)
+  )
+    return undefined
+  const source = metadata as Record<string, unknown>
+  const result: Record<string, unknown> = {}
+  for (const [key, schema] of Object.entries(auditCommandDetailsSchema.shape)) {
+    const parsed = schema.safeParse(source[key])
+    if (parsed.success && parsed.data !== undefined) {
+      if (
+        key === 'reason' &&
+        (hasControl(parsed.data as string) ||
+          Buffer.byteLength(parsed.data as string, 'utf8') > 1024)
+      )
+        continue
+      result[key] = parsed.data
+    }
+  }
+  return Object.keys(result).length ? auditCommandDetailsSchema.parse(result) : undefined
 }
 
 function userIdentity(id: string | null, users: Map<string, User>): Item['actorIdentity'] {
@@ -132,5 +166,6 @@ export function projectAuditRow(
     organizationIdentity: organizationIdentity(organizationId, organizations),
     category: row.category,
     summary: auditSummary(row.action, row.metadata),
+    commandDetails: commandDetails(row.action, row.metadata),
   }
 }

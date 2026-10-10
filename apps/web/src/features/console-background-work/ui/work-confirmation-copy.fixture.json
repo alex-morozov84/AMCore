@@ -1,0 +1,189 @@
+{
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "invalidType": "Unexpected value.",
+    "email": "Enter a valid email address.",
+    "pattern": "This value has the wrong format.",
+    "tooShort": "Must be at least {min} characters.",
+    "tooLong": "Must be at most {max} characters.",
+    "tooSmall": "Must be at least {min}.",
+    "tooBig": "Must be at most {max}.",
+    "invalidValue": "Choose one of the allowed values.",
+    "invalid": "This value is not valid."
+  },
+  "console": {
+    "backgroundWork": {
+      "control": {
+        "title": "Task management",
+        "separator": " · ",
+        "refresh": "Refresh work state",
+        "sourceBroker": "Queue jobs",
+        "sourceDomain": "Jobs in the database",
+        "availability": {
+          "available": "Data available",
+          "unavailable": "Data unavailable",
+          "disabled": "Disabled"
+        },
+        "actions": {
+          "pause": "Pause",
+          "resume": "Resume",
+          "retry": "Retry",
+          "cancel": "Cancel",
+          "cleanup": "Clean up"
+        },
+        "confirmTitle": "{operation}: {work}",
+        "pauseEffect": "Workers will stop claiming new jobs. Already running jobs continue. New jobs may be added and will wait until processing is resumed.",
+        "resumeEffect": "Workers may claim new jobs again. This does not guarantee that a worker is running. If the state has changed, the server will reject the action.",
+        "capturedRevision": "Captured work state version: {revision}",
+        "reason": "Reason for the action — recorded in the audit log",
+        "confirm": "Confirm action",
+        "receiptTitle": "Action result",
+        "receiptMeaning": "Applied records the administrative queue change. Read the registered job diagnostics for the business execution result.",
+        "unconfirmed": "The command response was lost or could not be verified. Read this command's receipt; do not send a replacement command.",
+        "awaitingReceipt": "Reading the command receipt. Its outcome is not yet confirmed.",
+        "readReceipt": "Read receipt again",
+        "unknownCount": "{count, plural, one {# target has an unconfirmed command outcome.} other {# targets have unconfirmed command outcomes.}}",
+        "deadlineUnconfirmed": "The dispatch deadline passed without a confirmed outcome.",
+        "recoveryMeaning": "Inspect the worker and business records before acknowledging uncertainty. This releases the administrative conflict after a settlement check. It does not confirm success, repeat the command, restore a retry allowance or clear provider uncertainty.",
+        "evidenceReferences": "Evidence references (optional; up to 3 IDs separated by commas)",
+        "acknowledgeUnknown": "Accept the unknown outcome and release the conflict",
+        "evidenceRecoveryMeaning": "Inspect provider and business records before accepting this uncertainty. This only records your disposition. It preserves the unknown effect, protected storage, attempts, retry allowance and any command conflict; it cannot send or recreate the job.",
+        "acknowledgeEvidence": "Record acceptance of provider uncertainty",
+        "resolutions": {
+          "acknowledged_unknown": "Uncertainty accepted by the operator; the outcome remains unknown.",
+          "proven_applied": "Application confirmed by authoritative evidence.",
+          "proven_no_effect": "No effect confirmed by authoritative evidence."
+        },
+        "receiptStates": {
+          "requested": "Requested",
+          "applying": "Applying",
+          "applied": "Applied",
+          "rejected": "Rejected",
+          "not_attempted": "Not attempted",
+          "partial": "Per-target outcomes differ or remain unconfirmed"
+        },
+        "targetStates": {
+          "prepared": "Prepared",
+          "dispatching": "Dispatching",
+          "applied": "Applied",
+          "rejected": "Rejected",
+          "not_attempted": "Not attempted",
+          "unknown": "Command outcome unknown"
+        },
+        "jobsTitle": "Jobs · {work}",
+        "inspectJobs": "Inspect jobs",
+        "windowTruncated": "This is a bounded live window. Additional jobs or unavailable rows may be outside this view.",
+        "loadingJobs": "Loading jobs…",
+        "noJobs": "No results",
+        "attempts": "Started: {started} · Finished attempts: {made} · Manual grant: {grant}",
+        "grants": {
+          "none": "unused",
+          "reserved": "reserved",
+          "spent": "spent"
+        },
+        "certainty": {
+          "none": "No action performed by the external service",
+          "accepted": "Request accepted by the external service",
+          "unknown": "It is unknown whether the action was performed"
+        },
+        "jobStates": {
+          "failed": "Failed",
+          "waiting": "Waiting",
+          "active": "Active",
+          "delayed": "Delayed",
+          "prioritized": "Prioritized",
+          "completed": "Completed",
+          "missing": "History unavailable",
+          "unavailable": "Broker execution state not observed"
+        },
+        "sources": {
+          "broker": "Queue jobs",
+          "PG_evidence": "Retained provider safety evidence"
+        },
+        "evidenceMeaning": "These independent records survive queue history removal and reused job IDs. Queue state and completed attempts are not observed here. A record does not establish success or authorize another call.",
+        "notDisplayed": "not observed",
+        "incarnation": "Execution identity: {id}",
+        "selectionFrozen": "Selection retains the observed identities and revisions. Refresh does not replace it; the server rejects stale targets.",
+        "previous": "Previous",
+        "next": "Next",
+        "page": "Page {page}",
+        "retryEffect": "The jobs will be queued again. Each job has one manual retry. If its state has changed or a retry is unsafe, the server will reject the action.",
+        "cancelEffect": "Prevents selected jobs that have never started from starting. It does not interrupt execution or undo completed work. If the state has changed, the server will reject the action.",
+        "cleanupEffect": "Remove the selected completed or failed task records from the list. The business result, such as a processed image, is kept. The server checks mandatory retention and safety restrictions; this does not remove individual attempts within a task.",
+        "cutoff": "Remove records completed before this date ({zone})",
+        "unsupportedQueue": "Queue-wide pause is not supported",
+        "noJobsDescription": "Try another job status or refresh the list. This view does not show the full queue history.",
+        "noEvidenceDescription": "No retained provider records were found on this page. Refresh the list to check again.",
+        "sourceBrokerHelp": "Job state is read from the background-processing queue (broker).",
+        "sourceDomainHelp": "Business work state is stored in the database. A queue may only signal when to process it.",
+        "updatedAt": "Updated",
+        "pausedHelp": "Already running jobs can finish. New jobs can still be added, but workers cannot claim them while paused.",
+        "notPausedHelp": "Workers may claim the next job. This does not confirm that a worker is running.",
+        "unsupportedQueueHelp": "This kind of work has no queue-wide pause/resume control. Individual actions depend on each job’s state and policy.",
+        "availabilityHelp": {
+          "available": "The Console could read the current state. This does not confirm worker health, successful execution or permission for every action.",
+          "unavailable": "The Console could not read the control source. This is not an empty queue; retained provider records may still be available.",
+          "disabled": "This kind of work is disabled in this deployment."
+        },
+        "unavailableActions": "Unavailable actions:",
+        "noSelectedActions": "{count, plural, one {No actions are available for the selected job} other {No actions are available for the selected jobs}}",
+        "outcomeUnrecorded": "Execution result was not saved",
+        "outcomeUnrecordedHelp": "There is no reliable result record. The action may have happened; a missing record does not make a repeat safe.",
+        "actionReasons": {
+          "uncertain": "A repeat may create a duplicate: the previous outcome is unknown.",
+          "started": "Only a job that has never started can be cancelled.",
+          "changed": "Refresh the data to check action availability.",
+          "active": "The job is running or has already started. This action is unavailable.",
+          "unknown": "The previous outcome is unknown. This action is unavailable."
+        },
+        "certaintyHelp": {
+          "none": "Sending has not started, or it is confirmed that the request was not accepted.",
+          "accepted": "Request acceptance is confirmed. This does not guarantee delivery or completion.",
+          "unknown": "The service may have performed the request, but confirmation is missing. A repeat may create a duplicate."
+        },
+        "reasonHelp": "Explain why you are taking this action. The comment is saved in the audit log to help other operators understand the change. It does not control job execution.",
+        "reasonExamples": {
+          "retry": "service settings corrected, retrying processing",
+          "cancel": "the request is no longer needed",
+          "cleanup": "removing old records after checking the result",
+          "pause": "pausing processing for maintenance",
+          "resume": "maintenance finished, resuming processing"
+        },
+        "technicalDetails": "Technical details",
+        "technicalDetailsHelp": "State versions and execution identities support freshness checks and diagnostics. You do not need to compare them manually.",
+        "workId": "Work type ID:",
+        "jobId": "Job ID:",
+        "commandId": "Request ID:",
+        "copyId": "Copy ID",
+        "copied": "Copied",
+        "copyFailed": "Could not copy",
+        "cutoffHelp": "Each selected job completion date is checked. Newer records and records protected by retention are not removed. Enter time in the displayed time zone.",
+        "manualRetrySpentHelp": "The manual retry has already been used. Each job has one manual retry, counted separately from automatic attempts.",
+        "manualRetryHelp": "Each job has one manual retry, counted separately from automatic attempts.",
+        "manualRetryReservedHelp": "A manual retry has already been requested. Another manual retry is not currently available for this job.",
+        "sectionDescription": "Choose a type of work to view its tasks and available actions. A green status means data can be read, not that a worker is running.",
+        "additionalLimits": "Additional restrictions",
+        "submitting": "Sending request…",
+        "receiptMissing": "No saved result was found for this request. This does not prove that an action with an unknown outcome was not performed. Do not send it again until its outcome is established.",
+        "receiptReadFailed": "Could not check the action result.",
+        "freshnessHelp": "Before applying the action, the system checks the selected tasks again. If their state changed, refresh the list and select them again.",
+        "success": {
+          "retry": "Tasks queued for another processing attempt",
+          "cancel": "Tasks cancelled",
+          "cleanup": "Task records deleted",
+          "pause": "Processing paused",
+          "resume": "Processing resumed"
+        },
+        "failureTitle": "Reason for failure",
+        "failureNextStep": "What to do:",
+        "failureUnavailable": "The detailed reason was not recorded or is no longer available. Ask the service maintainer to check worker diagnostics."
+      },
+      "paused": "Paused",
+      "notPaused": "Not paused"
+    }
+  }
+}

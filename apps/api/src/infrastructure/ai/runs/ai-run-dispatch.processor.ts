@@ -1,10 +1,11 @@
-import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq'
+import { Injectable } from '@nestjs/common'
 import type { Job } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AiRunDispatchService } from './ai-run-dispatch.service'
 import { aiRunWakeJobSchema } from './ai-run-wake.schema'
 
+import type { WorkHandler } from '@/infrastructure/background-work/work-definition'
 import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 
@@ -15,16 +16,19 @@ import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.cons
  * thrown drain is not retried by BullMQ — the recovery `@Cron` re-drains regardless, so a failed or
  * lost wake never strands a queued run.
  */
-@Processor(QueueName.AI_RUNS)
-export class AiRunDispatchProcessor extends WorkerHost {
+@Injectable()
+export class AiRunDispatchProcessor implements WorkHandler {
   constructor(
     private readonly dispatch: AiRunDispatchService,
     private readonly logger: PinoLogger,
     private readonly metrics: MetricsService
   ) {
-    super()
     this.logger.setContext(AiRunDispatchProcessor.name)
   }
+
+  async run(): Promise<void> { await this.dispatch.drainDueBatches() }
+
+  async runLegacyWake(): Promise<void> { await this.run() }
 
   async process(job: Job): Promise<void> {
     if (job.name !== JobName.AI_RUN_WAKE) {
@@ -46,7 +50,6 @@ export class AiRunDispatchProcessor extends WorkerHost {
   }
 
   /** A wake job that exhausted its single attempt (drain threw). The recovery cron re-drains. */
-  @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error): void {
     this.metrics.incQueueEvent(QueueName.AI_RUNS, 'dead_letter')
     this.logger.error(
@@ -56,7 +59,6 @@ export class AiRunDispatchProcessor extends WorkerHost {
   }
 
   /** Worker-side Redis/connection observability (mirrors the notification dispatch processor). */
-  @OnWorkerEvent('error')
   onError(error: Error): void {
     this.metrics.incRedisClientEvent('queue_worker', 'error')
     this.metrics.incQueueEvent(QueueName.AI_RUNS, 'worker_error')

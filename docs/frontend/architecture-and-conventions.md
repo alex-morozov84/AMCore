@@ -176,6 +176,83 @@ this guide already warns against elsewhere. Promote only once a second real
 consumer exists, or the task you are implementing right now explicitly
 requires the same shape for a second, concrete caller.
 
+## Interaction patterns: buttons, tabs and lists
+
+Use the existing `shared/ui` components before composing a page-local alternative.
+Keep feature wrappers thin: they supply localized labels, policy/state and event
+handlers; shared components own the repeated markup, styling and accessibility
+pattern. Component boundaries still follow [cohesion](#component-organization),
+not a target number of files.
+
+### Action, selection and mode are different states
+
+| Intent                                    | Shared pattern                                              | Appearance                                                                       |
+| ----------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Ordinary or reversible action             | `Button` with its ordinary variant                          | Neutral; pause/resume is not destructive merely because processing stops         |
+| Single-choice filter                      | `FilterButtons`                                             | Selected option uses `selection`; retain visible and semantic selection          |
+| Related content panels                    | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`            | Selected tab uses the selection token pair and remains associated with its panel |
+| Checkbox selection                        | `Checkbox`                                                  | Checked and indeterminate states use the selection token pair                    |
+| Open inspection target                    | `Button` with `selection-soft`                              | Muted selected surface; identify which item owns the revealed content            |
+| Independent on/off mode                   | `Button` with `aria-pressed` and explicit ordinary variants | Neutral; state and localized label identify on/off                               |
+| Destructive action requiring confirmation | Ordinary initial button, `destructive` final confirmation   | Red emphasizes the point where cancellation/removal is committed                 |
+
+Do not turn every `aria-pressed` button into an accent button. That attribute
+expresses a persistent toggle state; it does not choose the visual intent.
+A momentary pointer press and keyboard focus are also separate from selection.
+Keep a visible focus ring.
+
+Use filters to narrow one list and tabs to switch linked content panels. Do not
+copy tab markup for a filter or implement separate selected-state colors in each
+feature. Colors come from semantic tokens: `selection` / `selection-foreground`
+default to the neutral `primary` pair and can be scoped by an application shell.
+`primary` is not necessarily the brand color. A muted selection must remain
+readable in both themes; do not assume accent-colored text contrasts with every
+surface. See [Selected controls](./shared-ui-and-shadcn.md#selected-controls).
+
+Reserve destructive styling for destructive consequences, not for every action
+that sounds negative. State the actual consequence in the confirmation and use
+specific action labels. An action that only prevents new work from starting is
+**Pause**, not a promise to terminate running work. This follows the confirmation
+patterns in [GOV.UK](https://design-system.service.gov.uk/components/button/) and
+[Atlassian](https://atlassian.design/components/button/).
+
+### List and detail journeys
+
+- Reuse `Card` for distinct content widgets instead of rebuilding the surface,
+  border, spacing and shadow. Keep loading and loaded containers consistent.
+- When a control reveals details elsewhere on the page, visibly identify the
+  selected item. Bring newly revealed content into view and move focus to its
+  heading. Smooth scrolling must respect `prefers-reduced-motion`.
+- Show batch action controls after at least one item is selected. Clearly tie
+  them to the selection; if an operation is unavailable, explain its reason.
+  This follows [Carbon's batch action pattern](https://v10.carbondesignsystem.com/components/data-table/usage/).
+- Reuse `PaginationButtons` for local-state previous/next pagination. Supply
+  either `total` + `pageSize`, or explicit `hasPreviousPage` + `hasNextPage`
+  when the total is unknown. Keep boundaries and selection handling in the
+  feature, and repeated rendering in the shared component. Hide the pager when
+  neither direction is available. Do not invent a total for a bounded live list.
+- Reuse `Empty` with a localized title and useful next step. Distinguish an empty
+  collection from no filter matches, an out-of-range page, a read limit and a
+  failed request. Never present unavailable data as a successful empty result.
+- Use structural skeletons for initial list loads and filter/page transitions,
+  not only the first route load. Keep the surrounding widget and current context
+  visible; announce loading without exposing decorative skeletons to assistive
+  technology. See [Loading skeletons](#loading-skeletons).
+- Keep action results in confirmations/result dialogs or standard toasts. Close
+  a fully successful confirmation and refresh its data. Keep refusals, partial
+  results and uncertainty explainable in the dialog; retain a way to reopen an
+  uncertain result without resending. Page alerts describe page/section loading
+  and availability, rather than duplicating each action outcome.
+- Show counts next to filters only when the API defines their scope and
+  freshness. Distinguish exact, bounded and unavailable values; do not infer the
+  full count from the current page or from another data source.
+
+Before review, check these states in the running UI: initial loading, filtered
+loading, empty, error/limit, selection, confirmation and narrow layout. Verify
+both themes, keyboard focus, reduced motion and all supported locales for the
+changed behavior. Static lint proves import/style constraints, not the clarity
+of the journey.
+
 ## Loading skeletons
 
 A loading state preserves the page's stable context. Do not replace persistent

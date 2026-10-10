@@ -59,7 +59,7 @@ export function addFailedDefaultQueueJob(): string {
     now,
     'finishedOn',
     now,
-    'attemptsMade',
+    'atm',
     '1',
     'failedReason',
     `boom ${BOARD_CANARY}`,
@@ -70,7 +70,53 @@ export function addFailedDefaultQueueJob(): string {
   return FAILED_ID
 }
 
+/** Nonzero hidden diagnostics: the browser must never imply that these settings are absent. */
+export function seedBoardDiagnostics(): void {
+  redis('HSET', key('meta'), 'concurrency', '3', 'max', '7', 'duration', '60000')
+  redis('SET', key('limiter'), '7', 'PX', '60000')
+  redis('ZADD', key('repeat'), String(Date.now() + 60000), 'e2e-scheduler')
+  redis(
+    'HSET',
+    key(FAILED_ID),
+    'progress',
+    JSON.stringify({ phase: BOARD_CANARY }),
+    'parentKey',
+    key('e2e-parent'),
+    'parent',
+    JSON.stringify({ id: 'e2e-parent', queueKey: key('') })
+  )
+  redis('SADD', `${key(FAILED_ID)}:dependencies`, key('e2e-child'))
+  redis(
+    'HSET',
+    key('e2e-parent'),
+    'name',
+    'e2e',
+    'data',
+    '{}',
+    'opts',
+    '{}',
+    'timestamp',
+    String(Date.now())
+  )
+  redis('SADD', `${key('e2e-parent')}:dependencies`, key(FAILED_ID))
+  redis('ZADD', key('waiting-children'), String(Date.now()), 'e2e-parent')
+}
+
 export function clearDefaultQueue(): void {
   const jobKeys = [...ids(50), 'e2e-extra', FAILED_ID].map((id) => key(id))
-  redis('DEL', key('wait'), key('meta'), key('failed'), ...jobKeys)
+  // Preserve the live registration's epoch/protocol/control revision. Deleting meta
+  // would create an unsupported layout instead of the modern queue this fixture tests.
+  redis(
+    'DEL',
+    key('wait'),
+    key('failed'),
+    key('limiter'),
+    key('repeat'),
+    key('waiting-children'),
+    key('e2e-parent'),
+    `${key('e2e-parent')}:dependencies`,
+    `${key(FAILED_ID)}:dependencies`,
+    ...jobKeys
+  )
+  redis('HDEL', key('meta'), 'paused', 'concurrency', 'max', 'duration')
 }

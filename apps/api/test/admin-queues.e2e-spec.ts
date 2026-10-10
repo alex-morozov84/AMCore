@@ -114,8 +114,11 @@ describe('Admin background-work queues (e2e)', () => {
     const { token } = await makeSuperAdmin('queues-admin@example.com')
     const { QueueService, QueueName } = await import('../src/infrastructure/queue')
     const queues = app.get(QueueService)
-    // `default` has no processor, so this job stays waiting.
-    await queues.add(QueueName.DEFAULT, 'e2e-probe', { secret: 'PAYLOAD-MUST-NOT-LEAK' })
+    // Seed broker-owned observation data; external work intentionally has no managed producer.
+    await expect(queues.add(QueueName.DEFAULT, 'e2e-probe', {})).rejects.toThrow(
+      'ACTION_UNAVAILABLE'
+    )
+    await queues.getQueue(QueueName.DEFAULT)!.add('e2e-probe', { secret: 'PAYLOAD-MUST-NOT-LEAK' })
 
     const response = await request(app.getHttpServer())
       .get(ROUTE)

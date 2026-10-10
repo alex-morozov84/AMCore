@@ -9,6 +9,7 @@ import { LoggerModule } from 'nestjs-pino'
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 import { v4 as uuidv4 } from 'uuid'
 
+import { BACKGROUND_WORK } from './background-work.composition'
 import { createLoggingConfig } from './common/config'
 import {
   AllExceptionsFilter,
@@ -21,18 +22,22 @@ import { AiWebModule } from './core/ai/ai-web.module'
 import { AuthModule } from './core/auth/auth.module'
 import { NotificationsModule } from './core/notifications/notifications.module'
 import { NotificationsWebModule } from './core/notifications/notifications-web.module'
-import { NotificationsWorkerModule } from './core/notifications/notifications-worker.module'
 import { OrganizationsModule } from './core/organizations/organizations.module'
 import { envConfigOptions } from './env/env.config'
 import { EnvModule } from './env/env.module'
 import { EnvService } from './env/env.service'
 import { HealthModule } from './health'
 import { AiCatalogModule } from './infrastructure/ai/ai-catalog.module'
-import { AiWorkerModule } from './infrastructure/ai/ai-worker.module'
-import { EmailModule, EmailWorkerModule } from './infrastructure/email'
+import {
+  composeBackgroundWork,
+  type WorkProcessRole,
+} from './infrastructure/background-work/compose-background-work'
+import type { WorkRegistration } from './infrastructure/background-work/work-definition'
+import { EmailModule } from './infrastructure/email/email.module'
 import { IdempotencyModule } from './infrastructure/idempotency'
 import { ObservabilityModule } from './infrastructure/observability'
-import { QueueMetricsModule, QueueModule } from './infrastructure/queue'
+import { QueueModule } from './infrastructure/queue'
+import { BullBoardHttpModule } from './infrastructure/queue/dashboard/bull-board-http.module'
 import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module'
 import { SettingsModule } from './infrastructure/settings/settings.module'
@@ -57,7 +62,10 @@ type Imports = NonNullable<ModuleMetadata['imports']>
  * *producer* (`EmailService`), and storage. No business controllers, no BullMQ
  * worker, no scheduler.
  */
-export function coreImports(): Imports {
+export function coreImports(
+  role: WorkProcessRole = 'web',
+  entries: readonly WorkRegistration[] = BACKGROUND_WORK
+): Imports {
   return [
     // Environment variables (validated via Zod, typed Env)
     ConfigModule.forRoot(envConfigOptions),
@@ -139,7 +147,8 @@ export function coreImports(): Imports {
     HealthModule,
 
     // Queue infrastructure — producers (registerQueue) + the BullMQ connection.
-    // The consumer (EmailProcessor) lives in EmailWorkerModule (worker/all only).
+    // EmailWorkerModule supplies handlers/policy; the registry generates worker/all hosts.
+    composeBackgroundWork(entries, role),
     QueueModule,
 
     // Email producer (EmailService). The processor is EmailWorkerModule.
@@ -170,6 +179,7 @@ export function coreImports(): Imports {
 
 /** Business HTTP modules — `web` and `all` only. */
 export const webImports: Imports = [
+  BullBoardHttpModule,
   StoragePublicModule,
   // Auth
   AuthModule,
@@ -188,16 +198,17 @@ export const webImports: Imports = [
  * scheduler (`NestScheduleModule.forRoot()` lives in ScheduleModule, so `@Cron`
  * jobs only register here).
  */
-export const workerImports: Imports = [
-  EmailWorkerModule,
-  QueueMetricsModule,
-  ScheduleModule,
-  // Notifications dispatcher: BullMQ processor + recovery @Cron + durable state machine.
-  NotificationsWorkerModule,
-  // AI run worker (Track C — ADR-054): durable executor + BullMQ processor + recovery @Cron.
-  // Imports the worker-only AiGatewayModule, so provider-call capability stays off the web graph.
-  AiWorkerModule,
-]
+export function workerImports(): Imports {
+  return [
+    import('./core/admin/background-control-worker.module').then(
+      ({ BackgroundControlWorkerModule }) => ({ module: BackgroundControlWorkerModule })
+    ),
+    import('./infrastructure/queue/queue-metrics.module').then(({ QueueMetricsModule }) => ({
+      module: QueueMetricsModule,
+    })),
+    ScheduleModule,
+  ]
+}
 
 /** Global filters/pipe/interceptor/guard + shutdown — every role. */
 export const appProviders: Provider[] = [

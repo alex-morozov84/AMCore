@@ -3,9 +3,10 @@ import { Filter } from 'lucide-react'
 
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
-import type { AuditCopy } from './audit-copy'
+import { auditActionLabel, type AuditCopy } from './audit-copy'
 import { auditSummary } from './audit-summary'
 import { auditRowFilter } from './audit-url'
+import { AuditCommandDetails } from './AuditCommandDetails'
 import { AuditReference } from './AuditReference'
 import { AuditTimestamp } from './AuditTimestamp'
 import { CopyAuditId } from './CopyAuditId'
@@ -22,7 +23,7 @@ interface RowProps {
 export function AuditEventRow({ item, baseHref, query, copy }: RowProps) {
   const known = item.action && AUDIT_ACTIONS.some((code) => code === item.action)
   const actionLabel = known
-    ? copy.actions[item.action as keyof AuditCopy['actions']]
+    ? auditActionLabel(copy, item.action!)
     : (item.action ?? copy.unknownAction)
   return (
     <li className="space-y-3 rounded-lg border border-border bg-card p-3">
@@ -48,6 +49,7 @@ export function AuditEventRow({ item, baseHref, query, copy }: RowProps) {
       {auditSummary(item, copy) && (
         <p className="rounded-md bg-muted px-2 py-1 text-sm">{auditSummary(item, copy)}</p>
       )}
+      <AuditCommandDetails details={item.commandDetails} copy={copy} />
       <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
         <AuditReference
           id={item.actorId}

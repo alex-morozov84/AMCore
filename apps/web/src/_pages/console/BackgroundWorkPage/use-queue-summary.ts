@@ -1,7 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
-import { type AdminQueuesResponse, adminQueuesResponseSchema } from '@amcore/shared'
+import {
+  type AdminQueuesResponse,
+  adminQueuesResponseSchema,
+  workCatalogueSchema,
+  type WorkSummary,
+} from '@amcore/shared'
 import { focusManager, onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { consoleApi } from '@/shared/api/console-api'
@@ -20,6 +25,14 @@ import {
 } from './queue-poll-policy'
 import { useCooldownTicks } from './use-cooldown-ticks'
 
+type PageSnapshot = AdminQueuesResponse & {
+  works?: WorkSummary[]
+  queueError?: unknown
+  workError?: unknown
+  jobsError?: unknown
+  workRefreshed?: boolean
+}
+
 const visibleStore = {
   subscribe: (onChange: () => void) => focusManager.subscribe(onChange),
   get: () => focusManager.isFocused(),
@@ -37,7 +50,11 @@ const onlineStore = {
  * honours `Retry-After` and is never queued while offline. 401/403 hide the rows at once,
  * evict the cache and ask the Console frame to re-admit once.
  */
-export function useQueueSummary(initial: AdminQueuesResponse, initialUpdatedAt: number) {
+export function useQueueSummary(
+  initial: AdminQueuesResponse,
+  initialUpdatedAt: number,
+  initialWork?: WorkSummary[]
+) {
   const instance = useId()
   const queryKey = ['console', 'background-work', 'queues', instance]
   const queryClient = useQueryClient()
@@ -54,11 +71,60 @@ export function useQueueSummary(initial: AdminQueuesResponse, initialUpdatedAt: 
 
   const admitted = isAdmitted({ auto, denied, visible, online, now, floors })
 
-  const query = useQuery({
+  const query = useQuery<PageSnapshot>({
     queryKey,
-    queryFn: async ({ signal }) =>
-      adminQueuesResponseSchema.parse(await consoleApi.getBackgroundWorkQueues(signal)),
-    initialData: initial,
+    queryFn: async ({ signal }) => {
+      if (!initialWork)
+        return {
+          ...adminQueuesResponseSchema.parse(await consoleApi.getBackgroundWorkQueues(signal)),
+          works: undefined,
+          workError: null,
+          jobsError: null,
+        }
+      // Cancel only idle job reads started by this refresh, never a user-initiated filter request.
+      const jobReads = queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['console', 'background-work', 'jobs'], type: 'active' })
+        .filter((item) => item.state.fetchStatus === 'idle')
+      const cancelJobs = () => {
+        for (const item of jobReads)
+          void queryClient.cancelQueries({ queryKey: item.queryKey, exact: true })
+      }
+      signal.addEventListener('abort', cancelJobs, { once: true })
+      let results
+      try {
+        results = await Promise.allSettled([
+          consoleApi
+            .getBackgroundWorkQueues(signal)
+            .then((value) => adminQueuesResponseSchema.parse(value)),
+          consoleApi.getBackgroundWork(signal).then((value) => workCatalogueSchema.parse(value)),
+          queryClient.refetchQueries(
+            { predicate: (item) => jobReads.includes(item) },
+            { cancelRefetch: false, throwOnError: true }
+          ),
+        ])
+      } finally {
+        signal.removeEventListener('abort', cancelJobs)
+      }
+      const [queues, works, jobs] = results
+      if (queues.status === 'rejected' && isAccessLoss(queues.reason)) throw queues.reason
+      if (works.status === 'rejected' && isAccessLoss(works.reason)) throw works.reason
+      const previous = queryClient.getQueryData<PageSnapshot>(queryKey)
+      return {
+        ...(queues.status === 'fulfilled' ? queues.value : (previous ?? initial)),
+        queueError: queues.status === 'rejected' ? queues.reason : null,
+        workRefreshed: works.status === 'fulfilled',
+        works: works.status === 'fulfilled' ? works.value : (previous?.works ?? initialWork),
+        workError: works.status === 'rejected' ? works.reason : (null as unknown),
+        jobsError: jobs.status === 'rejected' ? jobs.reason : (null as unknown),
+      }
+    },
+    initialData: {
+      ...initial,
+      works: initialWork,
+      workError: null as unknown,
+      jobsError: null as unknown,
+    },
     initialDataUpdatedAt: initialUpdatedAt,
     staleTime: 10_000,
     gcTime: 0,
@@ -87,10 +153,22 @@ export function useQueueSummary(initial: AdminQueuesResponse, initialUpdatedAt: 
     handled.current.data = query.dataUpdatedAt
     const at = Date.now()
     setNow(at)
-    if (query.data && isDegraded(query.data)) {
+    if (
+      query.data &&
+      (isDegraded(query.data) ||
+        query.data.queueError ||
+        query.data.workError ||
+        query.data.jobsError)
+    ) {
       const next = streak + 1
       setStreak(next)
-      setFloors(floorsAfterFailure(at, next))
+      setFloors(
+        floorsAfterFailure(
+          at,
+          next,
+          retryAfterSecondsOf(query.data.queueError ?? query.data.workError ?? query.data.jobsError)
+        )
+      )
     } else {
       setStreak(0)
       setFloors(NO_FLOORS)
@@ -127,14 +205,22 @@ export function useQueueSummary(initial: AdminQueuesResponse, initialUpdatedAt: 
   }, [denied, floors, query])
 
   return {
-    data: denied ? null : query.data,
+    data: denied
+      ? null
+      : query.data
+        ? { checkedAt: query.data.checkedAt, board: query.data.board, queues: query.data.queues }
+        : undefined,
+    workRefreshed: !!query.data?.workRefreshed,
+    works: denied ? undefined : query.data?.works,
+    workError: query.data?.workError,
+    partial: !!(query.data?.queueError || query.data?.workError || query.data?.jobsError),
     denied,
     auto,
     setAuto,
     online,
     isFetching: query.isFetching,
     /** The latest refresh failed: rows (if any) are older than the status line says. */
-    refreshFailed: query.isError,
+    refreshFailed: query.isError || !!query.data?.queueError,
     canRefresh: manualAllowed,
     retryAfterSeconds: Math.max(0, Math.ceil((floors.retryAfterUntil - now) / 1000)),
     refresh,

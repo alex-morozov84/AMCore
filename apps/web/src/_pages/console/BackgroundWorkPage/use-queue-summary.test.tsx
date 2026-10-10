@@ -18,7 +18,9 @@ const refresh = vi.fn()
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => ({ refresh }),
 }))
-vi.mock('@/shared/api/console-api', () => ({ consoleApi: { getBackgroundWorkQueues: vi.fn() } }))
+vi.mock('@/shared/api/console-api', () => ({
+  consoleApi: { getBackgroundWorkQueues: vi.fn(), getBackgroundWork: vi.fn() },
+}))
 
 const api = vi.mocked(consoleApi.getBackgroundWorkQueues)
 const healthy = summary([availableQueue('email')], '2026-10-03T12:00:30.000Z')
@@ -359,5 +361,39 @@ describe('lifecycle', () => {
     } as never)
     expect(result.current.data).toEqual(mixedSummary)
     expect(result.current.refreshFailed).toBe(true)
+  })
+})
+
+describe('page-wide refresh', () => {
+  it('keeps fresh DB-owned catalogue data when only the broker overview request fails', async () => {
+    vi.mocked(consoleApi.getBackgroundWork).mockResolvedValue([])
+    const { result, unmount } = renderHook(() => useQueueSummary(mixedSummary, Date.now(), []), {
+      wrapper,
+    })
+    await advance(30_000)
+    await fail(0, new ApiRequestError(503, undefined))
+    expect(result.current.data).toEqual(mixedSummary)
+    expect(result.current.refreshFailed).toBe(true)
+    expect(result.current.partial).toBe(true)
+    expect(result.current.workError).toBeNull()
+    expect(result.current.works).toEqual([])
+    unmount()
+  })
+  it('refreshes registration data with queues and keeps it visibly stale on partial failure', async () => {
+    vi.mocked(consoleApi.getBackgroundWork).mockResolvedValue([])
+    const { result, unmount } = renderHook(() => useQueueSummary(mixedSummary, Date.now(), []), {
+      wrapper,
+    })
+    await advance(30_000)
+    await settle(0)
+    expect(consoleApi.getBackgroundWork).toHaveBeenCalledTimes(1)
+    expect(result.current.partial).toBe(false)
+    vi.mocked(consoleApi.getBackgroundWork).mockRejectedValue(new Error('Catalogue unavailable'))
+    await advance(30_000)
+    await settle(1)
+    expect(result.current.works).toEqual([])
+    expect(result.current.partial).toBe(true)
+    expect(result.current.workError).toBeInstanceOf(Error)
+    unmount()
   })
 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { AdminQueue } from '@amcore/shared'
 
 import { useQueueHint } from './QueueStatus'
@@ -21,6 +21,9 @@ export function QueueIdentity({
   /** Deep link into the queue board; only given when the board is confirmed available and has this queue. */
   boardHref?: string | null
 }) {
+  const locale = useLocale()
+  const labels = queue.presentation?.name
+  const title = labels?.[locale] ?? labels?.[locale.split('-')[0]!] ?? labels?.en
   const t = useTranslations('console.backgroundWork')
   const tBoard = useTranslations('console.backgroundWork.board')
   const hint = useQueueHint(queue)
@@ -29,7 +32,7 @@ export function QueueIdentity({
   const text = (part: Part) => (t.has(own(part)) ? t(own(part)) : t(`kinds.${queue.kind}.${part}`))
   return (
     <div>
-      <p className="font-medium">{text('title')}</p>
+      <p className="font-medium">{title ?? text('title')}</p>
       <p className="font-console-mono text-xs text-muted-foreground">{queue.name}</p>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">{text('description')}</p>
       {hint && <p className="mt-1 text-sm">{hint}</p>}

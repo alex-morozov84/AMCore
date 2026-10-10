@@ -39,7 +39,10 @@ export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShel
 
   return (
     <ConsoleTimeZoneProvider>
-      <SidebarProvider defaultOpen={defaultSidebarOpen}>
+      <SidebarProvider
+        defaultOpen={defaultSidebarOpen}
+        className="[--selection:var(--console-accent)] [--selection-foreground:var(--console-accent-foreground)]"
+      >
         <Sidebar
           collapsible="icon"
           role="navigation"

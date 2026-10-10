@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import type { JobType } from 'bullmq'
 
-import type { QueueName } from './constants/queues.constant'
 import { QueueService } from './queue.service'
 import { enabledQueueNames } from './queue-inventory'
 
@@ -20,12 +19,12 @@ const QUEUE_DEPTH_STATES = [
 type QueueDepthMetricState = (typeof QUEUE_DEPTH_STATES)[number][1]
 type QueueDepthLabels = 'queue' | 'state'
 type QueueDepthSnapshot = Array<{
-  queue: QueueName
+  queue: string
   counts: Record<string, number>
 }>
 type QueuePausedLabels = 'queue'
 type QueuePausedSnapshot = Array<{
-  queue: QueueName
+  queue: string
   paused: boolean
 }>
 

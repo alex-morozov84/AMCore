@@ -76,9 +76,8 @@ option is gone, and so is the ability. The variable is **ignored whatever its va
 logs one warning at start while it is still set (the warning event is
 `bull_board.legacy_read_only_flag_ignored`). Delete it from your environment.
 
-To act on a queue now, use your own controlled tooling against BullMQ. Retry, pause and clean
-from the Console are planned as separate, audited, confirmed actions; they are not part of the
-board.
+Use the native [Background work controls](background-work.md) for supported actions. They require
+confirmation and record administrative intent and receipts; the board remains a separate view.
 
 ## What the board shows
 
@@ -100,11 +99,26 @@ promise that no secret can exist** in a queue. The rule that matters is the one 
 a secret (a reset or verification link, a token) must never be put in a queue; the starter sends
 those emails directly. See [Email security](../email/security.md).
 
-Every enabled queue is on the board, the same rule that gives it a row in Background work: register
-a queue in the inventory and it appears in both. Its jobs show only identifiers, names and times
+Every enabled registered queue is on the board, the same rule that gives it a row in Background work:
+add its [work registration](../backend/background-work.md) and it appears in both. Its jobs show only identifiers, names and times
 until a projection names the fields to show. For an **AI run** wake job that is the run id. A wake
 queue only nudges a worker, and the state of the run lives in the database, so `ai-runs` is usually
 empty here.
+
+Numeric progress is shown only within 0–100. Object progress and hidden concurrency are labelled
+**Not displayed** (localized), rather than reported as zero or unset. Rate-limit, scheduler and flow
+controls are hidden; the board does not assert that those features are absent from Redis.
+Queue info does not fetch default job options for read-only queues. That API channel remains
+closed. The installed UI assets used for this behavior and flow concealment are checked by
+size, SHA256 and exact structural seams before the board mounts; a Bull Board upgrade must
+update those checks and pass the rendered-disclosure tests.
+
+Lists observe the first **512 IDs per state**, at most **50 jobs per page**, with a **512KiB**
+aggregate job-read budget. Counts describe the full queue, while pagination stops at this bounded
+window. A job observation permits at most 64 hash fields and 64KiB, with smaller field-specific
+limits. Detail membership checks refuse collections above 4096 entries. Unsupported content,
+layout or a read limit fails closed; use native diagnostics and operator recovery instead of
+assuming an empty queue. These observation limits never restrict native queue pause/resume.
 
 ### Showing the payload of your own queue
 
@@ -135,8 +149,8 @@ names, tokens or free text, and add tests like those beside the shipped ones.
 - For a data or asset request that fails, the Console builds its own JSON error with a fixed
   message and the path you requested; it never forwards the API's error body. These errors carry
   the board's security policy and `Cache-Control: private, no-store`, including on `HEAD`.
-- The board changes no queue or job state. Counting a queue can make BullMQ itself remove a pre-v5
-  legacy marker from the end of a waiting list; that is the one write its reads can cause.
+- Board counts, lists and details use bounded, read-only Redis scripts. They do not remove legacy
+  markers or load entire job hashes through BullMQ's standard readers.
 - The board is a snapshot of Redis state. Its numbers can differ slightly from Background work
   taken at another moment.
 - With the Console switched off (`pnpm init:project --admin-console=disabled`) the API keeps the

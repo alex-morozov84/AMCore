@@ -1,10 +1,15 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { AdminQueuesResponse } from '@amcore/shared'
+import type { AdminQueuesResponse, WorkSummary } from '@amcore/shared'
 
+import { BackgroundWorkControls } from '@/features/console-background-work'
 import { getConsoleQueueBoardHref } from '@/shared/lib/console-public-href'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
+import {
+  PrimaryUnavailableFallback,
+  type PrimaryUnavailableFallbackProps,
+} from '@/shared/ui/primary-unavailable-fallback'
 
 import { queueBoardHref, resolveBoardEntryState } from './board-entry-state'
 import { QUEUE_BOARD_GUIDE_HREF } from './board-guide-link'
@@ -25,13 +30,18 @@ export function QueueSummaryLive({
   initial,
   initialUpdatedAt,
   boardOpenFailed = false,
+  initialWork,
+  workUnavailable,
 }: {
+  initialWork?: WorkSummary[]
+  workUnavailable?: PrimaryUnavailableFallbackProps['reason']
   initial: AdminQueuesResponse
   initialUpdatedAt: number
   /** A page load of the queue board just failed (`?board=unavailable`): a one-shot, historical marker. */
   boardOpenFailed?: boolean
 }) {
-  const summary = useQueueSummary(initial, initialUpdatedAt)
+  const t = useTranslations('console.backgroundWork')
+  const summary = useQueueSummary(initial, initialUpdatedAt, initialWork)
   const { data } = summary
   const openNotice = useBoardOpenNotice(boardOpenFailed, data?.board.state ?? null)
   const entryState = resolveBoardEntryState(data?.board, openNotice.failed)
@@ -61,8 +71,32 @@ export function QueueSummaryLive({
           />
         )}
       </div>
-      <BoardNotices state={entryState} guideHref={QUEUE_BOARD_GUIDE_HREF} />
-      {data && <QueueRows queues={data.queues} boardAvailable={data.board.state === 'available'} />}
+      {summary.partial && (
+        <p role="status" className="text-sm text-warning">
+          {t('partialRefresh')}
+        </p>
+      )}
+      <section className="space-y-3" aria-label={t('overviewTitle')}>
+        <h2 className="text-xl font-semibold">{t('overviewTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('overviewDescription')}</p>
+        <BoardNotices state={entryState} guideHref={QUEUE_BOARD_GUIDE_HREF} />
+        {data && (
+          <QueueRows queues={data.queues} boardAvailable={data.board.state === 'available'} />
+        )}
+      </section>
+      {summary.works && (
+        <BackgroundWorkControls
+          initial={summary.works}
+          error={summary.workError}
+          onRefresh={() => void summary.refresh()}
+        />
+      )}
+      {workUnavailable && !summary.workRefreshed && (
+        <PrimaryUnavailableFallback
+          reason={workUnavailable}
+          onRetry={() => void summary.refresh()}
+        />
+      )}
     </>
   )
 }

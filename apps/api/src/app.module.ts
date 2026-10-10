@@ -8,7 +8,7 @@ import { appProviders, coreImports, webImports, workerImports } from './app-impo
  * `WebModule` / `WorkerModule` (ADR-041). Tests import this directly (= `all`).
  */
 @Module({
-  imports: [...coreImports(), ...webImports, ...workerImports],
+  imports: [...coreImports('all'), ...webImports, ...workerImports()],
   providers: appProviders,
 })
 export class AppModule {}

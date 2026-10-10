@@ -48,6 +48,17 @@ const copy = {
   summaryDecision: 'Decision',
   summaryReasonCode: 'Reason code',
   summaryOutcome: 'Outcome',
+  commandDetails: {
+    title: 'Details',
+    workId: 'Work type ID',
+    jobId: 'Task ID',
+    commandId: 'Command ID',
+    operation: 'Action',
+    reason: 'Reason for action',
+    outcome: 'Result',
+    operations: { retry: 'Retry' },
+    outcomes: { applied: 'Applied' },
+  },
   actions,
 } as unknown as AuditCopy
 const item: AdminAuditResponse['items'][number] = {
@@ -88,6 +99,27 @@ describe('Audit event row', () => {
       '/admin/audit?actorId=user1&limit=25'
     )
     expect(screen.getByText('user2')).toBeInTheDocument()
+  })
+
+  it('renders safe command details with the operator reason and copyable task/command IDs', () => {
+    renderRow({
+      ...item,
+      action: 'background_work.command_outcome',
+      commandDetails: {
+        commandId: '019a1234-1234-7123-8123-123456789012',
+        workId: 'fixture-import',
+        jobId: 'owner-retry',
+        operation: 'retry',
+        outcome: 'applied',
+        reason: 'Test retry',
+      },
+    })
+    expect(screen.getByText('Details')).toBeInTheDocument()
+    expect(screen.getByText('Test retry')).toBeInTheDocument()
+    expect(screen.getByText('Retry')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Copy ID: owner-retry', hidden: true })
+    ).toBeInTheDocument()
   })
 
   it('copies a displayed ID and reports success', async () => {

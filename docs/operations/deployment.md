@@ -591,6 +591,28 @@ retired `BULL_BOARD_READ_ONLY` variable is ignored. A proxy in front of the API 
 that path. See the
 [queue guide](../../apps/api/src/infrastructure/queue/README.md#bull-board-dashboard).
 
+Background work is registered once through the
+[backend registration contract](../backend/background-work.md). Deploy its PG
+migration before producers/workers start. Worker handlers start after readiness
+guards; the web role has no executable managed handler. Administrative commands
+require PG intent/budgets/strict audit even for broker-owned jobs. Unknown commands
+are not redispatched after transport or finalization failure.
+
+Each process has one bounded control connection owner with at most4 short leases;
+rendering, provider I/O and PG transactions do not hold those leases. Managed queue
+pause/resume has no backlog-count ceiling. Individual job controls require a
+supported membership layout with at most4096 entries in each inspected primary
+list. See the [queue runbook](runbooks/queues.md) for recovery rather than invoking
+stock queue mutation methods.
+
+Broker control failure leaves PG-owned durable control available when its other
+request dependencies are healthy. Total Redis failure can also affect authentication,
+the pre-auth rate-limit backstop and the frontend session vault; a PG-only business
+transaction does not promise browser availability during that outage. Provider-window
+execution additionally requires independent PG evidence and an immutable Redis
+request. See [queued-email safety](../email/queued-safety.md) for clock bounds,
+transport limits, retention and non-evicting uncertainty capacity.
+
 Multi-instance safety is already in place, and the two cron flavors are
 deliberate. The nightly **cleanup** and **notification-retention** sweeps are
 Redis-lock-guarded (only one replica runs each; a skipped run self-repairs the

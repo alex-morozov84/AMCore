@@ -17,7 +17,6 @@ import {
 import {
   AI_MODEL_NOT_CONFIGURED,
   AI_RUN_DEFAULT_MAX_ATTEMPTS,
-  AI_RUN_WAKE_JOB_OPTIONS,
 } from '../ai-run.constants'
 import {
   AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE,
@@ -423,8 +422,7 @@ export class AiRunProducerService {
       await this.queue.add(
         QueueName.AI_RUNS,
         JobName.AI_RUN_WAKE,
-        { runId } satisfies AiRunWakeJob,
-        AI_RUN_WAKE_JOB_OPTIONS
+        { runId } satisfies AiRunWakeJob
       )
     } catch (err) {
       this.logger.warn(

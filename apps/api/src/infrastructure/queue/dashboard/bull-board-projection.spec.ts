@@ -141,7 +141,12 @@ describe('closed job projection', () => {
       'email',
       context
     )
-    expect(bad).toMatchObject({ name: '[hidden]', timestamp: 0, progress: 0, attempts: 0 })
+    expect(bad).toMatchObject({
+      name: '[hidden]',
+      timestamp: 0,
+      progress: 'Not displayed',
+      attempts: 0,
+    })
     expect(bad).not.toHaveProperty('id')
     expect(JSON.stringify(bad)).not.toContain(CANARY)
   })

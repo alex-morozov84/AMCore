@@ -9,6 +9,7 @@ import {
   ResourceErrorCode,
   RoleDefinitionErrorCode,
   SUPPORTED_LOCALES,
+  WORK_REASONS,
 } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
@@ -35,6 +36,7 @@ const backendCodes = [
   ...Object.values(CommonErrorCode),
   ...Object.values(PermissionErrorCode),
   ...Object.values(RoleDefinitionErrorCode),
+  ...WORK_REASONS.filter((code) => code !== 'RATE_LIMIT_EXCEEDED'),
 ]
 
 const clientCodes = Object.values(ClientErrorCode)

@@ -1,3 +1,7 @@
+import type { RetryAfterConstraint } from '../background-work/provider-window-clock'
+
+export type { RetryAfterConstraint } from '../background-work/provider-window-clock'
+
 /**
  * Normalize an HTTP `Retry-After` response header into a delay in milliseconds (RFC 9110
  * §10.2.3: a non-negative decimal number of seconds, or an HTTP-date). This is a deliberately
@@ -17,6 +21,25 @@
 const DELTA_SECONDS = /^\d{1,10}$/
 const IMF_FIXDATE =
   /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/
+
+/** Provider-window policy must preserve absolute dates; converting through Date.now loses its bound. */
+export function parseRetryAfterConstraint(
+  value: string | null | undefined
+): RetryAfterConstraint | undefined {
+  if (value === undefined || value === null) return undefined
+  const trimmed = value.trim()
+  if (DELTA_SECONDS.test(trimmed)) return { kind: 'duration', milliseconds: Number(trimmed) * 1000 }
+  if (IMF_FIXDATE.test(trimmed)) {
+    const timestamp = Date.parse(trimmed)
+    if (
+      Number.isSafeInteger(timestamp) &&
+      timestamp >= 0 &&
+      new Date(timestamp).toUTCString() === trimmed
+    )
+      return { kind: 'absolute', timestamp }
+  }
+  return { kind: 'unsupported' }
+}
 
 export function parseRetryAfterMs(
   value: string | null | undefined,

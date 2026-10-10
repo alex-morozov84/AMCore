@@ -143,6 +143,7 @@ export {
   type AdminAuditResponse,
   adminAuditResponseSchema,
   auditActionCodeSchema,
+  auditCommandDetailsSchema,
   auditDisplayIdSchema,
   auditOrganizationIdentitySchema,
   auditSummarySchema,
@@ -438,6 +439,7 @@ export {
 } from './admin-queues'
 export * from './ai-approval-intent'
 export { type SignupPolicyResponse, signupPolicyResponseSchema } from './auth'
+export * from './background-work'
 export {
   type BoardRenderContext,
   boardRenderContextSchema,

@@ -10,11 +10,11 @@ import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gatewa
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiApprovalExpiryService } from '../src/infrastructure/ai/runs/ai-approval-expiry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
 
 import { ControllableAdapter, controls } from './fixtures/ai-run-controls'
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
 import { approvalHash } from './fixtures/extension-contracts/approval-hash'
 import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
@@ -63,7 +63,7 @@ describe('AI run history, replay and lock order (e2e)', () => {
     control = app.get(AiConversationControlService, { strict: false })
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 180000)
 
   afterAll(async () => {

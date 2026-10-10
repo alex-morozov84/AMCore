@@ -52,6 +52,7 @@ enum AuditTargetType {
   AI_ASSISTANT
   AI_CONVERSATION
   RUNTIME_SETTING
+  BACKGROUND_WORK
 
   @@schema("core")
 }

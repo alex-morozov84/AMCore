@@ -35,7 +35,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  */
 type BodyKind = 'json' | 'none' | 'redirect' | 'text' | 'html' | 'stream' | 'binary'
 interface Expected {
-  status: string
+  status: string | readonly string[]
   kind: BodyKind
 }
 
@@ -98,6 +98,19 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
   'get /admin/background-work/queues': { status: '200', kind: 'json' },
+  'get /admin/background-work/works': { status: '200', kind: 'json' },
+  'get /admin/background-work/works/{workId}/jobs': { status: '200', kind: 'json' },
+  'get /admin/background-work/works/{workId}/jobs/{jobId}': { status: '200', kind: 'json' },
+  'post /admin/background-work/commands': { status: ['200', '202'], kind: 'json' },
+  'get /admin/background-work/commands/{commandId}': { status: '200', kind: 'json' },
+  'post /admin/background-work/commands/{commandId}/reconciliation': {
+    status: '200',
+    kind: 'json',
+  },
+  'post /admin/background-work/works/{workId}/jobs/{jobId}/reconciliation': {
+    status: '204',
+    kind: 'none',
+  },
   // the read-only queue board: an Express-mounted UI documented programmatically
   'get /admin/queues': { status: '200', kind: 'html' },
   'get /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
@@ -342,51 +355,50 @@ describe('OpenAPI success surface (e2e)', () => {
       if (!expected) continue
 
       const successCodes = Object.keys(responses).filter((c) => /^[23]\d\d$/.test(c))
-      if (successCodes.length !== 1) {
+      const expectedCodes =
+        typeof expected.status === 'string' ? [expected.status] : [...expected.status]
+      if (JSON.stringify(successCodes.sort()) !== JSON.stringify(expectedCodes.sort())) {
         violations.push(
-          `${key}: expected exactly one success status, got [${successCodes.join(', ')}]`
+          `${key}: expected exactly [${expectedCodes.join(', ')}], got [${successCodes.join(', ')}]`
         )
         continue
       }
-      const [code] = successCodes
-      if (code !== expected.status) {
-        violations.push(`${key}: expected status ${expected.status}, documented ${code}`)
-        continue
-      }
-
-      const response = responses[code] as Record<string, unknown>
-      switch (expected.kind) {
-        case 'json':
-          if (!nonEmpty(jsonSchema(response))) {
-            violations.push(`${key}: ${code} has no application/json body schema`)
-          }
-          break
-        case 'text':
-          if (!nonEmpty(textSchema(response))) {
-            violations.push(`${key}: ${code} has no text/plain body schema`)
-          }
-          break
-        case 'html':
-          if (!nonEmpty(htmlSchema(response))) {
-            violations.push(`${key}: ${code} has no text/html body schema`)
-          }
-          break
-        case 'stream':
-          if (!nonEmpty(eventStreamSchema(response))) {
-            violations.push(`${key}: ${code} has no text/event-stream body schema`)
-          }
-          break
-        case 'binary':
-          if (!nonEmpty(octetSchema(response))) {
-            violations.push(`${key}: ${code} has no application/octet-stream body schema`)
-          }
-          break
-        case 'none':
-          if (jsonSchema(response)) violations.push(`${key}: ${code} must not carry a body schema`)
-          break
-        case 'redirect':
-          // 3xx already asserted by the status match; redirects carry no body.
-          break
+      for (const code of successCodes) {
+        const response = responses[code] as Record<string, unknown>
+        switch (expected.kind) {
+          case 'json':
+            if (!nonEmpty(jsonSchema(response))) {
+              violations.push(`${key}: ${code} has no application/json body schema`)
+            }
+            break
+          case 'text':
+            if (!nonEmpty(textSchema(response))) {
+              violations.push(`${key}: ${code} has no text/plain body schema`)
+            }
+            break
+          case 'html':
+            if (!nonEmpty(htmlSchema(response))) {
+              violations.push(`${key}: ${code} has no text/html body schema`)
+            }
+            break
+          case 'stream':
+            if (!nonEmpty(eventStreamSchema(response))) {
+              violations.push(`${key}: ${code} has no text/event-stream body schema`)
+            }
+            break
+          case 'binary':
+            if (!nonEmpty(octetSchema(response))) {
+              violations.push(`${key}: ${code} has no application/octet-stream body schema`)
+            }
+            break
+          case 'none':
+            if (jsonSchema(response))
+              violations.push(`${key}: ${code} must not carry a body schema`)
+            break
+          case 'redirect':
+            // 3xx already asserted by the status match; redirects carry no body.
+            break
+        }
       }
     }
 
@@ -565,6 +577,44 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.security).not.toContainEqual({ apiKeyBearer: [] })
   })
 
+  it('documents the command input byte-limit refusal', () => {
+    const operation = document.paths['/admin/background-work/commands']?.post
+    expect(operation?.responses).toHaveProperty('413')
+    const catalogue = document.paths['/admin/background-work/works']?.get
+    expect(catalogue?.responses?.['200']).toHaveProperty(
+      'description',
+      'At most64 registered resources within64KiB encoded JSON; oversize returns503 WORK_UNAVAILABLE'
+    )
+    expect(catalogue?.responses).toHaveProperty('503')
+    expect(operation?.responses?.['413']).toHaveProperty(
+      'description',
+      'Command input exceeds the 32KiB byte ceiling'
+    )
+  })
+
+  it('documents closed registered failure maps on common work diagnostics', () => {
+    const schemas = document.components?.schemas ?? {}
+    const resolve = (value: unknown): Record<string, unknown> => {
+      const schema = value as { $ref?: string }
+      return (schema?.$ref ? schemas[schema.$ref.split('/').at(-1)!] : value) as Record<
+        string,
+        unknown
+      >
+    }
+    const operation = document.paths['/admin/background-work/works/{workId}/jobs/{jobId}']?.get
+    expect(operation?.security).toEqual([{ bearer: [] }])
+    const response = operation?.responses?.['200'] as {
+      content?: { 'application/json'?: { schema?: unknown } }
+    }
+    const job = resolve(response.content?.['application/json']?.schema)
+    const properties = job.properties as Record<string, unknown>
+    const failure = resolve(properties.failure)
+    expect(Object.keys(failure.properties as object).sort()).toEqual(['code', 'nextStep', 'title'])
+    expect(failure.required).toEqual(expect.arrayContaining(['code', 'title']))
+    expect(job.required).not.toContain('failure')
+    expect(operation?.description).toContain('16KiB')
+  })
+
   it('documents the bearer-only background-work queue summary away from the Bull Board path', () => {
     const operation = document.paths['/admin/background-work/queues']?.get
 
@@ -667,6 +717,7 @@ describe('OpenAPI success surface (e2e)', () => {
     const forbidden = new Set(['metadata', 'ip', 'requestId', 'emailHash', 'pinoEvent'])
     const missingRefs: string[] = []
     const forbiddenKeys: string[] = []
+    const detailFields = new Set<string>()
     const inspect = (value: unknown): void => {
       if (!value || typeof value !== 'object') return
       if (Array.isArray(value)) {
@@ -681,6 +732,8 @@ describe('OpenAPI success surface (e2e)', () => {
         else missingRefs.push(node.$ref)
       }
       if (node.properties && typeof node.properties === 'object') {
+        if ('commandId' in node.properties && 'operation' in node.properties)
+          Object.keys(node.properties).forEach((key) => detailFields.add(key))
         for (const key of Object.keys(node.properties)) {
           if (forbidden.has(key)) forbiddenKeys.push(key)
         }
@@ -690,6 +743,9 @@ describe('OpenAPI success surface (e2e)', () => {
     inspect(response.content?.['application/json']?.schema)
     expect(missingRefs).toEqual([])
     expect(forbiddenKeys).toEqual([])
+    expect([...detailFields]).toEqual(
+      expect.arrayContaining(['commandId', 'workId', 'jobId', 'operation', 'reason', 'outcome'])
+    )
   })
 
   it('documents the admin discovery search/sortBy/sortOrder query contract on both list endpoints (ADR-082)', () => {

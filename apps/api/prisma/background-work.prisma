@@ -1,0 +1,123 @@
+/// ADMIN control metadata is retained independently of ordinary broker execution.
+model BackgroundWorkControl {
+  workId          String   @id @db.VarChar(64)
+  desiredSequence BigInt   @default(0)
+  desiredPaused   Boolean  @default(false)
+  observedEpoch   String?  @db.Uuid
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  @@schema("core")
+  @@map("background_work_control")
+}
+
+model BackgroundCommand {
+  actorId       String                    @db.VarChar(64)
+  commandId     String                    @db.Uuid
+  workId        String                    @db.VarChar(64)
+  operation     String                    @db.VarChar(16)
+  fingerprint   String                    @db.Char(64)
+  reason        String                    @db.VarChar(250)
+  revision      Int                       @default(0)
+  logicalBytes  Int
+  createdAt     DateTime                  @default(now()) @db.Timestamptz(3)
+  dispatchUntil DateTime                  @db.Timestamptz(3)
+  finalizedAt   DateTime?                 @db.Timestamptz(3)
+  targets       BackgroundCommandTarget[]
+
+  @@id([actorId, commandId])
+  @@index([actorId, createdAt])
+  @@index([workId, createdAt])
+  @@index([finalizedAt, actorId, commandId])
+  @@schema("core")
+  @@map("background_commands")
+}
+
+model BackgroundCommandTarget {
+  actorId       String            @db.VarChar(64)
+  commandId     String            @db.Uuid
+  workId        String            @db.VarChar(64)
+  targetId      String            @db.VarChar(128)
+  incarnation   String?           @db.Uuid
+  queueEpoch    String?           @db.Uuid
+  state         String            @default("prepared") @db.VarChar(16)
+  resolution    String            @default("none") @db.VarChar(32)
+  dispatchId    String?           @db.Uuid
+  reason        String?           @db.VarChar(64)
+  snapshot      Json
+  logicalBytes  Int
+  dispatchAfter DateTime?          @db.Timestamptz(3)
+  dispatchUntil DateTime?          @db.Timestamptz(3)
+  finalizedAt   DateTime?          @db.Timestamptz(3)
+  updatedAt     DateTime           @updatedAt @db.Timestamptz(3)
+  command       BackgroundCommand @relation(fields: [actorId, commandId], references: [actorId, commandId], onDelete: Restrict)
+
+  @@id([actorId, commandId, targetId])
+  @@index([state, dispatchUntil])
+  @@index([incarnation, state])
+  @@index([workId, state, targetId, incarnation])
+  @@index([finalizedAt, actorId, commandId, targetId])
+  @@index([state, logicalBytes, actorId, commandId], map: "background_command_targets_compaction_idx")
+  @@schema("core")
+  @@map("background_command_targets")
+}
+
+/// Serialized control/evidence accounting and PG-clock GCRA authorities.
+model BackgroundBudget {
+  key              String   @id @db.VarChar(192)
+  commands         Int      @default(0)
+  targets          Int      @default(0)
+  logicalBytes     BigInt   @default(0)
+  activeCommands   Int      @default(0)
+  activeTargets    Int      @default(0)
+  unknownTargets   Int      @default(0)
+  evidenceRows     Int      @default(0)
+  evidenceBytes    BigInt   @default(0)
+  unresolvedRows   Int      @default(0)
+  actorBudgetRows  Int      @default(0)
+  virtualTime      Json     @default("{}")
+  lastObservedTime DateTime @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([updatedAt, key])
+  @@schema("core")
+  @@map("background_budgets")
+}
+
+/// Only provider-window work owns this row; idempotent execution never creates one.
+model BackgroundEffectEvidence {
+  workId             String    @db.VarChar(64)
+  incarnation        String    @db.Uuid
+  jobId              String    @db.VarChar(128)
+  queueEpoch         String    @db.Uuid
+  jobName            String    @db.VarChar(64)
+  wireVersion        Int
+  policyVersion      Int
+  revision           Int       @default(0)
+  logicalBytes       Int
+  requestDigest      String?   @db.Char(64)
+  providerScope      String?   @db.Char(64)
+  firstDispatchAt    DateTime? @db.Timestamptz(3)
+  nominalDeadline    DateTime? @db.Timestamptz(3)
+  floorUpper         BigInt    @default(0)
+  clockPolicyVersion Int       @default(1)
+  autoStartsUsed     Int       @default(0)
+  automaticLimit     Int
+  manualGrant        String    @default("none") @db.VarChar(16)
+  certainty          String    @default("none") @db.VarChar(16)
+  unresolvedCount    Int       @default(0)
+  activeAttemptId    String?   @db.Uuid
+  outcomeRecorded    Boolean   @default(true)
+  commandFence       String?   @db.Uuid
+  safeResult         Json      @default("{}")
+  disposition        String    @default("none") @db.VarChar(32)
+  finalizedAt        DateTime? @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@id([workId, incarnation])
+  @@index([workId, createdAt, incarnation])
+  @@index([finalizedAt, workId, incarnation])
+  @@index([certainty, logicalBytes, createdAt, workId, incarnation], map: "background_effect_evidence_compaction_idx")
+  @@schema("core")
+  @@map("background_effect_evidence")
+}

@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib'
 import { Body, Controller, HttpCode, type INestApplication, Patch, Post, Req } from '@nestjs/common'
 import request from 'supertest'
 
-import { AuthType, MEMBER_REQUEST_BYTES } from '@amcore/shared'
+import { AuthType, MEMBER_REQUEST_BYTES, WORK_COMMAND_INPUT_BYTES } from '@amcore/shared'
 
 import { REQUEST_BODY_LIMIT_BYTES } from '../src/bootstrap/configure-body-parser'
 import { Auth } from '../src/core/auth/decorators/auth.decorator'
@@ -52,6 +52,22 @@ class MemberBodyController {
   }
 }
 
+/** Parser-only probe: exact production path, no ADMIN service in this isolated module. */
+@Controller('admin/background-work')
+@SkipRateLimit()
+class WorkCommandBodyController {
+  @Post([
+    'commands',
+    'commands/:commandId/reconciliation',
+    'works/:workId/jobs/:jobId/reconciliation',
+  ])
+  @HttpCode(200)
+  @Auth(AuthType.None)
+  echo(@Body() _body: unknown) {
+    return { ok: true }
+  }
+}
+
 describe('Request body size limit (e2e)', () => {
   let app: INestApplication
   let prisma: PrismaService
@@ -66,6 +82,7 @@ describe('Request body size limit (e2e)', () => {
       EchoController,
       WebhookSizeController,
       MemberBodyController,
+      WorkCommandBodyController,
     ])
     app = context.app
     prisma = context.prisma
@@ -78,6 +95,71 @@ describe('Request body size limit (e2e)', () => {
   beforeEach(async () => {
     await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
+  })
+
+  it('caps streamed command JSON at32KiB, including whitespace and inflated input', async () => {
+    const boundary = jsonBodyOfSize(WORK_COMMAND_INPUT_BYTES)
+    await request(app.getHttpServer())
+      .post('/admin/background-work/commands')
+      .set('Content-Type', 'application/json')
+      .send(boundary)
+      .expect(200)
+    for (const body of [
+      jsonBodyOfSize(WORK_COMMAND_INPUT_BYTES + 1),
+      ' '.repeat(WORK_COMMAND_INPUT_BYTES) + '{}',
+    ])
+      await request(app.getHttpServer())
+        .post('/admin/background-work/commands')
+        .set('Content-Type', 'application/json')
+        .send(body)
+        .expect(413)
+    await request(app.getHttpServer())
+      .post('/admin/background-work/commands')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'gzip')
+      .serialize(() => gzipSync(jsonBodyOfSize(WORK_COMMAND_INPUT_BYTES + 1)) as unknown as string)
+      .send({})
+      .expect(413)
+  })
+
+  it('bounds invalid command forms before the generic100000-byte parser', async () => {
+    const body = `value=${'x'.repeat(WORK_COMMAND_INPUT_BYTES - 6)}`
+    await request(app.getHttpServer())
+      .post('/admin/background-work/commands')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(body)
+      .expect(200)
+    await request(app.getHttpServer())
+      .post('/admin/background-work/commands')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(`${body}x`)
+      .expect(413)
+  })
+
+  it('preserves the32KiB cap for accepted trailing-slash and reconciliation route spellings', async () => {
+    for (const path of [
+      '/admin/background-work/commands/',
+      '/admin/background-work/commands/019a1234-1234-7123-8123-123456789012/reconciliation',
+      '/admin/background-work/commands/%30%31%39a1234-1234-7123-8123-123456789012/reconciliation/',
+      '/admin/background-work/works/email/jobs/recycled-evidence-job/reconciliation',
+      '/admin/background-work/works/email/jobs/%72ecycled-evidence-job/reconciliation/',
+    ]) {
+      await request(app.getHttpServer())
+        .post(path)
+        .set('Content-Type', 'application/json')
+        .send(jsonBodyOfSize(WORK_COMMAND_INPUT_BYTES))
+        .expect(200)
+      await request(app.getHttpServer())
+        .post(path)
+        .set('Content-Type', 'application/json')
+        .send(jsonBodyOfSize(WORK_COMMAND_INPUT_BYTES + 1))
+        .expect(413)
+      await request(app.getHttpServer())
+        .post(path)
+        .set('Content-Type', 'application/x-www-form-urlencoded')
+        .send(`value=${'x'.repeat(WORK_COMMAND_INPUT_BYTES)}`)
+        .expect(413)
+    }
   })
 
   describe('scoped member role JSON', () => {

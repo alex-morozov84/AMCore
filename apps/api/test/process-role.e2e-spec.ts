@@ -1,11 +1,13 @@
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { Test, type TestingModule } from '@nestjs/testing'
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 
 /**
  * Role-composition DI assertions (ADR-041). Lives in the e2e (ESM) project so the
  * full app graph (jose/openid-client) parses. Uses `.compile()` — it resolves the
- * DI graph WITHOUT `onModuleInit`, so no Redis/Postgres connection is made — plus
+ * DI graph WITHOUT `onModuleInit`. Isolated containers still bound constructor-side broker initialization — plus
  * a no-op `PinoLogger` (the real nestjs-pino provider hangs `compile()`).
  *
  * App modules are imported dynamically after the test env is set. A static
@@ -25,6 +27,8 @@ let AdminQueuesController: Token
 let QueueObservationService: Token
 let AuthController: Token
 let EmailProcessor: Token
+let postgres: StartedPostgreSqlContainer
+let broker: StartedRedisContainer
 let NotificationDispatchProcessor: Token
 let NotificationRetentionService: Token
 let NotificationRealtimePublisher: Token
@@ -106,8 +110,10 @@ const absent = (m: TestingModule, token: Token): void =>
 
 describe('PROCESS_ROLE module composition (ADR-041)', () => {
   beforeAll(async () => {
-    process.env.DATABASE_URL ??= 'postgresql://u:p@localhost:5432/test?schema=public'
-    process.env.REDIS_URL ??= 'redis://localhost:6379'
+    postgres = await new PostgreSqlContainer('postgres:18-alpine').start()
+    broker = await new RedisContainer('redis:7-alpine').start()
+    process.env.DATABASE_URL = postgres.getConnectionUri()
+    process.env.REDIS_URL = broker.getConnectionUrl()
     process.env.JWT_SECRET ??= 'test-only-jwt-secret-at-least-32-characters-long'
 
     const appModule = await import('../src/app.module')
@@ -115,7 +121,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const workerModule = await import('../src/worker.module')
     const adminController = await import('../src/core/admin/admin.controller')
     const authController = await import('../src/core/auth/auth.controller')
-    const emailProcessor = await import('../src/infrastructure/email/processors/email.processor')
+    const emailProcessor = await import('../src/infrastructure/email/queued-email.handler')
     const dispatchProcessor =
       await import('../src/core/notifications/dispatch/notification-dispatch.processor')
     const retentionService =
@@ -180,7 +186,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     WorkerModule = workerModule.WorkerModule
     AdminController = adminController.AdminController
     AuthController = authController.AuthController
-    EmailProcessor = emailProcessor.EmailProcessor
+    EmailProcessor = emailProcessor.QueuedEmailHandler
     NotificationDispatchProcessor = dispatchProcessor.NotificationDispatchProcessor
     NotificationRetentionService = retentionService.NotificationRetentionService
     NotificationRealtimePublisher = realtimePublisher.NotificationRealtimePublisher
@@ -225,7 +231,12 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     AiArtifactUploadService = aiArtifactUploadService.AiArtifactUploadService
     AiArtifactDownloadService = aiArtifactDownloadService.AiArtifactDownloadService
     AiAssistantAdminService = aiAssistantAdminService.AiAssistantAdminService
-  })
+  }, 120000)
+
+  afterAll(async () => {
+    await broker?.stop()
+    await postgres?.stop()
+  }, 60000)
 
   describe('web', () => {
     let m: TestingModule

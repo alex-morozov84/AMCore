@@ -49,6 +49,7 @@ interface Unit {
 
 const unavailable = (d: QueueDescriptor): AdminQueue => ({
   name: d.name,
+  ...(d.presentation ? { presentation: d.presentation } : {}),
   kind: d.kind,
   inBoard: isOnBoard(d),
   status: 'unavailable',
@@ -97,6 +98,7 @@ export class QueueObservationService implements OnModuleInit {
     if (!descriptor.enabled) {
       return {
         name: descriptor.name,
+        ...(descriptor.presentation ? { presentation: descriptor.presentation } : {}),
         kind: descriptor.kind,
         inBoard: isOnBoard(descriptor),
         status: 'disabled',
@@ -194,6 +196,7 @@ export class QueueObservationService implements OnModuleInit {
   ): Extract<AdminQueue, { status: 'available' }> {
     return {
       name: descriptor.name,
+      ...(descriptor.presentation ? { presentation: descriptor.presentation } : {}),
       kind: descriptor.kind,
       inBoard: isOnBoard(descriptor),
       status: 'available',

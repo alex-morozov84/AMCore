@@ -19,7 +19,8 @@ truth and the `AuditAction` type — the recorder only accepts values from it:
 The current areas are `admin.*` (privileged maintenance and user administration),
 `auth.*` (session step-up), `api_key.*`, `org.*` (invite lifecycle), `ai.*`
 (approval, tool, assistant-registry, and conversation-control events), and
-`telegram.*` (connection linking). Read the source file for the exact set rather
+`telegram.*` (connection linking), and `background_work.*` (administrative
+work control and uncertainty disposition). Read the source file for the exact set rather
 than relying on a list here — see [Add an audited action](#add-an-audited-action)
 to extend it.
 
@@ -54,6 +55,14 @@ interval projection commit atomically with the setting. A matching no-op adds no
 change event; a stale revision still conflicts. Reset is recorded as a null
 interval projection and a new revision. No arbitrary setting values or secrets
 are logged. The bounded read summary exposes interval and revision changes.
+
+Background-work requests record a bounded operator reason (up to250 characters
+and1024 UTF-8 bytes), command/work IDs, operation and target count. Each outcome
+records task identity and administrative result; newly written outcomes also
+retain the operator reason. These writes use the existing strict control
+transaction. The read API exposes a closed `commandDetails` projection for these
+events, never the entire metadata object. Missing historical fields stay absent.
+Do not enter secrets or personal task content in the reason.
 
 ## Sensitive Data Rules
 
@@ -96,6 +105,32 @@ Current examples:
   success/failure, AI tool execution events (`ai.tool.invoked`,
   `ai.tool.execution_failed`).
 
+## Background-work control
+
+The common backend control API records `background_work.command_intent`,
+`command_outcome`, `command_denied`, `command_resolution` and
+`evidence_resolution`. Intent and reservations commit with strict audit before a
+broker command can run. Outcome finalization records the observed administrative
+result; an unknown result never authorizes redispatch. Database-owned adapters
+commit business mutation, receipt and strict outcome audit in the same transaction.
+
+An ordinary idempotent handler may replay its business operation before an
+administrative receipt finalizes. Its business deduplication authority remains
+responsible for returning the same result; the audit receipt is not execution
+proof. Provider-window work keeps independent safety evidence and uncertainty
+rather than treating queue history or operator acknowledgement as success.
+
+Control metadata permits bounded identities, revisions, outcome codes, counts,
+snapshot digests and up to three evidence-reference IDs. Operator reasons are a
+closed exception to the usual content-free metadata rule: at most250 characters,
+for an operational explanation only. Never put addresses, credentials, payloads,
+provider responses or other sensitive data in a reason or evidence-reference ID.
+Repeated denied actions share a finite actor/work audit-suppression slot for60
+seconds. Known receipt history can expire after30 days; audit history has its own
+retention policy. Protected unknown rows are retained, including after disposition.
+See [registration and retained uncertainty](../backend/background-work.md) for the
+transaction contract, numerical quotas and recovery limits.
+
 ## Add an audited action
 
 Recording a new privileged action is three steps plus a write-mode choice.
@@ -113,7 +148,8 @@ the spec is dropped before the row is written. Each field is one of: `true`
 **bounded-value function** (e.g. the `boundedString(maxLength, pattern)` builder in
 that file) that accepts only in-grammar values and drops the rest. Keep every
 field **bounded and content-free** — a coded id, count, or classification, never
-free text, and never anything from [Sensitive Data Rules](#sensitive-data-rules).
+free text outside an explicitly approved bounded operational reason, and never
+anything from [Sensitive Data Rules](#sensitive-data-rules).
 `emailHash` and `pinoEvent` are allowed for every action by the common metadata
 spec, so add them at the call site only when that action actually has those
 bounded values.

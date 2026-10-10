@@ -14,6 +14,7 @@ const roots = [
   'apps/web/src/features/console-user-role',
   'apps/web/src/features/console-user-sessions',
   'apps/web/src/features/console-api-keys',
+  'apps/web/src/features/console-background-work',
   'apps/web/src/shared/api/console',
   'apps/web/src/shared/ui/console-detail',
   'apps/web/src/shared/lib/console-time-zone',
@@ -122,6 +123,8 @@ export const operationsConsoleFacts = {
 }
 
 export const operationsConsoleSurfaceRoots = [
+  // Only this mixed guide has a Console-owned block; backend code remains retained.
+  'apps/api/src/infrastructure/queue/README.md',
   'apps/web/src',
   'apps/web/e2e',
   'apps/web/messages',

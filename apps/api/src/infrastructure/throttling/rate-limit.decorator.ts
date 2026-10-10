@@ -22,7 +22,8 @@ export function RateLimit(policy: RateLimitPolicy): CustomDecorator<string> {
 
 /**
  * The only supported way to exempt a route or controller from the global
- * rate-limit backstop (health/metrics probes only, normally).
+ * rate-limit backstop (health and metrics probes). Privileged control routes keep
+ * this pre-auth backstop in addition to their authoritative per-actor budgets.
  */
 export function SkipRateLimit(): CustomDecorator<string> {
   return SetMetadata(RATE_LIMIT_SKIP_KEY, true)

@@ -93,9 +93,12 @@ actually made instead of leaving them implicit in deleted/kept files:
   imply a second live theme implementation ships in the starter itself.
 - **`admin_console`:** `enabled` or `disabled`. AMCore upstream's default is
   `enabled`; the Operations Console is the `SystemRole.SUPER_ADMIN`-only
-  system control plane, not a generic product backoffice. Disabling its future
-  frontend surface does not remove backend admin, audit, health, or metrics
-  capabilities.
+  system control plane, not a generic product backoffice. Disabling its
+  frontend removes Console pages, frontend Route Handlers/BFF, navigation,
+  messages, UI scenarios and Console-only documentation through their ownership
+  seams. Agents must not recreate them without a separate owner request.
+  Backend registration/producer/handler/policy recipes, generic backend admin
+  controllers/API, audit, workers, health and metrics remain available.
 - **`admin_console_mode`:** `path` or `host`, present only when
   `admin_console` is `enabled`. `path` serves console pages on the product
   host; `host` serves them on a separate host. The mode is a deployment and

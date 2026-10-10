@@ -34,7 +34,11 @@ export function QueueSummaryControls({
     <div className="flex flex-col items-start gap-1 sm:items-end">
       <div className="flex flex-wrap items-center gap-2">
         {leading}
-        <Button variant="outline" aria-pressed={auto} onClick={() => onAutoChange(!auto)}>
+        <Button
+          variant={auto ? 'default' : 'outline'}
+          aria-pressed={auto}
+          onClick={() => onAutoChange(!auto)}
+        >
           {auto ? (
             <Pause aria-hidden="true" className="size-4" />
           ) : (

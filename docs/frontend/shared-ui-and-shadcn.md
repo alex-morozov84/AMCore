@@ -51,6 +51,16 @@ for why.
 | `sheet.tsx`                      | shadcn (Base UI), customized                | Pulled in as `sidebar.tsx`'s mobile-breakpoint dependency. `SheetContent` requires a caller-provided `closeLabel`, mirroring `dialog.tsx`.                                                                                                                                                                                                                                                                                                |
 | `tooltip.tsx`, `separator.tsx`   | shadcn (Base UI), stock                     | Pulled in as `sidebar.tsx` dependencies (`SidebarMenuButton`'s collapsed-state tooltip, `SidebarSeparator`). No customization needed.                                                                                                                                                                                                                                                                                                     |
 
+### Expandable details
+
+Use `Disclosure` from `@/shared/ui/disclosure` for optional details. It keeps native
+`details`/`summary` keyboard behavior, a shared chevron, hover/focus treatment and
+content spacing. Pass the localized `label` and children; ordinary native props
+such as `open`, `onToggle` and `name` remain available. It needs no client state or
+new dependency. Use `contentClassName` when a real composition needs different
+spacing. Domain wrappers supply their content and layout without copying summary
+markup.
+
 ### Password fields and page titles
 
 Use `PasswordInput` from `@/shared/ui/password-input` in password forms.
@@ -445,3 +455,18 @@ time this file is touched:
 - [i18n & errors](./i18n-and-errors.md) — the general copy rule
   [Hardcoded copy still slips in](#hardcoded-copy-still-slips-in) is one
   instance of.
+
+## Selected controls
+
+Shared buttons with `variant="selection"`, selected shared tabs, and checked or
+indeterminate shared checkboxes use the
+`selection` / `selection-foreground` token pair, defaulting to
+`primary` / `primary-foreground`. The surrounding shell can set this pair
+without changing ordinary primary buttons. Use `FilterButtons` for single-choice filters; it sets the selected variant and
+semantic state. `selection-soft` marks an open inspection target with a muted
+accent surface. `aria-pressed` alone does not recolor a button: independent modes
+such as auto-refresh use the ordinary variants. Destructive final confirmations
+use `destructive`; reversible pause/resume actions remain neutral. Unselected controls keep their
+normal variant; keyboard focus remains a separate visible ring. These tokens
+follow the active brand and light/dark theme. A momentary click is not a
+persistent selection.

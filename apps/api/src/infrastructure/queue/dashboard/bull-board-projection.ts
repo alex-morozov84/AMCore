@@ -74,8 +74,11 @@ export function pickPagination(raw: unknown): {
   const source = isRecord(raw) ? raw : {}
   const range = isRecord(source.range) ? source.range : {}
   return {
-    pageCount: num(source.pageCount),
-    range: { start: num(range.start), end: num(range.end) },
+    pageCount: Math.min(
+      num(source.pageCount),
+      Math.ceil(512 / Math.max(1, num(range.end) - num(range.start) + 1))
+    ),
+    range: { start: num(range.start), end: Math.min(511, num(range.end)) },
   }
 }
 
@@ -134,7 +137,12 @@ export function pickJob(raw: unknown, queueName: unknown, context: ProjectionCon
       text(source.name, 64) && JOB_NAME.test(source.name as string) ? source.name : BOARD_HIDDEN,
     timestamp: num(source.timestamp),
     progress:
-      typeof source.progress === 'number' && Number.isFinite(source.progress) ? source.progress : 0,
+      typeof source.progress === 'number' &&
+      Number.isFinite(source.progress) &&
+      source.progress >= 0 &&
+      source.progress <= 100
+        ? source.progress
+        : boardCopy(context.locale).notDisplayed,
     attempts: num(source.attempts),
     stacktrace: [],
     opts: pickOpts(source.opts),

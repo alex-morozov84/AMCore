@@ -15,7 +15,9 @@ import { NotificationRecoveryService } from './dispatch/notification-recovery.se
 import { NOTIFICATION_CHANNELS } from './notification-composition'
 import { NotificationRetentionService } from './notification-retention.service'
 import { NotificationsModule } from './notifications.module'
+import { notificationsWork } from './notifications.work'
 
+import { bindWorkHandlers } from '@/infrastructure/background-work/registration'
 import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
 
 /**
@@ -69,6 +71,7 @@ export class ConfiguredNotificationsWorkerModule {
         SingletonCronRunner,
         NotificationRetentionService,
       ],
+      exports: [NotificationDispatchProcessor],
     }
   }
 }
@@ -77,5 +80,10 @@ const configuredWorker = ConfiguredNotificationsWorkerModule.register(
   NotificationsModule,
   NOTIFICATION_CHANNELS
 )
-@Module({ imports: [configuredWorker] })
+const bindings = bindWorkHandlers(
+  notificationsWork,
+  { 'dispatch-due@1': NotificationDispatchProcessor },
+  [configuredWorker]
+)
+@Module({ imports: [configuredWorker, bindings], exports: [bindings] })
 export class NotificationsWorkerModule {}

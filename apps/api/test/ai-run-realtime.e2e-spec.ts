@@ -9,10 +9,10 @@ import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunRealtimePublisher } from '../src/core/ai/realtime/ai-run-realtime.publisher'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import {
   cleanDatabase,
   type E2ETestContext,
@@ -81,7 +81,7 @@ describe('AI run realtime SSE (e2e)', () => {
     publisher = appA.get(AiRunRealtimePublisher, { strict: false })
     const scheduler = appA.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
-    await appA.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(appA, 'ai-runs')
     contextB = await startWebAppContext()
   }, 120000)
 

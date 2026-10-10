@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 
 import { expectNoAxeViolations } from './axe'
-import { QUEUES_ROUTE, row } from './background-work-journey'
+import { QUEUES_ROUTE } from './background-work-journey'
 
 /** Intercepted BFF answers prove the honest degraded states without stopping the stack's Redis. */
 export async function backgroundWorkDegradedJourney(page: Page, url: string): Promise<void> {
@@ -37,8 +37,16 @@ export async function backgroundWorkDegradedJourney(page: Page, url: string): Pr
   expect(calls).toBe(2)
   await page.clock.runFor(30_000)
   await expect.poll(() => calls).toBe(3)
-  await expect(row(page, /Email/)).toContainText('Unavailable')
-  await expect(row(page, /Email/).getByRole('cell').nth(2)).toHaveText('—')
+  await expect(
+    page.getByRole('table', { name: 'Background queues' }).getByRole('row', { name: /Email/ })
+  ).toContainText('Unavailable')
+  await expect(
+    page
+      .getByRole('table', { name: 'Background queues' })
+      .getByRole('row', { name: /Email/ })
+      .getByRole('cell')
+      .nth(2)
+  ).toHaveText('—')
   await expectNoAxeViolations(page)
 }
 
@@ -94,7 +102,7 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
     name: /Open in queue board/,
   })
   await expect(
-    page.getByRole('status').filter({ hasText: 'Could not open the queue board' })
+    page.getByRole('status').filter({ has: page.getByText('Could not open the queue board') })
   ).toBeVisible()
   await expect(open).toBeVisible()
   await expect(rowLinks).toHaveCount(4)

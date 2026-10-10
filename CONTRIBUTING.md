@@ -38,6 +38,12 @@ and migration conformance in an isolated copy with PostgreSQL/Redis Testcontaine
 Docker is required; ordinary `.env` and owner preview data are excluded. It is
 invoked by the CI Test job; see [channel conformance](docs/notifications/channels.md#run-the-conformance-lane).
 
+`pnpm test:background-work-contracts` runs the common registration, image and
+transactional durable recipes, administrative controls, queued-email safety,
+queue inventory/observation and read-only Board regression suites against isolated
+Testcontainers. Docker is required; the CI Test job runs this lane. See the
+[background-work contract](docs/backend/background-work.md#verify-a-registration).
+
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 ### Size review advisory

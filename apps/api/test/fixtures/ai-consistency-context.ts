@@ -5,14 +5,15 @@ import { AiRunProducerService } from '../../src/core/ai/runs/ai-run-producer.ser
 import type { AiConversation, AiRun, Prisma, User } from '../../src/generated/prisma/client'
 import { AiModelRegistry } from '../../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../../src/infrastructure/ai/runs/ai-run.repository'
-import { AiRunDispatchProcessor } from '../../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { cleanDatabase, type E2ETestContext } from '../helpers'
+
+import { closeManagedWorker } from './background-work/close-managed-worker'
 
 /** Disable only suite-owned wake/pollers; recovery fixtures explicitly exercise the PG authority. */
 export async function stopConsistencyWake(context: E2ETestContext): Promise<void> {
   for (const job of context.app.get(SchedulerRegistry, { strict: false }).getCronJobs().values())
     job.stop()
-  await context.app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+  await closeManagedWorker(context.app, 'ai-runs')
 }
 
 export async function resetConsistencyData(context: E2ETestContext): Promise<void> {

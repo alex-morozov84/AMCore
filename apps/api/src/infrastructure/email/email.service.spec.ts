@@ -126,24 +126,8 @@ describe('EmailService', () => {
 
       await service.queue(jobData)
 
-      // EQS-11: options come from the derived EMAIL_JOB_OPTIONS — the email 2s
-      // first-retry backoff is preserved, while attempts + removeOnComplete /
-      // removeOnFail are inherited from the single-source DEFAULT_JOB_OPTIONS
-      // (proving it is the derived constant, not a bespoke literal).
-      expect(queueService.add).toHaveBeenCalledWith(
-        QueueName.EMAIL,
-        JobName.SEND_EMAIL,
-        jobData,
-        expect.objectContaining({
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
-          removeOnComplete: expect.objectContaining({ age: 3600 }),
-          removeOnFail: expect.objectContaining({ age: 86400 }),
-        })
-      )
+      // The registered producer owns attempts, backoff and retention; callers supply wire input.
+      expect(queueService.add).toHaveBeenCalledWith(QueueName.EMAIL, JobName.SEND_EMAIL, jobData)
       expect(metrics.observeEmailOperation).toHaveBeenCalledWith(
         expect.objectContaining({
           template: EmailTemplate.WELCOME,
@@ -292,16 +276,13 @@ describe('EmailService', () => {
 
       await service.sendWelcomeEmail(data)
 
-      expect(queueService.add).toHaveBeenCalledWith(
-        QueueName.EMAIL,
-        JobName.SEND_EMAIL,
-        {
-          template: EmailTemplate.WELCOME,
-          to: 'john@example.com',
-          data,
-        },
-        expect.any(Object)
-      )
+      expect(queueService.add).toHaveBeenCalledWith(QueueName.EMAIL, JobName.SEND_EMAIL, {
+        template: EmailTemplate.WELCOME,
+        to: 'john@example.com',
+        data,
+      })
+      const payload = queueService.add.mock.calls[0]![2] as Record<string, unknown>
+      expect(Object.hasOwn(payload, 'userId')).toBe(false)
     })
   })
 

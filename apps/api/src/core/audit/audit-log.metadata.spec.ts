@@ -1,5 +1,47 @@
 import { sanitizeAuditMetadata } from './audit-log.metadata'
 
+describe('background control strict audit metadata', () => {
+  it('retains bounded command evidence and drops raw business/transport content', () => {
+    const result = sanitizeAuditMetadata('background_work.command_outcome', {
+      workId: 'image-processing',
+      commandId: '0199c011-0000-7000-8000-000000000001',
+      operation: 'retry',
+      outcome: 'unknown',
+      reasonCode: 'STATE_CHANGED',
+      reason: 'SUPPORT-1234',
+      snapshotDigest: 'a'.repeat(64),
+      count: 1,
+      payload: { token: 'fake-token...' },
+      exception: 'private-stack',
+      providerBody: 'private-body',
+      authorization: 'Bearer <fake-token>',
+    })
+    expect(result).toEqual({
+      workId: 'image-processing',
+      commandId: '0199c011-0000-7000-8000-000000000001',
+      operation: 'retry',
+      outcome: 'unknown',
+      reasonCode: 'STATE_CHANGED',
+      reason: 'SUPPORT-1234',
+      snapshotDigest: 'a'.repeat(64),
+      count: 1,
+    })
+  })
+
+  it('drops oversized values instead of making strict audit storage unbounded', () => {
+    expect(
+      sanitizeAuditMetadata('background_work.command_intent', {
+        reason: 'x'.repeat(251),
+        commandId: 'x'.repeat(37),
+        count: 51,
+        workId: 'x'.repeat(65),
+        snapshotDigest: 'raw-value',
+        outcome: 'unexpected-state',
+      })
+    ).toEqual({})
+  })
+})
+
 describe('invitation role intent audit', () => {
   it('keeps the complete role set and generation while dropping raw capabilities', () => {
     expect(

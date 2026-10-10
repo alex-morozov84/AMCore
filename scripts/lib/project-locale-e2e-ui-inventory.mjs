@@ -9,6 +9,7 @@ const METHODS = new Set([
   'getByRole',
   'getByText',
   'toContainText',
+  'toContain', // Response-body assertions can also check localized rendered UI text.
   'toHaveAccessibleName',
   'toHaveText',
 ])

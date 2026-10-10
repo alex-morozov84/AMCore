@@ -10,6 +10,7 @@ const CONFIG_DEFAULT = `  enabled: true,
   slug: 'admin',`
 const LIGHT_TOKENS = `  /* Operations Console: functional control-plane signal, not product primary. */
   --console-accent: #7c3aed;
+  --console-accent-foreground: #fafafa;
 
 `
 const FONT_TOKENS = `
@@ -85,7 +86,7 @@ function removeTokens(text) {
     replaceExactBlock(
       replaceExactBlock(
         replaceExactBlock(text, LIGHT_TOKENS, ''),
-        '  --console-accent: #7c3aed;\n',
+        '  --console-accent: #7c3aed;\n  --console-accent-foreground: #fafafa;\n',
         ''
       ),
       '  --color-console-accent: var(--console-accent);\n',
