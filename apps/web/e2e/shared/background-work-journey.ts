@@ -65,40 +65,50 @@ export async function backgroundWorkJourney(page: Page, url: string): Promise<vo
     await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await manual
 
+    // Real command UUIDs must use wall time, not the advanced polling-test clock.
+    await page.clock.setSystemTime(Date.now())
+    await page.clock.resume()
+
     // Native commands use captured confirmation/receipts; Board remains view-only.
-    const controls = page.getByRole('region', { name: 'Background work controls' })
+    const controls = page.getByRole('region', { name: 'Task management' })
     const external = controls
       .getByRole('article')
-      .filter({ has: page.getByRole('heading', { name: 'default', exact: true }) })
-    await expect(external.getByRole('button', { name: 'Resume', exact: true })).toBeDisabled()
+      .filter({ has: page.getByRole('heading', { name: /Default queue/ }) })
+    await expect(external.getByText('Queue-wide pause is not supported')).toBeVisible()
+    await expect(external.getByRole('button', { name: /^(Pause|Resume)$/ })).toHaveCount(0)
     const work = controls
       .getByRole('article')
-      .filter({ has: page.getByRole('heading', { name: 'email', exact: true }) })
+      .filter({ has: page.getByRole('heading', { name: /Email delivery/ }) })
     await expect(work.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
-    await expect(work.getByRole('button', { name: 'Resume', exact: true })).toBeDisabled()
+    await expect(work.getByRole('button', { name: 'Resume', exact: true })).toHaveCount(0)
     await work.getByRole('button', { name: 'Pause', exact: true }).click()
-    const confirmation = page.getByRole('dialog', { name: 'Pause: email' })
-    await expect(confirmation).toContainText('Captured revision:')
+    const confirmation = page.getByRole('dialog', { name: 'Pause: Email delivery' })
+    await confirmation.getByText('Technical details', { exact: true }).click()
+    await expect(confirmation).toContainText('Captured work state version:')
     await expectNoAxeViolations(page)
     await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(work.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
-    const apply = async (button: Locator, dialog: Locator, opposite: Locator) => {
+    const apply = async (button: Locator, dialog: Locator, opposite: Locator, notice: Locator) => {
       await button.click()
-      await dialog.getByLabel('Reason for this action').fill('Browser control conformance')
+      await dialog
+        .getByLabel('Reason for the action — recorded in the audit log')
+        .fill('Browser control conformance')
       await dialog.getByRole('button', { name: 'Confirm action' }).click()
-      const receipt = controls.getByRole('region', { name: 'Command receipt' })
-      await expect(receipt.getByRole('status')).toHaveText('Applied')
+      await expect(dialog).toBeHidden()
+      await expect(notice).toBeVisible()
       await expect(opposite).toBeEnabled()
     }
     await apply(
       work.getByRole('button', { name: 'Pause', exact: true }),
-      page.getByRole('dialog', { name: 'Pause: email' }),
-      work.getByRole('button', { name: 'Resume', exact: true })
+      page.getByRole('dialog', { name: 'Pause: Email delivery' }),
+      work.getByRole('button', { name: 'Resume', exact: true }),
+      page.getByText('Processing paused', { exact: true })
     )
     await apply(
       work.getByRole('button', { name: 'Resume', exact: true }),
-      page.getByRole('dialog', { name: 'Resume: email' }),
-      work.getByRole('button', { name: 'Pause', exact: true })
+      page.getByRole('dialog', { name: 'Resume: Email delivery' }),
+      work.getByRole('button', { name: 'Pause', exact: true }),
+      page.getByText('Processing resumed', { exact: true })
     )
     await expect(page.locator('a[href*="/admin/queues"]')).toHaveCount(0)
 
@@ -186,7 +196,7 @@ export async function queueBoardJourney(
   try {
     await page.goto(pageUrl)
     await expect(
-      page.getByText('To look at the jobs themselves, open the queue board')
+      page.getByText('Bull Board provides a separate technical, view-only queue dashboard.')
     ).toBeVisible()
     await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
     const entry = page.getByRole('link', { name: /Open queue board/ })
