@@ -1,3 +1,6 @@
+import { queuesHandler } from '@bull-board/api/dist/handlers/queues.js'
+import { appRoutes } from '@bull-board/api/dist/routes.js'
+import { validateResponse } from '@bull-board/api/dist/validation.js'
 import { BULL_BOARD_ADAPTER } from '@bull-board/nestjs'
 import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
@@ -7,7 +10,10 @@ import request from 'supertest'
 
 import { BULL_BOARD_CONTENT_SECURITY_POLICY, SUPPORTED_LOCALES } from '@amcore/shared'
 
+import { ControlConnection } from '../src/infrastructure/background-work/control-connection'
+import { BoundedBullMQAdapter } from '../src/infrastructure/queue/dashboard/bounded-bullmq-adapter'
 import { BOARD_HOOKS } from '../src/infrastructure/queue/dashboard/bull-board-hooks'
+import { projectQueuesBody } from '../src/infrastructure/queue/dashboard/bull-board-projection'
 import type { PrismaService } from '../src/prisma'
 
 import { BOARD, CANARY, failOneJob, queueOf, superAdminCookie } from './bull-board.helper'
@@ -139,6 +145,66 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
   const get = (path: string) =>
     request(app.getHttpServer()).get(`${BOARD}${path}`).set('Cookie', cookie)
 
+  it('loads legacy delayed observations through the bounded reader', async () => {
+    const adapter = new BoundedBullMQAdapter(queueOf(app, 'email'), app.get(ControlConnection))
+    const jobs = await adapter.getJobs(['delayed'], 0, 9)
+    expect(jobs.map((job) => job.id)).toEqual(['email-job-1'])
+    const result = await queuesHandler({
+      queues: new Map([['email', adapter]]),
+      query: { activeQueue: 'email', status: 'delayed', page: 1, jobsPerPage: 10 },
+      uiConfig: { showWorkers: false },
+      params: {},
+      body: {},
+      headers: {},
+    })
+    const route = appRoutes.api.find((route) => route.route === '/api/queues')!
+    const validated = validateResponse(route, { body: projectQueuesBody(result.body, {}) })
+    expect(validated.body.error).toBeUndefined()
+    const response = await get('/api/queues?activeQueue=email&status=delayed')
+    expect(response.status).toBe(200)
+  })
+
+  it('keeps full counts but observes only the first512 IDs without stock whole-hash readers', async () => {
+    const queue = queueOf(app, 'email')
+    const redis = new IORedis(process.env.REDIS_URL!)
+    const ids = Array.from({ length: 520 }, (_, index) => `bounded-${index}`)
+    try {
+      const seed = redis.pipeline()
+      for (const [index, id] of ids.entries()) {
+        seed.hset(queue.toKey(id), {
+          name: 'send-email',
+          data: '{}',
+          opts: '{}',
+          timestamp: '1',
+          progress: '25',
+        })
+        seed.zadd(queue.toKey('failed'), index, id)
+      }
+      const results = await seed.exec()
+      expect(results?.every(([error]) => error === null)).toBe(true)
+      jest.spyOn(Queue.prototype, 'getJobs').mockRejectedValue(new Error('STOCK_READER_FORBIDDEN'))
+      jest.spyOn(Queue.prototype, 'getJob').mockRejectedValue(new Error('STOCK_READER_FORBIDDEN'))
+      const page = await get(
+        '/api/queues?activeQueue=email&status=failed&page=11&jobsPerPage=50'
+      ).expect(200)
+      const observed = page.body.queues.find((entry: { name: string }) => entry.name === 'email')
+      expect(observed.counts.failed).toBe(520)
+      expect(observed.pagination.pageCount).toBe(11)
+      expect(observed.jobs.map((job: { id: string }) => job.id)).toEqual(ids.slice(500, 512))
+      expect(observed.jobs.every((job: { progress: number }) => job.progress === 25)).toBe(true)
+      await get('/api/queues?activeQueue=email&status=failed&page=12&jobsPerPage=50').expect(400)
+      await get('/api/queues/email/bounded-0').expect(200)
+      await redis.hset(queue.toKey('bounded-0'), 'data', 'x'.repeat(32769))
+      await get('/api/queues/email/bounded-0').expect(500)
+      expect(await redis.hstrlen(queue.toKey('bounded-0'), 'data')).toBe(32769)
+      expect(await redis.zcard(queue.toKey('failed'))).toBe(520)
+    } finally {
+      await redis.zrem(queue.toKey('failed'), ...ids)
+      await redis.del(...ids.map((id) => queue.toKey(id)))
+      redis.disconnect()
+    }
+  })
+
   it('shows an email job as template, locale and opaque user id only', async () => {
     const res = await get('/api/queues?activeQueue=email&status=delayed').expect(200)
     const raw = JSON.stringify(res.body)
@@ -266,7 +332,9 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
     })
 
     it('reduces a thrown error to a key', async () => {
-      jest.spyOn(Queue.prototype, 'getJobCounts').mockRejectedValue(new Error(`boom ${CANARY}`))
+      jest
+        .spyOn(BoundedBullMQAdapter.prototype, 'getJobCounts')
+        .mockRejectedValue(new Error(`boom ${CANARY}`))
       for (const send of [
         () => get('/api/queues'),
         () => request(app.getHttpServer()).head(`${BOARD}/api/queues`).set('Cookie', cookie),
@@ -383,7 +451,7 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
       'decr',
     ])
 
-    it('only performs the one known BullMQ-internal write, on a legacy marker', async () => {
+    it('performs no writes, including when a legacy marker is present', async () => {
       const redis = new IORedis(process.env.REDIS_URL!)
       const monitor = await redis.monitor()
       const seen: Array<{ command: string; key: string }> = []
@@ -400,9 +468,10 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
         }
       }
       try {
-        // A pre-v5 waitlist marker as the last element of the list: `getCounts` pops it.
+        // Stock getCounts would pop this pre-v5 marker. The bounded reader must preserve it.
         await redis.rpush('amcore:default:wait', '0:0')
         await redis.lpush('amcore:default:wait', 'legacy-job-id')
+        const waitingBefore = await redis.lrange('amcore:default:wait', 0, -1)
         await checkpoint('before')
         seen.length = 0
         await get('/api/queues?activeQueue=default&status=failed').expect(200)
@@ -411,9 +480,8 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
         const writes = seen.filter(
           (entry) => WRITE_COMMANDS.has(entry.command) && !entry.key.startsWith('board-sentinel:')
         )
-        expect(writes.map((entry) => `${entry.command} ${entry.key}`)).toEqual([
-          'rpop amcore:default:wait',
-        ])
+        expect(writes).toEqual([])
+        expect(await redis.lrange('amcore:default:wait', 0, -1)).toEqual(waitingBefore)
       } finally {
         monitor.disconnect()
         redis.disconnect()

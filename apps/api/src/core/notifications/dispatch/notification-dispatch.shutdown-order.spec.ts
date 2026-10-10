@@ -13,6 +13,7 @@ import { NotificationDispatchGate } from './notification-dispatch.gate'
 import { NotificationDispatchService } from './notification-dispatch.service'
 import { NotificationShutdownLatch } from './notification-shutdown.latch'
 
+import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
 import { MetricsService } from '@/infrastructure/observability'
 
 /**
@@ -79,6 +80,14 @@ describe('notification dispatch shutdown ordering (real Nest lifecycle)', () => 
         {
           provide: NotificationAttemptAdmission,
           useValue: mockDeep<NotificationAttemptAdmission>(),
+        },
+        {
+          provide: WorkReadiness,
+          useFactory: () => {
+            const readiness = new WorkReadiness()
+            readiness.open()
+            return readiness
+          },
         },
         NotificationDispatchService,
       ],

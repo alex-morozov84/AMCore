@@ -3,6 +3,7 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { fetchConsoleBackgroundWork } from '@/shared/api/console/background-work'
 import { fetchConsoleQueues } from '@/shared/api/console/queues'
 import { BackendRequestError } from '@/shared/api/server/errors'
 
@@ -13,6 +14,10 @@ import { queueMessages } from './queue-test-messages'
 vi.mock('server-only', () => ({}))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin' }))
 vi.mock('@/shared/api/console/queues', () => ({ fetchConsoleQueues: vi.fn() }))
+vi.mock('@/shared/api/console/background-work', () => ({ fetchConsoleBackgroundWork: vi.fn() }))
+vi.mock('@/features/console-background-work', () => ({
+  BackgroundWorkControls: () => <p>registered controls</p>,
+}))
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => ({ refresh: vi.fn() }),
 }))
@@ -46,7 +51,10 @@ async function view() {
   )
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(fetchConsoleBackgroundWork).mockResolvedValue({ status: 'success', data: [] })
+})
 
 describe('BackgroundWorkPage', () => {
   it('renders the static heading and hands the first snapshot to the live leaf', async () => {
@@ -63,6 +71,13 @@ describe('BackgroundWorkPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Background work' })).toBeInTheDocument()
     expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument()
     expect(screen.queryByText(/^live /)).toBeNull()
+  })
+
+  it('keeps available DB-owned management when the overview is unavailable', async () => {
+    vi.mocked(fetchConsoleQueues).mockResolvedValue({ status: 'unavailable', reason: 'upstream' })
+    await view()
+    expect(screen.getByText('registered controls')).toBeInTheDocument()
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument()
   })
 
   it('lets an unexpected 4xx reach the real error boundary', async () => {

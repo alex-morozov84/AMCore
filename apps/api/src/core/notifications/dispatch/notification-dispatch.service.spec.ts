@@ -25,6 +25,7 @@ import { NotificationDispatchService } from './notification-dispatch.service'
 import type { ClaimedDelivery } from './notification-dispatch.types'
 import { NotificationShutdownLatch } from './notification-shutdown.latch'
 
+import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
 import type { MetricsService } from '@/infrastructure/observability'
 
 const makeClaim = (id: string): ClaimedDelivery => ({
@@ -87,8 +88,11 @@ describe('NotificationDispatchService', () => {
 
   const buildService = (
     deliverers: ChannelDeliverer[],
-    capacity = 2
+    capacity = 2,
+    ready = true
   ): NotificationDispatchService => {
+    const readiness = new WorkReadiness()
+    if (ready) readiness.open()
     gate = new NotificationDispatchGate(latch, capacity)
     return new NotificationDispatchService(
       prisma,
@@ -98,7 +102,8 @@ describe('NotificationDispatchService', () => {
       logger,
       latch,
       gate,
-      admissions
+      admissions,
+      readiness
     )
   }
 
@@ -518,5 +523,14 @@ describe('NotificationDispatchService', () => {
       expect(afterTransport).not.toHaveBeenCalled()
       expect(gate.free).toBe(2)
     })
+  })
+  it('performs no PG recovery/claim or transport before shared startup readiness', async () => {
+    const service = buildService([], 2, false)
+    await service.runDispatchCycle()
+    await service.reapExpiredLeases()
+    await service.drainDueBatches()
+    expect(repository.reapExpiredLeases).not.toHaveBeenCalled()
+    expect(repository.claimDueBatch).not.toHaveBeenCalled()
+    expect(deliver).not.toHaveBeenCalled()
   })
 })

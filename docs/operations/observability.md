@@ -32,14 +32,16 @@ Invitation continuation and handoff headers, OAuth authorization code/state and
 login tickets are also redacted. Response `Set-Cookie` and `Location` values are
 redacted because authentication cookies and redirects may carry credentials.
 
-Email addresses in log lines (queued/processed/sent/dead-lettered email jobs)
+Email addresses in enqueue and direct-send log lines
 are redacted via `redactEmail()` (`a***@example.com` — domain kept, since
 delivery/bounce triage is overwhelmingly domain-level) rather than the
 `logging.config.ts` redact list: Pino's own redaction fully replaces a value
 with `[Redacted]`, which would destroy the domain. A stable `userId` pseudonym
 travels alongside the redacted address on the queued-email job payload so
 "which account's email failed" stays answerable after the job's own retention
-window, without a raw address ever reaching a rotated log file. Auth's own
+window, without a raw address ever reaching a rotated log file. Registered worker
+terminal events expose only bounded job ID, template and attempt information,
+without recipient, payload or raw provider exception. Auth's own
 `User registered`/`User logged in` log lines already carry `userId` and drop
 the raw `email` field entirely — no pseudonym gap to fill there, so no
 redaction is needed, only the surplus field's removal.
@@ -188,7 +190,8 @@ are the hard contract every label must satisfy.
   counted as `waiting`. Use `queue_paused` below for pause/resume observability.
 - `queue_paused{queue,role}` — `1` if the queue is currently paused, `0`
   otherwise, from `Queue.isPaused()`.
-  The series cover every queue enabled in the code-owned queue inventory.
+  The series cover every queue enabled by the single background-work registration;
+  the inventory is a derived observation projection.
 - `queue_events_total{queue,event,role}` —
   `event=job_added|redis_error|redis_reconnecting|worker_error|dead_letter`. Job
   IDs and job names are never labels.
@@ -247,6 +250,15 @@ ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
   `template=welcome|password-reset|email-verification|org-invite|notification|unknown`.
 - `email_dead_letters_total{template,unrecoverable,role}`. Recipients, provider
   IDs, job IDs, payloads, and error messages are never labels.
+
+Registered queued-email `process` results cover the admitted policy execution,
+including uncertainty failures; a provider-window retry is not counted as success
+merely because rendering or the handler returned. Before-entry cooldown/manual
+receipt deferrals do not count as failed sends or consume another possible call.
+Secret-bearing legacy jobs emit `discarded` before rendering or provider access.
+Malformed jobs rejected before admission are observed through terminal failure hooks.
+No command ID, incarnation, payload or provider response becomes a metric label.
+See [queued-email safety](../email/queued-safety.md) for certainty and recovery.
 
 **Realtime SSE** (notification + AI run status streams; no user/IP/event IDs)
 

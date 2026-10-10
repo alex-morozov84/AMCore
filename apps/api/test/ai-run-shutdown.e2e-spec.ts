@@ -6,11 +6,11 @@ import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.servic
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
 
 import { ControllableAdapter, controls, deferred, until } from './fixtures/ai-run-controls'
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import { AiRunStatus } from '@/generated/prisma/client'
@@ -41,7 +41,7 @@ describe('AI run dispatcher shutdown (e2e)', () => {
     repository = app.get(AiRunRepository, { strict: false })
     for (const job of app.get(SchedulerRegistry, { strict: false }).getCronJobs().values())
       job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 180000)
 
   afterAll(async () => {

@@ -28,7 +28,7 @@ export class AdminQueuesController {
   @ApiOperation({
     summary: 'Read-only background queue summary — live SUPER_ADMIN bearer only',
     description:
-      'Counts, global pause flag and a bounded creation-age sample for each queue of the code-owned inventory. ' +
+      'Registration-owned localized presentation labels, counts, global pause flag and a bounded creation-age sample for each queue of the code-owned inventory. ' +
       'No job payloads, ids, names or errors are returned. A queue whose Redis state cannot be read within ' +
       'a short deadline is reported as `unavailable` inside a 200 response.',
   })

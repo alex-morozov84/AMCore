@@ -106,6 +106,13 @@ describe('init-project --admin-console', () => {
       assert.equal(readFileSync(path.join(root, rel), 'utf8').includes(marker), false, rel)
     }
     for (const rel of [
+      'apps/api/recipes/background-work/image-work.ts',
+      'apps/api/recipes/background-work/db-owned-work.ts',
+      'docs/backend/background-work.md',
+      'docs/backend/recipes/image-work.sql',
+      'docs/backend/recipes/db-owned-work.sql',
+      'apps/api/src/core/admin/background-work.controller.ts',
+      'apps/api/src/infrastructure/background-work',
       'apps/api/src/core/admin/admin.controller.ts',
       'apps/api/src/core/auth/guards/fresh-auth.guard.ts',
       'apps/api/src/core/audit/audit-log.service.ts',
@@ -127,6 +134,18 @@ describe('init-project --admin-console', () => {
         rel
       )
     }
+    for (const rel of [
+      'docs/backend/background-work.md',
+      'apps/api/src/infrastructure/queue/README.md',
+    ]) {
+      assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /operations-console\//)
+    }
+    const context = readFileSync(path.join(root, 'PROJECT_CONTEXT.md'), 'utf8')
+    assert.match(context, /Agents must not recreate them without a separate owner request/)
+    assert.match(
+      readFileSync(path.join(root, 'AGENTS.md'), 'utf8'),
+      /A frontend Route Handler is not a NestJS/
+    )
     const rootReadme = readFileSync(path.join(root, 'README.md'), 'utf8')
     assert.equal(rootReadme.includes('| **Operations Console**'), false)
     assert.equal(rootReadme.includes('│   ├── operations-console/'), false)

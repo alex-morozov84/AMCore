@@ -5,10 +5,10 @@ import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AI_RUN_GUARDRAIL_REFUSAL_MESSAGE } from '../src/infrastructure/ai/runs/ai-run.constants'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import { AiRunStatus } from '@/generated/prisma/client'
@@ -43,7 +43,7 @@ describe('AI guardrails (e2e)', () => {
     dispatch = app.get(AiRunDispatchService, { strict: false })
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 120000)
 
   afterAll(async () => {

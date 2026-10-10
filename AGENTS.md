@@ -20,6 +20,14 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    `pnpm init:project --admin-console=disabled|path|host`, in any combination, only for the
    project choices the fork actually wants; see
    `docs/frontend/brand-theme-and-tokens.md#project-scaffolding`.
+   Check these declared choices before adding optional features. When
+   `admin_console: disabled`, do not create Console pages, frontend Route
+   Handlers/BFF, navigation, messages or admin UI scenarios without a separate
+   owner request. Console-only documentation, sections and links belong to its
+   removal seams. Backend work registration, producers, handlers and policies
+   remain usable: disabling the frontend does not remove generic backend admin
+   controllers/API, audit or workers. A frontend Route Handler is not a NestJS
+   backend controller.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
      `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo
@@ -57,6 +65,7 @@ pnpm install            # install all
 pnpm dev                # run all apps (or: pnpm --filter api dev)
 pnpm lint               # lint        pnpm typecheck   # types
 pnpm test               # unit tests  pnpm build       # build all
+pnpm test:background-work-contracts # isolated work registration/control/provider safety (Docker)
 pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
 pnpm init:brand         # downstream fork identity/brand/theme initializer
 pnpm init:project       # downstream project choices; run with flags
@@ -281,6 +290,13 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   universal.** Both marker packages are installed in `apps/web`; use them when
   the capability boundary applies, and do not add marker imports to ordinary
   universal modules.
+- **Frontend interaction patterns:** read
+  `docs/frontend/architecture-and-conventions.md#interaction-patterns-buttons-tabs-and-lists`
+  before adding buttons, tabs, filters or list/detail journeys. Reuse shared
+  controls, pagination, empty states and skeletons; distinguish action,
+  selection and on/off mode. Use explicit selected variants, destructive final
+  confirmations and semantic tokens instead of page-local copies or recoloring
+  every `aria-pressed` button. Verify the affected journey in the running UI.
 - **Frontend styling — the palette is a source, tokens are the public API.**
   Colors come from semantic tokens (`bg-card`, `text-muted-foreground`). All of
   these fail lint: Tailwind's default palette (`bg-red-500`, including behind

@@ -10,7 +10,7 @@ their organization role.
 | Screen                                | Use it to                                                                                  |
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | [Overview](overview.md)               | Check API readiness, file storage and resources; edit the probe interval; identify builds. |
-| [Background work](background-work.md) | See whether background queues are piling up, paused or unreadable. Read-only.              |
+| [Background work](background-work.md) | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup. |
 | [Queue board](queue-board.md)         | Look at the jobs of the background queues (view-only), opened from Background work.        |
 | [Users](users.md)                     | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
 | [Organizations](organizations.md)     | Inspect organizations, members and their roles without changing them.                      |
@@ -61,7 +61,10 @@ timestamps or the instants submitted in Audit queries.
 
 ## Scope
 
-The Console has the six areas above, with full user and organization detail
-pages accessible from the lists and from current identities in Audit. It has
-no historical metrics or AI control panels, and no actions on queues. Product administration belongs in a
-separate area with its own roles and permissions.
+The Console includes the screens listed here, with user and organization detail
+pages accessible from the lists and from current identities in Audit.
+Background work provides pause, resume, retry, cancel and cleanup when the
+registered policy permits them. The queue board remains read-only.
+
+Historical metrics and notification or AI run control panels are not available.
+Product administration belongs in a separate area with its own roles and permissions.

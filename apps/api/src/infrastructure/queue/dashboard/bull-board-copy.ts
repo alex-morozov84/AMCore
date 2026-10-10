@@ -13,6 +13,7 @@ interface BoardCopy {
   readonly logsHidden: string
   readonly failureHidden: string
   readonly backToConsole: string
+  readonly notDisplayed: string
 }
 
 const COPY: Readonly<Record<BoardLocale, BoardCopy>> = {
@@ -22,6 +23,7 @@ const COPY: Readonly<Record<BoardLocale, BoardCopy>> = {
     logsHidden: 'Logs are not displayed in this board.',
     failureHidden: 'Failure details are not displayed in this board.',
     backToConsole: 'Back to Console',
+    notDisplayed: 'Not displayed',
   },
   ru: {
     boardTitle: 'Панель очередей — только просмотр',
@@ -29,6 +31,7 @@ const COPY: Readonly<Record<BoardLocale, BoardCopy>> = {
     logsHidden: 'Журналы в этой панели не отображаются.',
     failureHidden: 'Сведения об ошибке в этой панели не отображаются.',
     backToConsole: 'Назад в консоль',
+    notDisplayed: 'Не отображается',
   },
 }
 

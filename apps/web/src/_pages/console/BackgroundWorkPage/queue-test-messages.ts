@@ -1,9 +1,4 @@
-/**
- * English copy of the Background work namespace, inlined so component tests do not import the real
- * catalogues (which are locale-scaffold-tracked). `QueueCatalogue.locale.test.tsx` asserts this
- * object equals `messages/en.json`, so it cannot drift. The two non-ASCII characters of the copy
- * are built from code points because the lint rules keep non-ASCII text out of non-test code.
- */
+/** Locale-independent queue copy; parity is checked by QueueCatalogue.locale.test.tsx. */
 const ELLIPSIS = String.fromCodePoint(0x2026)
 const EM_DASH = String.fromCodePoint(0x2014)
 
@@ -12,9 +7,8 @@ export const queueMessages = {
     backgroundWork: {
       title: 'Background work',
       eyebrow: 'Queues',
-      description:
-        'Read-only view of the background queues: whether work is piling up, paused or cannot be read.',
-      boardPointer: 'To look at the jobs themselves, open the queue board. It is view-only.',
+      description: 'Monitor background tasks, investigate failures and manage supported actions.',
+      boardPointer: 'Bull Board provides a separate technical, view-only queue dashboard.',
       scope:
         'Figures come from the queues of the Redis configured for this API, shared by every API and worker process. They show where work is waiting, not whether workers are running.',
       board: {
@@ -30,7 +24,7 @@ export const queueMessages = {
         unavailableTitle: 'Could not open the queue board',
         unavailableBody: 'Check that the API is available and try again.',
       },
-      checkedAt: 'Checked',
+      checkedAt: 'Last refreshed',
       refresh: 'Refresh',
       refreshing: 'Refreshing' + ELLIPSIS,
       autoRefreshOn: 'Auto-refresh: on',
@@ -82,7 +76,7 @@ export const queueMessages = {
         default: {
           title: 'Default',
           description:
-            'Extension queue for your own jobs. The starter ships no worker for it, so jobs added here wait until you add a processor.',
+            'Observed queue without a managed worker. Processing and administrative commands are unavailable.',
         },
         notifications: {
           title: 'Notifications',
@@ -111,6 +105,11 @@ export const queueMessages = {
         },
       },
       noFigure: EM_DASH,
+      overviewTitle: 'Queue overview',
+      overviewDescription:
+        'Counts describe broker queues. Task management also includes work stored directly in a database, which has no queue row.',
+      partialRefresh:
+        'Some sections could not be refreshed. Previous data remains visible with an error; the timestamp applies to the queue overview.',
     },
   },
-}
+} as const

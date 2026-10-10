@@ -10,14 +10,14 @@ import { EmailTemplate } from './email.types'
  *
  * BullMQ deserializes job data from Redis as untyped JSON, so the
  * `SendEmailJobData` compile-time type is not a runtime guarantee. The
- * `EmailProcessor` validates against these schemas before rendering; a job that
+ * The shared managed execution entry validates these schemas before rendering; a job that
  * fails is treated as a deterministic (`UnrecoverableError`) failure and is not
  * retried (EQS-03).
  *
- * Only the two non-secret, queueable templates are modelled — secret-bearing
+ * Only non-secret, queueable templates are modelled — secret-bearing
  * templates are sent directly via `EmailService.sendNow` and must never be
  * enqueued (EQS-02). The discriminated union therefore also rejects a secret
- * template, but the processor's EQS-02 discard runs first by design so such a
+ * template, but the managed host's EQS-02 discard runs first by design so such a
  * job is dropped (completed), not failed-and-retained.
  *
  * Kept in `apps/api` (not `packages/shared`): this is an internal worker

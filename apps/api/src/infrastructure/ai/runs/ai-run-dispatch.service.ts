@@ -6,6 +6,7 @@ import { AiRunRepository } from './ai-run.repository'
 import { AiRunExecutorService } from './ai-run-executor.service'
 import { AI_RUN_CAPACITY_GATE, AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
 
+import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
 import {
   AttemptRuntime,
   type CapacityGate,
@@ -44,7 +45,8 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
     private readonly executor: AiRunExecutorService,
     @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
     @Inject(AI_RUN_CAPACITY_GATE) private readonly gate: CapacityGate,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly readiness: WorkReadiness
   ) {
     this.logger.setContext(AiRunDispatchService.name)
   }
@@ -85,14 +87,14 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
 
   /** Recovery pass: reclaim crashed leases, sweep overdue queued runs, then drain the backlog. */
   async runDispatchCycle(): Promise<void> {
-    if (this.latch.closed) return
+    if (!this.readiness.isReady || this.latch.closed) return
     await this.reap()
     await this.drainDueBatches()
   }
 
   /** Reclaim expired leases, expire overdue never-run queued runs and fail runs whose history is full. */
   async reap(): Promise<void> {
-    if (this.latch.closed) return
+    if (!this.readiness.isReady || this.latch.closed) return
     // Each sweep is its own latch-bounded operation: once the dispatcher is closed or sealed no LATER sweep
     // starts (an outer wrapper would release the waiter on seal but let the callback keep issuing queries).
     let rescheduled = 0
@@ -104,7 +106,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
       ;({ rescheduled, failed } = reaped)
       if (!this.latch.closed) {
         await this.diagnoseQueuedRestrictions()
-        if (this.latch.closed) return
+        if (!this.readiness.isReady || this.latch.closed) return
         const overdue = await this.latch.run(() => this.repository.expireDeadlinedRuns())
         if (overdue !== CUTOFF) {
           expired = overdue
@@ -142,7 +144,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
    * lane WORK is done — never waiting for a still-pending physical call.
    */
   async drainDueBatches(): Promise<void> {
-    if (this.latch.closed) return
+    if (!this.readiness.isReady || this.latch.closed) return
     const granted = this.gate.reserve(this.gate.capacity)
     if (granted === 0) {
       // Full: a running lane will look once more before it exits (no lost wake).
@@ -174,7 +176,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
       }
     }
     try {
-      while (!this.latch.closed && budget.remaining > 0) {
+      while (this.readiness.isReady && !this.latch.closed && budget.remaining > 0) {
         budget.remaining -= 1
         const claimed = await this.latch.run(() => this.repository.claimDueBatch(1))
         if (claimed === CUTOFF) return

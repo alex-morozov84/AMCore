@@ -44,7 +44,7 @@ const RESERVED_JOB_SEGMENTS: ReadonlySet<string> = new Set([
 
 const QUERY_KEYS = new Set(['activeQueue', 'status', 'page', 'jobsPerPage'])
 export const BOARD_MAX_JOBS_PER_PAGE = 50
-const BOARD_MAX_PAGE = 10_000
+const BOARD_MAX_PAGE = 512
 
 const REJECT_404 = { kind: 'reject', status: 404 } as const
 const REJECT_400 = { kind: 'reject', status: 400 } as const
@@ -64,7 +64,9 @@ export function isValidQueuesQuery(query: URLSearchParams): boolean {
     if (key === 'page' && !boundedInteger(value, BOARD_MAX_PAGE)) return false
     if (key === 'jobsPerPage' && !boundedInteger(value, BOARD_MAX_JOBS_PER_PAGE)) return false
   }
-  return true
+  const page = Number(query.get('page') ?? 1)
+  const limit = Number(query.get('jobsPerPage') ?? 10)
+  return page <= Math.ceil(512 / limit)
 }
 
 /** `path` is the raw, undecoded request path relative to the mount (e.g. `/api/queues`). */

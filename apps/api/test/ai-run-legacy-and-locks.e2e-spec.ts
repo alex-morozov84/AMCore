@@ -7,7 +7,6 @@ import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'
 
@@ -17,6 +16,7 @@ import {
   controls,
   deferred,
 } from './fixtures/ai-run-controls'
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
@@ -65,7 +65,7 @@ describe('AI run legacy tool state and queued lock order (e2e)', () => {
     control = app.get(AiConversationControlService, { strict: false })
     for (const job of app.get(SchedulerRegistry, { strict: false }).getCronJobs().values())
       job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 180000)
 
   afterAll(async () => {

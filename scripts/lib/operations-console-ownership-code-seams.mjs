@@ -40,6 +40,7 @@ export const operationsConsoleCodeSeams = [
     {
       identifiers: [
         '--console-accent:',
+        '--console-accent-foreground:',
         '--color-console-accent:',
         'var(--console-accent)',
         '--font-console-heading:',
@@ -49,7 +50,7 @@ export const operationsConsoleCodeSeams = [
       ],
     },
     ['--console-accent', '--font-console-heading', '--font-console-mono'],
-    { occurrences: 8 }
+    { occurrences: 10 }
   ),
   seam(
     'console.messages.en',

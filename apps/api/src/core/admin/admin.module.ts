@@ -19,6 +19,11 @@ import { AdminQueuesService } from './admin-queues.service'
 import { AdminSessionsService } from './admin-sessions.service'
 import { AdminStorageSettingController } from './admin-storage-setting.controller'
 import { AdminStorageSettingService } from './admin-storage-setting.service'
+import { BackgroundControlModule } from './background-control.module'
+import { BackgroundWorkController } from './background-work.controller'
+import { BackgroundWorkService } from './background-work.service'
+import { BackgroundWorkCatalogue } from './background-work-catalogue'
+import { BackgroundWorkReader } from './background-work-reader'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard'
 
 import { HealthModule } from '@/health'
@@ -33,12 +38,21 @@ import { QueueModule } from '@/infrastructure/queue'
 // here for AdminSessionsService's location lookups carries the same "safe
 // everywhere" property as CleanupModule.
 @Module({
-  imports: [PrismaModule, CleanupModule, AuditModule, HealthModule, GeoipModule, QueueModule],
+  imports: [
+    PrismaModule,
+    CleanupModule,
+    AuditModule,
+    HealthModule,
+    GeoipModule,
+    QueueModule,
+    BackgroundControlModule,
+  ],
   controllers: [
     AdminController,
     AdminApiKeysController,
     AdminStorageSettingController,
     AdminQueuesController,
+    BackgroundWorkController,
   ],
   providers: [
     AdminService,
@@ -52,6 +66,9 @@ import { QueueModule } from '@/infrastructure/queue'
     AdminAuditService,
     AdminSessionsService,
     AdminQueuesService,
+    BackgroundWorkService,
+    BackgroundWorkCatalogue,
+    BackgroundWorkReader,
   ],
 })
 export class AdminModule {}

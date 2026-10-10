@@ -6,12 +6,12 @@ import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.servic
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { AiRunExecutorService } from '../src/infrastructure/ai/runs/ai-run-executor.service'
 import type { PrismaService } from '../src/prisma'
 
 import { ControllableAdapter, controls, deferred } from './fixtures/ai-run-controls'
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import { AiRunStatus } from '@/generated/prisma/client'
@@ -47,7 +47,7 @@ describe('AI run dispatcher: no database operation starts after the seal (e2e)',
     executor = app.get(AiRunExecutorService, { strict: false })
     for (const job of app.get(SchedulerRegistry, { strict: false }).getCronJobs().values())
       job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 180000)
 
   afterAll(async () => {

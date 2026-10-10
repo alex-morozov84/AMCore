@@ -99,17 +99,22 @@ export async function closeQueueGraph(graph?: CompiledQueueGraph): Promise<void>
   await graph?.redis.stop().catch(() => undefined)
 }
 
-/** `default` marked disabled in the single inventory (call before `compileQueueGraph`). */
+/** Disable the definition in the single registration owner before compiling either role. */
 export async function disableDefaultQueue(): Promise<void> {
   const { jest } = await import('@jest/globals')
-  const actual = await import('../src/infrastructure/queue/constants/queue-inventory.constant')
-  jest.unstable_mockModule(
-    '../src/infrastructure/queue/constants/queue-inventory.constant',
-    () => ({
-      ...actual,
-      QUEUE_INVENTORY: actual.QUEUE_INVENTORY.map((queue) =>
-        queue.name === 'default' ? { ...queue, enabled: false } : queue
-      ),
-    })
-  )
+  const actual = await import('../src/background-work.composition')
+  jest.unstable_mockModule('../src/background-work.composition', () => ({
+    ...actual,
+    BACKGROUND_WORK: actual.BACKGROUND_WORK.map((entry) =>
+      entry.definition.id === 'default'
+        ? {
+            ...entry,
+            definition: {
+              ...entry.definition,
+              queue: { ...entry.definition.queue!, enabled: false },
+            },
+          }
+        : entry
+    ),
+  }))
 }

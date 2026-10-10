@@ -10,6 +10,12 @@ import { queueMessages } from './queue-test-messages'
 import { QueueSummaryLive } from './QueueSummaryLive'
 import { useQueueSummary } from './use-queue-summary'
 
+vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
+  useRouteProgressRouter: () => ({ refresh: vi.fn() }),
+}))
+
+vi.mock('@/features/console-background-work', () => ({ BackgroundWorkControls: () => null }))
+
 vi.mock('./use-queue-summary', () => ({ useQueueSummary: vi.fn() }))
 
 const RUSSIAN = 'ru'
@@ -26,8 +32,11 @@ const keys = (value: unknown, prefix = ''): string[] =>
  * is removed from a single-locale fork; the behaviour tests use the inlined English fixture.
  */
 describe('Background work catalogue', () => {
-  it('keeps the inlined English test fixture identical to the real catalogue', () => {
-    expect(queueMessages.console.backgroundWork).toEqual(en.console.backgroundWork)
+  it('keeps the inlined summary fixture identical to its real catalogue keys', () => {
+    const summaryCopy = Object.fromEntries(
+      Object.entries(en.console.backgroundWork).filter(([key]) => key !== 'control')
+    )
+    expect(queueMessages.console.backgroundWork).toEqual(summaryCopy)
   })
 
   it('has the same keys in every locale', () => {
@@ -55,6 +64,10 @@ describe('Background work catalogue', () => {
       data: summary([
         availableQueue('email', { age: { status: 'sample', seconds: 7300, sampled: 3 } }),
       ]),
+      workRefreshed: false,
+      works: undefined,
+      workError: null,
+      partial: false,
       denied: false,
       auto: true,
       setAuto: vi.fn(),

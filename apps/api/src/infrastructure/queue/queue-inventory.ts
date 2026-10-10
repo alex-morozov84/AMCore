@@ -1,10 +1,9 @@
 import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant'
-import type { QueueName } from './constants/queues.constant'
 
 /** Names that are registered with BullMQ and observed. */
 export function enabledQueueNames(
   inventory: readonly QueueDescriptor[] = QUEUE_INVENTORY
-): QueueName[] {
+): string[] {
   return inventory.filter((queue) => queue.enabled).map((queue) => queue.name)
 }
 
@@ -14,9 +13,7 @@ export function enabledQueueNames(
  * Registering a queue in the inventory is therefore enough to see it in the board; its job data stays
  * hidden until `BOARD_DATA_PROJECTIONS` names the fields to show.
  */
-export function boardQueueNames(
-  inventory: readonly QueueDescriptor[] = QUEUE_INVENTORY
-): QueueName[] {
+export function boardQueueNames(inventory: readonly QueueDescriptor[] = QUEUE_INVENTORY): string[] {
   return enabledQueueNames(inventory)
 }
 

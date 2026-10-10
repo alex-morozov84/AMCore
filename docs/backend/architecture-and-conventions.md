@@ -327,8 +327,9 @@ Apply these only when your module needs them:
   cache** low-traffic data, anything you can't reliably invalidate, or values that
   must always be fresh. Pattern (cache-aside + tag invalidation + distributed lock):
   [`core/auth/user-cache.service.ts`](../../apps/api/src/core/auth/user-cache.service.ts).
-- **Background jobs** — enqueue via a producer; process in a worker-only module
-  (see step 5). Failure/retry semantics live with BullMQ.
+- **Background jobs** — use the [single registration contract](background-work.md)
+  and its typed producer/worker bindings. BullMQ owns scheduling; the declared
+  replay policy and business authority own retry safety and effect certainty.
 - **Idempotency** — for unsafe retried writes, use the HTTP idempotency primitive
   ([`docs/operations/idempotency.md`](../operations/idempotency.md)).
 - **Auditing** — record security-relevant actions in the append-only audit log
@@ -360,8 +361,13 @@ Apply these only when your module needs them:
     volumetric backstop, not precise per-actor protection — that's what
     dedicated limiters (`LoginRateLimiterService`, invite-accept, etc.)
     are for.
-  - **Exempt a route** with `@SkipRateLimit()` (health/metrics probes only,
-    normally).
+  - **Exempt probes** with `@SkipRateLimit()` (health/metrics only).
+    Background-work routes retain the pre-auth per-visitor backstop, including
+    its bounded held-memory fallback during Redis outages. Their authoritative
+    distributed request/read/target budgets use primary PG: command request cost
+    commits before replay or admission; PG failure refuses control. DB-owned
+    business mutation and receipt transactions do not depend on broker Redis.
+    The coarse HTTP backstop and browser session vault are separate boundaries.
   - **Buckets are per-route-per-visitor, precisely.** One visitor calling
     several _different_ routes doesn't share one budget — each route
     tracks its own bucket independently, completely unaffected by that

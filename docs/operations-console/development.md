@@ -262,15 +262,14 @@ being applied) and does not use it.
 
 ## Queues and the Background work screen
 
-The screen reads the queue inventory, a single code-owned list in
-`apps/api/src/infrastructure/queue/constants/queue-inventory.constant.ts`. A new
-queue appears on the screen after its descriptor is added there; a test fails when
-ordinary code registers or constructs a queue outside the list (a structural check:
-aliases and multi-line calls count, dynamic construction does not). See the
+The screen uses the background-work application registry. One registration
+connects observation, diagnostics, policy-eligible commands and the native UI;
+the queue inventory is derived rather than extended independently. See the
 [queue guide](../../apps/api/src/infrastructure/queue/README.md#adding-a-queue)
 and the [screen guide](background-work.md#adding-a-queue-for-developers). The
-backend reads Redis with plain read commands and a bounded number of pending
-requests, so a stalled Redis cannot pile up work behind the screen.
+backend uses bounded size-checked reads and policy-specific atomic control scripts.
+Privileged intent, receipt and strict audit remain shared owners; a downstream
+registration does not add BFF routes, pages, permissions or audit plumbing.
 
 ## Queue board
 

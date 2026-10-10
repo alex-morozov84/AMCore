@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto'
+
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { Resend } from 'resend'
 
 import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types'
-import { parseRetryAfterMs } from '../retry-after'
+import type { QueuedEmailOutcome, QueuedEmailProvider } from '../queued-email-provider'
+import { parseRetryAfterConstraint, parseRetryAfterMs } from '../retry-after'
 
 import { EnvService } from '@/env/env.service'
 
@@ -45,6 +48,13 @@ const DETERMINISTIC_RESEND_ERROR_CODES: ReadonlySet<string> = new Set([
 @Injectable()
 export class ResendEmailProvider implements EmailProvider {
   private readonly resend: Resend
+  readonly queuedEmail: QueuedEmailProvider = {
+    recipeVersion: 1,
+    provider: 'resend',
+    scope: () => this.queuedScope(),
+    send: (body, key, signal, beforeTransport) =>
+      this.sendQueued(body, key, signal, beforeTransport),
+  }
 
   constructor(
     private readonly env: EnvService,
@@ -98,6 +108,53 @@ export class ResendEmailProvider implements EmailProvider {
       }
     } catch {
       return { id: '', success: false, error: 'provider_failure', retryable: true }
+    }
+  }
+
+  private queuedScope(): string {
+    const credential = createHash('sha256')
+      .update(this.env.get('RESEND_API_KEY') ?? '')
+      .digest('hex')
+    return createHash('sha256')
+      .update(
+        JSON.stringify({ provider: 'resend', slot: 'RESEND_API_KEY', credential, recipeVersion: 1 })
+      )
+      .digest('hex')
+  }
+
+  private async sendQueued(
+    body: string,
+    key: string,
+    signal: AbortSignal,
+    beforeTransport: () => void
+  ): Promise<QueuedEmailOutcome> {
+    // Construct all bounded arguments first; the final fence check precedes SDK's immediate fetch.
+    const options = {
+      method: 'POST',
+      body,
+      signal,
+      headers: {
+        Authorization: `Bearer ${this.env.get('RESEND_API_KEY')}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': key,
+      },
+    }
+    beforeTransport()
+    const { data, error, headers } = await this.resend.fetchRequest<{ id: string }>(
+      '/emails',
+      options
+    )
+    if (!error && typeof data?.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(data.id))
+      return { certainty: 'accepted', retryable: false, code: 'COMPLETED' }
+    const rateLimited = error?.name === 'rate_limit_exceeded'
+    const permanent = !!error && DETERMINISTIC_RESEND_ERROR_CODES.has(error.name)
+    // 6.31.0 returns parsed error JSON without an independent HTTP-status witness.
+    // Its error.statusCode cannot prove a no-effect 429; keep all unaccepted SDK results unknown.
+    return {
+      certainty: 'unknown',
+      retryable: !permanent,
+      code: rateLimited ? 'RATE_LIMITED' : permanent ? 'PERMANENT_FAILURE' : 'TRANSIENT_FAILURE',
+      retryAfter: parseRetryAfterConstraint(headers?.['retry-after']),
     }
   }
 

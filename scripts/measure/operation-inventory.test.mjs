@@ -15,7 +15,11 @@ describe('operation inventory against the real plans', () => {
       // The roles list and capability editor stories add two story removals in each of the two
       // Storybook-disabled scenarios: four operations, four facts/claims and four final operations.
       // They are measured from every real plan, not estimated from file counts.
-      { name: 'measured operations', expected: 652, actual: inventory.operations.length },
+      // Background-work route/UI facts add 2/6/16/2 in single EN and 4/6/16/4 in RU host
+      // (operations/facts/claims/final operations). The selection story adds 1/1/1/1 twice.
+      // EN disabled adds 3/5/8/2: host journey, closed feature root and queue-guide seam;
+      // content facts are counted in shared and Console streams, while writes coalesce.
+      { name: 'measured operations', expected: 663, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -34,17 +38,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 905,
+        expected: 924,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1580,
+        expected: 1622,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 636,
+        expected: 646,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

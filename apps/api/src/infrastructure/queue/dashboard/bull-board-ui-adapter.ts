@@ -4,7 +4,9 @@ import type { NextFunction, Request, Response } from 'express'
 
 import type { BoardRequestLocals } from './bull-board-boundary.middleware'
 import { boardCopy, boardLanguage } from './bull-board-copy'
+import { installBoardDisplayAssets, withBoardDisplayStyle } from './bull-board-display-assets'
 import { clientErrorStatus, safeErrorResult, withFinalBoundary } from './bull-board-errors'
+import { withBoardReadBudget } from './bull-board-read-budget'
 
 const ENVIRONMENT_COLOR = { color: '#334155', textColor: '#f8fafc' } as const
 
@@ -36,6 +38,11 @@ function sendHtml(res: Response, html: string): void {
 export class QueueBoardAdapter extends ExpressAdapter {
   private terminated = false
 
+  override setStaticPath(route: string, directory: string): ExpressAdapter {
+    installBoardDisplayAssets(this.app, route, directory)
+    return super.setStaticPath(route, directory)
+  }
+
   override getRouter(): ReturnType<ExpressAdapter['getRouter']> {
     const router = super.getRouter()
     if (!this.terminated) {
@@ -59,7 +66,9 @@ export class QueueBoardAdapter extends ExpressAdapter {
     return super.setApiRoutes(
       routes.map((route) => ({
         ...route,
-        handler: withFinalBoundary(route.handler) as AppControllerRoute['handler'],
+        handler: withFinalBoundary(
+          withBoardReadBudget(route.handler)
+        ) as AppControllerRoute['handler'],
       }))
     )
   }
@@ -79,7 +88,13 @@ export class QueueBoardAdapter extends ExpressAdapter {
         })
         res.render(view.name, view.params, (error: Error | null, html?: string) => {
           if (error || typeof html !== 'string') sendSafeFailure(res)
-          else sendHtml(res, html)
+          else {
+            try {
+              sendHtml(res, withBoardDisplayStyle(html, context?.basePath ?? this.basePath))
+            } catch {
+              sendSafeFailure(res)
+            }
+          }
         })
       } catch {
         sendSafeFailure(res)

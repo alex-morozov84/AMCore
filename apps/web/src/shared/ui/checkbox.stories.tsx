@@ -15,3 +15,5 @@ export const Default: Story = {}
 export const Checked: Story = { args: { defaultChecked: true } }
 export const Disabled: Story = { args: { disabled: true } }
 export const DisabledChecked: Story = { args: { disabled: true, defaultChecked: true } }
+
+export const Indeterminate: Story = { args: { indeterminate: true } }

@@ -1,7 +1,7 @@
 import { SchedulerRegistry } from '@nestjs/schedule'
 
-import { NotificationDispatchProcessor } from '../../../src/core/notifications/dispatch/notification-dispatch.processor'
 import { type E2ETestContext, setupE2ETest, teardownE2ETest } from '../../helpers'
+import { closeManagedWorker } from '../background-work/close-managed-worker'
 
 import { registerFixtureNotifications } from './notification-registration'
 
@@ -10,7 +10,7 @@ export async function setupNotificationExtensions(): Promise<E2ETestContext> {
   try {
     for (const job of context.app.get(SchedulerRegistry, { strict: false }).getCronJobs().values())
       job.stop()
-    await context.app.get(NotificationDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(context.app, 'notifications')
     await context.prisma.$executeRaw`
     CREATE TABLE core.extension_fixture_subscriptions (
       id text PRIMARY KEY, "userId" text NOT NULL REFERENCES core.users(id) ON DELETE CASCADE,

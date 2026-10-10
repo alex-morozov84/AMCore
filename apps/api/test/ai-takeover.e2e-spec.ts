@@ -11,11 +11,11 @@ import { AiConversationControlService } from '../src/core/ai/conversations/ai-co
 import { AiConversationOperatorService } from '../src/core/ai/conversations/ai-conversation-operator.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { currentTimeTool } from '../src/infrastructure/ai/tools/reference/current-time.tool'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { demoFenceTool, setDemoFenceHook } from './fixtures/demo-fence.tool'
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
 import { approvalHash } from './fixtures/extension-contracts/approval-hash'
@@ -69,7 +69,7 @@ describe('AI human takeover lifecycle (e2e)', () => {
     approvals = app.get(AiApprovalService, { strict: false })
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 120000)
 
   afterAll(async () => {

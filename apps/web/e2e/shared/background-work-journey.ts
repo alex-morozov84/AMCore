@@ -1,19 +1,18 @@
 import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 import {
   addDefaultQueueJob,
   addFailedDefaultQueueJob,
   BOARD_CANARY,
   clearDefaultQueue,
+  seedBoardDiagnostics,
   seedDefaultQueue,
 } from '../support/queue-fixture'
 
 import { expectNoAxeViolations } from './axe'
 
 export const QUEUES_ROUTE = /\/api\/(?:console\/)?background-work\/queues$/
-export const row = (page: Page, name: string | RegExp) =>
-  page.getByRole('table', { name: 'Background queues' }).getByRole('row', { name })
 
 /**
  * Shared assertions for both topologies: the first RSC snapshot, live refresh through the fixed
@@ -31,11 +30,15 @@ export async function backgroundWorkJourney(page: Page, url: string): Promise<vo
     await expect(page.getByRole('heading', { level: 1, name: 'Background work' })).toBeVisible()
 
     // First snapshot: server-rendered, with the paused default queue counted as waiting.
-    const queue = row(page, /Default/)
+    const queue = page
+      .getByRole('table', { name: 'Background queues' })
+      .getByRole('row', { name: /Default/ })
     await expect(queue).toContainText('Paused')
     await expect(queue.getByRole('cell').nth(2)).toHaveText('3')
     await expect(queue).toContainText('At least 5 minutes')
-    await expect(row(page, /Email/)).toContainText('Not paused')
+    await expect(
+      page.getByRole('table', { name: 'Background queues' }).getByRole('row', { name: /Email/ })
+    ).toContainText('Not paused')
     await expect(page.getByText('Unavailable', { exact: true })).toHaveCount(0)
 
     // Live refresh: a new job appears after the automatic period, with no navigation.
@@ -62,13 +65,51 @@ export async function backgroundWorkJourney(page: Page, url: string): Promise<vo
     await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await manual
 
-    // Read-only: no control can change a queue. The board is reached only through its own Console
-    // route; the API's own mount (`/admin/queues`) is never linked.
-    await expect(
-      page.getByRole('button', {
-        name: /^(retry|clean|resume|promote|delete|pause queue|obliterate)/i,
-      })
-    ).toHaveCount(0)
+    // Real command UUIDs must use wall time, not the advanced polling-test clock.
+    await page.clock.setSystemTime(Date.now())
+    await page.clock.resume()
+
+    // Native commands use captured confirmation/receipts; Board remains view-only.
+    const controls = page.getByRole('region', { name: 'Task management' })
+    const external = controls
+      .getByRole('article')
+      .filter({ has: page.getByRole('heading', { name: /Default queue/ }) })
+    await expect(external.getByText('Queue-wide pause is not supported')).toBeVisible()
+    await expect(external.getByRole('button', { name: /^(Pause|Resume)$/ })).toHaveCount(0)
+    const work = controls
+      .getByRole('article')
+      .filter({ has: page.getByRole('heading', { name: /Email delivery/ }) })
+    await expect(work.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
+    await expect(work.getByRole('button', { name: 'Resume', exact: true })).toHaveCount(0)
+    await work.getByRole('button', { name: 'Pause', exact: true }).click()
+    const confirmation = page.getByRole('dialog', { name: 'Pause: Email delivery' })
+    await confirmation.getByText('Technical details', { exact: true }).click()
+    await expect(confirmation).toContainText('Captured work state version:')
+    await expectNoAxeViolations(page)
+    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(work.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
+    const apply = async (button: Locator, dialog: Locator, opposite: Locator, notice: Locator) => {
+      await button.click()
+      await dialog
+        .getByLabel('Reason for the action — recorded in the audit log')
+        .fill('Browser control conformance')
+      await dialog.getByRole('button', { name: 'Confirm action' }).click()
+      await expect(dialog).toBeHidden()
+      await expect(notice).toBeVisible()
+      await expect(opposite).toBeEnabled()
+    }
+    await apply(
+      work.getByRole('button', { name: 'Pause', exact: true }),
+      page.getByRole('dialog', { name: 'Pause: Email delivery' }),
+      work.getByRole('button', { name: 'Resume', exact: true }),
+      page.getByText('Processing paused', { exact: true })
+    )
+    await apply(
+      work.getByRole('button', { name: 'Resume', exact: true }),
+      page.getByRole('dialog', { name: 'Resume: Email delivery' }),
+      work.getByRole('button', { name: 'Pause', exact: true }),
+      page.getByText('Processing resumed', { exact: true })
+    )
     await expect(page.locator('a[href*="/admin/queues"]')).toHaveCount(0)
 
     // The browser never holds a backend token.
@@ -151,10 +192,11 @@ export async function queueBoardJourney(
   })
   seedDefaultQueue({ waiting: 2, oldestSeconds: 60, paused: false })
   addFailedDefaultQueueJob()
+  seedBoardDiagnostics()
   try {
     await page.goto(pageUrl)
     await expect(
-      page.getByText('To look at the jobs themselves, open the queue board')
+      page.getByText('Bull Board provides a separate technical, view-only queue dashboard.')
     ).toBeVisible()
     await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
     const entry = page.getByRole('link', { name: /Open queue board/ })
@@ -188,14 +230,24 @@ export async function queueBoardJourney(
     // A queue page, its failed job and the job's detail: nothing hidden leaks, nothing errors.
     await board.getByRole('navigation').getByRole('link', { name: 'default' }).click()
     await expect(board).toHaveURL(new RegExp(`${boardPath}/queue/default`))
+    await board.getByRole('button', { name: 'Queue info' }).click()
+    await expect(board.getByText('Not displayed', { exact: true }).first()).toBeVisible()
+    await board.keyboard.press('Escape')
+    await expect(board.locator('[class*="badgeWrap-O3UZRS"]')).toHaveCount(0)
+    await expect(board.locator('a[href*="job-schedulers"]')).toHaveCount(0)
     await board.getByText('Failed').first().click()
     await expect(board.getByText('e2e-failed').first()).toBeVisible()
     await board.getByText('e2e-failed').first().click()
     await expect(board.getByText('Failure details are not displayed in this board.')).toBeVisible()
+    await board.getByRole('tab', { name: 'Progress', exact: true }).click()
+    await expect(board.getByRole('tabpanel', { name: 'Progress', exact: true })).toContainText(
+      'Not displayed'
+    )
     await board.getByRole('tab', { name: 'Data' }).click()
     await expect(board.getByText('[hidden]').first()).toBeVisible()
     await board.getByRole('tab', { name: 'Logs' }).click()
     await expect(board.getByText('Logs are not displayed in this board.')).toBeVisible()
+    await expect(board.locator('[class*="jobFlowCard-"]')).toHaveCount(0)
     await expect(board.locator('body')).not.toContainText(BOARD_CANARY)
     await expect(board.locator('body')).not.toContainText('secret.js')
 

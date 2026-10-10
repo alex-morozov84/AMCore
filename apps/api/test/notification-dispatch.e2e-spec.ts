@@ -22,6 +22,7 @@ import {
 import { NotificationChannel } from '../src/core/notifications/notification.constants'
 import { NotificationDefinitionRegistry } from '../src/core/notifications/notification-definition.registry'
 import { EnvService } from '../src/env/env.service'
+import { WorkReadiness } from '../src/infrastructure/background-work/work-readiness'
 import { EmailService } from '../src/infrastructure/email/email.service'
 import { ResendEmailProvider } from '../src/infrastructure/email/providers/resend.provider'
 import { MetricsService } from '../src/infrastructure/observability'
@@ -310,7 +311,8 @@ describe('Notification dispatch (e2e)', () => {
       logger,
       latch,
       new NotificationDispatchGate(latch),
-      new NotificationAttemptAdmission(prisma, latch)
+      new NotificationAttemptAdmission(prisma, latch),
+      app.get(WorkReadiness, { strict: false })
     )
     const enqueue = jest.spyOn(queue, 'add')
     const fetch = jest

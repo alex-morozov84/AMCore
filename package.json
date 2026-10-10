@@ -39,7 +39,8 @@
     "stand": "node scripts/stand.mjs",
     "test:stands": "node scripts/stand/run-tests.mjs",
     "test:capability-extension": "bash scripts/fixtures/t024-capability-extension.sh",
-    "test:extension-contracts": "bash scripts/fixtures/notification-ai-extension-contracts.sh"
+    "test:extension-contracts": "bash scripts/fixtures/notification-ai-extension-contracts.sh",
+    "test:background-work-contracts": "pnpm --filter api test:e2e --runTestsByPath test/background-work-startup.e2e-spec.ts test/background-work-image.e2e-spec.ts test/background-work-http.e2e-spec.ts test/background-work-ledger.e2e-spec.ts test/background-work-pause.e2e-spec.ts test/queued-email-control.e2e-spec.ts test/queue-inventory.e2e-spec.ts test/queue-inventory-worker.e2e-spec.ts test/queue-inventory-disabled.e2e-spec.ts test/queue-inventory-disabled-worker.e2e-spec.ts test/queue-inventory-production.e2e-spec.ts test/queue-observation.e2e-spec.ts test/admin-queues.e2e-spec.ts test/bull-board-readonly.e2e-spec.ts test/bull-board-disclosure.e2e-spec.ts test/bull-board-edge.e2e-spec.ts test/bull-board-disabled-boot.e2e-spec.ts"
   },
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",

@@ -53,6 +53,17 @@ function assertConsole(root, scenario) {
   const configPath = path.join(root, 'apps/web/src/shared/lib/admin-console.generated.ts')
   if (mode === 'disabled') {
     assert.equal(existsSync(configPath), false)
+    for (const file of [
+      'apps/api/recipes/background-work/image-work.ts',
+      'apps/api/recipes/background-work/db-owned-work.ts',
+      'apps/api/src/core/admin/background-work.controller.ts',
+      'apps/api/src/infrastructure/background-work',
+      'docs/backend/background-work.md',
+    ])
+      assert.ok(existsSync(path.join(root, file)), file)
+    const recipe = readFileSync(path.join(root, 'docs/backend/background-work.md'), 'utf8')
+    assert.doesNotMatch(recipe, /operations-console\//)
+    assert.match(recipe, /Do not create Console pages/)
     return
   }
   const slug = flagValue(scenario, 'admin-console-slug') ?? 'admin'

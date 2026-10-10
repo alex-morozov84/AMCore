@@ -29,7 +29,10 @@ export function QueueAge({ queue }: { queue: AdminQueue }) {
   return <>{ageText(queue, t)}</>
 }
 
-function ageText(queue: Available, t: ReturnType<typeof useTranslations>) {
+function ageText(
+  queue: Available,
+  t: ReturnType<typeof useTranslations<'console.backgroundWork'>>
+) {
   const { age } = queue
   if (age.status === 'none') return t('ageNone')
   if (age.status === 'unknown') return t('ageUnknown')

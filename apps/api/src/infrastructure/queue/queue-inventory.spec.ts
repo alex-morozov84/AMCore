@@ -2,7 +2,7 @@ import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-invento
 import { QueueName } from './constants/queues.constant'
 import { boardQueueNames, enabledQueueNames } from './queue-inventory'
 
-const disable = (...names: QueueName[]): QueueDescriptor[] =>
+const disable = (...names: string[]): QueueDescriptor[] =>
   QUEUE_INVENTORY.map((queue) =>
     names.includes(queue.name) ? { ...queue, enabled: false } : queue
   )

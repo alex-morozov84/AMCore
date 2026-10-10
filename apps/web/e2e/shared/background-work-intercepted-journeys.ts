@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 
 import { expectNoAxeViolations } from './axe'
-import { QUEUES_ROUTE, row } from './background-work-journey'
+import { QUEUES_ROUTE } from './background-work-journey'
 
 /** Intercepted BFF answers prove the honest degraded states without stopping the stack's Redis. */
 export async function backgroundWorkDegradedJourney(page: Page, url: string): Promise<void> {
@@ -33,12 +33,22 @@ export async function backgroundWorkDegradedJourney(page: Page, url: string): Pr
   // Backoff: the next automatic read is not at +30 s but at +60 s after the first degraded result.
   await page.clock.runFor(31_000)
   await expect.poll(() => calls).toBe(2)
+  // Wait for the page-wide read to settle before advancing its backoff clock.
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
   await page.clock.runFor(40_000)
   expect(calls).toBe(2)
   await page.clock.runFor(30_000)
   await expect.poll(() => calls).toBe(3)
-  await expect(row(page, /Email/)).toContainText('Unavailable')
-  await expect(row(page, /Email/).getByRole('cell').nth(2)).toHaveText('—')
+  await expect(
+    page.getByRole('table', { name: 'Background queues' }).getByRole('row', { name: /Email/ })
+  ).toContainText('Unavailable')
+  await expect(
+    page
+      .getByRole('table', { name: 'Background queues' })
+      .getByRole('row', { name: /Email/ })
+      .getByRole('cell')
+      .nth(2)
+  ).toHaveText('—')
   await expectNoAxeViolations(page)
 }
 
@@ -94,7 +104,7 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
     name: /Open in queue board/,
   })
   await expect(
-    page.getByRole('status').filter({ hasText: 'Could not open the queue board' })
+    page.getByRole('status').filter({ has: page.getByText('Could not open the queue board') })
   ).toBeVisible()
   await expect(open).toBeVisible()
   await expect(rowLinks).toHaveCount(4)
@@ -130,7 +140,9 @@ export async function backgroundWorkBoardStatesJourney(page: Page, url: string):
 
   // The page says in its description that the board is view-only, and the help icon beside the
   // button carries the full explanation; on a phone the actions wrap instead of overflowing.
-  await expect(page.getByText('To look at the jobs themselves, open the queue board')).toBeVisible()
+  await expect(
+    page.getByText('Bull Board provides a separate technical, view-only queue dashboard.')
+  ).toBeVisible()
   await expect(page.getByLabel(/Retrying or deleting jobs and managing queues/)).toBeVisible()
   await page.setViewportSize({ width: 320, height: 800 })
   const box = await open.boundingBox()

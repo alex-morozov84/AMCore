@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 
-import { Button } from '@/shared/ui/button'
 import { ConsoleFilterDisclosure } from '@/shared/ui/console-detail/ConsoleFilterDisclosure'
+import { FilterButtons } from '@/shared/ui/filter-buttons'
 import { Input } from '@/shared/ui/input'
 
 import type { AuditCopy } from './audit-copy'
@@ -33,20 +33,15 @@ export function AuditIdentityFilters({
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-medium">{copy.userDestination}:</span>
-          <div className="flex gap-1" role="group" aria-label={copy.userDestination}>
-            {(['actorId', 'targetId'] as const).map((kind) => (
-              <Button
-                key={kind}
-                type="button"
-                size="sm"
-                variant={destination === kind ? 'secondary' : 'outline'}
-                aria-pressed={destination === kind}
-                onClick={() => setDestination(kind)}
-              >
-                {kind === 'actorId' ? copy.actor : copy.target}
-              </Button>
-            ))}
-          </div>
+          <FilterButtons<'actorId' | 'targetId'>
+            label={copy.userDestination}
+            value={destination}
+            options={(['actorId', 'targetId'] as const).map((kind) => ({
+              value: kind,
+              label: kind === 'actorId' ? copy.actor : copy.target,
+            }))}
+            onChange={setDestination}
+          />
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <AuditLookup kind="user" copy={copy} onSelect={(id) => onSelect(destination, id)} />

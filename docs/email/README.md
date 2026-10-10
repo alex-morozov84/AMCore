@@ -64,6 +64,7 @@ adding code.
 
 - [Templates](./templates.md) — add React Email templates, data types, subjects, i18n, and tests.
 - [Delivery](./delivery.md) — choose notification, queued, direct, secret-bearing, or worker delivery.
+- [Queued safety and recovery](./queued-safety.md) — immutable request, certainty, finite starts, cooldown/horizon, legacy handling and protected evidence.
 - [Security](./security.md) — secret-link invariants, logging rules, and queue boundaries.
 
 ## See Also

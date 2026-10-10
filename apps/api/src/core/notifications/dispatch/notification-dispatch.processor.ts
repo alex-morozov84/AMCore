@@ -1,4 +1,4 @@
-import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq'
+import { Injectable } from '@nestjs/common'
 import type { Job } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -6,6 +6,7 @@ import { dispatchDueJobSchema } from '../notification-dispatch.schema'
 
 import { NotificationDispatchService } from './notification-dispatch.service'
 
+import type { WorkHandler } from '@/infrastructure/background-work/work-definition'
 import { MetricsService } from '@/infrastructure/observability'
 import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
 
@@ -16,15 +17,22 @@ import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.cons
  * thrown drain is not retried by BullMQ — the recovery `@Cron` re-drains regardless, so a
  * failed wake never strands work.
  */
-@Processor(QueueName.NOTIFICATIONS)
-export class NotificationDispatchProcessor extends WorkerHost {
+@Injectable()
+export class NotificationDispatchProcessor implements WorkHandler {
   constructor(
     private readonly dispatch: NotificationDispatchService,
     private readonly logger: PinoLogger,
     private readonly metrics: MetricsService
   ) {
-    super()
     this.logger.setContext(NotificationDispatchProcessor.name)
+  }
+
+  async run(): Promise<void> {
+    await this.dispatch.drainDueBatches()
+  }
+
+  async runLegacyWake(): Promise<void> {
+    await this.run()
   }
 
   async process(job: Job): Promise<void> {
@@ -47,7 +55,6 @@ export class NotificationDispatchProcessor extends WorkerHost {
   }
 
   /** A wake job that exhausted its single attempt (drain threw). The cron recovers. */
-  @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error): void {
     this.metrics.incQueueEvent(QueueName.NOTIFICATIONS, 'dead_letter')
     this.logger.error(
@@ -57,7 +64,6 @@ export class NotificationDispatchProcessor extends WorkerHost {
   }
 
   /** Worker-side Redis/connection observability (mirrors EmailProcessor). */
-  @OnWorkerEvent('error')
   onError(error: Error): void {
     this.metrics.incRedisClientEvent('queue_worker', 'error')
     this.metrics.incQueueEvent(QueueName.NOTIFICATIONS, 'worker_error')

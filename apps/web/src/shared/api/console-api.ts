@@ -7,6 +7,13 @@ import type {
   StorageProbeSettingUpdate,
   SupportedLocale,
   SystemRole,
+  WorkCommand,
+  WorkJob,
+  WorkListQuery,
+  WorkPage,
+  WorkReceipt,
+  WorkReconciliation,
+  WorkSummary,
 } from '@amcore/shared'
 
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
@@ -21,6 +28,56 @@ import { apiClient } from './http-client'
  * `getConsolePublicApiPath()` so it resolves correctly in both topologies.
  */
 export const consoleApi = {
+  getBackgroundWork: (signal?: AbortSignal): Promise<WorkSummary[]> =>
+    apiClient.get(getConsolePublicApiPath('/background-work/works'), { signal }),
+  getBackgroundWorkJobs: (
+    workId: string,
+    query: WorkListQuery,
+    signal?: AbortSignal
+  ): Promise<WorkPage> =>
+    apiClient.get(
+      getConsolePublicApiPath(
+        `/background-work/works/${encodeURIComponent(workId)}/jobs?${new URLSearchParams(
+          Object.entries(query).map(([key, value]) => [key, String(value)])
+        )}`
+      ),
+      { signal }
+    ),
+  getBackgroundWorkJob: (workId: string, jobId: string, signal?: AbortSignal): Promise<WorkJob> =>
+    apiClient.get(
+      getConsolePublicApiPath(
+        `/background-work/works/${encodeURIComponent(workId)}/jobs/${encodeURIComponent(jobId)}`
+      ),
+      { signal }
+    ),
+  requestBackgroundWorkCommand: (input: WorkCommand): Promise<WorkReceipt> =>
+    apiClient.post(getConsolePublicApiPath('/background-work/commands'), input),
+  getBackgroundWorkReceipt: (commandId: string, signal?: AbortSignal): Promise<WorkReceipt> =>
+    apiClient.get(
+      getConsolePublicApiPath(`/background-work/commands/${encodeURIComponent(commandId)}`),
+      { signal }
+    ),
+  reconcileBackgroundWorkCommand: (
+    commandId: string,
+    input: WorkReconciliation
+  ): Promise<WorkReceipt> =>
+    apiClient.post(
+      getConsolePublicApiPath(
+        `/background-work/commands/${encodeURIComponent(commandId)}/reconciliation`
+      ),
+      input
+    ),
+  reconcileBackgroundWorkEvidence: (
+    workId: string,
+    jobId: string,
+    input: WorkReconciliation
+  ): Promise<void> =>
+    apiClient.post(
+      getConsolePublicApiPath(
+        `/background-work/works/${encodeURIComponent(workId)}/jobs/${encodeURIComponent(jobId)}/reconciliation`
+      ),
+      input
+    ),
   /** Live refresh of Background work; the signal cancels the browser request on unmount. */
   getBackgroundWorkQueues: (signal?: AbortSignal): Promise<AdminQueuesResponse> =>
     apiClient.get(getConsolePublicApiPath('/background-work/queues'), { signal }),

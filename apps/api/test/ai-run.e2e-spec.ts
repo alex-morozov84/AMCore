@@ -6,11 +6,11 @@ import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.servic
 import { freezeAiModel } from '../src/infrastructure/ai/registry/ai-execution-descriptor'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { AiRunTransitions } from '../src/infrastructure/ai/runs/ai-run-transitions.service'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 import { AiMessageRole, AiRunStatus, Prisma } from '@/generated/prisma/client'
@@ -50,7 +50,7 @@ describe('AI run durable worker (e2e)', () => {
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
     // Close the AI wake consumer so a producer-enqueued wake never auto-drains a run under test.
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 120000)
 
   afterAll(async () => {

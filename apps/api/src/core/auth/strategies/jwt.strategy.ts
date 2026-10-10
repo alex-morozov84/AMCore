@@ -2,17 +2,19 @@ import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
-import { type JwtPayload, type RequestPrincipal } from '@amcore/shared'
+import { type JwtPayload, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { UnauthorizedException } from '../../../common/exceptions'
 import { EnvService } from '../../../env/env.service'
+import { PrivilegedRoleService } from '../privileged-role.service'
 import { UserCacheService } from '../user-cache.service'
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     env: EnvService,
-    private readonly userCache: UserCacheService
+    private readonly userCache: UserCacheService,
+    private readonly privilegedRoles: PrivilegedRoleService
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -24,10 +26,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   /**
    * Called after JWT signature is verified.
    * Checks user still exists (security), then returns RequestPrincipal.
-   * Does NOT load full user from DB — only existence check via cache.
+   * Signed SUPER_ADMIN claims use primary existence to avoid a Redis-cache prerequisite.
+   * Privileged admission still intersects the signed claim with the current primary role.
    */
   async validate(payload: JwtPayload): Promise<RequestPrincipal> {
-    const user = await this.userCache.getUser(payload.sub)
+    const user =
+      payload.systemRole === SystemRole.SuperAdmin
+        ? await this.privilegedRoles.getCurrentSystemRole(payload.sub)
+        : await this.userCache.getUser(payload.sub)
 
     if (!user) {
       throw new UnauthorizedException('User not found')

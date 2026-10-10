@@ -24,6 +24,7 @@ import { NotificationDispatchGate } from './notification-dispatch.gate'
 import type { ClaimedDelivery, FinalizeResult } from './notification-dispatch.types'
 import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch'
 
+import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
 import { MetricsService } from '@/infrastructure/observability'
 import { QueueName } from '@/infrastructure/queue/constants/queues.constant'
 import { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
@@ -60,7 +61,8 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
     private readonly logger: PinoLogger,
     private readonly latch: NotificationShutdownLatch,
     private readonly gate: NotificationDispatchGate,
-    private readonly admissions: NotificationAttemptAdmission
+    private readonly admissions: NotificationAttemptAdmission,
+    private readonly readiness: WorkReadiness
   ) {
     this.logger.setContext(NotificationDispatchService.name)
   }
@@ -106,14 +108,14 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
 
   /** Reclaim expired leases, then drain due deliveries until the backlog is clear. */
   async runDispatchCycle(): Promise<void> {
-    if (this.latch.closed) return
+    if (!this.readiness.isReady || this.latch.closed) return
     await this.reapExpiredLeases()
     await this.drainDueBatches()
   }
 
   /** Reclaim crashed/stalled (`PROCESSING`, lease expired) deliveries. */
   async reapExpiredLeases(): Promise<void> {
-    if (this.latch.closed) return
+    if (!this.readiness.isReady || this.latch.closed) return
     // The repository runs its transaction through the latch; wrapping the call here as well keeps
     // the wait bounded independently of that implementation detail.
     const reaped = await this.latch.run(() => this.repository.reapExpiredLeases())
@@ -136,7 +138,7 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
    * resolve when lane WORK is done — never waiting for a still-pending physical call.
    */
   async drainDueBatches(): Promise<void> {
-    if (this.latch.closed) return
+    if (!this.readiness.isReady || this.latch.closed) return
     const granted = this.gate.reserve(this.gate.capacity)
     if (granted === 0) {
       // Full: a running lane will look once more before it exits (no lost wake).
@@ -168,7 +170,7 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
       }
     }
     try {
-      while (!this.latch.closed && budget.remaining > 0) {
+      while (this.readiness.isReady && !this.latch.closed && budget.remaining > 0) {
         budget.remaining -= 1
         const claimed = await this.latch.run(() => this.repository.claimDueBatch(1))
         if (claimed === CUTOFF) return

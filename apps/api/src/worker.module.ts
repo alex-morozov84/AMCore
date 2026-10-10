@@ -10,7 +10,7 @@ import { appProviders, coreImports, workerImports } from './app-imports'
  * exposes a probe/scrape-only HTTP surface and routes no business API.
  */
 @Module({
-  imports: [...coreImports(), ...workerImports],
+  imports: [...coreImports('worker'), ...workerImports()],
   providers: appProviders,
 })
 export class WorkerModule {}

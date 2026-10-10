@@ -32,16 +32,18 @@ Queued email is only for explicitly queueable, non-secret templates:
 ```text
 EmailService.queue()
   -> BullMQ EMAIL / SEND_EMAIL job
-  -> EmailProcessor
-  -> renderTemplate()
-  -> send()
-  -> EmailProvider
+  -> registered managed worker + queued-email policy
+  -> validate and freeze the rendered request
+  -> PG possible-call reservation + current broker/time fence
+  -> byte-preserving queued provider transport
 ```
 
 Queued jobs are runtime-validated with Zod after Redis deserialization, use
-provider idempotency keys derived from the BullMQ job id, retry transient
-provider failures, and dead-letter deterministic failures without logging
-payload values.
+an incarnation-derived provider key and immutable request bytes. Finite retries
+must satisfy recorded certainty, cooldown and the original horizon. A recycled
+job ID does not renew an old delivery's window. See
+[queued safety and recovery](queued-safety.md) for clock assumptions, legacy handling
+and independent evidence retention.
 
 ## Direct Secret Email
 
@@ -92,9 +94,12 @@ rate is limited, replicas multiply the cap.
 
 ## Provider Contract
 
-Providers implement both `EmailProvider.send(params)` and
-`EmailProvider.sendPrepared(body, idempotencyKey, signal)` from `email.types.ts`. Direct and queued email
-use `send`; durable notification deliveries use `sendPrepared`. The latter must send
+Providers implement `EmailProvider.send(params)` and
+`EmailProvider.sendPrepared(body, idempotencyKey, signal)` from `email.types.ts`.
+Direct email uses `send`; durable notification deliveries use `sendPrepared`.
+Queued email additionally requires the closed `queuedEmail` recipe port with
+frozen scope, certainty mapping and a synchronous actual-transport fence. The
+prepared notification port must send
 `body` unchanged with the required `idempotencyKey`, attach credentials at send
 time and propagate the live abort signal. Do not parse and re-render its content.
 The installed-SDK fake-fetch suite `resend.provider.contract.spec.ts` verifies the

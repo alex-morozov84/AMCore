@@ -8,6 +8,7 @@ import { ResendEmailProvider } from './providers/resend.provider'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
+import { ControlConnection } from '@/infrastructure/background-work/control-connection'
 import { MetricsService, ObservabilityModule } from '@/infrastructure/observability'
 import { QueueModule, QueueService } from '@/infrastructure/queue'
 
@@ -19,9 +20,9 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
  * - Provider abstraction (Resend/Mock)
  * - Async delivery: enqueues onto BullMQ
  *
- * The BullMQ consumer (`EmailProcessor`) lives in `EmailWorkerModule`, imported
- * only by the worker/all process roots (ADR-041). This module is safe to import
- * from `web` — it never registers a worker.
+ * The shared runtime loads `EmailWorkerModule` handler bindings only for
+ * worker/all roots. This module is safe to import from web and does not register
+ * a worker or a separate control-connection pool.
  */
 @Module({
   imports: [EnvModule, QueueModule, ObservabilityModule],
@@ -29,8 +30,12 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
     // Dynamic provider selection based on env
     {
       provide: 'EmailProvider',
-      inject: [EnvService, PinoLogger],
-      useFactory: (env: EnvService, logger: PinoLogger): EmailProvider => {
+      inject: [EnvService, PinoLogger, ControlConnection],
+      useFactory: (
+        env: EnvService,
+        logger: PinoLogger,
+        control: ControlConnection
+      ): EmailProvider => {
         const provider = env.get('EMAIL_PROVIDER')
 
         switch (provider) {
@@ -38,7 +43,7 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
             return new ResendEmailProvider(env, logger)
           case 'mock':
           default:
-            return new MockEmailProvider(logger)
+            return new MockEmailProvider(logger, env, control)
         }
       },
     },
@@ -57,6 +62,6 @@ import { QueueModule, QueueService } from '@/infrastructure/queue'
       },
     },
   ],
-  exports: [EmailService],
+  exports: [EmailService, 'EmailProvider'],
 })
 export class EmailModule {}

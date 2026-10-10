@@ -66,7 +66,7 @@ export const SCAFFOLD_COVERING_SCENARIOS = [
       routeProgress: 'enabled',
       proxy: 'none',
     },
-    WEB_BUILD_STEPS
+    [...WEB_BUILD_STEPS, ['--filter', 'api', 'typecheck']]
   ),
   row(
     'coverage-single-en-path-route-off',

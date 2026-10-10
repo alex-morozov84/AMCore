@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { workPresentationSchema } from './work-presentation'
+
 /** Queue kind: `work` carries jobs, `wake` only nudges a durable database worker, `extension` is downstream-defined. */
 export const ADMIN_QUEUE_KINDS = ['work', 'wake', 'extension'] as const
 
@@ -46,6 +48,7 @@ export type AdminQueueAge = z.infer<typeof adminQueueAgeSchema>
  */
 const identity = {
   name: adminQueueNameSchema,
+  presentation: workPresentationSchema.optional(),
   kind: z.enum(ADMIN_QUEUE_KINDS),
   inBoard: z.boolean(),
 }

@@ -8,6 +8,7 @@ import type { ClaimedRun } from './ai-run-dispatch.types'
 import type { AiRunExecutorService } from './ai-run-executor.service'
 import { AiRunCapacityGate, AiRunShutdownLatch } from './ai-run-shutdown'
 
+import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
 import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
@@ -49,16 +50,19 @@ describe('AiRunDispatchService', () => {
   let service: AiRunDispatchService
   const logger = { setContext: jest.fn(), warn: jest.fn(), error: jest.fn() }
 
-  function build(capacity = 2): void {
+  function build(capacity = 2, ready = true): void {
     latch = new AiRunShutdownLatch(logger as unknown as PinoLogger)
     gate = new AiRunCapacityGate(latch, capacity)
+    const readiness = new WorkReadiness()
+    if (ready) readiness.open()
     service = new AiRunDispatchService(
       prisma as unknown as PrismaService,
       repository,
       executor as unknown as AiRunExecutorService,
       latch,
       gate,
-      logger as never
+      logger as never,
+      readiness
     )
   }
 
@@ -328,4 +332,14 @@ describe('AiRunDispatchService', () => {
       }
     })
   })
+  it('performs no PG recovery/claim or executor call before shared startup readiness', async () => {
+    build(2, false)
+    await service.runDispatchCycle()
+    await service.reap()
+    await service.drainDueBatches()
+    expect(repository.reapExpiredLeases).not.toHaveBeenCalled()
+    expect(repository.claimDueBatch).not.toHaveBeenCalled()
+    expect(executor.execute).not.toHaveBeenCalled()
+  })
+
 })

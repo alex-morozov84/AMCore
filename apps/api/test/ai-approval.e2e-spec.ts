@@ -8,11 +8,11 @@ import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiApprovalExpiryService } from '../src/infrastructure/ai/runs/ai-approval-expiry.service'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { currentTimeTool } from '../src/infrastructure/ai/tools/reference/current-time.tool'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { demoSensitiveTool } from './fixtures/demo-sensitive.tool'
 import { approvalHash } from './fixtures/extension-contracts/approval-hash'
 import { registerFixtureTools } from './fixtures/extension-contracts/tool-registration'
@@ -58,7 +58,7 @@ describe('AI approval lifecycle (e2e)', () => {
     expiry = app.get(AiApprovalExpiryService, { strict: false })
     const scheduler = app.get(SchedulerRegistry, { strict: false })
     for (const job of scheduler.getCronJobs().values()) job.stop()
-    await app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(app, 'ai-runs')
   }, 120000)
 
   afterAll(async () => {

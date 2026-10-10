@@ -185,4 +185,63 @@ describe('ResendEmailProvider against the real Resend SDK', () => {
     }
     expect(prepared).not.toContain('re_test_fake')
   })
+
+  it('checks the queued fence before SDK fetch and preserves immutable bytes/key', async () => {
+    respond(200, { id: 'em_queued' })
+    const body = '{"from":"fake@example.test","to":["recipient@example.test"]}'
+    const fence = jest.fn(() => {
+      expect(calls).toHaveLength(0)
+    })
+    const outcome = await provider.queuedEmail.send(
+      body,
+      'email:fake-incarnation',
+      new AbortController().signal,
+      fence
+    )
+    expect(outcome).toEqual({ certainty: 'accepted', retryable: false, code: 'COMPLETED' })
+    expect(fence).toHaveBeenCalledTimes(1)
+    expect(calls[0]!.init.body).toBe(body)
+    expect(new Headers(calls[0]!.init.headers).get('idempotency-key')).toBe(
+      'email:fake-incarnation'
+    )
+  })
+
+  it('never fetches when the synchronous queued fence refuses', async () => {
+    respond(200, { id: 'em_queued' })
+    await expect(
+      provider.queuedEmail.send(
+        '{}',
+        'email:fake-incarnation',
+        new AbortController().signal,
+        () => {
+          throw new Error('FENCE_STALE')
+        }
+      )
+    ).rejects.toThrow('FENCE_STALE')
+    expect(calls).toHaveLength(0)
+  })
+
+  it.each([429, 500])(
+    'does not mistake parsed error.statusCode for actual HTTP truth (%i)',
+    async (status) => {
+      respond(
+        status,
+        { name: 'rate_limit_exceeded', statusCode: 429, message: 'SENTINEL' },
+        { 'retry-after': 'Mon, 05 Oct 2026 12:02:00 GMT' }
+      )
+      const outcome = await provider.queuedEmail.send(
+        '{}',
+        'email:fake-incarnation',
+        new AbortController().signal,
+        () => undefined
+      )
+      expect(outcome).toEqual({
+        certainty: 'unknown',
+        retryable: true,
+        code: 'RATE_LIMITED',
+        retryAfter: { kind: 'absolute', timestamp: Date.parse('2026-10-05T12:02:00.000Z') },
+      })
+      expect(JSON.stringify(outcome)).not.toContain('SENTINEL')
+    }
+  )
 })

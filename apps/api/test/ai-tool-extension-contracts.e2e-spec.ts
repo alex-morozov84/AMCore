@@ -12,7 +12,6 @@ import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { AiToolActionService } from '../src/infrastructure/ai/runs/ai-tool-action.service'
 import { AiToolContractRegistry } from '../src/infrastructure/ai/tools/ai-tool-contract.registry'
@@ -20,6 +19,7 @@ import { prepareToolIntent } from '../src/infrastructure/ai/tools/ai-tool-intent
 import type { AttemptRuntime } from '../src/infrastructure/worker-lifecycle'
 
 import { deferred, until } from './fixtures/ai-run-controls'
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import {
   FixtureOrganizationAuthority,
   fixtureOrganizationRegistration,
@@ -52,7 +52,7 @@ describe('Permission-aware tool extension (PostgreSQL)', () => {
       registerFixtureToolEntries(builder, [fixtureOrganizationRegistration])
     )
     for (const job of context.app.get(SchedulerRegistry).getCronJobs().values()) job.stop()
-    await context.app.get(AiRunDispatchProcessor).worker.close()
+    await closeManagedWorker(context.app, 'ai-runs')
     dispatch = context.app.get(AiRunDispatchService)
     approvals = context.app.get(AiApprovalService)
     await context.prisma.$executeRaw`CREATE TABLE core.extension_fixture_tool_effects (

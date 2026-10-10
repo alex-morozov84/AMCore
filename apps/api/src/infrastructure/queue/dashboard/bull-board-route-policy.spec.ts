@@ -78,6 +78,10 @@ describe('board route policy', () => {
       true
     )
     expect(isValidQueuesQuery(query(`jobsPerPage=${BOARD_MAX_JOBS_PER_PAGE}`))).toBe(true)
+    expect(isValidQueuesQuery(query('page=11&jobsPerPage=50'))).toBe(true)
+    expect(isValidQueuesQuery(query('page=12&jobsPerPage=50'))).toBe(false)
+    expect(isValidQueuesQuery(query('page=52'))).toBe(true)
+    expect(isValidQueuesQuery(query('page=53'))).toBe(false)
     for (const bad of [
       `jobsPerPage=${BOARD_MAX_JOBS_PER_PAGE + 1}`,
       'jobsPerPage=0',

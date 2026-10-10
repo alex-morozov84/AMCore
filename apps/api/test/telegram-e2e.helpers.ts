@@ -4,11 +4,11 @@ import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import request from 'supertest'
 
-import { NotificationDispatchProcessor } from '../src/core/notifications/dispatch/notification-dispatch.processor'
 import { NotificationDispatchService } from '../src/core/notifications/dispatch/notification-dispatch.service'
 import { NotificationsService } from '../src/core/notifications/notifications.service'
 import type { PrismaService } from '../src/prisma'
 
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 import { type FakeTelegram, startFakeTelegram } from './telegram-fake-server'
 
@@ -35,7 +35,7 @@ export async function setupTelegramE2E(): Promise<TelegramE2E> {
   const { app } = context
   // Only explicit `dispatch.runDispatchCycle()` calls should drain — no cron, no async worker race.
   for (const [, job] of app.get(SchedulerRegistry, { strict: false }).getCronJobs()) void job.stop()
-  await app.get(NotificationDispatchProcessor, { strict: false }).worker.close(true)
+  await closeManagedWorker(app, 'notifications', true)
   return {
     context,
     app,

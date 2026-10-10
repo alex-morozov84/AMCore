@@ -1,13 +1,18 @@
-import { HttpStatus, Inject, Injectable, type OnModuleInit } from '@nestjs/common'
-import type { Job, Queue } from 'bullmq'
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common'
+import type { Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AppException, NotFoundException } from '../../common/exceptions'
+import { NotFoundException } from '../../common/exceptions'
+import type {
+  ManagedJobIdentity,
+  ManagedJobOptions,
+  ManagedProducer,
+} from '../background-work/managed-producer'
+import { MANAGED_PRODUCERS } from '../background-work/registration'
+import type { WorkDefinition } from '../background-work/work-definition'
 
 import { QUEUE_REGISTRY } from './constants/queue-inventory.constant'
 import type { QueueName } from './constants/queues.constant'
-import type { JobOptions } from './interfaces/job-options.interface'
-import { DEFAULT_JOB_OPTIONS } from './interfaces/job-options.interface'
 import type { IQueueService } from './interfaces/queue.interface'
 
 import { MetricsService } from '@/infrastructure/observability'
@@ -19,7 +24,9 @@ export class QueueService implements IQueueService, OnModuleInit {
   constructor(
     @Inject(QUEUE_REGISTRY) queues: ReadonlyMap<QueueName, Queue>,
     private readonly logger: PinoLogger,
-    private readonly metrics: MetricsService
+    private readonly metrics: MetricsService,
+    @Inject(MANAGED_PRODUCERS)
+    private readonly producers: ReadonlyMap<string, ManagedProducer<WorkDefinition>>
   ) {
     this.logger.setContext(QueueService.name)
     // One registry built from the enabled inventory; the public add/get API is unchanged.
@@ -32,7 +39,7 @@ export class QueueService implements IQueueService, OnModuleInit {
    * Producer-side Redis observability (EQS-06). Surfaces a Redis outage on the
    * *producer* path (`queue.redis_error`) instead of it being silent until jobs
    * visibly stop. The worker's blocking connection is observed separately via
-   * `EmailProcessor`'s `@OnWorkerEvent('error')`.
+   * the managed host's worker error event and the registered email handler.
    *
    * MUST NOT block bootstrap. `queue.getBackend().client` (BullMQ 6's Redis-
    * specific escape hatch, replacing the removed `Queue#client`) is BullMQ's
@@ -82,131 +89,28 @@ export class QueueService implements IQueueService, OnModuleInit {
     queueName: string,
     jobName: string,
     data: T,
-    options?: JobOptions
-  ): Promise<Job<T>> {
+    options?: ManagedJobOptions
+  ): Promise<ManagedJobIdentity> {
     const queue = this.getQueue(queueName)
 
     if (!queue) {
       throw new NotFoundException('Queue', queueName)
     }
 
-    const mergedOptions = { ...DEFAULT_JOB_OPTIONS, ...options }
-
-    const job = await queue.add(jobName, data, mergedOptions)
+    const producer = this.producers.get(queueName)
+    if (!producer) throw new Error('ACTION_UNAVAILABLE')
+    const identity = await producer.add(jobName, data, options)
 
     this.metrics.incQueueEvent(queueName as QueueName, 'job_added')
-    this.logger.info({ jobId: job.id, jobName, queueName }, `Job added to queue "${queueName}"`)
+    this.logger.info(
+      { jobId: identity.jobId, jobName, queueName },
+      `Job added to queue "${queueName}"`
+    )
 
-    return job as Job<T>
+    return identity
   }
 
   getQueue(queueName: string): Queue | undefined {
     return this.queues.get(queueName as QueueName)
-  }
-
-  async removeJob(queueName: string, jobId: string): Promise<void> {
-    const job = await this.getJob(queueName, jobId)
-
-    if (!job) {
-      throw new AppException(
-        `Job "${jobId}" not found in queue "${queueName}"`,
-        HttpStatus.NOT_FOUND,
-        'RESOURCE_NOT_FOUND',
-        { resource: 'Job', jobId, queueName }
-      )
-    }
-
-    await job.remove()
-
-    this.logger.info({ jobId, queueName }, `Job removed from queue "${queueName}"`)
-  }
-
-  async getJob<T = unknown>(queueName: string, jobId: string): Promise<Job<T> | undefined> {
-    const queue = this.getQueue(queueName)
-
-    if (!queue) {
-      throw new NotFoundException('Queue', queueName)
-    }
-
-    return (await queue.getJob(jobId)) as Job<T> | undefined
-  }
-
-  async getActiveJobs(queueName: string): Promise<Job[]> {
-    const queue = this.getQueue(queueName)
-
-    if (!queue) {
-      throw new NotFoundException('Queue', queueName)
-    }
-
-    return queue.getActive()
-  }
-
-  async getFailedJobs(queueName: string): Promise<Job[]> {
-    const queue = this.getQueue(queueName)
-
-    if (!queue) {
-      throw new NotFoundException('Queue', queueName)
-    }
-
-    return queue.getFailed()
-  }
-
-  async retryJob(queueName: string, jobId: string): Promise<void> {
-    const job = await this.getJob(queueName, jobId)
-
-    if (!job) {
-      throw new AppException(
-        `Job "${jobId}" not found in queue "${queueName}"`,
-        HttpStatus.NOT_FOUND,
-        'RESOURCE_NOT_FOUND',
-        { resource: 'Job', jobId, queueName }
-      )
-    }
-
-    await job.retry()
-
-    this.logger.info({ jobId, queueName }, `Job retried in queue "${queueName}"`)
-  }
-
-  async pauseQueue(queueName: string): Promise<void> {
-    const queue = this.getQueue(queueName)
-
-    if (!queue) {
-      throw new NotFoundException('Queue', queueName)
-    }
-
-    await queue.pause()
-
-    this.logger.info({ queueName }, 'Queue paused')
-  }
-
-  async resumeQueue(queueName: string): Promise<void> {
-    const queue = this.getQueue(queueName)
-
-    if (!queue) {
-      throw new NotFoundException('Queue', queueName)
-    }
-
-    await queue.resume()
-
-    this.logger.info({ queueName }, 'Queue resumed')
-  }
-
-  async cleanQueue(
-    queueName: string,
-    grace: number,
-    status: 'completed' | 'failed'
-  ): Promise<string[]> {
-    const queue = this.getQueue(queueName)
-
-    if (!queue) {
-      throw new NotFoundException('Queue', queueName)
-    }
-
-    const cleaned = await queue.clean(grace, 1000, status)
-
-    this.logger.info({ queueName, status, grace, cleaned: cleaned.length }, 'Queue cleaned')
-
-    return cleaned
   }
 }

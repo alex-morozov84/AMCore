@@ -23,6 +23,10 @@ const linkedTests = [
 ].map(([path, module]) => one(path, { module }))
 
 const e2eVerification = [
+  'apps/web/e2e/real-stack/admin-background-work.spec.ts',
+  'apps/web/e2e/console-real-stack/background-work.spec.ts',
+  'apps/web/e2e/shared/background-work-journey.ts',
+  'apps/web/e2e/shared/background-work-intercepted-journeys.ts',
   'apps/api/test/oauth.e2e-spec.ts',
   'apps/web/e2e/console-real-stack/session-isolation.spec.ts',
   'apps/web/e2e/mocked/accessibility.spec.ts',
@@ -101,8 +105,12 @@ export const localeOwnershipFacts = {
     ...e2eVerification,
     ...localeOnlyVerification,
     one('apps/web/src/features/auth-login/ui/LoginForm.stories.tsx', { disposition: 'rewrite' }),
-    one('apps/web/src/features/auth-register/ui/RegisterForm.stories.tsx', { disposition: 'rewrite' }),
-    one('apps/web/src/features/auth-reset-password/ui/ResetPasswordForm.stories.tsx', { disposition: 'rewrite' }),
+    one('apps/web/src/features/auth-register/ui/RegisterForm.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/auth-reset-password/ui/ResetPasswordForm.stories.tsx', {
+      disposition: 'rewrite',
+    }),
     one('apps/web/src/_pages/invitation-recipient/ui/recipient-auth.stories.tsx', {
       disposition: 'rewrite',
     }),

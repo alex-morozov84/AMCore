@@ -16,6 +16,12 @@ import { queueMessages } from './queue-test-messages'
 import { QueueSummaryLive } from './QueueSummaryLive'
 import { useQueueSummary } from './use-queue-summary'
 
+vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
+  useRouteProgressRouter: () => ({ refresh: vi.fn() }),
+}))
+
+vi.mock('@/features/console-background-work', () => ({ BackgroundWorkControls: () => null }))
+
 vi.mock('./use-queue-summary', () => ({ useQueueSummary: vi.fn() }))
 
 const setAuto = vi.fn()
@@ -23,6 +29,10 @@ const refresh = vi.fn()
 function state(overrides: Partial<ReturnType<typeof useQueueSummary>> = {}) {
   vi.mocked(useQueueSummary).mockReturnValue({
     data: mixedSummary,
+    workRefreshed: false,
+    works: undefined,
+    workError: null,
+    partial: false,
     denied: false,
     auto: true,
     setAuto,
@@ -161,7 +171,7 @@ describe('rows', () => {
 describe('status line and degraded states', () => {
   it('shows when the snapshot was taken', () => {
     view()
-    expect(screen.getByText(/Checked:/)).toBeInTheDocument()
+    expect(screen.getByText(/Last refreshed:/)).toBeInTheDocument()
     expect(document.querySelector('time')?.getAttribute('datetime')).toBe(mixedSummary.checkedAt)
   })
 
@@ -176,7 +186,7 @@ describe('status line and degraded states', () => {
     view()
     expect(screen.getByRole('status')).toHaveTextContent('Showing data from')
     expect(screen.getByRole('status')).toHaveTextContent('The last refresh failed.')
-    expect(screen.queryByText(/Checked:/)).toBeNull()
+    expect(screen.queryByText(/Last refreshed:/)).toBeNull()
   })
 
   it('hides every row after access is lost', () => {

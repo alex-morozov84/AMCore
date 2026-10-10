@@ -23,6 +23,7 @@ import { NotificationChannel } from '../src/core/notifications/notification.cons
 import { NOTIFICATION_CHANNELS } from '../src/core/notifications/notification-composition'
 import { NotificationDefinitionRegistry } from '../src/core/notifications/notification-definition.registry'
 import { EnvService } from '../src/env/env.service'
+import { WorkReadiness } from '../src/infrastructure/background-work/work-readiness'
 import type { PrismaService } from '../src/prisma'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
@@ -434,7 +435,8 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
               return started
             },
           }),
-        } as unknown as NotificationAttemptAdmission
+        } as unknown as NotificationAttemptAdmission,
+        app.get(WorkReadiness, { strict: false })
       )
       service.shutdownGraceMs = 500
 

@@ -10,10 +10,10 @@ secret-bearing email data is never serialized into shared infrastructure.
   notification payloads, audit logs, metrics, or application logs.
 - `SendEmailJobData` is restricted to queueable templates at compile time.
 - `EmailService.queue()` rejects non-queueable templates at runtime.
-- `EmailProcessor` discards injected legacy secret-bearing jobs before rendering
-  or sending.
+- The managed email host discards injected legacy or enveloped secret-bearing
+  jobs before version validation, rendering or provider admission.
 - Notification definitions reject `SECRET` content entirely.
-- Logs may include bounded metadata such as template, recipient, job id, and
+- Logs may include bounded metadata such as template, redacted recipient, job id, and
   provider status, but never rendered bodies or raw payload objects.
 
 ## Allowed Metadata
@@ -21,7 +21,7 @@ secret-bearing email data is never serialized into shared infrastructure.
 Application logs may contain:
 
 - template name;
-- recipient email address;
+- redacted recipient email address;
 - provider success/failure status;
 - bounded job or delivery identifiers;
 - retryability classification.

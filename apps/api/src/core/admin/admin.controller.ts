@@ -125,6 +125,8 @@ export class AdminController {
     description:
       'Newest first within a fixed UTC [from,to) interval. Defaults to 7 days; maximum 31 days. ' +
       'Current names are present-day data and may differ from the event date. ' +
+      'Background-work events expose only allowlisted command details: work/task/command IDs, operation, ' +
+      'operator reason, target count, outcome and resolution when recorded; raw metadata is never returned. ' +
       'Each successful read is durably audited. Invalid or stale cursors require a cursor reset.',
   })
   @ApiQuery({ name: 'actorId', required: false, type: String, maxLength: 128 })

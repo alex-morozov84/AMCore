@@ -10,7 +10,7 @@ type MetadataRule = MetadataSpec | PrimitiveArrayRule | MetadataValueRule | true
 type Primitive = boolean | number | string | null
 type PrimitiveArrayRule = 'number[]' | 'string[]'
 /** A custom bounded-value rule: returns the accepted primitive, or `undefined` to drop the field. */
-type MetadataValueRule = (value: unknown) => Primitive | undefined
+type MetadataValueRule = (value: unknown) => Primitive | Prisma.JsonArray | undefined
 
 /** Accept a string only when it is within `maxLength` and matches `pattern`; else drop the field. */
 function boundedString(maxLength: number, pattern: RegExp): MetadataValueRule {
@@ -121,7 +121,46 @@ const roleDefinitionAuditMetadata: MetadataSpec = {
   source: boundedString(12, /^(editor|legacy)$/),
 }
 
+const backgroundControlMetadata: MetadataSpec = {
+  workId: aiSlug,
+  commandId: boundedString(36, /^[a-f0-9-]{36}$/),
+  dispatchId: boundedString(36, /^[a-f0-9-]{36}$/),
+  incarnation: boundedString(36, /^[a-f0-9-]{36}$/),
+  queueEpoch: boundedString(36, /^[a-f0-9-]{36}$/),
+  jobId: boundedString(128, /^[A-Za-z0-9_-]+$/),
+  operation: boundedString(7, /^(retry|pause|resume|cancel|cleanup)$/),
+  outcome: boundedString(16, /^(prepared|dispatching|applied|rejected|not_attempted|unknown)$/),
+  resolution: boundedString(32, /^(none|acknowledged_unknown|proven_applied|proven_no_effect)$/),
+  reasonCode: boundedString(64, /^[A-Z][A-Z0-9_]*$/),
+  reason: (value) =>
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 250 &&
+    Buffer.byteLength(value, 'utf8') <= 1024
+      ? value
+      : undefined,
+  snapshotDigest: boundedString(64, /^[a-f0-9]{64}$/),
+  count: auditResultCount,
+  references: (value) =>
+    Array.isArray(value) &&
+    value.length <= 3 &&
+    value.every(
+      (item) =>
+        typeof item === 'string' &&
+        item.length > 0 &&
+        item.length <= 64 &&
+        /^[A-Za-z0-9_-]+$/.test(item)
+    )
+      ? value
+      : undefined,
+}
+
 const specs: Record<AuditAction, MetadataSpec> = {
+  'background_work.command_intent': backgroundControlMetadata,
+  'background_work.command_outcome': backgroundControlMetadata,
+  'background_work.command_denied': backgroundControlMetadata,
+  'background_work.command_resolution': backgroundControlMetadata,
+  'background_work.evidence_resolution': backgroundControlMetadata,
   'admin.audit_logs.viewed': {
     actor: auditFilterFlag,
     action: auditFilterFlag,

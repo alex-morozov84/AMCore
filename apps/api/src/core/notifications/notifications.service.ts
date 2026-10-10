@@ -17,7 +17,6 @@ import type { NotificationDefinition } from './notification-definition.types'
 import {
   NOTIFICATION_EXTERNAL_MAX_ATTEMPTS,
   NOTIFICATION_IN_APP_MAX_ATTEMPTS,
-  NOTIFICATION_WAKE_JOB_OPTIONS,
 } from './notification-dispatch.constants'
 import type { DispatchDueJob } from './notification-dispatch.schema'
 import { notificationIntent } from './notification-intent'
@@ -209,12 +208,9 @@ export class NotificationsService {
   /** Best-effort dispatch wake. Swallows queue/Redis errors (the poller recovers). */
   private async enqueueWake(notificationId: string): Promise<void> {
     try {
-      await this.queue.add(
-        QueueName.NOTIFICATIONS,
-        JobName.DISPATCH_DUE,
-        { notificationId } satisfies DispatchDueJob,
-        NOTIFICATION_WAKE_JOB_OPTIONS
-      )
+      await this.queue.add(QueueName.NOTIFICATIONS, JobName.DISPATCH_DUE, {
+        notificationId,
+      } satisfies DispatchDueJob)
     } catch (err) {
       this.logger.warn(
         {

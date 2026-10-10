@@ -10,7 +10,14 @@ It shows a table on wide screens and cards on narrow screens.
 ## Read an event
 
 Each entry shows a time, action, actor, target, and organization when present.
-A short coded result appears for actions that have one. Badges distinguish
+A short coded result appears for actions that have one. For background-work events,
+expand **Details** to read the action, work/task IDs, command ID, operator reason,
+target count, result or uncertainty resolution when recorded. IDs can be copied.
+The request event records the reason and count; individual outcome events identify
+each affected task. New outcome events also retain the reason. Historical outcome
+events may omit it: inspect the request event with the same command ID. A batch
+creates separate target outcomes; applied means the administrative change was
+confirmed, not that the subsequent business task completed. Badges distinguish
 users, API keys, system jobs, and other actor or target types. A dash means
 that the event has no value for that field.
 

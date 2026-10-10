@@ -14,7 +14,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '../../../common/exceptions'
-import { AI_APPROVAL_LIST_LIMIT, AI_RUN_WAKE_JOB_OPTIONS } from '../ai-run.constants'
+import { AI_APPROVAL_LIST_LIMIT } from '../ai-run.constants'
 import { lockRun, runIdOfApproval } from '../ai-run-locks'
 import type { AiRunWakeJob } from '../runs/ai-run-producer.service'
 
@@ -371,8 +371,7 @@ export class AiApprovalService {
       await this.queue.add(
         QueueName.AI_RUNS,
         JobName.AI_RUN_WAKE,
-        { runId } satisfies AiRunWakeJob,
-        AI_RUN_WAKE_JOB_OPTIONS
+        { runId } satisfies AiRunWakeJob
       )
     } catch (err) {
       this.logger.warn(

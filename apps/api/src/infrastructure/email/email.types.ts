@@ -5,6 +5,7 @@
  */
 
 import type { Locale } from './messages'
+import type { QueuedEmailProvider } from './queued-email-provider'
 
 /**
  * Email send parameters
@@ -51,6 +52,9 @@ export interface SendEmailResult {
    * normalized number crosses the boundary: no headers, body or provider error text.
    */
   retryAfterMs?: number
+  /** Policy-aware queued delivery only; retryable alone never establishes no external effect. */
+  attemptEffectCertainty?: 'none' | 'accepted' | 'unknown'
+  safeCode?: 'COMPLETED' | 'RATE_LIMITED' | 'TRANSIENT_FAILURE' | 'PERMANENT_FAILURE'
 }
 
 /**
@@ -59,6 +63,8 @@ export interface SendEmailResult {
  * All email providers (Resend, Mock) must implement this interface
  */
 export interface EmailProvider {
+  /** Absent for an unapproved custom transport: queued replay has no generic safety guarantee. */
+  readonly queuedEmail?: QueuedEmailProvider
   /**
    * Send an email
    */

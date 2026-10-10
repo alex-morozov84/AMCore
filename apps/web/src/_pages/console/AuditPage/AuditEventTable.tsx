@@ -4,9 +4,10 @@ import { Filter } from 'lucide-react'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 
-import type { AuditCopy } from './audit-copy'
+import { auditActionLabel, type AuditCopy } from './audit-copy'
 import { auditSummary } from './audit-summary'
 import { auditRowFilter } from './audit-url'
+import { AuditCommandDetails } from './AuditCommandDetails'
 import { AuditReference } from './AuditReference'
 import { AuditTimestamp } from './AuditTimestamp'
 import { CopyAuditId } from './CopyAuditId'
@@ -40,7 +41,7 @@ export function AuditEventTable({
           {items.map((item, index) => {
             const known = item.action && AUDIT_ACTIONS.some((code) => code === item.action)
             const label = known
-              ? copy.actions[item.action as keyof AuditCopy['actions']]
+              ? auditActionLabel(copy, item.action!)
               : (item.action ?? copy.unknownAction)
             return (
               <TableRow key={item.id ?? `unsafe-${index}`} className="border-line-soft align-top">
@@ -74,6 +75,7 @@ export function AuditEventTable({
                   {auditSummary(item, copy) && (
                     <p className="mt-1 text-xs text-muted-foreground">{auditSummary(item, copy)}</p>
                   )}
+                  <AuditCommandDetails details={item.commandDetails} copy={copy} />
                   {item.id && (
                     <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                       <span className="truncate font-console-mono" title={item.id}>

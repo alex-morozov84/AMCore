@@ -11,7 +11,8 @@ these alerts being silent does not mean the backlog is fine.
 To see the current state of every queue (waiting, active, delayed, failed, paused,
 and a sampled age of the oldest queued job) without a metrics query, open the Operations
 Console's [Background work](../../operations-console/background-work.md) screen. It
-is read-only and shows `notifications` and `ai-runs` as wake queues: their real
+provides safe diagnostics and policy-eligible commands with captured confirmations
+and audited receipts. Bull Board remains read-only. It shows `notifications` and `ai-runs` as wake queues: their real
 backlog is in the database, as described under [Outbox backlog](#outbox-backlog).
 
 <!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->
@@ -76,7 +77,7 @@ has been paused for at least a minute).
 
 **Likely causes, ranked:**
 
-1. Someone paused the queue deliberately through the BullMQ API (the queue
+1. Someone paused the queue deliberately through the shared control API (the queue
    board is view-only and cannot pause) and this alert is a confirmation, not a
    surprise.
 2. The pause was accidental (a script or manual action targeting the wrong
@@ -92,9 +93,9 @@ has been paused for at least a minute).
    amcore_queue_paused == 1
    ```
 
-2. Check your team's change log / deploy history for who or what paused the
-   queue and why (the view-only queue board shows that a queue is paused, not
-   who paused it).
+2. Check the command receipt and audit for the actor, reason and outcome, then
+   correlate your team's deploy/change history. The read-only queue board shows
+   the pause flag but does not establish who changed it.
 3. Open the **"Queue paused"** dashboard panel (Queues & outbox row) to see
    the pause duration and whether other queues are affected too.
 
@@ -102,8 +103,12 @@ has been paused for at least a minute).
 
 - If deliberate and still needed: no action — this alert exists precisely so
   an intentional pause doesn't go unnoticed as "delivery silently stopped."
-- If accidental or no longer needed: resume the queue with the BullMQ API
-  through your controlled operational tooling. The queue board cannot resume
+- If accidental or no longer needed: use the shared background-work control API
+  with the current captured epoch/revision and a reason. Queue pause/resume remains
+  available for supported modern queues regardless of backlog size. Job actions
+  retain their bounded membership limits. Mixed legacy layouts refuse without
+  writes and require a controlled migration; do not merge lists with raw commands.
+  The queue board cannot resume
   a queue, and no setting makes it able to.
 
 **Escalation:** this is `severity: page` specifically because a paused queue

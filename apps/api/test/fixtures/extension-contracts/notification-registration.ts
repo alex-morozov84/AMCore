@@ -15,6 +15,7 @@ import type {
 import type { NotificationChannelDescriptor } from '../../../src/core/notifications/channels/notification-channel.types'
 import { preparedNotificationRequest } from '../../../src/core/notifications/channels/notification-prepared-request'
 import { NOTIFICATION_DEFINITIONS } from '../../../src/core/notifications/definitions'
+import { NotificationDispatchProcessor } from '../../../src/core/notifications/dispatch/notification-dispatch.processor'
 import { NotificationExecutionModule } from '../../../src/core/notifications/dispatch/notification-execution.module'
 import { NotificationPreparedRequestService } from '../../../src/core/notifications/dispatch/notification-prepared-request.service'
 import {
@@ -25,12 +26,14 @@ import { NOTIFICATION_CHANNELS } from '../../../src/core/notifications/notificat
 import { NotificationDefinitionRegistry } from '../../../src/core/notifications/notification-definition.registry'
 import type { NotificationDefinition } from '../../../src/core/notifications/notification-definition.types'
 import { NotificationsModule } from '../../../src/core/notifications/notifications.module'
+import { notificationsWork } from '../../../src/core/notifications/notifications.work'
 import { NotificationsCoreModule } from '../../../src/core/notifications/notifications-core.module'
 import {
   ConfiguredNotificationsWorkerModule,
   NotificationsWorkerModule,
 } from '../../../src/core/notifications/notifications-worker.module'
 import type { Prisma } from '../../../src/generated/prisma/client'
+import { bindWorkHandlers } from '../../../src/infrastructure/background-work/registration'
 import { PrismaModule } from '../../../src/prisma'
 
 @Injectable()
@@ -171,9 +174,16 @@ export function registerFixtureNotifications(builder: TestingModuleBuilder): Tes
     FixtureNotificationsModule,
     fixtureChannels
   )
+  const bindings = bindWorkHandlers(
+    notificationsWork,
+    { 'dispatch-due@1': NotificationDispatchProcessor },
+    [worker]
+  )
+  @Module({ imports: [worker, bindings], exports: [bindings] })
+  class FixtureNotificationsWorkerModule {}
   return builder
     .overrideModule(NotificationsModule)
     .useModule(FixtureNotificationsModule)
     .overrideModule(NotificationsWorkerModule)
-    .useModule(worker)
+    .useModule(FixtureNotificationsWorkerModule)
 }

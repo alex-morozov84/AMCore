@@ -5,7 +5,6 @@ import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.servic
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
 import { ModelGateway } from '../src/infrastructure/ai/gateway/model-gateway.service'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
-import { AiRunDispatchProcessor } from '../src/infrastructure/ai/runs/ai-run-dispatch.processor'
 import { reconstructRounds } from '../src/infrastructure/ai/runs/ai-run-loop-reconstruct'
 import { callProvider } from '../src/infrastructure/ai/runs/ai-run-provider-call'
 import { AiToolRecoveryService } from '../src/infrastructure/ai/runs/ai-tool-recovery.service'
@@ -14,6 +13,7 @@ import { REDIS_CLIENT } from '../src/infrastructure/redis'
 import { AttemptRuntime, CUTOFF, ShutdownLatch } from '../src/infrastructure/worker-lifecycle'
 
 import { ControllableAdapter, controls, deferred } from './fixtures/ai-run-controls'
+import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 
 /**
@@ -31,7 +31,7 @@ describe('AI run shutdown seal inside nested helpers (e2e)', () => {
     )
     for (const cron of context.app.get(SchedulerRegistry, { strict: false }).getCronJobs().values())
       cron.stop()
-    await context.app.get(AiRunDispatchProcessor, { strict: false }).worker.close()
+    await closeManagedWorker(context.app, 'ai-runs')
   }, 180000)
   afterAll(async () => {
     await teardownE2ETest(context)

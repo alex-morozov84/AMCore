@@ -8,7 +8,7 @@ import { appProviders, coreImports, webImports } from './app-imports'
  * enqueue jobs (via `EmailService` / `QueueService` in core) for a worker to run.
  */
 @Module({
-  imports: [...coreImports(), ...webImports],
+  imports: [...coreImports('web'), ...webImports],
   providers: appProviders,
 })
 export class WebModule {}

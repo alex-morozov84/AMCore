@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
 
+import { bindWorkHandlers } from '../background-work/registration'
+
 import { AiGatewayModule } from './ai-gateway.module'
 import { AiApprovalExpiryService } from './runs/ai-approval-expiry.service'
 import { AiRunRepository } from './runs/ai-run.repository'
@@ -19,6 +21,7 @@ import {
   AiRunShutdownLatch,
 } from './runs/ai-run-shutdown'
 import { AiRunTransitions } from './runs/ai-run-transitions.service'
+import { aiRunsWork } from './runs/ai-runs.work'
 import { AiToolActionService } from './runs/ai-tool-action.service'
 import { AiToolRecoveryService } from './runs/ai-tool-recovery.service'
 import { AiToolsModule } from './tools/ai-tools.module'
@@ -67,5 +70,11 @@ import { PrismaModule } from '@/prisma'
     AiRunDispatchProcessor,
     AiRunRecoveryService,
   ],
+  exports: [AiRunDispatchProcessor],
 })
+class AiRunImplementationModule {}
+
+const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor },
+  [AiRunImplementationModule])
+@Module({ imports: [AiRunImplementationModule, bindings], exports: [bindings] })
 export class AiWorkerModule {}
