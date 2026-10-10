@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import type { WorkSummary } from '@amcore/shared'
+import { DEFAULT_LOCALE, type WorkSummary } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -64,7 +64,7 @@ const work: WorkSummary = {
 }
 function view(value: WorkSummary) {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <WorkCard
         work={value}
         selected={false}

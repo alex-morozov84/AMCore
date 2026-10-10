@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Background-work Console uses page-wide refresh, registration-owned names,
   grouped task details and action results that keep request failures in confirmations.
 
+- Background-work registrations can provide localized operator names and safe
+  field labels; native job cards clarify unavailable actions and provider outcomes.
+
 - Background-work bindings separate canonical stored JSON from optional pure
   business normalization; retained versions share typed handler/projection inputs.
 - Single versioned background-work registration for managed producers, worker
@@ -215,8 +218,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Background-work Console uses page-wide refresh, registration-owned names and clear action results that keep request errors inside confirmations.
-
 - Refresh Vitest, request-context storage, environment loading and email
   localization dependencies; update the pinned CI security scanners together.
 
@@ -278,8 +279,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own Content-Security-Policy and headers on every answer of the mount, refusals included. The generic product proxy no longer reaches the board.
   A live `SUPER_ADMIN` access token is admitted next to the cookie, checked against the
   signed claim and the current database role on every request.
-
-- Background-work registrations can provide localized operator names and safe field labels; native job cards clarify unavailable actions and provider outcomes.
 
 ## [0.10.1] - 2026-09-29
 

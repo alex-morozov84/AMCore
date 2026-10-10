@@ -4,12 +4,12 @@ import { join, relative } from 'node:path'
 import ts from 'typescript'
 
 /**
- * Guard: BullMQ queues must come from the single queue inventory.
+ * Guard: BullMQ queues must come from the single work registration.
  *
- * A queue created outside `queue-inventory.constant.ts` is invisible to the Console Background
- * work screen, the depth metrics and `QueueService`, and nothing would say so. The compiler
- * already rejects a `QueueName` without a descriptor; this guard closes the other gap by parsing
- * every production source file and reporting file:line for the forms below.
+ * WorkDefinition composition creates queues and projects their observation inventory.
+ * A queue created elsewhere bypasses the Console, metrics and managed producer/worker wiring.
+ * This guard closes that gap by parsing every production source file and reporting file:line
+ * for the forms below.
  *
  * Detected (statically, through the TypeScript AST, so import aliases and multiline calls count):
  * - `new Queue(...)` where `Queue` is imported from `bullmq` under any local name, or
@@ -27,8 +27,8 @@ const SRC_ROOT = join(__dirname, '..', '..')
 
 /** Places allowed to create queues, each with the reason. Keep this list short. */
 const ALLOWLIST: Record<string, string> = {
-  'infrastructure/queue/queue.module.ts':
-    'registers the enabled inventory, the only place that may',
+  'infrastructure/background-work/compose-background-work.ts':
+    'registers enabled WorkDefinitions and projects the queue inventory, the only creation owner',
 }
 
 interface Finding {
@@ -184,7 +184,7 @@ describe('queue creation detector', () => {
 })
 
 describe('queue registration coverage', () => {
-  it('creates queues only through the single inventory', () => {
+  it('creates queues only through the single work registration', () => {
     const violations = sources(SRC_ROOT).flatMap((file) => {
       const name = relative(SRC_ROOT, file)
       if (name in ALLOWLIST) return []

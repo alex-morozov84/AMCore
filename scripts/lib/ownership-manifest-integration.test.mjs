@@ -23,7 +23,8 @@ function cloneManifest(change) {
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 17)
+  // Background-work controls add one closed feature root; nested files inherit its ownership.
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 18)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -59,7 +60,9 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assertExactScaffoldCounts([
     {
       name: 'console closed-root files',
-      expected: 327,
+      // PR5 adds seven BFF routes, one Audit detail, seventeen feature files,
+      // five Console API helpers/tests, one time-input helper and one accent test.
+      expected: 359,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

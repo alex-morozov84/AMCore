@@ -117,8 +117,7 @@ describe('AiRunProducerService', () => {
     expect(queue.add).toHaveBeenCalledWith(
       QueueName.AI_RUNS,
       JobName.AI_RUN_WAKE,
-      { runId: 'run-1' },
-      expect.objectContaining({ attempts: 1 })
+      { runId: 'run-1' }
     )
   })
 

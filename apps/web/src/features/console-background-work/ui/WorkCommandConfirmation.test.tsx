@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import type { WorkJob, WorkSummary } from '@amcore/shared'
+import { DEFAULT_LOCALE, type WorkJob, type WorkSummary } from '@amcore/shared'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -37,7 +37,7 @@ const row: WorkJob = {
 function view(operation: 'retry' | 'cancel' | 'cleanup' | 'pause' | 'resume') {
   const confirm = vi.fn()
   render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       <WorkCommandConfirmation
         work={work}
         operation={operation}

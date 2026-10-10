@@ -1,9 +1,15 @@
 import { type DynamicModule, Module } from '@nestjs/common'
+import type { Queue } from 'bullmq'
 import { z } from 'zod'
 
+import { aiRunsWork } from '../ai/runs/ai-runs.work'
+import { JobName } from '../queue/constants/queues.constant'
+
 import { composeBackgroundWork } from './compose-background-work'
+import { ManagedProducer } from './managed-producer'
 import { bindWorkHandlers, validateWorkRegistrations } from './registration'
 import { defineDurableWork, defineWork, type WorkRegistration } from './work-definition'
+import { WorkReadiness } from './work-readiness'
 
 @Module({})
 class BusinessModule {}
@@ -34,6 +40,42 @@ function ordinary(enabled = true) {
 }
 
 describe('Background-work registration boundary', () => {
+  it.each([undefined, 5])(
+    'forces wake attempts1 at the producer boundary for options %s',
+    async (attempts) => {
+      const epoch = '019a1234-1234-7123-8123-123456789012'
+      const add = jest.fn(async (_name: string, _data: unknown, _options: unknown) => ({
+        id: 'wake-proof',
+      }))
+      const evalRedis = jest
+        .fn()
+        .mockResolvedValueOnce(['initialized', epoch])
+        .mockImplementationOnce(async () => JSON.stringify(add.mock.calls[0]![1]))
+      const queue = {
+        keys: {},
+        toKey: (id: string) => `amcore:ai-runs:${id}`,
+        getBackend: () => ({ client: Promise.resolve({ eval: evalRedis }) }),
+        add,
+      } as unknown as Queue
+      const readiness = new WorkReadiness()
+      readiness.open()
+
+      const identity = await new ManagedProducer(aiRunsWork, queue, readiness).add(
+        JobName.AI_RUN_WAKE,
+        { runId: 'run-1' },
+        attempts === undefined ? undefined : { attempts }
+      )
+
+      expect(add).toHaveBeenCalledTimes(1)
+      expect(add).toHaveBeenCalledWith(
+        JobName.AI_RUN_WAKE,
+        expect.objectContaining({ payload: { runId: 'run-1' } }),
+        expect.objectContaining({ attempts: 1 })
+      )
+      expect(identity.jobId).toBe('wake-proof')
+    }
+  )
+
   it('validates bounded operator labels for both ordinary and durable registrations', () => {
     const presentation = {
       name: { en: 'Image processing', ru: 'Обработка изображений' },
