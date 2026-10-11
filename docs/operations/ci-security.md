@@ -61,8 +61,8 @@ of workflow self-hardening to keep the example forkable.
   31 named paths, rather than the full standard inventory.
   Initial layout admission requires Linux cold and cached setup evidence, measured
   runner-minutes and three comparable successful final warm observations.
-  The [API E2E budget policy](#api-e2e-budget-policy) defines the accepted limits. The workflow target is
-  15 minutes and its proposed ceiling is 17 minutes;
+  The [API E2E budget policy](#api-e2e-budget-policy) defines the accepted limits.
+  The workflow target is 15 minutes with a 17-minute ceiling;
   the API target is 12 minutes. The 30-minute measurement timeout is headroom.
   Cold diagnostics retain an isolated pnpm-store option without cache restoration.
   Historical cold setup evidence does not prove successful final-candidate execution.
@@ -210,8 +210,10 @@ brand-new observability-contract job would.
 
 The accepted layout uses three built-in shards on measured Linux x64 runners with
 4 CPUs and approximately 16 GB RAM. The declared runner label is `ubuntu-latest`;
-measurements must confirm the actual class. Each job installs the frozen lockfile
-and prepares its own checkout. Cache dependencies only; keep Docker and test data isolated.
+measurements must confirm the actual class. Each plan and shard job installs the
+frozen lockfile and prepares its own checkout. The aggregate validates downloaded
+artifacts without installing dependencies or preparing test infrastructure.
+Cache dependencies only; keep Docker and test data isolated.
 
 There are two different time limits:
 
@@ -224,6 +226,9 @@ There are two different time limits:
 The complete normal workflow targets 15 minutes and has a 17-minute ceiling,
 excluding queue time. Report queue-inclusive waiting time separately.
 Job timeouts provide diagnostic headroom; they do not raise these limits.
+These are admission limits assessed from retained job timestamps and artifacts.
+The aggregate enforces evidence completeness and lifecycle contracts; it does not
+apply these time budgets automatically.
 
 Historical baseline hardware was not measured. Its timing remains a historical
 reference, not proof of equivalent resources, monetary cost or CPU-normalized

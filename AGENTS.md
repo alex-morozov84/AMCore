@@ -366,7 +366,8 @@ API E2E policy and measurement triggers are defined in
 [CI security](docs/operations/ci-security.md#api-e2e-budget-policy).
 Use the accepted layout and absolute budgets; do not recreate a historical hardware
 comparison or repeat three admission samples for an ordinary PR.
-Reopen measurements only for a material runner/layout/lifecycle change or an observed regression.
+Reopen measurements only when runner class, layout, preparation or lifecycle policy
+materially changes, or evidence shows a regression.
 Use existing API fixtures and managed cleanup. Test observable state or a controlled
 clock boundary, not assumptions about simultaneous HTTP arrivals; see
 [backend test guidance](docs/backend/architecture-and-conventions.md#tests).
