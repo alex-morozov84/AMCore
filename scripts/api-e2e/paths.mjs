@@ -50,7 +50,7 @@ export function executionHash() {
 export function outputHash() {
   const hash = createHash('sha256')
   for (const path of [
-    ...files(resolve(api, 'src/generated/prisma')),
+    ...files(resolve(api, 'src', 'generated', 'prisma')),
     ...files(resolve(root, 'packages/shared/dist')),
   ]) {
     hash.update(path.slice(root.length)).update(readFileSync(path))

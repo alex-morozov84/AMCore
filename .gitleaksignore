@@ -1,0 +1,2 @@
+# Historical false positive: resolve() path src/generated/prisma, not an API credential.
+4fa079074f37c3217748ebe0256a911039b24ea2:scripts/api-e2e/paths.mjs:generic-api-key:47
