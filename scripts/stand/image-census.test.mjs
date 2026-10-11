@@ -350,7 +350,11 @@ test('a foreign alias, a foreign sole tag or any referencing container refuses b
 
   for (const container of [
     { Id: 'a'.repeat(64), Image: hex(1), Mounts: [] },
-    { Id: 'b'.repeat(64), Image: hex(99), Mounts: [{ Type: 'image', Source: hex(1) }] },
+    {
+      Id: 'b'.repeat(64),
+      Image: hex(99),
+      Mounts: [{ Type: 'bind', Source: hex(1), Destination: '/proof' }],
+    },
   ]) {
     const used = fakeDocker({ images: [image(1)], containers: [container] })
     await assert.rejects(() => disposeImages(m, used.execute, noSave), /referenced by a container/)
@@ -396,4 +400,46 @@ test('closeout inventory lists every image labelled for the worktree', async () 
     docker.state.calls[0],
     /^image ls -a --no-trunc -q --filter label=org\.amcore\.worktree=/
   )
+})
+
+test('confirmed vanished container permits disposal but never hides surviving consumers', async () => {
+  const vanished = 'e'.repeat(64)
+  for (const consumer of [
+    undefined,
+    { Id: 'f'.repeat(64), Image: hex(1), Mounts: [] },
+    {
+      Id: 'f'.repeat(64),
+      Image: hex(99),
+      Mounts: [{ Type: 'bind', Source: hex(1), Destination: '/proof' }],
+    },
+  ]) {
+    const docker = fakeDocker({
+      images: [image(1)],
+      containers: [{ Id: vanished, Image: hex(99), Mounts: [] }, ...(consumer ? [consumer] : [])],
+      before(args, state) {
+        if (args[0] === 'container' && args[1] === 'inspect' && args[2] === vanished) {
+          state.containers = state.containers.filter((item) => item.Id !== vanished)
+          throw Object.assign(
+            new Error(
+              `docker failed (1): Error response from daemon: No such container: ${vanished}`
+            ),
+            {
+              stderr: `Error response from daemon: No such container: ${vanished}`,
+            }
+          )
+        }
+      },
+    })
+    if (consumer) {
+      await assert.rejects(
+        () => disposeImages(m, docker.execute, noSave),
+        /referenced by a container/
+      )
+      assert.ok(!docker.state.calls.some((call) => call.startsWith('image rm')))
+      assert.deepEqual(docker.state.containers, [consumer])
+    } else {
+      await disposeImages(m, docker.execute, noSave)
+      assert.deepEqual(docker.state.images, [])
+    }
+  }
 })

@@ -206,7 +206,10 @@ with its last remaining reference, whatever it is, and refuses while a second on
 exists). The ownership proof is repeated before every step, and each name is resolved
 to the proved image ID before it is untagged. Nothing is forced and parent images are
 never pruned. A foreign tag or alias present at the start, or any container in any
-state that uses the image, refuses removal before anything changes. A foreign alias
+state that uses the image, refuses removal before anything changes. Containers are
+inspected by full ID. If an unrelated container disappears after listing, cleanup
+skips it only after a successful fresh inventory confirms its exact ID is absent.
+Incomplete inspection, permission or transport errors still refuse disposal. A foreign alias
 or a consumer that appears while the removal runs is preserved: it fails the repeated
 proof or makes the engine refuse the final removal, and cleanup reports failure
 (partial: some own names may already be gone). That protection for an alias depends on
