@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { aggregate } from '../api-e2e/aggregate.mjs'
@@ -74,14 +74,24 @@ test('artifact aggregate binds complete evidence to actual checkout and PR head'
     try {
       process.env.GITHUB_RUN_ID = plan.run
       process.env.GITHUB_RUN_ATTEMPT = plan.runAttempt
+      renameSync(join(directory, 'api-e2e-plan'), join(directory, 'api-e2e-attempt-1-plan'))
+      renameSync(
+        join(directory, 'api-e2e-report-1-1'),
+        join(directory, 'api-e2e-attempt-1-report-1-1')
+      )
       aggregate(directory, outcomes)
       process.env.GITHUB_RUN_ID = 'old-run'
       assert.throws(() => aggregate(directory, outcomes), /workflow run/)
       process.env.GITHUB_RUN_ID = plan.run
       process.env.GITHUB_RUN_ATTEMPT = '999'
-      assert.throws(() => aggregate(directory, outcomes), /workflow run/)
+      assert.throws(() => aggregate(directory, outcomes), /ENOENT/)
       assert.throws(() => aggregate(directory, outcomes, { mode: 'local' }), /local artifact/)
     } finally {
+      renameSync(join(directory, 'api-e2e-attempt-1-plan'), join(directory, 'api-e2e-plan'))
+      renameSync(
+        join(directory, 'api-e2e-attempt-1-report-1-1'),
+        join(directory, 'api-e2e-report-1-1')
+      )
       if (originalRun === undefined) delete process.env.GITHUB_RUN_ID
       else process.env.GITHUB_RUN_ID = originalRun
       if (originalAttempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT

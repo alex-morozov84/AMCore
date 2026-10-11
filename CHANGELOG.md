@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Managed stand image cleanup tolerates a vanished unrelated container after confirming its absence; surviving consumers and ambiguous inspection still refuse removal.
 
-- API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage is diagnostic until Linux admission and separate branch-protection activation.
+- API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage uses three shards and attempt-specific artifacts. It is diagnostic until Linux admission and separate branch-protection activation.
 
 ### Features
 

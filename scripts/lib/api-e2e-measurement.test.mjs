@@ -5,7 +5,28 @@ import { parse } from 'yaml'
 
 test('measurement uses fresh cold stores only in API jobs and retains runner evidence', () => {
   const workflow = parse(readFileSync('.github/workflows/ci.yml', 'utf8'))
-  assert.ok(['cold', 'warm'].includes(workflow.env.API_E2E_CACHE_MODE))
+  assert.equal(workflow.env.API_E2E_CACHE_MODE, 'warm')
+  const planSteps = workflow.jobs['api-e2e-plan'].steps
+  assert.match(planSteps.find((step) => step.id === 'plan').run, /--plan=3\)/)
+  assert.equal(
+    workflow.jobs['api-e2e-shards'].strategy.matrix,
+    '${{ fromJSON(needs.api-e2e-plan.outputs.matrix) }}'
+  )
+  assert.equal(
+    planSteps.find((step) => step.name === 'Retain canonical inventory').with.name,
+    'api-e2e-attempt-${{ github.run_attempt }}-plan'
+  )
+  assert.equal(
+    workflow.jobs['api-e2e-shards'].steps.find(
+      (step) => step.name === 'Retain partial and final evidence'
+    ).with.name,
+    'api-e2e-attempt-${{ github.run_attempt }}-report-${{ steps.artifact.outputs.shard }}'
+  )
+  const download = workflow.jobs['api-e2e'].steps.find(
+    (step) => step.name === 'Download current-attempt evidence'
+  )
+  assert.equal(download.with.pattern, 'api-e2e-attempt-${{ github.run_attempt }}-*')
+  assert.notEqual(download.with['merge-multiple'], true)
   for (const name of ['api-e2e-plan', 'api-e2e-shards']) {
     const steps = workflow.jobs[name].steps
     const setup = steps.find((step) => step.id === 'node')

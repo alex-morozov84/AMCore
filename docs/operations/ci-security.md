@@ -47,24 +47,29 @@ of workflow self-hardening to keep the example forkable.
 - **API E2E** adds diagnostic full standard coverage in separate plan, shard and
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
   generates Prisma and builds shared. Layout measurements start with a serial shard;
-  the measurement candidate compares two built-in shards.
+  the measurement candidate uses three built-in shards and pnpm dependency caching.
   The aggregate requires successful dependencies and exact-once inventory evidence
   for the same checkout SHA, inputs and current GitHub run/attempt. It normalizes
   actual suite paths across fresh workspace roots and binds them to assignments. Missing, cancelled,
-  skipped or forced attempts fail. Reports remain available for seven days.
+  skipped or forced attempts fail. Artifact names include the workflow attempt;
+  the aggregate downloads only that attempt and rejects unexpected artifact directories.
+  Reports remain available for seven days.
   This declaration does not enable live branch protection. The six existing focused
   suites remain in **Test** until measured full required coverage replaces them.
   Background-work contracts add 17 original-checkout paths; extension contracts
   add eight disjoint paths in a disposable copy. Their union with those six is
   31 named paths, rather than the full standard inventory.
   Admission requires Linux cold and cached setup evidence, measured runner-minutes
-  and final candidate verification. The proposed workflow ceiling is 17 minutes;
+  and three comparable successful final warm observations. The workflow target is
+  15 minutes and its proposed ceiling is 17 minutes;
   the API target is 12 minutes. The 30-minute measurement timeout is headroom.
-  Initial measurement jobs use isolated cold pnpm stores without cache restoration.
+  Cold diagnostics retain an isolated pnpm-store option without cache restoration.
+  Historical cold setup evidence does not prove successful final-candidate execution.
   Runner snapshots record CPU/RAM, cache status, package/Docker versions, image IDs
   and available runner cgroup metrics. Unavailable metrics remain unknown; runner
   cgroup snapshots do not represent individual container peaks. Ordinary pnpm caching
-  returns for cached setup comparisons. Measurement snapshots accompany the reports.
+  is enabled for the final warm candidate; an eligible warm observation requires
+  actual cache hits in the plan and every shard. Each job still uses fresh isolated Docker. Measurement snapshots accompany the reports.
   Built-in two/three shards require evidence before selection. Full PR coverage is
   preferred; full post-merge coverage requires a separate owner policy decision.
 - **Test** also runs `pnpm test:capability-extension`: an isolated disposable

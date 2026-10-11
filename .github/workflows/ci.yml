@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  API_E2E_CACHE_MODE: cold
+  API_E2E_CACHE_MODE: warm
   API_E2E_PR_HEAD: ${{ github.event.pull_request.head.sha || '' }}
 
 jobs:
@@ -165,12 +165,12 @@ jobs:
       - name: Discover complete inventory
         id: plan
         run: |
-          matrix="$(node scripts/api-e2e-ci.mjs --plan=2)"
+          matrix="$(node scripts/api-e2e-ci.mjs --plan=3)"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
       - name: Retain canonical inventory
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: api-e2e-plan
+          name: api-e2e-attempt-${{ github.run_attempt }}-plan
           path: |
             .amcore/api-e2e-results/plan.json
             .amcore/api-e2e-results/measurement-before.json
@@ -230,7 +230,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: api-e2e-report-${{ steps.artifact.outputs.shard }}
+          name: api-e2e-attempt-${{ github.run_attempt }}-report-${{ steps.artifact.outputs.shard }}
           path: .amcore/api-e2e-results/
           include-hidden-files: true
           if-no-files-found: error
@@ -251,10 +251,10 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - name: Download current-run evidence
+      - name: Download current-attempt evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: api-e2e-*
+          pattern: api-e2e-attempt-${{ github.run_attempt }}-*
           path: api-e2e-evidence
       - name: Require complete coverage and natural process exits
         env:
