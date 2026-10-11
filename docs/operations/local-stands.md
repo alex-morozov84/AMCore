@@ -82,8 +82,15 @@ The parent saves partial evidence under `.amcore/api-e2e-results`.
 Natural process exit and absence of attempt-labelled containers are required.
 Shared teardown attempts workers, app and containers even after a close rejection.
 Cleanup has phase deadlines and a 60-second parent deadline. Forced termination
-cannot turn a failed attempt green. Emergency container removal checks both exact
+cannot turn a failed attempt green. Malformed reporter data cannot disable the
+termination watchdog. Custom queue-graph teardown also retains close failures and
+attempts its Redis stop. Only a complete ordinary assertion-failure report permits
+the next suite; incomplete reports stop the lane. Emergency container removal checks both exact
 run and attempt labels. It never removes Ryuk or another run's resources.
+CI artifact admission binds the canonical plan to the current GitHub run and attempt.
+For local artifact inspection, the aggregate command requires explicit `--local`
+and rejects inherited GitHub run context. Local inspection still checks checkout
+SHA and full evidence; it does not admit stale evidence in CI.
 A new local full run needs a changed hypothesis or its designated delivery stage.
 
 ### Managed stand admission

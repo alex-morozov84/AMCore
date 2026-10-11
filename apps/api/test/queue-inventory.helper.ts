@@ -2,7 +2,9 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 
+import { cleanupE2E } from './e2e-cleanup'
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { closeOwnedQueueGraph } from './queue-graph-cleanup'
 
 const noopLogger = {
   setContext: () => undefined,
@@ -97,8 +99,7 @@ export async function compileQueueGraph(
 }
 
 export async function closeQueueGraph(graph?: CompiledQueueGraph): Promise<void> {
-  await graph?.module.close().catch(() => undefined)
-  await graph?.redis.stop().catch(() => undefined)
+  await closeOwnedQueueGraph(graph, cleanupE2E)
 }
 
 /** Disable the definition in the single registration owner before compiling either role. */

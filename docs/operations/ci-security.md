@@ -39,7 +39,7 @@ of workflow self-hardening to keep the example forkable.
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
-- **Test** runs API process-role/shutdown-drain E2E and the four focused AI
+- **Test** prepares its own API E2E receipt before the focused launcher. It runs API process-role/shutdown-drain E2E and the four focused AI
   suites: gateway consistency, catalogue degradation, provider receipt settlement
   and maintenance upgrade. They use isolated PG18/Redis Testcontainers and injected
   SDK HTTP fixtures. The broader durable AI regression inventory remains a local
@@ -48,7 +48,8 @@ of workflow self-hardening to keep the example forkable.
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
   generates Prisma and builds shared. The initial layout uses one serial shard.
   The aggregate requires successful dependencies and exact-once inventory evidence
-  for the same checkout SHA, inputs and workflow attempt. Missing, cancelled,
+  for the same checkout SHA, inputs and current GitHub run/attempt. It normalizes
+  actual suite paths across fresh workspace roots and binds them to assignments. Missing, cancelled,
   skipped or forced attempts fail. Reports remain available for seven days.
   This declaration does not enable live branch protection. The six existing focused
   suites remain in **Test** until measured full required coverage replaces them.

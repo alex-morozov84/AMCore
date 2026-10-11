@@ -6,7 +6,7 @@ function valid() {
   return {
     id: 'a',
     pid: 1,
-    absolutePath: '/suite',
+    absolutePath: '/workspace/apps/api/test/suite.e2e-spec.ts',
     path: 'test/suite.e2e-spec.ts',
     closed: true,
     forced: false,
@@ -18,12 +18,17 @@ function valid() {
     final: { success: true },
     rows: [
       { event: 'run-start', attempt: 'a', pid: 1 },
-      { event: 'suite-start', attempt: 'a', pid: 1, path: '/suite' },
+      {
+        event: 'suite-start',
+        attempt: 'a',
+        pid: 1,
+        path: '/workspace/apps/api/test/suite.e2e-spec.ts',
+      },
       {
         event: 'suite-end',
         attempt: 'a',
         pid: 1,
-        path: '/suite',
+        path: '/workspace/apps/api/test/suite.e2e-spec.ts',
         runtimeError: false,
         failure: false,
         assertions: [{ status: 'passed', invocations: 1, retryReasons: [] }],
@@ -116,7 +121,7 @@ test('CI full coverage retains original focused obligations and strict aggregate
   )
   assert.match(workflow, /fail-fast: false/)
   assert.match(workflow, /node scripts\/api-e2e\/aggregate.mjs api-e2e-evidence/)
-  assert.equal((workflow.match(/node scripts\/api-e2e-ci.mjs --prepare/g) || []).length, 2)
+  assert.equal((workflow.match(/node scripts\/api-e2e-ci.mjs --prepare/g) || []).length, 3)
   assert.match(
     workflow,
     /pnpm --filter api test:e2e --runTestsByPath test\/process-role.e2e-spec.ts/

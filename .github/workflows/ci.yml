@@ -115,9 +115,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run tests
+      - name: Run unit tests
+        run: pnpm test
+
+      - name: Prepare API E2E fresh job
+        run: node scripts/api-e2e-ci.mjs --prepare
+
+      - name: Run integration tests
         run: |
-          pnpm test
           pnpm --filter api test:e2e --runTestsByPath test/process-role.e2e-spec.ts test/shutdown-drain.e2e-spec.ts test/ai-gateway-consistency.e2e-spec.ts test/ai-catalog-degradation.e2e-spec.ts test/ai-provider-receipt.e2e-spec.ts test/ai-gateway-upgrade.e2e-spec.ts
           pnpm test:capability-extension
           pnpm test:extension-contracts

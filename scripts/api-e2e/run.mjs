@@ -4,9 +4,15 @@ import { resolve } from 'node:path'
 import { api, root, jest } from './paths.mjs'
 import { supervise, readRows } from './process.mjs'
 import { cleanOwned } from './resources.mjs'
-import { validateAttempt } from './validate.mjs'
+import { recordDiagnostic } from './diagnostic.mjs'
+import { validateAttempt, isOrdinaryFailure, actualSuitePath } from './validate.mjs'
 
-export async function runShard(plan, shard, output) {
+export async function runShard(
+  plan,
+  shard,
+  output,
+  services = { supervise, readRows, cleanOwned }
+) {
   mkdirSync(output, { recursive: true })
   const report = {
     schemaVersion: 1,
@@ -58,7 +64,7 @@ export async function runShard(plan, shard, output) {
     try {
       Object.assign(
         attempt,
-        await supervise(process.execPath, args, {
+        await services.supervise(process.execPath, args, {
           cwd: api,
           env,
           progress,
@@ -68,39 +74,24 @@ export async function runShard(plan, shard, output) {
           },
         })
       )
-      attempt.rows = readRows(progress)
+      attempt.rows = services.readRows(progress)
       attempt.final = JSON.parse(readFileSync(final, 'utf8'))
     } catch (error) {
-      attempt.lifecycleFailure = true
-      attempt.diagnostic = error.message
+      recordDiagnostic(attempt, error, 'execution')
     }
     try {
-      attempt.clean = await cleanOwned(run, id)
+      attempt.clean = await services.cleanOwned(run, id)
       if (!attempt.clean) attempt.lifecycleFailure = true
       if (attempt.forced || attempt.lifecycleFailure || !attempt.closed)
-        await cleanOwned(run, id, true)
+        await services.cleanOwned(run, id, true)
     } catch (error) {
-      attempt.lifecycleFailure = true
-      attempt.diagnostic = error.message
+      recordDiagnostic(attempt, error, 'cleanup')
     }
     try {
-      validateAttempt(attempt)
-    } catch {
-      const ordinaryFailure =
-        attempt.exit === 1 &&
-        attempt.closed &&
-        !attempt.forced &&
-        !attempt.lifecycleFailure &&
-        !attempt.signal &&
-        attempt.clean &&
-        attempt.final?.success === false &&
-        attempt.rows.some(
-          (row) =>
-            row.event === 'suite-end' &&
-            !row.runtimeError &&
-            row.assertions.some((test) => test.status === 'failed')
-        )
-      if (!ordinaryFailure) attempt.lifecycleFailure = true
+      actualSuitePath(attempt)
+      if (!isOrdinaryFailure(attempt)) validateAttempt(attempt)
+    } catch (error) {
+      recordDiagnostic(attempt, error, 'admission')
     }
     attempt.milliseconds = performance.now() - began
     attempt.parentRss = process.memoryUsage().rss

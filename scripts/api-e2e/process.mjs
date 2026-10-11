@@ -61,13 +61,13 @@ export async function supervise(command, args, options) {
       })
       interval = setInterval(() => {
         const now = performance.now()
-        let rows
+        let rows = []
         try {
           rows = readRows(options.progress, true)
-        } catch {
+        } catch (error) {
           result.lifecycleFailure = true
+          result.diagnostic ??= error.message
           force()
-          return
         }
         if (rows.some((row) => row.event === 'terminal')) terminalAt ??= now
         const index = rows.findLastIndex((row) => row.event === 'cleanup-start')
