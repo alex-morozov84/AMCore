@@ -7,12 +7,13 @@ import { command } from '../api-e2e/measurement-command.mjs'
 
 test('M1 TERM-ignoring direct child is killed at deadline and retains error', () => {
   const directory = mkdtempSync(join(tmpdir(), 't041-telemetry-'))
-  const state = join(directory, 'child.json')
+  const state = join(directory, `child-'"-<script>-\\-\n.json`)
   let pid
   try {
-    const script = `const fs=require('node:fs');process.on('SIGTERM',()=>fs.writeFileSync(${JSON.stringify(state)},JSON.stringify({pid:process.pid,ignoredTerm:true})));process.kill(process.pid,'SIGTERM');setInterval(()=>{},10)`
+    const script =
+      "const fs=require('node:fs');process.on('SIGTERM',()=>fs.writeFileSync(process.argv[1],JSON.stringify({pid:process.pid,ignoredTerm:true})));process.kill(process.pid,'SIGTERM');setInterval(()=>{},10)"
     const began = performance.now()
-    const result = command(process.execPath, ['-e', script], 200)
+    const result = command(process.execPath, ['-e', script, state], 200)
     const child = JSON.parse(readFileSync(state, 'utf8'))
     pid = child.pid
     assert.equal(child.ignoredTerm, true)
