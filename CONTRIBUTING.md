@@ -105,6 +105,11 @@ It runs each suite in a fresh observed Node process, with ESM support and a 1 Gi
 V8 heap limit. It rejects retries, skipped assertions, forced exits and incomplete
 cleanup. Use the managed command for focused checks as well as the full inventory.
 
+Follow the [API E2E budget policy](docs/operations/ci-security.md#api-e2e-budget-policy)
+for layout measurements. Ordinary PRs use complete CI without repeating initial
+three-sample admission. Do not repeat a passed full local run for review without
+changed covered behavior or a new testable hypothesis.
+
 ### Shared-package test commands
 
 | Command                                             | Description                               |

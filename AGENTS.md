@@ -362,6 +362,15 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## Testing
 
+API E2E policy and measurement triggers are defined in
+[CI security](docs/operations/ci-security.md#api-e2e-budget-policy).
+Use the accepted layout and absolute budgets; do not recreate a historical hardware
+comparison or repeat three admission samples for an ordinary PR.
+Reopen measurements only for a material runner/layout/lifecycle change or an observed regression.
+Use existing API fixtures and managed cleanup. Test observable state or a controlled
+clock boundary, not assumptions about simultaneous HTTP arrivals; see
+[backend test guidance](docs/backend/architecture-and-conventions.md#tests).
+
 API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for
 `packages/shared`'s own schema/lib unit tests (`pnpm --filter shared test`,
 included in the default `pnpm test`). Web: Vitest for unit/component

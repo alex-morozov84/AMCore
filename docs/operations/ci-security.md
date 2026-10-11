@@ -46,8 +46,8 @@ of workflow self-hardening to keep the example forkable.
   delivery gate; these focused suites do not claim full API E2E coverage.
 - **API E2E** adds diagnostic full standard coverage in separate plan, shard and
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
-  generates Prisma and builds shared. Layout measurements start with a serial shard;
-  the measurement candidate uses three built-in shards and pnpm dependency caching.
+  generates Prisma and builds shared. The measured layout uses three built-in shards
+  and pnpm dependency caching.
   The aggregate requires successful dependencies and exact-once inventory evidence
   for the same checkout SHA, inputs and current GitHub run/attempt. It normalizes
   actual suite paths across fresh workspace roots and binds them to assignments. Missing, cancelled,
@@ -59,8 +59,9 @@ of workflow self-hardening to keep the example forkable.
   Background-work contracts add 17 original-checkout paths; extension contracts
   add eight disjoint paths in a disposable copy. Their union with those six is
   31 named paths, rather than the full standard inventory.
-  Admission requires Linux cold and cached setup evidence, measured runner-minutes
-  and three comparable successful final warm observations. The workflow target is
+  Initial layout admission requires Linux cold and cached setup evidence, measured
+  runner-minutes and three comparable successful final warm observations.
+  The [API E2E budget policy](#api-e2e-budget-policy) defines the accepted limits. The workflow target is
   15 minutes and its proposed ceiling is 17 minutes;
   the API target is 12 minutes. The 30-minute measurement timeout is headroom.
   Cold diagnostics retain an isolated pnpm-store option without cache restoration.
@@ -204,6 +205,46 @@ they have run at least once on the repository. A newly added job context
 (such as the scaffolding-contract pair) needs that same one-time
 re-application after its first real run on the repository, exactly like a
 brand-new observability-contract job would.
+
+## API E2E budget policy
+
+The accepted layout uses three built-in shards on measured Linux x64 runners with
+4 CPUs and approximately 16 GB RAM. The declared runner label is `ubuntu-latest`;
+measurements must confirm the actual class. Each job installs the frozen lockfile
+and prepares its own checkout. Cache dependencies only; keep Docker and test data isolated.
+
+There are two different time limits:
+
+- **API critical path:** plan start to aggregate completion, including preparation,
+  cleanup and artifacts, must stay within 12 minutes.
+- **API runner-time:** add the actual durations of the plan, every shard and
+  aggregate job. The limit is 2,262 seconds (37:42) per complete observation.
+  Parallel job durations count separately. This is machine time, not an invoice.
+
+The complete normal workflow targets 15 minutes and has a 17-minute ceiling,
+excluding queue time. Report queue-inclusive waiting time separately.
+Job timeouts provide diagnostic headroom; they do not raise these limits.
+
+Historical baseline hardware was not measured. Its timing remains a historical
+reference, not proof of equivalent resources, monetary cost or CPU-normalized
+speedup. The absolute runner-time limit does not require reconstructing that host.
+Missing physical or cgroup metrics remain unknown; process heap/RSS are not substitutes.
+A new serial comparison is an optimization experiment, not a routine delivery gate.
+
+Initial layout admission requires three complete, mutually comparable warm samples.
+Compare exact source/configuration/inventory/assignments, measured runner class,
+software and resolved container images. Require actual cache hits in the plan and
+every shard, exact-once coverage, natural clean exits and matching run/attempt artifacts.
+Current normal CI, including Web, generated projects and security, must also pass.
+
+Ordinary feature PRs use the current complete CI gates; they do not repeat layout
+admission automatically. Documentation-only changes do not justify another full
+local API run. Revisit layout measurements when runner class, sharding, preparation
+or lifecycle policy materially changes, or evidence shows a budget/reliability regression.
+Record a specific hypothesis before another measurement. A failed or ineligible
+sample stops admission; diagnose the smallest failed risk instead of retrying for green.
+Runner upgrades, budget changes and a switch to post-merge coverage require an
+explicit owner decision. Required-check activation remains a separate repository action.
 
 ## Handling CodeQL alerts (false positives)
 
