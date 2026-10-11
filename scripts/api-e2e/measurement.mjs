@@ -1,17 +1,10 @@
-import { execFileSync } from 'node:child_process'
+import { command } from './measurement-command.mjs'
 import { cpus, totalmem, freemem, platform, release, arch } from 'node:os'
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 const [output] = process.argv.slice(2)
 if (!output) throw new Error('Provide measurement output path')
-const command = (binary, args) => {
-  try {
-    return { value: execFileSync(binary, args, { encoding: 'utf8', timeout: 5000 }).trim() }
-  } catch (error) {
-    return { value: null, error: error.message }
-  }
-}
 const file = (path) => {
   try {
     return readFileSync(path, 'utf8').trim()
