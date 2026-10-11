@@ -31,6 +31,7 @@ import {
 } from '../src/infrastructure/background-work/provider-evidence.store'
 import { PrismaService } from '../src/prisma'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
 import { importWork, ImportWorkAdapter } from './fixtures/background-work/import-fixture'
 import { migrateTestDatabase, noopPinoLogger } from './helpers'
 
@@ -46,7 +47,9 @@ describe('Background-work ADMIN ledger', () => {
   const revision = 'a'.repeat(64)
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:18-alpine').start()
+    container = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
     await migrateTestDatabase(container.getConnectionUri())
     prisma = new PrismaClient({
       adapter: new PrismaPg({ connectionString: container.getConnectionUri() }),

@@ -15,6 +15,8 @@ import { WorkExecutionService } from '../src/infrastructure/background-work/work
 import { WorkReadiness } from '../src/infrastructure/background-work/work-readiness'
 import { buildBullConnection } from '../src/infrastructure/queue/redis-connection.config'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 const defaults = {
   wireVersion: 1,
   replay: { kind: 'idempotent' as const, policyVersion: 1 },
@@ -109,7 +111,7 @@ describe('Actual managed wire → BullMQ → worker/projection', () => {
   let redis: Redis
   const readiness = new WorkReadiness()
   beforeAll(async () => {
-    container = await new RedisContainer('redis:7-alpine').start()
+    container = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     queue = new Queue('payload', {
       prefix: 'amcore',
       connection: buildBullConnection(container.getConnectionUrl()),

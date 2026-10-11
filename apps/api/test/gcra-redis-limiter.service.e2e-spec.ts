@@ -1,11 +1,15 @@
 import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
+import { Wait } from 'testcontainers'
 
 import type { MetricsService } from '../src/infrastructure/observability'
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { KEY_PREFIX } from '../src/infrastructure/throttling/gcra.constants'
 import type { RateLimitPolicy } from '../src/infrastructure/throttling/rate-limit-policies'
+
+import { cleanupE2E } from './e2e-cleanup'
+import { e2eContainerLabels } from './e2e-owned-containers'
 
 type RedisClient = ReturnType<typeof createClient>
 
@@ -32,16 +36,35 @@ describe('GcraRedisLimiter (e2e, real Redis)', () => {
   let limiter: GcraRedisLimiter
 
   beforeAll(async () => {
-    container = await new RedisContainer('redis:7-alpine').start()
+    container = await new RedisContainer('redis:7-alpine')
+      .withLabels(e2eContainerLabels())
+      // A ready Redis log does not prove the host's mapped TCP port is reachable.
+      .withWaitStrategy(
+        Wait.forAll([Wait.forLogMessage('Ready to accept connections'), Wait.forListeningPorts()])
+      )
+      .start()
     client = createClient({ url: container.getConnectionUrl() })
     await client.connect()
     limiter = new GcraRedisLimiter(client as never, noopLogger, noopMetrics)
   }, 120000)
 
   afterAll(async () => {
-    await client.quit()
-    await container.stop({ timeout: 10000 })
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await cleanupE2E([
+      { name: 'redis-client', milliseconds: 5000, run: () => client?.close() },
+      {
+        name: 'redis-destroy',
+        milliseconds: 1000,
+        run: () => {
+          if (client?.isOpen) client.destroy()
+        },
+      },
+      { name: 'redis', milliseconds: 10_000, run: () => container?.stop({ timeout: 10_000 }) },
+      {
+        name: 'sockets',
+        milliseconds: 3000,
+        run: () => new Promise((resolve) => setTimeout(resolve, 2000)),
+      },
+    ])
   }, 120000)
 
   beforeEach(async () => {

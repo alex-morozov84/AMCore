@@ -2,6 +2,8 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 const noopLogger = {
   setContext: () => undefined,
   trace: () => undefined,
@@ -55,7 +57,7 @@ export async function compileQueueGraph(
     ? 'postgresql://u:p@localhost:5432/test?sslmode=require&schema=public'
     : (process.env.DATABASE_URL ?? 'postgresql://u:p@localhost:5432/test?schema=public')
   process.env.JWT_SECRET ??= 'test-only-jwt-secret-at-least-32-characters-long'
-  const redis = await new RedisContainer('redis:7-alpine').start()
+  const redis = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
   process.env.REDIS_URL = redis.getConnectionUrl()
   process.env.NODE_ENV = production ? 'production' : 'test'
   if (production) {

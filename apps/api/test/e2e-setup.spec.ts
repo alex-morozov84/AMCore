@@ -37,35 +37,22 @@ describe('API e2e bootstrap prerequisites', () => {
     ).toThrow()
   })
 
-  it('attempts later cleanup after app closure fails without masking the setup error', async () => {
-    const original = new Error('application bootstrap failed')
+  it('reports cleanup failure after attempting all later resources', async () => {
     const order: string[] = []
-    const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-    try {
-      const setup = async () => {
-        try {
-          throw original
-        } catch (error) {
-          await cleanupFailedE2ESetup([
-            async () => {
-              order.push('app')
-              throw new Error('close failed')
-            },
-            async () => {
-              order.push('redis')
-            },
-            async () => {
-              order.push('postgres')
-            },
-          ])
-          throw error
-        }
-      }
-      await expect(setup()).rejects.toBe(original)
-      expect(order).toEqual(['app', 'redis', 'postgres'])
-      expect(warning).toHaveBeenCalledTimes(1)
-    } finally {
-      warning.mockRestore()
-    }
+    await expect(
+      cleanupFailedE2ESetup([
+        async () => {
+          order.push('app')
+          throw new Error('close failed')
+        },
+        async () => {
+          order.push('redis')
+        },
+        async () => {
+          order.push('postgres')
+        },
+      ])
+    ).rejects.toThrow('E2E cleanup failed')
+    expect(order).toEqual(['app', 'redis', 'postgres'])
   })
 })

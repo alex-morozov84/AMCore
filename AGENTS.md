@@ -69,6 +69,7 @@ pnpm test:background-work-contracts # isolated work registration/control/provide
 pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
 pnpm init:brand         # downstream fork identity/brand/theme initializer
 pnpm init:project       # downstream project choices; run with flags
+node scripts/api-e2e-ci.mjs --prepare # generate Prisma and build shared for API E2E
 pnpm --filter api test:e2e            # e2e (Jest + Testcontainers, needs Docker)
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL dev only)
 docker compose up                     # full stack (Postgres+Redis+migrate+api+web)

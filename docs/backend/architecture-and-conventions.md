@@ -447,6 +447,8 @@ Cover the critical paths and the project-specific gates:
   the right role, as in
   [`apps/api/test/process-role.e2e-spec.ts`](../../apps/api/test/process-role.e2e-spec.ts).
 
+Use the supervised [API Testcontainers contract](../operations/local-stands.md#api-testcontainers) for fresh-process execution and bounded cleanup.
+
 Commands are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#api-specific-test-commands).
 
 ## See also

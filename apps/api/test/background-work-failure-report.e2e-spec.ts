@@ -4,6 +4,8 @@ import { v7 as uuidv7 } from 'uuid'
 
 import { reportManagedInvocation } from '../src/infrastructure/background-work/scripts/invocation-report'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 /** Optional diagnosis shares the existing hash/CAS/history; no separate evidence owner. */
 describe('Bounded failure report before-write predicates', () => {
   let broker: StartedRedisContainer
@@ -21,7 +23,7 @@ describe('Bounded failure report before-write predicates', () => {
     failureCode: 'corrupted_file',
   }
   beforeAll(async () => {
-    broker = await new RedisContainer('redis:7-alpine').start()
+    broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     redis = new Redis(broker.getConnectionUrl())
   }, 60000)
   beforeEach(async () => {

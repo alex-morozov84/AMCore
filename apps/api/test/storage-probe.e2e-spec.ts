@@ -8,6 +8,8 @@ import type { MetricsService } from '../src/infrastructure/observability'
 import { StorageProbeIo } from '../src/infrastructure/storage/storage-probe.io'
 import { StorageProbeService } from '../src/infrastructure/storage/storage-probe.service'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.fixture'
 
 // Test-only S3-compatible implementation, not an application runtime dependency.
@@ -45,6 +47,7 @@ describe('active probe against isolated S3-compatible storage', () => {
   const ios: StorageProbeIo[] = []
   beforeAll(async () => {
     container = await new GenericContainer(IMAGE)
+      .withLabels(e2eContainerLabels())
       .withCommand([
         'server',
         '-s3',

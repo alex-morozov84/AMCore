@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Reliability
+
+- API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage is diagnostic until Linux admission and separate branch-protection activation.
+
 ### Features
 
 - Shared native disclosures unify expandable details and filters; queue cards show one state-dependent pause/resume action with an icon.

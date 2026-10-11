@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { Client } from 'pg'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 /**
  * The AI run ownership migrations against REAL legacy data (Track C — ADR-054): the state-aware conversion
  * of applied markers, the retry budget and uncertain tool effects, and the maintenance-stop guard that
@@ -58,6 +60,7 @@ const sql = (name: string): string =>
 
 async function startDatabase(): Promise<{ container: StartedPostgreSqlContainer; url: string }> {
   const container = await new PostgreSqlContainer('postgres:18-alpine')
+    .withLabels(e2eContainerLabels())
     .withDatabase('amcore_migration')
     .withUsername('test')
     .withPassword('test')

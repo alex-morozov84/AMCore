@@ -15,6 +15,8 @@ import {
   RateLimitGuard,
 } from '../src/infrastructure/throttling'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 const noopLogger = {
   setContext: () => undefined,
   error: () => undefined,
@@ -60,7 +62,7 @@ describe('Originally-reported-symptom reproduction (e2e, real Redis)', () => {
   let app: INestApplication
 
   beforeAll(async () => {
-    container = await new RedisContainer('redis:7-alpine').start()
+    container = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     client = createClient({ url: container.getConnectionUrl() })
     await client.connect()
 

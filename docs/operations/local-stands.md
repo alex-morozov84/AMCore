@@ -69,6 +69,23 @@ Secondary apps in the suite share that test secret. The shared setup helper
 attempts cleanup of its created application and containers if bootstrap fails.
 Tests using a custom setup remain responsible for its teardown.
 
+Prepare a fresh checkout with `pnpm install --frozen-lockfile`, then
+`node scripts/api-e2e-ci.mjs --prepare`. Preparation generates Prisma and builds
+shared; execution checks the preparation receipt before discovery or Docker.
+`node scripts/api-e2e-ci.mjs --all` runs the standard inventory sequentially.
+`--shard=i/n` uses Jest's built-in partition, with at most three shards.
+Each suite gets one fresh in-band Node process and a 1 GiB V8 heap limit.
+No pool replays or automatic suite retries are allowed. Missing assertion metadata,
+skipping, signals, forced exits and incomplete reports fail the run.
+
+The parent saves partial evidence under `.amcore/api-e2e-results`.
+Natural process exit and absence of attempt-labelled containers are required.
+Shared teardown attempts workers, app and containers even after a close rejection.
+Cleanup has phase deadlines and a 60-second parent deadline. Forced termination
+cannot turn a failed attempt green. Emergency container removal checks both exact
+run and attempt labels. It never removes Ryuk or another run's resources.
+A new local full run needs a changed hypothesis or its designated delivery stage.
+
 ### Managed stand admission
 
 A managed invocation performs full admission before work, holds its lease and

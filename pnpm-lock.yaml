@@ -288,6 +288,9 @@ importers:
       aws-sdk-client-mock:
         specifier: ^4.1.0
         version: 4.1.0
+      express:
+        specifier: 5.2.1
+        version: 5.2.1
       happy-dom:
         specifier: ^20.14.5
         version: 20.14.5

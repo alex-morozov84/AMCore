@@ -8,6 +8,8 @@ import { Pool } from 'pg'
 
 import { PrismaClient } from '../src/generated/prisma/client'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 export const DEFAULTS_MIGRATION = '20260927180000_explicit_org_authorization_defaults'
 export const defaultsMigrationSql = (): string =>
   readFileSync(resolve('prisma/migrations', DEFAULTS_MIGRATION, 'migration.sql'), 'utf8')
@@ -27,6 +29,7 @@ export interface AuthorizationDbFixture {
 /** No ambient DB: every client and CLI is explicitly bound to this owned container. */
 export async function authorizationDbFixture(): Promise<AuthorizationDbFixture> {
   const container = await new PostgreSqlContainer('postgres:18-alpine')
+    .withLabels(e2eContainerLabels())
     .withDatabase('authorization_test')
     .withUsername('test')
     .withPassword('test')

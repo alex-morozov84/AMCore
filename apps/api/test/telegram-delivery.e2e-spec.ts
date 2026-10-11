@@ -32,6 +32,39 @@ describe('Telegram delivery + lifecycle (e2e)', () => {
   afterAll(async () => teardownTelegramE2E(tg), 120000)
   beforeEach(async () => resetTelegramE2E(tg))
 
+  it('advertises Telegram only with the configured fake provider', async () => {
+    const registered = await request(tg.app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: 'capabilities@example.com', password: 'StrongP@ss123' })
+      .expect(201)
+    const response = await request(tg.app.getHttpServer())
+      .get('/notifications/capabilities')
+      .set('Authorization', `Bearer ${registered.body.accessToken}`)
+      .expect(200)
+    expect(response.body.channels).toContain('telegram')
+    const preferences = await request(tg.app.getHttpServer())
+      .get('/notifications/preferences')
+      .set('Authorization', `Bearer ${registered.body.accessToken}`)
+      .expect(200)
+    expect(
+      preferences.body.preferences.some((row: { channel: string }) => row.channel === 'telegram')
+    ).toBe(true)
+  })
+
+  it.each([null, 99])(
+    'refuses unverifiable request version %s before calling Telegram',
+    async (version) => {
+      const user = await createTgUser(tg.prisma)
+      await seedPendingTelegramDelivery(tg.prisma, user, 'legacy-target', '7007')
+      await tg.prisma.notificationDelivery.updateMany({ data: { requestContractVersion: version } })
+      await tg.dispatch.runDispatchCycle()
+      const row = await tg.prisma.notificationDelivery.findFirstOrThrow()
+      expect(row.status).toBe('FAILED')
+      expect(row.lastErrorCode).toBe('legacy_delivery_outcome_unverified')
+      expect(tg.fake.sendCalls).toHaveLength(0)
+    }
+  )
+
   async function linkedUser(chatId: string): Promise<string> {
     const userId = await createTgUser(tg.prisma)
     await tg.prisma.telegramConnection.create({

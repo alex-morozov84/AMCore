@@ -5,6 +5,8 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { execSync } from 'child_process'
 import { Client } from 'pg'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 describe('AuditLog append-only trigger', () => {
   let client: Client | null = null
   let databaseUrl = ''
@@ -12,6 +14,7 @@ describe('AuditLog append-only trigger', () => {
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
       .withDatabase('amcore_test')
       .withUsername('test')
       .withPassword('test')

@@ -4,13 +4,17 @@ import { resolve } from 'node:path'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { Client } from 'pg'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 const upgrade = '20261007180000_ai_gateway_consistency'
 describe('maintenance-only AI execution contract upgrade (real preceding migrations)', () => {
   let container: StartedPostgreSqlContainer
   let migrator: Client
   let sql: string
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:18-alpine').start()
+    container = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
     migrator = new Client({
       connectionString: container.getConnectionUri(),
       application_name: 'fixture-migrator',

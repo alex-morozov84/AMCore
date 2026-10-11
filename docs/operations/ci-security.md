@@ -44,13 +44,29 @@ of workflow self-hardening to keep the example forkable.
   and maintenance upgrade. They use isolated PG18/Redis Testcontainers and injected
   SDK HTTP fixtures. The broader durable AI regression inventory remains a local
   delivery gate; these focused suites do not claim full API E2E coverage.
+- **API E2E** adds diagnostic full standard coverage in separate plan, shard and
+  aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
+  generates Prisma and builds shared. The initial layout uses one serial shard.
+  The aggregate requires successful dependencies and exact-once inventory evidence
+  for the same checkout SHA, inputs and workflow attempt. Missing, cancelled,
+  skipped or forced attempts fail. Reports remain available for seven days.
+  This declaration does not enable live branch protection. The six existing focused
+  suites remain in **Test** until measured full required coverage replaces them.
+  Background-work contracts add 17 original-checkout paths; extension contracts
+  add eight disjoint paths in a disposable copy. Their union with those six is
+  31 named paths, rather than the full standard inventory.
+  Admission requires Linux cold and cached setup evidence, measured runner-minutes
+  and final candidate verification. The proposed workflow ceiling is 17 minutes;
+  the API target is 12 minutes. The 30-minute measurement timeout is headroom.
+  Built-in two/three shards require evidence before selection. Full PR coverage is
+  preferred; full post-merge coverage requires a separate owner policy decision.
 - **Test** also runs `pnpm test:capability-extension`: an isolated disposable
   resource variant compiles shared, API and web consumers and exercises
   authorization against PostgreSQL and Redis Testcontainers. The fixture does
   not add a sample product domain to the shipped starter.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
-- **Web E2E** remains the mandatory aggregate check. Its plan selects all
+- **Web E2E** is the declared aggregate check. Live required status is separate. Its plan selects all
   applicable lanes; independent matrix runners execute safety/transport, mocked,
   two isolated path groups and the retained HTTPS host lane with `fail-fast: false`.
   Every lane invokes `node scripts/e2e-ci.mjs <lane>` with CI settings. Matrix
