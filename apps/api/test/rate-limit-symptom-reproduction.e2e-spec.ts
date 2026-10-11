@@ -5,6 +5,7 @@ import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 import request from 'supertest'
+import { Wait } from 'testcontainers'
 
 import { EnvService } from '../src/env/env.service'
 import { MetricsService } from '../src/infrastructure/observability'
@@ -14,6 +15,9 @@ import {
   RateLimit,
   RateLimitGuard,
 } from '../src/infrastructure/throttling'
+
+import { cleanupE2E } from './e2e-cleanup'
+import { e2eContainerLabels } from './e2e-owned-containers'
 
 const noopLogger = {
   setContext: () => undefined,
@@ -60,7 +64,12 @@ describe('Originally-reported-symptom reproduction (e2e, real Redis)', () => {
   let app: INestApplication
 
   beforeAll(async () => {
-    container = await new RedisContainer('redis:7-alpine').start()
+    container = await new RedisContainer('redis:7-alpine')
+      .withLabels(e2eContainerLabels())
+      .withWaitStrategy(
+        Wait.forAll([Wait.forLogMessage('Ready to accept connections'), Wait.forListeningPorts()])
+      )
+      .start()
     client = createClient({ url: container.getConnectionUrl() })
     await client.connect()
 
@@ -88,13 +97,23 @@ describe('Originally-reported-symptom reproduction (e2e, real Redis)', () => {
   }, 120000)
 
   afterAll(async () => {
-    // Guard against a failed beforeAll (e.g. a DI resolution error) leaving
-    // `app` unset — closing only what actually got built avoids a secondary
-    // crash masking the real one, and avoids leaking the Redis container.
-    await app?.close()
-    await client?.quit()
-    await container.stop({ timeout: 10000 })
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await cleanupE2E([
+      { name: 'app', milliseconds: 10_000, run: () => app?.close() },
+      { name: 'redis-client', milliseconds: 5000, run: () => client?.close() },
+      {
+        name: 'redis-destroy',
+        milliseconds: 1000,
+        run: () => {
+          if (client?.isOpen) client.destroy()
+        },
+      },
+      { name: 'redis', milliseconds: 10_000, run: () => container?.stop({ timeout: 10_000 }) },
+      {
+        name: 'sockets',
+        milliseconds: 3000,
+        run: () => new Promise((resolve) => setTimeout(resolve, 2000)),
+      },
+    ])
   }, 120000)
 
   it('zero 429s across 5 visits x 12 parallel requests (6/route) under the DEFAULT policy', async () => {

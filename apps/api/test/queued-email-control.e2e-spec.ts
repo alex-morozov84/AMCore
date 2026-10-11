@@ -41,6 +41,7 @@ import { DEFAULT_JOB_OPTIONS } from '../src/infrastructure/queue/interfaces/job-
 import { buildBullConnection } from '../src/infrastructure/queue/redis-connection.config'
 import type { PrismaService } from '../src/prisma'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
 import { migrateTestDatabase } from './helpers'
 
 const definition = defineOrdinaryWork({
@@ -72,8 +73,10 @@ describe('Queued-email immutable request and independent provider evidence', () 
 
   beforeAll(async () => {
     // Sequential starts leave every successful resource available to teardown on setup failure.
-    postgres = await new PostgreSqlContainer('postgres:18-alpine').start()
-    broker = await new RedisContainer('redis:7-alpine').start()
+    postgres = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
+    broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     await migrateTestDatabase(postgres.getConnectionUri())
     prisma = new PrismaClient({
       adapter: new PrismaPg({ connectionString: postgres.getConnectionUri() }),

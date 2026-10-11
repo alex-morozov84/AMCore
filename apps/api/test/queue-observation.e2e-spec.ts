@@ -9,6 +9,8 @@ import type { QueueService } from '../src/infrastructure/queue/queue.service'
 import { QueueObservationService } from '../src/infrastructure/queue/queue-observation.service'
 import { buildBullConnection } from '../src/infrastructure/queue/redis-connection.config'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 /**
  * Real BullMQ 6 + Redis, on this suite's OWN container (never the application's Redis):
  * the observation service reads plain keys, so every state is compared with BullMQ's own getters,
@@ -25,7 +27,7 @@ describe('QueueObservationService against real Redis', () => {
   let url: string
 
   beforeAll(async () => {
-    container = await new RedisContainer('redis:7-alpine').start()
+    container = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     url = container.getConnectionUrl()
     queue = new Queue('email', { connection: buildBullConnection(url), prefix: 'amcore' })
     queue.on('error', () => undefined)

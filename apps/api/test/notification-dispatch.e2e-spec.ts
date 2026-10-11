@@ -126,7 +126,8 @@ describe('Notification dispatch (e2e)', () => {
         locale: 'en',
         status: NotificationDeliveryStatus.PENDING,
         maxAttempts: opts.maxAttempts ?? 5,
-        ...(opts.availableAt ? { availableAt: opts.availableAt } : {}),
+        // Claims use Postgres transaction time; explicitly seed a due row.
+        availableAt: opts.availableAt ?? new Date(0),
       },
       select: { id: true },
     })
@@ -221,7 +222,7 @@ describe('Notification dispatch (e2e)', () => {
     expect(transientAttempt.finishedAt).toBeInstanceOf(Date)
 
     // Permanent → FAILED + PERMANENT_FAILURE attempt, dead-lettered.
-    const permanentId = await createDelivery(notificationId, { availableAt: new Date() })
+    const permanentId = await createDelivery(notificationId, { availableAt: new Date(0) })
     const claims = await claimBatch(10)
     const permanentClaim = claims.find((c) => c.id === permanentId)!
     const permanent = await repository.finalizePermanent(
@@ -242,7 +243,7 @@ describe('Notification dispatch (e2e)', () => {
     // Exhausted: maxAttempts=1 → the first transient failure is terminal + dead-lettered.
     const exhaustedId = await createDelivery(notificationId, {
       maxAttempts: 1,
-      availableAt: new Date(),
+      availableAt: new Date(0),
     })
     const exhaustedClaims = await claimBatch(10)
     const exhaustedClaim = exhaustedClaims.find((c) => c.id === exhaustedId)!

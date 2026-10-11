@@ -6,10 +6,14 @@ import { resolve } from 'node:path'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { Pool } from 'pg'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 /** Upgrade starts with the actual previous repository migration chain. */
 describe('R17 invitation role-intent migration', () => {
   it('revokes only ambiguous nonterminal rows and frees pending unique slot', async () => {
-    const container = await new PostgreSqlContainer('postgres:18-alpine').start()
+    const container = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
     const pool = new Pool({ connectionString: container.getConnectionUri() })
     const directory = mkdtempSync(resolve(tmpdir(), 't028-migration-'))
     const migration = '20261003180000_invitation_role_intent'

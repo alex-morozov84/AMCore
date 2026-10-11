@@ -3,6 +3,7 @@ import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redi
 
 import { AiCatalogCache } from '../../src/infrastructure/ai/registry/ai-catalog-cache'
 import type { AppRedisClient } from '../../src/infrastructure/redis'
+import { e2eContainerLabels } from '../e2e-owned-containers'
 
 import { redisTransportStall } from './redis-transport-stall'
 
@@ -11,7 +12,9 @@ export function catalogueRedisPhysicalProof(): void {
     let container: StartedRedisContainer
     const cleanups: Array<() => Promise<unknown>> = []
     beforeAll(async () => {
-      container = await new RedisContainer('redis:7-alpine').start()
+      container = await new RedisContainer('redis:7-alpine')
+        .withLabels(e2eContainerLabels())
+        .start()
     }, 120000)
     afterEach(async () => {
       for (const cleanup of cleanups.splice(0).reverse()) await cleanup()

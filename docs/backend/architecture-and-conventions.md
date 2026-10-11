@@ -428,6 +428,25 @@ Apply these only when your module needs them:
 
 ## Tests
 
+Reuse existing API fixtures and managed runner cleanup. Prefer assertions about
+observable state over elapsed wall-clock timing. For exact time boundaries, use
+an existing controlled-clock fixture at the layer that owns the clock.
+
+Concurrent HTTP requests do not arrive simultaneously at Redis. A replenishing
+rate limiter can accept another request while the batch is still arriving.
+Verify route burst configuration through a genuine idle request and its rate-limit
+headers, as in `apps/api/test/telegram-webhook.e2e-spec.ts`.
+Keep algorithm burst/refill boundaries in the dedicated GCRA tests.
+Do not add sleeps, retries or wider tolerances to conceal an incorrect timing assumption.
+
+Use existing cleanup helpers for shared Docker inspection/disposal responsibilities.
+A resource may disappear between inventory and inspection. Require exact-ID absence
+confirmation before accepting disappearance; permission, transport and incomplete
+inspection errors must remain failures. See the
+[managed image safety contract](../operations/local-stands.md#built-images-and-unresolved-builds).
+CI budgets and triggers for repeat measurements live in the
+[API E2E budget policy](../operations/ci-security.md#api-e2e-budget-policy).
+
 Cover the critical paths and the project-specific gates:
 
 - **Unit** — service logic in isolation.
@@ -446,6 +465,8 @@ Cover the critical paths and the project-specific gates:
 - **Process-role gating** — if you added a processor or cron, assert it runs only in
   the right role, as in
   [`apps/api/test/process-role.e2e-spec.ts`](../../apps/api/test/process-role.e2e-spec.ts).
+
+Use the supervised [API Testcontainers contract](../operations/local-stands.md#api-testcontainers) for fresh-process execution and bounded cleanup.
 
 Commands are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#api-specific-test-commands).
 

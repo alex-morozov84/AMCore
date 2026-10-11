@@ -69,6 +69,30 @@ Secondary apps in the suite share that test secret. The shared setup helper
 attempts cleanup of its created application and containers if bootstrap fails.
 Tests using a custom setup remain responsible for its teardown.
 
+Prepare a fresh checkout with `pnpm install --frozen-lockfile`, then
+`node scripts/api-e2e-ci.mjs --prepare`. Preparation generates Prisma and builds
+shared; execution checks the preparation receipt before discovery or Docker.
+`node scripts/api-e2e-ci.mjs --all` runs the standard inventory sequentially.
+`--shard=i/n` uses Jest's built-in partition, with at most three shards.
+Each suite gets one fresh in-band Node process and a 1 GiB V8 heap limit.
+No pool replays or automatic suite retries are allowed. Missing assertion metadata,
+skipping, signals, forced exits and incomplete reports fail the run.
+
+The parent saves partial evidence under `.amcore/api-e2e-results`.
+Natural process exit and absence of attempt-labelled containers are required.
+Shared teardown attempts workers, app and containers even after a close rejection.
+Cleanup has phase deadlines and a 60-second parent deadline. Forced termination
+cannot turn a failed attempt green. Malformed reporter data cannot disable the
+termination watchdog. Custom queue-graph teardown also retains close failures and
+attempts its Redis stop. Only a complete ordinary assertion-failure report permits
+the next suite; incomplete reports stop the lane. Emergency container removal checks both exact
+run and attempt labels. It never removes Ryuk or another run's resources.
+CI artifact admission binds the canonical plan to the current GitHub run and attempt.
+For local artifact inspection, the aggregate command requires explicit `--local`
+and rejects inherited GitHub run context. Local inspection still checks checkout
+SHA and full evidence; it does not admit stale evidence in CI.
+A new local full run needs a changed hypothesis or its designated delivery stage.
+
 ### Managed stand admission
 
 A managed invocation performs full admission before work, holds its lease and
@@ -182,7 +206,10 @@ with its last remaining reference, whatever it is, and refuses while a second on
 exists). The ownership proof is repeated before every step, and each name is resolved
 to the proved image ID before it is untagged. Nothing is forced and parent images are
 never pruned. A foreign tag or alias present at the start, or any container in any
-state that uses the image, refuses removal before anything changes. A foreign alias
+state that uses the image, refuses removal before anything changes. Containers are
+inspected by full ID. If an unrelated container disappears after listing, cleanup
+skips it only after a successful fresh inventory confirms its exact ID is absent.
+Incomplete inspection, permission or transport errors still refuse disposal. A foreign alias
 or a consumer that appears while the removal runs is preserved: it fails the repeated
 proof or makes the engine refuse the final removal, and cleanup reports failure
 (partial: some own names may already be gone). That protection for an alias depends on

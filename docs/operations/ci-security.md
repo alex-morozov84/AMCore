@@ -39,18 +39,47 @@ of workflow self-hardening to keep the example forkable.
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
-- **Test** runs API process-role/shutdown-drain E2E and the four focused AI
+- **Test** prepares its own API E2E receipt before the focused launcher. It runs API process-role/shutdown-drain E2E and the four focused AI
   suites: gateway consistency, catalogue degradation, provider receipt settlement
   and maintenance upgrade. They use isolated PG18/Redis Testcontainers and injected
   SDK HTTP fixtures. The broader durable AI regression inventory remains a local
   delivery gate; these focused suites do not claim full API E2E coverage.
+- **API E2E** adds diagnostic full standard coverage in separate plan, shard and
+  aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
+  generates Prisma and builds shared. The measured layout uses three built-in shards
+  and pnpm dependency caching.
+  The aggregate requires successful dependencies and exact-once inventory evidence
+  for the same checkout SHA, inputs and current GitHub run/attempt. It normalizes
+  actual suite paths across fresh workspace roots and binds them to assignments. Missing, cancelled,
+  skipped or forced attempts fail. Artifact names include the workflow attempt;
+  the aggregate downloads only that attempt and rejects unexpected artifact directories.
+  Reports remain available for seven days.
+  This declaration does not enable live branch protection. The six existing focused
+  suites remain in **Test** until measured full required coverage replaces them.
+  Background-work contracts add 17 original-checkout paths; extension contracts
+  add eight disjoint paths in a disposable copy. Their union with those six is
+  31 named paths, rather than the full standard inventory.
+  Initial layout admission requires Linux cold and cached setup evidence, measured
+  runner-minutes and three comparable successful final warm observations.
+  The [API E2E budget policy](#api-e2e-budget-policy) defines the accepted limits.
+  The workflow target is 15 minutes with a 17-minute ceiling;
+  the API target is 12 minutes. The 30-minute measurement timeout is headroom.
+  Cold diagnostics retain an isolated pnpm-store option without cache restoration.
+  Historical cold setup evidence does not prove successful final-candidate execution.
+  Runner snapshots record CPU/RAM, cache status, package/Docker versions, image IDs
+  and available runner cgroup metrics. Unavailable metrics remain unknown; runner
+  cgroup snapshots do not represent individual container peaks. Ordinary pnpm caching
+  is enabled for the final warm candidate; an eligible warm observation requires
+  actual cache hits in the plan and every shard. Each job still uses fresh isolated Docker. Measurement snapshots accompany the reports.
+  Built-in two/three shards require evidence before selection. Full PR coverage is
+  preferred; full post-merge coverage requires a separate owner policy decision.
 - **Test** also runs `pnpm test:capability-extension`: an isolated disposable
   resource variant compiles shared, API and web consumers and exercises
   authorization against PostgreSQL and Redis Testcontainers. The fixture does
   not add a sample product domain to the shipped starter.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
-- **Web E2E** remains the mandatory aggregate check. Its plan selects all
+- **Web E2E** is the declared aggregate check. Live required status is separate. Its plan selects all
   applicable lanes; independent matrix runners execute safety/transport, mocked,
   two isolated path groups and the retained HTTPS host lane with `fail-fast: false`.
   Every lane invokes `node scripts/e2e-ci.mjs <lane>` with CI settings. Matrix
@@ -176,6 +205,51 @@ they have run at least once on the repository. A newly added job context
 (such as the scaffolding-contract pair) needs that same one-time
 re-application after its first real run on the repository, exactly like a
 brand-new observability-contract job would.
+
+## API E2E budget policy
+
+The accepted layout uses three built-in shards on measured Linux x64 runners with
+4 CPUs and approximately 16 GB RAM. The declared runner label is `ubuntu-latest`;
+measurements must confirm the actual class. Each plan and shard job installs the
+frozen lockfile and prepares its own checkout. The aggregate validates downloaded
+artifacts without installing dependencies or preparing test infrastructure.
+Cache dependencies only; keep Docker and test data isolated.
+
+There are two different time limits:
+
+- **API critical path:** plan start to aggregate completion, including preparation,
+  cleanup and artifacts, must stay within 12 minutes.
+- **API runner-time:** add the actual durations of the plan, every shard and
+  aggregate job. The limit is 2,262 seconds (37:42) per complete observation.
+  Parallel job durations count separately. This is machine time, not an invoice.
+
+The complete normal workflow targets 15 minutes and has a 17-minute ceiling,
+excluding queue time. Report queue-inclusive waiting time separately.
+Job timeouts provide diagnostic headroom; they do not raise these limits.
+These are admission limits assessed from retained job timestamps and artifacts.
+The aggregate enforces evidence completeness and lifecycle contracts; it does not
+apply these time budgets automatically.
+
+Historical baseline hardware was not measured. Its timing remains a historical
+reference, not proof of equivalent resources, monetary cost or CPU-normalized
+speedup. The absolute runner-time limit does not require reconstructing that host.
+Missing physical or cgroup metrics remain unknown; process heap/RSS are not substitutes.
+A new serial comparison is an optimization experiment, not a routine delivery gate.
+
+Initial layout admission requires three complete, mutually comparable warm samples.
+Compare exact source/configuration/inventory/assignments, measured runner class,
+software and resolved container images. Require actual cache hits in the plan and
+every shard, exact-once coverage, natural clean exits and matching run/attempt artifacts.
+Current normal CI, including Web, generated projects and security, must also pass.
+
+Ordinary feature PRs use the current complete CI gates; they do not repeat layout
+admission automatically. Documentation-only changes do not justify another full
+local API run. Revisit layout measurements when runner class, sharding, preparation
+or lifecycle policy materially changes, or evidence shows a budget/reliability regression.
+Record a specific hypothesis before another measurement. A failed or ineligible
+sample stops admission; diagnose the smallest failed risk instead of retrying for green.
+Runner upgrades, budget changes and a switch to post-merge coverage require an
+explicit owner decision. Required-check activation remains a separate repository action.
 
 ## Handling CodeQL alerts (false positives)
 

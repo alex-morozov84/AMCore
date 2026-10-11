@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { Client, types } from 'pg'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 const upgrade = '20261008160000_notification_ai_extension_contracts'
 const migrations = join(process.cwd(), 'prisma/migrations')
 const fixture = (name: string) =>
@@ -14,7 +16,9 @@ describe('Extension legacy maintenance migration (PostgreSQL)', () => {
   let container: StartedPostgreSqlContainer
   let client: Client
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:18-alpine').start()
+    container = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
     client = new Client({
       connectionString: container.getConnectionUri(),
       application_name: 'amcore-t039-migrator',

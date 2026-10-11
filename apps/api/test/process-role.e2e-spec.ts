@@ -4,6 +4,8 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 /**
  * Role-composition DI assertions (ADR-041). Lives in the e2e (ESM) project so the
  * full app graph (jose/openid-client) parses. Uses `.compile()` — it resolves the
@@ -110,8 +112,10 @@ const absent = (m: TestingModule, token: Token): void =>
 
 describe('PROCESS_ROLE module composition (ADR-041)', () => {
   beforeAll(async () => {
-    postgres = await new PostgreSqlContainer('postgres:18-alpine').start()
-    broker = await new RedisContainer('redis:7-alpine').start()
+    postgres = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
+    broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     process.env.DATABASE_URL = postgres.getConnectionUri()
     process.env.REDIS_URL = broker.getConnectionUrl()
     process.env.JWT_SECRET ??= 'test-only-jwt-secret-at-least-32-characters-long'

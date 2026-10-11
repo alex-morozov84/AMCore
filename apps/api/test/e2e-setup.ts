@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto'
 
+import { cleanupE2E } from './e2e-cleanup'
+
 // One secret per Jest suite also keeps secondary apps and repeated bootstraps
 // consistent with the cached AppModule configuration.
 const jwtSecret = randomBytes(32).toString('hex')
@@ -9,12 +11,7 @@ export function prepareE2EAuthEnvironment(): void {
 }
 
 export async function cleanupFailedE2ESetup(actions: Array<() => Promise<unknown>>): Promise<void> {
-  for (const action of actions) {
-    try {
-      await action()
-    } catch (error) {
-      // Attempt every owned resource while preserving the original setup error.
-      console.warn('E2E setup cleanup failed:', error)
-    }
-  }
+  await cleanupE2E(
+    actions.map((run, index) => ({ name: `setup-${index}`, run, milliseconds: 10_000 }))
+  )
 }

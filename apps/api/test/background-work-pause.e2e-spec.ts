@@ -24,6 +24,8 @@ import { PROVIDER_FENCE_LUA } from '../src/infrastructure/background-work/script
 import { applyQueueControl } from '../src/infrastructure/background-work/scripts/queue-control'
 import { buildBullConnection } from '../src/infrastructure/queue/redis-connection.config'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
+
 describe('Managed queue pause/resume — real BullMQ/Redis', () => {
   let container: StartedRedisContainer
   let queue: Queue
@@ -33,7 +35,7 @@ describe('Managed queue pause/resume — real BullMQ/Redis', () => {
   const prefix = 'amcore:pause-proof:'
 
   beforeAll(async () => {
-    container = await new RedisContainer('redis:7-alpine').start()
+    container = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     queue = new Queue('pause-proof', {
       prefix: 'amcore',
       connection: buildBullConnection(container.getConnectionUrl()),

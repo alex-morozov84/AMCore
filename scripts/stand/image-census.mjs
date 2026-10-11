@@ -1,5 +1,6 @@
 import { label, labels, builtServices } from './config.mjs'
 import { orderedInspection } from './resource-census.mjs'
+import { assertUnreferenced } from './image-consumers.mjs'
 
 const fullId = /^sha256:[0-9a-f]{64}$/
 const gone = (error) => /no such (image|object)|not found/i.test(error.stderr ?? error.message)
@@ -56,19 +57,6 @@ export async function imageCensus(m, execute) {
     id: item.Id,
     tags: ownedImage(m, item),
   }))
-}
-
-// Any container in any state that still uses a candidate refuses removal.
-async function assertUnreferenced(execute, candidates) {
-  const ids = lines(await execute(['container', 'ls', '-a', '-q', '--no-trunc'], { capture: true }))
-  if (!ids.length) return
-  const found = JSON.parse(await execute(['container', 'inspect', ...ids], { capture: true }))
-  for (const container of orderedInspection('container', ids, found)) {
-    const used = candidates.some(
-      (id) => container.Image === id || JSON.stringify(container.Mounts ?? []).includes(id)
-    )
-    if (used) throw new Error('Image referenced by a container; removal refused')
-  }
 }
 
 // Fresh physical proof of one candidate by full ID: it must still exist and every

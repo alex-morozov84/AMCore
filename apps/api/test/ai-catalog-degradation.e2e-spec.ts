@@ -5,6 +5,7 @@ import { Pool, type PoolClient } from 'pg'
 import { AiCatalogLoad } from '../src/infrastructure/ai/registry/ai-catalog-load'
 import { ObservedTransactionRunner } from '../src/prisma/observed-transaction'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
 import { catalogueRedisPhysicalProof } from './fixtures/ai-catalog-redis-proof'
 import { observedPrismaRoleProof } from './fixtures/observed-prisma-role-proof'
 
@@ -24,7 +25,9 @@ describe('AI catalogue physical PG lifetime', () => {
   const gates: ReturnType<typeof barrier>[] = []
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:18-alpine').start()
+    container = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
   }, 120000)
   afterEach(async () => {
     for (const gate of gates.splice(0)) gate.release()

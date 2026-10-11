@@ -8,6 +8,7 @@ import { NotificationDispatchService } from '../src/core/notifications/dispatch/
 import { NotificationsService } from '../src/core/notifications/notifications.service'
 import type { PrismaService } from '../src/prisma'
 
+import { boundedPhase } from './e2e-cleanup'
 import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
 import { type FakeTelegram, startFakeTelegram } from './telegram-fake-server'
@@ -31,28 +32,56 @@ export async function setupTelegramE2E(): Promise<TelegramE2E> {
   process.env.TELEGRAM_BOT_USERNAME = TG_BOT
   process.env.WEBHOOK_TELEGRAM_SECRET = TG_SECRET
   process.env.TELEGRAM_API_BASE_URL = fake.url
-  const context = await setupE2ETest()
-  const { app } = context
-  // Only explicit `dispatch.runDispatchCycle()` calls should drain — no cron, no async worker race.
-  for (const [, job] of app.get(SchedulerRegistry, { strict: false }).getCronJobs()) void job.stop()
-  await closeManagedWorker(app, 'notifications', true)
-  return {
-    context,
-    app,
-    prisma: context.prisma,
-    fake,
-    notifications: app.get(NotificationsService, { strict: false }),
-    dispatch: app.get(NotificationDispatchService, { strict: false }),
+  let context: E2ETestContext | undefined
+  try {
+    context = await setupE2ETest()
+    const { app } = context
+    // Only explicit `dispatch.runDispatchCycle()` calls should drain — no cron, no async worker race.
+    for (const [, job] of app.get(SchedulerRegistry, { strict: false }).getCronJobs())
+      void job.stop()
+    await boundedPhase({
+      name: 'telegram-worker',
+      run: () => closeManagedWorker(app, 'notifications', true),
+      milliseconds: 10_000,
+    })
+    return {
+      context,
+      app,
+      prisma: context.prisma,
+      fake,
+      notifications: app.get(NotificationsService, { strict: false }),
+      dispatch: app.get(NotificationDispatchService, { strict: false }),
+    }
+  } catch (error) {
+    try {
+      await teardownTelegramE2E({ context, fake })
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Telegram setup and cleanup failed')
+    }
+    throw error
   }
 }
 
-export async function teardownTelegramE2E(tg: TelegramE2E | undefined): Promise<void> {
-  if (tg?.context) await teardownE2ETest(tg.context)
-  if (tg?.fake) await tg.fake.close()
+export async function teardownTelegramE2E(
+  tg: Partial<Pick<TelegramE2E, 'context' | 'fake'>> | undefined
+): Promise<void> {
+  const failures: unknown[] = []
+  try {
+    if (tg?.context) await teardownE2ETest(tg.context)
+  } catch (error) {
+    failures.push(error)
+  }
+  try {
+    if (tg?.fake)
+      await boundedPhase({ name: 'telegram-fake', run: () => tg.fake!.close(), milliseconds: 5000 })
+  } catch (error) {
+    failures.push(error)
+  }
   delete process.env.TELEGRAM_BOT_TOKEN
   delete process.env.TELEGRAM_BOT_USERNAME
   delete process.env.WEBHOOK_TELEGRAM_SECRET
   delete process.env.TELEGRAM_API_BASE_URL
+  if (failures.length) throw new AggregateError(failures, 'Telegram teardown failed')
 }
 
 /** Per-test reset: clean the DB + receipts and restore the default fake send response. */
@@ -131,6 +160,7 @@ export async function seedPendingTelegramDelivery(
       locale: 'en',
       status: 'PENDING',
       maxAttempts: 5,
+      requestContractVersion: 1,
     },
   })
 }

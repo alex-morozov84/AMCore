@@ -25,7 +25,10 @@ import type { WorkRegistration } from '../src/infrastructure/background-work/wor
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
+import { boundedPhase, cleanupE2E } from './e2e-cleanup'
+import { e2eContainerLabels } from './e2e-owned-containers'
 import { cleanupFailedE2ESetup, prepareE2EAuthEnvironment } from './e2e-setup'
+import { closeE2EWorkers } from './e2e-workers'
 
 /**
  * No-op PinoLogger stub for e2e. With the EmailModule and InviteService
@@ -92,15 +95,22 @@ export async function setupE2ETestInfrastructure(): Promise<
 > {
   prepareE2EAuthEnvironment()
   const postgresContainer = await new PostgreSqlContainer('postgres:18-alpine')
+    .withLabels(e2eContainerLabels())
     .withDatabase('amcore_test')
     .withUsername('test')
     .withPassword('test')
     .start()
   try {
-    const redisContainer = await new RedisContainer('redis:7-alpine').start()
+    const redisContainer = await new RedisContainer('redis:7-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
     return { postgresContainer, redisContainer }
   } catch (error) {
-    await cleanupFailedE2ESetup([() => postgresContainer.stop({ timeout: 10_000 })])
+    try {
+      await cleanupFailedE2ESetup([() => postgresContainer.stop({ timeout: 10_000 })])
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'E2E infrastructure and cleanup failed')
+    }
     throw error
   }
 }
@@ -234,16 +244,21 @@ export async function setupE2ETest(
 
     return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
   } catch (error) {
-    await cleanupFailedE2ESetup([
-      async () => {
-        if (app) {
-          await closeBullWorkers(app)
-          await app.close()
-        } else await moduleFixture?.close()
-      },
-      () => redisContainer.stop({ timeout: 10_000 }),
-      () => postgresContainer.stop({ timeout: 10_000 }),
-    ])
+    try {
+      await cleanupFailedE2ESetup([
+        async () => {
+          if (app) await closeBullWorkers(app)
+        },
+        async () => {
+          if (app) await app.close()
+          else await moduleFixture?.close()
+        },
+        () => redisContainer.stop({ timeout: 10_000 }),
+        () => postgresContainer.stop({ timeout: 10_000 }),
+      ])
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'E2E bootstrap and cleanup failed')
+    }
     throw error
   }
 }
@@ -255,30 +270,35 @@ export async function setupE2ETest(
  * - Stops containers
  */
 export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
-  await closeBullWorkers(context.app)
-  await context.app.close()
-  await context.redisContainer.stop({ timeout: 10_000 })
-  await context.postgresContainer.stop({ timeout: 10_000 })
-  // Testcontainers closes Docker/Reaper sockets asynchronously shortly after stop().
-  // Let them settle before Jest decides the suite leaked an open handle.
-  await new Promise((resolve) => setTimeout(resolve, 5_000))
+  await cleanupE2E([
+    { name: 'workers', run: () => closeBullWorkers(context.app), milliseconds: 10_000 },
+    { name: 'app', run: () => context.app.close(), milliseconds: 10_000 },
+    {
+      name: 'redis',
+      run: () => context.redisContainer.stop({ timeout: 10_000 }),
+      milliseconds: 10_000,
+    },
+    {
+      name: 'postgres',
+      run: () => context.postgresContainer.stop({ timeout: 10_000 }),
+      milliseconds: 10_000,
+    },
+    {
+      name: 'sockets',
+      run: () => new Promise((resolve) => setTimeout(resolve, 5000)),
+      milliseconds: 6000,
+    },
+  ])
 }
 
 async function closeBullWorkers(app: INestApplication): Promise<void> {
-  let bindings: readonly ManagedWorkerBinding[]
-  try {
-    bindings = app.get(MANAGED_WORKERS, { strict: false })
-  } catch {
-    return
-  }
-  await Promise.all(
-    bindings.map(async ({ host }) => {
-      try {
-        await app.get<WorkerHost>(host, { strict: false }).worker.close(true)
-      } catch {
-        // Failed startup can leave an unregistered host; focused modules may have none.
-      }
-    })
+  await closeE2EWorkers(
+    () => app.get<readonly ManagedWorkerBinding[]>(MANAGED_WORKERS, { strict: false }),
+    ({ host }) => {
+      const worker = app.get<WorkerHost>(host, { strict: false }).worker
+      return { close: () => worker.close(true) }
+    },
+    boundedPhase
   )
 }
 

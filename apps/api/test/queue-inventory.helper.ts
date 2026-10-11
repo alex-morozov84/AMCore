@@ -2,6 +2,10 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
 
+import { cleanupE2E } from './e2e-cleanup'
+import { e2eContainerLabels } from './e2e-owned-containers'
+import { closeOwnedQueueGraph } from './queue-graph-cleanup'
+
 const noopLogger = {
   setContext: () => undefined,
   trace: () => undefined,
@@ -55,7 +59,7 @@ export async function compileQueueGraph(
     ? 'postgresql://u:p@localhost:5432/test?sslmode=require&schema=public'
     : (process.env.DATABASE_URL ?? 'postgresql://u:p@localhost:5432/test?schema=public')
   process.env.JWT_SECRET ??= 'test-only-jwt-secret-at-least-32-characters-long'
-  const redis = await new RedisContainer('redis:7-alpine').start()
+  const redis = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
   process.env.REDIS_URL = redis.getConnectionUrl()
   process.env.NODE_ENV = production ? 'production' : 'test'
   if (production) {
@@ -95,8 +99,7 @@ export async function compileQueueGraph(
 }
 
 export async function closeQueueGraph(graph?: CompiledQueueGraph): Promise<void> {
-  await graph?.module.close().catch(() => undefined)
-  await graph?.redis.stop().catch(() => undefined)
+  await closeOwnedQueueGraph(graph, cleanupE2E)
 }
 
 /** Disable the definition in the single registration owner before compiling either role. */

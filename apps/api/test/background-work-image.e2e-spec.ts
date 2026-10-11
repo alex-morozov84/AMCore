@@ -20,6 +20,7 @@ import { WorkExecutionService } from '../src/infrastructure/background-work/work
 import { WorkReadiness } from '../src/infrastructure/background-work/work-readiness'
 import { buildBullConnection } from '../src/infrastructure/queue/redis-connection.config'
 
+import { e2eContainerLabels } from './e2e-owned-containers'
 import { ImageFixtureHandler, imageWork } from './fixtures/background-work/image-fixture'
 import { migrateTestDatabase } from './helpers'
 
@@ -34,8 +35,10 @@ describe('Idempotent image conformance — two actual workers and one business o
   const workers: Worker[] = []
 
   beforeAll(async () => {
-    postgres = await new PostgreSqlContainer('postgres:18-alpine').start()
-    broker = await new RedisContainer('redis:7-alpine').start()
+    postgres = await new PostgreSqlContainer('postgres:18-alpine')
+      .withLabels(e2eContainerLabels())
+      .start()
+    broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     db = new PrismaClient({
       adapter: new PrismaPg({ connectionString: postgres.getConnectionUri() }),
     })

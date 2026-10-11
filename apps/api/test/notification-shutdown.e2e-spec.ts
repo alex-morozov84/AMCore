@@ -157,6 +157,8 @@ describe('Notification shutdown atomicity (e2e, real Postgres)', () => {
         targetKey: `shutdown-${Date.now()}-${seq}@example.com`,
         locale: 'en',
         status: overrides.status ?? NotificationDeliveryStatus.PENDING,
+        // Claims use Postgres transaction time; explicitly seed a due row.
+        availableAt: new Date(0),
         maxAttempts: 5,
       },
       select: { id: true },

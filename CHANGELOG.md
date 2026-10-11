@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Reliability
+
+- Managed stand image cleanup tolerates a vanished unrelated container after confirming its absence; surviving consumers and ambiguous inspection still refuse removal.
+
+- API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage uses three shards and attempt-specific artifacts. It is diagnostic until Linux admission and separate branch-protection activation.
+
 ### Features
 
 - Shared native disclosures unify expandable details and filters; queue cards show one state-dependent pause/resume action with an icon.
