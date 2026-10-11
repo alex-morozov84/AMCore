@@ -7,20 +7,25 @@ function valid() {
     id: 'a',
     pid: 1,
     absolutePath: '/suite',
-    path: 'test/suite',
+    path: 'test/suite.e2e-spec.ts',
     closed: true,
+    forced: false,
+    lifecycleFailure: false,
+    signal: null,
     spawns: 1,
     exit: 0,
     clean: true,
     final: { success: true },
     rows: [
       { event: 'run-start', attempt: 'a', pid: 1 },
-      { event: 'suite-start', attempt: 'a', pid: 1 },
+      { event: 'suite-start', attempt: 'a', pid: 1, path: '/suite' },
       {
         event: 'suite-end',
         attempt: 'a',
         pid: 1,
         path: '/suite',
+        runtimeError: false,
+        failure: false,
         assertions: [{ status: 'passed', invocations: 1, retryReasons: [] }],
       },
       { event: 'terminal', attempt: 'a', pid: 1, success: true },
@@ -31,6 +36,10 @@ test('late green cannot conceal forced stop, missing evidence, retry or replay',
   validateAttempt(valid())
   for (const change of [
     { forced: true },
+    { forced: undefined },
+    { lifecycleFailure: undefined },
+    { signal: undefined },
+    { pid: undefined },
     { signal: 'SIGTERM' },
     { closed: false },
     { spawns: 2 },
@@ -51,6 +60,12 @@ test('late green cannot conceal forced stop, missing evidence, retry or replay',
   const duplicate = valid()
   duplicate.rows.push(duplicate.rows[1])
   assert.throws(() => validateAttempt(duplicate))
+  const extraTerminal = valid()
+  extraTerminal.rows.push({ event: 'terminal', attempt: 'a', pid: 1, success: false })
+  assert.throws(() => validateAttempt(extraTerminal))
+  const missingPid = valid()
+  delete missingPid.rows[2].pid
+  assert.throws(() => validateAttempt(missingPid))
   const empty = valid()
   empty.rows[2].assertions = []
   empty.rows[2].runtimeError = true
@@ -58,23 +73,31 @@ test('late green cannot conceal forced stop, missing evidence, retry or replay',
 })
 test('aggregate rejects omitted, duplicate, unexpected or wrong-SHA shard reports', () => {
   const plan = {
-    sha: 'sha',
+    schemaVersion: 1,
+    sha: 'a'.repeat(40),
+    inputs: 'b'.repeat(64),
+    pullRequestHead: null,
+    all: ['test/suite.e2e-spec.ts'],
     run: 'run',
     runAttempt: '1',
-    shards: [{ id: '1/1', paths: ['test/suite'] }],
+    shards: [{ id: '1/1', paths: ['test/suite.e2e-spec.ts'] }],
   }
   const report = {
     ...plan,
     shard: '1/1',
-    paths: ['test/suite'],
+    paths: ['test/suite.e2e-spec.ts'],
     success: true,
     attempts: [valid()],
   }
   validateReports(plan, [report])
+  assert.throws(() => validateReports({ ...plan, all: [], shards: [] }, []))
+  assert.throws(() => validateReports({ ...plan, all: [] }, [report]))
   for (const reports of [
     [],
     [report, report],
     [{ ...report, sha: 'other' }],
+    [{ ...report, pullRequestHead: 'c'.repeat(40) }],
+    [{ ...report, schemaVersion: undefined }],
     [{ ...report, success: false }],
     [{ ...report, paths: [] }],
     [{ ...report, attempts: [] }],

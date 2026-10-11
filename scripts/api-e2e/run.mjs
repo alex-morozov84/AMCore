@@ -9,6 +9,8 @@ import { validateAttempt } from './validate.mjs'
 export async function runShard(plan, shard, output) {
   mkdirSync(output, { recursive: true })
   const report = {
+    schemaVersion: 1,
+    pullRequestHead: plan.pullRequestHead,
     inputs: plan.inputs,
     sha: plan.sha,
     run: plan.run,

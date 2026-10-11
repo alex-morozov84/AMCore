@@ -81,6 +81,7 @@ export function plan(count = 1) {
   )
   return {
     schemaVersion: 1,
+    pullRequestHead: process.env.API_E2E_PR_HEAD || null,
     inputs: executionHash(),
     sha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
     run: process.env.GITHUB_RUN_ID || 'local',

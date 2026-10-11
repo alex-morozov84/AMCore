@@ -33,6 +33,11 @@ test('fresh-job receipt refuses missing, stale and changed generated outputs bef
       'pnpm-lock.yaml',
       'apps/api/package.json',
       'apps/api/jest-e2e.config.js',
+      'apps/api/prisma.config.ts',
+      'apps/api/tsconfig.json',
+      'packages/shared/package.json',
+      'packages/shared/tsconfig.json',
+      'packages/shared/tsup.config.ts',
     ])
       cpSync(join(root, name), join(directory, name))
     symlinkSync(join(root, 'node_modules'), join(directory, 'node_modules'))

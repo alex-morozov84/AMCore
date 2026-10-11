@@ -19,6 +19,12 @@ export function files(directory, suffix = '') {
 export function inputHash() {
   const paths = [
     resolve(root, 'pnpm-lock.yaml'),
+    resolve(root, 'package.json'),
+    resolve(root, 'packages/shared/package.json'),
+    resolve(root, 'packages/shared/tsconfig.json'),
+    resolve(root, 'packages/shared/tsup.config.ts'),
+    resolve(api, 'prisma.config.ts'),
+    resolve(api, 'tsconfig.json'),
     resolve(api, 'package.json'),
     resolve(api, 'jest-e2e.config.js'),
     ...files(resolve(api, 'prisma')),
