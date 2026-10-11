@@ -1,3 +1,4 @@
+import { clearTimeout } from 'node:timers'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -26,7 +27,9 @@ test('F2 malformed progress cannot disable KILL watchdog or turn late exit0 gree
         safetyUsed = true
         try {
           if (pid) process.kill(-pid, 'SIGKILL')
-        } catch {}
+        } catch {
+          /* Owned group already exited. */
+        }
       }, 1000)
       const began = performance.now()
       try {
@@ -63,7 +66,9 @@ test('F2 malformed progress cannot disable KILL watchdog or turn late exit0 gree
         clearTimeout(safety)
         try {
           if (pid) process.kill(-pid, 'SIGKILL')
-        } catch {}
+        } catch {
+          /* Owned group already exited. */
+        }
         rmSync(directory, { recursive: true, force: true })
       }
     }

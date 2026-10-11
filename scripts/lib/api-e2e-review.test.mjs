@@ -32,7 +32,7 @@ test('F1 every fresh wrapper job prepares before execution; missing/late/skipped
   const jobs = parse(readFileSync(`${root}/.github/workflows/ci.yml`, 'utf8')).jobs
   preparation(jobs)
   for (const change of ['missing', 'late', 'skipped']) {
-    const bad = structuredClone(jobs)
+    const bad = globalThis.structuredClone(jobs)
     const index = bad.test.steps.findIndex((step) =>
       /api-e2e-ci.mjs --prepare/.test(step.run || '')
     )
@@ -100,14 +100,14 @@ test('F3 assignments bind actual paths across distinct workspace roots; substitu
   for (const row of nested.report.attempts[1].rows)
     if (row.path) row.path = nested.report.attempts[1].absolutePath
   validateReports(nested.plan, [nested.report])
-  const substituted = structuredClone(report)
-  const copy = structuredClone(substituted.attempts[0])
+  const substituted = globalThis.structuredClone(report)
+  const copy = globalThis.structuredClone(substituted.attempts[0])
   copy.path = plan.all[1]
   copy.id = 'unique-ledger-id'
   for (const row of copy.rows) row.attempt = copy.id
   substituted.attempts[1] = copy
   assert.throws(() => validateReports(plan, [substituted]), /actual suite/)
-  const alias = structuredClone(report)
+  const alias = globalThis.structuredClone(report)
   alias.attempts[1].absolutePath = '/other/apps/api/test/../test/second.e2e-spec.ts'
   assert.throws(() => validateReports(plan, [alias]), /actual suite/)
 })

@@ -1,3 +1,4 @@
+const process = require('node:process')
 const { appendFileSync, writeFileSync } = require('node:fs')
 class Reporter {
   record(row) {

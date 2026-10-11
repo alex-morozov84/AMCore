@@ -117,7 +117,7 @@ test('CI full coverage retains original focused obligations and strict aggregate
   assert.equal((workflow.match(/name: API E2E\n/g) || []).length, 1)
   assert.match(
     workflow,
-    /api-e2e:\n[\s\S]*?needs: \[api-e2e-plan, api-e2e-shards\]\n    if: \$\{\{ always\(\) \}\}/
+    /api-e2e:\n[\s\S]*?needs: \[api-e2e-plan, api-e2e-shards\]\n {4}if: \$\{\{ always\(\) \}\}/
   )
   assert.match(workflow, /fail-fast: false/)
   assert.match(workflow, /node scripts\/api-e2e\/aggregate.mjs api-e2e-evidence/)
