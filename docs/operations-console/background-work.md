@@ -47,12 +47,12 @@ not be read.
 
 ### The queues that ship with the starter
 
-| Queue           | Kind   | What an empty queue means                                                                                                                          |
-| --------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `email`         | Work   | No email waits to be sent. Messages that contain secret links (password reset, verification, invitations) are sent directly and never appear here. |
-| `notifications` | Wake   | Only wake-up signals live here. The real delivery state is stored in the database, so an empty queue does **not** mean nothing is pending.         |
-| `ai-runs`       | Wake   | Only wake-up signals live here. Run state is stored in the database, so an empty queue does **not** mean nothing is pending.                       |
-| `default`       | Custom | Observed external queue with no managed worker. Native commands are disabled; downstream processing requires a supported work registration.        |
+| Queue           | Kind   | What an empty queue means                                                                                                                                 |
+| --------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `email`         | Work   | No separate queued email waits to be sent. Notification emails use database-owned deliveries; secret-link emails are sent directly. Neither appears here. |
+| `notifications` | Wake   | Only wake-up signals live here. The real delivery state is stored in the database, so an empty queue does **not** mean nothing is pending.                |
+| `ai-runs`       | Wake   | Only wake-up signals live here. Run state is stored in the database, so an empty queue does **not** mean nothing is pending.                              |
+| `default`       | Custom | Observed external queue with no managed worker. Native commands are disabled; downstream processing requires a supported work registration.               |
 
 A queue added by your team appears with its technical name and a generic
 description for its kind. See [Adding a queue](#adding-a-queue-for-developers).
@@ -220,6 +220,15 @@ highlighted and focus moves to its **Jobs** card. The card uses the same surface
 as other Console widgets. Select a state to filter the list; the highlighted
 filter identifies the current view. These filters do not change jobs. Previous
 and Next move through the bounded live window, not a complete historical archive.
+The shared search field matches a literal, case-insensitive part of a job ID.
+Search updates after a 300 ms typing pause, without changing the URL.
+Enter applies it immediately; Clear removes the query and refocuses the field.
+Search applies inside the selected state/channel or evidence source, before
+pagination, among at most 512 observed identities. It does not search other states
+or the whole archive. Changing search clears captured selection and open history.
+Attempt timestamps explicitly label Started and Finished, even when both round
+to the same displayed second. Registered boolean values display Yes/No; empty
+technical values do not produce an empty disclosure.
 
 **Not paused** means the queue is not paused; it does not prove a worker
 is running. **Paused** prevents workers taking another job,
@@ -417,3 +426,29 @@ when the confirmation opens. The API still receives an exact UTC instant.
 Nonexistent or ambiguous local times are rejected. The cutoff checks completion
 time for each selected record, in addition to mandatory retention and safety
 predicates; cleanup does not delete business output.
+
+## Notification deliveries
+
+Open **Notification deliveries** to control database-owned deliveries. The separate
+notification wake card only shows processing signals. Those signals reduce dispatch
+latency; a periodic database scan recovers when signals are absent or lost.
+Notification email is sent directly by this delivery worker, without a second
+email queue job. The email queue serves separate, explicitly queueable emails.
+This separation is the production architecture, not a preview-only fixture.
+Counts describe the database
+backlog and show `+` when the10000-row bound is reached. Choose the registered
+channel filter and a state. Native states distinguish delivered, skipped and cancelled
+rows within Completed. Open one **Attempt history** disclosure to inspect the
+latest16 attempts; list reads never fetch every row's history. Dates use the existing
+Console timestamp display. Expired/truncated history remains explicit.
+
+Pause prevents new claims; already claimed attempts can finish. Retry reserves one
+lifetime additional attempt after provable transient exhaustion and preserves its
+earliest allowed time. Unknown or accepted effects refuse retry. Cancel applies to
+pending work, including a reserved retry, and consumes that reservation. Cleanup
+removes resolved external deliveries finished at least30 days ago; it keeps the
+notification and audit. See [backend contract](../notifications/control.md).
+
+Database-owned reads and commands do not need the wake broker. Console authentication
+still depends on its Redis session vault; a complete Redis outage does not promise
+a usable authenticated screen.

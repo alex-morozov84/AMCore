@@ -135,6 +135,16 @@ The command prints one roles page address per organization.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_START -->
 
 The default also prepares SUPER_ADMIN when the Console feature is enabled.
+For notification delivery acceptance, create a fresh ID with
+`pnpm stand preview --id notification-work --profile notification-work`.
+This profile adds an internal fake Telegram provider and17 repeatable delivery
+cases. It sends no real messages. Five actual client HTTP429 witnesses establish
+one safe retry case; its sixth call can receive fake acceptance. Claims initially
+start paused. Other cases cover pending cancellation, a reserved/spent grant,
+unknown effects, permanent failure, changed version/target, protected legacy
+history, old/recent cleanup and truncated/expired history. Repeated preview keeps
+the owner's changes and does not reseed removed deliveries. The fake provider
+counter uses an owned volume; stop/purge follows the usual managed commands.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared

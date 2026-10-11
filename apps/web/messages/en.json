@@ -809,7 +809,43 @@
         },
         "failureTitle": "Reason for failure",
         "failureNextStep": "What to do:",
-        "failureUnavailable": "The detailed reason was not recorded or is no longer available. Ask the service maintainer to check worker diagnostics."
+        "failureUnavailable": "The detailed reason was not recorded or is no longer available. Ask the service maintainer to check worker diagnostics.",
+        "allFilter": "All",
+        "nextAttempt": "Next attempt:",
+        "claimsPauseHelp": "Pause prevents new delivery claims. Already claimed attempts may finish.",
+        "scheduledRetryEffect": "Reserve one additional attempt for this delivery. Its earliest permitted time remains unchanged.",
+        "retainedCleanupEffect": "Remove selected resolved external deliveries that finished at least 30 days ago. Keep the notification and audit history.",
+        "countBounded": "+",
+        "historyTitle": "Attempt history",
+        "historyTruncated": "Only the latest 16 attempts are shown.",
+        "historyExpired": "Older attempt records expired. Delivery certainty and the lifetime grant remain preserved.",
+        "historyEmpty": "No retained attempts.",
+        "historyNumber": "Attempt {number}",
+        "historyReason": "Technical reason",
+        "historyGrant": "Manual grant: actor {actor}, command {command}",
+        "historyOutcomes": {
+          "active": "Active",
+          "delivered": "Delivered",
+          "transient_failure": "Temporary failure",
+          "permanent_failure": "Permanent failure",
+          "abandoned": "Interrupted"
+        },
+        "counts": {
+          "pending": "Pending",
+          "due": "Due now",
+          "processing": "Processing",
+          "failed": "Failed",
+          "terminal": "Finished",
+          "unresolved": "Unresolved effect"
+        },
+        "cleanupAgeHelp": "Cleanup requires at least 30 days since the delivery finished.",
+        "historyStarted": "Started",
+        "historyFinished": "Finished",
+        "projectionYes": "Yes",
+        "projectionNo": "No",
+        "searchLabel": "Search by job ID",
+        "searchClear": "Clear job search",
+        "searchHelp": "Searches the latest 512 jobs in the selected list."
       },
       "title": "Background work",
       "eyebrow": "Queues",
@@ -869,7 +905,7 @@
       "queues": {
         "email": {
           "title": "Email",
-          "description": "Sends transactional email that is safe to queue. Messages with secret links are sent directly and never appear here."
+          "description": "Sends separate emails placed in this queue. Notification emails are sent by the delivery worker and are not counted here. Emails with secret links are sent directly."
         },
         "default": {
           "title": "Default",
@@ -877,7 +913,7 @@
         },
         "notifications": {
           "title": "Notifications",
-          "description": "Wake signals only. Delivery state is stored in the database, so an empty queue does not mean nothing is pending."
+          "description": "Signals prompt the delivery worker to run sooner. Deliveries themselves are stored in the database and shown below. Periodic checks process them even without a signal."
         },
         "ai-runs": {
           "title": "AI runs",
@@ -900,7 +936,7 @@
       },
       "noFigure": "—",
       "overviewTitle": "Queue overview",
-      "overviewDescription": "Counts describe broker queues. Task management also includes work stored directly in a database, which has no queue row.",
+      "overviewDescription": "Only Redis queues are shown here. Notification deliveries are stored in the database: see their counts and status in the Notification deliveries card below. An empty signal queue does not mean there are no deliveries.",
       "partialRefresh": "Some sections could not be refreshed. Previous data remains visible with an error; the timestamp applies to the queue overview."
     }
   },

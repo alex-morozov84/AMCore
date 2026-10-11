@@ -16,7 +16,12 @@ import {
   computeNextAttemptAt,
   resolveRetryFloor,
 } from './notification-backoff'
+import { notificationClaimsAllowed } from './notification-claim-authority'
 import type { ClaimedDelivery, FinalizeResult, ReapResult } from './notification-dispatch.types'
+import {
+  type NotificationEffectCertainty,
+  settleNotificationEffect,
+} from './notification-effect-evidence'
 import { CUTOFF, type Cutoff, NotificationShutdownLatch } from './notification-shutdown.latch'
 
 import {
@@ -36,6 +41,9 @@ interface ClaimedRow {
   locale: string
   attemptCount: number
   maxAttempts: number
+  grantActorId: string | null
+  grantCommandId: string | null
+  grantAttemptNumber: number | null
 }
 
 /** Shape returned by the raw reaper `SELECT ... FOR UPDATE SKIP LOCKED`. */
@@ -53,6 +61,7 @@ interface AttemptFinalization {
   errorCode?: string
   providerMessageId?: string
   durationMs?: number
+  effectCertainty?: NotificationEffectCertainty
 }
 
 /**
@@ -97,12 +106,17 @@ export class NotificationDeliveryRepository {
     const leaseSeconds = NOTIFICATION_LEASE_TTL_MS / 1000
 
     return this.latch.transaction(this.prisma, async (tx) => {
+      if (!(await notificationClaimsAllowed(tx))) return []
       const rows = await tx.$queryRaw<ClaimedRow[]>(Prisma.sql`
         UPDATE "notifications"."notification_deliveries" AS d
         SET status = 'PROCESSING'::"notifications"."NotificationDeliveryStatus",
             "leaseToken" = ${leaseToken},
             "leaseExpiresAt" = clock_timestamp() + make_interval(secs => ${leaseSeconds}::double precision),
             "attemptCount" = d."attemptCount" + 1,
+            "manualGrant" = CASE WHEN d."manualGrant" = 'reserved' THEN 'spent' ELSE d."manualGrant" END,
+            "grantAttemptNumber" = CASE WHEN d."manualGrant" = 'reserved' THEN d."attemptCount" + 1 ELSE d."grantAttemptNumber" END,
+            "controlRevision" = d."controlRevision" + 1,
+            "terminalAt" = NULL, "retryableExhaustion" = false,
             "updatedAt" = now()
         FROM (
           SELECT id FROM "notifications"."notification_deliveries"
@@ -110,15 +124,17 @@ export class NotificationDeliveryRepository {
               'PENDING'::"notifications"."NotificationDeliveryStatus",
               'RETRY_SCHEDULED'::"notifications"."NotificationDeliveryStatus"
             )
-            AND "availableAt" <= now()
-            AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= now())
+            AND "attemptCount" < "maxAttempts" + CASE WHEN "manualGrant" IN ('reserved', 'spent') THEN 1 ELSE 0 END
+            AND "availableAt" <= clock_timestamp()
+            AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= clock_timestamp())
           ORDER BY COALESCE("nextAttemptAt", "availableAt")
           FOR UPDATE SKIP LOCKED
           LIMIT ${limit}
         ) AS sub
         WHERE d.id = sub.id
         RETURNING d.id, d."notificationId", d.channel, d."targetKey", d."targetRef",
-                  d."destinationSnapshot", d.locale, d."attemptCount", d."maxAttempts"
+                  d."destinationSnapshot", d.locale, d."attemptCount", (d."maxAttempts" + CASE WHEN d."manualGrant" IN ('reserved', 'spent') THEN 1 ELSE 0 END) AS "maxAttempts",
+                  d."grantActorId", d."grantCommandId", d."grantAttemptNumber"
       `)
 
       if (rows.length === 0) return []
@@ -132,6 +148,12 @@ export class NotificationDeliveryRepository {
           deliveryId: row.id,
           attemptNumber: row.attemptCount,
           leaseToken,
+          ...(row.grantAttemptNumber === row.attemptCount
+            ? {
+                grantActorId: row.grantActorId,
+                grantCommandId: row.grantCommandId,
+              }
+            : {}),
         })),
       })
 
@@ -183,61 +205,56 @@ export class NotificationDeliveryRepository {
     claim: ClaimedDelivery,
     errorCode: string,
     durationMs: number,
-    retryAfterMs?: number
+    retryAfterMs?: number,
+    effectCertainty: NotificationEffectCertainty = 'unknown'
   ): Promise<FinalizeResult> {
-    const now = new Date()
-    const floorAt = resolveRetryFloor(retryAfterMs, now)
-    const attemptFinal: AttemptFinalization = {
-      outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
-      errorCode,
-      durationMs,
-    }
-
-    if (claim.attemptNumber >= claim.maxAttempts) {
-      const won = await this.finalizeInTx(
-        claim,
-        {
-          status: NotificationDeliveryStatus.FAILED,
-          failedAt: now,
-          lastErrorCode: errorCode,
-          terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
-          nextAttemptAt: floorAt ?? null,
-          leaseToken: null,
-          leaseExpiresAt: null,
-        },
-        attemptFinal
-      )
-      return this.toResult(won, {
-        state: 'failed',
-        reasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
-        deadLettered: true,
-      })
-    }
-
-    const nextAttemptAt = applyRetryAfterFloor(
-      computeNextAttemptAt(claim.attemptNumber, now),
-      retryAfterMs,
-      now
-    )
+    const exhausted = claim.attemptNumber >= claim.maxAttempts
+    let nextAttemptAt: Date | undefined
     const won = await this.finalizeInTx(
       claim,
-      {
-        status: NotificationDeliveryStatus.RETRY_SCHEDULED,
-        nextAttemptAt,
-        lastErrorCode: errorCode,
-        leaseToken: null,
-        leaseExpiresAt: null,
+      (now) => {
+        nextAttemptAt = exhausted
+          ? resolveRetryFloor(retryAfterMs, now)
+          : applyRetryAfterFloor(computeNextAttemptAt(claim.attemptNumber, now), retryAfterMs, now)
+        return {
+          status: exhausted
+            ? NotificationDeliveryStatus.FAILED
+            : NotificationDeliveryStatus.RETRY_SCHEDULED,
+          ...(exhausted
+            ? { failedAt: now, terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED }
+            : {}),
+          retryableExhaustion: exhausted,
+          lastErrorCode: errorCode,
+          nextAttemptAt: nextAttemptAt ?? null,
+          leaseToken: null,
+          leaseExpiresAt: null,
+        }
       },
-      attemptFinal
+      {
+        outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
+        effectCertainty,
+        errorCode,
+        durationMs,
+      }
     )
-    return this.toResult(won, { state: 'retry_scheduled', nextAttemptAt })
+    return this.toResult(
+      won,
+      exhausted
+        ? {
+            state: 'failed',
+            reasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
+            deadLettered: true,
+          }
+        : { state: 'retry_scheduled', nextAttemptAt: nextAttemptAt! }
+    )
   }
 
   /** Permanent failure: terminal `FAILED`, never retried. */
   async finalizePermanent(
     claim: ClaimedDelivery,
     errorCode: string,
-    durationMs: number
+    durationMs: number,
+    effectCertainty: NotificationEffectCertainty = 'unknown'
   ): Promise<FinalizeResult> {
     const won = await this.finalizeInTx(
       claim,
@@ -250,7 +267,12 @@ export class NotificationDeliveryRepository {
         leaseToken: null,
         leaseExpiresAt: null,
       },
-      { outcome: NotificationAttemptOutcome.PERMANENT_FAILURE, errorCode, durationMs }
+      {
+        outcome: NotificationAttemptOutcome.PERMANENT_FAILURE,
+        errorCode,
+        durationMs,
+        effectCertainty,
+      }
     )
     return this.toResult(won, {
       state: 'failed',
@@ -272,17 +294,18 @@ export class NotificationDeliveryRepository {
     limit: number = NOTIFICATION_REAP_BATCH_LIMIT
   ): Promise<ReapResult | Cutoff> {
     return this.latch.transaction(this.prisma, async (tx) => {
-      const now = new Date()
       const expired = await tx.$queryRaw<ReapRow[]>(Prisma.sql`
-        SELECT id, "attemptCount", "maxAttempts", "leaseToken"
+        SELECT id, "attemptCount", ("maxAttempts" + CASE WHEN "manualGrant" IN ('reserved', 'spent') THEN 1 ELSE 0 END) AS "maxAttempts", "leaseToken"
         FROM "notifications"."notification_deliveries"
         WHERE status = 'PROCESSING'::"notifications"."NotificationDeliveryStatus"
-          AND "leaseExpiresAt" < now()
+          AND "leaseExpiresAt" < clock_timestamp()
         ORDER BY "leaseExpiresAt"
         FOR UPDATE SKIP LOCKED
         LIMIT ${limit}
       `)
 
+      const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+      const now = clock!.now
       let rescheduled = 0
       let deadLettered = 0
 
@@ -295,6 +318,9 @@ export class NotificationDeliveryRepository {
             ? {
                 status: NotificationDeliveryStatus.FAILED,
                 failedAt: now,
+                terminalAt: now,
+                retryableExhaustion: false,
+                controlRevision: { increment: 1 },
                 lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
                 terminalReasonCode: NotificationTerminalReason.ATTEMPTS_EXHAUSTED,
                 nextAttemptAt: null,
@@ -304,6 +330,7 @@ export class NotificationDeliveryRepository {
             : {
                 status: NotificationDeliveryStatus.RETRY_SCHEDULED,
                 nextAttemptAt: computeNextAttemptAt(delivery.attemptCount, now),
+                controlRevision: { increment: 1 },
                 lastErrorCode: NotificationErrorCode.LEASE_EXPIRED,
                 leaseToken: null,
                 leaseExpiresAt: null,
@@ -341,19 +368,48 @@ export class NotificationDeliveryRepository {
    */
   private async finalizeInTx(
     claim: ClaimedDelivery,
-    deliveryData: Prisma.NotificationDeliveryUpdateManyMutationInput,
+    input:
+      | Prisma.NotificationDeliveryUpdateManyMutationInput
+      | ((now: Date) => Prisma.NotificationDeliveryUpdateManyMutationInput),
     finalization: AttemptFinalization
   ): Promise<'won' | 'lost' | Cutoff> {
     return this.latch.transaction(this.prisma, async (tx) => {
+      await tx.$queryRaw`SELECT set_config('lock_timeout', '500ms', true)`
+      const locked = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT id FROM notifications.notification_deliveries
+        WHERE id = ${claim.id} AND status = 'PROCESSING' AND "leaseToken" = ${claim.leaseToken}
+        FOR UPDATE`)
+      if (locked.length !== 1) return 'lost' as const
+      const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+      const now = clock!.now
+      const deliveryData = typeof input === 'function' ? input(now) : input
       const { count } = await tx.notificationDelivery.updateMany({
         where: {
           id: claim.id,
           status: NotificationDeliveryStatus.PROCESSING,
           leaseToken: claim.leaseToken,
         },
-        data: deliveryData,
+        data: {
+          ...deliveryData,
+          ...(deliveryData.deliveredAt ? { deliveredAt: now } : {}),
+          ...(deliveryData.failedAt ? { failedAt: now } : {}),
+          controlRevision: { increment: 1 },
+          terminalAt: ['DELIVERED', 'FAILED', 'CANCELLED', 'SKIPPED'].includes(
+            String(deliveryData.status)
+          )
+            ? now
+            : null,
+        },
       })
       if (count !== 1) return 'lost' as const
+      await settleNotificationEffect(
+        tx,
+        claim.id,
+        claim.leaseToken,
+        finalization.outcome === NotificationAttemptOutcome.DELIVERED
+          ? 'accepted'
+          : (finalization.effectCertainty ?? 'unknown')
+      )
 
       await tx.notificationDeliveryAttempt.updateMany({
         where: {
@@ -362,7 +418,7 @@ export class NotificationDeliveryRepository {
           leaseToken: claim.leaseToken,
         },
         data: {
-          finishedAt: new Date(),
+          finishedAt: now,
           outcome: finalization.outcome,
           errorCode: finalization.errorCode ?? null,
           providerMessageId: finalization.providerMessageId ?? null,

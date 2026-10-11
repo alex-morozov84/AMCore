@@ -17,7 +17,7 @@ export function WorkProjection({
   const t = useTranslations('console.backgroundWork.control')
   const keys = [
     ...new Set([...Object.keys(work.presentation?.fields ?? {}), ...Object.keys(values)]),
-  ].filter((key) => key in values)
+  ].filter((key) => values[key] !== undefined && values[key] !== null && values[key] !== '')
   const technical = new Set(work.presentation?.technicalFields ?? [])
   const fields = (items: string[]) => (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
@@ -26,19 +26,25 @@ export function WorkProjection({
           <dt className="text-xs text-muted-foreground">
             {workLabel(work.presentation?.fields[key], locale, key)}
           </dt>
-          <dd className="break-words font-medium">{String(values[key])}</dd>
+          <dd className="break-words font-medium">
+            {typeof values[key] === 'boolean'
+              ? t(values[key] ? 'projectionYes' : 'projectionNo')
+              : String(values[key])}
+          </dd>
         </div>
       ))}
     </dl>
   )
   return (
-    <div className="space-y-3 rounded-md bg-muted/40 p-3">
-      {fields(keys.filter((key) => !technical.has(key)))}
-      {keys.some((key) => technical.has(key)) && (
-        <Disclosure label={t('technicalDetails')}>
-          {fields(keys.filter((key) => technical.has(key)))}
-        </Disclosure>
-      )}
-    </div>
+    keys.length > 0 && (
+      <div className="space-y-3 rounded-md bg-muted/40 p-3">
+        {fields(keys.filter((key) => !technical.has(key)))}
+        {keys.some((key) => technical.has(key)) && (
+          <Disclosure label={t('technicalDetails')}>
+            {fields(keys.filter((key) => technical.has(key)))}
+          </Disclosure>
+        )}
+      </div>
+    )
   )
 }

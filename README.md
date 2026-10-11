@@ -42,6 +42,8 @@ catalog/content admin UI.
 The [background-work registration contract](docs/backend/background-work.md) connects
 managed producers, worker handlers and policy-aware diagnostics/control through one
 registration. Its backend recipes remain usable without the optional frontend.
+The [notification delivery adapter](docs/notifications/control.md) adds durable
+pause state, conservative provider evidence and one lifetime manual retry grant.
 
 The retained [runtime settings foundation](docs/backend/settings.md) provides
 code-owned typed ordinary configuration, revision-checked writes with atomic audit,

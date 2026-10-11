@@ -35,12 +35,24 @@ export function WorkJobDetails({
       return t(operation === 'cancel' ? 'actionReasons.started' : 'actionReasons.active')
     if (reason === 'MANUAL_GRANT_SPENT')
       return t(row.manualGrant === 'reserved' ? 'manualRetryReservedHelp' : 'manualRetrySpentHelp')
+    if (reason === 'COOLDOWN' && operation === 'cleanup' && work.presentation?.commandSemantics)
+      return t('cleanupAgeHelp')
     if (reason === 'STATE_CHANGED') return t('actionReasons.changed')
     return errors(reason)
   }
   return (
     <>
       {showState && <p className="text-sm">{t(`jobStates.${row.state}`)}</p>}
+      {row.nativeState && (
+        <p className="text-sm">
+          {workLabel(work.presentation?.nativeStates?.[row.nativeState], locale, row.nativeState)}
+        </p>
+      )}
+      {row.nextAttemptAt && (
+        <p className="text-sm">
+          {t('nextAttempt')} <ConsoleTimestamp value={row.nextAttemptAt} variant="inline" seconds />
+        </p>
+      )}
       <p className="text-sm">
         <ConsoleTimestamp value={row.sampledAt} variant="inline" seconds />
       </p>

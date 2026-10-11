@@ -39,5 +39,6 @@ done
   test/ai-run-legacy-and-locks.e2e-spec.ts \
   test/ai-provider-extension-contracts.e2e-spec.ts \
   test/notification-ai-legacy-migration.e2e-spec.ts \
+  test/notification-control-migration.e2e-spec.ts \
   test/openapi.e2e-spec.ts)
 finished=true

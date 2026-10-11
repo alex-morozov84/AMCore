@@ -30,6 +30,24 @@ function redactChatId(chatId: string): string {
 export class TelegramTargetResolver implements ChannelTargetResolver {
   readonly channel = NotificationChannel.TELEGRAM
 
+  async validateDelivery(
+    tx: Prisma.TransactionClient,
+    delivery: { targetKey: string; targetRef: string | null },
+    recipientUserId: string
+  ): Promise<import('@amcore/shared').WorkReason | null> {
+    const [target] = await tx.$queryRaw<
+      { userId: string; chatId: string; status: string }[]
+    >(Prisma.sql`
+      SELECT "userId", "chatId", status FROM notifications.telegram_connections
+      WHERE id = ${delivery.targetRef} FOR SHARE
+    `)
+    return target?.userId === recipientUserId &&
+      target.chatId === delivery.targetKey &&
+      target.status === 'ACTIVE'
+      ? null
+      : 'STATE_CHANGED'
+  }
+
   async resolveTargets(
     tx: Prisma.TransactionClient,
     context: TargetResolutionContext

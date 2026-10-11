@@ -1121,3 +1121,18 @@ After a completed rollout, saved changes need no process restart under healthy
 reconciliation. A successful operator response certifies the commit and reports
 only the responding API's applied state. Console frontend removal leaves this
 backend capability, contracts and migration intact.
+
+## Notification delivery control rollout
+
+Drain and stop every old API and worker role before applying
+`20261011170000_notification_delivery_control`. Disable automatic restarts during
+the maintenance window. Verify a restorable backup first. The migration rejects
+known application connections; it cannot detect every differently named writer.
+Start the compatible API, worker and web set after migration. Verify the seeded
+claim authority, durable work registration and recovery poller before admitting
+operator commands. Mixed old/new writers are unsupported.
+
+Historical attempted deliveries become legacy-unverified. Do not clear their
+uncertainty to enable retries. Rollback requires restoring the verified backup
+with a compatible process set; prefer forward repair. See
+[notification delivery control](../notifications/control.md#upgrade).

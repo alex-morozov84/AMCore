@@ -1,8 +1,13 @@
 import { Module } from '@nestjs/common'
+import { ModuleRef } from '@nestjs/core'
+import { Test } from '@nestjs/testing'
 import { z } from 'zod'
+
+import type { NotificationDefinitionRegistry } from '../notification-definition.registry'
 
 import { NotificationChannelRegistry } from './notification-channel.registry'
 import type { NotificationChannelDescriptor } from './notification-channel.types'
+import { NotificationControlTargets } from './notification-control-targets'
 
 import type { EnvService } from '@/env/env.service'
 @Module({})
@@ -36,6 +41,9 @@ describe('Single channel descriptor contract', () => {
       { requestTargetsDelivery: null },
       { worker: null },
       { wireVersion: 2 },
+      { manualRetry: {} },
+      { manualRetry: { validatorToken: Reader } },
+      { manualRetry: { validatorToken: Reader, requestIdentity: () => ({}), providerScope: null } },
     ])
       expect(
         () =>
@@ -44,5 +52,58 @@ describe('Single channel descriptor contract', () => {
             env
           )
       ).toThrow()
+  })
+  it.each([
+    ['missing', undefined],
+    ['wrong channel', { channel: 'another', validateDelivery: () => null }],
+    ['missing method', { channel: descriptor.id }],
+  ])(
+    'refuses a %s core manual validator through real Nest provider resolution',
+    async (_name, validator) => {
+      const registry = new NotificationChannelRegistry(
+        [
+          {
+            ...descriptor,
+            manualRetry: {
+              validatorToken: Reader,
+              requestIdentity: () => ({ binding: 'fixture', path: '/', idempotencyKey: null }),
+            },
+          },
+        ],
+        env
+      )
+      const app = await Test.createTestingModule({
+        providers: [
+          {
+            provide: NotificationControlTargets,
+            inject: [ModuleRef],
+            useFactory: (modules: ModuleRef) =>
+              new NotificationControlTargets(
+                registry,
+                modules,
+                {} as NotificationDefinitionRegistry,
+                env
+              ),
+          },
+          ...(validator ? [{ provide: Reader, useValue: validator }] : []),
+        ],
+      }).compile()
+      try {
+        expect(() => app.get(NotificationControlTargets).onModuleInit()).toThrow()
+      } finally {
+        await app.close()
+      }
+    }
+  )
+  it('allows an explicitly unsupported manual retry without resolving a validator', async () => {
+    const modules = { get: jest.fn() } as unknown as ModuleRef
+    const targets = new NotificationControlTargets(
+      new NotificationChannelRegistry([descriptor], env),
+      modules,
+      {} as NotificationDefinitionRegistry,
+      env
+    )
+    targets.onModuleInit()
+    expect(modules.get).not.toHaveBeenCalled()
   })
 })

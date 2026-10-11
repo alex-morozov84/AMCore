@@ -217,6 +217,19 @@ describe('OpenAPI success surface (e2e)', () => {
   const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const
   const EXCLUDED_PREFIXES = ['/health']
 
+  it('documents bounded registered filters on the common work list', () => {
+    const operation = document.paths['/admin/background-work/works/{workId}/jobs']?.get
+    expect(operation).toBeDefined()
+    expect(operation?.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'filters', in: 'query', required: false }),
+        expect.objectContaining({ name: 'search', in: 'query', required: false }),
+      ])
+    )
+    expect(JSON.stringify(operation?.parameters)).toContain('1024')
+    expect(operation?.responses).toHaveProperty('400')
+  })
+
   beforeAll(async () => {
     process.env.JWT_SECRET ??= 'openapi-e2e-secret-at-least-32-characters'
     context = await setupE2ETest()
@@ -613,6 +626,9 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(failure.required).toEqual(expect.arrayContaining(['code', 'title']))
     expect(job.required).not.toContain('failure')
     expect(operation?.description).toContain('16KiB')
+    expect(document.paths['/admin/background-work/works']?.get?.description).toContain(
+      'masked original recipients and Telegram connection generations'
+    )
   })
 
   it('documents the bearer-only background-work queue summary away from the Bull Board path', () => {

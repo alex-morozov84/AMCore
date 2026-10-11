@@ -8,6 +8,18 @@ import type { EnvService } from '@/env/env.service'
 /** One code-owned registration, projected into the selected process role. */
 export interface NotificationChannelDescriptor {
   readonly id: string
+  readonly manualRetry?: {
+    readonly validatorToken: InjectionToken
+    readonly providerScope?: (env: EnvService) => string
+    readonly requestIdentity: (
+      env: EnvService,
+      deliveryId: string
+    ) => {
+      binding: string
+      path: string
+      idempotencyKey: string | null
+    }
+  }
   readonly targetMode: 'snapshot' | 'generation'
   readonly core: { module: Type<unknown>; token: InjectionToken }
   readonly worker: (core: Type<unknown>) => DynamicModule

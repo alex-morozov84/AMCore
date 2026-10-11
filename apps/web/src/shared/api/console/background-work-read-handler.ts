@@ -1,4 +1,4 @@
-import { adminQueueNameSchema, workJobIdSchema, workListQuerySchema } from '@amcore/shared'
+import { adminQueueNameSchema, workJobIdSchema, workListWireQuerySchema } from '@amcore/shared'
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
@@ -28,16 +28,21 @@ export async function handleConsoleWorkJobs(
   let path = `/works/${encodeURIComponent(id.data)}/jobs`
   if (target?.success) path += `/${encodeURIComponent(target.data)}`
   else {
-    const query = workListQuerySchema.safeParse(
-      Object.fromEntries(new URL(request.url).searchParams)
-    )
+    const params = new URL(request.url).searchParams
+    if ([...params.keys()].some((key) => params.getAll(key).length !== 1))
+      return apiErrorResponse(request, { statusCode: 400, message: 'Repeated query parameter' })
+    const query = workListWireQuerySchema.safeParse(Object.fromEntries(params))
     if (!query.success)
       return apiErrorResponse(request, {
         statusCode: 400,
         message: 'Validation failed',
         errors: zodValidationErrors(query.error),
       })
-    path += `?${new URLSearchParams(Object.entries(query.data).map(([key, value]) => [key, String(value)]))}`
+    path += `?${new URLSearchParams(
+      Object.entries(query.data)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, key === 'filters' ? JSON.stringify(value) : String(value)])
+    )}`
   }
   return read(request, path)
 }

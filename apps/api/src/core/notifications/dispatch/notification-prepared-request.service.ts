@@ -11,11 +11,13 @@ import {
   type PreparedNotificationRequest,
   validatePreparedRequest,
 } from '../channels/notification-prepared-request'
+import { notificationProviderScope } from '../control/notification-provider-scope'
 import { NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS } from '../notification-dispatch.constants'
 
 import { cancelClaimedDelivery } from './notification-delivery-cancellation'
 import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch'
 
+import { EnvService } from '@/env/env.service'
 import { Prisma } from '@/generated/prisma/client'
 import { PrismaService } from '@/prisma'
 
@@ -30,7 +32,8 @@ export class NotificationPreparedRequestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly channels: NotificationChannelRegistry,
-    private readonly latch: NotificationShutdownLatch
+    private readonly latch: NotificationShutdownLatch,
+    private readonly env?: EnvService
   ) {}
 
   async obtain(
@@ -109,7 +112,9 @@ export class NotificationPreparedRequestService {
         const changed = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
           UPDATE "notifications"."notification_deliveries"
           SET "preparedRequest" = ${JSON.stringify(candidate.request)}::jsonb,
-              "preparedRequestHash" = ${candidate.hash}, "updatedAt" = now()
+              "preparedRequestHash" = ${candidate.hash},
+              "providerScope" = ${this.env ? notificationProviderScope(this.env, context.delivery.channel, descriptor) : null},
+              "controlRevision" = "controlRevision" + 1, "updatedAt" = now()
           WHERE id = ${context.delivery.id} AND status = 'PROCESSING'::"notifications"."NotificationDeliveryStatus"
             AND "leaseToken" = ${context.delivery.leaseToken} AND "leaseExpiresAt" > clock_timestamp()
             AND "preparedRequest" IS NULL AND "preparedRequestHash" IS NULL RETURNING id

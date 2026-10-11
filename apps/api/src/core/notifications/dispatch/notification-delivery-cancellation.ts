@@ -37,14 +37,21 @@ export async function cancelActiveDeliveries(
     ? Prisma.sql`AND id <> ${target.exceptDeliveryId}`
     : Prisma.empty
   const cancelled = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
-    UPDATE "notifications"."notification_deliveries"
+    WITH locked AS MATERIALIZED (
+      SELECT id FROM notifications.notification_deliveries
+      WHERE channel = ${target.channel} AND "targetRef" = ${target.targetRef}
+        AND status IN ('PENDING', 'RETRY_SCHEDULED', 'PROCESSING') ${exclusion}
+      ORDER BY id FOR UPDATE
+    ) UPDATE "notifications"."notification_deliveries"
     SET status = 'CANCELLED'::"notifications"."NotificationDeliveryStatus",
         "terminalReasonCode" = ${target.reason},
+        "terminalAt" = clock_timestamp(), "controlRevision" = "controlRevision" + 1,
+        "manualGrant" = CASE WHEN "manualGrant" = 'reserved' THEN 'spent' ELSE "manualGrant" END,
         "leaseToken" = NULL,
         "leaseExpiresAt" = NULL,
         "nextAttemptAt" = NULL,
         "updatedAt" = now()
-    WHERE channel = ${target.channel}
+    WHERE id IN (SELECT id FROM locked) AND channel = ${target.channel}
       AND "targetRef" = ${target.targetRef}
       AND status IN (
         'PENDING'::"notifications"."NotificationDeliveryStatus",
@@ -77,11 +84,19 @@ export async function cancelClaimedDelivery(
   claim: ClaimedDelivery,
   reason: string
 ): Promise<boolean> {
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM notifications.notification_deliveries
+    WHERE id = ${claim.id} AND status = 'PROCESSING' AND "leaseToken" = ${claim.leaseToken}
+    FOR UPDATE`
+  if (!locked.length) return false
+  const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
   const { count } = await tx.notificationDelivery.updateMany({
     where: { id: claim.id, status: 'PROCESSING', leaseToken: claim.leaseToken },
     data: {
       status: 'CANCELLED',
       terminalReasonCode: reason,
+      terminalAt: clock!.now,
+      controlRevision: { increment: 1 },
       leaseToken: null,
       leaseExpiresAt: null,
       nextAttemptAt: null,
@@ -96,7 +111,7 @@ export async function cancelClaimedDelivery(
       outcome: null,
     },
     data: {
-      finishedAt: new Date(),
+      finishedAt: clock!.now,
       outcome: NotificationAttemptOutcome.ABANDONED,
       errorCode: NotificationErrorCode.TARGET_REVOKED,
     },

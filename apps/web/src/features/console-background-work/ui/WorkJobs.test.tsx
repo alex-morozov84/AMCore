@@ -11,6 +11,15 @@ const messages = {
   console: {
     backgroundWork: {
       control: {
+        allFilter: 'All',
+        searchLabel: 'Search by job ID',
+        searchClear: 'Clear job search',
+        searchHelp: 'Searches the latest 512 jobs in the selected list.',
+        projectionYes: 'Yes',
+        projectionNo: 'No',
+        technicalDetails: 'Technical details',
+        historyTitle: 'Attempt history',
+        historyEmpty: 'No retained attempts.',
         failureTitle: 'Reason for failure',
         failureNextStep: 'What to do:',
         failureUnavailable: 'Detailed reason unavailable.',
@@ -91,7 +100,9 @@ import { WorkJobs } from './WorkJobs'
 
 vi.mock('@/shared/ui/route-progress-link', () => ({ RouteProgressLink: 'a' }))
 
-vi.mock('@/shared/api/console-api', () => ({ consoleApi: { getBackgroundWorkJobs: vi.fn() } }))
+vi.mock('@/shared/api/console-api', () => ({
+  consoleApi: { getBackgroundWorkJobs: vi.fn(), getBackgroundWorkJob: vi.fn() },
+}))
 
 const work: WorkSummary = {
   id: 'image',
@@ -262,5 +273,127 @@ describe('native registered job selection', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Failed' })).not.toBeInTheDocument()
     expect(screen.getAllByText(/not observed/).length).toBeGreaterThan(0)
+  })
+})
+
+describe('registered filters and lazy history', () => {
+  it('renders readable booleans and omits empty technical disclosures', async () => {
+    vi.mocked(consoleApi.getBackgroundWorkJobs).mockResolvedValue({
+      workId: work.id,
+      sampledAt: work.sampledAt,
+      windowTruncated: false,
+      rows: [{ ...job, projection: { unresolved: false, reference: '', generation: '' } }],
+    })
+    view({
+      ...work,
+      presentation: {
+        name: { en: 'Delivery' },
+        fields: {
+          unresolved: { en: 'Unconfirmed attempts' },
+          reference: { en: 'Reference' },
+          generation: { en: 'Generation' },
+        },
+        technicalFields: ['reference', 'generation'],
+      },
+    })
+    await screen.findByRole('checkbox', { name: 'job_1' })
+    expect(screen.getByText('No', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByText('false', { exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByText('Technical details')).not.toBeInTheDocument()
+  })
+  it('debounces search with the selected status and resets captured selection; clear refocuses', async () => {
+    view()
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'job_1' }))
+    const field = screen.getByRole('textbox', { name: 'Search by job ID' })
+    fireEvent.change(field, { target: { value: ' job_1 ' } })
+    expect(screen.queryByRole('button', { name: /^Search$/ })).not.toBeInTheDocument()
+    expect(consoleApi.getBackgroundWorkJobs).not.toHaveBeenLastCalledWith(
+      work.id,
+      expect.objectContaining({ search: 'job_1' }),
+      expect.any(AbortSignal)
+    )
+    await waitFor(() =>
+      expect(consoleApi.getBackgroundWorkJobs).toHaveBeenLastCalledWith(
+        work.id,
+        expect.objectContaining({ state: 'failed', search: 'job_1', page: 1 }),
+        expect.any(AbortSignal)
+      )
+    )
+    expect(screen.queryByRole('button', { name: 'Retry · 1' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear job search' }))
+    expect(field).toHaveFocus()
+    await waitFor(() =>
+      expect(consoleApi.getBackgroundWorkJobs).toHaveBeenLastCalledWith(
+        work.id,
+        expect.objectContaining({ search: undefined, page: 1 }),
+        expect.any(AbortSignal)
+      )
+    )
+  })
+  const presented: WorkSummary = {
+    ...work,
+    kind: 'durable',
+    presentation: {
+      name: { en: 'Delivery fixture' },
+      fields: {},
+      attemptHistory: true,
+      filters: [
+        {
+          key: 'channel',
+          label: { en: 'Channel' },
+          options: [{ value: 'telegram', label: { en: 'Telegram' } }],
+        },
+      ],
+    },
+  }
+
+  it('does not fetch history for rows until opened and keeps only one open', async () => {
+    const second = {
+      ...job,
+      identity: {
+        ...job.identity,
+        id: 'job_2',
+        incarnation: '019a1234-1234-7123-8123-123456789013',
+      },
+    }
+    vi.mocked(consoleApi.getBackgroundWorkJobs).mockResolvedValue({
+      workId: work.id,
+      sampledAt: work.sampledAt,
+      rows: [job, second],
+      windowTruncated: false,
+    })
+    vi.mocked(consoleApi.getBackgroundWorkJob).mockImplementation(async (_work, id) => ({
+      ...(id === 'job_1' ? job : second),
+      history: { attempts: [], historyTruncated: false, historyExpired: false },
+    }))
+    view(presented)
+    await screen.findByRole('checkbox', { name: 'job_2' })
+    expect(consoleApi.getBackgroundWorkJob).not.toHaveBeenCalled()
+    const summaries = screen.getAllByText('Attempt history')
+    const details0 = summaries[0]!.closest('details')!
+    details0.open = true
+    fireEvent(details0, new Event('toggle'))
+    await waitFor(() => expect(consoleApi.getBackgroundWorkJob).toHaveBeenCalledTimes(1))
+    const details1 = summaries[1]!.closest('details')!
+    details1.open = true
+    fireEvent(details1, new Event('toggle'))
+    await waitFor(() => expect(consoleApi.getBackgroundWorkJob).toHaveBeenCalledTimes(2))
+    expect(summaries[0]!.closest('details')).not.toHaveAttribute('open')
+    expect(summaries[1]!.closest('details')).toHaveAttribute('open')
+  })
+
+  it('resets selection and page when a registered filter changes', async () => {
+    const capture = view(presented)
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'job_1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Telegram' }))
+    await waitFor(() =>
+      expect(consoleApi.getBackgroundWorkJobs).toHaveBeenLastCalledWith(
+        work.id,
+        expect.objectContaining({ page: 1, filters: { channel: 'telegram' } }),
+        expect.any(AbortSignal)
+      )
+    )
+    expect(screen.queryByRole('button', { name: 'Retry · 1' })).not.toBeInTheDocument()
+    expect(capture).not.toHaveBeenCalled()
   })
 })

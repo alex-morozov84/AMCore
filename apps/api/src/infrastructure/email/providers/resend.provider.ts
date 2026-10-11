@@ -93,7 +93,11 @@ export class ResendEmailProvider implements EmailProvider {
           'Idempotency-Key': idempotencyKey,
         },
       })
-      if (!error) return { id: data?.id ?? '', success: true }
+      if (!error) {
+        if (typeof data?.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(data.id))
+          return { id: data.id, success: true }
+        return { id: '', success: false, error: 'provider_failure', retryable: true }
+      }
       const retryable = !DETERMINISTIC_RESEND_ERROR_CODES.has(error.name)
       const known =
         !retryable ||

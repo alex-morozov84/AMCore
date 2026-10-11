@@ -14,8 +14,13 @@ import {
 } from './organization-roles-fixture.mjs'
 
 export async function preview(m, profile = 'default') {
-  if (!['default', 'user', 'organization', 'organization-roles'].includes(profile))
-    throw new Error('Unknown fixture profile')
+  const profiles = ['default', 'user', 'organization', 'organization-roles']
+  // AMCORE_CONSOLE_NOTIFICATION_PROFILE_START
+  profiles.push('notification-work')
+  if (profile === 'notification-work' && m.fixtureProfile !== profile)
+    throw new Error('Notification work preview needs a fresh stand created with this profile')
+  // AMCORE_CONSOLE_NOTIFICATION_PROFILE_END
+  if (!profiles.includes(profile)) throw new Error('Unknown fixture profile')
   await admitInvocation(m)
   const labels = await previewLabels(m)
   const require = createRequire(join(m.worktree, 'apps/web/package.json'))
@@ -42,6 +47,12 @@ export async function preview(m, profile = 'default') {
       await organizationFixture(m, api)
     }
     if (profile === 'organization-roles') await organizationRolesFixture(m, api)
+    // AMCORE_CONSOLE_NOTIFICATION_FIXTURE_START
+    if (profile === 'notification-work') {
+      const { notificationWorkFixture } = await import('./notification-work-fixture.mjs')
+      await notificationWorkFixture(m)
+    }
+    // AMCORE_CONSOLE_NOTIFICATION_FIXTURE_END
     for (const account of m.accounts) {
       const existing = await sql(
         m,
@@ -82,6 +93,10 @@ export async function preview(m, profile = 'default') {
             await page.waitForURL(`${m.origins.console}${m.localePrefix}`)
           }
           if (page.url().includes('/login')) throw new Error('Admin preview access not proved')
+          if (profile === 'notification-work') {
+            const { notificationWorkPreview } = await import('./notification-work-fixture.mjs')
+            await notificationWorkPreview(page, m, SUPPORTED_LOCALES)
+          }
         }
         // AMCORE_CONSOLE_PREVIEW_ACCESS_END
         await page.screenshot({

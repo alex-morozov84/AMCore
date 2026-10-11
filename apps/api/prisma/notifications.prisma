@@ -72,6 +72,19 @@ model Notification {
 /// transaction as the Notification; external targets start PENDING.
 model NotificationDelivery {
   id                  String                     @id @default(cuid())
+  incarnation         String                     @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  controlRevision     Int                        @default(0)
+  manualGrant         String                     @default("none") @db.VarChar(16)
+  grantActorId        String?                    @db.VarChar(64)
+  grantCommandId      String?                    @db.Uuid
+  grantAttemptNumber  Int?
+  retryableExhaustion Boolean @default(false)
+  acceptedSeen        Boolean                    @default(false)
+  unresolvedEffectCount Int                      @default(0)
+  legacyUnverified    Boolean                    @default(false)
+  providerScope       String?                    @db.Char(64)
+  terminalAt          DateTime?                  @db.Timestamptz(3)
+  historyPrunedThrough Int                       @default(0)
   notificationId      String
   channel             String
   targetKey           String // stable adapter-owned identity
@@ -101,6 +114,9 @@ model NotificationDelivery {
   attempts     NotificationDeliveryAttempt[]
 
   @@unique([notificationId, channel, targetKey])
+  @@index([status, channel, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([unresolvedEffectCount])
+  @@index([legacyUnverified])
   @@index([status, availableAt])
   @@index([status, nextAttemptAt])
   @@index([status, leaseExpiresAt])
@@ -114,6 +130,10 @@ model NotificationDeliveryAttempt {
   id                String                      @id @default(cuid())
   deliveryId        String
   attemptNumber     Int
+  effectState       String                      @default("not_started") @db.VarChar(16)
+  transportStartedAt DateTime?                  @db.Timestamptz(3)
+  grantActorId      String?                     @db.VarChar(64)
+  grantCommandId    String?                     @db.Uuid
   leaseToken        String
   startedAt         DateTime                    @default(now())
   finishedAt        DateTime?
@@ -147,5 +167,16 @@ model NotificationPreference {
 
   @@unique([userId, category, channel])
   @@map("notification_preferences")
+  @@schema("notifications")
+}
+
+/// Fleet-wide claim authority. Missing authority fails closed.
+model NotificationDeliveryControl {
+  id       Int      @id
+  paused   Boolean  @default(false)
+  revision Int      @default(0)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("notification_delivery_control")
   @@schema("notifications")
 }

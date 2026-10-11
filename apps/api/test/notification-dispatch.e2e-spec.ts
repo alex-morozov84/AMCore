@@ -281,9 +281,7 @@ describe('Notification dispatch (e2e)', () => {
     expect(attempts).toBeGreaterThanOrEqual(1)
   })
 
-  it('persists real-SDK Retry-After through rendering, email admission and dispatch without enqueueing', async () => {
-    const userId = await createUser()
-    const deliveryId = await createDelivery(await createNotification(userId))
+  function preparedSdkDispatcher() {
     const env = app.get(EnvService)
     const logger = app.get<PinoLogger>(PinoLogger, { strict: false })
     const metrics = app.get(MetricsService)
@@ -315,6 +313,14 @@ describe('Notification dispatch (e2e)', () => {
       new NotificationAttemptAdmission(prisma, latch),
       app.get(WorkReadiness, { strict: false })
     )
+    return service
+  }
+
+  it('persists real-SDK Retry-After through rendering, email admission and dispatch without enqueueing', async () => {
+    const userId = await createUser()
+    const deliveryId = await createDelivery(await createNotification(userId))
+    const service = preparedSdkDispatcher()
+    const queue = app.get(QueueService)
     const enqueue = jest.spyOn(queue, 'add')
     const fetch = jest
       .spyOn(globalThis, 'fetch')
@@ -334,16 +340,80 @@ describe('Notification dispatch (e2e)', () => {
       expect(fetch).toHaveBeenCalledTimes(1)
       expect(fetch.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal)
       expect(enqueue).not.toHaveBeenCalled()
-      expect(await localRepository.claimDueBatch(1)).toEqual([])
+      expect(await repository.claimDueBatch(1)).toEqual([])
       // Move the stored floor to the due boundary; the same claim query can now acquire it.
       await prisma.notificationDelivery.update({
         where: { id: deliveryId },
         data: { nextAttemptAt: new Date(Date.now() - 1) },
       })
-      expect(await localRepository.claimDueBatch(1)).toHaveLength(1)
+      expect(await repository.claimDueBatch(1)).toHaveLength(1)
     } finally {
       fetch.mockRestore()
       enqueue.mockRestore()
+      await service.shutdown()
+    }
+  })
+
+  it.each([{}, { id: '' }, { id: 7 }, { id: 'x'.repeat(129) }])(
+    'keeps malformed real-SDK HTTP200 unknown through PostgreSQL finalization: %j',
+    async (body) => {
+      const id = await createDelivery(await createNotification(await createUser()), {
+        maxAttempts: 1,
+      })
+      const service = preparedSdkDispatcher()
+      const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+      try {
+        await service.drainDueBatches()
+        expect(fetch).toHaveBeenCalledTimes(1)
+        expect(await prisma.notificationDelivery.findUnique({ where: { id } })).toMatchObject({
+          status: 'FAILED',
+          attemptCount: 1,
+          acceptedSeen: false,
+          unresolvedEffectCount: 1,
+        })
+        expect(
+          await prisma.notificationDeliveryAttempt.findFirst({ where: { deliveryId: id } })
+        ).toMatchObject({
+          outcome: 'TRANSIENT_FAILURE',
+          effectState: 'unknown',
+          providerMessageId: null,
+        })
+      } finally {
+        fetch.mockRestore()
+        await service.shutdown()
+      }
+    }
+  )
+
+  it('records only a validated real-SDK HTTP200 acceptance in PostgreSQL', async () => {
+    const id = await createDelivery(await createNotification(await createUser()), {
+      maxAttempts: 1,
+    })
+    const service = preparedSdkDispatcher()
+    const fetch = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ id: 'valid_receipt-1' }), { status: 200 }))
+    try {
+      await service.drainDueBatches()
+      expect(await prisma.notificationDelivery.findUnique({ where: { id } })).toMatchObject({
+        status: 'DELIVERED',
+        acceptedSeen: true,
+        unresolvedEffectCount: 0,
+      })
+      expect(
+        await prisma.notificationDeliveryAttempt.findFirst({ where: { deliveryId: id } })
+      ).toMatchObject({
+        outcome: 'DELIVERED',
+        effectState: 'accepted',
+        providerMessageId: 'valid_receipt-1',
+      })
+    } finally {
+      fetch.mockRestore()
       await service.shutdown()
     }
   })

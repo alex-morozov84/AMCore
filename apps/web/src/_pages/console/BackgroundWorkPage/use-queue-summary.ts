@@ -84,7 +84,8 @@ export function useQueueSummary(
       // Cancel only idle job reads started by this refresh, never a user-initiated filter request.
       const jobReads = queryClient
         .getQueryCache()
-        .findAll({ queryKey: ['console', 'background-work', 'jobs'], type: 'active' })
+        .findAll({ queryKey: ['console', 'background-work'], type: 'active' })
+        .filter((item) => ['jobs', 'detail'].includes(String(item.queryKey[2])))
         .filter((item) => item.state.fetchStatus === 'idle')
       const cancelJobs = () => {
         for (const item of jobReads)

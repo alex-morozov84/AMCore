@@ -61,7 +61,9 @@ are registered under `renderExternal[channelId]`.
 
 Retirement requires a data check proving that no retained notifications or active
 external deliveries reference the version. Age alone is insufficient: retention
-preserves active deliveries even beyond ordinary read/unread retention windows.
+preserves active deliveries, unresolved external effects and legacy-unverified
+history even beyond ordinary read/unread retention windows. Manual grants preserve
+the original stored version; neither grant nor cleanup authorizes current-version substitution.
 Keep the decoder until all referencing work and retained feed history are gone.
 A maintenance conversion must explicitly preserve occurrence/target evidence;
 changing a decoder in place is not a migration.

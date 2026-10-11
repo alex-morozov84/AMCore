@@ -47,6 +47,10 @@ export async function start(m) {
   await dataAdmission(m)
   m.state = 'migrated'
   await save(m)
+  // AMCORE_CONSOLE_NOTIFICATION_START_START
+  if (m.fixtureProfile === 'notification-work')
+    await compose(m, ['up', '-d', '--wait', '--no-deps', 'notification-provider'])
+  // AMCORE_CONSOLE_NOTIFICATION_START_END
   await compose(m, [
     'up',
     '-d',

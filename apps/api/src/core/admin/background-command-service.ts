@@ -174,12 +174,12 @@ export class BackgroundCommandService implements OnModuleInit {
         throw backgroundControlError('INCONSISTENT_STATE')
       const snapshot = state.targets[0]!
       const captured = target.snapshot as Record<string, unknown>
+      transaction.now = await sampleControlClock(ctx.tx)
       const reason =
         snapshot.incarnation !== (target.incarnation ?? undefined) ||
         snapshot.snapshot.revision !== captured.revision
           ? 'STATE_CHANGED'
           : adapter.eligibility(transaction, state, command)
-      transaction.now = await sampleControlClock(ctx.tx)
       let outcome: CommandOutcome
       if (transaction.now.getTime() >= transaction.dispatchNotAfter.getTime())
         outcome = { state: 'not_attempted', reason: 'COMMAND_EXPIRED' }

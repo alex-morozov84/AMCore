@@ -62,7 +62,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       name: 'console closed-root files',
       // PR5 adds seven BFF routes, one Audit detail, seventeen feature files,
       // five Console API helpers/tests, one time-input helper and one accent test.
-      expected: 359,
+      expected: 360,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

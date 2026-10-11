@@ -19,7 +19,7 @@ describe('operation inventory against the real plans', () => {
       // (operations/facts/claims/final operations). The selection story adds 1/1/1/1 twice.
       // EN disabled adds 3/5/8/2: host journey, closed feature root and queue-guide seam;
       // content facts are counted in shared and Console streams, while writes coalesce.
-      { name: 'measured operations', expected: 663, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 667, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -38,17 +38,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 924,
+        expected: 929,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1622,
+        expected: 1639,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 646,
+        expected: 650,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

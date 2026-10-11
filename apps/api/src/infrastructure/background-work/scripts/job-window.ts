@@ -38,5 +38,8 @@ export async function readJobWindow(
     throw new Error('INVALID_BROKER_REPLY')
   const ids = z.array(workJobIdSchema).max(512).parse(result[1])
   const offset = (query.page - 1) * query.limit
-  return { ids: ids.slice(offset, offset + query.limit), truncated: result[2] === '1' }
+  const matching = query.search
+    ? ids.filter((id) => id.toLowerCase().includes(query.search!.toLowerCase()))
+    : ids
+  return { ids: matching.slice(offset, offset + query.limit), truncated: result[2] === '1' }
 }

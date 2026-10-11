@@ -125,12 +125,21 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
       return { status: 'delivered', providerMessageId: result.providerMessageId }
     }
     if (result.status === 'transient') {
-      return { status: 'transient', errorCode: result.errorCode, retryAfterMs: result.retryAfterMs }
+      return {
+        status: 'transient',
+        errorCode: result.errorCode,
+        retryAfterMs: result.retryAfterMs,
+        effectCertainty: result.effectCertainty,
+      }
     }
     if (TELEGRAM_FENCING_ERROR_CODES.has(result.errorCode)) {
       await this.fenceConnection(delivery)
     }
-    return { status: 'permanent', errorCode: result.errorCode }
+    return {
+      status: 'permanent',
+      errorCode: result.errorCode,
+      effectCertainty: result.effectCertainty,
+    }
   }
 
   /**

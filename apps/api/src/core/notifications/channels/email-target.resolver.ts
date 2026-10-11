@@ -8,7 +8,7 @@ import type {
 } from './channel-target-resolver.types'
 
 import { redactEmail } from '@/common/utils'
-import type { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 
 /** Bounded terminal reason: the account email is not a usable notification target. */
 export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVERIFIED
@@ -24,6 +24,22 @@ export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVE
  */
 export class EmailTargetResolver implements ChannelTargetResolver {
   readonly channel = NotificationChannel.EMAIL
+
+  async validateDelivery(
+    tx: Prisma.TransactionClient,
+    delivery: { targetKey: string },
+    recipientUserId: string
+  ): Promise<import('@amcore/shared').WorkReason | null> {
+    const [recipient] = await tx.$queryRaw<
+      { emailCanonical: string; emailVerified: boolean }[]
+    >(Prisma.sql`
+      SELECT "emailCanonical", "emailVerified" FROM core.users
+      WHERE id = ${recipientUserId} FOR SHARE
+    `)
+    return recipient?.emailVerified && recipient.emailCanonical === delivery.targetKey
+      ? null
+      : 'STATE_CHANGED'
+  }
 
   async resolveTargets(
     _tx: Prisma.TransactionClient,

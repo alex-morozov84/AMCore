@@ -168,6 +168,7 @@ describe('NotificationDispatchService', () => {
         expect.objectContaining({ id: 'd1' }),
         'provider_transient',
         expect.any(Number),
+        undefined,
         undefined
       )
     })
@@ -183,7 +184,8 @@ describe('NotificationDispatchService', () => {
         expect.objectContaining({ id: 'd1' }),
         'telegram_rate_limited',
         expect.any(Number),
-        30_000
+        30_000,
+        undefined
       )
     })
 
@@ -193,7 +195,8 @@ describe('NotificationDispatchService', () => {
       expect(repository.finalizePermanent).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'd1' }),
         'provider_permanent',
-        expect.any(Number)
+        expect.any(Number),
+        undefined
       )
       expect(metrics.incQueueEvent).toHaveBeenCalledWith('notifications', 'dead_letter')
     })
@@ -205,6 +208,7 @@ describe('NotificationDispatchService', () => {
         expect.objectContaining({ id: 'd1' }),
         'provider_error',
         expect.any(Number),
+        undefined,
         undefined
       )
       const logged = JSON.stringify(logger.warn.mock.calls)
@@ -350,6 +354,7 @@ describe('NotificationDispatchService', () => {
         expect.objectContaining({ id: 'a' }),
         'provider_timeout',
         expect.any(Number),
+        undefined,
         undefined
       )
       // The wake work is done, yet the physical call is still pending: the slot is NOT freed.

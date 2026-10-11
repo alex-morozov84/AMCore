@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Notification deliveries use common work control with durable pause, one safe
+  lifetime retry grant, pending cancellation, protected cleanup, channel filters
+  and bounded attempt history. Unknown provider effects remain protected. Upgrade
+  requires stopping all old API roles before migration.
+
 - Shared native disclosures unify expandable details and filters; queue cards show one state-dependent pause/resume action with an icon.
 
 - Registered background work can declare bounded, localized failure reasons and next steps; current failed attempts expose them through the common API and Console, with safe fallback for missing causes.
