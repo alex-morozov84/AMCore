@@ -14,6 +14,10 @@ Console's [Background work](../../operations-console/background-work.md) screen.
 provides safe diagnostics and policy-eligible commands with captured confirmations
 and audited receipts. Bull Board remains read-only. It shows `notifications` and `ai-runs` as wake queues: their real
 backlog is in the database, as described under [Outbox backlog](#outbox-backlog).
+The separate `notification-deliveries` card shows this durable backlog. Pausing it
+blocks future claims; already claimed work may drain. Retry reserves one lifetime
+attempt and retains the provider floor. Unknown sending history refuses retry and
+cleanup. See [delivery control](../../notifications/control.md).
 
 <!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->
 

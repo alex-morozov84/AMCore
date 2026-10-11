@@ -374,6 +374,10 @@ export class NotificationsService {
 
     if (deliveries.length > 0) {
       await client.notificationDelivery.createMany({ data: deliveries })
+      await client.$executeRaw`UPDATE notifications.notification_deliveries
+        SET "terminalAt" = clock_timestamp()
+        WHERE "notificationId" = ${created.id} AND "terminalAt" IS NULL
+          AND status IN ('DELIVERED', 'SKIPPED')`
     }
 
     return {

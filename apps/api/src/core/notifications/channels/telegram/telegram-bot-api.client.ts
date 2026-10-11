@@ -24,8 +24,13 @@ export interface TelegramSendMessageInput {
  */
 export type TelegramSendResult =
   | { status: 'delivered'; providerMessageId?: string }
-  | { status: 'transient'; errorCode: string; retryAfterMs?: number }
-  | { status: 'permanent'; errorCode: string }
+  | {
+      status: 'transient'
+      errorCode: string
+      retryAfterMs?: number
+      effectCertainty?: 'none' | 'unknown'
+    }
+  | { status: 'permanent'; errorCode: string; effectCertainty?: 'none' | 'unknown' }
 
 /**
  * Bounded projection of a Bot API response: `result` is narrowed to only the shapes used here
@@ -193,28 +198,35 @@ function isHttpOk(status: number): boolean {
  * does NOT fence the destination — D.5).
  */
 function classifySend(httpStatus: number, body: BotApiResponse): TelegramSendResult {
-  if (isHttpOk(httpStatus) && body.ok === true) {
+  if (isHttpOk(httpStatus) && body.ok === true && extractMessageId(body.result)) {
     return { status: 'delivered', providerMessageId: extractMessageId(body.result) }
   }
   if (httpStatus === 429) {
     return {
       status: 'transient',
       errorCode: TelegramDeliveryError.RATE_LIMITED,
+      effectCertainty: body.ok === false && body.error_code === 429 ? 'none' : 'unknown',
       retryAfterMs: toRetryAfterMs(body.parameters?.retry_after),
     }
   }
-  if (httpStatus === 403) return { status: 'permanent', errorCode: TelegramDeliveryError.BLOCKED }
+  const effectCertainty = body.ok === false && body.error_code === httpStatus ? 'none' : 'unknown'
+  if (httpStatus === 403)
+    return { status: 'permanent', errorCode: TelegramDeliveryError.BLOCKED, effectCertainty }
   if (httpStatus === 400 && body.parameters?.migrate_to_chat_id !== undefined) {
-    return { status: 'permanent', errorCode: TelegramDeliveryError.MIGRATED }
+    return { status: 'permanent', errorCode: TelegramDeliveryError.MIGRATED, effectCertainty }
   }
   if (httpStatus === 400 && /chat not found/i.test(body.description ?? '')) {
-    return { status: 'permanent', errorCode: TelegramDeliveryError.CHAT_NOT_FOUND }
+    return { status: 'permanent', errorCode: TelegramDeliveryError.CHAT_NOT_FOUND, effectCertainty }
   }
   if (httpStatus === 408 || httpStatus >= 500) {
     return { status: 'transient', errorCode: TelegramDeliveryError.PROVIDER_TRANSIENT }
   }
   if (httpStatus >= 400) {
-    return { status: 'permanent', errorCode: TelegramDeliveryError.PROVIDER_PERMANENT }
+    return {
+      status: 'permanent',
+      errorCode: TelegramDeliveryError.PROVIDER_PERMANENT,
+      effectCertainty,
+    }
   }
   // A 2xx with ok:false (or other anomaly) — retry rather than permanently fail.
   return { status: 'transient', errorCode: TelegramDeliveryError.PROVIDER_TRANSIENT }
@@ -222,7 +234,13 @@ function classifySend(httpStatus: number, body: BotApiResponse): TelegramSendRes
 
 /** Defensively read `result.message_id` (sendMessage) — absent for a boolean/other result. */
 function extractMessageId(result: BotApiResponse['result']): string | undefined {
-  if (typeof result === 'object' && result !== null && typeof result.message_id === 'number') {
+  if (
+    typeof result === 'object' &&
+    result !== null &&
+    typeof result.message_id === 'number' &&
+    Number.isSafeInteger(result.message_id) &&
+    result.message_id > 0
+  ) {
     return result.message_id.toString()
   }
   return undefined

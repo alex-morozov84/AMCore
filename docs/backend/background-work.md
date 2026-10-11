@@ -267,6 +267,12 @@ personal authorization, fresh authentication, confirmations, distributed budgets
 receipts, replay rules and audit. Register the adapter module in the registration's
 `core` and `control` loaders; downstream code does not duplicate these surfaces.
 
+The shipped [notification delivery adapter](../notifications/control.md) is a
+production example of durable authority alongside a separate wake registration.
+Its shared presentation adds bounded registered filters, native state labels,
+counts and detail-only attempt history. Filters remain adapter-owned; arbitrary
+filters do not become broker query options.
+
 ## Limits and deployment
 
 At most64 works and32 job/version bindings per work are accepted. The complete
@@ -278,11 +284,18 @@ each inspected primary list). Queue pause/resume has no backlog-count ceiling:
 a paused queue can keep receiving jobs and can still resume. Pausing affects new
 claims; already active jobs may finish.
 
+The optional `search` query is a trimmed string of at most128 characters.
+Readers match a literal case-insensitive job ID substring within their existing
+first512-identity window before pagination. Search never extends observation,
+uses wildcard syntax, or merges states. Durable extension readers must implement
+this bounded search contract or reject nonempty unsupported search input.
+
 Diagnostics are live bounded windows, not an archive: first512 identities per
 selected state/source, page size1–50, no arbitrary payload or recursive relation
 expansion. The durable recipe clamps its last page to the remaining first512
-identities. Its bounded513th-row witness sets `windowTruncated` only when more
-than512 matching records exist; that witness is never projected. Provider evidence has an independent PG source that survives queue
+identities. Its bounded513th-row witness sets `windowTruncated` when the selected
+state contains more than512 records, before the ID search. The witness survives
+empty searched pages and is never projected as a row. Provider evidence has an independent PG source that survives queue
 hash removal; unavailable broker state is explicitly unobserved.
 
 PG failure prevents new administrative effects and provider-window admissions.
@@ -354,6 +367,12 @@ Run `pnpm test:background-work-contracts` with Docker available. The isolated
 PostgreSQL/Redis lane exercises both compiled recipes through the common
 registration and control surfaces, including two-worker image deduplication,
 transactional durable mutation/receipt/audit and queued-email certainty gates.
+The notification cases prove claim/pause interleavings, transport drain, fresh
+clocks after lock waits, lifetime grants through the common HTTP endpoint,
+strict audit rollback, retained unknown evidence and both retention race winners.
+They include the installed Resend SDK through PostgreSQL finalization, five
+Telegram HTTP429 starts plus the single manual start, changed email and relinked
+Telegram generations, bounded empty pages and the historical control migration.
 It also checks process-role inventory, observation and read-only Bull Board.
 No application database or owner preview is used. Keep downstream conformance
 tests alongside the registered handler and business authority; do not add a

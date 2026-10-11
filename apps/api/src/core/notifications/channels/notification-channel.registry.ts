@@ -33,6 +33,11 @@ export class NotificationChannelRegistry {
         typeof descriptor.worker !== 'function' ||
         (descriptor.web !== undefined && typeof descriptor.web !== 'function') ||
         typeof descriptor.requestTargetsDelivery !== 'function' ||
+        (descriptor.manualRetry !== undefined &&
+          (!descriptor.manualRetry.validatorToken ||
+            typeof descriptor.manualRetry.requestIdentity !== 'function' ||
+            (descriptor.manualRetry.providerScope !== undefined &&
+              typeof descriptor.manualRetry.providerScope !== 'function'))) ||
         descriptor.wireVersion !== 1
       ) {
         throw new Error(`Incomplete notification channel: ${descriptor.id}`)

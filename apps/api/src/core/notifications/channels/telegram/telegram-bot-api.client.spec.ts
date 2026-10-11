@@ -75,6 +75,33 @@ function mockFetch(resp: Response): jest.Mock {
 describe('TelegramBotApiClient.sendMessage', () => {
   afterEach(() => jest.restoreAllMocks())
 
+  it.each([
+    [429, { ok: false, error_code: 429 }, 'none'],
+    [200, { ok: false, error_code: 429 }, undefined],
+    [429, { ok: true, error_code: 429 }, 'unknown'],
+    [429, { ok: false, error_code: 500 }, 'unknown'],
+    [500, { ok: false, error_code: 429 }, undefined],
+  ] as const)(
+    'requires the independent HTTP429 witness (%s, %j)',
+    async (status, body, certainty) => {
+      mockFetch(response(status, body))
+      const result = await makeClient().sendMessage({ chatId: '111', text: 'hi' })
+      expect(result.status).toBe('transient')
+      expect('effectCertainty' in result ? result.effectCertainty : undefined).toBe(certainty)
+    }
+  )
+
+  it.each([undefined, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'does not infer acceptance without a positive bounded message ID (%s)',
+    async (messageId) => {
+      mockFetch(response(200, { ok: true, result: { message_id: messageId } }))
+      expect(await makeClient().sendMessage({ chatId: '111', text: 'hi' })).toEqual({
+        status: 'transient',
+        errorCode: 'telegram_provider_transient',
+      })
+    }
+  )
+
   it('maps HTTP 200 + ok:true to delivered with the message id', async () => {
     mockFetch(response(200, { ok: true, result: { message_id: 42 } }))
     const result = await makeClient().sendMessage({ chatId: '111', text: 'hi' })
@@ -118,6 +145,7 @@ describe('TelegramBotApiClient.sendMessage', () => {
     expect(result).toEqual({
       status: 'transient',
       errorCode: 'telegram_rate_limited',
+      effectCertainty: 'unknown',
       retryAfterMs: 30_000,
     })
   })
@@ -125,13 +153,21 @@ describe('TelegramBotApiClient.sendMessage', () => {
   it('is rate_limited on HTTP 429 even with a degraded (empty) body', async () => {
     mockFetch(response(429, {}))
     const result = await makeClient().sendMessage({ chatId: '111', text: 'hi' })
-    expect(result).toEqual({ status: 'transient', errorCode: 'telegram_rate_limited' })
+    expect(result).toEqual({
+      status: 'transient',
+      errorCode: 'telegram_rate_limited',
+      effectCertainty: 'unknown',
+    })
   })
 
   it('ignores a non-positive / non-safe retry_after', async () => {
     mockFetch(response(429, { parameters: { retry_after: 0 } }))
     const result = await makeClient().sendMessage({ chatId: '111', text: 'hi' })
-    expect(result).toEqual({ status: 'transient', errorCode: 'telegram_rate_limited' })
+    expect(result).toEqual({
+      status: 'transient',
+      errorCode: 'telegram_rate_limited',
+      effectCertainty: 'unknown',
+    })
   })
 
   it('maps HTTP 403 to permanent telegram_blocked', async () => {
@@ -139,6 +175,7 @@ describe('TelegramBotApiClient.sendMessage', () => {
     expect(await makeClient().sendMessage({ chatId: '1', text: 'h' })).toEqual({
       status: 'permanent',
       errorCode: 'telegram_blocked',
+      effectCertainty: 'unknown',
     })
   })
 
@@ -147,13 +184,18 @@ describe('TelegramBotApiClient.sendMessage', () => {
     expect(await makeClient().sendMessage({ chatId: '1', text: 'h' })).toEqual({
       status: 'permanent',
       errorCode: 'telegram_chat_not_found',
+      effectCertainty: 'unknown',
     })
   })
 
   it('maps HTTP 400 + migrate_to_chat_id to permanent telegram_migrated without leaking the value', async () => {
     mockFetch(response(400, { ok: false, parameters: { migrate_to_chat_id: -1009999 } }))
     const result = await makeClient().sendMessage({ chatId: '1', text: 'h' })
-    expect(result).toEqual({ status: 'permanent', errorCode: 'telegram_migrated' })
+    expect(result).toEqual({
+      status: 'permanent',
+      errorCode: 'telegram_migrated',
+      effectCertainty: 'unknown',
+    })
     expect(JSON.stringify(result)).not.toContain('1009999')
   })
 
@@ -184,6 +226,7 @@ describe('TelegramBotApiClient.sendMessage', () => {
       expect(await makeClient().sendMessage({ chatId: '1', text: 'h' })).toEqual({
         status: 'permanent',
         errorCode: 'telegram_provider_permanent',
+        effectCertainty: 'unknown',
       })
     }
   )

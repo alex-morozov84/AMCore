@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { adminQueueNameSchema } from './admin-queues'
-import { serializedJsonBytes } from './organization-members-budget'
+import { serializedJsonBytes, utf8Bytes } from './organization-members-budget'
 import { workFailureDiagnosticSchema } from './work-failure'
 import { workPresentationSchema } from './work-presentation'
 
@@ -111,6 +111,29 @@ export const workCapabilitySchema = z.strictObject({
 
 export const workListQuerySchema = z
   .strictObject({
+    search: z.string().trim().max(128).optional(),
+    filters: z
+      .union([
+        z
+          .string()
+          .max(1024)
+          .refine((value) => utf8Bytes(value) <= 1024),
+        z.record(z.string().max(64), z.string().min(1).max(64)),
+      ])
+      .transform((value, ctx) => {
+        try {
+          const result = z
+            .record(z.string().max(64), z.string().min(1).max(64))
+            .parse(typeof value === 'string' ? JSON.parse(value) : value)
+          if (Object.keys(result).length > 4 || serializedJsonBytes(result) > 1024)
+            throw new Error()
+          return result
+        } catch {
+          ctx.addIssue({ code: 'custom' })
+          return z.NEVER
+        }
+      })
+      .optional(),
     source: z.enum(['broker', 'PG_evidence']).optional(),
     state: z
       .enum(['waiting', 'active', 'delayed', 'prioritized', 'failed', 'completed'])
@@ -121,6 +144,18 @@ export const workListQuerySchema = z
   .superRefine((query, ctx) => {
     if (query.page > Math.ceil(512 / query.limit)) ctx.addIssue({ code: 'custom', path: ['page'] })
   })
+/** HTTP accepts one JSON string; internal readers may revalidate decoded filters. */
+export const workListWireQuerySchema = z.preprocess((input) => {
+  if (
+    input &&
+    typeof input === 'object' &&
+    'filters' in input &&
+    (input as { filters?: unknown }).filters !== undefined &&
+    typeof (input as { filters?: unknown }).filters !== 'string'
+  )
+    return { ...input, filters: [] }
+  return input
+}, workListQuerySchema)
 export type WorkListQuery = z.infer<typeof workListQuerySchema>
 
 export const workSummarySchema = z.strictObject({
@@ -131,6 +166,12 @@ export const workSummarySchema = z.strictObject({
   sampledAt: z.iso.datetime(),
   revision: workRevisionSchema.optional(),
   epoch: z.uuid().optional(),
+  counts: z
+    .record(
+      z.enum(['pending', 'due', 'processing', 'failed', 'terminal', 'unresolved']),
+      z.strictObject({ value: z.number().int().min(0).max(10000), truncated: z.boolean() })
+    )
+    .optional(),
   paused: z.boolean().optional(),
   providerEvidence: z.boolean().optional(),
   presentation: workPresentationSchema.optional(),
@@ -172,15 +213,44 @@ const workJobFieldsSchema = z.strictObject({
       reason: workReasonSchema.optional(),
     })
     .optional(),
+  nativeState: z.string().max(64).optional(),
+  nextAttemptAt: z.iso.datetime().optional(),
   projection: z.record(
     z.string().max(64),
     z.union([z.string().max(256), z.number().finite(), z.boolean()])
   ),
   capabilities: z.array(workCapabilitySchema).max(5),
 })
-export const workJobSchema = workJobFieldsSchema.refine(
-  (value) => serializedJsonBytes(value) <= WORK_DETAIL_BYTES
-)
+export const workAttemptHistorySchema = z.strictObject({
+  attempts: z
+    .array(
+      z
+        .strictObject({
+          number: z.number().int().positive(),
+          startedAt: z.iso.datetime(),
+          finishedAt: z.iso.datetime().optional(),
+          outcome: z.enum([
+            'active',
+            'delivered',
+            'transient_failure',
+            'permanent_failure',
+            'abandoned',
+          ]),
+          certainty: z.enum(['none', 'accepted', 'unknown']),
+          reason: z.string().max(64).optional(),
+          actorId: z.string().max(64).optional(),
+          commandId: z.uuid().optional(),
+        })
+        .refine((value) => serializedJsonBytes(value) <= 512)
+    )
+    .max(16),
+  historyTruncated: z.boolean(),
+  historyExpired: z.boolean(),
+  oldestRetainedNumber: z.number().int().positive().optional(),
+})
+export const workJobSchema = workJobFieldsSchema
+  .extend({ history: workAttemptHistorySchema.optional() })
+  .refine((value) => serializedJsonBytes(value) <= WORK_DETAIL_BYTES)
 export const workListRowSchema = workJobFieldsSchema.refine(
   (value) => serializedJsonBytes(value) <= WORK_LIST_ROW_BYTES
 )

@@ -8,7 +8,8 @@ import { NotificationRetentionService } from './notification-retention.service'
 import type { Prisma, PrismaClient } from '@/generated/prisma/client'
 import type { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
 
-const sqlText = (sql: Prisma.Sql): string => sql.strings.join('')
+const sqlText = (sql: Prisma.Sql | TemplateStringsArray): string =>
+  ('strings' in sql ? sql.strings : sql).join('')
 
 describe('NotificationRetentionService', () => {
   let service: NotificationRetentionService
@@ -18,6 +19,13 @@ describe('NotificationRetentionService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
+    prisma.$queryRaw.mockResolvedValue([])
+    prisma.$executeRaw.mockResolvedValue(0)
+    prisma.notificationDelivery.findMany.mockResolvedValue([])
+    prisma.$transaction.mockImplementation((async (callback: unknown) => {
+      if (typeof callback !== 'function') throw new Error('Expected interactive transaction')
+      return callback(prisma)
+    }) as PrismaClient['$transaction'])
     singletonCron = {
       run: jest.fn().mockImplementation(async (_opts, task: () => Promise<void>) => {
         await task()
@@ -38,26 +46,12 @@ describe('NotificationRetentionService', () => {
   })
 
   describe('runRetention', () => {
-    it('sweeps every bucket and returns per-bucket counts', async () => {
-      prisma.$executeRaw
-        .mockResolvedValueOnce(3) // archived
-        .mockResolvedValueOnce(5) // read
-        .mockResolvedValueOnce(7) // unread
-        .mockResolvedValueOnce(2) // finished attempts
-        .mockResolvedValueOnce(4) // telegram link tokens
-        .mockResolvedValueOnce(6) // telegram update receipts
-
+    it('runs each protected-data bucket inside a bounded transaction', async () => {
       const result = await service.runRetention()
-
-      expect(result).toEqual({
-        archivedNotifications: 3,
-        readNotifications: 5,
-        unreadNotifications: 7,
-        finishedAttempts: 2,
-        telegramLinkTokens: 4,
-        telegramUpdateReceipts: 6,
-        failures: [],
-      })
+      expect(result.failures).toEqual([])
+      expect(prisma.$transaction).toHaveBeenCalledTimes(4)
+      for (const [, options] of prisma.$transaction.mock.calls)
+        expect(options).toEqual({ timeout: 5000 })
     })
 
     it('prunes telegram tokens (expired/consumed only) and update receipts by age', async () => {
@@ -72,50 +66,33 @@ describe('NotificationRetentionService', () => {
       expect(receiptDelete).toContain('"receivedAt" <')
     })
 
-    it('never deletes a notification that still has an active external delivery', async () => {
-      prisma.$executeRaw.mockResolvedValue(0)
-
+    it('keeps protected rows out of candidate parents and still rechecks locked children', async () => {
       await service.runRetention()
-
-      // Each of the three notification deletes guards on active delivery statuses.
-      const notificationDeletes = prisma.$executeRaw.mock.calls
-        .map(([sql]) => sqlText(sql as Prisma.Sql))
-        .filter((text) => text.includes('"notifications"."notifications"'))
-      expect(notificationDeletes).toHaveLength(3)
-      for (const text of notificationDeletes) {
+      const reads = prisma.$queryRaw.mock.calls.map(([sql]) => sqlText(sql as Prisma.Sql))
+      const parents = reads.filter(
+        (text) => text.includes('WHERE') && text.includes('notifications.notifications n')
+      )
+      expect(parents).toHaveLength(4)
+      for (const text of parents.slice(0, 3)) {
         expect(text).toContain('NOT EXISTS')
-        expect(text).toContain("'PENDING', 'PROCESSING', 'RETRY_SCHEDULED'")
+        expect(text).toContain('unresolvedEffectCount')
+        expect(text).toContain('legacyUnverified')
+        expect(text).toContain('manualGrant')
+        expect(text).toContain('FOR UPDATE SKIP LOCKED LIMIT 50')
       }
+      expect(prisma.notificationDelivery.deleteMany).not.toHaveBeenCalled()
     })
 
-    it('keeps deleting in batches until a short batch is returned', async () => {
-      // First archived batch fills the limit (loop continues), everything else is short.
-      prisma.$executeRaw.mockResolvedValueOnce(500).mockResolvedValue(0)
-
+    it('reports a failed bucket while continuing other independent buckets', async () => {
+      prisma.$transaction.mockRejectedValueOnce(new Error('lock timeout'))
       const result = await service.runRetention()
-
-      expect(result.archivedNotifications).toBe(500)
-      // 6 first-pass calls + 1 extra archived pass that drains to 0.
-      expect(prisma.$executeRaw).toHaveBeenCalledTimes(7)
-    })
-
-    it('isolates a per-bucket failure: keeps other counts, records it, never throws', async () => {
-      prisma.$executeRaw
-        .mockResolvedValueOnce(4) // archived
-        .mockRejectedValueOnce(new Error('pool timeout')) // read
-        .mockResolvedValueOnce(0) // unread
-        .mockResolvedValueOnce(1) // finished attempts
-
-      const result = await service.runRetention()
-
-      expect(result.archivedNotifications).toBe(4)
-      expect(result.readNotifications).toBe(0)
-      expect(result.finishedAttempts).toBe(1)
-      expect(result.failures).toEqual(['readNotifications'])
+      expect(result.failures).toEqual(['archivedNotifications'])
+      expect(prisma.$transaction).toHaveBeenCalledTimes(4)
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(2)
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'notification.retention_partial_failure',
-          bucket: 'readNotifications',
+          bucket: 'archivedNotifications',
         }),
         expect.any(String)
       )

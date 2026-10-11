@@ -38,7 +38,9 @@ export const consoleApi = {
     apiClient.get(
       getConsolePublicApiPath(
         `/background-work/works/${encodeURIComponent(workId)}/jobs?${new URLSearchParams(
-          Object.entries(query).map(([key, value]) => [key, String(value)])
+          Object.entries(query)
+            .filter(([, value]) => value !== undefined)
+            .map(([key, value]) => [key, key === 'filters' ? JSON.stringify(value) : String(value)])
         )}`
       ),
       { signal }

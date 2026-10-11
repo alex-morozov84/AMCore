@@ -111,7 +111,8 @@ async function execute() {
         id,
         action === 'e2e' ? 'e2e' : 'preview',
         topology,
-        action === 'e2e' && lane === 'mocked'
+        action === 'e2e' && lane === 'mocked',
+        action === 'preview' ? value('--profile', 'default') : undefined
       )
     if (lane !== 'mocked') await boot(m, !existing)
     if (interrupted) throw new Error('Interrupted startup')

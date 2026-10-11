@@ -186,6 +186,43 @@ describe('ResendEmailProvider against the real Resend SDK', () => {
     expect(prepared).not.toContain('re_test_fake')
   })
 
+  it.each([
+    null,
+    {},
+    { id: null },
+    { id: 7 },
+    { id: '' },
+    { id: {} },
+    { id: 'x'.repeat(129) },
+    { id: 'not an id' },
+  ])('keeps malformed HTTP200 prepared acceptance unknown: %j', async (body) => {
+    respond(200, body)
+    expect(
+      await provider.sendPrepared(
+        '{}',
+        'notification-delivery:fixture',
+        new AbortController().signal
+      )
+    ).toEqual({
+      id: '',
+      success: false,
+      error: 'provider_failure',
+      retryable: true,
+    })
+    expect(calls).toHaveLength(1)
+  })
+
+  it.each(['a', 'A_9-' + 'x'.repeat(124)])('accepts a bounded prepared ID: %s', async (id) => {
+    respond(200, { id })
+    expect(
+      await provider.sendPrepared(
+        '{}',
+        'notification-delivery:fixture',
+        new AbortController().signal
+      )
+    ).toEqual({ id, success: true })
+  })
+
   it('checks the queued fence before SDK fetch and preserves immutable bytes/key', async () => {
     respond(200, { id: 'em_queued' })
     const body = '{"from":"fake@example.test","to":["recipient@example.test"]}'

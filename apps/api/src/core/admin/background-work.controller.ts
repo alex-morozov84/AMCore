@@ -19,7 +19,7 @@ import {
   type WorkJob,
   workJobIdSchema,
   type WorkListQuery,
-  workListQuerySchema,
+  workListWireQuerySchema,
   type WorkPage,
   type WorkReceipt,
   type WorkSummary,
@@ -79,7 +79,7 @@ export class BackgroundWorkController {
     summary: 'Discover registered background work and current command capabilities',
     description:
       'Code-owned registrations are discovered automatically. Broker outages are per-resource unavailable states; ' +
-      'authorization and distributed read budgets use primary PG. Optional registration-owned presentation supplies bounded localized names and safe field labels (English fallback). No job payloads or provider errors are returned.',
+      'authorization and distributed read budgets use primary PG. Optional registration-owned presentation supplies bounded localized names and safe field labels (English fallback). No job payloads or provider errors are returned. Notification projections may include masked original recipients and Telegram connection generations; raw recipient addresses and chat IDs are excluded.',
   })
   @ZodResponse({
     type: BackgroundWorkCatalogueDto,
@@ -99,7 +99,7 @@ export class BackgroundWorkController {
       'At most50 safe rows within the first512 IDs. Live windows can change between reads; truncation ' +
       'and unavailable evidence are explicit. List rows<=2KiB including optional registered failure<=1KiB; page<=128KiB. ' +
       'Failure contains code and static localized title/nextStep maps with English fallback, only for a current failed attempt. ' +
-      'No raw payloads, recipient data or provider errors.',
+      'Masked original recipients and Telegram connection generations are permitted; raw recipient addresses, chat IDs, payloads and provider errors are excluded.',
   })
   @ApiParam({ name: 'workId', description: 'Registered work ID' })
   @ApiQuery({
@@ -116,6 +116,21 @@ export class BackgroundWorkController {
       'Broker state/completed-attempt counts are unobserved; retained incarnations survive hash trim/recycled IDs. ' +
       'Unsupported replay policies return409. Does not establish missing jobs or effect success.',
   })
+  @ApiQuery({
+    name: 'filters',
+    required: false,
+    type: String,
+    description:
+      'One URL-encoded JSON object, maximum1024 UTF-8 bytes and4 registered string filters. Each value<=64 characters. Repeated/nested parameters are rejected.',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    maxLength: 128,
+    description:
+      'Case-insensitive literal job ID substring within the selected first512-identity window, before pagination. Does not expand observation or search other states.',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1, maximum: 512 })
   @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 50 })
   @ApiResponse({ status: 400, description: 'Invalid status, page or registered work identifier' })
@@ -127,7 +142,7 @@ export class BackgroundWorkController {
   jobs(
     @CurrentUser() principal: RequestPrincipal,
     @Param('workId', new ZodValidationPipe(adminQueueNameSchema)) workId: string,
-    @Query(new ZodValidationPipe(workListQuerySchema)) query: WorkListQuery
+    @Query(new ZodValidationPipe(workListWireQuerySchema)) query: WorkListQuery
   ): Promise<WorkPage> {
     return this.reader.list(principal, workId, query)
   }
@@ -139,6 +154,7 @@ export class BackgroundWorkController {
     description:
       'Capabilities are observations, not authorization. Every command rechecks captured identity and predicates. ' +
       'Detail<=16KiB; optional failure<=1KiB contains registered localized labels only. ' +
+      'Durable notification detail includes the latest16 safe attempts (<=512 bytes each), certainty and lifetime-grant correlation; truncation and expiry are explicit. ' +
       'Idempotent broker history expires with the job hash; missing/unknown causes are omitted, not inferred. ' +
       'A diagnosis does not establish provider certainty or authorize a command.',
   })

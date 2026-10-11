@@ -71,7 +71,11 @@ export function WorkCommandConfirmation({
       ...(operation === 'cleanup'
         ? {
             cutoff: new Date(
-              Math.floor((Date.parse(work.sampledAt) - 86400000) / 1000) * 1000
+              Math.floor(
+                (Date.parse(work.sampledAt) -
+                  (work.presentation?.commandSemantics?.cleanupMinimumAgeSeconds ?? 86400) * 1000) /
+                  1000
+              ) * 1000
             ).toISOString(),
           }
         : {}),
@@ -96,7 +100,18 @@ export function WorkCommandConfirmation({
               work: workLabel(work.presentation?.name, locale, work.id),
             })}
           </DialogTitle>
-          <DialogDescription>{t(`${operation}Effect`)}</DialogDescription>
+          <DialogDescription>
+            {t(
+              operation === 'pause' && work.presentation?.commandSemantics?.pause === 'claims'
+                ? 'claimsPauseHelp'
+                : operation === 'retry' &&
+                    work.presentation?.commandSemantics?.retry === 'scheduled-single-grant'
+                  ? 'scheduledRetryEffect'
+                  : operation === 'cleanup' && work.presentation?.commandSemantics
+                    ? 'retainedCleanupEffect'
+                    : `${operation}Effect`
+            )}
+          </DialogDescription>
           <div>
             <InfoTooltip label={t('freshnessHelp')} />
           </div>
@@ -139,7 +154,7 @@ export function WorkCommandConfirmation({
           >
             <fieldset disabled={pending || !!result} className="space-y-4">
               {!!targets.length && (
-                <ul className="max-h-48 space-y-3 overflow-y-auto text-sm">
+                <ul className="space-y-3 text-sm">
                   {targets.map((row) => (
                     <li key={row.identity.incarnation} className="space-y-1">
                       <div className="flex items-center gap-2">

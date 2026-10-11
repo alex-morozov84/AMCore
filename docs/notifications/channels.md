@@ -16,17 +16,18 @@ Do not independently call `register()` from each consumer.
 
 Each descriptor declares:
 
-| Field                                   | Responsibility                                                 |
-| --------------------------------------- | -------------------------------------------------------------- |
-| `id`                                    | Stable external channel identifier; `in_app` is reserved.      |
-| `targetMode`                            | `snapshot` or `generation`.                                    |
-| `core.module`, `core.token`             | Reader module and its exported reader token.                   |
-| `worker(core)`                          | Dynamic worker module importing the same core facade.          |
-| `delivererToken`                        | Exported worker deliverer token.                               |
-| `web(core)`                             | Optional dynamic HTTP module importing the same core facade.   |
-| `available(env)`                        | Code-owned configuration availability.                         |
-| `wireVersion`, `requestSchema`          | Retained prepared request contract.                            |
-| `requestTargetsDelivery(body, context)` | Checks actual body destination against the immutable delivery. |
+| Field                                   | Responsibility                                                                                                               |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                    | Stable external channel identifier; `in_app` is reserved.                                                                    |
+| `manualRetry`                           | Optional core target-validator token and live request identity. Custom providers also supply a private stable scope witness. |
+| `targetMode`                            | `snapshot` or `generation`.                                                                                                  |
+| `core.module`, `core.token`             | Reader module and its exported reader token.                                                                                 |
+| `worker(core)`                          | Dynamic worker module importing the same core facade.                                                                        |
+| `delivererToken`                        | Exported worker deliverer token.                                                                                             |
+| `web(core)`                             | Optional dynamic HTTP module importing the same core facade.                                                                 |
+| `available(env)`                        | Code-owned configuration availability.                                                                                       |
+| `wireVersion`, `requestSchema`          | Retained prepared request contract.                                                                                          |
+| `requestTargetsDelivery(body, context)` | Checks actual body destination against the immutable delivery.                                                               |
 
 `ConfiguredNotificationsWorkerModule.register(core, channels)` derives deliverer
 providers from this inventory and validates token/channel agreement. Adapter
@@ -119,3 +120,14 @@ The notification cases live in `extension-registration.e2e-spec.ts`,
 `notification-ai-legacy-migration.e2e-spec.ts` starts from the old schema and checks
 the upgrade matrix. Use these registered module fixtures for a new channel;
 checking only a manually constructed reader or deliverer does not prove role DI.
+
+## Manual retry extension
+
+A channel that supports administrative retry declares `manualRetry.validatorToken`
+and a pure `requestIdentity(env, deliveryId)` supplying the expected binding, path
+and stable key. Its core validator uses the supplied transaction and locks the
+original target; it never resolves a replacement or performs provider I/O.
+Custom providers supply a bounded digest through `providerScope(env)`; without
+a supported scope, their ordinary deliveries remain usable but manual retry refuses.
+Return `effectCertainty: 'none'` only with an independently validated provider
+non-acceptance witness. Missing evidence remains unknown. See [control](control.md).

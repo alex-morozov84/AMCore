@@ -89,7 +89,9 @@ export class BackgroundWorkCatalogue {
           throw new Error('INVALID_DOMAIN_SUMMARY')
         return workSummarySchema.parse({
           ...result,
-          ...(definition.presentation ? { presentation: definition.presentation } : {}),
+          ...(definition.presentation
+            ? { presentation: { ...definition.presentation, ...result.presentation } }
+            : {}),
         })
       }
       const queue = definition.queue && this.queues.get(definition.queue.name)

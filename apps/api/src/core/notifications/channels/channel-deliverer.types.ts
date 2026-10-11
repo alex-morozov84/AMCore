@@ -15,9 +15,10 @@ export interface DeliveryContext {
  * `permanent` → FAILED. Error codes are bounded strings, never provider bodies.
  */
 export type DeliveryResult =
-  | { status: 'delivered'; providerMessageId?: string }
+  | { status: 'delivered'; providerMessageId?: string; effectCertainty?: 'accepted' }
   | {
       status: 'transient'
+      effectCertainty?: 'none' | 'unknown'
       errorCode: string
       /**
        * Optional provider-requested retry **floor** in ms (e.g. Telegram `retry_after`, email
@@ -27,7 +28,7 @@ export type DeliveryResult =
        */
       retryAfterMs?: number
     }
-  | { status: 'permanent'; errorCode: string }
+  | { status: 'permanent'; errorCode: string; effectCertainty?: 'none' | 'unknown' }
 
 /** Why a delivery attempt never reached the transport. */
 export type NotStartedReason =

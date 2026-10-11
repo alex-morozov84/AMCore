@@ -6,6 +6,7 @@ import { ChannelTargetResolverRegistry } from './channels/channel-target-resolve
 import type { ChannelTargetResolver } from './channels/channel-target-resolver.types'
 import { NotificationChannelRegistry } from './channels/notification-channel.registry'
 import type { NotificationChannelDescriptor } from './channels/notification-channel.types'
+import { NotificationControlTargets } from './channels/notification-control-targets'
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
 import type { NotificationDefinitionRegistration } from './notification-definition.types'
 import { NotificationPreferenceRepository } from './notification-preference.repository'
@@ -51,12 +52,14 @@ export class NotificationsCoreModule {
           },
           inject: channels.map((channel) => channel.core.token),
         },
+        NotificationControlTargets,
         NotificationPreferenceResolver,
         NotificationPreferenceRepository,
         NotificationRealtimePublisher,
         NotificationsService,
       ],
       exports: [
+        NotificationControlTargets,
         NotificationsService,
         NotificationDefinitionRegistry,
         NotificationChannelRegistry,

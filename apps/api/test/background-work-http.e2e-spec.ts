@@ -117,6 +117,33 @@ describe('One registration → shared privileged HTTP observation/control', () =
     }
   )
 
+  it.each([512, 513])(
+    'preserves the durable window witness on empty searched pages with %i rows',
+    async (count) => {
+      token = await actor()
+      await context.prisma.$executeRaw`TRUNCATE core.fixture_imports`
+      await context.prisma.$executeRaw`
+      INSERT INTO core.fixture_imports (id, incarnation, state)
+      SELECT 'window-' || lpad(n::text, 4, '0'), ${uuidv4()}::uuid, 'failed'
+      FROM generate_series(1, ${count}::integer) AS n`
+      for (const [search, page] of [
+        ['absent', 1],
+        ['window-0001', 2],
+      ] as const) {
+        const response = await request(context.app.getHttpServer())
+          .get(
+            `${base}/works/fixture-import/jobs?state=failed&page=${page}&limit=25&search=${search}`
+          )
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200)
+        expect(workPageSchema.parse(response.body)).toMatchObject({
+          rows: [],
+          windowTruncated: count > 512,
+        })
+      }
+    }
+  )
+
   it('returns closed temporary unavailability when control connection capacity is exhausted', async () => {
     token = await actor()
     const previous = Reflect.get(ControlConnection, 'leases')

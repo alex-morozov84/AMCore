@@ -6,8 +6,12 @@ export const MEMBER_ASSIGNED_BYTES = 524_288
 
 /** Count JSON escaping, punctuation and UTF-8, identically on server and client. */
 export function serializedJsonBytes(value: unknown): number {
+  return utf8Bytes(JSON.stringify(value))
+}
+
+export function utf8Bytes(value: string): number {
   let bytes = 0
-  for (const character of JSON.stringify(value)) {
+  for (const character of value) {
     const code = character.codePointAt(0)!
     bytes += code <= 0x7f ? 1 : code <= 0x7ff ? 2 : code <= 0xffff ? 3 : 4
   }

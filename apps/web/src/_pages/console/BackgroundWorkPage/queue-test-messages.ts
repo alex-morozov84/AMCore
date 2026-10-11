@@ -71,7 +71,7 @@ export const queueMessages = {
         email: {
           title: 'Email',
           description:
-            'Sends transactional email that is safe to queue. Messages with secret links are sent directly and never appear here.',
+            'Sends separate emails placed in this queue. Notification emails are sent by the delivery worker and are not counted here. Emails with secret links are sent directly.',
         },
         default: {
           title: 'Default',
@@ -81,7 +81,7 @@ export const queueMessages = {
         notifications: {
           title: 'Notifications',
           description:
-            'Wake signals only. Delivery state is stored in the database, so an empty queue does not mean nothing is pending.',
+            'Signals prompt the delivery worker to run sooner. Deliveries themselves are stored in the database and shown below. Periodic checks process them even without a signal.',
         },
         'ai-runs': {
           title: 'AI runs',
@@ -107,7 +107,7 @@ export const queueMessages = {
       noFigure: EM_DASH,
       overviewTitle: 'Queue overview',
       overviewDescription:
-        'Counts describe broker queues. Task management also includes work stored directly in a database, which has no queue row.',
+        'Only Redis queues are shown here. Notification deliveries are stored in the database: see their counts and status in the Notification deliveries card below. An empty signal queue does not mean there are no deliveries.',
       partialRefresh:
         'Some sections could not be refreshed. Previous data remains visible with an error; the timestamp applies to the queue overview.',
     },

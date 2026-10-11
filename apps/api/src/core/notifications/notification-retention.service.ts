@@ -4,6 +4,8 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { PrismaService } from '../../prisma'
 
+import { lockRetentionChildren, protectsNotification } from './notification-retention-locks'
+
 import { Prisma } from '@/generated/prisma/client'
 import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
 
@@ -99,8 +101,11 @@ export class NotificationRetentionService {
    * delete does not abort the others and never throws. Each delete is idempotent
    * (delete-by-age), so partial success is correct without a transaction.
    */
-  async runRetention(now: Date = new Date()): Promise<NotificationRetentionResult> {
-    const cutoff = (days: number): Date => new Date(now.getTime() - days * DAY_MS)
+  async runRetention(now?: Date): Promise<NotificationRetentionResult> {
+    const cutoff = (days: number): Date | Prisma.Sql =>
+      now
+        ? new Date(now.getTime() - days * DAY_MS)
+        : Prisma.sql`clock_timestamp() - make_interval(days => ${days}::int)`
     const archivedCutoff = cutoff(RETENTION_ARCHIVED_DAYS)
     const readCutoff = cutoff(RETENTION_READ_DAYS)
     const unreadCutoff = cutoff(RETENTION_UNREAD_DAYS)
@@ -172,35 +177,90 @@ export class NotificationRetentionService {
    * pending/in-flight/retrying work. Returns the total rows deleted.
    */
   private deleteNotifications(predicate: Prisma.Sql): Promise<number> {
-    return this.deleteInBatches(
-      (limit) => Prisma.sql`
-        DELETE FROM "notifications"."notifications"
-        WHERE id IN (
-          SELECT n.id FROM "notifications"."notifications" n
-          WHERE ${predicate}
-            AND NOT EXISTS (
-              SELECT 1 FROM "notifications"."notification_deliveries" d
-              WHERE d."notificationId" = n.id
-                AND d.status::text IN ('PENDING', 'PROCESSING', 'RETRY_SCHEDULED')
-            )
-          LIMIT ${limit}
+    return this.deleteTransactional(async (tx) => {
+      const parents = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT n.id FROM notifications.notifications n WHERE ${predicate}
+          AND NOT EXISTS (SELECT 1 FROM notifications.notification_deliveries d
+            WHERE d."notificationId" = n.id AND (d.status IN ('PENDING', 'PROCESSING', 'RETRY_SCHEDULED')
+              OR d."unresolvedEffectCount" > 0 OR d."legacyUnverified" OR d."manualGrant" = 'reserved'))
+        AND NOT EXISTS (SELECT 1 FROM notifications.notification_deliveries excess
+          WHERE excess."notificationId" = n.id OFFSET 4096 LIMIT 1)
+        ORDER BY n.id FOR UPDATE SKIP LOCKED LIMIT 50`)
+      const locked = await lockRetentionChildren(
+        tx,
+        parents.map((row) => row.id)
+      )
+      const children = locked.rows
+      const ids = parents
+        .filter((parent) => locked.parentIds.includes(parent.id))
+        .filter(
+          (parent) =>
+            !children.some((row) => row.notificationId === parent.id && protectsNotification(row))
         )
-      `
-    )
+        .map((row) => row.id)
+      if (!ids.length) return 0
+      // Separate statement sees the current feed predicate after all lock waits.
+      return tx.$executeRaw(Prisma.sql`DELETE FROM notifications.notifications n
+        WHERE id IN (${Prisma.join(ids)}) AND ${predicate}`)
+    })
   }
 
-  /** Prune finished (terminal) attempt history older than the window. */
-  private deleteFinishedAttempts(cutoff: Date): Promise<number> {
-    return this.deleteInBatches(
-      (limit) => Prisma.sql`
-        DELETE FROM "notifications"."notification_delivery_attempts"
-        WHERE id IN (
-          SELECT id FROM "notifications"."notification_delivery_attempts"
-          WHERE "finishedAt" IS NOT NULL AND "finishedAt" < ${cutoff}
-          LIMIT ${limit}
+  private deleteFinishedAttempts(cutoff: Date | Prisma.Sql): Promise<number> {
+    return this.deleteTransactional(async (tx) => {
+      const parents = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT n.id FROM notifications.notifications n WHERE EXISTS (
+          SELECT 1 FROM notifications.notification_deliveries d
+          JOIN notifications.notification_delivery_attempts a ON a."deliveryId" = d.id
+          WHERE d."notificationId" = n.id AND a."finishedAt" < ${cutoff}
+            AND d.status IN ('DELIVERED', 'FAILED', 'SKIPPED', 'CANCELLED')
+            AND d."unresolvedEffectCount" = 0 AND NOT d."legacyUnverified"
+            AND a."attemptNumber" IS DISTINCT FROM d."grantAttemptNumber"
+        ) AND NOT EXISTS (SELECT 1 FROM notifications.notification_deliveries excess
+          WHERE excess."notificationId" = n.id OFFSET 4096 LIMIT 1)
+        ORDER BY n.id FOR UPDATE SKIP LOCKED LIMIT 50`)
+      const locked = await lockRetentionChildren(
+        tx,
+        parents.map((row) => row.id)
+      )
+      const ids = locked.rows.filter((row) => !protectsNotification(row)).map((row) => row.id)
+      if (!ids.length) return 0
+      const removed = await tx.$queryRaw<
+        { deliveryId: string; attemptNumber: number }[]
+      >(Prisma.sql`
+        DELETE FROM notifications.notification_delivery_attempts WHERE id IN (
+          SELECT a.id FROM notifications.notification_delivery_attempts a
+          JOIN notifications.notification_deliveries d ON a."deliveryId" = d.id
+          WHERE d.id IN (${Prisma.join(ids)}) AND a."finishedAt" < ${cutoff}
+            AND a.outcome IS NOT NULL AND a."attemptNumber" IS DISTINCT FROM d."grantAttemptNumber"
+          ORDER BY a.id LIMIT 500
+        ) RETURNING "deliveryId", "attemptNumber"`)
+      for (const id of [...new Set(removed.map((row) => row.deliveryId))].sort()) {
+        const through = Math.max(
+          ...removed.filter((row) => row.deliveryId === id).map((row) => row.attemptNumber)
         )
-      `
-    )
+        await tx.$executeRaw`UPDATE notifications.notification_deliveries
+          SET "historyPrunedThrough" = GREATEST("historyPrunedThrough", ${through}) WHERE id = ${id}`
+      }
+      return removed.length
+    })
+  }
+
+  private async deleteTransactional(
+    run: (tx: Prisma.TransactionClient) => Promise<number>
+  ): Promise<number> {
+    let total = 0
+    for (let cycle = 0; cycle < RETENTION_MAX_CYCLES; cycle += 1) {
+      const count = await this.prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT set_config('lock_timeout', '500ms', true), set_config('statement_timeout', '2000ms', true)`
+          return run(tx)
+        },
+        { timeout: 5000 }
+      )
+      total += count
+      if (!count) break
+    }
+    return total
   }
 
   /**
@@ -208,7 +268,7 @@ export class NotificationRetentionService {
    * still-bindable token is never swept (the token TTL is far shorter than the window,
    * so this is defense-in-depth, not the primary bound).
    */
-  private deleteTelegramLinkTokens(cutoff: Date): Promise<number> {
+  private deleteTelegramLinkTokens(cutoff: Date | Prisma.Sql): Promise<number> {
     return this.deleteInBatches(
       (limit) => Prisma.sql`
         DELETE FROM "notifications"."telegram_link_tokens"
@@ -223,7 +283,7 @@ export class NotificationRetentionService {
   }
 
   /** Prune durable `update_id` dedupe receipts older than the window. */
-  private deleteTelegramUpdateReceipts(cutoff: Date): Promise<number> {
+  private deleteTelegramUpdateReceipts(cutoff: Date | Prisma.Sql): Promise<number> {
     return this.deleteInBatches(
       (limit) => Prisma.sql`
         DELETE FROM "notifications"."telegram_update_receipts"

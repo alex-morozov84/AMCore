@@ -994,12 +994,10 @@ describe('Notifications (e2e)', () => {
           channel: NotificationChannel.EMAIL,
           targetKey: user.email,
           locale: 'ru',
-          status: NotificationDeliveryStatus.RETRY_SCHEDULED,
+          status: NotificationDeliveryStatus.FAILED,
           maxAttempts: 5,
-          // Keep it out of the due-set so the background poller does not re-attempt it
-          // mid-test (we only care about its attempt-history pruning here).
-          availableAt: new Date(Date.now() + 60 * 60 * 1000),
-          nextAttemptAt: new Date(Date.now() + 60 * 60 * 1000),
+          // Only terminal resolved deliveries allow history pruning.
+          terminalAt: daysAgo(1),
         },
         select: { id: true },
       })
@@ -1012,6 +1010,7 @@ describe('Notifications (e2e)', () => {
           startedAt: daysAgo(40),
           finishedAt: daysAgo(40),
           outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
+          effectState: 'proven_none',
         },
         select: { id: true },
       })
@@ -1026,6 +1025,31 @@ describe('Notifications (e2e)', () => {
         select: { id: true },
       })
 
+      const activeNotificationId = await makeNotification(user.userId, { createdAt: daysAgo(1) })
+      const activeDelivery = await prisma.notificationDelivery.create({
+        data: {
+          notificationId: activeNotificationId,
+          channel: NotificationChannel.TELEGRAM,
+          targetKey: 'active-retention-fixture',
+          locale: 'ru',
+          status: NotificationDeliveryStatus.RETRY_SCHEDULED,
+          maxAttempts: 5,
+          availableAt: new Date(Date.now() + 60 * 60 * 1000),
+          nextAttemptAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      })
+      const activeAttempt = await prisma.notificationDeliveryAttempt.create({
+        data: {
+          deliveryId: activeDelivery.id,
+          attemptNumber: 1,
+          leaseToken: 'lease-active-resolved',
+          startedAt: daysAgo(40),
+          finishedAt: daysAgo(40),
+          outcome: NotificationAttemptOutcome.TRANSIENT_FAILURE,
+          effectState: 'proven_none',
+        },
+      })
+
       const result = await retention.runRetention()
       expect(result.finishedAttempts).toBeGreaterThanOrEqual(1)
 
@@ -1037,6 +1061,9 @@ describe('Notifications (e2e)', () => {
       expect(ids).not.toContain(oldAttempt.id)
       // An in-flight attempt (finishedAt null) is never pruned by age.
       expect(ids).toContain(inFlightAttempt.id)
+      expect(
+        await prisma.notificationDeliveryAttempt.findUnique({ where: { id: activeAttempt.id } })
+      ).not.toBeNull()
     })
   })
 })

@@ -36,6 +36,13 @@ export async function configuration(m) {
     CORS_ORIGIN: Object.values(m.origins).join(','),
     TRUST_PROXY: m.topology === 'host' ? '1' : 'false',
   }
+  // AMCORE_CONSOLE_NOTIFICATION_ENV_START
+  if (m.fixtureProfile === 'notification-work')
+    Object.assign(app, {
+      TELEGRAM_BOT_TOKEN: '<fake-preview-token>',
+      TELEGRAM_API_BASE_URL: 'http://notification-provider:8099',
+    })
+  // AMCORE_CONSOLE_NOTIFICATION_ENV_END
   const environments = {
     postgres: { POSTGRES_USER: 'amcore', POSTGRES_DB: 'amcore', POSTGRES_PASSWORD: m.dbPassword },
     redis: {},
@@ -47,13 +54,24 @@ export async function configuration(m) {
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
       WEB_TRUSTED_ORIGINS: m.origins.product,
-      WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:') ? m.origins.product : '',
+      WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:')
+        ? m.origins.product
+        : '',
       // AMCORE_CONSOLE_WEB_ENV_START
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console ?? '',
       ADMIN_CONSOLE_ORIGIN: m.origins.console ?? '',
       // AMCORE_CONSOLE_WEB_ENV_END
     },
   }
+  // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_START
+  let fixtureService
+  if (m.fixtureProfile === 'notification-work') {
+    if (!m.consoleEnabled) throw new Error('Notification work preview requires Console')
+    const { notificationProviderService } = await import('./notification-work-provider.mjs')
+    fixtureService = notificationProviderService(m)
+    environments['notification-provider'] = {}
+  }
+  // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_END
   // AMCORE_CONSOLE_CADDY_ENV_START
   if (m.topology === 'host')
     environments.caddy = {
@@ -76,9 +94,20 @@ export async function configuration(m) {
     if (builtServices.includes(service))
       yaml += `    build:\n      labels:\n${labelLines(m, '        ')}`
     if (m.images?.[service]) yaml += `    image: ${m.images[service]}\n`
+    // AMCORE_CONSOLE_NOTIFICATION_SERVICE_START
+    if (service === 'notification-provider')
+      yaml += stringify({ services: { [service]: fixtureService } })
+        .replace(/^services:\n/, '')
+        .split('\n')
+        .slice(1)
+        .join('\n')
+    // AMCORE_CONSOLE_NOTIFICATION_SERVICE_END
     if (ports[service]) yaml += `    ports: ${overridden(ports[service])}\n`
   }
   const base = parse(await readFile(join(m.snapshot, 'docker-compose.yml'), 'utf8'))
+  // AMCORE_CONSOLE_NOTIFICATION_VOLUME_START
+  if (m.fixtureProfile === 'notification-work') base.volumes.notification_provider_data = {}
+  // AMCORE_CONSOLE_NOTIFICATION_VOLUME_END
   yaml += stringify({
     networks: { default: { labels: labels(m) } },
     volumes: Object.fromEntries(

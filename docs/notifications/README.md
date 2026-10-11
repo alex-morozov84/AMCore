@@ -5,7 +5,7 @@ AMCore ships a reusable, per-user notification subsystem on its own
 with mandatory channels, a transaction-aware **producer**, durable worker-driven
 **email** and **Telegram** channels, and a realtime **SSE** fan-out. External
 channels and realtime are purely additive over the producer/feed/preferences
-contract. See [versioning and replay](versioning.md) and [channel registration](channels.md).
+contract. See [delivery control](control.md), [versioning and replay](versioning.md) and [channel registration](channels.md).
 
 Endpoint shapes (paths, bodies, status codes) live in the Swagger/OpenAPI
 document at `/docs` in development — the source of truth. This guide covers the
@@ -361,7 +361,9 @@ completed Telegram link. None are demo-only.
 - **Retention never deletes active deliveries.** A daily worker-only sweep ages out
   old rows (defaults: archived 30d, read 90d, unread 180d, finished attempts and
   expired Telegram artifacts 30d) but never removes a notification with a
-  `PENDING` / `PROCESSING` / `RETRY_SCHEDULED` external delivery. The feed is
+  `PENDING` / `PROCESSING` / `RETRY_SCHEDULED` external delivery. Unknown effects,
+  legacy-unverified history and reserved manual grants also protect the parent.
+  Attempt pruning preserves compact certainty and grant-linked evidence. The feed is
   **not** an audit log — durable security events live in `AuditLog`.
 
 ## Realtime stream (SSE)

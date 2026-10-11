@@ -1,3 +1,4 @@
+import { notificationDeliveriesWork } from './core/notifications/control/notification-deliveries.work'
 import { notificationsWork } from './core/notifications/notifications.work'
 import { aiRunsWork } from './infrastructure/ai/runs/ai-runs.work'
 import { defineWork, type WorkRegistration } from './infrastructure/background-work/work-definition'
@@ -14,6 +15,15 @@ const defaultWork = defineWork({
 
 /** One application registration collection. Lazy loaders keep executable workers out of web. */
 export const BACKGROUND_WORK = [
+  {
+    definition: notificationDeliveriesWork,
+    core: async () =>
+      (await import('./core/notifications/control/notification-work.module'))
+        .NotificationWorkModule,
+    control: async () =>
+      (await import('./core/notifications/control/notification-work.module'))
+        .NotificationWorkModule,
+  },
   {
     definition: emailWork,
     core: async () => (await import('./infrastructure/email/email.module')).EmailModule,

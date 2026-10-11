@@ -9,7 +9,7 @@ import { snapshot } from './snapshot.mjs'
 import { allocate } from './ports.mjs'
 import { engine } from './docker.mjs'
 
-export async function create(id, purpose, topology, mocked = false) {
+export async function create(id, purpose, topology, mocked = false, fixtureProfile) {
   const choices = await projectChoices(root)
   topology ??= choices.topology
   const uuid = randomUUID()
@@ -41,6 +41,7 @@ export async function create(id, purpose, topology, mocked = false) {
     version: 1,
     ...choices,
     fixtureVersion: 2,
+    fixtureProfile,
     mocked,
     id,
     uuid,

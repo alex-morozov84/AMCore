@@ -65,3 +65,23 @@ describe('fixed registered-work reads', () => {
     expect(upstream).toHaveBeenCalledTimes(1)
   })
 })
+
+it('preserves one JSON filter string through the BFF and refuses repeated/nested parameters', async () => {
+  const encoded = new URLSearchParams({ filters: JSON.stringify({ channel: 'telegram' }) })
+  await handleConsoleWorkJobs(request(`?${encoded}`), 'notification-deliveries')
+  const url = new URL(upstream.mock.calls[0]![0])
+  expect(JSON.parse(url.searchParams.get('filters')!)).toEqual({ channel: 'telegram' })
+  expect(
+    (await handleConsoleWorkJobs(request(`?${encoded}&${encoded}`), 'notification-deliveries'))
+      .status
+  ).toBe(400)
+  expect(
+    (await handleConsoleWorkJobs(request('?filters[channel]=telegram'), 'notification-deliveries'))
+      .status
+  ).toBe(400)
+  expect(
+    (await handleConsoleWorkJobs(request('?filters=%22nested%22'), 'notification-deliveries'))
+      .status
+  ).toBe(400)
+  expect(upstream).toHaveBeenCalledTimes(1)
+})

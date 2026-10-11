@@ -8,12 +8,14 @@ import type {
   NotStarted,
   NotStartedReason,
 } from '../channels/channel-deliverer.types'
+import { NotificationControlTargets } from '../channels/notification-control-targets'
 import {
   NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS,
   NOTIFICATION_LEASE_TTL_MS,
 } from '../notification-dispatch.constants'
 
 import { cancelClaimedDelivery } from './notification-delivery-cancellation'
+import { markNotificationTransport } from './notification-effect-evidence'
 import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch'
 
 import { Prisma } from '@/generated/prisma/client'
@@ -56,7 +58,8 @@ function notStarted(reason: NotStartedReason): NotStarted {
 export class NotificationAttemptAdmission {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly latch: NotificationShutdownLatch
+    private readonly latch: NotificationShutdownLatch,
+    private readonly targets?: NotificationControlTargets
   ) {}
 
   create(
@@ -100,6 +103,16 @@ export class NotificationAttemptAdmission {
         Prisma.sql`SELECT set_config('lock_timeout', ${`${NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS}ms`}, true)`
       )
 
+      const metadata = await tx.notificationDelivery.findUnique({ where: { id: delivery.id } })
+      if (metadata?.grantAttemptNumber === delivery.attemptNumber) {
+        if (!this.targets) throw new Error('notification_control_targets_missing')
+        const refusal = await this.targets.validate(tx, metadata, context.notification)
+        if (refusal) {
+          const cancelled = await cancelClaimedDelivery(tx, delivery, 'manual_retry_target_changed')
+          return cancelled ? 'target_revoked' : 'lease_lost'
+        }
+      }
+
       // Lock order: connection (target) first …
       if (deliverer.checkTarget) {
         const refusal = await deliverer.checkTarget(tx, context)
@@ -129,7 +142,9 @@ export class NotificationAttemptAdmission {
           AND "leaseExpiresAt" > clock_timestamp()
         RETURNING id
       `)
-      return renewed.length === 1 ? 'admitted' : 'lease_expired'
+      if (renewed.length !== 1) return 'lease_expired'
+      await markNotificationTransport(tx, delivery.id, delivery.leaseToken)
+      return 'admitted'
     })
   }
 }

@@ -17,12 +17,21 @@ import { TelegramNotificationWebModule } from './channels/telegram/telegram-web.
 import { NOTIFICATION_DEFINITIONS } from './definitions'
 import { NotificationsCoreModule } from './notifications-core.module'
 
+import { canonicalJsonHash } from '@/common/utils/canonical-json'
 import { preparedEmailBodySchema } from '@/infrastructure/email/prepared-email'
 
 /** Application composition entry; neutral/core barrels do not import this inventory. */
 export const NOTIFICATION_CHANNELS: readonly NotificationChannelDescriptor[] = [
   {
     id: 'email',
+    manualRetry: {
+      validatorToken: EmailTargetResolver,
+      requestIdentity: (env, id) => ({
+        binding: `${env.get('EMAIL_PROVIDER')}:default:https://api.resend.com`,
+        path: '/emails',
+        idempotencyKey: `notification-delivery:${id}`,
+      }),
+    },
     targetMode: 'snapshot',
     core: { module: EmailTargetReaderModule, token: EmailTargetResolver },
     worker: (core) => EmailNotificationDeliveryModule.register(core),
@@ -37,6 +46,14 @@ export const NOTIFICATION_CHANNELS: readonly NotificationChannelDescriptor[] = [
   },
   {
     id: 'telegram',
+    manualRetry: {
+      validatorToken: TelegramTargetResolver,
+      requestIdentity: (env) => ({
+        binding: `telegram:TELEGRAM_BOT_TOKEN:${canonicalJsonHash(env.get('TELEGRAM_API_BASE_URL').replace(/\/+$/, ''))}`,
+        path: 'sendMessage',
+        idempotencyKey: null,
+      }),
+    },
     requestTargetsDelivery: (body, context) =>
       (body as { chat_id: string }).chat_id === context.delivery.targetKey,
     web: (core) => TelegramNotificationWebModule.register(core),

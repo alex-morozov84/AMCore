@@ -22,6 +22,7 @@ import { BackgroundControlAuthority } from './background-control-authority'
 import { BackgroundControlBudgets } from './background-control-budgets'
 import { backgroundControlError } from './background-control-error'
 
+import { BadRequestException } from '@/common/exceptions'
 import { ControlConnection } from '@/infrastructure/background-work/control-connection'
 import { backgroundControlTransaction } from '@/infrastructure/background-work/control-transaction'
 import type { DurableWorkReader } from '@/infrastructure/background-work/durable-work'
@@ -65,6 +66,11 @@ export class BackgroundWorkReader {
     const query = workListQuerySchema.parse(input)
     await this.admitRead(principal)
     const definition = this.definition(workId)
+    if (
+      Object.keys(query.filters ?? {}).length &&
+      (definition.kind !== 'durable' || query.source === 'PG_evidence')
+    )
+      throw new BadRequestException('Unsupported work filters')
     if (query.source === 'PG_evidence') return this.evidencePage(definition, query)
     if (definition.kind === 'durable') {
       const reader = this.modules.get<DurableWorkReader>(definition.tokens.reader, {
@@ -304,10 +310,13 @@ export class BackgroundWorkReader {
         where: { workId: definition.id },
         orderBy: [{ createdAt: 'asc' }, { incarnation: 'asc' }],
         take: 513,
-        select: { incarnation: true },
+        select: { incarnation: true, jobId: true },
       })
       const selected = window
         .slice(0, 512)
+        .filter(
+          (row) => !query.search || row.jobId.toLowerCase().includes(query.search.toLowerCase())
+        )
         .slice((query.page - 1) * query.limit, query.page * query.limit)
       const evidence = selected.length
         ? await ctx.tx.backgroundEffectEvidence.findMany({

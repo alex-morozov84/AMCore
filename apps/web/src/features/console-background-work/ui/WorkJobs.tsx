@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { type WorkJob, type WorkListQuery, workPageSchema, type WorkSummary } from '@amcore/shared'
 import { useQuery } from '@tanstack/react-query'
 
@@ -11,11 +11,14 @@ import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { DebouncedSearchField } from '@/shared/ui/debounced-search-field'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/ui/empty'
 import { FilterButtons } from '@/shared/ui/filter-buttons'
 import { PaginationButtons } from '@/shared/ui/pagination'
 import { Skeleton } from '@/shared/ui/skeleton'
 
+import { workLabel } from './work-label'
+import { WorkAttemptHistory } from './WorkAttemptHistory'
 import { WorkJobDetails } from './WorkJobDetails'
 import { WorkUnknownDisposition } from './WorkUnknownDisposition'
 
@@ -34,6 +37,8 @@ export function WorkJobs({
 }) {
   const t = useTranslations('console.backgroundWork.control')
   const errors = useTranslations('errors')
+  const locale = useLocale()
+  const [openHistory, setOpenHistory] = useState<string | null>(null)
   const instance = useId()
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
@@ -52,6 +57,11 @@ export function WorkJobs({
     ...(work.providerEvidence && work.status === 'unavailable' ? { source: 'PG_evidence' } : {}),
   })
   const [selected, setSelected] = useState<WorkJob[]>([])
+  const applySearch = (value: string) => {
+    setQuery({ ...query, search: value.trim() || undefined, page: 1 })
+    setSelected([])
+    setOpenHistory(null)
+  }
   const page = useQuery({
     queryKey: ['console', 'background-work', 'jobs', work.id, query, instance],
     gcTime: 0,
@@ -84,6 +94,18 @@ export function WorkJobs({
             {t('jobsTitle', { work: work.id })}
           </h3>
         </div>
+        <DebouncedSearchField
+          identity={JSON.stringify([work.id, query.state, query.source, query.filters])}
+          search={query.search ?? ''}
+          page={query.page}
+          onCommit={applySearch}
+          id={`${instance}-search`}
+          label={t('searchLabel')}
+          placeholder={t('searchLabel')}
+          clearLabel={t('searchClear')}
+          maxLength={128}
+        />
+        <p className="text-xs text-muted-foreground">{t('searchHelp')}</p>
         {work.providerEvidence && (
           <FilterButtons
             label={t('evidenceMeaning')}
@@ -95,6 +117,7 @@ export function WorkJobs({
             onChange={(source) => {
               setQuery({ ...query, source, page: 1 })
               setSelected([])
+              setOpenHistory(null)
             }}
           />
         )}
@@ -106,9 +129,32 @@ export function WorkJobs({
             onChange={(state) => {
               setQuery({ ...query, state, page: 1 })
               setSelected([])
+              setOpenHistory(null)
             }}
           />
         )}
+        {work.presentation?.filters?.map((filter) => (
+          <FilterButtons
+            key={filter.key}
+            label={workLabel(filter.label, locale, filter.key)}
+            value={query.filters?.[filter.key] ?? ''}
+            options={[
+              { value: '', label: t('allFilter') },
+              ...filter.options.map((option) => ({
+                value: option.value,
+                label: workLabel(option.label, locale, option.value),
+              })),
+            ]}
+            onChange={(value) => {
+              const filters = { ...query.filters }
+              if (value) filters[filter.key] = value
+              else delete filters[filter.key]
+              setQuery({ ...query, filters, page: 1 })
+              setSelected([])
+              setOpenHistory(null)
+            }}
+          />
+        ))}
         {query.source === 'PG_evidence' && (
           <p className="text-sm text-muted-foreground">{t('evidenceMeaning')}</p>
         )}
@@ -171,6 +217,14 @@ export function WorkJobs({
                 work={work}
                 showState={query.source === 'PG_evidence' || row.state !== query.state}
               />
+              {work.presentation?.attemptHistory && (
+                <WorkAttemptHistory
+                  workId={work.id}
+                  row={row}
+                  open={openHistory === row.identity.id}
+                  onOpenChange={(open) => setOpenHistory(open ? row.identity.id : null)}
+                />
+              )}
               {row.reconciliation?.allowed && (
                 <WorkUnknownDisposition
                   subject={{
@@ -235,6 +289,7 @@ export function WorkJobs({
           onPageChange={(page) => {
             setQuery({ ...query, page })
             setSelected([])
+            setOpenHistory(null)
           }}
         />
       </CardContent>

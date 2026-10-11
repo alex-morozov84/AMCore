@@ -282,10 +282,16 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
           claim,
           result.errorCode,
           durationMs,
-          result.retryAfterMs
+          result.retryAfterMs,
+          result.effectCertainty
         )
       case 'permanent':
-        return this.repository.finalizePermanent(claim, result.errorCode, durationMs)
+        return this.repository.finalizePermanent(
+          claim,
+          result.errorCode,
+          durationMs,
+          result.effectCertainty
+        )
     }
   }
 

@@ -98,19 +98,27 @@ export class ImportWorkAdapter implements DurableWorkReader, DurableWorkControl 
 
   async list(query: WorkListQuery): Promise<WorkPage> {
     const offset = (query.page - 1) * query.limit
-    const remaining = Math.min(query.limit, 512 - offset)
-    const rows = await this.db.$queryRaw<(ImportRow & { window_truncated: boolean })[]>`
+    const remaining = Math.max(0, Math.min(query.limit, 512 - offset))
+    const observed = await this.db.$queryRaw<
+      ((ImportRow | { id: null }) & { window_truncated: boolean })[]
+    >`
       WITH first_window AS MATERIALIZED (
         SELECT * FROM core.fixture_imports WHERE state = ${query.state}
         ORDER BY id LIMIT 513
+      ), visible AS (SELECT * FROM first_window ORDER BY id LIMIT 512), paged AS (
+        SELECT * FROM visible WHERE strpos(lower(id), lower(${query.search ?? ''})) > 0
+        ORDER BY id LIMIT ${remaining} OFFSET ${offset}
       )
-      SELECT *, (SELECT count(*) > 512 FROM first_window) AS window_truncated
-      FROM first_window ORDER BY id LIMIT ${remaining + 1} OFFSET ${offset}`
+      SELECT paged.*, witness.window_truncated
+      FROM (SELECT count(*) > 512 AS window_truncated FROM first_window) witness
+      LEFT JOIN paged ON true ORDER BY paged.id`
     return {
       workId: importWork.id,
       sampledAt: new Date().toISOString(),
-      rows: rows.slice(0, remaining).map((row) => this.project(rowSchema.parse(row))),
-      windowTruncated: rows[0]?.window_truncated ?? false,
+      rows: observed
+        .filter((row) => row.id !== null)
+        .map((row) => this.project(rowSchema.parse(row))),
+      windowTruncated: observed[0]?.window_truncated ?? false,
     }
   }
 

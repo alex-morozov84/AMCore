@@ -6,7 +6,7 @@ import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.cons
 export const notificationsWork = defineWork({
   id: 'notifications',
   presentation: {
-    name: { en: 'Notifications', ru: 'Уведомления' },
+    name: { en: 'Notification processing signals', ru: 'Сигналы обработки уведомлений' },
     fields: { notificationId: { en: 'Notification ID', ru: 'Идентификатор уведомления' } },
   },
   definitionVersion: 1,
