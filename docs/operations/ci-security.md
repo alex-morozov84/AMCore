@@ -42,9 +42,9 @@ of workflow self-hardening to keep the example forkable.
 - **Test** prepares its own API E2E receipt before the focused launcher. It runs API process-role/shutdown-drain E2E and the four focused AI
   suites: gateway consistency, catalogue degradation, provider receipt settlement
   and maintenance upgrade. They use isolated PG18/Redis Testcontainers and injected
-  SDK HTTP fixtures. The broader durable AI regression inventory remains a local
-  delivery gate; these focused suites do not claim full API E2E coverage.
-- **API E2E** adds diagnostic full standard coverage in separate plan, shard and
+  SDK HTTP fixtures. The broader standard API inventory runs in **API E2E**;
+  these focused suites do not claim full API E2E coverage.
+- **API E2E** provides full standard PR coverage in separate plan, shard and
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
   generates Prisma and builds shared. The measured layout uses three built-in shards
   and pnpm dependency caching.
@@ -54,8 +54,10 @@ of workflow self-hardening to keep the example forkable.
   skipped or forced attempts fail. Artifact names include the workflow attempt;
   the aggregate downloads only that attempt and rejects unexpected artifact directories.
   Reports remain available for seven days.
-  This declaration does not enable live branch protection. The six existing focused
-  suites remain in **Test** until measured full required coverage replaces them.
+  The tracked main ruleset requires the stable **API E2E** aggregate from GitHub
+  Actions. Individual shard contexts are not required. Applying the declaration
+  to live GitHub protection remains a separate owner-authorized repository action.
+  The six existing focused suites remain in **Test** as additional coverage.
   Background-work contracts add 17 original-checkout paths; extension contracts
   add eight disjoint paths in a disposable copy. Their union with those six is
   31 named paths, rather than the full standard inventory.
@@ -71,8 +73,9 @@ of workflow self-hardening to keep the example forkable.
   cgroup snapshots do not represent individual container peaks. Ordinary pnpm caching
   is enabled for the final warm candidate; an eligible warm observation requires
   actual cache hits in the plan and every shard. Each job still uses fresh isolated Docker. Measurement snapshots accompany the reports.
-  Built-in two/three shards require evidence before selection. Full PR coverage is
-  preferred; full post-merge coverage requires a separate owner policy decision.
+  Changes to shard selection require evidence. Full API coverage is declared
+  mandatory for PRs; switching to full post-merge coverage requires a separate
+  owner policy decision.
 - **Test** also runs `pnpm test:capability-extension`: an isolated disposable
   resource variant compiles shared, API and web consumers and exercises
   authorization against PostgreSQL and Redis Testcontainers. The fixture does
