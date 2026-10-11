@@ -46,7 +46,8 @@ of workflow self-hardening to keep the example forkable.
   delivery gate; these focused suites do not claim full API E2E coverage.
 - **API E2E** adds diagnostic full standard coverage in separate plan, shard and
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
-  generates Prisma and builds shared. The initial layout uses one serial shard.
+  generates Prisma and builds shared. Layout measurements start with a serial shard;
+  the measurement candidate compares two built-in shards.
   The aggregate requires successful dependencies and exact-once inventory evidence
   for the same checkout SHA, inputs and current GitHub run/attempt. It normalizes
   actual suite paths across fresh workspace roots and binds them to assignments. Missing, cancelled,
@@ -59,6 +60,11 @@ of workflow self-hardening to keep the example forkable.
   Admission requires Linux cold and cached setup evidence, measured runner-minutes
   and final candidate verification. The proposed workflow ceiling is 17 minutes;
   the API target is 12 minutes. The 30-minute measurement timeout is headroom.
+  Initial measurement jobs use isolated cold pnpm stores without cache restoration.
+  Runner snapshots record CPU/RAM, cache status, package/Docker versions, image IDs
+  and available runner cgroup metrics. Unavailable metrics remain unknown; runner
+  cgroup snapshots do not represent individual container peaks. Ordinary pnpm caching
+  returns for cached setup comparisons. Measurement snapshots accompany the reports.
   Built-in two/three shards require evidence before selection. Full PR coverage is
   preferred; full post-merge coverage requires a separate owner policy decision.
 - **Test** also runs `pnpm test:capability-extension`: an isolated disposable
