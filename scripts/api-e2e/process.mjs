@@ -7,7 +7,20 @@ export function readRows(path, live = false) {
   if (!live && text && !text.endsWith('\n')) throw new Error('Truncated incremental report')
   const lines = text.split('\n')
   if (live && !text.endsWith('\n')) lines.pop()
-  return lines.filter(Boolean).map((line) => JSON.parse(line))
+  return lines.filter(Boolean).map((line) => {
+    const row = JSON.parse(line)
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      Array.isArray(row) ||
+      typeof row.event !== 'string' ||
+      !/^(run-start|suite-start|suite-end|terminal|cleanup-start|cleanup-phase|cleanup-failure|cleanup-failed|cleanup-end)$/.test(
+        row.event
+      )
+    )
+      throw new Error('Invalid incremental report record')
+    return row
+  })
 }
 
 /** One execution spawn; failure latches before termination and cannot be replaced by late PASS. */
@@ -64,18 +77,18 @@ export async function supervise(command, args, options) {
         let rows = []
         try {
           rows = readRows(options.progress, true)
+          if (rows.some((row) => row.event === 'terminal')) terminalAt ??= now
+          const index = rows.findLastIndex((row) => row.event === 'cleanup-start')
+          if (index > cleanupIndex) {
+            cleanupIndex = index
+            cleanupAt = now
+          }
+          if (rows.some((row) => /cleanup-fail/.test(row.event))) result.lifecycleFailure = true
         } catch (error) {
           result.lifecycleFailure = true
           result.diagnostic ??= error.message
           force()
         }
-        if (rows.some((row) => row.event === 'terminal')) terminalAt ??= now
-        const index = rows.findLastIndex((row) => row.event === 'cleanup-start')
-        if (index > cleanupIndex) {
-          cleanupIndex = index
-          cleanupAt = now
-        }
-        if (rows.some((row) => /cleanup-fail/.test(row.event))) result.lifecycleFailure = true
         if (
           now - began > (options.wallMilliseconds ?? 240_000) ||
           (terminalAt && now - terminalAt > (options.exitMilliseconds ?? 5000)) ||
