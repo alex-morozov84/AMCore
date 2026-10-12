@@ -31,12 +31,10 @@ import { cleanupFailedE2ESetup, prepareE2EAuthEnvironment } from './e2e-setup'
 import { closeE2EWorkers } from './e2e-workers'
 
 /**
- * No-op PinoLogger stub for e2e. With the EmailModule and InviteService
- * dependencies in the Nest DI graph, the real
- * `nestjs-pino` provider makes `Test.createTestingModule(...).compile()` hang
- * indefinitely under Jest + ts-jest ESM — InstanceLoader stops mid-bootstrap
- * with no thrown error. Overriding only the logger sidesteps it. This is a
- * test-harness workaround; production logging is unchanged.
+ * Suite-local PinoLogger stub for E2E. The original Jest ESM harness stalled
+ * during TestingModule compilation with the real logger and email/invite graph.
+ * Retain the stub while changing the test compiler; logger integration is a
+ * separate behavior. Production logging is unchanged.
  */
 export const noopPinoLogger = {
   setContext: () => undefined,

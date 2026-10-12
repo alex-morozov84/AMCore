@@ -1,25 +1,11 @@
 module.exports = {
-  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   setupFiles: ['<rootDir>/test/setup-nest-loader.cjs'],
   rootDir: '.',
   testMatch: ['**/test/**/*.e2e-spec.ts'],
   moduleFileExtensions: ['js', 'json', 'ts', 'tsx'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
-  transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: {
-          module: 'ES2022',
-          moduleResolution: 'node',
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-        },
-      },
-    ],
-  },
+  transform: { '^.+\\.tsx?$': ['@swc/jest', require('./jest-swc.config.cjs')(true)] },
   transformIgnorePatterns: ['node_modules/(?!(@formatjs|openid-client|oauth4webapi|jose)/)'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

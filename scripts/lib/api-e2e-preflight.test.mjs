@@ -33,6 +33,7 @@ test('fresh-job receipt refuses missing, stale and changed generated outputs bef
       'pnpm-lock.yaml',
       'apps/api/package.json',
       'apps/api/jest-e2e.config.js',
+      'apps/api/jest-swc.config.cjs',
       'apps/api/prisma.config.ts',
       'apps/api/tsconfig.json',
       'packages/shared/package.json',
@@ -53,6 +54,15 @@ test('fresh-job receipt refuses missing, stale and changed generated outputs bef
     const receipt = join(directory, '.amcore/api-e2e-prepared.json')
     assert.throws(preflight, /--prepare/)
     writeFileSync(receipt, JSON.stringify({ hash: inputHash(), outputs: outputHash() }))
+    preflight()
+    const swcPath = join(directory, 'apps/api/jest-swc.config.cjs')
+    const swcOriginal = readFileSync(swcPath)
+    writeFileSync(
+      swcPath,
+      Buffer.concat([swcOriginal, Buffer.from('\n// changed compiler setting')])
+    )
+    assert.throws(preflight, /--prepare/)
+    writeFileSync(swcPath, swcOriginal)
     preflight()
     writeFileSync(join(directory, 'packages/shared/dist/index.js'), 'changed')
     assert.throws(preflight, /--prepare/)

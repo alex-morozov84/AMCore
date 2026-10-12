@@ -372,7 +372,8 @@ Use existing API fixtures and managed cleanup. Test observable state or a contro
 clock boundary, not assumptions about simultaneous HTTP arrivals; see
 [backend test guidance](docs/backend/architecture-and-conventions.md#tests).
 
-API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for
+API: Jest + SWC (unit) + Jest/SWC/Testcontainers (e2e); independent `typecheck`
+checks test types. Email retains its own Vitest config. Shared: Vitest for
 `packages/shared`'s own schema/lib unit tests (`pnpm --filter shared test`,
 included in the default `pnpm test`). Web: Vitest for unit/component
 tests, `msw/node` for selected same-origin `/api/*` integration tests,

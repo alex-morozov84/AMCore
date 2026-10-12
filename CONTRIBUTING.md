@@ -96,6 +96,10 @@ examples in [Project scaffolding](docs/frontend/brand-theme-and-tokens.md#option
 | `pnpm test:capability-extension`                                     | Disposable downstream resource compilation and PostgreSQL authorization proof |
 | `pnpm --filter api test:email`                                       | Email template integration tests (Vitest)                                     |
 
+API unit and E2E tests use `@swc/jest` with shared decorator/source-map settings.
+Run `pnpm --filter api typecheck` separately; SWC does not check types.
+Email retains Vitest. `test:watch` and `test:cov` apply to API unit tests.
+
 API E2E tests provision their own Postgres/Redis and test JWT secret; no local
 `.env` preparation is required. See [API Testcontainers](docs/operations/local-stands.md#api-testcontainers).
 

@@ -35,6 +35,7 @@ yarn-error.log*
 
 # Testing
 coverage/
+coverage-email/
 .nyc_output/
 
 # Generated files

@@ -32,7 +32,7 @@ pnpm --filter api dev
 pnpm --filter api test
 pnpm --filter api test -- src/path/to.spec.ts
 pnpm --filter api test:e2e
-pnpm --filter api test:e2e -- oauth.e2e-spec.ts
+pnpm --filter api test:e2e --runTestsByPath test/oauth.e2e-spec.ts
 pnpm --filter api test:email
 pnpm --filter api lint
 pnpm --filter api typecheck
@@ -44,6 +44,23 @@ migrate dev`). Production uses `db:migrate:prod` / `prisma migrate deploy` from
 the CLI-capable migrator image as a one-shot step before the slim app image
 rollout. See
 [`docs/operations/deployment.md`](../../docs/operations/deployment.md).
+
+## Test compiler and type checking
+
+API unit tests use Jest with SWC CommonJS transformation. API E2E uses Jest
+with SWC ESM transformation in a fresh supervised process per suite.
+`jest-swc.config.cjs` shares decorator metadata, target and source-map settings.
+Run `pnpm --filter api typecheck` separately: SWC does not check types.
+
+Email template tests retain Vitest, happy-dom and `vitest.config.ts`.
+`test:email:watch`, `test:email:ui` and `test:email:cov` remain separate commands.
+API coverage uses `test:cov` and writes text/lcov/html to `coverage`;
+email coverage writes to `coverage-email`. No API coverage threshold is configured.
+Watch API unit tests with `pnpm --filter api test:watch`.
+
+The managed E2E launcher rejects forced exits, signals, retries and incomplete
+reports. A passed assertion does not excuse an unclosed timer or connection.
+See [API Testcontainers](../../docs/operations/local-stands.md#api-testcontainers).
 
 ## Source Map
 

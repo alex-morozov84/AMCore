@@ -27,6 +27,7 @@ export function inputHash() {
     resolve(api, 'tsconfig.json'),
     resolve(api, 'package.json'),
     resolve(api, 'jest-e2e.config.js'),
+    resolve(api, 'jest-swc.config.cjs'),
     ...files(resolve(api, 'prisma')),
     ...files(resolve(root, 'packages/shared/src')),
   ]

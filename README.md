@@ -204,11 +204,12 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | Deployment platforms                                         | [`docs/operations/deployment-platforms.md`](docs/operations/deployment-platforms.md) — decision matrix (not recipes): how AMCore's api/worker/Redis/Postgres/SSE map onto Kubernetes, Cloud Run, Fly, Render, Railway, and (web-only) Vercel                                                                                                                                                                                                                                                                                                                     |
 | API surface                                                  | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
-Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
-Vitest for `packages/shared`'s own schema/lib contract tests, React Email
-template rendering, and frontend unit/integration tests, Storybook for
-isolated component-state/interaction/a11y checks, Playwright for frontend
-browser flows, and `@axe-core/playwright` for automated accessibility scans.
+Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
+Type checking runs separately; SWC only transforms code.
+Vitest runs `packages/shared`'s own schema/lib contract tests, React Email
+template rendering, and frontend unit/integration tests. Storybook covers
+isolated component-state/interaction/a11y checks. Playwright runs frontend
+browser flows, with `@axe-core/playwright` for automated accessibility scans.
 See [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md#2-contract-shared-zod)
 for where a shared schema's own test belongs, and
 [`docs/frontend/testing.md`](docs/frontend/testing.md) for the frontend test

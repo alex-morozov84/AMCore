@@ -457,7 +457,7 @@ Cover the critical paths and the project-specific gates:
 - **Unit** — service logic in isolation.
 - **Shared contract** (Vitest, `packages/shared`) — a new or changed Zod
   schema's own validation-boundary test lives beside it, per step 2 above.
-- **E2E** (Jest + Testcontainers, needs Docker) — the HTTP contract end to end.
+- **E2E** (Jest + SWC + Testcontainers, needs Docker) — the HTTP contract end to end.
 - **OpenAPI inventory** — a new public handler **must** be added to the expected
   inventory in [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts).
   The check runs both ways: a handler that ships without a typed `@SchemaResponse` (or
@@ -521,3 +521,11 @@ requires explicit lifecycle, physical-completion and process-role proof. Shutdow
 closes starts before barriers, reserves 2 s for private-client disconnect within the
 20 s aggregate cap, then tears down the main client/pool. A wait cap is not evidence
 that a database operation ended; process supervision owns ultimate cleanup.
+
+### Test transformation and type checking
+
+API unit and E2E suites use `@swc/jest`. Shared settings preserve Nest legacy
+decorators, constructor metadata and source maps. Unit output is CommonJS;
+E2E output is ESM. Production build configuration is independent.
+SWC does not check types: run `pnpm --filter api typecheck` for source and tests.
+Email template integration tests retain Vitest and happy-dom.

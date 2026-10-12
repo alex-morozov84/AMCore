@@ -60,7 +60,7 @@ selection and inventory proof. These commands never reuse owner preview data.
 
 ### API Testcontainers
 
-Backend Jest E2E uses `pnpm --filter api test:e2e`; scope it with
+Backend Jest + SWC E2E uses `pnpm --filter api test:e2e`; scope it with
 `--runTestsByPath test/<name>.e2e-spec.ts`. This is a separate lane from managed
 browser stands. Its shared helper starts fresh Postgres/Redis Testcontainers,
 sets their application/migration URLs and supplies a suite-local random JWT
@@ -73,6 +73,10 @@ Prepare a fresh checkout with `pnpm install --frozen-lockfile`, then
 `node scripts/api-e2e-ci.mjs --prepare`. Preparation generates Prisma and builds
 shared; execution checks the preparation receipt before discovery or Docker.
 `node scripts/api-e2e-ci.mjs --all` runs the standard inventory sequentially.
+SWC transforms E2E TypeScript to ESM and preserves decorator metadata.
+Run API `typecheck` separately. The preparation receipt hashes the shared SWC
+config, so a compiler-setting change requires a new `--prepare`.
+
 `--shard=i/n` uses Jest's built-in partition, with at most three shards.
 Each suite gets one fresh in-band Node process and a 1 GiB V8 heap limit.
 No pool replays or automatic suite retries are allowed. Missing assertion metadata,
