@@ -53,6 +53,7 @@ node -e '
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/tsc --noEmit)
 (cd "$fixture_root/apps/web" && ./node_modules/.bin/tsc --noEmit)
 (cd "$fixture_root/apps/api" && \
+  NODE_OPTIONS=--experimental-vm-modules \
   ./node_modules/.bin/jest --config jest.config.js --runInBand \
   --runTestsByPath src/core/organizations/capability-policy-parity.spec.ts --silent)
 (cd "$fixture_root/apps/api" && \
