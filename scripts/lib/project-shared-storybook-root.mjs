@@ -18,21 +18,23 @@ const STRUCTURE_AFTER = `> flags. \`init:project\` records project choices: stru
 > non-structural route-progress default. Console hostnames remain deployment
 > configuration (\`ADMIN_CONSOLE_HOSTNAME\`), not a slug. Still set by hand: where the
 `
-const TOOLING_BEFORE = `Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
-Vitest for \`packages/shared\`'s own schema/lib contract tests, React Email
-template rendering, and frontend unit/integration tests, Storybook for
-isolated component-state/interaction/a11y checks, Playwright for frontend
-browser flows, and \`@axe-core/playwright\` for automated accessibility scans.
+const TOOLING_BEFORE = `Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
+Type checking runs separately; SWC only transforms code.
+Vitest runs \`packages/shared\`'s own schema/lib contract tests, React Email
+template rendering, and frontend unit/integration tests. Storybook covers
+isolated component-state/interaction/a11y checks. Playwright runs frontend
+browser flows, with \`@axe-core/playwright\` for automated accessibility scans.
 See [\`docs/backend/architecture-and-conventions.md\`](docs/backend/architecture-and-conventions.md#2-contract-shared-zod)
 for where a shared schema's own test belongs, and
 [\`docs/frontend/testing.md\`](docs/frontend/testing.md) for the frontend test
 taxonomy and command choices.
 `
-const TOOLING_AFTER = `Tests use Jest for backend unit tests, Jest + Testcontainers for API E2E suites,
-Vitest for \`packages/shared\`'s own schema/lib contract tests, React Email
-template rendering, and frontend unit/integration tests, Playwright for
-frontend browser flows, and \`@axe-core/playwright\` for automated accessibility
-scans. See [\`docs/backend/architecture-and-conventions.md\`](docs/backend/architecture-and-conventions.md#2-contract-shared-zod)
+const TOOLING_AFTER = `Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
+Type checking runs separately; SWC only transforms code.
+Vitest runs \`packages/shared\`'s own schema/lib contract tests, React Email
+template rendering, and frontend unit/integration tests. Playwright runs frontend
+browser flows, with \`@axe-core/playwright\` for automated accessibility scans.
+See [\`docs/backend/architecture-and-conventions.md\`](docs/backend/architecture-and-conventions.md#2-contract-shared-zod)
 for where a shared schema's own test belongs, and
 [\`docs/frontend/testing.md\`](docs/frontend/testing.md) for the frontend test
 taxonomy and command choices.
