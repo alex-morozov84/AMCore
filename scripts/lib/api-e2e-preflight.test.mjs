@@ -38,7 +38,7 @@ test('fresh-job receipt refuses missing, stale and changed generated outputs bef
       'apps/api/tsconfig.json',
       'packages/shared/package.json',
       'packages/shared/tsconfig.json',
-      'packages/shared/tsup.config.ts',
+      'packages/shared/tsdown.config.ts',
     ])
       cpSync(join(root, name), join(directory, name))
     symlinkSync(join(root, 'node_modules'), join(directory, 'node_modules'))
@@ -54,6 +54,12 @@ test('fresh-job receipt refuses missing, stale and changed generated outputs bef
     const receipt = join(directory, '.amcore/api-e2e-prepared.json')
     assert.throws(preflight, /--prepare/)
     writeFileSync(receipt, JSON.stringify({ hash: inputHash(), outputs: outputHash() }))
+    preflight()
+    const builderPath = join(directory, 'packages/shared/tsdown.config.ts')
+    const builderOriginal = readFileSync(builderPath)
+    writeFileSync(builderPath, Buffer.concat([builderOriginal, Buffer.from('\n// changed target')]))
+    assert.throws(preflight, /--prepare/)
+    writeFileSync(builderPath, builderOriginal)
     preflight()
     const swcPath = join(directory, 'apps/api/jest-swc.config.cjs')
     const swcOriginal = readFileSync(swcPath)

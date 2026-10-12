@@ -146,6 +146,10 @@ job does this explicitly; turbo does it automatically for `pnpm test`,
 `pnpm lint`, and `pnpm typecheck`. Managed Playwright commands prepare their own
 isolated runtime; see [local stands](docs/operations/local-stands.md).
 
+Shared builder changes must preserve the [distribution contract](docs/backend/shared-package-build.md).
+`pnpm test:scripts:fast` checks package build/dev commands, strict dist-only consumers,
+removed modules, source maps and build failures in disposable copies.
+
 ## Commit Messages
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) and commitlint.

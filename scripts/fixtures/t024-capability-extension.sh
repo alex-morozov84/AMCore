@@ -48,7 +48,7 @@ node -e '
   }
 ' "$fixture_root"
 
-(cd "$fixture_root/packages/shared" && ./node_modules/.bin/tsup)
+(cd "$fixture_root/packages/shared" && pnpm run build)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/prisma generate)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/tsc --noEmit)
 (cd "$fixture_root/apps/web" && ./node_modules/.bin/tsc --noEmit)

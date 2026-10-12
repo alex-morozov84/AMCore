@@ -1,0 +1,34 @@
+import { z } from 'zod';
+import {registerSchema,paginationQuerySchema,paginatedResponseSchema,type CapabilityDescriptor,type TelegramConnectionResponse} from '@amcore/shared';
+type IsAny<T> = 0 extends (1 & T) ? true : false;
+type Assert<T extends true> = T;
+type Name = z.output<typeof registerSchema>['name'];
+type Equal<A, B> = IsAny<A> extends true ? false :
+  (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2)
+    ? ((<T>() => T extends B ? 1 : 2) extends (<T>() => T extends A ? 1 : 2) ? true : false)
+    : false;
+type NameExact = Assert<Equal<Name, string | undefined>>;
+type InputNameExact = Assert<Equal<z.input<typeof registerSchema>['name'], string | undefined>>;
+const nameString: Name = 'Alice';
+const nameUndefined: Name = undefined;
+const inputUndefined: z.input<typeof registerSchema> = {email:'a@b.com',password:'Password1',name:undefined};
+const inputString: z.input<typeof registerSchema> = {email:'a@b.com',password:'Password1',name:'Alice'};
+const input: z.input<typeof registerSchema> = {email:'a@b.com',password:'Password1',name:''};
+// @ts-expect-error numeric name rejected
+const invalid: z.input<typeof registerSchema> = {email:'a@b.com',password:'Password1',name:12};
+const coerce: z.input<typeof paginationQuerySchema> = {page:'2'};
+const output: z.output<typeof paginationQuerySchema> = {page:2,limit:10};
+// @ts-expect-error output coercion yields numbers
+const wrong: z.output<typeof paginationQuerySchema> = {page:'2',limit:10};
+const page = paginatedResponseSchema(z.object({id:z.string()}));
+const id: string = page.parse({data:[{id:'x'}],total:1,page:1,limit:10}).data[0]!.id;
+// @ts-expect-error generic item preserves id string
+const idWrong: number = page.parse({data:[],total:0,page:1,limit:10}).data[0]!.id;
+declare const connection: TelegramConnectionResponse;
+if (connection.connected) { const linked: string = connection.linkedAt; }
+else { const absent: null = connection.linkedAt; }
+// @ts-expect-error discriminant rejects linked data on disconnected branch
+const badConnection: TelegramConnectionResponse = {connected:false,status:null,linkedAt:'x'};
+const path: CapabilityDescriptor['path'] = '/x';
+// @ts-expect-error capability path requires leading slash
+const badPath: CapabilityDescriptor['path'] = 'x';

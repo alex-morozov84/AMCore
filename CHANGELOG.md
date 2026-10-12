@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shared packages build with tsdown instead of tsup. Preserve dual ESM/CommonJS
+  output and TypeScript 5.9 declarations; verify built-package contracts and watch mode.
+
 - API unit and E2E tests use SWC instead of ts-jest. Type checking remains
   separate, and email template tests retain Vitest.
 

@@ -25,7 +25,7 @@ for package in apps/api apps/web packages/shared; do
   rsync -a "$source_root/$package/node_modules/" "$fixture_root/$package/node_modules/"
 done
 
-(cd "$fixture_root/packages/shared" && ./node_modules/.bin/tsup)
+(cd "$fixture_root/packages/shared" && pnpm run build)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/prisma generate)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/tsc --noEmit)
 (cd "$fixture_root/apps/api" && \
