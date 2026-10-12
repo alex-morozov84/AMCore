@@ -1,5 +1,7 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { adminOrganizationListQuerySchema } from '@amcore/shared'
 
-export class AdminOrganizationListQueryDto extends createZodDto(adminOrganizationListQuerySchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class AdminOrganizationListQueryDto extends createSchemaDto(
+  adminOrganizationListQuerySchema
+) {}

@@ -1,6 +1,5 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Post } from '@nestjs/common'
 import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -8,6 +7,7 @@ import {
   type TelegramLinkResponse,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../../../common/schemas/schema-response'
 import { Auth } from '../../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator'
 
@@ -28,14 +28,14 @@ export class TelegramController {
 
   @Post('link')
   @ApiOperation({ summary: 'Issue a one-time Telegram deep-link' })
-  @ZodResponse({ type: TelegramLinkResponseDto, status: 201, description: 'Deep-link issued' })
+  @SchemaResponse({ type: TelegramLinkResponseDto, status: 201, description: 'Deep-link issued' })
   issueLink(@CurrentUser('sub') userId: string): Promise<TelegramLinkResponse> {
     return this.linkService.issueLink(userId)
   }
 
   @Get('connection')
   @ApiOperation({ summary: 'Current Telegram connection status' })
-  @ZodResponse({
+  @SchemaResponse({
     type: TelegramConnectionResponseDto,
     status: 200,
     description: 'Connection status',

@@ -237,7 +237,7 @@ index 0000000..4c08cba
 +import { subject } from '@casl/ability'
 +import { BadRequestException, Body, Controller, Get, Param, Patch } from '@nestjs/common'
 +import { ApiBearerAuth, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger'
-+import { createZodDto } from 'nestjs-zod'
++import { createSchemaDto } from '../../common/schemas/schema-dto'
 +
 +import {
 +  Action, AuthType, type FixtureOrderUpdate, fixtureOrderUpdateSchema,
@@ -256,7 +256,7 @@ index 0000000..4c08cba
 +
 +import type { FixtureOrder, Prisma } from '@/generated/prisma/client'
 +
-+class FixtureOrderUpdateDto extends createZodDto(fixtureOrderUpdateSchema) {}
++class FixtureOrderUpdateDto extends createSchemaDto(fixtureOrderUpdateSchema) {}
 +const MAX_SCAN = 200
 +const PAGE_SIZE = 20
 +
@@ -307,7 +307,7 @@ index 0000000..4c08cba
 +    legacyPlatformMembershipBypass: true })
 +  @ApiOperation({ summary: 'Update authorized fixture order fields' })
 +  async update(@Param('orgId') orgId: string, @Param('id') id: string,
-+    @Body() input: FixtureOrderUpdateDto, @CurrentAbility() ability: AppAbility) {
++    @Body({ schema: FixtureOrderUpdateDto.schema }) input: FixtureOrderUpdateDto, @CurrentAbility() ability: AppAbility) {
 +    return this.prisma.$transaction(async (tx) => {
 +      await tx.$queryRaw`SELECT id FROM core.fixture_orders WHERE id = ${id} AND "organizationId" = ${orgId} FOR UPDATE`
 +      const before = await tx.fixtureOrder.findUnique({ where: { id } })

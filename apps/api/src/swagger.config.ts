@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
-import { cleanupOpenApiDoc } from 'nestjs-zod'
 
+import { schemaOpenApiConverter } from './common/schemas/schema-openapi'
 import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mount-state'
 
 /** The one global prefix of the API (`main.ts` applies it; the OpenAPI paths carry it). */
@@ -15,8 +15,7 @@ export const API_GLOBAL_PREFIX = 'api/v1'
  * `apiKeyBearer` documents AMCore API keys as a **second named bearer
  * scheme**, not a separate `x-api-key` header: `ApiKeyGuard.parseApiKey()`
  * only reads `Authorization: Bearer amcore_live_<id>_<secret>` — there is no
- * `x-api-key` transport in this runtime. See `ai/models-talk.md` (Swagger/
- * OpenAPI completeness plan) for the design rationale.
+ * `x-api-key` transport in this runtime. The two named schemes preserve the distinct admission contracts in the public document.
  */
 export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
   return new DocumentBuilder()
@@ -94,6 +93,8 @@ export function addQueueBoardOperation(
  * e2e harness).
  */
 export function buildApiDocument(app: INestApplication, pathPrefix: string): OpenAPIObject {
-  const document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, buildSwaggerConfig()))
+  const document = SwaggerModule.createDocument(app, buildSwaggerConfig(), {
+    standardSchemaConverter: schemaOpenApiConverter,
+  })
   return addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
 }

@@ -1,6 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   type AiRunCancelResponse,
@@ -10,6 +9,7 @@ import {
 } from '@amcore/shared'
 
 import { BadRequestException } from '../../../common/exceptions'
+import { SchemaResponse } from '../../../common/schemas/schema-response'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import {
@@ -59,17 +59,17 @@ export class AiRunsController {
     description:
       'No AI model is configured (`model_not_configured`), or bounded catalogue selection is temporarily unavailable (`catalogue_unavailable`)',
   })
-  @ZodResponse({ type: AiRunResponseDto, status: 201, description: 'Queued (or replayed) run' })
-  create(@CurrentUser('sub') userId: string, @Body() body: CreateAiRunDto): Promise<AiRunResponse> {
+  @SchemaResponse({ type: AiRunResponseDto, status: 201, description: 'Queued (or replayed) run' })
+  create(@CurrentUser('sub') userId: string, @Body({ schema: CreateAiRunDto.schema }) body: CreateAiRunDto): Promise<AiRunResponse> {
     return this.producer.create(userId, body)
   }
 
   @Get()
   @ApiOperation({ summary: 'Cursor-paginated list of owned AI runs' })
-  @ZodResponse({ type: AiRunPageDto, status: 200, description: 'Run page' })
+  @SchemaResponse({ type: AiRunPageDto, status: 200, description: 'Run page' })
   async list(
     @CurrentUser('sub') userId: string,
-    @Query() query: AiRunListQueryDto
+    @Query({ schema: AiRunListQueryDto.schema }) query: AiRunListQueryDto
   ): Promise<AiRunPage> {
     try {
       return await this.runs.list(userId, query)
@@ -85,7 +85,7 @@ export class AiRunsController {
     description:
       'Returns durable state and bounded reason/error codes. Execution may refuse model_snapshot_legacy_unsupported, model_snapshot_invalid, model_binding_changed, assistant_binding_changed, provider_retry_restriction_invalid or provider_retry_after_exceeds_horizon. Retry restrictions and provider receipts are internal and are not exposed by this response.',
   })
-  @ZodResponse({ type: AiRunResponseDto, status: 200, description: 'Run' })
+  @SchemaResponse({ type: AiRunResponseDto, status: 200, description: 'Run' })
   get(@CurrentUser('sub') userId: string, @Param('id') id: string): Promise<AiRunResponse> {
     return this.runs.getOwned(userId, id)
   }
@@ -98,7 +98,7 @@ export class AiRunsController {
       'Decided under the run lock, so a cancel is never lost to a racing approval or park. A queued run is cancelled at once; a run waiting for approval is cancelled and its pending approval voided; a RUNNING run records `cancellationRequested` and the worker stops before its next provider call or tool start — the status stays `running` until it does (an in-flight provider call or tool is not aborted, so the delay is bounded by its timeout); a finished run is an idempotent no-op.',
   })
   @ApiResponse({ status: 404, description: 'The run does not exist or is not owned by the caller' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AiRunCancelResponseDto,
     status: 200,
     description: 'Run status after cancel',

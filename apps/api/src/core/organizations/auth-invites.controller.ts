@@ -24,10 +24,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import type { Request } from 'express'
-import { ZodResponse, ZodValidationPipe } from 'nestjs-zod'
 
 import { type AcceptInviteInput, AuthType, type RequestPrincipal } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { getClientIp } from '../../common/utils/anonymize-ip'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -76,9 +76,9 @@ export class AuthInvitesController {
     summary:
       'Inspect an invitation for the matching account; verified consent reveals stable intent',
   })
-  @ZodResponse({ type: InvitationInspectDto, status: 200 })
+  @SchemaResponse({ type: InvitationInspectDto, status: 200 })
   inspect(
-    @Body() dto: InvitationAdmissionDto,
+    @Body({ schema: InvitationAdmissionDto.schema }) dto: InvitationAdmissionDto,
     @CurrentUser() principal: RequestPrincipal
   ): ReturnType<InvitationContinuationService['inspect']> {
     return this.continuation.inspect({ token: dto.token }, principal)
@@ -93,7 +93,7 @@ export class AuthInvitesController {
     description: 'Scoped continuation secret',
   })
   @ApiOperation({ summary: 'Inspect a current scoped continuation for the matching account' })
-  @ZodResponse({ type: InvitationInspectDto, status: 200 })
+  @SchemaResponse({ type: InvitationInspectDto, status: 200 })
   inspectContinuation(
     @Headers('x-invitation-continuation') credential: string,
     @CurrentUser() principal: RequestPrincipal
@@ -119,9 +119,9 @@ export class AuthInvitesController {
     summary:
       'Explicitly accept the inspected intent; same operation replays without granting twice',
   })
-  @ZodResponse({ type: AcceptInviteResponseDto, status: 200 })
+  @SchemaResponse({ type: AcceptInviteResponseDto, status: 200 })
   accept(
-    @Body(new ZodValidationPipe(AcceptInviteDto)) dto: AcceptInviteInput,
+    @Body({ schema: AcceptInviteDto.schema }) dto: AcceptInviteInput,
     @CurrentUser() principal: RequestPrincipal,
     @Headers('x-invitation-operation-id') operation: string,
     @Headers('x-invitation-continuation') credential: string,
@@ -147,7 +147,7 @@ export class AuthInvitesController {
     summary:
       'Recover own acceptance proof without invitation credential; access may have been removed',
   })
-  @ZodResponse({ type: InvitationOperationDto, status: 200 })
+  @SchemaResponse({ type: InvitationOperationDto, status: 200 })
   operation(
     @Param('operationId') id: string,
     @CurrentUser() principal: RequestPrincipal

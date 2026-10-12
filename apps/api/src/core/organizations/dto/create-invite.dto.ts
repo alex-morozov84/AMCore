@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { createInviteSchema } from '@amcore/shared'
 
-export class CreateInviteDto extends createZodDto(createInviteSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class CreateInviteDto extends createSchemaDto(createInviteSchema) {}

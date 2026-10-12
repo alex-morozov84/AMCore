@@ -12,11 +12,11 @@ import { execSync } from 'child_process'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { PinoLogger } from 'nestjs-pino'
-import { ZodValidationPipe } from 'nestjs-zod'
 import { Client } from 'pg'
 
 import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
+import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
 import {
   MANAGED_WORKERS,
   type ManagedWorkerBinding,
@@ -224,7 +224,7 @@ export async function setupE2ETest(
       app.enableCors({ origin: ['https://app.example.test'], credentials: true })
       app.setGlobalPrefix('api/v1')
     }
-    app.useGlobalPipes(new ZodValidationPipe())
+    app.useGlobalPipes(createSchemaValidationPipe())
 
     // Migrate BEFORE the app (and its database connections) exists: see `migrateTestDatabase`.
     await migrateTestDatabase(databaseUrl)
@@ -455,7 +455,7 @@ export async function startWebAppContext(
   const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
   configureBodyParser(app, '')
   app.use(cookieParser())
-  app.useGlobalPipes(new ZodValidationPipe())
+  app.useGlobalPipes(createSchemaValidationPipe())
   await app.init()
   await app.listen(0, '127.0.0.1')
   const address = app.getHttpServer().address() as { port: number }

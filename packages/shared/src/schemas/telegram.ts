@@ -38,10 +38,10 @@ export type TelegramLinkResponse = z.infer<typeof telegramLinkResponseSchema>
  * runtime validation and the generated TypeScript type: disconnected = `false + null + null`
  * (stable keys for clients), connected = `true + status + linkedAt`. Carries no chat/user id.
  *
- * Note: `createZodDto`/OpenAPI cannot consume a `discriminatedUnion` directly, so the API ships a
- * narrow flat DTO adapter for the document only (`apps/api/.../telegram.dto.ts`), with a
- * compile-time assertion that this union stays assignable to it — the shared contract is NOT
- * weakened to fit the DTO library. Language-agnostic: no human-readable messages here.
+ * The API retains a narrow flat DTO adapter to preserve its existing OpenAPI projection
+ * (`apps/api/.../telegram.dto.ts`). Native schema conversion supports this union.
+ * A compile-time assertion checks that this union stays assignable to the adapter.
+ * The shared contract retains the stronger union. Language-agnostic: no human-readable messages here.
  */
 export const telegramConnectionResponseSchema = z.discriminatedUnion('connected', [
   z.object({

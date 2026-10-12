@@ -22,7 +22,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
-import { ZodResponse, ZodValidationException } from 'nestjs-zod'
 
 import {
   ADMIN_ORGANIZATION_SORT_FIELDS,
@@ -45,6 +44,8 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
+import { SchemaValidationException } from '../../common/schemas/schema-validation'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
 import { Auth } from '../auth/decorators/auth.decorator'
@@ -179,7 +180,7 @@ export class AdminController {
   @ApiResponse({ status: 429, description: 'Audit read rate limit exceeded' })
   @ApiResponse({ status: 500, description: 'Audit query or strict read-audit write failed' })
   @ApiResponse({ status: 503, description: 'Audit dependency unavailable' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminAuditResponseDto,
     status: 200,
     description: 'Redacted events with safe present-day identity projection and opaque cursor',
@@ -191,7 +192,7 @@ export class AdminController {
     // Parse once: the schema transforms action lists and booleans, while the
     // global DTO pipe would re-parse its transformed output and reject it.
     const parsed = adminAuditQuerySchema.safeParse(rawQuery)
-    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    if (!parsed.success) throw new SchemaValidationException(parsed.error)
     return this.auditService.list(parsed.data, actor)
   }
 
@@ -226,8 +227,10 @@ export class AdminController {
     description:
       'Invalid page/limit/sortBy/sortOrder, an oversized search term, or a repeated query key',
   })
-  @ZodResponse({ type: AdminUserListResponseDto, status: 200, description: 'Paginated users' })
-  findAllUsers(@Query() query: AdminUserListQueryDto): Promise<AdminUserListResponse> {
+  @SchemaResponse({ type: AdminUserListResponseDto, status: 200, description: 'Paginated users' })
+  findAllUsers(
+    @Query({ schema: AdminUserListQueryDto.schema }) query: AdminUserListQueryDto
+  ): Promise<AdminUserListResponse> {
     return this.adminService.findAllUsers(query)
   }
 
@@ -257,17 +260,17 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
   @ApiResponse({ status: 404, description: 'User no longer exists' })
   @ApiResponse({ status: 503, description: 'Detail dependency unavailable' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminUserDetailResponseDto,
     status: 200,
     description: 'Safe user detail and bounded memberships',
   })
   findUserDetail(
     @Param('id') id: string,
-    @Query() query: AdminUserDetailQueryDto
+    @Query({ schema: AdminUserDetailQueryDto.schema }) query: AdminUserDetailQueryDto
   ): Promise<AdminUserDetailResponse> {
     const parsed = adminDetailIdSchema.safeParse(id)
-    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    if (!parsed.success) throw new SchemaValidationException(parsed.error)
     return this.detailService.user(parsed.data, query)
   }
 
@@ -293,11 +296,11 @@ export class AdminController {
       'SUPER_ADMIN required, or STEP_UP_REQUIRED (session not recently re-authenticated)',
   })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded for this privileged operation' })
-  @ZodResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })
+  @SchemaResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })
   updateUserSystemRole(
     @CurrentUser() actor: RequestPrincipal,
     @Param('id') id: string,
-    @Body() dto: UpdateSystemRoleDto
+    @Body({ schema: UpdateSystemRoleDto.schema }) dto: UpdateSystemRoleDto
   ): Promise<AdminUserResponse> {
     return this.adminService.updateUserSystemRole(id, dto.systemRole, actor)
   }
@@ -331,7 +334,7 @@ export class AdminController {
   @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
   @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
   @ApiResponse({ status: 404, description: 'User no longer exists' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminSessionsListResponseDto,
     status: 200,
     description: 'Paginated active sessions',
@@ -339,11 +342,11 @@ export class AdminController {
   listUserSessions(
     @CurrentUser() actor: RequestPrincipal,
     @Param('id') id: string,
-    @Query() query: AdminSessionsQueryDto,
+    @Query({ schema: AdminSessionsQueryDto.schema }) query: AdminSessionsQueryDto,
     @Headers('accept-language') acceptLanguage: string | undefined
   ): Promise<AdminSessionsListResponse> {
     const userId = adminDetailIdSchema.safeParse(id)
-    if (!userId.success) throw new ZodValidationException(userId.error)
+    if (!userId.success) throw new SchemaValidationException(userId.error)
     return this.sessionsService.list(
       userId.data,
       query,
@@ -379,9 +382,9 @@ export class AdminController {
     @Param('sessionId') sessionId: string
   ): Promise<void> {
     const userId = adminDetailIdSchema.safeParse(id)
-    if (!userId.success) throw new ZodValidationException(userId.error)
+    if (!userId.success) throw new SchemaValidationException(userId.error)
     const familyId = adminSessionIdSchema.safeParse(sessionId)
-    if (!familyId.success) throw new ZodValidationException(familyId.error)
+    if (!familyId.success) throw new SchemaValidationException(familyId.error)
     await this.sessionsService.revokeOne(userId.data, familyId.data, actor)
   }
 
@@ -411,7 +414,7 @@ export class AdminController {
     @Param('id') id: string
   ): Promise<void> {
     const userId = adminDetailIdSchema.safeParse(id)
-    if (!userId.success) throw new ZodValidationException(userId.error)
+    if (!userId.success) throw new SchemaValidationException(userId.error)
     await this.sessionsService.revokeAll(userId.data, actor)
   }
 
@@ -422,7 +425,7 @@ export class AdminController {
   // OB-03: heavy DB sweep — narrow to 5/min for this handler. Same
   // per-handler-override pattern as above.
   @RateLimit(RATE_LIMIT_POLICIES.EXPENSIVE_ACTION)
-  @ZodResponse({ type: CleanupResultDto, status: 200, description: 'Cleanup counts' })
+  @SchemaResponse({ type: CleanupResultDto, status: 200, description: 'Cleanup counts' })
   runCleanup(@CurrentUser() actor: RequestPrincipal): Promise<CleanupResult> {
     return this.adminService.runCleanup(actor)
   }
@@ -463,13 +466,13 @@ export class AdminController {
     description:
       'Invalid page/limit/sortBy/sortOrder, an oversized search term, or a repeated query key',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminOrganizationListResponseDto,
     status: 200,
     description: 'Paginated organizations',
   })
   findAllOrganizations(
-    @Query() query: AdminOrganizationListQueryDto
+    @Query({ schema: AdminOrganizationListQueryDto.schema }) query: AdminOrganizationListQueryDto
   ): Promise<AdminOrganizationListResponse> {
     return this.adminService.findAllOrganizations(query)
   }
@@ -500,24 +503,25 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'Current SUPER_ADMIN role required' })
   @ApiResponse({ status: 404, description: 'Organization no longer exists' })
   @ApiResponse({ status: 503, description: 'Detail dependency unavailable' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminOrganizationDetailResponseDto,
     status: 200,
     description: 'Safe organization detail and bounded members',
   })
   findOrganizationDetail(
     @Param('id') id: string,
-    @Query() query: AdminOrganizationDetailQueryDto
+    @Query({ schema: AdminOrganizationDetailQueryDto.schema })
+    query: AdminOrganizationDetailQueryDto
   ): Promise<AdminOrganizationDetailResponse> {
     const parsed = adminDetailIdSchema.safeParse(id)
-    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    if (!parsed.success) throw new SchemaValidationException(parsed.error)
     return this.detailService.organization(parsed.data, query)
   }
 
   @Get('overview')
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'Console Overview status — SUPER_ADMIN only' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminOverviewResponseDto,
     status: 200,
     description:

@@ -8,7 +8,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import type { Response } from 'express'
-import { ZodResponse, ZodValidationPipe } from 'nestjs-zod'
 import { z } from 'zod'
 
 import {
@@ -25,6 +24,7 @@ import {
   type WorkSummary,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
@@ -81,7 +81,7 @@ export class BackgroundWorkController {
       'Code-owned registrations are discovered automatically. Broker outages are per-resource unavailable states; ' +
       'authorization and distributed read budgets use primary PG. Optional registration-owned presentation supplies bounded localized names and safe field labels (English fallback). No job payloads or provider errors are returned. Notification projections may include masked original recipients and Telegram connection generations; raw recipient addresses and chat IDs are excluded.',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: BackgroundWorkCatalogueDto,
     status: 200,
     description:
@@ -134,15 +134,15 @@ export class BackgroundWorkController {
   @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1, maximum: 512 })
   @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 50 })
   @ApiResponse({ status: 400, description: 'Invalid status, page or registered work identifier' })
-  @ZodResponse({
+  @SchemaResponse({
     type: BackgroundWorkPageDto,
     status: 200,
     description: 'Bounded safe window; reason/truncation are data',
   })
   jobs(
     @CurrentUser() principal: RequestPrincipal,
-    @Param('workId', new ZodValidationPipe(adminQueueNameSchema)) workId: string,
-    @Query(new ZodValidationPipe(workListWireQuerySchema)) query: WorkListQuery
+    @Param('workId', { schema: adminQueueNameSchema }) workId: string,
+    @Query({ schema: workListWireQuerySchema }) query: WorkListQuery
   ): Promise<WorkPage> {
     return this.reader.list(principal, workId, query)
   }
@@ -165,15 +165,15 @@ export class BackgroundWorkController {
   })
   @ApiResponse({ status: 400, description: 'Invalid work or target identifier' })
   @ApiResponse({ status: 404, description: 'Target history absent or expired' })
-  @ZodResponse({
+  @SchemaResponse({
     type: BackgroundWorkJobDto,
     status: 200,
     description: 'Safe diagnostics and captured target revision',
   })
   async job(
     @CurrentUser() principal: RequestPrincipal,
-    @Param('workId', new ZodValidationPipe(adminQueueNameSchema)) workId: string,
-    @Param('jobId', new ZodValidationPipe(workJobIdSchema)) jobId: string
+    @Param('workId', { schema: adminQueueNameSchema }) workId: string,
+    @Param('jobId', { schema: workJobIdSchema }) jobId: string
   ): Promise<WorkJob> {
     const row = await this.reader.detail(principal, workId, jobId)
     if (!row) throw new NotFoundException('Work target')
@@ -197,14 +197,14 @@ export class BackgroundWorkController {
     type: BackgroundWorkReceiptDto,
     description: 'Durable receipt with unconfirmed targets; never redispatch',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: BackgroundWorkReceiptDto,
     status: 200,
     description: 'Durable per-target command receipt',
   })
   async execute(
     @CurrentUser() principal: RequestPrincipal,
-    @Body() input: BackgroundWorkCommandDto,
+    @Body({ schema: BackgroundWorkCommandDto.schema }) input: BackgroundWorkCommandDto,
     @Res({ passthrough: true }) response: Response
   ): Promise<WorkReceipt> {
     const receipt = await this.work.execute(principal, input)
@@ -226,14 +226,14 @@ export class BackgroundWorkController {
   })
   @ApiResponse({ status: 400, description: 'Invalid command ID' })
   @ApiResponse({ status: 404, description: 'No receipt owned by the current actor' })
-  @ZodResponse({
+  @SchemaResponse({
     type: BackgroundWorkReceiptDto,
     status: 200,
     description: 'Current receipt; deadline expiry preserves uncertainty',
   })
   receipt(
     @CurrentUser() principal: RequestPrincipal,
-    @Param('commandId', new ZodValidationPipe(z.uuidv7())) commandId: string
+    @Param('commandId', { schema: z.uuidv7() }) commandId: string
   ): Promise<WorkReceipt> {
     return this.work.receipt(principal, commandId)
   }
@@ -257,15 +257,15 @@ export class BackgroundWorkController {
   @ApiResponse({ status: 400, description: 'Invalid reconciliation contract' })
   @ApiResponse({ status: 404, description: 'No retained receipt owned by the current actor' })
   @ApiResponse({ status: 413, description: 'Decoded input exceeds32KiB' })
-  @ZodResponse({
+  @SchemaResponse({
     type: BackgroundWorkReceiptDto,
     status: 200,
     description: 'Unknown outcome with separately audited operator disposition',
   })
   reconcile(
     @CurrentUser() principal: RequestPrincipal,
-    @Param('commandId', new ZodValidationPipe(z.uuidv7())) commandId: string,
-    @Body() input: BackgroundWorkReconciliationDto
+    @Param('commandId', { schema: z.uuidv7() }) commandId: string,
+    @Body({ schema: BackgroundWorkReconciliationDto.schema }) input: BackgroundWorkReconciliationDto
   ): Promise<WorkReceipt> {
     return this.work.reconcile(principal, commandId, input)
   }
@@ -292,9 +292,10 @@ export class BackgroundWorkController {
   @ApiResponse({ status: 413, description: 'Decoded input exceeds32KiB' })
   reconcileEvidence(
     @CurrentUser() principal: RequestPrincipal,
-    @Param('workId', new ZodValidationPipe(adminQueueNameSchema)) workId: string,
-    @Param('jobId', new ZodValidationPipe(workJobIdSchema)) jobId: string,
-    @Body() input: BackgroundWorkEvidenceReconciliationDto
+    @Param('workId', { schema: adminQueueNameSchema }) workId: string,
+    @Param('jobId', { schema: workJobIdSchema }) jobId: string,
+    @Body({ schema: BackgroundWorkEvidenceReconciliationDto.schema })
+    input: BackgroundWorkEvidenceReconciliationDto
   ): Promise<void> {
     return this.work.reconcileEvidence(principal, workId, jobId, input)
   }

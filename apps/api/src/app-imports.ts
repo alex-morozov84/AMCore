@@ -6,7 +6,6 @@ import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
 import { Request } from 'express'
 import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
-import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod'
 import { v4 as uuidv4 } from 'uuid'
 
 import { BACKGROUND_WORK } from './background-work.composition'
@@ -16,6 +15,8 @@ import {
   HttpExceptionFilter,
   PrismaClientExceptionFilter,
 } from './common/exceptions/filters'
+import { SchemaResponseInterceptor } from './common/schemas/schema-response.interceptor'
+import { createSchemaValidationPipe } from './common/schemas/schema-validation'
 import { anonymizeIp, getClientIp } from './common/utils'
 import { AdminModule } from './core/admin/admin.module'
 import { AiWebModule } from './core/ai/ai-web.module'
@@ -216,10 +217,10 @@ export const appProviders: Provider[] = [
   { provide: APP_FILTER, useClass: AllExceptionsFilter }, // Catch-all (last resort)
   { provide: APP_FILTER, useClass: PrismaClientExceptionFilter }, // Prisma-specific errors
   { provide: APP_FILTER, useClass: HttpExceptionFilter }, // Standard HTTP exceptions
-  // Zod validation pipe (auto-validates DTOs)
-  { provide: APP_PIPE, useClass: ZodValidationPipe },
-  // Zod serializer (auto-validates responses)
-  { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+  // Native validation reads explicit parameter schema metadata.
+  { provide: APP_PIPE, useFactory: createSchemaValidationPipe },
+  // Validate whole responses declared by SchemaResponse.
+  { provide: APP_INTERCEPTOR, useClass: SchemaResponseInterceptor },
   // Rate limiting's global guard (RateLimitGuard) is registered inside
   // ThrottlingModule itself, not here — see its own module doc.
   ShutdownService,

@@ -5,9 +5,9 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import type { Cache } from 'cache-manager'
 import cookieParser from 'cookie-parser'
 import { PinoLogger } from 'nestjs-pino'
-import { ZodValidationPipe } from 'nestjs-zod'
 
 import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
+import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
 import { IdempotencyModule } from '../src/infrastructure/idempotency'
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
@@ -45,7 +45,7 @@ export async function setupIdempotencyTestApp(
   const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
   configureBodyParser(app, '')
   app.use(cookieParser())
-  app.useGlobalPipes(new ZodValidationPipe())
+  app.useGlobalPipes(createSchemaValidationPipe())
   // Migrate BEFORE the app's database connections exist (AI migration maintenance-stop guard).
   await migrateTestDatabase(databaseUrl)
   await app.init()

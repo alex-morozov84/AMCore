@@ -21,7 +21,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
@@ -34,6 +33,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
@@ -103,7 +103,7 @@ export class RolesController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodResponse({ type: RoleListResponseDto, status: 200, description: 'Paginated roles' })
+  @SchemaResponse({ type: RoleListResponseDto, status: 200, description: 'Paginated roles' })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'orgId' },
@@ -112,7 +112,7 @@ export class RolesController {
   listRoles(
     @Param('orgId') orgId: string,
     @CurrentUser() principal: RequestPrincipal,
-    @Query() pagination: PaginationQueryDto
+    @Query({ schema: PaginationQueryDto.schema }) pagination: PaginationQueryDto
   ): Promise<RoleListResponse> {
     return this.roleService.listRoles(orgId, principal, pagination.page, pagination.limit)
   }
@@ -121,7 +121,7 @@ export class RolesController {
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Create a custom role — requires full TeamAccess' })
-  @ZodResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
+  @SchemaResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'orgId' },
@@ -129,7 +129,7 @@ export class RolesController {
   })
   createRole(
     @Param('orgId') orgId: string,
-    @Body() dto: CreateRoleDto,
+    @Body({ schema: CreateRoleDto.schema }) dto: CreateRoleDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<OrgRoleResponse> {
     return this.roleService.createRole(orgId, dto, principal)
@@ -139,7 +139,7 @@ export class RolesController {
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Update a custom role — requires full TeamAccess' })
-  @ZodResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
+  @SchemaResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'orgId' },
@@ -148,7 +148,7 @@ export class RolesController {
   updateRole(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
-    @Body() dto: UpdateRoleDto,
+    @Body({ schema: UpdateRoleDto.schema }) dto: UpdateRoleDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<OrgRoleResponse> {
     return this.roleService.updateRole(orgId, roleId, dto, principal)
@@ -179,7 +179,7 @@ export class RolesController {
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Assign a CASL permission to a custom role — requires full TeamAccess' })
-  @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
+  @SchemaResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   @ApiBadRequestResponse({
     description:
       'Validation error or unsupported condition, field or identity placeholder (PERMISSION_RULE_UNSUPPORTED, PERMISSION_FIELD_UNSUPPORTED, PERMISSION_PLACEHOLDER_UNSUPPORTED)',
@@ -192,7 +192,7 @@ export class RolesController {
   assignPermission(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
-    @Body() dto: AssignPermissionDto,
+    @Body({ schema: AssignPermissionDto.schema }) dto: AssignPermissionDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<PermissionResponse> {
     return this.roleService.assignPermission(orgId, roleId, dto, principal)

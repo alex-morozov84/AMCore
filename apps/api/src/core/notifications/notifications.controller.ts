@@ -1,6 +1,5 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -10,6 +9,7 @@ import {
 } from '@amcore/shared'
 
 import { BadRequestException } from '../../common/exceptions'
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
@@ -44,14 +44,14 @@ export class NotificationsController {
       'changes do not add or remove existing items. Pages are filtered before the limit, so ' +
       '`hasMore`/`nextCursor` always describe feed items only.',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: NotificationFeedResponseDto,
     status: 200,
     description: 'Notification feed page',
   })
   async getFeed(
     @CurrentUser('sub') userId: string,
-    @Query() query: NotificationFeedQueryDto
+    @Query({ schema: NotificationFeedQueryDto.schema }) query: NotificationFeedQueryDto
   ): Promise<NotificationFeedResponse> {
     try {
       return await this.feed.getFeed(userId, query)
@@ -68,7 +68,7 @@ export class NotificationsController {
       "Counts unread, non-archived notifications of the caller's in-app feed — the same set that " +
       '`GET /notifications` lists, so the count and the list always agree.',
   })
-  @ZodResponse({ type: UnreadCountResponseDto, status: 200, description: 'Unread count' })
+  @SchemaResponse({ type: UnreadCountResponseDto, status: 200, description: 'Unread count' })
   async unreadCount(@CurrentUser('sub') userId: string): Promise<UnreadCountResponse> {
     return { unread: await this.feed.getUnreadCount(userId) }
   }
@@ -80,7 +80,7 @@ export class NotificationsController {
       "Marks every unread, non-archived item of the caller's in-app feed as read. Notifications " +
       "outside the feed (never delivered in-app, archived, or another user's) are not touched.",
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: MarkAllReadResponseDto,
     status: 200,
     description: 'Number of feed items marked read (0 when there was nothing to change)',

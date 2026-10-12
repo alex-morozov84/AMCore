@@ -1,6 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Put } from '@nestjs/common'
 import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -8,6 +7,7 @@ import {
   type NotificationPreferencesResponse,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
@@ -32,7 +32,7 @@ export class NotificationPreferencesController {
 
   @Get('capabilities')
   @ApiOperation({ summary: 'Active channels and per-category capabilities' })
-  @ZodResponse({
+  @SchemaResponse({
     type: NotificationCapabilitiesResponseDto,
     status: 200,
     description: 'Notification capabilities',
@@ -43,7 +43,7 @@ export class NotificationPreferencesController {
 
   @Get('preferences')
   @ApiOperation({ summary: 'User notification preferences and master toggle' })
-  @ZodResponse({
+  @SchemaResponse({
     type: NotificationPreferencesResponseDto,
     status: 200,
     description: 'Notification preferences',
@@ -58,7 +58,7 @@ export class NotificationPreferencesController {
   @ApiNoContentResponse({ description: 'Preference updated' })
   async updatePreference(
     @CurrentUser('sub') userId: string,
-    @Body() body: UpdateNotificationPreferenceDto
+    @Body({ schema: UpdateNotificationPreferenceDto.schema }) body: UpdateNotificationPreferenceDto
   ): Promise<void> {
     await this.preferences.updatePreference(userId, body)
   }
@@ -69,7 +69,7 @@ export class NotificationPreferencesController {
   @ApiNoContentResponse({ description: 'Master toggle updated' })
   async updateSettings(
     @CurrentUser('sub') userId: string,
-    @Body() body: UpdateNotificationSettingsDto
+    @Body({ schema: UpdateNotificationSettingsDto.schema }) body: UpdateNotificationSettingsDto
   ): Promise<void> {
     await this.preferences.setMasterToggle(userId, body.notificationsEnabled)
   }

@@ -9,7 +9,7 @@ import { PAGINATION } from '../constants'
  * query string (`?page=2`) and converts to number before validation.
  * Defaults match `PAGINATION.DEFAULT_*`; bounds enforce `page >= 1` and
  * `1 <= limit <= PAGINATION.MAX_LIMIT`. Invalid input returns a clean
- * field-level 400 via the global `ZodValidationPipe`.
+ * field-level 400 via the global native schema validation pipe.
  */
 export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(PAGINATION.DEFAULT_PAGE),

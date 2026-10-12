@@ -5,7 +5,7 @@ import type { AiAssistant } from '@/generated/prisma/client'
 /**
  * DB → wire projection for the assistant-admin surface (Track C — ADR-054, Arc F.1). `modelSelection`
  * is stored as validated JSON (the shared `aiModelSelectionSchema` shape) and re-validated by the
- * `@ZodResponse` interceptor on the way out, so the cast is safe. `systemPrompt` is trusted
+ * `@SchemaResponse` interceptor on the way out, so the cast is safe. `systemPrompt` is trusted
  * instruction text, exposed to SUPER_ADMIN only through this admin surface — never logged or audited.
  */
 export function toAiAssistantResponse(assistant: AiAssistant): AiAssistantResponse {

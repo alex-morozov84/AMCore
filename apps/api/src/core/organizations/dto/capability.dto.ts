@@ -1,8 +1,8 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { capabilityCatalogueResponseSchema, createPresetPermissionSchema } from '@amcore/shared'
 
-export class CapabilityCatalogueResponseDto extends createZodDto(
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class CapabilityCatalogueResponseDto extends createSchemaDto(
   capabilityCatalogueResponseSchema
 ) {}
-export class CreatePresetPermissionDto extends createZodDto(createPresetPermissionSchema) {}
+export class CreatePresetPermissionDto extends createSchemaDto(createPresetPermissionSchema) {}

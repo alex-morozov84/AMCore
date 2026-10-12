@@ -10,7 +10,6 @@ import {
   Query,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AI_OPERATOR_REASON_HEADER,
@@ -21,6 +20,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../../common/schemas/schema-response'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import {
@@ -52,11 +52,11 @@ export class AiConversationControlController {
   @Post(':id/takeover')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Take human control of a conversation (owner or SUPER_ADMIN operator)' })
-  @ZodResponse({ type: AiConversationResponseDto, status: 200, description: 'Taken over' })
+  @SchemaResponse({ type: AiConversationResponseDto, status: 200, description: 'Taken over' })
   takeover(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') id: string,
-    @Body() dto: TakeoverConversationDto
+    @Body({ schema: TakeoverConversationDto.schema }) dto: TakeoverConversationDto
   ): Promise<AiConversationResponse> {
     return this.operator.takeover(principal, id, dto.reason ?? undefined)
   }
@@ -64,11 +64,11 @@ export class AiConversationControlController {
   @Post(':id/release')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Release control back to the assistant (holder or owner)' })
-  @ZodResponse({ type: AiConversationResponseDto, status: 200, description: 'Released' })
+  @SchemaResponse({ type: AiConversationResponseDto, status: 200, description: 'Released' })
   release(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') id: string,
-    @Body() dto: ReleaseConversationDto
+    @Body({ schema: ReleaseConversationDto.schema }) dto: ReleaseConversationDto
   ): Promise<AiConversationResponse> {
     return this.operator.release(principal, id, dto.reason ?? undefined)
   }
@@ -80,11 +80,11 @@ export class AiConversationControlController {
     required: false,
     description: 'Reason / ticket ref — required for a cross-user SUPER_ADMIN operator review.',
   })
-  @ZodResponse({ type: AiTranscriptResponseDto, status: 200, description: 'Transcript page' })
+  @SchemaResponse({ type: AiTranscriptResponseDto, status: 200, description: 'Transcript page' })
   getTranscript(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') id: string,
-    @Query() query: AiTranscriptQueryDto,
+    @Query({ schema: AiTranscriptQueryDto.schema }) query: AiTranscriptQueryDto,
     // The reason is a header (not a query param) so it never lands in access-log URLs; redacted in logs.
     @Headers(AI_OPERATOR_REASON_HEADER) reason?: string
   ): Promise<AiTranscriptResponse> {
@@ -93,11 +93,11 @@ export class AiConversationControlController {
 
   @Post(':id/messages')
   @ApiOperation({ summary: 'Post a human turn while holding control' })
-  @ZodResponse({ type: AiMessageResponseDto, status: 201, description: 'Posted message' })
+  @SchemaResponse({ type: AiMessageResponseDto, status: 201, description: 'Posted message' })
   postMessage(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') id: string,
-    @Body() dto: PostOperatorMessageDto
+    @Body({ schema: PostOperatorMessageDto.schema }) dto: PostOperatorMessageDto
   ): Promise<AiMessageResponse> {
     return this.operator.postMessage(principal, id, dto)
   }

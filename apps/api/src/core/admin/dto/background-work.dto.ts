@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   workCatalogueSchema,
   workCommandSchema,
@@ -10,13 +8,15 @@ import {
   workReconciliationSchema,
 } from '@amcore/shared'
 
-export class BackgroundWorkCommandDto extends createZodDto(workCommandSchema) {}
-export class BackgroundWorkReceiptDto extends createZodDto(workReceiptSchema) {}
-export class BackgroundWorkCatalogueDto extends createZodDto(workCatalogueSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
 
-export class BackgroundWorkJobDto extends createZodDto(workJobSchema) {}
-export class BackgroundWorkPageDto extends createZodDto(workPageSchema) {}
-export class BackgroundWorkReconciliationDto extends createZodDto(workReconciliationSchema) {}
-export class BackgroundWorkEvidenceReconciliationDto extends createZodDto(
+export class BackgroundWorkCommandDto extends createSchemaDto(workCommandSchema) {}
+export class BackgroundWorkReceiptDto extends createSchemaDto(workReceiptSchema) {}
+export class BackgroundWorkCatalogueDto extends createSchemaDto(workCatalogueSchema) {}
+
+export class BackgroundWorkJobDto extends createSchemaDto(workJobSchema) {}
+export class BackgroundWorkPageDto extends createSchemaDto(workPageSchema) {}
+export class BackgroundWorkReconciliationDto extends createSchemaDto(workReconciliationSchema) {}
+export class BackgroundWorkEvidenceReconciliationDto extends createSchemaDto(
   workEvidenceReconciliationSchema
 ) {}

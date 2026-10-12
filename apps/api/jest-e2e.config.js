@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/test/setup-nest-loader.cjs'],
   rootDir: '.',
   testMatch: ['**/test/**/*.e2e-spec.ts'],
   moduleFileExtensions: ['js', 'json', 'ts', 'tsx'],

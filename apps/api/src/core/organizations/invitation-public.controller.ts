@@ -10,10 +10,10 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
-import { ZodResponse } from 'nestjs-zod'
 
 import { AuthType } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../env/env.service'
 import { RateLimit } from '../../infrastructure/throttling'
@@ -60,8 +60,10 @@ export class InvitationPublicController {
     summary:
       'Admit a current invitation into a30-minute scoped continuation; no account/access mutation',
   })
-  @ZodResponse({ type: InvitationAdmissionResponseDto, status: 201 })
-  admit(@Body() dto: InvitationAdmissionDto): ReturnType<InvitationContinuationService['admit']> {
+  @SchemaResponse({ type: InvitationAdmissionResponseDto, status: 201 })
+  admit(
+    @Body({ schema: InvitationAdmissionDto.schema }) dto: InvitationAdmissionDto
+  ): ReturnType<InvitationContinuationService['admit']> {
     return this.continuation.admit(dto.token)
   }
 
@@ -72,7 +74,7 @@ export class InvitationPublicController {
   @ApiOperation({
     summary: 'Read fixed signup email for a valid bearer continuation; no account existence',
   })
-  @ZodResponse({ type: InvitationContextDto, status: 200 })
+  @SchemaResponse({ type: InvitationContextDto, status: 200 })
   context(
     @Headers('x-invitation-continuation') credential: string
   ): ReturnType<InvitationContinuationService['context']> {
@@ -88,9 +90,9 @@ export class InvitationPublicController {
   @ApiOperation({
     summary: 'Create an unverified ordinary account for the fixed invitation email; never join',
   })
-  @ZodResponse({ type: AuthResponseDto, status: 201 })
+  @SchemaResponse({ type: AuthResponseDto, status: 201 })
   async register(
-    @Body() dto: InvitedRegisterDto,
+    @Body({ schema: InvitedRegisterDto.schema }) dto: InvitedRegisterDto,
     @Headers('x-invitation-continuation') credential: string,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response

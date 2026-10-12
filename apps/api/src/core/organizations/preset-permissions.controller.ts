@@ -9,7 +9,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -18,6 +17,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
@@ -59,11 +59,11 @@ export class PresetPermissionsController {
     description:
       'Unsupported capability/preset (CAPABILITY_UNSUPPORTED) or invalid generated rule (PERMISSION_RULE_UNSUPPORTED, PERMISSION_FIELD_UNSUPPORTED, PERMISSION_PLACEHOLDER_UNSUPPORTED)',
   })
-  @ZodResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
+  @SchemaResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   assign(
     @Param('orgId') orgId: string,
     @Param('roleId') roleId: string,
-    @Body() body: CreatePresetPermissionDto,
+    @Body({ schema: CreatePresetPermissionDto.schema }) body: CreatePresetPermissionDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<PermissionResponse> {
     return this.roles.assignPermission(orgId, roleId, this.registry.preset(body), principal)

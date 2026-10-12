@@ -22,10 +22,10 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import { type AiApprovalListResponse, type AiApprovalResponse, AuthType } from '@amcore/shared'
 
+import { SchemaResponse } from '../../../common/schemas/schema-response'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import {
@@ -54,7 +54,7 @@ export class AiApprovalsController {
   @Header('Cache-Control', 'private, no-store')
   @ApiResponse({
     status: 200,
-    type: AiApprovalListResponseDto.Output,
+    standardSchema: AiApprovalListResponseDto.schema,
     description: 'Owned approvals',
     headers: {
       'Cache-Control': {
@@ -67,10 +67,10 @@ export class AiApprovalsController {
   @ApiUnauthorizedResponse({ description: 'Personal bearer required' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   @ApiOperation({ summary: 'List owned AI approvals (optionally by state)' })
-  @ZodResponse({ type: AiApprovalListResponseDto, status: 200, description: 'Owned approvals' })
+  @SchemaResponse({ type: AiApprovalListResponseDto, status: 200, description: 'Owned approvals' })
   list(
     @CurrentUser('sub') userId: string,
-    @Query() query: AiApprovalListQueryDto
+    @Query({ schema: AiApprovalListQueryDto.schema }) query: AiApprovalListQueryDto
   ): Promise<AiApprovalListResponse> {
     return this.approvals.list(userId, query)
   }
@@ -79,7 +79,7 @@ export class AiApprovalsController {
   @Header('Cache-Control', 'private, no-store')
   @ApiResponse({
     status: 200,
-    type: AiApprovalResponseDto.Output,
+    standardSchema: AiApprovalResponseDto.schema,
     description: 'Approval after the decision',
     headers: {
       'Cache-Control': {
@@ -101,7 +101,7 @@ export class AiApprovalsController {
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve or reject an owned pending AI approval' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AiApprovalResponseDto,
     status: 200,
     description: 'Approval after the decision',
@@ -109,7 +109,7 @@ export class AiApprovalsController {
   decide(
     @CurrentUser('sub') userId: string,
     @Param('id') id: string,
-    @Body() body: DecideAiApprovalDto
+    @Body({ schema: DecideAiApprovalDto.schema }) body: DecideAiApprovalDto
   ): Promise<AiApprovalResponse> {
     return this.approvals.decide(userId, id, body)
   }

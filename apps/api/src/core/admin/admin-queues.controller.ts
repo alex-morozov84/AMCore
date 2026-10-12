@@ -1,9 +1,9 @@
 import { Controller, Get, Header } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import { type AdminQueuesResponse, AuthType, SystemRole } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { SystemRoles } from '../auth/decorators/system-roles.decorator'
 
@@ -35,7 +35,7 @@ export class AdminQueuesController {
   @ApiResponse({ status: 401, description: 'Bearer JWT required; API keys rejected' })
   @ApiResponse({ status: 403, description: 'SUPER_ADMIN required' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminQueuesResponseDto,
     status: 200,
     description: 'Queue summary; per-queue unavailable/disabled states are data, not errors',

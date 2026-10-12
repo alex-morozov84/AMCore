@@ -21,7 +21,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import type { Response } from 'express'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AI_OPERATOR_REASON_HEADER,
@@ -30,6 +29,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../../common/schemas/schema-response'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
@@ -73,7 +73,7 @@ export class AiArtifactsController {
       required: ['file'],
     },
   })
-  @ZodResponse({ type: AiArtifactResponseDto, status: 201, description: 'Artifact stored' })
+  @SchemaResponse({ type: AiArtifactResponseDto, status: 201, description: 'Artifact stored' })
   uploadArtifact(
     @CurrentUser('sub') userId: string,
     @Param('id') conversationId: string,
@@ -83,8 +83,8 @@ export class AiArtifactsController {
   }
 
   @Get(':id/artifacts/:artifactId')
-  // No `@ZodResponse`: the body is a binary stream (StreamableFile), not a JSON DTO — so the global
-  // ZodSerializerInterceptor passes it through (matches the metrics-scrape passthrough precedent).
+  // No `@SchemaResponse`: the body is a binary stream (StreamableFile), not a JSON DTO — so the global
+  // SchemaResponseInterceptor passes it through (matches the metrics-scrape passthrough precedent).
   @ApiProduces('application/octet-stream')
   @ApiHeader({
     name: AI_OPERATOR_REASON_HEADER,

@@ -18,7 +18,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   type ApiKeyListResponse,
@@ -27,6 +26,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 
@@ -64,10 +64,10 @@ export class ApiKeysController {
 
   @Post()
   @ApiOperation({ summary: 'Create an API key for the current user — returns the secret once' })
-  @ZodResponse({ type: CreateApiKeyResponseDto, status: 201, description: 'API key created' })
+  @SchemaResponse({ type: CreateApiKeyResponseDto, status: 201, description: 'API key created' })
   create(
     @CurrentUser() user: RequestPrincipal,
-    @Body() dto: CreateApiKeyDto
+    @Body({ schema: CreateApiKeyDto.schema }) dto: CreateApiKeyDto
   ): Promise<CreateApiKeyResult> {
     return this.apiKeysService.create(user.sub, dto)
   }
@@ -96,10 +96,10 @@ export class ApiKeysController {
     description:
       'Default all includes retained historical rows; lifecycle status does not guarantee access',
   })
-  @ZodResponse({ type: ApiKeyListResponseDto, status: 200, description: 'Paginated API keys' })
+  @SchemaResponse({ type: ApiKeyListResponseDto, status: 200, description: 'Paginated API keys' })
   findAll(
     @CurrentUser() user: RequestPrincipal,
-    @Query() pagination: ApiKeyQueryDto
+    @Query({ schema: ApiKeyQueryDto.schema }) pagination: ApiKeyQueryDto
   ): Promise<ApiKeyListResponse> {
     return this.apiKeysService.findAllForUser(
       user.sub,

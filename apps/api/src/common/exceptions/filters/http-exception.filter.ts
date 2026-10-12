@@ -55,7 +55,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ...(details && { details }),
     }
 
-    // Add validation errors if present (from ZodValidationException)
+    // Add validation errors if present (from SchemaValidationException)
     if (validationErrors.length > 0) {
       errorResponse.errors = validationErrors
     }
@@ -95,7 +95,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const message = exceptionResponse.message
       // For validation errors, return the main message (detailed errors in 'errors' field)
       if (Array.isArray(message)) {
-        // ZodValidationException returns array - use first message or generic
+        // SchemaValidationException returns array - use first message or generic
         return message[0] || 'Validation failed'
       }
       return String(message)
@@ -128,7 +128,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 
   /**
-   * Extract validation errors from ZodValidationException response
+   * Extract validation errors from SchemaValidationException response
    */
   private extractValidationErrors(exceptionResponse: string | object): ValidationError[] {
     if (typeof exceptionResponse !== 'object' || !('errors' in exceptionResponse)) {

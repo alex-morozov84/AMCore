@@ -115,8 +115,8 @@ describe('HttpExceptionFilter', () => {
     )
   })
 
-  it('should handle ZodValidationException with structured errors', () => {
-    // Simulate ZodValidationException response format
+  it('should handle SchemaValidationException with structured errors', () => {
+    // Simulate SchemaValidationException response format
     const exception = new HttpException(
       {
         message: 'Validation failed',
