@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Refresh ts-jest's Handlebars dependency to 4.7.10 and SWC CLI's transitive
+  HTTP cache semantics to 4.3.0 within their declared ranges.
+
 ### Reliability
 
 - Managed stand image cleanup tolerates a vanished unrelated container after confirming its absence; surviving consumers and ambiguous inspection still refuse removal.
