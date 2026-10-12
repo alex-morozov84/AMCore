@@ -94,6 +94,9 @@ Node floor, which supports synchronous `require(esm)`. Jest remains the existing
 runner; a runner migration is independent work. Framework upgrades also need
 role boot, worker admission and shutdown checks because lifecycle ordering changes.
 
+SWC emits legacy decorator metadata for API unit and E2E tests. Type checking
+remains a separate command. E2E keeps its ESM test module format.
+
 The E2E Jest setup evaluates Nest and its BullMQ integration before loading each
 suite. Jest's mixed CJS/ESM loader can otherwise reject a companion's synchronous
 require while the same ESM graph is still loading. This preparation runs in every

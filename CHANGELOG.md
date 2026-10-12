@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- API unit and E2E tests use SWC instead of ts-jest. Type checking remains
+  separate, and email template tests retain Vitest.
+
 - Upgrade the API to NestJS 12 and replace `nestjs-zod` with native request
   schema validation and a typed response seam. Preserve shared Zod contracts,
   response filtering and OpenAPI input/output components. Response validation

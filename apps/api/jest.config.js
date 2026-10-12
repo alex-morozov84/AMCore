@@ -1,5 +1,5 @@
 module.exports = {
-  preset: 'ts-jest',
+  transform: { '^.+\\.tsx?$': ['@swc/jest', require('./jest-swc.config.cjs')()] },
   testEnvironment: 'node',
   rootDir: '.',
   testMatch: ['**/*.spec.ts'],

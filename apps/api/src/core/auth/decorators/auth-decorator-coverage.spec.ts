@@ -28,14 +28,11 @@
  * Entries use **route signatures** (HTTP verb + class path + handler
  * path) — survives controller-class or method renames, since the URL
  * is the actual public contract.
- *
- * See ADR-034 in `ai/DECISIONS.md` and
- * `ai/ORGANIZATIONS_ADMIN_REVIEW.md` OA-11.
  */
 
 // Loading each controller transitively pulls everything that controller
 // depends on through Node's module graph. One tree in this repo carries
-// an ESM-only dependency that ts-jest's default `transformIgnorePatterns`
+// an ESM-only dependency that the unit config's `transformIgnorePatterns`
 // doesn't process:
 //   - OAuth chain → `oauth-client.service` → `jose`
 //
