@@ -39,9 +39,10 @@ export const storybookAgentsSeams = [
   ),
   owned(
     'storybook.agents-testing',
-    block('API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for', 'taxonomy.', {
+    block('API: Jest + SWC (unit) + Jest/SWC/Testcontainers (e2e); independent `typecheck`', 'taxonomy.', {
       replacement:
-        'API: Jest (unit) + Jest/Testcontainers (e2e). Shared: Vitest for\n' +
+        'API: Jest + SWC (unit) + Jest/SWC/Testcontainers (e2e); independent `typecheck`\n' +
+        'checks test types. Email retains its own Vitest config. Shared: Vitest for\n' +
         "`packages/shared`'s own schema/lib unit tests (`pnpm --filter shared test`,\n" +
         'included in the default `pnpm test`). Web: Vitest for unit/component\n' +
         'tests, `msw/node` for selected same-origin `/api/*` integration tests,\n' +
