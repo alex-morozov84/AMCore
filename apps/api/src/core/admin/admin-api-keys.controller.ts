@@ -7,7 +7,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
-import { ZodResponse, ZodValidationException } from 'nestjs-zod'
 import { z } from 'zod'
 
 import {
@@ -18,6 +17,8 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
+import { SchemaValidationException } from '../../common/schemas/schema-validation'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
 import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service'
 import { Auth } from '../auth/decorators/auth.decorator'
@@ -99,13 +100,13 @@ export class AdminApiKeysController {
     status: 503,
     description: 'Inventory or mandatory read-audit unavailable; no metadata returned',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminApiKeyListDto,
     status: 200,
     description: 'Paginated safe credential metadata; status is lifecycle only',
   })
   list(
-    @Query() query: AdminApiKeyQueryDto,
+    @Query({ schema: AdminApiKeyQueryDto.schema }) query: AdminApiKeyQueryDto,
     @CurrentUser() actor: RequestPrincipal
   ): Promise<AdminApiKeyListResponse> {
     return this.inventory.list(query, actor.sub)
@@ -118,7 +119,7 @@ export class AdminApiKeysController {
   @ApiOperation({ summary: 'Irreversibly revoke one API key; known revoked keys are a no-op' })
   @ApiParam({ name: 'id', description: 'API-key CUID', type: String })
   @ApiResponse({ status: 404, description: 'Unknown or purged key' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminApiKeyRevokeResultDto,
     status: 200,
     description: 'Actual requested and affected counts',
@@ -128,7 +129,7 @@ export class AdminApiKeysController {
     @CurrentUser() actor: RequestPrincipal
   ): Promise<AdminApiKeyRevokeResponse> {
     const parsed = z.cuid().safeParse(id)
-    if (!parsed.success) throw new ZodValidationException(parsed.error)
+    if (!parsed.success) throw new SchemaValidationException(parsed.error)
     return this.revocation.revoke([parsed.data], actor.sub, true)
   }
 
@@ -145,13 +146,13 @@ export class AdminApiKeysController {
     status: 404,
     description: 'Unknown or purged target; refresh and reselect, no key changed',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: AdminApiKeyRevokeResultDto,
     status: 200,
     description: 'Actual requested and affected counts',
   })
   revokeSelected(
-    @Body() body: AdminApiKeyRevokeDto,
+    @Body({ schema: AdminApiKeyRevokeDto.schema }) body: AdminApiKeyRevokeDto,
     @CurrentUser() actor: RequestPrincipal
   ): Promise<AdminApiKeyRevokeResponse> {
     return this.revocation.revoke(body.ids, actor.sub, true)

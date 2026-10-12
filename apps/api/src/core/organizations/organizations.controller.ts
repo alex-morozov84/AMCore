@@ -21,7 +21,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import type { OrganizationContextResponse } from '@amcore/shared'
 import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
@@ -35,6 +34,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import type { AppAbility } from '../auth/casl/ability.factory'
 import type { TeamAccessDecision } from '../auth/casl/ability.factory'
 import { Auth } from '../auth/decorators/auth.decorator'
@@ -106,10 +106,10 @@ export class OrganizationsController {
   @Post()
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Create a new organization — caller becomes ADMIN' })
-  @ZodResponse({ type: OrgResponseDto, status: 201, description: 'Organization created' })
+  @SchemaResponse({ type: OrgResponseDto, status: 201, description: 'Organization created' })
   @RequestContextPolicy({ kind: 'personal' })
   create(
-    @Body() dto: CreateOrganizationDto,
+    @Body({ schema: CreateOrganizationDto.schema }) dto: CreateOrganizationDto,
     @CurrentUser('sub') userId: string
   ): Promise<OrgResponse> {
     return this.orgsService.create(userId, dto)
@@ -140,7 +140,7 @@ export class OrganizationsController {
     maximum: PAGINATION.MAX_LIMIT,
     example: PAGINATION.DEFAULT_LIMIT,
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: OrganizationListResponseDto,
     status: 200,
     description: 'Paginated organizations',
@@ -148,7 +148,7 @@ export class OrganizationsController {
   @RequestContextPolicy({ kind: 'discovery' })
   findAll(
     @CurrentUser('sub') userId: string,
-    @Query() pagination: PaginationQueryDto
+    @Query({ schema: PaginationQueryDto.schema }) pagination: PaginationQueryDto
   ): Promise<OrganizationListResponse> {
     return this.orgsService.findAllForUser(userId, pagination.page, pagination.limit)
   }
@@ -176,7 +176,7 @@ export class OrganizationsController {
     description:
       'JWT: membership-based discovery without switching organization context. API key: bound organization, actual record conditions and read permission for all six response fields; partial grants return 403.',
   })
-  @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
+  @SchemaResponse({ type: OrgResponseDto, status: 200, description: 'Organization details' })
   @RequestContextPolicy({ kind: 'discovery' })
   findOne(
     @Param('id') id: string,
@@ -196,7 +196,7 @@ export class OrganizationsController {
   })
   @ApiNotFoundResponse({ description: 'Organization missing or caller is not a member' })
   @ApiForbiddenResponse({ description: 'Bound credential organization does not match target' })
-  @ZodResponse({
+  @SchemaResponse({
     type: OrganizationContextResponseDto,
     status: 200,
     description: 'Safe organization context',
@@ -217,7 +217,7 @@ export class OrganizationsController {
     summary:
       'Update selected organization fields — current authority and full response read required',
   })
-  @ZodResponse({ type: OrgResponseDto, status: 200, description: 'Updated organization' })
+  @SchemaResponse({ type: OrgResponseDto, status: 200, description: 'Updated organization' })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'id' },
@@ -225,7 +225,7 @@ export class OrganizationsController {
   })
   update(
     @Param('id') id: string,
-    @Body() dto: UpdateOrganizationDto,
+    @Body({ schema: UpdateOrganizationDto.schema }) dto: UpdateOrganizationDto,
     @CurrentUser() principal: RequestPrincipal,
     @CurrentAbility() ability: AppAbility
   ): Promise<OrgResponse> {
@@ -279,7 +279,11 @@ export class OrganizationsController {
   @ApiUnauthorizedResponse({
     description: 'UNAUTHORIZED: invalid credential or missing/elapsed parent expiry',
   })
-  @ZodResponse({ type: SwitchOrgResponseDto, status: 200, description: 'Org-context access token' })
+  @SchemaResponse({
+    type: SwitchOrgResponseDto,
+    status: 200,
+    description: 'Org-context access token',
+  })
   @RequestContextPolicy({ kind: 'exchange' })
   async switchOrganization(
     @Param('id') orgId: string,

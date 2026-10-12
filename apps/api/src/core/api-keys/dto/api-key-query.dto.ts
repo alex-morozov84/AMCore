@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { apiKeyQuerySchema } from '@amcore/shared'
-export class ApiKeyQueryDto extends createZodDto(apiKeyQuerySchema) {}
+
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+export class ApiKeyQueryDto extends createSchemaDto(apiKeyQuerySchema) {}

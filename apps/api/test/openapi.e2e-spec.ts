@@ -19,7 +19,7 @@ import { setupE2ETest, teardownE2ETest } from './helpers'
  * success status code and the body kind (typed JSON schema / 204 no-content /
  * 3xx redirect / text). The check runs both ways — every documented operation
  * must be in the inventory and every inventory entry must be documented — so
- * a new handler that ships without a typed `@ZodResponse` (or with the wrong
+ * a new handler that ships without a typed `@SchemaResponse` (or with the wrong
  * status) fails CI, and a silent status flip (e.g. a `POST` defaulting back
  * to 200) is caught.
  *

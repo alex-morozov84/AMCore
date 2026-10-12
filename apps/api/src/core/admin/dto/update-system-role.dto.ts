@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { updateUserSystemRoleSchema } from '@amcore/shared'
 
-export class UpdateSystemRoleDto extends createZodDto(updateUserSystemRoleSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class UpdateSystemRoleDto extends createSchemaDto(updateUserSystemRoleSchema) {}

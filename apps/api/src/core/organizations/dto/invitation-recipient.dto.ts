@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   invitationAdmissionResponseSchema,
   invitationAdmissionSchema,
@@ -9,11 +7,13 @@ import {
   invitedRegisterSchema,
 } from '@amcore/shared'
 
-export class InvitationAdmissionDto extends createZodDto(invitationAdmissionSchema) {}
-export class InvitationAdmissionResponseDto extends createZodDto(
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class InvitationAdmissionDto extends createSchemaDto(invitationAdmissionSchema) {}
+export class InvitationAdmissionResponseDto extends createSchemaDto(
   invitationAdmissionResponseSchema
 ) {}
-export class InvitationContextDto extends createZodDto(invitationContextSchema) {}
-export const InvitationInspectDto = createZodDto(invitationInspectResponseSchema)
-export const InvitationOperationDto = createZodDto(invitationOperationResponseSchema)
-export class InvitedRegisterDto extends createZodDto(invitedRegisterSchema) {}
+export class InvitationContextDto extends createSchemaDto(invitationContextSchema) {}
+export const InvitationInspectDto = createSchemaDto(invitationInspectResponseSchema)
+export const InvitationOperationDto = createSchemaDto(invitationOperationResponseSchema)
+export class InvitedRegisterDto extends createSchemaDto(invitedRegisterSchema) {}

@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   memberAccessSchema,
   memberRolesQuerySchema,
@@ -10,12 +8,16 @@ import {
   replaceMemberRolesSchema,
 } from '@amcore/shared'
 
-export class OrganizationMembersQueryDto extends createZodDto(organizationMembersQuerySchema) {}
-export class MemberRolesQueryDto extends createZodDto(memberRolesQuerySchema) {}
-export class OrganizationMembersResponseDto extends createZodDto(
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class OrganizationMembersQueryDto extends createSchemaDto(organizationMembersQuerySchema) {}
+export class MemberRolesQueryDto extends createSchemaDto(memberRolesQuerySchema) {}
+export class OrganizationMembersResponseDto extends createSchemaDto(
   organizationMembersResponseSchema
 ) {}
-export const MemberRolesResponseDto = createZodDto(memberRolesResponseSchema)
-export class MemberAccessResponseDto extends createZodDto(memberAccessSchema) {}
-export class ReplaceMemberRolesDto extends createZodDto(replaceMemberRolesSchema) {}
-export class ReplaceMemberRolesResponseDto extends createZodDto(replaceMemberRolesResponseSchema) {}
+export const MemberRolesResponseDto = createSchemaDto(memberRolesResponseSchema)
+export class MemberAccessResponseDto extends createSchemaDto(memberAccessSchema) {}
+export class ReplaceMemberRolesDto extends createSchemaDto(replaceMemberRolesSchema) {}
+export class ReplaceMemberRolesResponseDto extends createSchemaDto(
+  replaceMemberRolesResponseSchema
+) {}

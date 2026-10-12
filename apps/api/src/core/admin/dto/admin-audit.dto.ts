@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { adminAuditResponseSchema } from '@amcore/shared'
 
-export class AdminAuditResponseDto extends createZodDto(adminAuditResponseSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class AdminAuditResponseDto extends createSchemaDto(adminAuditResponseSchema) {}

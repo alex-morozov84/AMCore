@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   type AiAssistantListResponse,
@@ -10,6 +9,7 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../../common/schemas/schema-response'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling'
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
@@ -43,18 +43,18 @@ export class AiAssistantAdminController {
 
   @Get()
   @ApiOperation({ summary: 'List assistants (latest-per-slug by default) — SUPER_ADMIN only' })
-  @ZodResponse({
+  @SchemaResponse({
     type: AiAssistantListResponseDto,
     status: 200,
     description: 'Paginated assistants',
   })
-  list(@Query() query: AiAssistantListQueryDto): Promise<AiAssistantListResponse> {
+  list(@Query({ schema: AiAssistantListQueryDto.schema }) query: AiAssistantListQueryDto): Promise<AiAssistantListResponse> {
     return this.service.list(query)
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Fetch one assistant version — SUPER_ADMIN only' })
-  @ZodResponse({ type: AiAssistantResponseDto, status: 200, description: 'Assistant' })
+  @SchemaResponse({ type: AiAssistantResponseDto, status: 200, description: 'Assistant' })
   get(@Param('id') id: string): Promise<AiAssistantResponse> {
     return this.service.get(id)
   }
@@ -63,10 +63,10 @@ export class AiAssistantAdminController {
   @ApiOperation({ summary: 'Create a new assistant (version 1) — SUPER_ADMIN only' })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
-  @ZodResponse({ type: AiAssistantResponseDto, status: 201, description: 'Created assistant' })
+  @SchemaResponse({ type: AiAssistantResponseDto, status: 201, description: 'Created assistant' })
   create(
     @CurrentUser() actor: RequestPrincipal,
-    @Body() dto: CreateAiAssistantDto
+    @Body({ schema: CreateAiAssistantDto.schema }) dto: CreateAiAssistantDto
   ): Promise<AiAssistantResponse> {
     return this.service.create(actor, dto)
   }
@@ -75,11 +75,11 @@ export class AiAssistantAdminController {
   @ApiOperation({ summary: 'Publish a new immutable assistant version — SUPER_ADMIN only' })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
-  @ZodResponse({ type: AiAssistantResponseDto, status: 201, description: 'Published version' })
+  @SchemaResponse({ type: AiAssistantResponseDto, status: 201, description: 'Published version' })
   publishVersion(
     @CurrentUser() actor: RequestPrincipal,
     @Param('slug') slug: string,
-    @Body() dto: PublishAiAssistantVersionDto
+    @Body({ schema: PublishAiAssistantVersionDto.schema }) dto: PublishAiAssistantVersionDto
   ): Promise<AiAssistantResponse> {
     return this.service.publishVersion(actor, slug, dto)
   }
@@ -88,11 +88,11 @@ export class AiAssistantAdminController {
   @ApiOperation({ summary: 'Update assistant enabled/displayName in place — SUPER_ADMIN only' })
   @RequireFreshAuth()
   @RateLimit(RATE_LIMIT_POLICIES.PRIVILEGED_MUTATION)
-  @ZodResponse({ type: AiAssistantResponseDto, status: 200, description: 'Updated assistant' })
+  @SchemaResponse({ type: AiAssistantResponseDto, status: 200, description: 'Updated assistant' })
   update(
     @CurrentUser() actor: RequestPrincipal,
     @Param('id') id: string,
-    @Body() dto: UpdateAiAssistantDto
+    @Body({ schema: UpdateAiAssistantDto.schema }) dto: UpdateAiAssistantDto
   ): Promise<AiAssistantResponse> {
     return this.service.update(actor, id, dto)
   }

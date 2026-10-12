@@ -9,7 +9,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -17,6 +16,7 @@ import {
   ORGANIZATION_CONTEXT_FAMILY,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 import {
@@ -48,7 +48,7 @@ export class CapabilitiesController {
   @ApiOperation({ summary: 'Discover implemented authorization capabilities for role authoring' })
   @ApiParam({ name: 'orgId', description: 'Selected organization ID' })
   @ApiBadRequestResponse({ description: 'Malformed or conflicting organization selector' })
-  @ZodResponse({
+  @SchemaResponse({
     type: CapabilityCatalogueResponseDto,
     status: 200,
     description: 'Implemented capability and preset metadata; no grants',

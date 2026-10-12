@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Header, Patch, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -9,6 +8,7 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
@@ -43,7 +43,7 @@ export class AdminStorageSettingController {
   @ApiOperation({
     summary: 'Read saved interval and responding API applied state; not fleet confirmation',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: StorageProbeSettingResponseDto,
     status: 200,
     description: 'Saved and applied state separately',
@@ -67,13 +67,13 @@ export class AdminStorageSettingController {
   })
   @ApiResponse({ status: 429, description: 'Privileged write rate exceeded' })
   @ApiResponse({ status: 500, description: 'Write or atomic audit failed; no success receipt' })
-  @ZodResponse({
+  @SchemaResponse({
     type: StorageProbeSettingResponseDto,
     status: 200,
     description: 'Committed saved state; runtime adoption may lag',
   })
   update(
-    @Body() input: StorageProbeSettingUpdateDto,
+    @Body({ schema: StorageProbeSettingUpdateDto.schema }) input: StorageProbeSettingUpdateDto,
     @CurrentUser() actor: RequestPrincipal
   ): Promise<StorageProbeSettingResponse> {
     return this.settings.update(input, actor)

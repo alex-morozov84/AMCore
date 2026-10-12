@@ -1,7 +1,7 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { organizationContextResponseSchema } from '@amcore/shared'
 
-export class OrganizationContextResponseDto extends createZodDto(
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class OrganizationContextResponseDto extends createSchemaDto(
   organizationContextResponseSchema
 ) {}

@@ -23,7 +23,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -38,6 +37,7 @@ import {
 } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
@@ -110,10 +110,10 @@ export class RoleDefinitionsController {
   })
   @ApiBadRequestResponse({ description: 'Invalid query or selector' })
   @ApiServiceUnavailableResponse({ description: 'ROLE_READ_UNAVAILABLE: read budget exceeded' })
-  @ZodResponse({ type: RoleDefinitionListResponseDto, status: 200 })
+  @SchemaResponse({ type: RoleDefinitionListResponseDto, status: 200 })
   list(
     @Param('orgId') orgId: string,
-    @Query() query: RoleDefinitionListQueryDto,
+    @Query({ schema: RoleDefinitionListQueryDto.schema }) query: RoleDefinitionListQueryDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<RoleDefinitionListResponse> {
     return this.queries.list(orgId, principal.organizationId, query)
@@ -129,7 +129,7 @@ export class RoleDefinitionsController {
   })
   @ApiNotFoundResponse({ description: 'ROLE_UNAVAILABLE: missing, foreign or unassignable role' })
   @ApiServiceUnavailableResponse({ description: 'ROLE_READ_UNAVAILABLE: read budget exceeded' })
-  @ZodResponse({ type: RoleDefinitionDetailDto, status: 200 })
+  @SchemaResponse({ type: RoleDefinitionDetailDto, status: 200 })
   detail(
     @Param('orgId') orgId: string,
     @Param('roleId') id: string,
@@ -148,10 +148,10 @@ export class RoleDefinitionsController {
   @ApiServiceUnavailableResponse({
     description: 'ROLE_SAVE_UNAVAILABLE: outcome unconfirmed, never replayed',
   })
-  @ZodResponse({ type: RoleDefinitionDetailDto, status: 201 })
+  @SchemaResponse({ type: RoleDefinitionDetailDto, status: 201 })
   create(
     @Param('orgId') orgId: string,
-    @Body() body: CreateRoleDefinitionDto,
+    @Body({ schema: CreateRoleDefinitionDto.schema }) body: CreateRoleDefinitionDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<RoleDefinitionDetail> {
     return this.commands.create(orgId, body, principal)
@@ -181,11 +181,11 @@ export class RoleDefinitionsController {
   @ApiServiceUnavailableResponse({
     description: 'ROLE_SAVE_UNAVAILABLE: outcome unconfirmed, never replayed',
   })
-  @ZodResponse({ type: SaveRoleDefinitionResponseDto, status: 200 })
+  @SchemaResponse({ type: SaveRoleDefinitionResponseDto, status: 200 })
   save(
     @Param('orgId') orgId: string,
     @Param('roleId') id: string,
-    @Body() body: SaveRoleDefinitionDto,
+    @Body({ schema: SaveRoleDefinitionDto.schema }) body: SaveRoleDefinitionDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<SaveRoleDefinitionResponse> {
     return this.commands.save(orgId, roleId(id), body, principal)
@@ -212,11 +212,11 @@ export class RoleDefinitionsController {
   @ApiServiceUnavailableResponse({
     description: 'ROLE_SAVE_UNAVAILABLE: outcome unconfirmed, never replayed',
   })
-  @ZodResponse({ type: DeleteRoleDefinitionResponseDto, status: 200 })
+  @SchemaResponse({ type: DeleteRoleDefinitionResponseDto, status: 200 })
   remove(
     @Param('orgId') orgId: string,
     @Param('roleId') id: string,
-    @Body() body: DeleteRoleDefinitionDto,
+    @Body({ schema: DeleteRoleDefinitionDto.schema }) body: DeleteRoleDefinitionDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<DeleteRoleDefinitionResponse> {
     return this.commands.remove(orgId, roleId(id), body, principal)

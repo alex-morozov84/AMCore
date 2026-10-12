@@ -39,7 +39,7 @@ export function toAiRunResponse(
 
 /**
  * DB → wire projection for a transcript message (Track C — ADR-054, Arc F.3b). `content` is stored as
- * the validated structured-parts JSON and re-validated by `@ZodResponse` on the way out. The wire
+ * the validated structured-parts JSON and re-validated by `@SchemaResponse` on the way out. The wire
  * `role`/`authorType` are the lowercase projection of the Prisma SCREAMING_CASE tokens.
  */
 export function toAiMessageResponse(message: AiMessage): AiMessageResponse {

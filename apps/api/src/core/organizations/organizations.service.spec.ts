@@ -42,7 +42,7 @@ describe('OrganizationsService', () => {
   }
 
   // Arc C: create/findOne/update map Prisma rows to the response shape
-  // (Date → ISO string) before returning, so handlers can `@ZodResponse`.
+  // (Date → ISO string) before returning, so handlers can `@SchemaResponse`.
   const expectedOrgResponse = {
     id: mockOrg.id,
     name: mockOrg.name,

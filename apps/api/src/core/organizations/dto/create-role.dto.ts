@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { createRoleSchema } from '@amcore/shared'
 
-export class CreateRoleDto extends createZodDto(createRoleSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class CreateRoleDto extends createSchemaDto(createRoleSchema) {}

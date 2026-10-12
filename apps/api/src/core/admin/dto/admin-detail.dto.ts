@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   adminOrganizationDetailQuerySchema,
   adminOrganizationDetailResponseSchema,
@@ -7,11 +5,13 @@ import {
   adminUserDetailResponseSchema,
 } from '@amcore/shared'
 
-export class AdminUserDetailQueryDto extends createZodDto(adminUserDetailQuerySchema) {}
-export class AdminOrganizationDetailQueryDto extends createZodDto(
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class AdminUserDetailQueryDto extends createSchemaDto(adminUserDetailQuerySchema) {}
+export class AdminOrganizationDetailQueryDto extends createSchemaDto(
   adminOrganizationDetailQuerySchema
 ) {}
-export class AdminUserDetailResponseDto extends createZodDto(adminUserDetailResponseSchema) {}
-export class AdminOrganizationDetailResponseDto extends createZodDto(
+export class AdminUserDetailResponseDto extends createSchemaDto(adminUserDetailResponseSchema) {}
+export class AdminOrganizationDetailResponseDto extends createSchemaDto(
   adminOrganizationDetailResponseSchema
 ) {}

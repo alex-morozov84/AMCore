@@ -27,10 +27,10 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse, ZodValidationPipe } from 'nestjs-zod'
 
 import { AuthType, ORGANIZATION_CONTEXT_FAMILY, type ReissueInviteInput } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 import {
@@ -77,11 +77,11 @@ export class InvitesController {
   @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 100 })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['pending', 'expired', 'all'] })
-  @ZodResponse({ type: InviteListResponseDto, status: 200 })
+  @SchemaResponse({ type: InviteListResponseDto, status: 200 })
   listInvites(
     @Param('orgId') orgId: string,
     @CurrentInvitationActor() actor: InvitationActor,
-    @Query() query: InviteListQueryDto
+    @Query({ schema: InviteListQueryDto.schema }) query: InviteListQueryDto
   ): ReturnType<InviteService['listInvites']> {
     return this.inviteService.listInvites(orgId, actor, query)
   }
@@ -95,11 +95,11 @@ export class InvitesController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number, maximum: 100 })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ZodResponse({ type: InviteRoleChoicesResponseDto, status: 200 })
+  @SchemaResponse({ type: InviteRoleChoicesResponseDto, status: 200 })
   roleChoices(
     @Param('orgId') orgId: string,
     @CurrentInvitationActor() actor: InvitationActor,
-    @Query() query: InviteRoleChoicesQueryDto
+    @Query({ schema: InviteRoleChoicesQueryDto.schema }) query: InviteRoleChoicesQueryDto
   ): ReturnType<InviteService['roleChoices']> {
     return this.inviteService.roleChoices(orgId, actor, query)
   }
@@ -116,14 +116,14 @@ export class InvitesController {
     required: true,
     description: 'UUIDv7; first execution within24h, replay30d',
   })
-  @ZodResponse({
+  @SchemaResponse({
     type: InviteResponseDto,
     status: 202,
     description: 'Decision committed; email delivery is best-effort',
   })
   create(
     @Param('orgId') orgId: string,
-    @Body() dto: CreateInviteDto,
+    @Body({ schema: CreateInviteDto.schema }) dto: CreateInviteDto,
     @CurrentInvitationActor() actor: InvitationActor,
     @Headers('x-invitation-operation-id') operation: string
   ): ReturnType<InviteService['createInvite']> {
@@ -140,7 +140,7 @@ export class InvitesController {
   })
   @ApiParam({ name: 'inviteId', type: String })
   @ApiHeader({ name: 'X-Invitation-Operation-Id', required: true })
-  @ZodResponse({
+  @SchemaResponse({
     type: InviteResponseDto,
     status: 202,
     description: 'Decision committed; email delivery is best-effort',
@@ -148,7 +148,7 @@ export class InvitesController {
   reissue(
     @Param('orgId') orgId: string,
     @Param('inviteId') id: string,
-    @Body(new ZodValidationPipe(ReissueInviteDto)) dto: ReissueInviteInput,
+    @Body({ schema: ReissueInviteDto.schema }) dto: ReissueInviteInput,
     @CurrentInvitationActor() actor: InvitationActor,
     @Headers('x-invitation-operation-id') operation: string
   ): ReturnType<InviteService['reissueInvite']> {
@@ -173,7 +173,7 @@ export class InvitesController {
   revokeInvite(
     @Param('orgId') orgId: string,
     @Param('inviteId') id: string,
-    @Query() query: RevokeInviteQueryDto,
+    @Query({ schema: RevokeInviteQueryDto.schema }) query: RevokeInviteQueryDto,
     @CurrentInvitationActor() actor: InvitationActor,
     @Headers('x-invitation-operation-id') operation: string
   ): ReturnType<InviteService['revokeInvite']> {

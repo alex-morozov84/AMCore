@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   createRoleDefinitionSchema,
   deleteRoleDefinitionResponseSchema,
@@ -11,13 +9,19 @@ import {
   saveRoleDefinitionSchema,
 } from '@amcore/shared'
 
-export class RoleDefinitionListQueryDto extends createZodDto(roleDefinitionListQuerySchema) {}
-export class RoleDefinitionListResponseDto extends createZodDto(roleDefinitionListResponseSchema) {}
-export class RoleDefinitionDetailDto extends createZodDto(roleDefinitionDetailSchema) {}
-export class CreateRoleDefinitionDto extends createZodDto(createRoleDefinitionSchema) {}
-export class SaveRoleDefinitionDto extends createZodDto(saveRoleDefinitionSchema) {}
-export class SaveRoleDefinitionResponseDto extends createZodDto(saveRoleDefinitionResponseSchema) {}
-export class DeleteRoleDefinitionDto extends createZodDto(deleteRoleDefinitionSchema) {}
-export class DeleteRoleDefinitionResponseDto extends createZodDto(
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class RoleDefinitionListQueryDto extends createSchemaDto(roleDefinitionListQuerySchema) {}
+export class RoleDefinitionListResponseDto extends createSchemaDto(
+  roleDefinitionListResponseSchema
+) {}
+export class RoleDefinitionDetailDto extends createSchemaDto(roleDefinitionDetailSchema) {}
+export class CreateRoleDefinitionDto extends createSchemaDto(createRoleDefinitionSchema) {}
+export class SaveRoleDefinitionDto extends createSchemaDto(saveRoleDefinitionSchema) {}
+export class SaveRoleDefinitionResponseDto extends createSchemaDto(
+  saveRoleDefinitionResponseSchema
+) {}
+export class DeleteRoleDefinitionDto extends createSchemaDto(deleteRoleDefinitionSchema) {}
+export class DeleteRoleDefinitionResponseDto extends createSchemaDto(
   deleteRoleDefinitionResponseSchema
 ) {}

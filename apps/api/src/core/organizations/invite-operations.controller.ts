@@ -9,10 +9,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import { AuthType, ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
 import {
@@ -44,7 +44,7 @@ export class InviteOperationsController {
   @ApiOperation({
     summary: 'Recover an own committed invitation command; unknown is not rollback proof',
   })
-  @ZodResponse({ type: ManagerInviteOperationResponseDto, status: 200 })
+  @SchemaResponse({ type: ManagerInviteOperationResponseDto, status: 200 })
   operation(
     @Param('orgId') orgId: string,
     @Param('operationId') id: string,

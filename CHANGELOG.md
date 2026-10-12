@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade the API to NestJS 12 and replace `nestjs-zod` with native request
+  schema validation and a typed response seam. Preserve shared Zod contracts,
+  response filtering and OpenAPI input/output components. Response validation
+  failures use a safe 500 with `INTERNAL_ERROR`.
+
 ### Security
 
 - Refresh ts-jest's Handlebars dependency to 4.7.10 and SWC CLI's transitive

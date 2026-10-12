@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   inviteListQuerySchema,
   inviteRoleChoicesQuerySchema,
@@ -9,9 +7,15 @@ import {
   revokeInviteQuerySchema,
 } from '@amcore/shared'
 
-export class InviteListQueryDto extends createZodDto(inviteListQuerySchema) {}
-export class InviteRoleChoicesQueryDto extends createZodDto(inviteRoleChoicesQuerySchema) {}
-export class InviteRoleChoicesResponseDto extends createZodDto(inviteRoleChoicesResponseSchema) {}
-export const ReissueInviteDto = createZodDto(reissueInviteSchema)
-export class RevokeInviteQueryDto extends createZodDto(revokeInviteQuerySchema) {}
-export const ManagerInviteOperationResponseDto = createZodDto(managerInviteOperationResponseSchema)
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class InviteListQueryDto extends createSchemaDto(inviteListQuerySchema) {}
+export class InviteRoleChoicesQueryDto extends createSchemaDto(inviteRoleChoicesQuerySchema) {}
+export class InviteRoleChoicesResponseDto extends createSchemaDto(
+  inviteRoleChoicesResponseSchema
+) {}
+export const ReissueInviteDto = createSchemaDto(reissueInviteSchema)
+export class RevokeInviteQueryDto extends createSchemaDto(revokeInviteQuerySchema) {}
+export const ManagerInviteOperationResponseDto = createSchemaDto(
+  managerInviteOperationResponseSchema
+)

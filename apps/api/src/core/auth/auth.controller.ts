@@ -30,7 +30,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   type AuthResponse,
@@ -46,6 +45,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../env/env.service'
 import { invitationHandoffProof } from '../invitations/invitation-auth-handoff'
@@ -121,7 +121,7 @@ export class AuthController {
     summary:
       'Read the public signup policy; invitation/account authorization remains server-enforced',
   })
-  @ZodResponse({ type: SignupPolicyResponseDto, status: 200 })
+  @SchemaResponse({ type: SignupPolicyResponseDto, status: 200 })
   signupPolicy(): { publicSignupEnabled: boolean } {
     return { publicSignupEnabled: this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED') }
   }
@@ -135,9 +135,9 @@ export class AuthController {
     summary:
       'Register under public signup policy; scoped handoff uses the fixed matching invitation email',
   })
-  @ZodResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
+  @SchemaResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
   async register(
-    @Body() dto: RegisterDto,
+    @Body({ schema: RegisterDto.schema }) dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
   ): Promise<AuthResponse> {
@@ -175,9 +175,9 @@ export class AuthController {
   @ApiOperation({
     summary: 'Login user; optional scoped invitation handoff requires explicit confirmation',
   })
-  @ZodResponse({ type: AuthResponseDto, status: 200, description: 'Login successful' })
+  @SchemaResponse({ type: AuthResponseDto, status: 200, description: 'Login successful' })
   async login(
-    @Body() dto: LoginDto,
+    @Body({ schema: LoginDto.schema }) dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
   ): Promise<AuthResponse> {
@@ -226,7 +226,7 @@ export class AuthController {
   @UseGuards(OriginCheckGuard, RefreshTokenGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Refresh access token' })
-  @ZodResponse({ type: RefreshResponseDto, status: 200, description: 'Access token refreshed' })
+  @SchemaResponse({ type: RefreshResponseDto, status: 200, description: 'Access token refreshed' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
@@ -275,7 +275,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiSecurity('apiKeyBearer')
   @ApiOperation({ summary: 'Get current user profile' })
-  @ZodResponse({ type: ProfileResponseDto, status: 200, description: 'Current user profile' })
+  @SchemaResponse({ type: ProfileResponseDto, status: 200, description: 'Current user profile' })
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
     const profile = await this.authService.getUserById(user.sub)
     return { user: profile }
@@ -291,10 +291,10 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update current user profile' })
-  @ZodResponse({ type: ProfileResponseDto, status: 200, description: 'Updated user profile' })
+  @SchemaResponse({ type: ProfileResponseDto, status: 200, description: 'Updated user profile' })
   async updateProfile(
     @CurrentUser('sub') userId: string,
-    @Body() dto: UpdateProfileDto
+    @Body({ schema: UpdateProfileDto.schema }) dto: UpdateProfileDto
   ): Promise<ProfileResponse> {
     const user = await this.authService.updateProfile(userId, dto)
     return { user }
@@ -322,7 +322,7 @@ export class AuthController {
       required: ['file'],
     },
   })
-  @ZodResponse({ type: AvatarResponseDto, status: 201, description: 'Avatar stored' })
+  @SchemaResponse({ type: AvatarResponseDto, status: 201, description: 'Avatar stored' })
   async uploadAvatar(
     @CurrentUser('sub') userId: string,
     @UploadedFile(new FileValidationPipe(AVATAR_VALIDATION)) file: AvatarUploadFile
@@ -352,10 +352,10 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Re-verify password to refresh step-up freshness' })
-  @ZodResponse({ type: RefreshResponseDto, status: 200, description: 'Step-up token issued' })
+  @SchemaResponse({ type: RefreshResponseDto, status: 200, description: 'Step-up token issued' })
   async stepUp(
     @CurrentUser() principal: RequestPrincipal,
-    @Body() dto: StepUpDto,
+    @Body({ schema: StepUpDto.schema }) dto: StepUpDto,
     @Req() req: Request
   ): Promise<RefreshResponse> {
     return this.authService.stepUp(principal, dto.password, req.ip ?? '')
@@ -392,11 +392,11 @@ export class AuthController {
       "Display locale for each session's approximate-location city name ('en'/'ru'); " +
       'unsupported or absent falls back to en. Never used for authorization.',
   })
-  @ZodResponse({ type: SessionsListResponseDto, status: 200, description: 'Active sessions' })
+  @SchemaResponse({ type: SessionsListResponseDto, status: 200, description: 'Active sessions' })
   async sessions(
     @CurrentUser('sub') userId: string,
     @Req() req: Request,
-    @Query() pagination: PaginationQueryDto,
+    @Query({ schema: PaginationQueryDto.schema }) pagination: PaginationQueryDto,
     @Headers('accept-language') acceptLanguage: string | undefined
   ): Promise<SessionsListResponse> {
     const refreshToken = req.cookies?.refresh_token
@@ -445,8 +445,10 @@ export class AuthController {
   @Post('forgot-password')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Request password reset email' })
-  @ZodResponse({ type: MessageResponseDto, status: 200, description: 'Reset email dispatched' })
-  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<MessageResponse> {
+  @SchemaResponse({ type: MessageResponseDto, status: 200, description: 'Reset email dispatched' })
+  async forgotPassword(
+    @Body({ schema: ForgotPasswordDto.schema }) dto: ForgotPasswordDto
+  ): Promise<MessageResponse> {
     await this.authService.forgotPassword(dto.email)
     // Always return the same message to prevent account enumeration
     return { message: 'If an account with that email exists, a password reset link has been sent.' }
@@ -457,7 +459,9 @@ export class AuthController {
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiNoContentResponse({ description: 'Password reset' })
-  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+  async resetPassword(
+    @Body({ schema: ResetPasswordDto.schema }) dto: ResetPasswordDto
+  ): Promise<void> {
     await this.authService.resetPassword(dto.token, dto.password)
   }
 
@@ -466,19 +470,21 @@ export class AuthController {
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Verify email address using token from email' })
   @ApiNoContentResponse({ description: 'Email verified' })
-  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+  async verifyEmail(@Body({ schema: VerifyEmailDto.schema }) dto: VerifyEmailDto): Promise<void> {
     await this.authService.verifyEmail(dto.token)
   }
 
   @Post('resend-verification')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Resend email verification link' })
-  @ZodResponse({
+  @SchemaResponse({
     type: MessageResponseDto,
     status: 200,
     description: 'Verification email dispatched',
   })
-  async resendVerification(@Body() dto: ResendVerificationDto): Promise<MessageResponse> {
+  async resendVerification(
+    @Body({ schema: ResendVerificationDto.schema }) dto: ResendVerificationDto
+  ): Promise<MessageResponse> {
     await this.authService.resendVerificationEmail(dto.email)
     // Always return the same message to prevent account enumeration
     return {

@@ -1,0 +1,91 @@
+# Request and response schemas
+
+AMCore uses shared Zod schemas with NestJS 12's Standard Schema request validation.
+It does not require `nestjs-zod` or `class-validator`.
+
+## Requests
+
+Keep schemas in `packages/shared`. Do not add literal localized messages.
+Custom issues carry `params: { errorCode }`; the frontend translates that code.
+
+Wrap the schema to retain a named DTO and its parsed TypeScript type:
+
+```ts
+import { createSchemaDto } from '../../common/schemas/schema-dto'
+
+export class CreateThingDto extends createSchemaDto(createThingSchema) {}
+```
+
+Declare the schema explicitly on each validated parameter:
+
+```ts
+create(@Body({ schema: CreateThingDto.schema }) input: CreateThingDto) {
+  return this.service.create(input)
+}
+```
+
+Use the same option on `@Query()` and `@Param()`. A raw schema works too:
+`@Param('id', { schema: identifierSchema })`. A DTO type alone does not validate
+input. The global native pipe reads parameter schema metadata, applies coercion,
+defaults and transformations, and rejects invalid input.
+
+`createSchemaValidationPipe()` supplies the application exception factory.
+It preserves nested/root paths, issue codes and custom `errorCode`, including
+Standard Schema's `{ key }` path segments. Only transport fields survive in the
+exception; the request value and nested validation error objects do not.
+The existing HTTP exception filter emits field errors and the correlation ID.
+For explicit `safeParse()` branches, throw `SchemaValidationException(error)`.
+
+## Responses
+
+Declare the DTO with `@SchemaResponse({ type: ThingDto, status: 200 })`.
+This declaration binds three contracts:
+
+```text
+Shared schema -> handler return type
+              -> whole-response validation -> filtered HTTP response
+              -> Swagger output schema
+```
+
+The decorator checks the handler's return type at compilation. The global
+`SchemaResponseInterceptor` validates the entire declared response, including an
+array's length, primitive values and null. It applies schema transforms and strips
+unknown fields. Invalid responses produce a safe 500 with `INTERNAL_ERROR`;
+neither the invalid response nor its validation issues enter the exception.
+
+The handler returns the response schema's input; the interceptor produces its
+output. If the handler already applies a transform, declare a separate schema
+for that result to avoid applying the transform twice. `[ThingDto]` declares an
+array of that DTO. A root array schema keeps its whole-array constraints.
+
+The interceptor passes through responses without a schema. Keep download,
+`StreamableFile`, SSE, manual responses and 204 handlers outside JSON validation
+unless they already declare a corresponding response contract.
+
+Nest's native serializer processes arrays element by element and bypasses some
+falsy values. AMCore's narrow interceptor preserves whole-response contracts.
+Request validation uses the native pipe directly.
+
+## OpenAPI and checks
+
+`buildApiDocument()` passes `schemaOpenApiConverter` to Swagger. It uses Zod's
+input/output JSON Schema conversion and preserves named DTO components:
+`ThingDto` for requests and `ThingDto_Output` for responses.
+Unrepresentable JSON transformations use Zod's `any` conversion; runtime validation
+still uses the complete shared schema. Do not replace a runtime contract with its
+documentation projection.
+
+Run API typecheck and the schema unit fixtures for changes to this seam. The
+return-type fixture checks a valid return and the specific compilation diagnostic
+for an invalid return. The OpenAPI E2E suite checks the public route inventory,
+success bodies, security, multipart requests and component references.
+
+NestJS 12 ships ESM packages. AMCore retains its CommonJS API on the declared
+Node floor, which supports synchronous `require(esm)`. Jest remains the existing
+runner; a runner migration is independent work. Framework upgrades also need
+role boot, worker admission and shutdown checks because lifecycle ordering changes.
+
+The E2E Jest setup evaluates Nest and its BullMQ integration before loading each
+suite. Jest's mixed CJS/ESM loader can otherwise reject a companion's synchronous
+require while the same ESM graph is still loading. This preparation runs in every
+isolated test environment and does not rely on the order of test files.

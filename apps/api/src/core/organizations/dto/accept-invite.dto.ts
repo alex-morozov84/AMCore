@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { acceptInviteSchema } from '@amcore/shared'
 
-export const AcceptInviteDto = createZodDto(acceptInviteSchema)
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export const AcceptInviteDto = createSchemaDto(acceptInviteSchema)

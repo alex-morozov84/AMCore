@@ -10,7 +10,6 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { createZodDto, ZodResponse } from 'nestjs-zod'
 
 import {
   AuthType,
@@ -19,6 +18,8 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { createSchemaDto } from '../../common/schemas/schema-dto'
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { RateLimit } from '../../infrastructure/throttling'
 import { invitationHandoffProof } from '../invitations/invitation-auth-handoff'
 import { InvitationAuthHandoffService } from '../invitations/invitation-auth-handoff.service'
@@ -31,8 +32,8 @@ import {
   RequestContextPolicy,
 } from './organization-context/request-context-policy'
 
-class HandoffConfirmedDto extends createZodDto(invitationHandoffConfirmedSchema) {}
-class HandoffAbortedDto extends createZodDto(invitationHandoffAbortedSchema) {}
+class HandoffConfirmedDto extends createSchemaDto(invitationHandoffConfirmedSchema) {}
+class HandoffAbortedDto extends createSchemaDto(invitationHandoffAbortedSchema) {}
 
 @ApiTags('auth')
 @ApiHeader({
@@ -63,7 +64,7 @@ export class InvitationHandoffsController {
   @ApiOperation({
     summary: 'Confirm the exact newly published backend session; repeated confirmation is safe',
   })
-  @ZodResponse({ type: HandoffConfirmedDto, status: 200 })
+  @SchemaResponse({ type: HandoffConfirmedDto, status: 200 })
   confirm(
     @Param('attemptId') attempt: string,
     @Headers('x-invitation-handoff-key') key: string,
@@ -78,7 +79,7 @@ export class InvitationHandoffsController {
   @ApiOperation({
     summary: 'Abort only the tagged unconfirmed session; never revoke a prior or confirmed session',
   })
-  @ZodResponse({ type: HandoffAbortedDto, status: 200 })
+  @SchemaResponse({ type: HandoffAbortedDto, status: 200 })
   abort(
     @Param('attemptId') attempt: string,
     @Headers('x-invitation-handoff-key') key: string

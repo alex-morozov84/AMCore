@@ -12,7 +12,6 @@ import {
 } from '@nestjs/common'
 import { ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
-import { ZodResponse } from 'nestjs-zod'
 
 import {
   AuthErrorCode,
@@ -25,6 +24,7 @@ import {
 } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../../common/exceptions'
+import { SchemaResponse } from '../../../common/schemas/schema-response'
 import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip'
 import { EnvService } from '../../../env/env.service'
 import { invitationHandoffProof } from '../../invitations/invitation-auth-handoff'
@@ -67,7 +67,7 @@ export class OAuthController {
   @Get('providers')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'List configured OAuth providers' })
-  @ZodResponse({
+  @SchemaResponse({
     type: OAuthProvidersResponseDto,
     status: 200,
     description: 'Configured providers',
@@ -240,9 +240,13 @@ export class OAuthController {
   @UseGuards(OriginCheckGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Exchange OAuth login ticket for access token' })
-  @ZodResponse({ type: OAuthExchangeResponseDto, status: 200, description: 'Access token issued' })
+  @SchemaResponse({
+    type: OAuthExchangeResponseDto,
+    status: 200,
+    description: 'Access token issued',
+  })
   async exchange(
-    @Body() dto: OAuthExchangeDto,
+    @Body({ schema: OAuthExchangeDto.schema }) dto: OAuthExchangeDto,
     @Req() req: Request
   ): Promise<OAuthExchangeResponse> {
     const refreshToken = req.cookies?.refresh_token

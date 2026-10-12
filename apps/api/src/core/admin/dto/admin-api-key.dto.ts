@@ -1,5 +1,3 @@
-import { createZodDto } from 'nestjs-zod'
-
 import {
   adminApiKeyListResponseSchema,
   adminApiKeyQuerySchema,
@@ -7,7 +5,9 @@ import {
   adminApiKeyRevokeSchema,
 } from '@amcore/shared'
 
-export class AdminApiKeyQueryDto extends createZodDto(adminApiKeyQuerySchema) {}
-export class AdminApiKeyListDto extends createZodDto(adminApiKeyListResponseSchema) {}
-export class AdminApiKeyRevokeDto extends createZodDto(adminApiKeyRevokeSchema) {}
-export class AdminApiKeyRevokeResultDto extends createZodDto(adminApiKeyRevokeResponseSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class AdminApiKeyQueryDto extends createSchemaDto(adminApiKeyQuerySchema) {}
+export class AdminApiKeyListDto extends createSchemaDto(adminApiKeyListResponseSchema) {}
+export class AdminApiKeyRevokeDto extends createSchemaDto(adminApiKeyRevokeSchema) {}
+export class AdminApiKeyRevokeResultDto extends createSchemaDto(adminApiKeyRevokeResponseSchema) {}

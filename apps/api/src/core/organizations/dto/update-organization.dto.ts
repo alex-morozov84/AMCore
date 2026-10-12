@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod'
-
 import { updateOrganizationSchema } from '@amcore/shared'
 
-export class UpdateOrganizationDto extends createZodDto(updateOrganizationSchema) {}
+import { createSchemaDto } from '../../../common/schemas/schema-dto'
+
+export class UpdateOrganizationDto extends createSchemaDto(updateOrganizationSchema) {}

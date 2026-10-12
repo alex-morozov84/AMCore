@@ -26,7 +26,6 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import { ZodResponse } from 'nestjs-zod'
 
 import { ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 import {
@@ -38,6 +37,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { SchemaResponse } from '../../common/schemas/schema-response'
 import { Auth } from '../auth/decorators/auth.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
@@ -108,10 +108,10 @@ export class MembersController {
   @RequireTeamAccess('orgId')
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @ApiOperation({ summary: 'List organization members; full TeamAccess and membership required' })
-  @ZodResponse({ type: OrganizationMembersResponseDto, status: 200 })
+  @SchemaResponse({ type: OrganizationMembersResponseDto, status: 200 })
   list(
     @Param('orgId') orgId: string,
-    @Query() query: OrganizationMembersQueryDto,
+    @Query({ schema: OrganizationMembersQueryDto.schema }) query: OrganizationMembersQueryDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<OrganizationMembersResponse> {
     return this.memberQuery.list(orgId, principal.organizationId, query)
@@ -136,11 +136,11 @@ export class MembersController {
   @RequireTeamAccess('orgId')
   @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' } })
   @ApiOperation({ summary: 'Read complete member assignments and paginated role choices' })
-  @ZodResponse({ type: MemberRolesResponseDto, status: 200 })
+  @SchemaResponse({ type: MemberRolesResponseDto, status: 200 })
   roles(
     @Param('orgId') orgId: string,
     @Param('userId') userId: string,
-    @Query() query: MemberRolesQueryDto,
+    @Query({ schema: MemberRolesQueryDto.schema }) query: MemberRolesQueryDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<MemberRolesResponse> {
     return this.memberQuery.roles(orgId, userId, principal.organizationId, query)
@@ -163,7 +163,7 @@ export class MembersController {
     description:
       'Items are of three kinds: `record` (exact decision for the organization row, built-in operations), `configured` (what the role settings configure by independent areas for other registered capabilities, never a proof for one record) and `notEvaluated` (a capability that opted out).',
   })
-  @ZodResponse({ type: MemberAccessResponseDto, status: 200 })
+  @SchemaResponse({ type: MemberAccessResponseDto, status: 200 })
   access(
     @Param('orgId') orgId: string,
     @Param('userId') userId: string,
@@ -195,11 +195,11 @@ export class MembersController {
     summary:
       'Atomically replace up to1000 roles with membership/ACL CAS; decoded JSON262144 bytes maximum',
   })
-  @ZodResponse({ type: ReplaceMemberRolesResponseDto, status: 200 })
+  @SchemaResponse({ type: ReplaceMemberRolesResponseDto, status: 200 })
   replace(
     @Param('orgId') orgId: string,
     @Param('userId') userId: string,
-    @Body() dto: ReplaceMemberRolesDto,
+    @Body({ schema: ReplaceMemberRolesDto.schema }) dto: ReplaceMemberRolesDto,
     @CurrentUser() principal: RequestPrincipal
   ): Promise<ReplaceMemberRolesResponse> {
     return this.memberRoleSet.replace(orgId, userId, dto, principal)

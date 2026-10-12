@@ -140,12 +140,12 @@ pnpm --filter @amcore/shared build
 
 ### 3. Implement: DTO → service (+ mapper) → controller → module
 
-- **DTO** — wrap each schema with `createZodDto()` so it produces validation +
-  Swagger automatically:
+- **DTO** — wrap each schema with `createSchemaDto()` to retain handler types. Declare the schema in Nest12 parameter metadata;
+  the native global pipe validates it, and Swagger reads the same metadata:
 
   ```ts
   // dto/thing-response.dto.ts
-  export class ThingResponseDto extends createZodDto(thingResponseSchema) {}
+  export class ThingResponseDto extends createSchemaDto(thingResponseSchema) {}
   ```
 
 - **Service** — own the Prisma access and **map raw Prisma rows to the shared
@@ -164,14 +164,19 @@ pnpm --filter @amcore/shared build
   export class ThingsController {
     @ApiOperation({ summary: 'Create a thing' })
     @Post()
-    @ZodResponse({ type: ThingResponseDto, status: 201, description: 'Thing created' })
-    create(@CurrentUser() user: RequestPrincipal, @Body() dto: CreateThingDto) {
+    @SchemaResponse({ type: ThingResponseDto, status: 201, description: 'Thing created' })
+    create(
+      @CurrentUser() user: RequestPrincipal,
+      @Body({ schema: CreateThingDto.schema }) dto: CreateThingDto
+    ) {
       return this.thingsService.create(user.sub, dto)
     }
   }
   ```
 
   Typed responses are **enforced** — see [Tests](#tests).
+  See [request and response schemas](schema-validation.md) for native metadata,
+  transformations, safe failures and OpenAPI input/output components.
 
 - **Module** — compose controller + service into a NestJS module; export any service
   other modules are allowed to call.
@@ -455,7 +460,7 @@ Cover the critical paths and the project-specific gates:
 - **E2E** (Jest + Testcontainers, needs Docker) — the HTTP contract end to end.
 - **OpenAPI inventory** — a new public handler **must** be added to the expected
   inventory in [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts).
-  The check runs both ways: a handler that ships without a typed `@ZodResponse` (or
+  The check runs both ways: a handler that ships without a typed `@SchemaResponse` (or
   with the wrong status) **fails CI**.
 - **OpenAPI security/multipart guardrails** — API-key-capable handlers must match
   the shared ADR-034 allowlist and document `apiKeyBearer`; upload handlers that
