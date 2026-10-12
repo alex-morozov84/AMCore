@@ -12,15 +12,18 @@ shape is generated from Swagger/OpenAPI at `/docs` in development.
 
 | Area           | Baseline                                                     |
 | -------------- | ------------------------------------------------------------ |
-| Framework      | NestJS 11                                                    |
+| Framework      | NestJS 12                                                    |
 | Database       | PostgreSQL 18, Prisma 7, schema-per-area modularity          |
 | Cache / queues | Redis, BullMQ                                                |
-| Validation     | Zod + `nestjs-zod`, shared contracts in `packages/shared`    |
+| Validation     | Shared Zod contracts + native Standard Schema metadata       |
 | Auth           | JWT/refresh sessions, OAuth/OIDC, API keys, CASL permissions |
 | Email          | Resend/mock providers, React Email, FormatJS                 |
 | Storage        | S3-compatible, local, and memory drivers                     |
 | Observability  | Pino logs, Prometheus metrics, health probes                 |
 | Rate limiting  | Redis-backed GCRA global backstop with per-route policies    |
+
+See [request/response schemas](../../docs/backend/schema-validation.md) for explicit
+parameter metadata, typed responses and OpenAPI conversion.
 
 ## Commands
 

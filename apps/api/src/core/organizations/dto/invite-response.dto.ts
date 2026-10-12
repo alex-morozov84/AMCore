@@ -18,4 +18,7 @@ export class InviteResponseDto extends createSchemaDto(inviteResponseSchema) {}
 
 export class InviteListResponseDto extends createSchemaDto(inviteListResponseSchema) {}
 
-export const AcceptInviteResponseDto = createSchemaDto(acceptInviteResponseSchema)
+export const AcceptInviteResponseDto = createSchemaDto(
+  acceptInviteResponseSchema,
+  'AcceptInviteResponseDto'
+)

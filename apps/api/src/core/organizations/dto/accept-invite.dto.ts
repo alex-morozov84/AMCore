@@ -2,4 +2,4 @@ import { acceptInviteSchema } from '@amcore/shared'
 
 import { createSchemaDto } from '../../../common/schemas/schema-dto'
 
-export const AcceptInviteDto = createSchemaDto(acceptInviteSchema)
+export const AcceptInviteDto = createSchemaDto(acceptInviteSchema, 'AcceptInviteDto')

@@ -15,7 +15,10 @@ export class MemberRolesQueryDto extends createSchemaDto(memberRolesQuerySchema)
 export class OrganizationMembersResponseDto extends createSchemaDto(
   organizationMembersResponseSchema
 ) {}
-export const MemberRolesResponseDto = createSchemaDto(memberRolesResponseSchema)
+export const MemberRolesResponseDto = createSchemaDto(
+  memberRolesResponseSchema,
+  'MemberRolesResponseDto'
+)
 export class MemberAccessResponseDto extends createSchemaDto(memberAccessSchema) {}
 export class ReplaceMemberRolesDto extends createSchemaDto(replaceMemberRolesSchema) {}
 export class ReplaceMemberRolesResponseDto extends createSchemaDto(

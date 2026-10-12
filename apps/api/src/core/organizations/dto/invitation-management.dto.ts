@@ -14,8 +14,9 @@ export class InviteRoleChoicesQueryDto extends createSchemaDto(inviteRoleChoices
 export class InviteRoleChoicesResponseDto extends createSchemaDto(
   inviteRoleChoicesResponseSchema
 ) {}
-export const ReissueInviteDto = createSchemaDto(reissueInviteSchema)
+export const ReissueInviteDto = createSchemaDto(reissueInviteSchema, 'ReissueInviteDto')
 export class RevokeInviteQueryDto extends createSchemaDto(revokeInviteQuerySchema) {}
 export const ManagerInviteOperationResponseDto = createSchemaDto(
-  managerInviteOperationResponseSchema
+  managerInviteOperationResponseSchema,
+  'ManagerInviteOperationResponseDto'
 )

@@ -14,6 +14,12 @@ export class InvitationAdmissionResponseDto extends createSchemaDto(
   invitationAdmissionResponseSchema
 ) {}
 export class InvitationContextDto extends createSchemaDto(invitationContextSchema) {}
-export const InvitationInspectDto = createSchemaDto(invitationInspectResponseSchema)
-export const InvitationOperationDto = createSchemaDto(invitationOperationResponseSchema)
+export const InvitationInspectDto = createSchemaDto(
+  invitationInspectResponseSchema,
+  'InvitationInspectDto'
+)
+export const InvitationOperationDto = createSchemaDto(
+  invitationOperationResponseSchema,
+  'InvitationOperationDto'
+)
 export class InvitedRegisterDto extends createSchemaDto(invitedRegisterSchema) {}

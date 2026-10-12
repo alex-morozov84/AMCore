@@ -16,6 +16,15 @@ import { createSchemaDto } from '../../common/schemas/schema-dto'
 export class CreateThingDto extends createSchemaDto(createThingSchema) {}
 ```
 
+A direct factory binding needs an explicit stable name, including union DTOs:
+
+```ts
+export const ChoiceDto = createSchemaDto(choiceSchema, 'ChoiceDto')
+```
+
+Named subclasses use their class names. Assigning an anonymous factory result to
+a variable does not rename its runtime class. Use a unique DTO name for each contract.
+
 Declare the schema explicitly on each validated parameter:
 
 ```ts

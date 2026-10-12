@@ -4,7 +4,7 @@ import { telegramConnectionResponseSchema, telegramLinkResponseSchema } from './
 
 /**
  * Contract tests for the shared Telegram linking responses. The connection status is a
- * `@ZodResponse` boundary, so the schema must make a contradictory state unrepresentable
+ * `@SchemaResponse` boundary, so the schema must make a contradictory state unrepresentable
  * (Finding D.1.1) — a real control, not a prose assertion.
  */
 describe('telegramConnectionResponseSchema', () => {

@@ -13,9 +13,9 @@ export class TelegramLinkResponseDto extends createSchemaDto(telegramLinkRespons
 
 /**
  * OpenAPI/`@SchemaResponse` adapter ONLY. The canonical contract is the shared
- * `telegramConnectionResponseSchema` discriminated union, but `createSchemaDto`/OpenAPI cannot consume
- * a `discriminatedUnion` (it is not a single object type). This flat refined object documents the
- * same shape and still rejects contradictory states at validation time; it is never the source of
+ * `telegramConnectionResponseSchema` discriminated union. The native converter supports that union.
+ * This existing flat adapter preserves the current documentation shape and still rejects
+ * contradictory states at validation time; it is never the source of
  * truth. Language-agnostic (no `.refine` message). The controller returns the shared **union** type
  * — the assertion below fails to compile if that union ever stops being a subtype of this shape.
  */
