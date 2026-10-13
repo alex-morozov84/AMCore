@@ -16,7 +16,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
+import { FileInterceptor } from '@nestjs/platform-fastify'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -30,6 +30,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
+import type { FastifyReply } from 'fastify'
 
 import {
   type AuthResponse,
@@ -80,7 +81,7 @@ import type { User } from '@/generated/prisma/client'
 import { AVATAR_VALIDATION, FileValidationPipe } from '@/infrastructure/storage'
 import { RATE_LIMIT_POLICIES, RateLimit } from '@/infrastructure/throttling'
 
-// Multer hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
+// Multipart hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
 // (2 MB) so the FileValidationPipe produces the clean 413 for files between the
 // preset limit and this cap; this cap is the absolute anti-DoS backstop.
 const AVATAR_UPLOAD_HARD_LIMIT_BYTES = 6 * 1024 * 1024
@@ -99,7 +100,7 @@ export class AuthController {
     private readonly env: EnvService
   ) {}
 
-  private get cookieOptions(): {
+  private cookieOptions(res: Response | FastifyReply): {
     httpOnly: boolean
     secure: boolean
     sameSite: 'strict'
@@ -111,7 +112,7 @@ export class AuthController {
       secure: this.env.get('NODE_ENV') === 'production',
       sameSite: 'strict',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * ('raw' in res ? 1 : 1000), // Native cookies use seconds.
     }
   }
 
@@ -155,7 +156,7 @@ export class AuthController {
           : undefined,
     })
 
-    res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', result.refreshToken, this.cookieOptions(res))
 
     return {
       user: result.user,
@@ -195,7 +196,7 @@ export class AuthController {
           : undefined,
     })
 
-    res.cookie('refresh_token', result.refreshToken, this.cookieOptions)
+    res.cookie('refresh_token', result.refreshToken, this.cookieOptions(res))
 
     return {
       user: result.user,
@@ -254,7 +255,7 @@ export class AuthController {
       sid: sessionId,
     })
 
-    res.cookie('refresh_token', newRefreshToken, this.cookieOptions)
+    res.cookie('refresh_token', newRefreshToken, this.cookieOptions(res))
 
     return { accessToken }
   }

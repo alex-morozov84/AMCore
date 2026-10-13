@@ -1,4 +1,5 @@
 import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
 import { ApiOkResponse, ApiProduces } from '@nestjs/swagger'
 import type { Response } from 'express'
 
@@ -22,7 +23,10 @@ import { SkipRateLimit } from '@/infrastructure/throttling/rate-limit.decorator'
 @SkipRateLimit()
 @UseGuards(MetricsAuthGuard)
 export class MetricsController {
-  constructor(private readonly metrics: MetricsService) {}
+  constructor(
+    private readonly metrics: MetricsService,
+    private readonly host: HttpAdapterHost
+  ) {}
 
   @Get()
   @ApiProduces('text/plain')
@@ -37,7 +41,7 @@ export class MetricsController {
 
     // Use the registry's own exposition content type rather than a hardcoded
     // literal, so the header stays correct if the format ever changes.
-    res.setHeader('Content-Type', this.metrics.contentType)
+    this.host.httpAdapter.setHeader(res, 'Content-Type', this.metrics.contentType)
     return this.metrics.metrics()
   }
 }

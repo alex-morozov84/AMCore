@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
-import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import request from 'supertest'
 
@@ -47,7 +47,7 @@ describe('AI run realtime SSE (e2e)', () => {
   let producer: AiRunProducerService
   let dispatch: AiRunDispatchService
   let publisher: AiRunRealtimePublisher
-  let contextB: { app: NestExpressApplication; baseUrl: string } // web-role, serves SSE
+  let contextB: { app: NestFastifyApplication; baseUrl: string } // web-role, serves SSE
   const open: SseClient<AiRunSseEvent>[] = []
 
   const streamUrl = (runId: string): string => `${contextB.baseUrl}/ai/runs/${runId}/stream`

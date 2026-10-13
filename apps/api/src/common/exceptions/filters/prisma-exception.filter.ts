@@ -1,5 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common'
-import { Response } from 'express'
+import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -97,14 +97,15 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
 
   constructor(
     private readonly logger: PinoLogger,
-    private readonly cls: ClsService
+    private readonly cls: ClsService,
+    private readonly adapterHost: HttpAdapterHost
   ) {
     this.logger.setContext(PrismaClientExceptionFilter.name)
   }
 
   catch(exception: PrismaClientException, host: ArgumentsHost): void {
     const ctx = host.switchToHttp()
-    const response = ctx.getResponse<Response>()
+    const response = ctx.getResponse()
     const request = ctx.getRequest()
 
     const { errorCode, statusCode, message, details, logContext, retryAfterSeconds } =
@@ -127,10 +128,10 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
     this.logger.error(logContext, `Prisma error: ${errorCode} - ${message}`)
 
     if (retryAfterSeconds !== undefined) {
-      response.setHeader('Retry-After', String(retryAfterSeconds))
+      this.adapterHost.httpAdapter.setHeader(response, 'Retry-After', String(retryAfterSeconds))
     }
 
-    response.status(statusCode).json(errorResponse)
+    this.adapterHost.httpAdapter.reply(response, errorResponse, statusCode)
   }
 
   private buildExceptionContext(exception: PrismaClientException): {

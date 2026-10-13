@@ -2,20 +2,17 @@ import type { WorkerHost } from '@nestjs/bullmq'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { type INestApplication, Module } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { TestingModule, TestingModuleBuilder } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
-import cookieParser from 'cookie-parser'
-import helmet from 'helmet'
 import { PinoLogger } from 'nestjs-pino'
 import { Client } from 'pg'
 
 import { seedOrgRoles } from '../prisma/seed-org-roles'
-import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
 import {
   MANAGED_WORKERS,
@@ -25,6 +22,7 @@ import type { WorkRegistration } from '../src/infrastructure/background-work/wor
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
+import { createHttpTestApp } from './create-http-test-app'
 import { boundedPhase, cleanupE2E } from './e2e-cleanup'
 import { e2eContainerLabels } from './e2e-owned-containers'
 import { cleanupFailedE2ESetup, prepareE2EAuthEnvironment } from './e2e-setup'
@@ -146,7 +144,7 @@ export async function setupE2ETest(
 ): Promise<E2ETestContext> {
   const { postgresContainer, redisContainer } = await setupE2ETestInfrastructure()
 
-  let app: NestExpressApplication | undefined
+  let app: NestFastifyApplication | undefined
   let moduleFixture: TestingModule | undefined
   try {
     // Set environment variables
@@ -208,17 +206,9 @@ export async function setupE2ETest(
 
     // Create app instance. `rawBody: true` matches production (main.ts) so the
     // e2e bootstrap shares one parser contract with prod, not a divergent one.
-    app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
-
-    // Apply same configuration as in main.ts
-    // Loaded here, not at the top: it reads the board's mount decision, which a suite may need to take first.
-    const { configureBullBoardEdge } = await import('../src/bootstrap/configure-bull-board-edge')
     const prefix = options.productionOrder ? '/api/v1' : ''
-    configureBullBoardEdge(app, prefix)
-    configureBodyParser(app, prefix)
-    app.use(cookieParser())
+    app = await createHttpTestApp(moduleFixture, prefix, options.productionOrder)
     if (options.productionOrder) {
-      app.use(helmet())
       app.enableCors({ origin: ['https://app.example.test'], credentials: true })
       app.setGlobalPrefix('api/v1')
     }
@@ -433,7 +423,7 @@ export function signAccessToken(app: INestApplication, payload: Record<string, u
 export async function startWebAppContext(
   options: Pick<E2ESetupOptions, 'registrations'> = {}
 ): Promise<{
-  app: NestExpressApplication
+  app: NestFastifyApplication
   baseUrl: string
 }> {
   let root
@@ -450,9 +440,7 @@ export async function startWebAppContext(
     .overrideProvider(PinoLogger)
     .useValue(noopPinoLogger)
     .compile()
-  const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
-  configureBodyParser(app, '')
-  app.use(cookieParser())
+  const app = await createHttpTestApp(moduleFixture, '')
   app.useGlobalPipes(createSchemaValidationPipe())
   await app.init()
   await app.listen(0, '127.0.0.1')

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import { type CanActivate, type ExecutionContext, HttpStatus, Injectable } from '@nestjs/common'
-import { Reflector } from '@nestjs/core'
+import { HttpAdapterHost, Reflector } from '@nestjs/core'
 import type { Request, Response } from 'express'
 
 import { AppException } from '../../common/exceptions'
@@ -36,7 +36,8 @@ export class RateLimitGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly limiter: GcraRedisLimiter,
     private readonly env: EnvService,
-    private readonly metrics: MetricsService
+    private readonly metrics: MetricsService,
+    private readonly host: HttpAdapterHost
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -65,9 +66,17 @@ export class RateLimitGuard implements CanActivate {
     // X-RateLimit-Limit = burst, never `rate`: `remaining` counts down from
     // `burst - 1` on the very first request from idle, so pairing it with
     // `Limit = rate` would be self-contradictory.
-    res.setHeader('X-RateLimit-Limit', String(burst))
-    res.setHeader('X-RateLimit-Remaining', String(decision.allowed ? decision.remaining : 0))
-    res.setHeader('X-RateLimit-Reset', String(Math.ceil(decision.resetAfterMs / 1000)))
+    this.host.httpAdapter.setHeader(res, 'X-RateLimit-Limit', String(burst))
+    this.host.httpAdapter.setHeader(
+      res,
+      'X-RateLimit-Remaining',
+      String(decision.allowed ? decision.remaining : 0)
+    )
+    this.host.httpAdapter.setHeader(
+      res,
+      'X-RateLimit-Reset',
+      String(Math.ceil(decision.resetAfterMs / 1000))
+    )
 
     this.metrics.incRateLimitDecision(
       classifyPolicy(policy),
@@ -80,7 +89,7 @@ export class RateLimitGuard implements CanActivate {
       // unreachable with today's fixed cost=1 and every policy's burst >= 1).
       // Math.max(1, ...) keeps Retry-After a sane, spec-valid value even then.
       const retryAfterSeconds = Math.max(1, Math.ceil(decision.retryAfterMs / 1000))
-      res.setHeader('Retry-After', String(retryAfterSeconds))
+      this.host.httpAdapter.setHeader(res, 'Retry-After', String(retryAfterSeconds))
       throw new AppException(
         'Too many requests',
         HttpStatus.TOO_MANY_REQUESTS,

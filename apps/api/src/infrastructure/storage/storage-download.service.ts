@@ -1,6 +1,7 @@
 import type { Readable } from 'node:stream'
 
 import { HttpStatus, Injectable, StreamableFile } from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
 import type { Response } from 'express'
 
 import { AppException, BadRequestException, NotFoundException } from '../../common/exceptions'
@@ -34,7 +35,10 @@ const UNSAFE_INLINE_TYPES = new Set([
  */
 @Injectable()
 export class StorageDownloadService {
-  constructor(private readonly storage: StorageService) {}
+  constructor(
+    private readonly storage: StorageService,
+    private readonly adapterHost: HttpAdapterHost
+  ) {}
 
   /**
    * Set safe download headers on `res` and return a `StreamableFile` for the
@@ -60,9 +64,11 @@ export class StorageDownloadService {
     const declared = metadata.contentType ?? OCTET_STREAM
     const contentType = UNSAFE_INLINE_TYPES.has(declared) ? OCTET_STREAM : declared
 
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    if (metadata.etag) res.setHeader('ETag', metadata.etag)
-    if (metadata.lastModified) res.setHeader('Last-Modified', metadata.lastModified.toUTCString())
+    const adapter = this.adapterHost.httpAdapter
+    adapter.setHeader(res, 'X-Content-Type-Options', 'nosniff')
+    if (metadata.etag) adapter.setHeader(res, 'ETag', metadata.etag)
+    if (metadata.lastModified)
+      adapter.setHeader(res, 'Last-Modified', metadata.lastModified.toUTCString())
 
     return new StreamableFile(stream, {
       type: contentType,

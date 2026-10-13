@@ -1,4 +1,6 @@
 import { ArgumentsHost, BadRequestException, HttpException, HttpStatus } from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
+import { ExpressAdapter } from '@nestjs/platform-express'
 import { PinoLogger } from 'nestjs-pino'
 
 import { HttpExceptionFilter } from './http-exception.filter'
@@ -30,6 +32,8 @@ describe('HttpExceptionFilter', () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
       setHeader: jest.fn(),
+      getHeader: jest.fn(),
+      set: (name: string, value: string) => mockResponse.setHeader(name, value),
     }
 
     // Mock request
@@ -46,7 +50,9 @@ describe('HttpExceptionFilter', () => {
       }),
     } as any
 
-    filter = new HttpExceptionFilter(mockLogger, mockCls)
+    const adapterHost = new HttpAdapterHost()
+    adapterHost.httpAdapter = new ExpressAdapter()
+    filter = new HttpExceptionFilter(mockLogger, mockCls, adapterHost)
   })
 
   it('emits bounded Retry-After for an exhausted issuance allowance', () => {

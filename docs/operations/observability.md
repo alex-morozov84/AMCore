@@ -15,8 +15,10 @@ carry a `correlationId` on every record. The value is read from
 one per request.
 
 HTTP request logs include bounded request metadata — method, route, status, user
-id when authenticated, user agent, and an **anonymized client IP** (IPv4 host
-octet zeroed; IPv6 reduced to its network prefix). The source IP is Express
+id when authenticated, user agent, and an **anonymized client IP**. IPv4 keeps
+the first two octets and replaces the last two with zero (`192.0.2.45` becomes
+`192.0.0.0`). IPv6 keeps only the first hextet (`2001:db8:1::2` becomes `2001::`),
+not a subnet inferred from network configuration. The source IP is Fastify
 `req.ip`: by default this is the socket peer and ignores spoofable
 `X-Forwarded-*` headers; behind a trusted reverse proxy/load balancer, set
 `TRUST_PROXY` to the real topology so logs, audit records, and rate limiting use
@@ -153,9 +155,8 @@ are the hard contract every label must satisfy.
   routes, and client aborts are all counted. `/api/v1/metrics` is excluded
   from its own HTTP metrics.
 - `http_requests_in_flight{method,role}` — **not** labeled by route: the route
-  hasn't resolved yet when a request enters/leaves flight (before Express
-  matches it), so a `route` label here could only ever hold one placeholder
-  value.
+  hasn't resolved yet when middleware starts observing the request, so a `route`
+  label here could only hold a placeholder value at that point.
 - `metrics_collector_errors_total{collector}`.
 - `build_info{version,commit,node_version,role}` — a static info-metric, value
   always `1`; `version`/`commit` come from the deployer (`APP_VERSION`/

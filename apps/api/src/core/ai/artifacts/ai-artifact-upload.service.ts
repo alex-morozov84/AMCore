@@ -24,7 +24,7 @@ import { type AiMetricsArtifactKind, MetricsService } from '@/infrastructure/obs
 import { normalizeObjectKey, StorageService } from '@/infrastructure/storage'
 import { PrismaService } from '@/prisma'
 
-/** Minimal shape of an in-memory (Multer) upload this service validates. */
+/** Minimal shape of an in-memory multipart upload this service validates. */
 export interface UploadableAiArtifactFile {
   buffer: Buffer
 }

@@ -4,7 +4,7 @@ import type { NotificationSseEvent } from '@amcore/shared'
 export type StreamCloseReason = 'client' | 'expired' | 'shutdown' | 'overflow'
 
 /**
- * The subset of an Express/Node response the SSE writer needs. Kept minimal so the
+ * The subset of a raw Node response the SSE writer needs. Kept minimal so the
  * connection is unit-testable with a fake — no HTTP server required.
  */
 export interface StreamWritable {

@@ -16,6 +16,7 @@ import {
   RateLimitGuard,
 } from '../src/infrastructure/throttling'
 
+import { createHttpTestApp } from './create-http-test-app'
 import { cleanupE2E } from './e2e-cleanup'
 import { e2eContainerLabels } from './e2e-owned-containers'
 
@@ -87,7 +88,7 @@ describe('Originally-reported-symptom reproduction (e2e, real Redis)', () => {
       ],
     }).compile()
 
-    app = moduleRef.createNestApplication()
+    app = await createHttpTestApp(moduleRef, '')
     await app.init()
     // Explicit listen before any parallel supertest traffic — passing an
     // un-listened server to multiple concurrent `request()` calls races

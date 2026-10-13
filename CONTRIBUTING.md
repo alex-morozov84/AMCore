@@ -259,3 +259,10 @@ tag. See the internal maintainer checklist in `ai/PROCESS.md` when `ai/` exists.
   rm -f apps/web/.next/lock
   ```
   then re-run the build. Don't bisect dependencies for this symptom.
+
+### Backend HTTP changes
+
+The API uses Fastify. Follow [HTTP runtime](docs/backend/http-runtime.md) when
+adding plugins, cookies, uploads, raw responses or middleware. Run affected HTTP
+contract fixtures and API typecheck; full API E2E and generated consumer checks
+remain required CI.

@@ -183,7 +183,7 @@ On the `apps/api` side, the global `RateLimitGuard`'s tracker resolver
 (`client-tracker.ts`, ADR-039/ADR-073) trusts the relayed header only when **both**
 (a) `TRUSTED_WEB_PEERS` is configured (`.env.example`) **and** (b) the
 inbound request's _actual_ socket peer — `req.socket.remoteAddress`, never a
-forwarded header, and independent of Express's own `TRUST_PROXY` — is in
+forwarded header, and independent of Fastify's `TRUST_PROXY` — is in
 that trusted set (real IPv4/IPv6 CIDR matching via Node's built-in
 `net.BlockList`). Either half missing → falls back to stock `req.ip`,
 identical to pre-ADR-072 behavior; a request that never went through

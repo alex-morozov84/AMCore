@@ -1,9 +1,11 @@
+import { types } from 'node:util'
+
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
-import { REQUEST_BODY_LIMIT_BYTES } from '../../../bootstrap/configure-body-parser'
+import { REQUEST_BODY_LIMIT_BYTES } from '../../../bootstrap/request-body-policy'
 import { sanitizeRequestUrl } from '../../config/logging.config'
 import { sanitizeHeaders } from '../../utils'
 import { PayloadTooLargeException } from '../domain'
@@ -37,6 +39,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const statusCode = this.getStatusCode(normalized)
     const message = this.getErrorMessage(normalized)
     const errorCode = this.getErrorCode(normalized)
+    if (
+      statusCode === 415 &&
+      types.isNativeError(exception) &&
+      (exception as Error & { type?: string }).type === 'encoding.unsupported'
+    )
+      httpAdapter.setHeader(response, 'Accept-Encoding', 'identity, gzip, deflate, br')
 
     // Build error response
     const errorResponse: ErrorResponse = {
@@ -94,7 +102,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private normalizeException(exception: unknown): unknown {
     if (
       exception instanceof Error &&
-      (exception as { type?: unknown }).type === 'entity.too.large'
+      ((exception as { type?: unknown }).type === 'entity.too.large' ||
+        (exception as { code?: unknown }).code === 'FST_ERR_CTP_BODY_TOO_LARGE')
     ) {
       return new PayloadTooLargeException('Request body exceeds the maximum allowed size', {
         limitBytes:
@@ -102,6 +111,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
             ? (exception as Error & { limit?: number }).limit
             : REQUEST_BODY_LIMIT_BYTES,
       })
+    }
+    if (types.isNativeError(exception)) {
+      const parser = exception as Error & { type?: string; status?: number }
+      const known = new Map([
+        ['entity.parse.failed', 400],
+        ['querystring.parse.rangeError', 400],
+        ['request.aborted', 400],
+        ['request.size.invalid', 400],
+        ['charset.unsupported', 415],
+        ['encoding.unsupported', 415],
+      ])
+      if (parser.type === 'parameters.too.many' && parser.status === 413)
+        return new PayloadTooLargeException('Too many form parameters', { parameterLimit: 1000 })
+      const status = parser.type ? known.get(parser.type) : undefined
+      if (status && parser.status === status)
+        return new HttpException(
+          status === 415 ? 'Unsupported request format' : 'Invalid request body',
+          status
+        )
     }
     return exception
   }

@@ -76,7 +76,7 @@
       "node scripts/lint.mjs --scope shared --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
-    "*.{ts,tsx,js,jsx}": [
+    "{*.{ts,tsx,js,jsx},!(apps|packages)/**/*.{ts,tsx,js,jsx}}": [
       "node scripts/lint.mjs --scope root --fix --no-warn-ignored",
       "node scripts/lint.mjs --scope root --max-warnings=0 --no-warn-ignored",
       "prettier --write"

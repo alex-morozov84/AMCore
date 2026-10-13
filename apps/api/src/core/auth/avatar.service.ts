@@ -14,7 +14,7 @@ import { EnvService } from '@/env/env.service'
 import { generateUploadVersion, MediaService } from '@/infrastructure/media'
 import { normalizeObjectKey, StorageService } from '@/infrastructure/storage'
 
-/** The validated multer file shape the avatar upload consumes. */
+/** The validated multipart file shape the avatar upload consumes. */
 export interface AvatarUploadFile {
   buffer: Buffer
   mimetype: string

@@ -1,13 +1,12 @@
 import type { Type } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
-import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { SwaggerModule } from '@nestjs/swagger'
-import cookieParser from 'cookie-parser'
-import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
 
-import { configureBodyParser } from './bootstrap/configure-body-parser'
-import { configureBullBoardEdge } from './bootstrap/configure-bull-board-edge'
+import { configureHttp } from './bootstrap/configure-http'
+import { createHttpAdapter } from './bootstrap/create-http-adapter'
+import { resolveTrustProxy } from './common/utils/trust-proxy'
 import { EnvService } from './env/env.service'
 import { ShutdownService } from './shutdown.service'
 import { API_GLOBAL_PREFIX, buildApiDocument } from './swagger.config'
@@ -36,18 +35,28 @@ async function bootstrap(): Promise<void> {
   const role = (process.env.PROCESS_ROLE ?? 'all') as ProcessRole
   const isWorker = role === 'worker'
 
-  const app = await NestFactory.create<NestExpressApplication>(await rootModuleFor(role), {
-    bufferLogs: true,
-    rawBody: true,
-  })
+  const root = await rootModuleFor(role)
+  const { BULL_BOARD_MOUNT } =
+    await import('./infrastructure/queue/dashboard/bull-board-mount-state')
+  const app = await NestFactory.create<NestFastifyApplication>(
+    root,
+    createHttpAdapter(
+      '/api/v1/admin/queues',
+      resolveTrustProxy(process.env.TRUST_PROXY ?? 'false'),
+      BULL_BOARD_MOUNT.mounted
+    ),
+    {
+      bufferLogs: true,
+      rawBody: true,
+    }
+  )
   const env = app.get(EnvService)
   const isProduction = env.get('NODE_ENV') === 'production'
 
-  // Proxy awareness: Express derives `req.ip`/`req.protocol` from `X-Forwarded-*`
+  // Proxy awareness: the native adapter derives `req.ip`/`req.protocol` from `X-Forwarded-*`
   // only for the hops TRUST_PROXY names. Default `false` trusts nothing (req.ip is
   // the socket peer), so forwarded headers can't spoof the client IP; set it to the
   // real proxy topology when running behind a reverse proxy/LB.
-  app.set('trust proxy', env.get('TRUST_PROXY'))
 
   // Use Pino logger
   const logger = app.get(Logger)
@@ -60,14 +69,7 @@ async function bootstrap(): Promise<void> {
   // raw-body capture intact). Shared with the e2e bootstrap so the body-size
   // contract is identical in tests and production.
   // The queue board's own guard comes first: parser, Helmet and CORS must not answer its requests.
-  configureBullBoardEdge(app, `/${API_GLOBAL_PREFIX}`)
-  configureBodyParser(app)
-
-  // Cookie parser for refresh tokens
-  app.use(cookieParser())
-
-  // Security: HTTP headers
-  app.use(helmet())
+  await configureHttp(app, `/${API_GLOBAL_PREFIX}`, true)
 
   // Security: CORS (origin from validated env, already string[])
   app.enableCors({
@@ -88,7 +90,7 @@ async function bootstrap(): Promise<void> {
   app.get(ShutdownService).setApp(app)
 
   const port = env.get('API_PORT')
-  await app.listen(port)
+  await app.listen(port, '0.0.0.0')
 
   logger.log(`🚀 AMCore [${role}] running on http://localhost:${port}`)
   if (isWorker) {

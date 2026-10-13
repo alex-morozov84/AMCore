@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, type PipeTransform } from '@nestjs/common'
 
 import { AppException, BadRequestException } from '../../../common/exceptions'
 
-/** Minimal shape of an in-memory (Multer) upload the pipe validates. */
+/** Minimal shape of an in-memory multipart upload the pipe validates. */
 export interface ValidatableFile {
   buffer: Buffer
 }

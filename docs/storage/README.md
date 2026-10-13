@@ -75,3 +75,13 @@ For S3-compatible providers, also set `STORAGE_ENDPOINT` and usually
 - [Uploads](./uploads.md) — validated uploads, avatar flow, presigned upload caveats.
 - [API Reference](./reference.md) — `StorageService` methods and error behavior.
 - [Providers](./providers.md) — provider differences and gotchas.
+
+## HTTP upload and download integration
+
+The API uses Nest’s Fastify multipart interceptors with explicit per-route file
+limits. Storage validation remains independent of HTTP parsing. Authorized
+downloads return Nest-managed `StreamableFile` responses with full object bytes,
+safe attachment headers and metadata. The primitive ignores Range and does not
+implement conditional 304 responses. Do not hijack its response. The focused
+transport tests cover GET; verify HEAD behavior for the actual consumer. See
+[HTTP runtime](../backend/http-runtime.md) before adding a consumer.

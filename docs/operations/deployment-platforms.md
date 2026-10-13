@@ -110,7 +110,7 @@ generates a configurable Helm chart directly; the official Kubernetes project
 [Kompose](https://kompose.io/) (an incubator-graduated project under
 `kubernetes/kompose`) converts Compose files to plain Kubernetes manifests.
 Neither is maintained by or bundled with AMCore — verify the output against
-this section's mapping (especially the worker's health-only HTTP surface and
+this section's mapping (especially the worker's health-and-metrics HTTP surface and
 the migration `Job` step) rather than trusting a generated chart as-is.
 
 ## Google Cloud Run

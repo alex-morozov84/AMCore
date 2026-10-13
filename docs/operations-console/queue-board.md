@@ -163,3 +163,10 @@ names, tokens or free text, and add tests like those beside the shipped ones.
 - [Background work](background-work.md): counts and states of every queue, without job details.
 - [Configuration and deployment](configuration.md): topology, edge and session settings.
 - [Email security](../email/security.md): what is allowed in a queue.
+
+## HTTP adapter and upgrades
+
+The API serves the board through its maintained Fastify integration. It preserves
+closed errors, authentication, read budgets and pinned display assets. Test
+malformed case aliases, method-first refusal and disabled/worker boundaries when
+upgrading Nest, Fastify or Bull Board. See [HTTP runtime](../backend/http-runtime.md).

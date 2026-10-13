@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
+import { addParserResponses } from './bootstrap/parser-openapi'
 import { schemaOpenApiConverter } from './common/schemas/schema-openapi'
 import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mount-state'
 
@@ -40,7 +41,7 @@ export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
 }
 
 /**
- * The queue board is an Express-mounted UI, not a Nest controller, so the scanner cannot see it.
+ * The queue board is a Fastify plugin UI, not a Nest controller, so the scanner cannot see it.
  * This adds its single documented operation. Nest decorators do NOT protect that mount (its
  * admission is a middleware); the description says what the middleware enforces. Added only when the
  * board is mounted, so a deployment without it documents nothing.
@@ -58,7 +59,7 @@ export function addQueueBoardOperation(
       tags: ['admin'],
       summary: 'Read-only queue board (HTML) — SUPER_ADMIN only',
       description:
-        'The Bull Board UI and its data API, mounted as Express middleware under this path. It is ' +
+        'The Bull Board UI and its data API, mounted as a Fastify plugin under this path. It is ' +
         'read-only: only GET and HEAD are served and any other method is answered with 405. ' +
         'Authentication is a middleware, not a Nest guard: a live SUPER_ADMIN bearer access token ' +
         '(sent by the Console BFF) or the browser `refresh_token` cookie; API keys are rejected. ' +
@@ -96,5 +97,6 @@ export function buildApiDocument(app: INestApplication, pathPrefix: string): Ope
   const document = SwaggerModule.createDocument(app, buildSwaggerConfig(), {
     standardSchemaConverter: schemaOpenApiConverter,
   })
+  addParserResponses(document)
   return addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
 }

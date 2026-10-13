@@ -1,4 +1,6 @@
 import { ArgumentsHost, HttpStatus } from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
+import { ExpressAdapter } from '@nestjs/platform-express'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode, InfrastructureErrorCode, ResourceErrorCode } from '@amcore/shared'
@@ -30,6 +32,8 @@ describe('PrismaClientExceptionFilter', () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
       setHeader: jest.fn(),
+      getHeader: jest.fn(),
+      set: (name: string, value: string) => mockResponse.setHeader(name, value),
     }
 
     mockRequest = {
@@ -44,7 +48,9 @@ describe('PrismaClientExceptionFilter', () => {
       }),
     } as any
 
-    filter = new PrismaClientExceptionFilter(mockLogger, mockCls)
+    const adapterHost = new HttpAdapterHost()
+    adapterHost.httpAdapter = new ExpressAdapter()
+    filter = new PrismaClientExceptionFilter(mockLogger, mockCls, adapterHost)
   })
 
   it('should map P2002 on emailCanonical to EMAIL_ALREADY_EXISTS', () => {

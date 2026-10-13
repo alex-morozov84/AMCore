@@ -6,7 +6,7 @@ import request from 'supertest'
 
 import { AuthType, MEMBER_REQUEST_BYTES, WORK_COMMAND_INPUT_BYTES } from '@amcore/shared'
 
-import { REQUEST_BODY_LIMIT_BYTES } from '../src/bootstrap/configure-body-parser'
+import { REQUEST_BODY_LIMIT_BYTES } from '../src/bootstrap/request-body-policy'
 import { Auth } from '../src/core/auth/decorators/auth.decorator'
 import { RATE_LIMIT_POLICIES, RateLimit, SkipRateLimit } from '../src/infrastructure/throttling'
 import { VerifyWebhook } from '../src/infrastructure/webhooks'
@@ -78,12 +78,10 @@ describe('Request body size limit (e2e)', () => {
     process.env.WEBHOOK_STRIPE_SECRET = secret
     process.env.WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = '300'
     process.env.WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS = '300'
-    context = await setupWebhookTestApp([
-      EchoController,
-      WebhookSizeController,
-      MemberBodyController,
-      WorkCommandBodyController,
-    ])
+    context = await setupWebhookTestApp(
+      [EchoController, WebhookSizeController, MemberBodyController, WorkCommandBodyController],
+      true
+    )
     app = context.app
     prisma = context.prisma
   }, 120000)

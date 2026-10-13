@@ -9,6 +9,7 @@
         "extensions": [".ts", ".tsx"]
       }
     },
-    "typeCheck": true
+    "typeCheck": true,
+    "deleteOutDir": true
   }
 }

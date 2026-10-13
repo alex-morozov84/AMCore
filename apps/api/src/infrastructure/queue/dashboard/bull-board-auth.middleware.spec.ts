@@ -19,7 +19,6 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
   let verifyAccess: jest.Mock<Promise<BullBoardAccess>, [string]>
   let verify: jest.Mock<Promise<BullBoardBearerAccess>, [string]>
   let next: jest.Mock
-  let status: jest.Mock
   let end: jest.Mock
   let res: Response
   let events: BoardEvent[]
@@ -34,8 +33,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     verify = jest.fn()
     next = jest.fn()
     end = jest.fn()
-    status = jest.fn().mockReturnValue({ end })
-    res = { status, end, locals: {} } as unknown as Response
+    res = { statusCode: 200, end, locals: {} } as unknown as Response
     events = []
   })
 
@@ -55,7 +53,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
       await run({
         authorization: 'Bearer amcore_live_shorttoken00_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       })
-      expect(status).toHaveBeenCalledWith(401)
+      expect(res.statusCode).toBe(401)
       expect(next).not.toHaveBeenCalled()
       expect(verifyAccess).not.toHaveBeenCalled()
       expect(verify).not.toHaveBeenCalled()
@@ -64,7 +62,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
 
     it('rejects an x-api-key header outright (belt-and-suspenders for aliases)', async () => {
       await run({ 'x-api-key': 'anything', cookie: 'refresh_token=abc' })
-      expect(status).toHaveBeenCalledWith(401)
+      expect(res.statusCode).toBe(401)
       expect(verifyAccess).not.toHaveBeenCalled()
     })
   })
@@ -72,7 +70,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
   describe('cookie (direct access)', () => {
     it('returns 401 when no refresh_token cookie is present', async () => {
       await run({ cookie: 'other=1; another=2' })
-      expect(status).toHaveBeenCalledWith(401)
+      expect(res.statusCode).toBe(401)
       expect(verifyAccess).not.toHaveBeenCalled()
     })
 
@@ -81,7 +79,8 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
       await run({ cookie: 'refresh_token=abc123; theme=dark' })
       expect(verifyAccess).toHaveBeenCalledWith('abc123')
       expect(next).toHaveBeenCalledTimes(1)
-      expect(status).not.toHaveBeenCalled()
+      expect(res.statusCode).toBe(200)
+      expect(end).not.toHaveBeenCalled()
       expect(res.locals.boardCredential).toBe('cookie')
       expect(res.locals.boardContext).toBeUndefined()
     })
@@ -103,14 +102,14 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     ] as const)('returns %s as %i', async (access, code) => {
       verifyAccess.mockResolvedValue(access)
       await run({ cookie: 'refresh_token=abc123' })
-      expect(status).toHaveBeenCalledWith(code)
+      expect(res.statusCode).toBe(code)
       expect(next).not.toHaveBeenCalled()
     })
 
     it('fails closed (401) if the verifier throws', async () => {
       verifyAccess.mockRejectedValue(new Error('redis down'))
       await run({ cookie: 'refresh_token=abc123' })
-      expect(status).toHaveBeenCalledWith(401)
+      expect(res.statusCode).toBe(401)
       expect(next).not.toHaveBeenCalled()
       expect(events).toEqual([{ event: 'bull_board.access_denied', reason: 'unavailable' }])
     })
@@ -144,7 +143,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     ] as const)('maps %j to %i', async (access, code, reason) => {
       verify.mockResolvedValue(access)
       await run({ authorization: 'Bearer token-1' })
-      expect(status).toHaveBeenCalledWith(code)
+      expect(res.statusCode).toBe(code)
       expect(next).not.toHaveBeenCalled()
       expect(events).toEqual([{ event: 'bull_board.access_denied', reason }])
     })
@@ -152,7 +151,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     it('treats a verifier crash as unavailable (503), never as a pass', async () => {
       verify.mockRejectedValue(new Error('db down'))
       await run({ authorization: 'Bearer token-1' })
-      expect(status).toHaveBeenCalledWith(503)
+      expect(res.statusCode).toBe(503)
       expect(next).not.toHaveBeenCalled()
     })
 
@@ -160,7 +159,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
       verifyAccess.mockResolvedValue('authorized')
       verify.mockResolvedValue({ kind: 'unauthenticated' })
       await run({ authorization: 'Bearer expired', cookie: 'refresh_token=valid' })
-      expect(status).toHaveBeenCalledWith(401)
+      expect(res.statusCode).toBe(401)
       expect(next).not.toHaveBeenCalled()
       expect(verifyAccess).not.toHaveBeenCalled()
     })
@@ -170,7 +169,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
       async (authorization) => {
         verifyAccess.mockResolvedValue('authorized')
         await run({ authorization, cookie: 'refresh_token=valid' })
-        expect(status).toHaveBeenCalledWith(401)
+        expect(res.statusCode).toBe(401)
         expect(verify).not.toHaveBeenCalled()
         expect(verifyAccess).not.toHaveBeenCalled()
       }
@@ -187,7 +186,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     ])('answers 400 for an invalid render context (%s) after admission', async (_label, header) => {
       verify.mockResolvedValue({ kind: 'authorized', userId: 'admin-1' })
       await run({ authorization: 'Bearer token-1', [BULL_BOARD_CONTEXT_HEADER]: header })
-      expect(status).toHaveBeenCalledWith(400)
+      expect(res.statusCode).toBe(400)
       expect(next).not.toHaveBeenCalled()
       expect(events).toEqual([{ event: 'bull_board.access_denied', reason: 'invalid_context' }])
     })
@@ -195,7 +194,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     it('does not read the render context of a request that is not admitted', async () => {
       verify.mockResolvedValue({ kind: 'forbidden' })
       await run({ authorization: 'Bearer token-1', [BULL_BOARD_CONTEXT_HEADER]: 'garbage!' })
-      expect(status).toHaveBeenCalledWith(403)
+      expect(res.statusCode).toBe(403)
     })
   })
 })

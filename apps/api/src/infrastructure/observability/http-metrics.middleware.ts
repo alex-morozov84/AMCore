@@ -48,6 +48,6 @@ export class HttpMetricsMiddleware implements NestMiddleware {
 }
 
 function isMetricsRequest(req: Request): boolean {
-  const path = req.originalUrl.split('?')[0]
+  const path = (req.originalUrl ?? req.url).split('?')[0]
   return path === METRICS_HTTP_PATH || path === '/metrics'
 }

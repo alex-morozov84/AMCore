@@ -43,7 +43,7 @@ UA/IP are captured on registration, login, OAuth login callback and each refresh
 generation. The bundled BFF preserves current visitor UA; missing UA is null.
 Stored IP uses an opt-in peer-verified visitor claim when configured, otherwise
 req.ip/socket fallback. See [GeoIP setup](../operations/geoip-setup.md#capturing-visitor-ip-through-the-bff).
-This does not change password-login rate-limit identity, global Express proxy
+This does not change password-login rate-limit identity, global Fastify proxy
 trust, audit IP or authorization. Historical Node UA/internal peer IP is not
 backfilled; its original visitor metadata cannot be reconstructed reliably.
 

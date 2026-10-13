@@ -63,7 +63,7 @@ export interface RequestInfo {
   ipAddress?: string
   /**
    * Locale negotiated from the request `Accept-Language` header (controller
-   * resolves it via `req.acceptsLanguages`). Used at registration only as a
+   * resolves it via `negotiateLocale` and the accepts parser). Used at registration only as a
    * fallback when the body carries no explicit `locale`.
    */
   acceptedLocale?: SupportedLocale

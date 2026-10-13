@@ -8,12 +8,14 @@ type RequestWithRoute = Request & {
   route?: {
     path?: unknown
   }
+  routeOptions?: { url?: unknown }
 }
 
 export function normalizeRouteTemplate(req: Request): string {
-  const routePath = (req as RequestWithRoute).route?.path
+  const routed = req as RequestWithRoute
+  const routePath = routed.route?.path ?? routed.routeOptions?.url
   if (routePath === undefined) {
-    return UNMATCHED_ROUTE
+    return routed.routeOptions ? UNKNOWN_ROUTE : UNMATCHED_ROUTE
   }
 
   if (typeof routePath !== 'string') {
@@ -34,7 +36,7 @@ export function normalizeRouteTemplate(req: Request): string {
     return joined
   }
 
-  if (req.originalUrl.startsWith(GLOBAL_PREFIX)) {
+  if ((req.originalUrl ?? req.url).startsWith(GLOBAL_PREFIX)) {
     return joinPaths(GLOBAL_PREFIX, joined)
   }
 

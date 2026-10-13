@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { Express } from 'express'
 import { z } from 'zod'
 
 import { boardCopy } from './bull-board-copy'
@@ -17,14 +16,17 @@ const translationsSchema = z
 const LOCALES = ['en-US', 'en-GB', 'ru-RU'] as const
 const FLOW_ASSET = 'js/async/8.f93064bab2.js'
 const FLOW_SHA256 = '204dea1cda0cb8f792d43cc182b3e68fbe202a1ffbe248837d412688299aee19'
-const FLOW_CSS = '.jobFlowCard-Y7apDE{display:none!important}'
-const INFO_ASSET = 'js/async/g.ff87bf7356.js'
+export const FLOW_CSS = '.jobFlowCard-Y7apDE{display:none!important}'
+export const INFO_ASSET = 'js/async/g.ff87bf7356.js'
 const INFO_SHA256 = 'a0a6b6b231fa1e69e7ebe03174526b1f7e32d28cc19696a0e8e0f245dbdcdc4c'
 const DEFAULTS_QUERY = '(a.name,l),w=Object.entries(k||{})'
 export const BOARD_DISPLAY_CSS = 'amcore-board-display.css'
 
 /** Fixed installed assets only; mismatched version/selector/translation shape prevents mounting. */
-export function installBoardDisplayAssets(app: Express, route: string, directory: string): void {
+export function readBoardDisplayAssets(directory: string): {
+  readOnlyInfo: string
+  assets: Array<{ locale: string; messages: z.infer<typeof translationsSchema> }>
+} {
   const flowPath = join(directory, FLOW_ASSET)
   if (statSync(flowPath).size > 262144) throw new Error('BOARD_DISPLAY_UPGRADE_REQUIRED')
   const flow = readFileSync(flowPath)
@@ -52,11 +54,7 @@ export function installBoardDisplayAssets(app: Express, route: string, directory
     messages.QUEUE.INFO.NOT_SET = boardCopy(locale === 'ru-RU' ? 'ru' : 'en').notDisplayed
     return { locale, messages }
   })
-  // Install only after every before-mount validation succeeds.
-  app.get(`${route}/${INFO_ASSET}`, (_req, res) => res.type('js').send(readOnlyInfo))
-  for (const { locale, messages } of assets)
-    app.get(`${route}/locales/${locale}/messages.json`, (_req, res) => res.json(messages))
-  app.get(`${route}/${BOARD_DISPLAY_CSS}`, (_req, res) => res.type('css').send(FLOW_CSS))
+  return { readOnlyInfo, assets }
 }
 
 export function withBoardDisplayStyle(html: string, basePath: string): string {

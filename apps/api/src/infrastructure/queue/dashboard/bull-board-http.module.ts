@@ -2,6 +2,7 @@ import type { createBullBoard } from '@bull-board/api'
 import { BULL_BOARD_INSTANCE, BullBoardModule } from '@bull-board/nestjs'
 import { Inject, Module, type OnModuleInit, Optional } from '@nestjs/common'
 import type { Queue } from 'bullmq'
+import type { RequestHandler } from 'express'
 import { PinoLogger } from 'nestjs-pino'
 
 import { ControlConnection } from '../../background-work/control-connection'
@@ -15,10 +16,10 @@ import { BullBoardAuthService } from './bull-board-auth.service'
 import { BullBoardBearerAuthService } from './bull-board-bearer-auth.service'
 import { chainBoardMiddleware, createBullBoardBoundary } from './bull-board-boundary.middleware'
 import type { BoardEvent } from './bull-board-events'
+import { QueueBoardFastifyAdapter } from './bull-board-fastify-adapter'
 import { BOARD_HOOKS, BOARD_UI_CONFIG } from './bull-board-hooks'
 import { BullBoardLegacyFlagWarning } from './bull-board-legacy-flag'
 import { BULL_BOARD_MOUNT } from './bull-board-mount-state'
-import { QueueBoardAdapter } from './bull-board-ui-adapter'
 
 /** Content-free board events go to the structured log; never a payload, token or job id. */
 function boardEventSink(logger: PinoLogger): (event: BoardEvent) => void {
@@ -50,13 +51,20 @@ const bullBoardImports = BULL_BOARD_MOUNT.mounted
           logger: PinoLogger
         ) => {
           const events = boardEventSink(logger)
+          const admission = chainBoardMiddleware(
+            createBullBoardAuthMiddleware(cookieAuth, bearerAuth, events),
+            createBullBoardBoundary(events)
+          )
+          class AuthenticatedQueueBoardAdapter extends QueueBoardFastifyAdapter {
+            constructor() {
+              super(admission)
+            }
+          }
+          const passThrough: RequestHandler = (_req, _res, next) => next()
           return {
             route: '/admin/queues',
-            adapter: QueueBoardAdapter,
-            middleware: chainBoardMiddleware(
-              createBullBoardAuthMiddleware(cookieAuth, bearerAuth, events),
-              createBullBoardBoundary(events)
-            ),
+            adapter: AuthenticatedQueueBoardAdapter,
+            middleware: passThrough,
             boardOptions: {
               // Checks the projected response against the Board's schema; a mismatch fails closed.
               validateResponses: true,
