@@ -23,7 +23,8 @@
     "dev": "tsdown --watch",
     "lint": "node ../../scripts/lint.mjs --scope shared",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "lint:fix": "node ../../scripts/lint.mjs --scope shared --fix"
   },
   "dependencies": {
     "zod": "^4.6.5"

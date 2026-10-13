@@ -663,5 +663,481 @@
     "code": "const {createClass}=require('react');export const C=createClass",
     "rule": "react/no-deprecated",
     "expected": true
+  },
+  {
+    "name": "a11y alt-text prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <img />",
+    "rule": "jsx-a11y/alt-text",
+    "expected": true
+  },
+  {
+    "name": "a11y alt-text allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <img alt=\"\" />",
+    "rule": "jsx-a11y/alt-text",
+    "expected": false
+  },
+  {
+    "name": "a11y anchor-has-content prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <a href=\"/docs\" />",
+    "rule": "jsx-a11y/anchor-has-content",
+    "expected": true
+  },
+  {
+    "name": "a11y anchor-has-content allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <a href=\"/docs\">Docs</a>",
+    "rule": "jsx-a11y/anchor-has-content",
+    "expected": false
+  },
+  {
+    "name": "a11y anchor-is-valid prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <a href=\"#\">Docs</a>",
+    "rule": "jsx-a11y/anchor-is-valid",
+    "expected": true
+  },
+  {
+    "name": "a11y anchor-is-valid allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <a href=\"/docs\">Docs</a>",
+    "rule": "jsx-a11y/anchor-is-valid",
+    "expected": false
+  },
+  {
+    "name": "a11y aria-activedescendant-has-tabindex prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div aria-activedescendant=\"item\" />",
+    "rule": "jsx-a11y/aria-activedescendant-has-tabindex",
+    "expected": true
+  },
+  {
+    "name": "a11y aria-activedescendant-has-tabindex allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div tabIndex={0} aria-activedescendant=\"item\" />",
+    "rule": "jsx-a11y/aria-activedescendant-has-tabindex",
+    "expected": false
+  },
+  {
+    "name": "a11y aria-props prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div aria-unknown=\"x\" />",
+    "rule": "jsx-a11y/aria-props",
+    "expected": true
+  },
+  {
+    "name": "a11y aria-props allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div aria-label=\"Docs\" />",
+    "rule": "jsx-a11y/aria-props",
+    "expected": false
+  },
+  {
+    "name": "a11y aria-proptypes prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div aria-hidden=\"oops\" />",
+    "rule": "jsx-a11y/aria-proptypes",
+    "expected": true
+  },
+  {
+    "name": "a11y aria-proptypes allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div aria-hidden={true} />",
+    "rule": "jsx-a11y/aria-proptypes",
+    "expected": false
+  },
+  {
+    "name": "a11y aria-role prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"oops\" />",
+    "rule": "jsx-a11y/aria-role",
+    "expected": true
+  },
+  {
+    "name": "a11y aria-role allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"button\" />",
+    "rule": "jsx-a11y/aria-role",
+    "expected": false
+  },
+  {
+    "name": "a11y aria-unsupported-elements prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <meta aria-label=\"Docs\" />",
+    "rule": "jsx-a11y/aria-unsupported-elements",
+    "expected": true
+  },
+  {
+    "name": "a11y aria-unsupported-elements allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <meta />",
+    "rule": "jsx-a11y/aria-unsupported-elements",
+    "expected": false
+  },
+  {
+    "name": "a11y autocomplete-valid prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <input autoComplete=\"oops\" />",
+    "rule": "jsx-a11y/autocomplete-valid",
+    "expected": true
+  },
+  {
+    "name": "a11y autocomplete-valid allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <input autoComplete=\"name\" />",
+    "rule": "jsx-a11y/autocomplete-valid",
+    "expected": false
+  },
+  {
+    "name": "a11y click-events-have-key-events prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div onClick={()=>{}} />",
+    "rule": "jsx-a11y/click-events-have-key-events",
+    "expected": true
+  },
+  {
+    "name": "a11y click-events-have-key-events allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div onClick={()=>{}} onKeyDown={()=>{}} />",
+    "rule": "jsx-a11y/click-events-have-key-events",
+    "expected": false
+  },
+  {
+    "name": "a11y heading-has-content prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <h2 />",
+    "rule": "jsx-a11y/heading-has-content",
+    "expected": true
+  },
+  {
+    "name": "a11y heading-has-content allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <h2>Heading</h2>",
+    "rule": "jsx-a11y/heading-has-content",
+    "expected": false
+  },
+  {
+    "name": "a11y html-has-lang prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <html />",
+    "rule": "jsx-a11y/html-has-lang",
+    "expected": true
+  },
+  {
+    "name": "a11y html-has-lang allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <html lang=\"en\" />",
+    "rule": "jsx-a11y/html-has-lang",
+    "expected": false
+  },
+  {
+    "name": "a11y iframe-has-title prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <iframe />",
+    "rule": "jsx-a11y/iframe-has-title",
+    "expected": true
+  },
+  {
+    "name": "a11y iframe-has-title allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <iframe title=\"Example\" />",
+    "rule": "jsx-a11y/iframe-has-title",
+    "expected": false
+  },
+  {
+    "name": "a11y img-redundant-alt prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <img alt=\"Picture of example\" />",
+    "rule": "jsx-a11y/img-redundant-alt",
+    "expected": true
+  },
+  {
+    "name": "a11y img-redundant-alt allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <img alt=\"Example\" />",
+    "rule": "jsx-a11y/img-redundant-alt",
+    "expected": false
+  },
+  {
+    "name": "a11y interactive-supports-focus prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"button\" onClick={()=>{}} />",
+    "rule": "jsx-a11y/interactive-supports-focus",
+    "expected": true
+  },
+  {
+    "name": "a11y interactive-supports-focus allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"button\" tabIndex={0} onClick={()=>{}} />",
+    "rule": "jsx-a11y/interactive-supports-focus",
+    "expected": false
+  },
+  {
+    "name": "a11y label-has-associated-control prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <label>Name</label>",
+    "rule": "jsx-a11y/label-has-associated-control",
+    "expected": true
+  },
+  {
+    "name": "a11y label-has-associated-control allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <label htmlFor=\"name\">Name</label>",
+    "rule": "jsx-a11y/label-has-associated-control",
+    "expected": false
+  },
+  {
+    "name": "a11y media-has-caption prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <video />",
+    "rule": "jsx-a11y/media-has-caption",
+    "expected": true
+  },
+  {
+    "name": "a11y media-has-caption allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <video><track kind=\"captions\" /></video>",
+    "rule": "jsx-a11y/media-has-caption",
+    "expected": false
+  },
+  {
+    "name": "a11y mouse-events-have-key-events prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div onMouseOver={()=>{}} />",
+    "rule": "jsx-a11y/mouse-events-have-key-events",
+    "expected": true
+  },
+  {
+    "name": "a11y mouse-events-have-key-events allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div onMouseOver={()=>{}} onFocus={()=>{}} />",
+    "rule": "jsx-a11y/mouse-events-have-key-events",
+    "expected": false
+  },
+  {
+    "name": "a11y no-access-key prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div accessKey=\"a\" />",
+    "rule": "jsx-a11y/no-access-key",
+    "expected": true
+  },
+  {
+    "name": "a11y no-access-key allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div />",
+    "rule": "jsx-a11y/no-access-key",
+    "expected": false
+  },
+  {
+    "name": "a11y no-autofocus prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <input autoFocus />",
+    "rule": "jsx-a11y/no-autofocus",
+    "expected": true
+  },
+  {
+    "name": "a11y no-autofocus allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <input />",
+    "rule": "jsx-a11y/no-autofocus",
+    "expected": false
+  },
+  {
+    "name": "a11y no-distracting-elements prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <marquee>News</marquee>",
+    "rule": "jsx-a11y/no-distracting-elements",
+    "expected": true
+  },
+  {
+    "name": "a11y no-distracting-elements allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div>News</div>",
+    "rule": "jsx-a11y/no-distracting-elements",
+    "expected": false
+  },
+  {
+    "name": "a11y no-interactive-element-to-noninteractive-role prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <button role=\"article\" />",
+    "rule": "jsx-a11y/no-interactive-element-to-noninteractive-role",
+    "expected": true
+  },
+  {
+    "name": "a11y no-interactive-element-to-noninteractive-role allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <button />",
+    "rule": "jsx-a11y/no-interactive-element-to-noninteractive-role",
+    "expected": false
+  },
+  {
+    "name": "a11y no-noninteractive-element-interactions prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <li onClick={()=>{}} />",
+    "rule": "jsx-a11y/no-noninteractive-element-interactions",
+    "expected": true
+  },
+  {
+    "name": "a11y no-noninteractive-element-interactions allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <li />",
+    "rule": "jsx-a11y/no-noninteractive-element-interactions",
+    "expected": false
+  },
+  {
+    "name": "a11y no-noninteractive-element-to-interactive-role prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <h1 role=\"button\">Heading</h1>",
+    "rule": "jsx-a11y/no-noninteractive-element-to-interactive-role",
+    "expected": true
+  },
+  {
+    "name": "a11y no-noninteractive-element-to-interactive-role allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <h1>Heading</h1>",
+    "rule": "jsx-a11y/no-noninteractive-element-to-interactive-role",
+    "expected": false
+  },
+  {
+    "name": "a11y no-noninteractive-tabindex prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div tabIndex={0} />",
+    "rule": "jsx-a11y/no-noninteractive-tabindex",
+    "expected": true
+  },
+  {
+    "name": "a11y no-noninteractive-tabindex allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div />",
+    "rule": "jsx-a11y/no-noninteractive-tabindex",
+    "expected": false
+  },
+  {
+    "name": "a11y no-redundant-roles prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <button role=\"button\" />",
+    "rule": "jsx-a11y/no-redundant-roles",
+    "expected": true
+  },
+  {
+    "name": "a11y no-redundant-roles allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <button />",
+    "rule": "jsx-a11y/no-redundant-roles",
+    "expected": false
+  },
+  {
+    "name": "a11y no-static-element-interactions prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div onClick={()=>{}} />",
+    "rule": "jsx-a11y/no-static-element-interactions",
+    "expected": true
+  },
+  {
+    "name": "a11y no-static-element-interactions allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"button\" onClick={()=>{}} />",
+    "rule": "jsx-a11y/no-static-element-interactions",
+    "expected": false
+  },
+  {
+    "name": "a11y role-has-required-aria-props prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"checkbox\" />",
+    "rule": "jsx-a11y/role-has-required-aria-props",
+    "expected": true
+  },
+  {
+    "name": "a11y role-has-required-aria-props allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"checkbox\" aria-checked={false} />",
+    "rule": "jsx-a11y/role-has-required-aria-props",
+    "expected": false
+  },
+  {
+    "name": "a11y role-supports-aria-props prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"heading\" aria-checked={false} />",
+    "rule": "jsx-a11y/role-supports-aria-props",
+    "expected": true
+  },
+  {
+    "name": "a11y role-supports-aria-props allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div role=\"heading\" aria-level={2} />",
+    "rule": "jsx-a11y/role-supports-aria-props",
+    "expected": false
+  },
+  {
+    "name": "a11y scope prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div scope=\"col\" />",
+    "rule": "jsx-a11y/scope",
+    "expected": true
+  },
+  {
+    "name": "a11y scope allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <th scope=\"col\" />",
+    "rule": "jsx-a11y/scope",
+    "expected": false
+  },
+  {
+    "name": "a11y tabindex-no-positive prohibited",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div tabIndex={1} />",
+    "rule": "jsx-a11y/tabindex-no-positive",
+    "expected": true
+  },
+  {
+    "name": "a11y tabindex-no-positive allowed",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "export const Fixture = () => <div tabIndex={0} />",
+    "rule": "jsx-a11y/tabindex-no-positive",
+    "expected": false
+  },
+  {
+    "name": "a11y option tr role exemption",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "const condition=true; export const Fixture=()=><tr role=\"presentation\" />",
+    "rule": "jsx-a11y/no-interactive-element-to-noninteractive-role",
+    "expected": false
+  },
+  {
+    "name": "a11y option ul role exemption",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "const condition=true; export const Fixture=()=><ul role=\"menu\" />",
+    "rule": "jsx-a11y/no-noninteractive-element-to-interactive-role",
+    "expected": false
+  },
+  {
+    "name": "a11y option tabpanel tabindex exemption",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "const condition=true; export const Fixture=()=><div role=\"tabpanel\" tabIndex={0} />",
+    "rule": "jsx-a11y/no-noninteractive-tabindex",
+    "expected": false
+  },
+  {
+    "name": "a11y option dynamic tabindex restricted baseline",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "const condition=true; export const Fixture=()=><div tabIndex={condition ? 0 : 1} />",
+    "rule": "jsx-a11y/no-noninteractive-tabindex",
+    "expected": true
+  },
+  {
+    "name": "a11y option dynamic role exemption",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "const condition=true; export const Fixture=()=><div role={condition ? \"button\" : \"link\"} onClick={()=>{}} />",
+    "rule": "jsx-a11y/no-static-element-interactions",
+    "expected": false
+  },
+  {
+    "name": "a11y option alert event restricted baseline",
+    "file": "src/test/lint-a11y-probe.tsx",
+    "code": "const condition=true; export const Fixture=()=><div role=\"alert\" onKeyDown={()=>{}} />",
+    "rule": "jsx-a11y/no-noninteractive-element-interactions",
+    "expected": true
   }
 ]

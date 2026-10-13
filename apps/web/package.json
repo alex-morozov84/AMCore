@@ -18,7 +18,8 @@
     "test:e2e:console-real-stack": "node ../../scripts/stand.mjs e2e --lane console-real-stack",
     "lint:css": "stylelint \"src/**/*.css\"",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "lint:fix": "node ../../scripts/lint.mjs --scope web --fix && stylelint \"src/**/*.css\" --fix"
   },
   "dependencies": {
     "@amcore/shared": "workspace:^",

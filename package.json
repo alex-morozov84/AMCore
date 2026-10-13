@@ -19,7 +19,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint && node scripts/lint.mjs --scope root scripts",
-    "lint:fix": "turbo run lint -- --fix && node scripts/lint.mjs --scope root --fix scripts",
+    "lint:fix": "turbo run lint:fix && node scripts/lint.mjs --scope root --fix scripts",
     "test": "turbo test",
     "test:console-session-e2e": "node scripts/run-console-session-e2e.mjs",
     "test:scripts:fast": "node --test --test-concurrency=1 scripts/lib/*.test.mjs scripts/measure/*.test.mjs",

@@ -33,7 +33,8 @@ arrays. ESLint alone checks only residual rules. Complete consumers must run bot
 3. Run Oxlint with that config and the selected files.
 4. Run ESLint with the default configuration and the same files.
 
-The repository wrapper implements this sequence. Scoped patterns resolve relative
+The repository wrapper implements this sequence. It uses the stable public ESLint
+Node API to reuse loaded plugins; Oxlint runs through its native CLI. Scoped patterns resolve relative
 to the workspace config directory. Oxlint settings are global; conflicting scoped
 React/accessibility/Next settings fail explicitly. React `detect` resolves the
 workspace React package. Experimental JavaScript plugins are not used.

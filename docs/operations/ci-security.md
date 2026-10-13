@@ -438,21 +438,14 @@ CI is the actual gate, not either hook:
   commit message.
 - **`.husky/pre-commit`** runs `lint-staged` against staged files. Its
   `prettier --write` step formats every matched file repo-wide, including
-  inside `apps/*` and `packages/*`. Its ESLint step is workspace-aware by
-  design: `apps/api/**`, `apps/web/**`, and `packages/shared/**` each get
-  linted via `pnpm --filter <workspace> exec eslint`, which runs with that
-  workspace's directory as cwd — the same mechanism `pnpm lint` (via Turbo)
-  uses for that workspace in CI, so it resolves the same nested
-  `eslint.config.mjs` and behaves identically (an explicit `eslint -c
-<path>` from the repo root also works, but leaves cwd at the repo root,
-  which confuses cwd-relative plugin checks like Next.js's pages-directory
-  detection into printing a spurious warning). A catch-all
-  `*.{ts,tsx,js,jsx}` pattern still exists in `lint-staged` for genuinely
-  root-level files (currently only `eslint.config.js` and
-  `commitlint.config.js`) — it does nothing for files already covered by a
-  workspace-specific pattern above, since the root `eslint.config.js`
-  deliberately ignores `apps/**`/`packages/**` (that root config is for the
-  two root-level files only, not a fallback for the workspaces).
+  inside `apps/*` and `packages/*`. Its lint steps use the paired Oxlint and
+  ESLint wrapper with an explicit workspace scope. The wrapper changes cwd to
+  that workspace before loading its policy. API, web, shared and shared-config
+  files therefore use the same policy as their workspace lint command.
+  Each staged scope runs fixes, then checks with `--max-warnings=0`.
+  The root pattern ignores files owned by workspace policies.
+  See [the paired lint configuration](../../packages/eslint-config/README.md)
+  for rule ownership and engine-specific exceptions.
 
   After successful `lint-staged`, the hook prints a read-only size report from
   the final staged snapshot. It marks files at 150 lines and functions at 30
@@ -460,15 +453,15 @@ CI is the actual gate, not either hook:
   `describe`/`test`/`it` and Playwright `test.describe` suite/case callbacks.
   Ordinary callbacks such as `test.step` remain visible. The report is
   advisory: a size marker or unavailable report cannot fail the commit, and CI
-  has no size gate. ESLint remains blocking on its existing rules, including
+  has no size gate. Both lint engines remain blocking on their assigned rules, including
   `--max-warnings=0`; size is deliberately outside that invocation. See
   `CONTRIBUTING.md` → _Size
   review advisory_ for the handoff decision required for each marker.
 
 **Do not add a new lintable workspace under `apps/*` or `packages/*` without
 also adding a matching `lint-staged` pattern** in the root `package.json`
-using `pnpm --filter <workspace> exec eslint`, or its staged files
-will silently skip ESLint locally (formatting still runs) while still being
+using the paired wrapper with its workspace scope, or its staged files
+will silently skip policy checks locally (formatting still runs) while still being
 correctly caught by CI's `pnpm lint`. This is exactly the gap found and fixed
 2026-07-18: `packages/shared` had no `eslint.config.mjs`/`lint` script at all
 (never linted anywhere, not even in CI) until that gap surfaced 19 real,
@@ -478,7 +471,7 @@ skipped every file under `apps/**`/`packages/**` because the root config
 ignores those paths, and `--no-warn-ignored` suppressed even the "file was
 ignored" notice. `pnpm lint`/`pnpm --filter <workspace> lint` was and remains
 the authoritative local check; run it before relying on a clean commit if
-you're touching a workspace's ESLint config or adding a new lintable
+you're touching a workspace's lint policy or adding a new lintable
 workspace.
 
 ### Local Pre-Push Checks

@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 
 import { nativeConfig } from '@amcore/eslint-config/hybrid'
+import { runResidual } from './lib/lint-eslint.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const SCOPES = {
@@ -45,7 +46,8 @@ async function lint() {
   const { scope, files, options } = argumentsForScope(process.argv.slice(2))
   const cwd = path.join(ROOT, SCOPES[scope])
   const configPath = path.join(cwd, scope === 'root' ? 'eslint.config.js' : 'eslint.config.mjs')
-  const { policy } = await import(pathToFileURL(configPath).href)
+  process.chdir(cwd)
+  const { policy, default: residualPolicy } = await import(pathToFileURL(configPath).href)
   if (!Array.isArray(policy)) throw new Error(`Missing paired lint policy: ${configPath}`)
   // Oxlint resolves scoped override patterns relative to its config directory.
   const config = path.join(cwd, `.oxlint-run-${randomUUID()}.json`)
@@ -65,7 +67,7 @@ async function lint() {
       cwd,
       capture
     )
-    const residual = execute('eslint', ['--config', configPath, ...options, ...files], cwd, capture)
+    const residual = await runResidual({ cwd, config: residualPolicy, files, options, capture })
     if (capture) console.log(JSON.stringify({ scope, engines: [native, residual] }))
     return Math.max(native.exit, residual.exit)
   } finally {

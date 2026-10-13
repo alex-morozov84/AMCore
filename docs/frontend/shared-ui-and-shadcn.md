@@ -358,7 +358,8 @@ for valid reasons:
 - raw Tailwind palette classes (`bg-red-500`, `dark:text-gray-800`) must become
   semantic tokens (`bg-destructive`, `text-muted-foreground`);
 - inline `style` must be replaced with classes, a CSS Module, or a reviewed
-  one-line `eslint-disable` only for a genuinely dynamic value;
+  one-line `oxlint-disable-next-line react/forbid-dom-props` with a reason
+  only for a genuinely dynamic value;
 - hardcoded user-facing English, including `sr-only` labels, must move to the
   caller as translated props or children;
 - imports must follow FSD paths (`@/shared/ui/button`, feature public APIs,
@@ -366,7 +367,7 @@ for valid reasons:
   shape.
 
 Do **not** accept a shadcn component by disabling lint just because the CLI
-generated it. A scoped `eslint-disable` is a last-resort exception with a
+generated it. A scoped exception for the owning engine is a last-resort exception with a
 reason, visible in review; it is not the normal path for importing registry
 code into the starter. If the generated code needs a color that has no
 semantic token yet, either choose an existing token or make a surgical token

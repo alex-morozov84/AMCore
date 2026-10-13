@@ -31,6 +31,7 @@
     "eslint-plugin-jest": "^29.16.6"
   },
   "scripts": {
-    "lint": "node ../../scripts/lint.mjs --scope config"
+    "lint": "node ../../scripts/lint.mjs --scope config",
+    "lint:fix": "node ../../scripts/lint.mjs --scope config --fix"
   }
 }

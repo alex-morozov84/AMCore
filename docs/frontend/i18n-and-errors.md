@@ -216,7 +216,7 @@ page would redirect to itself forever in production while working fine under
 | `src/shared/api/error-messages.test.ts`      | A shared error code with no translation, or an orphaned message              |
 | `apps/api/.../messages.spec.ts`              | The same, for email copy                                                     |
 | `apps/api/.../frontend-url-coverage.spec.ts` | A backend module building a link from `FRONTEND_URL` without a locale prefix |
-| ESLint                                       | Non-ASCII literals in code, locale-unaware navigation, `z.config`            |
+| Oxlint + ESLint                              | Non-ASCII literals in code, locale-unaware navigation, `z.config`            |
 
 None of them can tell you a translation is _wrong_ — only that it is missing.
 Reviewing the actual wording is still a human job.
