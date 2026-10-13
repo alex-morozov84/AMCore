@@ -34,12 +34,13 @@ function nativeOverride(block) {
       .filter(([id]) => nativeRule(id))
       .map(([id, value]) => [nativeRule(id), value])
   )
-  if (!Object.keys(rules).length) return undefined
+  const globals = block.languageOptions?.globals
+  if (!Object.keys(rules).length && !globals) return undefined
   return {
     files: block.files ?? ['**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}'],
     ...(block.ignores && { excludeFiles: block.ignores }),
     rules,
-    ...(block.languageOptions?.globals && { globals: block.languageOptions.globals }),
+    ...(globals && { globals }),
   }
 }
 
