@@ -37,7 +37,7 @@ export function OAuthSection({ providers }: OAuthSectionProps) {
       cannot guarantee the hard, full-document navigation this
       redirect-to-Google chain requires, so a plain anchor is correct here,
       not a lint gap. */}
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+      {/* oxlint-disable-next-line nextjs/no-html-link-for-pages */}
       <a
         href="/api/auth/oauth/google"
         data-slot="button"

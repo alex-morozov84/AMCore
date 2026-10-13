@@ -304,7 +304,7 @@ Two rules that are easy to get wrong:
   `@/i18n/navigation` and preserve both the locale prefix and the global
   progress signal. Import other locale-aware helpers directly from
   `@/i18n/navigation`. Never bypass these with `next/link` or locale-unaware
-  `next/navigation`; ESLint enforces both boundaries. `notFound()` and other
+  `next/navigation`; Oxlint enforces both boundaries. `notFound()` and other
   non-navigating helpers may still come from `next/navigation`. See
   [Top route progress bar](./route-progress.md).
 - **Call `setRequestLocale(locale)` before any other next-intl call** in each

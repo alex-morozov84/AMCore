@@ -109,7 +109,7 @@ Assert the intended UI state first (for example a loaded view or an open dialog)
 Visual stability does not prove hydration, completed data loading or authority.
 Do not scan a skeleton when the scenario is meant to prove the loaded form.
 Keep normal-motion and reduced-motion behavior checks in their own scenarios.
-ESLint rejects direct runtime imports of axe in E2E outside the shared helper,
+Oxlint rejects direct runtime imports of axe in E2E outside the shared helper,
 with guidance to use it. Genuine final-state contrast violations remain failures;
 never fix transient results by excluding nodes, disabling contrast or retrying
 scans until one passes. Screenshot `animations: 'disabled'` does not configure axe.

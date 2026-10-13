@@ -56,6 +56,17 @@
       "rationale": "Production CLIs and generated-project harnesses define scaffold behavior."
     },
     {
+      "id": "planning.lint-fixtures",
+      "graph": "planning",
+      "matcher": {
+        "kind": "root",
+        "patterns": ["scripts/fixtures/lint"]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Lint fixtures include locale-owned content and verify the paired lint policy."
+    },
+    {
       "id": "planning.direct-inputs",
       "graph": "planning",
       "matcher": {
@@ -144,6 +155,7 @@
           "eslint.config.js",
           "pnpm-lock.yaml",
           "pnpm-workspace.yaml",
+          "scripts/lint.mjs",
           "turbo.json"
         ]
       },

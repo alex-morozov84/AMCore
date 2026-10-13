@@ -1,3 +1,4 @@
+import { projectSingleLocaleLintFixtures } from './project-lint-fixtures.mjs'
 import {
   applyConsoleContext,
   applyLocaleContext,
@@ -30,6 +31,13 @@ function consoleClaims(params) {
 }
 
 export const PROJECT_SHARED_CORE_DEFINITIONS = [
+  [
+    'lint-fixtures-single-locale',
+    {
+      claims: () => [field('lint-fixtures-topology', 'single')],
+      apply: projectSingleLocaleLintFixtures,
+    },
+  ],
   [
     'context-locale',
     {

@@ -169,7 +169,7 @@ export async function setupE2ETest(
     process.env.E2E_DATABASE_URL = databaseUrl
 
     // Log test environment (suppress ESLint in tests)
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.log('🔧 Test Environment:', { databaseUrl, redisUrl })
 
     // Dynamic import AFTER process.env is set — otherwise AppModule's

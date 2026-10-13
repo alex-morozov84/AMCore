@@ -1,4 +1,5 @@
-import nestConfig from '@amcore/eslint-config/nest';
+import { residualConfig } from '@amcore/eslint-config/hybrid'
+import { policy as nestConfig } from '@amcore/eslint-config/nest'
 
 const bannedExceptionImports = [
   'UnauthorizedException',
@@ -7,10 +8,10 @@ const bannedExceptionImports = [
   'ForbiddenException',
   'ConflictException',
   'InternalServerErrorException',
-];
+]
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+export const policy = [
   ...nestConfig,
   {
     ignores: ['src/generated/prisma/**'],
@@ -53,4 +54,6 @@ export default [
       ],
     },
   },
-];
+]
+
+export default residualConfig(policy)

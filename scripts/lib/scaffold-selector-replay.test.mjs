@@ -21,6 +21,8 @@ function fixtureFor(glob) {
 }
 
 const samples = [
+  ['locale lint fixtures', ['scripts/fixtures/lint/web.json'], true],
+  ['paired lint wrapper', ['scripts/lint.mjs'], true],
   ['#431', ['scripts/lib/project-composition-contract.test.mjs'], true],
   ['#430', ['scripts/lib/brand-facts.mjs', 'docs/frontend/brand-theme-and-tokens.md'], true],
   ['locale migration', ['.github/workflows/ci.yml', 'scripts/lib/locale-ownership.mjs'], true],

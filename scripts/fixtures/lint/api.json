@@ -1,0 +1,191 @@
+[
+  {
+    "name": "Logger",
+    "file": "src/admission-0-admission.ts",
+    "code": "import {Logger} from '@nestjs/common';export const L=Logger",
+    "rule": "no-restricted-imports",
+    "expected": true
+  },
+  {
+    "name": "raw exception",
+    "file": "src/admission-1-admission.ts",
+    "code": "import {BadRequestException} from '@nestjs/common';export const E=BadRequestException",
+    "rule": "no-restricted-imports",
+    "expected": true
+  },
+  {
+    "name": "filter exception",
+    "file": "src/common/exceptions/admission-2-admission.ts",
+    "code": "import {BadRequestException} from '@nestjs/common';export const E=BadRequestException",
+    "rule": "no-restricted-imports",
+    "expected": false
+  },
+  {
+    "name": "filter Logger",
+    "file": "src/common/exceptions/admission-3-admission.ts",
+    "code": "import {Logger} from '@nestjs/common';export const L=Logger",
+    "rule": "no-restricted-imports",
+    "expected": true
+  },
+  {
+    "name": "runtime any",
+    "file": "src/admission-4-admission.ts",
+    "code": "export const v:any=1",
+    "rule": "@typescript-eslint/no-explicit-any",
+    "expected": true
+  },
+  {
+    "name": "test any",
+    "file": "src/admission-5-admission.spec.ts",
+    "code": "export const v:any=1",
+    "rule": "@typescript-eslint/no-explicit-any",
+    "expected": false
+  },
+  {
+    "name": "public",
+    "file": "src/admission-6-admission.ts",
+    "code": "export class A{public value=1}",
+    "rule": "@typescript-eslint/explicit-member-accessibility",
+    "expected": true
+  },
+  {
+    "name": "implicit public",
+    "file": "src/admission-7-admission.ts",
+    "code": "export class A{value=1}",
+    "rule": "@typescript-eslint/explicit-member-accessibility",
+    "expected": false
+  },
+  {
+    "name": "return runtime",
+    "file": "src/admission-8-admission.ts",
+    "code": "export function v(){return 1}",
+    "rule": "@typescript-eslint/explicit-function-return-type",
+    "expected": true
+  },
+  {
+    "name": "return test",
+    "file": "src/admission-9-admission.spec.ts",
+    "code": "export function v(){return 1}",
+    "rule": "@typescript-eslint/explicit-function-return-type",
+    "expected": false
+  },
+  {
+    "name": "constructor",
+    "file": "src/admission-10-admission.ts",
+    "code": "export class A{constructor(){}}",
+    "rule": "@typescript-eslint/no-empty-function",
+    "expected": false
+  },
+  {
+    "name": "empty function",
+    "file": "src/admission-11-admission.ts",
+    "code": "export function v():void{}",
+    "rule": "@typescript-eslint/no-empty-function",
+    "expected": true
+  },
+  {
+    "name": "DI value import",
+    "file": "src/admission-12-admission.ts",
+    "code": "import {Injectable} from '@nestjs/common';import {EnvService} from './env/env.service';@Injectable() export class A{constructor(private readonly env:EnvService){}}",
+    "rule": "@typescript-eslint/consistent-type-imports",
+    "expected": false
+  },
+  {
+    "name": "eval",
+    "file": "src/admission-13-admission.ts",
+    "code": "export function v():unknown{return eval('1')}",
+    "rule": "no-eval",
+    "expected": true
+  },
+  {
+    "name": "Function",
+    "file": "src/admission-14-admission.ts",
+    "code": "export const v=new Function('return 1')",
+    "rule": "no-new-func",
+    "expected": true
+  },
+  {
+    "name": "console log",
+    "file": "src/admission-15-admission.ts",
+    "code": "console.log('v')",
+    "rule": "no-console",
+    "expected": true
+  },
+  {
+    "name": "console warn",
+    "file": "src/admission-16-admission.ts",
+    "code": "console.warn('v')",
+    "rule": "no-console",
+    "expected": false
+  },
+  {
+    "name": "underscore",
+    "file": "src/admission-17-admission.ts",
+    "code": "export function v(_x:number):number{return 1}",
+    "rule": "@typescript-eslint/no-unused-vars",
+    "expected": false
+  },
+  {
+    "name": "unused param",
+    "file": "src/admission-18-admission.ts",
+    "code": "export function v(x:number):number{return 1}",
+    "rule": "@typescript-eslint/no-unused-vars",
+    "expected": true
+  },
+  {
+    "name": "assertion helper",
+    "file": "src/admission-19-admission.spec.ts",
+    "code": "test('v',()=>{expectThing()})",
+    "rule": "jest/expect-expect",
+    "expected": false
+  },
+  {
+    "name": "no assertion",
+    "file": "src/admission-20-admission.spec.ts",
+    "code": "test('v',()=>{value()})",
+    "rule": "jest/expect-expect",
+    "expected": true
+  },
+  {
+    "name": "focused",
+    "file": "src/admission-21-admission.spec.ts",
+    "code": "test.only('v',()=>{expect(1).toBe(1)})",
+    "rule": "jest/no-focused-tests",
+    "expected": true
+  },
+  {
+    "name": "skipped",
+    "file": "src/admission-22-admission.spec.ts",
+    "code": "test.skip('v',()=>{expect(1).toBe(1)})",
+    "rule": "jest/no-disabled-tests",
+    "expected": true
+  },
+  {
+    "name": "Jest2args",
+    "file": "src/admission-23-admission.spec.ts",
+    "code": "import {expect,test} from '@jest/globals';test('v',()=>{expect(1,'detail').toBe(1)})",
+    "rule": "jest/valid-expect",
+    "expected": true
+  },
+  {
+    "name": "Vitest2args",
+    "file": "src/admission-24-admission.spec.ts",
+    "code": "import {expect,test} from 'vitest';test('v',()=>{expect(1,'detail').toBe(1)})",
+    "rule": "jest/valid-expect",
+    "expected": false
+  },
+  {
+    "name": "loop assertion helper",
+    "file": "src/admission-25-admission.spec.ts",
+    "code": "function assertValues(values:number[]){for(const v of values){expect(v).toBe(1)}}test('v',()=>{assertValues([1]);expect(1).toBe(1)})",
+    "rule": "jest/no-conditional-expect",
+    "expected": false
+  },
+  {
+    "name": "merged name",
+    "file": "src/admission-26-admission.ts",
+    "code": "export const Token='token';export type Token=typeof Token",
+    "rule": "@typescript-eslint/no-redeclare",
+    "expected": true
+  }
+]

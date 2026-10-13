@@ -12,7 +12,16 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/lint.mjs",
+        "$TURBO_ROOT$/scripts/lib/lint-*.mjs",
+        "$TURBO_ROOT$/packages/eslint-config/**",
+        "$TURBO_ROOT$/apps/web/node_modules/tailwindcss/theme.css",
+        "$TURBO_ROOT$/packages/typescript-config/**",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ]
     },
     "typecheck": {
       "dependsOn": ["^build"]
@@ -22,6 +31,10 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.env.example"]
     },
     "clean": {
+      "cache": false
+    },
+    "lint:fix": {
+      "dependsOn": ["^build"],
       "cache": false
     }
   }

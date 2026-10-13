@@ -58,6 +58,13 @@ pnpm + Turborepo monorepo.
   remain downstream-owned.
 - `packages/shared` — Zod schemas, types, constants used by both api and web.
 
+## Lint engines
+
+`pnpm lint` runs paired Oxlint and ESLint checks, plus web Stylelint.
+Use the shared policy guide in `packages/eslint-config/README.md`.
+ESLint alone runs only residual rules. Use the wrapper for complete checks.
+Keep rule ownership explicit when adding rules or inline exceptions.
+
 ## Commands
 
 ```bash
@@ -318,7 +325,7 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
      locale-aware helpers and keep the top progress bar correct. Import other
      locale-aware helpers (`usePathname`, `redirect`, etc.) from
      `@/i18n/navigation`; never use locale-unaware `next/link` or navigation
-     APIs for these jobs. ESLint enforces the boundaries. See
+     APIs for these jobs. Oxlint enforces the boundaries. See
      `docs/frontend/route-progress.md`.
   3. **Translate API failures by `errorCode`**, never the backend's `message`
      (English, developer-facing). Use `<ApiErrorAlert>` / `useApiError()`. A new

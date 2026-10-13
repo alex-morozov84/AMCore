@@ -18,7 +18,7 @@ Three tools, chosen by what each can actually see:
 | --------------------------------- | ----------------------------------- | --------------------------------------------------------------- |
 | Imports between layers and slices | ESLint (`eslint-plugin-boundaries`) | It resolves the module graph                                    |
 | Tailwind classes in `.ts`/`.tsx`  | ESLint (`no-restricted-syntax`)     | Class strings are string literals in code                       |
-| The DOM `style` prop              | ESLint (`react/forbid-dom-props`)   | It is JSX, not CSS                                              |
+| The DOM `style` prop              | Oxlint (`react/forbid-dom-props`)   | It is JSX, not CSS                                              |
 | `*.module.css`                    | Stylelint                           | CSS is Stylelint's domain; ESLint would be parsing CSS by regex |
 
 ## Import rules
@@ -204,7 +204,7 @@ The palette hue names are read from the installed Tailwind rather than listed in
 the config, so upgrading Tailwind extends the rule by itself.
 
 The inline `style` prop is banned outright, not only for colours. A genuinely
-dynamic value costs one `eslint-disable` with a reason, which is visible in
+dynamic value costs one `oxlint-disable` with a reason, which is visible in
 review — the alternative was a hand-maintained list of CSS colour properties,
 which is exactly the kind of thing that rots.
 

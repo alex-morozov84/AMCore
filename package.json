@@ -18,8 +18,8 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "turbo lint && eslint scripts",
-    "lint:fix": "turbo run lint -- --fix",
+    "lint": "turbo lint && node scripts/lint.mjs --scope root scripts",
+    "lint:fix": "turbo run lint:fix && node scripts/lint.mjs --scope root --fix scripts",
     "test": "turbo test",
     "test:console-session-e2e": "node scripts/run-console-session-e2e.mjs",
     "test:scripts:fast": "node --test --test-concurrency=1 scripts/lib/*.test.mjs scripts/measure/*.test.mjs",
@@ -47,37 +47,43 @@
     "@clack/prompts": "^1.8.1",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
-    "@eslint/js": "^9.39.5",
-    "eslint": "^9.39.5",
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "turbo": "^2.11.5",
     "typescript": "^5.9.3",
-    "yaml": "^2.9.1"
+    "yaml": "^2.9.1",
+    "oxlint": "1.87.0"
   },
   "lint-staged": {
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
     "apps/api/**/*.{ts,tsx,js,jsx}": [
-      "pnpm --filter api exec eslint --fix --no-warn-ignored",
-      "pnpm --filter api exec eslint --max-warnings=0 --no-warn-ignored",
+      "node scripts/lint.mjs --scope api --fix --no-warn-ignored",
+      "node scripts/lint.mjs --scope api --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "apps/web/**/*.{ts,tsx,js,jsx}": [
-      "pnpm --filter web exec eslint --fix --no-warn-ignored",
-      "pnpm --filter web exec eslint --max-warnings=0 --no-warn-ignored",
+      "node scripts/lint.mjs --scope web --fix --no-warn-ignored",
+      "node scripts/lint.mjs --scope web --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "packages/shared/**/*.{ts,tsx,js,jsx}": [
-      "pnpm --filter shared exec eslint --fix --no-warn-ignored",
-      "pnpm --filter shared exec eslint --max-warnings=0 --no-warn-ignored",
+      "node scripts/lint.mjs --scope shared --fix --no-warn-ignored",
+      "node scripts/lint.mjs --scope shared --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
     "*.{ts,tsx,js,jsx}": [
-      "eslint --fix --no-warn-ignored",
-      "eslint --max-warnings=0 --no-warn-ignored",
+      "node scripts/lint.mjs --scope root --fix --no-warn-ignored",
+      "node scripts/lint.mjs --scope root --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
-    "*.{json,md,yml,yaml}": [
+    "packages/eslint-config/**/*.{js,mjs}": [
+      "node scripts/lint.mjs --scope config --fix --no-warn-ignored",
+      "node scripts/lint.mjs --scope config --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ]
   }

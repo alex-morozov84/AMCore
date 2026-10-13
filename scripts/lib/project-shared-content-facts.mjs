@@ -3,6 +3,7 @@ import { STORYBOOK_CONTENT_PATHS } from './storybook-ownership.mjs'
 export const SHARED_CONTENT_PATHS = Object.freeze([
   ...new Set([
     'PROJECT_CONTEXT.md',
+    'scripts/fixtures/lint/web.json',
     'apps/web/src/shared/lib/route-progress/route-progress-flag.ts',
     'apps/web/eslint.config.mjs',
     'apps/web/package.json',
@@ -38,6 +39,7 @@ function localeFacts(state) {
   return [
     content('locale', 'PROJECT_CONTEXT.md', 'context-locale', { locale: state.locale.base }),
     content('locale', 'apps/web/eslint.config.mjs', 'project-eslint-remove-navigation'),
+    content('locale', 'scripts/fixtures/lint/web.json', 'lint-fixtures-single-locale'),
     remove('locale', `apps/web/messages/${removed}.json`),
   ]
 }

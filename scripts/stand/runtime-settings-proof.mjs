@@ -68,7 +68,7 @@ if (action === 'start') {
     const events = []
     for (const raw of log.split('\n')) {
       // Strip terminal formatting before reading the bounded structured event.
-      // eslint-disable-next-line no-control-regex
+      // oxlint-disable-next-line no-control-regex
       const line = raw.replace(/\x1b\[[0-9;]*m/g, '')
       const start = line.indexOf('{'),
         end = line.lastIndexOf('}')

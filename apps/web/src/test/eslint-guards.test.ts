@@ -1,5 +1,4 @@
-// The repository's custom ESLint rules are contract guards, and `ai/TESTING.md`
-// asks the same of them as of any other guard: derive from the source of truth,
+// The repository lint rules are contract guards. Derive from the source of truth,
 // don't be vacuous, and prove they fail on the case they exist for.
 //
 // They needed it. `project/zod-locale` shipped in #267 and was silently
@@ -16,17 +15,15 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
-import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-import config from '../../eslint.config.mjs'
+import { lintFixture } from '../../../../scripts/lib/lint-fixture.mjs'
+import { policy as config } from '../../eslint.config.mjs'
 
 const WEB_ROOT = path.resolve(import.meta.dirname, '../..')
 
 async function lint(code: string, filePath: string) {
-  const eslint = new ESLint({ cwd: WEB_ROOT })
-  const [result] = await eslint.lintText(code, { filePath })
-  return result.messages
+  return lintFixture(code, filePath) as Array<{ ruleId: string | null; message: string }>
 }
 
 /** Rule ids reported for `code`, restricted to the rule under test. */
@@ -365,7 +362,7 @@ describe('FSD boundaries', () => {
       // an earlier version of this test linted `manifest.ts` and passed with a
       // deprecated rule reintroduced. Linting `src` also survived the `views`
       // -> `_pages` rename (Track 9), which a narrower path would not have.
-      [path.join(WEB_ROOT, 'node_modules/eslint/bin/eslint.js'), 'src'],
+      [path.resolve(WEB_ROOT, '../../scripts/lint.mjs'), '--scope', 'web', 'src'],
       { cwd: WEB_ROOT, encoding: 'utf8' }
     )
 
@@ -374,6 +371,7 @@ describe('FSD boundaries', () => {
     // happily with a deprecated rule reintroduced.
     const output = `${run.stdout ?? ''}${run.stderr ?? ''}`
 
+    expect(run.status, output).toBe(0)
     expect(output).not.toMatch(/\[boundaries]\[warning]/)
     expect(output).not.toMatch(/deprecated/i)
   }, 60_000)
@@ -453,7 +451,7 @@ describe('token-only styling', () => {
 
   it('rejects even a non-colour inline style, on purpose', async () => {
     // The ban is deliberately wider than colour. A dynamic transform is a real
-    // use, and it is meant to cost one `eslint-disable` with a reason rather
+    // use, and it is meant to cost one `oxlint-disable` with a reason rather
     // than be waved through by a rule guessing at intent.
     expect(
       await ruleIds(

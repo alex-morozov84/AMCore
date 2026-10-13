@@ -75,7 +75,7 @@ These router methods do not expose a cancellation callback. Validate or ask
 for confirmation _before_ calling them; if a call produces no commit, the
 safety timer clears the bar.
 
-An ESLint rule bans importing `Link` or `useRouter` directly from
+An Oxlint rule bans importing `Link` or `useRouter` directly from
 `@/i18n/navigation` anywhere except these two adapters' own implementation
 files, so a new call site cannot silently bypass the bar.
 
