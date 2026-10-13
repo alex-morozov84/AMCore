@@ -47,6 +47,7 @@ it.each(['google', 'apple'])(
       cookie: jest.fn(),
       clearCookie: jest.fn(),
       redirect: jest.fn(),
+      status: jest.fn().mockReturnThis(),
     } as unknown as Response
     if (provider === 'apple')
       await controller.callbackPost(provider, 'code', 'state', undefined, req, res)
@@ -65,6 +66,7 @@ it.each(['google', 'apple'])(
       'fixture-refresh',
       expect.objectContaining({ httpOnly: true })
     )
+    expect(res.status).toHaveBeenCalledWith(302)
     expect(res.redirect).toHaveBeenCalledWith(
       `http://web.test${localePathPrefix(DEFAULT_LOCALE)}/auth/callback?ticket=ticket`
     )
