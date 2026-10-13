@@ -14,10 +14,9 @@ import { type BoardEvent, type BoardEventSink, NOOP_BOARD_EVENTS } from './bull-
 /**
  * Read the `refresh_token` cookie straight from the raw `Cookie` header.
  *
- * Bull Board is mounted as Express middleware by `@bull-board/nestjs`; the
- * ordering of that router relative to the global `cookie-parser` is not
- * guaranteed, so we parse the header ourselves instead of trusting
- * `req.cookies`. Refresh tokens are hex (`randomBytes(32).toString('hex')`),
+ * The board boundary runs against the raw Node request before the
+ * Fastify cookie plugin is guaranteed to populate its wrapper. Parse the
+ * header directly instead of trusting `req.cookies`. Refresh tokens are hex (`randomBytes(32).toString('hex')`),
  * so no URL-decoding is required.
  */
 function readRefreshTokenCookie(req: Request): string | null {
@@ -89,7 +88,8 @@ export function createBullBoardAuthMiddleware(
 ): RequestHandler {
   const deny = (res: Response, status: 400 | 401 | 403 | 503, reason: DenialReason): void => {
     events({ event: 'bull_board.access_denied', reason })
-    res.status(status).end()
+    res.statusCode = status
+    res.end()
   }
 
   const admitBearer = (req: Request, res: Response, next: NextFunction, header: string): void => {
@@ -126,6 +126,8 @@ export function createBullBoardAuthMiddleware(
   }
 
   return (req: Request, res: Response, next: NextFunction): void => {
+    // Board-owned state also lives on the raw Node response under native middleware.
+    res.locals ??= {}
     // The render context is never accepted from a cookie request: drop it before anything reads it.
     const authHeader = req.headers.authorization
     if (authHeader === undefined) delete req.headers[BULL_BOARD_CONTEXT_HEADER]

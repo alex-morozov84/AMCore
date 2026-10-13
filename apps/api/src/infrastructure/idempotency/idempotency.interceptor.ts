@@ -5,7 +5,7 @@ import {
   type NestInterceptor,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import type { Request, Response } from 'express'
+import type { Request } from 'express'
 import { PinoLogger } from 'nestjs-pino'
 import { from, type Observable, of, switchMap } from 'rxjs'
 
@@ -19,7 +19,12 @@ import {
 import type { IdempotencyOptions } from './idempotency.types'
 import { createIdempotencyFingerprint } from './idempotency-fingerprint'
 import { parseIdempotencyKey } from './idempotency-header'
-import { prepareReplayResponse, responseRecord, wrapSend } from './idempotency-response'
+import {
+  type IdempotencyResponse,
+  prepareReplayResponse,
+  responseRecord,
+  wrapSend,
+} from './idempotency-response'
 import { IdempotencyStoreService } from './idempotency-store.service'
 
 import { EnvService } from '@/env/env.service'
@@ -46,7 +51,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
     const http = context.switchToHttp()
     const req = http.getRequest<Request & { rawBody?: Buffer }>()
-    const res = http.getResponse<Response>()
+    const res = http.getResponse<IdempotencyResponse>()
     if (req.method !== 'POST') return next.handle()
 
     const idempotencyKey = parseIdempotencyKey(req)
@@ -95,7 +100,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     storageKey: string,
     ownerToken: string,
     fingerprint: string,
-    res: Response,
+    res: IdempotencyResponse,
     body: unknown
   ): Promise<void> {
     try {

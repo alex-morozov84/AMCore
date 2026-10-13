@@ -53,4 +53,21 @@ describe('normalizeRouteTemplate', () => {
       )
     ).toBe('unknown')
   })
+  it('uses native route metadata without leaking parameters or query values', () => {
+    expect(
+      normalizeRouteTemplate({
+        url: '/api/v1/files/private-id?token=private-token',
+        routeOptions: { url: '/api/v1/files/:id' },
+      } as unknown as Request)
+    ).toBe('/api/v1/files/:id')
+  })
+
+  it('keeps native unmatched requests in one bounded label', () => {
+    expect(
+      normalizeRouteTemplate({
+        url: '/api/v1/private-id?token=private-token',
+        routeOptions: {},
+      } as unknown as Request)
+    ).toBe('unknown')
+  })
 })

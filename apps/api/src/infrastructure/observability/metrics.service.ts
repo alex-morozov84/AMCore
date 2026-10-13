@@ -13,7 +13,7 @@ type HttpLabels = {
 }
 
 // Not `Omit<HttpLabels, 'status_code'>`: the route hasn't resolved yet when a
-// request enters/leaves flight (before Express matches it), so the middleware's
+// request enters/leaves flight (before the final route template is attached), so the middleware's
 // only call site always passed the literal `'pending'` for `route` — a label
 // that can only ever hold one value, which is worse than no label at all.
 // Dropped rather than fixed.

@@ -47,8 +47,11 @@ export function setOAuthBindingCookie(
   res: Response,
   provider: string,
   nonce: string,
-  isProduction: boolean
+  isProduction: boolean,
+  maxAgeUnit?: 'milliseconds' | 'seconds'
 ): void {
+  const seconds = maxAgeUnit === 'seconds' || (maxAgeUnit === undefined && 'raw' in res)
+  const maxAge = seconds ? MAX_AGE_MS / 1000 : MAX_AGE_MS
   // Inline literal options so `httpOnly`/`secure` are statically visible at the
   // `res.cookie` sink — CodeQL cannot resolve flags supplied via a getter and
   // would otherwise raise false `js/client-exposed-cookie` alerts.
@@ -71,7 +74,7 @@ export function setOAuthBindingCookie(
       secure: true,
       sameSite: 'none',
       path: APPLE_CALLBACK_PATH,
-      maxAge: MAX_AGE_MS,
+      maxAge,
     })
     return
   }
@@ -81,7 +84,7 @@ export function setOAuthBindingCookie(
     secure: isProduction,
     sameSite: 'lax',
     path: '/',
-    maxAge: MAX_AGE_MS,
+    maxAge,
   })
 }
 

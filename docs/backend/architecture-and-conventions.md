@@ -10,6 +10,13 @@ to _use_ a built-in capability, start from [the feature docs](#see-also) instead
 For the high-level module tree, tech stack, and runtime layers, read
 [`apps/api/README.md`](../../apps/api/README.md) first.
 
+## HTTP runtime
+
+The API uses one Fastify production adapter. Use the shared bootstrap in tests
+and native plugins for extensions; do not rely on Express response methods.
+See [HTTP runtime](http-runtime.md) and [request bodies](request-body-contract.md)
+for uploads, cookies, raw streams, error policies and upgrade checks.
+
 ## Module boundaries
 
 AMCore is a **modular monolith**. The rules that keep it modular:
@@ -183,6 +190,8 @@ watch mode and checks against the built package.
 
 - **Module** — compose controller + service into a NestJS module; export any service
   other modules are allowed to call.
+
+Request parsing and transport refusals follow the [request body contract](request-body-contract.md).
 
 ### 4. Authentication & authorization
 

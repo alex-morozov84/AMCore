@@ -1,5 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from '@nestjs/common'
-import { Response } from 'express'
+import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -14,14 +14,15 @@ import type { ErrorResponse, ValidationError } from '../types'
 export class HttpExceptionFilter implements ExceptionFilter {
   constructor(
     private readonly logger: PinoLogger,
-    private readonly cls: ClsService
+    private readonly cls: ClsService,
+    private readonly adapterHost: HttpAdapterHost
   ) {
     this.logger.setContext(HttpExceptionFilter.name)
   }
 
   catch(exception: HttpException, host: ArgumentsHost): void {
     const ctx = host.switchToHttp()
-    const response = ctx.getResponse<Response>()
+    const response = ctx.getResponse()
     const request = ctx.getRequest()
 
     const statusCode = exception.getStatus()
@@ -41,7 +42,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       retryAfter > 0 &&
       retryAfter <= 86400
     )
-      response.setHeader('Retry-After', String(Math.ceil(retryAfter)))
+      this.adapterHost.httpAdapter.setHeader(response, 'Retry-After', String(Math.ceil(retryAfter)))
 
     // Build error response
     const errorResponse: ErrorResponse = {
@@ -80,7 +81,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.warn(logContext, `Client error: ${message}`)
     }
 
-    response.status(statusCode).json(errorResponse)
+    this.adapterHost.httpAdapter.reply(response, errorResponse, statusCode)
   }
 
   /**

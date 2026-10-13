@@ -43,15 +43,19 @@ export function createBullBoardEdgeGuard(): RequestHandler {
     } as Response['writeHead']
 
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.status(405).set('Allow', 'GET, HEAD').end()
+      res.statusCode = 405
+      res.setHeader('Allow', 'GET, HEAD')
+      res.end()
       return
     }
     // A path that cannot be decoded would fail inside the routing layer, which answers with the general
     // error body naming the request; refuse it here, with the board's own.
     try {
-      decodeURIComponent(req.path)
+      decodeURIComponent((req.url ?? '').split('?')[0] ?? '')
     } catch {
-      res.status(400).json(safeErrorResult(400).body)
+      res.statusCode = 400
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.end(JSON.stringify(safeErrorResult(400).body))
       return
     }
     delete req.headers['content-type']

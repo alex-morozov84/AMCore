@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use Fastify as the API’s sole production HTTP adapter, with native cookies, uploads, streaming and the closed read-only queue-board boundary. Express adapters remain development test controls.
+
 - Lint uses Oxlint 1.87 and ESLint 10 across API, web, shared and root tooling.
   Shared presets expose a paired policy; preserve architecture, Hooks and TypeScript
   checks in ESLint. Keep CSS checks in Stylelint.
@@ -25,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failures use a safe 500 with `INTERNAL_ERROR`.
 
 ### Security
+
+- Restore native JSON prototype/constructor protection and preserve supported request encodings.
+  Recognized body-parser failures use 400/413/415 instead of 500; keep true internal failures unchanged.
 
 - Refresh ts-jest's Handlebars dependency to 4.7.10 and SWC CLI's transitive
   HTTP cache semantics to 4.3.0 within their declared ranges.

@@ -38,14 +38,14 @@ interface RequestWithIp {
 /**
  * Resolves the client IP for audit/logging.
  *
- * Uses Express's computed `req.ip`, which honors the `trust proxy` setting
+ * Uses Fastify's computed `req.ip`, which honors the `trustProxy` setting
  * (TRUST_PROXY): with it off, `req.ip` is the socket peer; with it configured, the
  * real client with untrusted `X-Forwarded-*` hops stripped. `X-Forwarded-For` /
  * `X-Real-IP` are NEVER read directly — they are client-controlled and would let a
  * caller spoof the recorded IP. Configure TRUST_PROXY to your proxy topology to get
  * true client IPs behind a reverse proxy.
  *
- * @param req - Express Request object
+ * @param req - Request metadata with IP/socket fields
  * @returns Client IP address
  */
 export function getClientIp(req: RequestWithIp): string | undefined {

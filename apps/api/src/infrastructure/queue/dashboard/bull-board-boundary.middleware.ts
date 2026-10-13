@@ -34,7 +34,13 @@ export function applyBoardHeaders(res: Response, revalidate = false): void {
 
 function sendError(res: Response, status: 400 | 404 | 500): void {
   const result = safeErrorResult(status)
-  res.status(status).json(result.body)
+  sendJson(res, status, result.body)
+}
+
+function sendJson(res: Response, status: number, body: unknown): void {
+  res.statusCode = status
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.end(JSON.stringify(body))
 }
 
 /**
@@ -48,6 +54,7 @@ export function createBullBoardBoundary(
 ): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
     applyBoardHeaders(res)
+    res.locals ??= {}
 
     // The locale for the response hooks is ours alone: drop whatever the client sent.
     delete req.headers[BOARD_LOCALE_HEADER]
@@ -55,28 +62,31 @@ export function createBullBoardBoundary(
     if (locals.boardContext) req.headers[BOARD_LOCALE_HEADER] = locals.boardContext.locale
 
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.status(405).set('Allow', 'GET, HEAD').end()
+      res.statusCode = 405
+      res.setHeader('Allow', 'GET, HEAD')
+      res.end()
       return
     }
 
-    const query = new URL(req.originalUrl, 'http://board.invalid').searchParams
-    const decision = decideBoardRoute(req.path, query)
+    const path = req.url.split('?')[0] ?? '/'
+    const query = new URL(req.originalUrl ?? req.url, 'http://board.invalid').searchParams
+    const decision = decideBoardRoute(path, query)
     if (decision.kind === 'reject') {
       sendError(res, decision.status)
       return
     }
     if (decision.kind === 'synthetic') {
       // The board's own "this job is not part of a flow" reply; nothing is read.
-      res
-        .status(200)
-        .json(
-          decision.channel === 'logs'
-            ? [boardCopy(locals.boardContext?.locale).logsHidden]
-            : { nodeId: decision.jobId, isFlowNode: false, flowRoot: null }
-        )
+      sendJson(
+        res,
+        200,
+        decision.channel === 'logs'
+          ? [boardCopy(locals.boardContext?.locale).logsHidden]
+          : { nodeId: decision.jobId, isFlowNode: false, flowRoot: null }
+      )
       return
     }
-    if (req.path.startsWith('/static/')) res.setHeader('Cache-Control', 'private, no-cache')
+    if (path.startsWith('/static/')) res.setHeader('Cache-Control', 'private, no-cache')
     if (decision.entry) {
       events({
         event: 'bull_board.entry_opened',

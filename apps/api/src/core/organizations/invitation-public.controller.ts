@@ -111,7 +111,7 @@ export class InvitationPublicController {
       secure: this.env.get('NODE_ENV') === 'production',
       sameSite: 'strict',
       path: '/',
-      maxAge: 7 * 86400000,
+      maxAge: 7 * 86400 * ('raw' in res ? 1 : 1000),
     })
     return { user: result.user, accessToken: result.accessToken }
   }

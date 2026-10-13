@@ -5,10 +5,14 @@ import type { GcraRedisLimiter } from '../../infrastructure/throttling/gcra-redi
 import type { InvitationContinuationService } from './invitation-continuation.service'
 import { InvitationRequestGuard } from './invitation-request.guard'
 
-describe('invitation admission order', () => {
+describe.each([false, true])('invitation admission order native=%s', (native) => {
   const request = {
-    originalUrl: '/api/v1/auth/invites/register',
-    path: '/api/v1/auth/invites/register',
+    ...(native
+      ? { url: '/api/v1/auth/invites/register?ignored=fixture' }
+      : {
+          originalUrl: '/api/v1/auth/invites/register',
+          path: '/api/v1/auth/invites/register',
+        }),
     method: 'POST',
     headers: { 'x-invitation-continuation': 'fake-continuation' },
     params: {},

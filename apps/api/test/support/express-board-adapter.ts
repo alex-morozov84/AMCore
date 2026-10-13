@@ -2,11 +2,17 @@ import type { AppControllerRoute, AppViewRoute, UIConfig } from '@bull-board/api
 import { ExpressAdapter } from '@bull-board/express'
 import type { NextFunction, Request, Response } from 'express'
 
-import type { BoardRequestLocals } from './bull-board-boundary.middleware'
-import { boardCopy, boardLanguage } from './bull-board-copy'
-import { installBoardDisplayAssets, withBoardDisplayStyle } from './bull-board-display-assets'
-import { clientErrorStatus, safeErrorResult, withFinalBoundary } from './bull-board-errors'
-import { withBoardReadBudget } from './bull-board-read-budget'
+import type { BoardRequestLocals } from '../../src/infrastructure/queue/dashboard/bull-board-boundary.middleware'
+import { boardCopy, boardLanguage } from '../../src/infrastructure/queue/dashboard/bull-board-copy'
+import { withBoardDisplayStyle } from '../../src/infrastructure/queue/dashboard/bull-board-display-assets'
+import {
+  clientErrorStatus,
+  safeErrorResult,
+  withFinalBoundary,
+} from '../../src/infrastructure/queue/dashboard/bull-board-errors'
+import { withBoardReadBudget } from '../../src/infrastructure/queue/dashboard/bull-board-read-budget'
+
+import { installBoardDisplayAssets } from './express-board-display-assets'
 
 const ENVIRONMENT_COLOR = { color: '#334155', textColor: '#f8fafc' } as const
 

@@ -22,7 +22,9 @@ export class InvitationRequestGuard implements CanActivate {
     const req = context
       .switchToHttp()
       .getRequest<Request & { rawBody?: Buffer; user?: { sub: string } }>()
-    const limit = invitationJsonLimit(req.originalUrl, '/api/v1')
+    const url = req.originalUrl ?? req.url
+    const path = req.path ?? url.split('?')[0] ?? ''
+    const limit = invitationJsonLimit(url, '/api/v1')
     if (limit && (req.rawBody?.length ?? 0) > limit)
       throw new AppException('Invitation body budget exceeded', 413, 'PAYLOAD_TOO_LARGE')
     const hasBody =
@@ -31,8 +33,8 @@ export class InvitationRequestGuard implements CanActivate {
       !!req.headers['transfer-encoding']
     if (
       (req.method === 'DELETE' ||
-        /\/(?:context|confirm|abort)\/?$/.test(req.path) ||
-        /\/continuations\/inspect\/?$/.test(req.path)) &&
+        /\/(?:context|confirm|abort)\/?$/.test(path) ||
+        /\/continuations\/inspect\/?$/.test(path)) &&
       hasBody
     )
       throw new AppException('This operation requires an empty body', 400, 'VALIDATION_ERROR')
@@ -46,14 +48,14 @@ export class InvitationRequestGuard implements CanActivate {
       })
     if (req.user && req.params.orgId && ['POST', 'DELETE'].includes(req.method))
       keys.push({ key: `invite-command:${req.user.sub}:${req.params.orgId}`, rate: 20, per: 60000 })
-    if (/\/auth-handoffs\//.test(req.path))
+    if (/\/auth-handoffs\//.test(path))
       keys.push({
         key: `invite-handoff:${invitationSecretHash(String(req.params.attemptId ?? ''))}:${req.ip}`,
         rate: 60,
         per: 60000,
       })
     await this.consume(keys)
-    if (/\/invites\/register\/?$/.test(req.path) && typeof credential === 'string') {
+    if (/\/invites\/register\/?$/.test(path) && typeof credential === 'string') {
       await this.consume([{ key: `invite-register-ip:${req.ip}`, rate: 5, per: 3600000 }])
       const { email } = await this.continuation.context(credential)
       await this.consume([

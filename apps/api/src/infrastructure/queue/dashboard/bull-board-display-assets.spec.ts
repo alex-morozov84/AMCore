@@ -4,7 +4,9 @@ import { dirname, join, resolve } from 'node:path'
 import express from 'express'
 import request from 'supertest'
 
-import { installBoardDisplayAssets, withBoardDisplayStyle } from './bull-board-display-assets'
+import { installBoardDisplayAssets } from '../../../../test/support/express-board-display-assets'
+
+import { withBoardDisplayStyle } from './bull-board-display-assets'
 
 const nativeRequire = createRequire(resolve(process.cwd(), 'package.json'))
 const apiRequire = createRequire(nativeRequire.resolve('@bull-board/api'))

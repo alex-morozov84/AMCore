@@ -2,7 +2,7 @@ import { BlockList, isIP } from 'node:net'
 
 // Which real socket peers apps/api trusts to relay a verified client-IP claim
 // (AMCORE_CLIENT_IP_HEADER, ADR-072) via the apps/web BFF hop. Unlike
-// TRUST_PROXY (ADR-060), this never touches Express's own trust-proxy/req.ip
+// TRUST_PROXY (ADR-060), this never touches Fastify's own trustProxy/req.ip
 // machinery — it checks the literal TCP peer address of the inbound request
 // (`req.socket.remoteAddress`, never a forwarded header) against an explicit
 // allowlist, using Node's built-in `net.BlockList` for real IPv4/IPv6 CIDR

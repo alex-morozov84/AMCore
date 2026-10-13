@@ -676,10 +676,11 @@ those separately inside the platform's grace period.
 
 AMCore's Node process speaks plain HTTP; TLS terminates at the **edge** — a
 reverse proxy, your cloud load balancer, or a Kubernetes Ingress — never inside
-the app. There is no in-app certificate management. `helmet()`
-(`apps/api/src/main.ts`) sends secure-header defaults for **`apps/api`'s
-JSON responses only** — it never touches the HTML `apps/web` serves, so it
-does not cover the browser-facing origin at all. `apps/web`'s own browser
+the app. There is no in-app certificate management. `@fastify/helmet`
+(the HTTP bootstrap in `apps/api/src/bootstrap/configure-http.ts`) sets security-header
+defaults for API routes after parser admission. The queue board owns its separate
+policy. This API bootstrap never touches the HTML `apps/web` serves, so it does not
+cover the browser-facing origin. `apps/web`'s own browser
 security-header baseline (static headers, HSTS, nonce-based CSP) is a
 separate mechanism — see
 [Browser security headers and CSP](../frontend/browser-security-and-csp.md)
@@ -709,7 +710,7 @@ its own listener/annotation configuration instead of an `nginx.conf`.
    `req.protocol` reflect them **only** once `TRUST_PROXY` is configured for
    your exact proxy topology (e.g. `TRUST_PROXY=loopback` for an nginx on the
    same host, or the exact trusted hop count/CIDR for a managed LB), which
-   makes Express trust only the last N untrusted hops rather than the whole
+   makes Fastify trust the configured proxies rather than the whole
    `X-Forwarded-For` chain. Leaving `TRUST_PROXY=false` behind a proxy that
    already sanitizes headers is safe, but audit/request logs then record the
    proxy's own IP, not the client's. Avoid broad `TRUST_PROXY=true` unless the
@@ -853,7 +854,7 @@ terminates TLS the same way, but you configure header/timeout/body-size
 behavior through the platform, not an `nginx.conf`. Check your provider's
 documented `X-Forwarded-For` behavior rather than assuming it — **AWS ALB
 appends by default** rather than overwriting, which is fine as long as
-`TRUST_PROXY` is set to the exact trusted hop count/CIDR (so Express trusts
+`TRUST_PROXY` is set to the exact trusted hop count/CIDR (so Fastify trusts
 only the LB's own hop, not the whole header chain) rather than the broad
 `true`. Also confirm idle/read timeouts exceed the SSE heartbeat and that the
 platform's request body-size limit is at or above your largest enabled

@@ -97,7 +97,7 @@ export class OAuthController {
       this.invitedStart(req)
     )
     setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
-    res.redirect(url)
+    res.status(HttpStatus.FOUND).redirect(url)
   }
 
   @Get(':provider/link')
@@ -111,7 +111,7 @@ export class OAuthController {
   ): Promise<void> {
     const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
     setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
-    res.redirect(url)
+    res.status(HttpStatus.FOUND).redirect(url)
   }
 
   /**
@@ -210,7 +210,7 @@ export class OAuthController {
         secure: this.env.get('NODE_ENV') === 'production',
         sameSite: 'strict',
         path: '/',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * ('raw' in res ? 1 : 1000),
       })
 
       const ticket = await this.ticketService.issue({
@@ -221,13 +221,13 @@ export class OAuthController {
         ...(result.invitation ? { invitation: result.invitation } : {}),
       })
 
-      res.redirect(
+      res.status(HttpStatus.FOUND).redirect(
         localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'auth/callback', {
           ticket,
         })
       )
     } else {
-      res.redirect(
+      res.status(HttpStatus.FOUND).redirect(
         localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'settings/linked-accounts', {
           linked: provider,
         })

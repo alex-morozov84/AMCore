@@ -1,8 +1,11 @@
 import { Controller, Get, type INestApplication } from '@nestjs/common'
 import { APP_GUARD, Reflector } from '@nestjs/core'
+import { ExpressAdapter } from '@nestjs/platform-express'
+import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 
+import { createHttpAdapter } from '../../bootstrap/create-http-adapter'
 import { EnvService } from '../../env/env.service'
 import { MetricsService } from '../observability'
 
@@ -42,7 +45,7 @@ class PingController {
  * the guard's policy-resolution/header/skip behavior, not Redis semantics
  * (covered by `gcra-redis-limiter.service.e2e-spec.ts`, Testcontainers).
  */
-async function buildApp(): Promise<INestApplication> {
+async function buildApp(native: boolean): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({
     controllers: [PingController],
     providers: [
@@ -54,12 +57,16 @@ async function buildApp(): Promise<INestApplication> {
     ],
   }).compile()
 
-  const app = moduleRef.createNestApplication()
+  const adapter = native ? createHttpAdapter() : new ExpressAdapter()
+  const app = moduleRef.createNestApplication(adapter)
   await app.init()
+  if (adapter instanceof FastifyAdapter) await adapter.getInstance().ready()
+  // Keep one bound socket for the fixture lifetime instead of rebinding per supertest request.
+  await app.listen(0, '127.0.0.1')
   return app
 }
 
-describe('RateLimitGuard — real guard + HTTP (ADR-073)', () => {
+describe.each([false, true])('RateLimitGuard — real guard + HTTP native=%s (ADR-073)', (native) => {
   let app: INestApplication | undefined
 
   afterEach(async () => {
@@ -68,7 +75,7 @@ describe('RateLimitGuard — real guard + HTTP (ADR-073)', () => {
   })
 
   it('admits exactly burst requests from idle, refuses the next with a real 429', async () => {
-    app = await buildApp()
+    app = await buildApp(native)
     const server = app.getHttpServer()
 
     for (let i = 0; i < HANDLER_OVERRIDE_POLICY.burst; i++) {
@@ -82,7 +89,7 @@ describe('RateLimitGuard — real guard + HTTP (ADR-073)', () => {
     // /ping-override has burst=2 (handler) vs /ping's class-level burst=50 —
     // if the class-level policy leaked through, this would take 50 requests
     // to 429, not 2.
-    app = await buildApp()
+    app = await buildApp(native)
     const server = app.getHttpServer()
 
     await request(server).get('/ping-override').expect(200)
@@ -91,7 +98,7 @@ describe('RateLimitGuard — real guard + HTTP (ADR-073)', () => {
   })
 
   it('@SkipRateLimit() route never 429s', async () => {
-    app = await buildApp()
+    app = await buildApp(native)
     const server = app.getHttpServer()
 
     for (let i = 0; i < HANDLER_OVERRIDE_POLICY.burst + 5; i++) {
@@ -100,7 +107,7 @@ describe('RateLimitGuard — real guard + HTTP (ADR-073)', () => {
   })
 
   it('a different route is unaffected — separate bucket per route per tracker', async () => {
-    app = await buildApp()
+    app = await buildApp(native)
     const server = app.getHttpServer()
 
     await request(server).get('/ping-override').expect(200)
@@ -112,7 +119,7 @@ describe('RateLimitGuard — real guard + HTTP (ADR-073)', () => {
   })
 
   it('emits unsuffixed X-RateLimit-* headers with X-RateLimit-Limit = burst, and a whole-second Retry-After on refusal', async () => {
-    app = await buildApp()
+    app = await buildApp(native)
     const server = app.getHttpServer()
 
     const first = await request(server).get('/ping-override').expect(200)

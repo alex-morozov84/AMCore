@@ -1,7 +1,8 @@
+import { createRequire } from 'node:module'
+
 import { queuesHandler } from '@bull-board/api/dist/handlers/queues.js'
 import { appRoutes } from '@bull-board/api/dist/routes.js'
 import { validateResponse } from '@bull-board/api/dist/validation.js'
-import { BULL_BOARD_ADAPTER } from '@bull-board/nestjs'
 import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import { Queue } from 'bullmq'
@@ -352,28 +353,24 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
   describe('the HTML entry page', () => {
     const ENTRIES = ['/', '/queue/email', '/queue/email/email-job-1']
 
-    type Engine = (
-      path: string,
-      options: object,
-      callback: (error: Error | null, html?: string) => void
-    ) => void
-    function router(): { engine(ext: string, fn: Engine): void; engines: Record<string, Engine> } {
-      return (app.get(BULL_BOARD_ADAPTER, { strict: false }) as { getRouter(): never }).getRouter()
-    }
+    type Engine = (...args: unknown[]) => (data: object) => string | Promise<string>
+    const fromBoard = createRequire(createRequire(import.meta.url).resolve('@bull-board/fastify'))
+    const engine = fromBoard('ejs') as { compile: Engine }
 
     async function withEngine<T>(replacement: Engine, run: () => Promise<T>): Promise<T> {
-      const original = router().engines['.ejs']!
-      router().engine('ejs', replacement)
+      const original = engine.compile
+      engine.compile = replacement
       try {
         return await run()
       } finally {
-        router().engine('ejs', original)
+        engine.compile = original
       }
     }
 
-    const asyncFailure: Engine = (_path, _options, callback) => {
-      setImmediate(() => callback(new Error(`render ${CANARY} at /srv/app/views/index.ejs`)))
-    }
+    const asyncFailure: Engine = () => () =>
+      new Promise((_resolve, reject) => {
+        setImmediate(() => reject(new Error(`render ${CANARY} at /srv/app/views/index.ejs`)))
+      })
     const syncFailure: Engine = () => {
       throw new Error(`render ${CANARY} at /srv/app/views/index.ejs`)
     }

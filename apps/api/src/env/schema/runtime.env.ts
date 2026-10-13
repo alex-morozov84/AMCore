@@ -18,9 +18,9 @@ export const runtimeEnv = z.object({
     .string()
     .default('http://localhost:3002')
     .transform((s) => s.split(',').map((x) => x.trim())),
-  // Express `trust proxy` (proxy awareness). Default `false` — `req.ip` is the socket
+  // Fastify `trustProxy` (proxy awareness). Default `false` — `req.ip` is the socket
   // peer and `X-Forwarded-*` is not trusted. Set it to the real proxy topology behind
-  // a reverse proxy/LB so `req.ip` is the true client. Validated + mapped to Express's
+  // a reverse proxy/LB so `req.ip` is the true client. Validated + mapped to the HTTP adapter’s
   // value by `resolveTrustProxy` (see common/utils/trust-proxy.ts).
   TRUST_PROXY: z
     .string()
@@ -38,7 +38,7 @@ export const runtimeEnv = z.object({
   // never trusts AMCORE_CLIENT_IP_HEADER regardless of value until this
   // names the real socket address(es) apps/web connects from. Validated + compiled to a
   // `net.BlockList` by `resolveTrustedWebPeers` (see
-  // common/utils/trusted-web-peer.ts) — never Express's own TRUST_PROXY
+  // common/utils/trusted-web-peer.ts) — never Fastify's TRUST_PROXY
   // machinery, which this is independent of.
   TRUSTED_WEB_PEERS: z
     .string()

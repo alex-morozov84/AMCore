@@ -1,17 +1,15 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { Provider, Type } from '@nestjs/common'
-import type { NestExpressApplication } from '@nestjs/platform-express'
 import { Test, type TestingModule } from '@nestjs/testing'
 import type { Cache } from 'cache-manager'
-import cookieParser from 'cookie-parser'
 import { PinoLogger } from 'nestjs-pino'
 
-import { configureBodyParser } from '../src/bootstrap/configure-body-parser'
 import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
 import { IdempotencyModule } from '../src/infrastructure/idempotency'
 import { GcraRedisLimiter } from '../src/infrastructure/throttling'
 import { PrismaService } from '../src/prisma'
 
+import { createHttpTestApp } from './create-http-test-app'
 import {
   type E2ETestContext,
   migrateTestDatabase,
@@ -42,13 +40,12 @@ export async function setupIdempotencyTestApp(
     .useValue(noopPinoLogger)
     .compile()
 
-  const app = moduleFixture.createNestApplication<NestExpressApplication>({ rawBody: true })
-  configureBodyParser(app, '')
-  app.use(cookieParser())
+  const app = await createHttpTestApp(moduleFixture, '')
   app.useGlobalPipes(createSchemaValidationPipe())
   // Migrate BEFORE the app's database connections exist (AI migration maintenance-stop guard).
   await migrateTestDatabase(databaseUrl)
   await app.init()
+  await app.getHttpAdapter().getInstance().ready()
 
   const prisma = app.get(PrismaService)
   const cache = app.get<Cache>(CACHE_MANAGER)

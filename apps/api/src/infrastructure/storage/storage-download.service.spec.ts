@@ -1,6 +1,8 @@
 import { Readable } from 'node:stream'
 
 import { StreamableFile } from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
+import { ExpressAdapter } from '@nestjs/platform-express'
 import type { Response } from 'express'
 
 import { AppException, BadRequestException, NotFoundException } from '../../common/exceptions'
@@ -24,6 +26,9 @@ function makeRes(): Response & { headers: Record<string, string> } {
     setHeader: jest.fn((name: string, value: string) => {
       headers[name] = value
     }),
+    set: jest.fn((name: string, value: string) => {
+      headers[name] = value
+    }),
   } as unknown as Response & { headers: Record<string, string> }
 }
 
@@ -36,7 +41,9 @@ describe('StorageDownloadService', () => {
       getMetadata: jest.fn().mockResolvedValue(META),
       downloadStream: jest.fn().mockResolvedValue(Readable.from(Buffer.from('hello'))),
     }
-    service = new StorageDownloadService(storage as unknown as StorageService)
+    const host = new HttpAdapterHost()
+    host.httpAdapter = new ExpressAdapter()
+    service = new StorageDownloadService(storage as unknown as StorageService, host)
   })
 
   it('streams the object as an attachment with safe headers', async () => {

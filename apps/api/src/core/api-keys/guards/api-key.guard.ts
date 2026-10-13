@@ -113,7 +113,7 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   /**
-   * Client IP for the API-key rate limiter. `req.ip` respects Express `trust proxy`,
+   * Client IP for the API-key rate limiter. `req.ip` respects Fastify `trustProxy`,
    * which the starter sets from `TRUST_PROXY` (default off → the socket peer, so a
    * forwarded header can't spoof it; configured → the real client). Falling back to
    * `socket.remoteAddress` covers the rare null case; `'unknown'` keeps the limiter

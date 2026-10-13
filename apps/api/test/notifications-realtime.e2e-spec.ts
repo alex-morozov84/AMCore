@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
-import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import request from 'supertest'
 
 import { NotificationsService } from '../src/core/notifications/notifications.service'
@@ -39,7 +39,7 @@ describe('Notifications realtime SSE (e2e)', () => {
   let prisma: PrismaService
   let notifications: NotificationsService
   let publisher: NotificationRealtimePublisher
-  let contextB: { app: NestExpressApplication; baseUrl: string } // web-role, serves SSE
+  let contextB: { app: NestFastifyApplication; baseUrl: string } // web-role, serves SSE
   let streamUrl: string
   const open: SseClient[] = []
 

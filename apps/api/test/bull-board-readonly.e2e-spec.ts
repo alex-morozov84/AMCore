@@ -1,13 +1,19 @@
-import { createServer, type Server } from 'node:http'
+import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
-import { BULL_BOARD_ADAPTER } from '@bull-board/nestjs'
+import { createBullBoard } from '@bull-board/api'
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
+import { FastifyAdapter } from '@bull-board/fastify'
 import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import { Job, Queue } from 'bullmq'
-import express from 'express'
+import fastify, { type FastifyInstance } from 'fastify'
 import request from 'supertest'
 
+import {
+  BOARD_HOOKS,
+  BOARD_UI_CONFIG,
+} from '../src/infrastructure/queue/dashboard/bull-board-hooks'
 import type { PrismaService } from '../src/prisma'
 
 import { BOARD, queueOf, superAdminCookie } from './bull-board.helper'
@@ -165,17 +171,26 @@ describe('Bull Board is read-only (e2e)', () => {
     // block. An unexpected answer reports which listener answered and the shape of the reply, with
     // no cookie, token or payload, so the cause can be found instead of retried.
     let routerServer: Server
+    let bareBoard: FastifyInstance
     let routerBase: string
 
     beforeAll(async () => {
-      const adapter = app.get(BULL_BOARD_ADAPTER, { strict: false }) as { getRouter(): never }
-      routerServer = createServer(express().use(adapter.getRouter()))
-      await new Promise<void>((resolve) => routerServer.listen(0, '127.0.0.1', resolve))
+      // Stock native adapter has no auth/boundary seam: exercise the installed board hooks alone.
+      const adapter = new FastifyAdapter()
+      createBullBoard({
+        queues: [new BullMQAdapter(queueOf(app, 'email'))],
+        serverAdapter: adapter,
+        options: { handlerHooks: BOARD_HOOKS, uiConfig: BOARD_UI_CONFIG, validateResponses: true },
+      })
+      bareBoard = fastify()
+      await bareBoard.register(adapter.registerPlugin())
+      await bareBoard.listen({ port: 0, host: '127.0.0.1' })
+      routerServer = bareBoard.server
       routerBase = `http://127.0.0.1:${(routerServer.address() as AddressInfo).port}`
     })
 
     afterAll(async () => {
-      await new Promise((resolve) => routerServer.close(resolve))
+      if (bareBoard) await bareBoard.close()
     })
 
     it.each(CASES)('denies %s %s through the Board hooks', async (verb, path, body) => {

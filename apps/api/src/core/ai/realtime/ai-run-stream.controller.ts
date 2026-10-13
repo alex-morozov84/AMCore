@@ -71,12 +71,20 @@ export class AiRunStreamController {
   async stream(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') runId: string,
-    @Res() res: Response
+    @Res()
+    reply:
+      | Response
+      | {
+          raw: ServerResponse
+          hijack(): unknown
+          getHeaders(): ReturnType<ServerResponse['getHeaders']>
+        }
   ): Promise<void> {
     // Owner check first (404 if missing/not-owned) — throws before any SSE header is flushed.
     await this.runs.getOwned(principal.sub, runId)
 
     const lifetimeMs = this.resolveLifetimeMs(principal.exp)
+    const res = 'raw' in reply ? reply.raw : reply
 
     // A client can drop mid-setup: bind cleanup before admission and aim it at the connection once
     // admitted. The hub's close path is idempotent.
@@ -100,6 +108,12 @@ export class AiRunStreamController {
 
     try {
       // Register-in-hub happened above; only now flush headers + the ready frame.
+      if ('raw' in reply) {
+        for (const [name, value] of Object.entries(reply.getHeaders())) {
+          if (value !== undefined) res.setHeader(name, value)
+        }
+        reply.hijack()
+      }
       res.writeHead(HttpStatus.OK, SSE_HEADERS)
       connection.open()
     } catch (err) {
@@ -129,3 +143,4 @@ export class AiRunStreamController {
     return Math.min(remainingMs, this.env.get('AI_REALTIME_MAX_STREAM_LIFETIME_MS'))
   }
 }
+import type { ServerResponse } from 'node:http'

@@ -164,4 +164,33 @@ describe('NotificationStreamController', () => {
     expect(() => call(principal())).not.toThrow()
     expect(connection.close).toHaveBeenCalledWith('client')
   })
+
+  it('takes native response ownership only after admission, before flushing', () => {
+    const reply = { raw: res, hijack: jest.fn(), getHeaders: jest.fn(() => ({})) }
+    controller.stream(
+      principal(),
+      reply as unknown as Parameters<NotificationStreamController['stream']>[1]
+    )
+    expect(hub.register).toHaveBeenCalledWith(res, 'user-1', expect.any(Number))
+    expect(reply.hijack).toHaveBeenCalledTimes(1)
+    expect(hub.register.mock.invocationCallOrder[0]).toBeLessThan(
+      reply.hijack.mock.invocationCallOrder[0]!
+    )
+    expect(reply.hijack.mock.invocationCallOrder[0]).toBeLessThan(
+      res.writeHead.mock.invocationCallOrder[0]!
+    )
+  })
+
+  it('retains native JSON error handling when admission fails', () => {
+    const reply = { raw: res, hijack: jest.fn(), getHeaders: jest.fn(() => ({})) }
+    hub.register.mockReturnValue({ ok: false, reason: 'global' })
+    expect(() =>
+      controller.stream(
+        principal(),
+        reply as unknown as Parameters<NotificationStreamController['stream']>[1]
+      )
+    ).toThrow(ServiceUnavailableException)
+    expect(reply.hijack).not.toHaveBeenCalled()
+    expect(res.writeHead).not.toHaveBeenCalled()
+  })
 })

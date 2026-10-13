@@ -1,16 +1,27 @@
 import type { Response } from 'express'
+import type { FastifyReply } from 'fastify'
 
+import { captureFastifyResponse } from './fastify-idempotency-response'
 import { IDEMPOTENCY_REPLAY_HEADER } from './idempotency.constants'
 import type { CompletedIdempotencyRecord } from './idempotency.types'
 
-export function prepareReplayResponse(res: Response, response: CompletedIdempotencyRecord): string {
-  for (const [name, value] of Object.entries(response.headers)) res.setHeader(name, value)
-  res.setHeader(IDEMPOTENCY_REPLAY_HEADER, 'true')
+export type IdempotencyResponse = Response | FastifyReply
+
+export function prepareReplayResponse(
+  res: IdempotencyResponse,
+  response: CompletedIdempotencyRecord
+): string {
+  for (const [name, value] of Object.entries(response.headers)) setHeader(res, name, value)
+  setHeader(res, IDEMPOTENCY_REPLAY_HEADER, 'true')
   res.status(response.status)
   return response.body
 }
 
-export function wrapSend(res: Response, onSend: (body: unknown) => Promise<void>): void {
+export function wrapSend(res: IdempotencyResponse, onSend: (body: unknown) => Promise<void>): void {
+  if ('raw' in res) {
+    captureFastifyResponse(res, onSend)
+    return
+  }
   const original = res.send.bind(res)
   let active = true
   res.send = ((body: unknown) => {
@@ -21,13 +32,21 @@ export function wrapSend(res: Response, onSend: (body: unknown) => Promise<void>
   }) as Response['send']
 }
 
-export function responseRecord(res: Response, body: unknown): CompletedIdempotencyRecord {
+export function responseRecord(
+  res: IdempotencyResponse,
+  body: unknown
+): CompletedIdempotencyRecord {
   return { status: res.statusCode, body: normalizeBody(body), headers: replayHeaders(res) }
 }
 
-function replayHeaders(res: Response): Record<string, string> {
+function replayHeaders(res: IdempotencyResponse): Record<string, string> {
   const contentType = res.getHeader('content-type')
   return typeof contentType === 'string' ? { 'content-type': contentType } : {}
+}
+
+function setHeader(res: IdempotencyResponse, name: string, value: string): void {
+  if ('raw' in res) res.header(name, value)
+  else res.setHeader(name, value)
 }
 
 function normalizeBody(body: unknown): string {

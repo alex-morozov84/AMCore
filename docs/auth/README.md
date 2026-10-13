@@ -136,3 +136,9 @@ recipient scenarios; custom downstream screens can reuse its headless contracts.
 | `FRONTEND_URL`          | Frontend origin; user-facing paths add the locale via `localizedFrontendUrl` |
 
 See [Auth contracts](./reference.md#environment-variables) for the full list.
+
+## HTTP cookie integration
+
+The API uses Fastify cookies. Cookie `maxAge` values use seconds; existing refresh
+and OAuth binding helpers preserve their lifetimes, scopes and secure flags.
+New handlers must follow [HTTP runtime](../backend/http-runtime.md).

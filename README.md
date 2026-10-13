@@ -115,7 +115,7 @@ verified team-access status without adding a role editor.
 
 | Layer             | Technology                                                                     |
 | ----------------- | ------------------------------------------------------------------------------ |
-| **Backend**       | NestJS 12, PostgreSQL 18, Prisma 7, Redis, BullMQ                              |
+| **Backend**       | NestJS 12 + Fastify 5, PostgreSQL 18, Prisma 7, Redis, BullMQ                  |
 | **Auth**          | JWT + Refresh Tokens, OAuth 2.0 / OIDC, API Keys                               |
 | **Email**         | Resend, vendored React Email primitives + `@react-email/render`, FormatJS i18n |
 | **Storage**       | S3-compatible storage, local production/development driver, memory test driver |

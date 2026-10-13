@@ -24,7 +24,7 @@ export function detectAiArtifactKind(mime: string): AiArtifactKind | null {
 }
 
 /**
- * Static Multer transport-layer ceiling for the upload route — a crude, kind-agnostic backstop
+ * Static multipart transport-layer ceiling for the upload route — a crude, kind-agnostic backstop
  * against memory exhaustion, sized above the largest possible `AI_ARTIFACT_MAX_DOCUMENT_BYTES`
  * (env-bounded max 32 MB) so the service's own kind-aware size check always gets a chance to
  * produce the clean, precise `FILE_TOO_LARGE` error — mirrors the avatar upload's

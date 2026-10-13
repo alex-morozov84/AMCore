@@ -112,7 +112,7 @@ const EXPECTED: Record<string, Expected> = {
     status: '204',
     kind: 'none',
   },
-  // the read-only queue board: an Express-mounted UI documented programmatically
+  // the read-only queue board: a Fastify plugin UI documented programmatically
   'get /admin/queues': { status: '200', kind: 'html' },
   'get /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
   'patch /admin/runtime-settings/storage-probe': { status: '200', kind: 'json' },
@@ -290,6 +290,18 @@ describe('OpenAPI success surface (e2e)', () => {
         },
       })
     }
+  })
+
+  it('documents parser400/413/415 on all declared request bodies', () => {
+    const bodies = Object.values(document.paths).flatMap((item) =>
+      ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'].flatMap((method) => {
+        const operation = item?.[method as 'post']
+        return operation?.requestBody ? [operation] : []
+      })
+    )
+    expect(bodies.length).toBeGreaterThan(0)
+    for (const operation of bodies)
+      for (const status of ['400', '413', '415']) expect(operation.responses[status]).toBeDefined()
   })
 
   it('documents TeamAccess/record-field failures and permission assignment branches', () => {

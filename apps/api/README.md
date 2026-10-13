@@ -12,7 +12,7 @@ shape is generated from Swagger/OpenAPI at `/docs` in development.
 
 | Area           | Baseline                                                     |
 | -------------- | ------------------------------------------------------------ |
-| Framework      | NestJS 12                                                    |
+| Framework      | NestJS 12 + Fastify 5                                        |
 | Database       | PostgreSQL 18, Prisma 7, schema-per-area modularity          |
 | Cache / queues | Redis, BullMQ                                                |
 | Validation     | Shared Zod contracts + native Standard Schema metadata       |
@@ -61,6 +61,19 @@ Watch API unit tests with `pnpm --filter api test:watch`.
 The managed E2E launcher rejects forced exits, signals, retries and incomplete
 reports. A passed assertion does not excuse an unclosed timer or connection.
 See [API Testcontainers](../../docs/operations/local-stands.md#api-testcontainers).
+
+## HTTP runtime
+
+Fastify is the only production HTTP adapter. The same bootstrap serves `web`,
+`all` and the worker’s health-and-metrics HTTP surface. Express packages are development
+controls for focused compatibility tests, not a configurable production fallback.
+See [HTTP runtime](../../docs/backend/http-runtime.md) for plugins, extension
+patterns, maintained upgrade checks, performance limits and rollback.
+
+## Request bodies
+
+See the [request body contract](../../docs/backend/request-body-contract.md) for parser refusals,
+Unicode/form handling, decoded limits and connection recovery. Route validation/auth remain separate.
 
 ## Source Map
 

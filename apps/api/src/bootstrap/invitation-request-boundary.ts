@@ -1,4 +1,4 @@
-import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { INestApplication } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
 
 import { AppException } from '../common/exceptions'
@@ -25,23 +25,24 @@ export function invitationRequestKind(url: string, prefix: string): 'personal' |
     : null
 }
 
-export function configureInvitationBoundary(app: NestExpressApplication, prefix: string): void {
+export function configureInvitationBoundary(app: INestApplication, prefix: string): void {
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (!invitationRequestKind(req.originalUrl, prefix)) return next()
+    const url = req.originalUrl ?? req.url
+    if (!invitationRequestKind(url, prefix)) return next()
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Robots-Tag', 'noindex, nofollow')
-    const query = req.originalUrl.split('?')[1] ?? ''
+    const query = url.split('?')[1] ?? ''
     if (Buffer.byteLength(query) > 2048)
       return next(new AppException('Query budget exceeded', 400, 'VALIDATION_ERROR'))
     const names = [...new URLSearchParams(query).keys()]
-    const path = invitationBudgetPath(req.originalUrl)
+    const path = invitationBudgetPath(url)
     const allowed =
       /\/organizations\/[^/]+\/invites$/i.test(path) && req.method === 'GET'
         ? ['page', 'limit', 'search', 'status']
         : /\/invites\/role-choices$/i.test(path) && req.method === 'GET'
           ? ['page', 'limit', 'search']
-          : req.method === 'DELETE' && invitationRequestKind(req.originalUrl, prefix) === 'manager'
+          : req.method === 'DELETE' && invitationRequestKind(url, prefix) === 'manager'
             ? ['expectedGeneration']
             : []
     if (names.some((name) => !allowed.includes(name)))

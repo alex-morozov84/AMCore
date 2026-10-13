@@ -65,6 +65,40 @@ describe('AiRunStreamController', () => {
   })
 
   describe('ownership', () => {
+    it('retains native JSON error handling when ownership fails', async () => {
+      const reply = { raw: res, hijack: jest.fn(), getHeaders: jest.fn(() => ({})) }
+      runs.getOwned.mockRejectedValue(new NotFoundException('Ai run', 'run-1'))
+      await expect(
+        controller.stream(
+          principal(),
+          'run-1',
+          reply as unknown as Parameters<AiRunStreamController['stream']>[2]
+        )
+      ).rejects.toBeInstanceOf(NotFoundException)
+      expect(reply.hijack).not.toHaveBeenCalled()
+      expect(hub.register).not.toHaveBeenCalled()
+      expect(res.writeHead).not.toHaveBeenCalled()
+    })
+
+    it('takes native response ownership only after ownership and admission', async () => {
+      const reply = { raw: res, hijack: jest.fn(), getHeaders: jest.fn(() => ({})) }
+      await controller.stream(
+        principal(),
+        'run-1',
+        reply as unknown as Parameters<AiRunStreamController['stream']>[2]
+      )
+      expect(hub.register).toHaveBeenCalledWith(res, 'user-1', 'run-1', expect.any(Number))
+      expect(reply.hijack).toHaveBeenCalledTimes(1)
+      expect(runs.getOwned.mock.invocationCallOrder[0]).toBeLessThan(
+        hub.register.mock.invocationCallOrder[0]!
+      )
+      expect(hub.register.mock.invocationCallOrder[0]).toBeLessThan(
+        reply.hijack.mock.invocationCallOrder[0]!
+      )
+      expect(reply.hijack.mock.invocationCallOrder[0]).toBeLessThan(
+        res.writeHead.mock.invocationCallOrder[0]!
+      )
+    })
     it('verifies run ownership before admission and rejects a non-owned/missing run with 404', async () => {
       runs.getOwned.mockRejectedValue(new NotFoundException('Ai run', 'run-1'))
       await expect(call(principal())).rejects.toBeInstanceOf(NotFoundException)
