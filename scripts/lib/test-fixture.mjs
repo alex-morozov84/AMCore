@@ -78,6 +78,9 @@ export function createFixtureRepo() {
   )
 
   git(root, ['init', '--quiet', '--initial-branch=main'])
+  // Snapshot tests include .git; no detached maintenance may mutate the fixture.
+  git(root, ['config', '--local', 'maintenance.auto', 'false'])
+  git(root, ['config', '--local', 'gc.auto', '0'])
   git(root, ['add', '-A'])
   git(root, [
     '-c',
