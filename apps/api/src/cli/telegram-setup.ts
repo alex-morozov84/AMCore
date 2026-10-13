@@ -1,4 +1,4 @@
-/* eslint-disable no-console -- a deploy CLI reports progress to stdout (mirrors prisma/seed.ts) */
+/* oxlint-disable no-console -- a deploy CLI reports progress to stdout (mirrors prisma/seed.ts) */
 /**
  * Deploy-time Telegram `setWebhook` (Arc D / D.3). Compiled into the production artifact
  * (`dist/cli/telegram-setup.js`); run once per deploy with **plain Node**, no pnpm/tsx:

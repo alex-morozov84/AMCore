@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Lint uses Oxlint 1.87 and ESLint 10 across API, web, shared and root tooling.
+  Shared presets expose a paired policy; preserve architecture, Hooks and TypeScript
+  checks in ESLint. Keep CSS checks in Stylelint.
+
 - Shared packages build with tsdown instead of tsup. Preserve dual ESM/CommonJS
   output and TypeScript 5.9 declarations; verify built-package contracts and watch mode.
 

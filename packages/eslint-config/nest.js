@@ -1,9 +1,10 @@
+import { residualConfig } from './hybrid.js'
 import jestPlugin from 'eslint-plugin-jest'
 
-import baseConfig from './base.js'
+import { policy as baseConfig } from './base.js'
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+export const policy = [
   ...baseConfig,
   {
     files: ['**/*.ts'],
@@ -101,3 +102,5 @@ export default [
     },
   },
 ]
+
+export default residualConfig(policy)

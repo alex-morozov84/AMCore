@@ -27,7 +27,7 @@ export function RoleChoices({
       className="h-64 overflow-y-auto sm:h-[min(25rem,45dvh)]"
       role="region"
       aria-label={regionLabels.roleList}
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scrolling region needs keyboard access even while its children are loading or read-only.
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scrolling region needs keyboard access even while its children are loading or read-only.
       tabIndex={0}
       aria-busy={pending}
     >

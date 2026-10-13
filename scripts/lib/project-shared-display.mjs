@@ -1,4 +1,6 @@
 const summaries = {
+  'lint-fixtures-single-locale':
+    'lint fixtures: project navigation and sibling examples to single-locale mode',
   'context-locale': 'update i18n_mode/base_locale/supported_locales for single-locale mode',
   'context-storybook':
     'update frontend_storybook for the disabled choice and drop the dead doc link',

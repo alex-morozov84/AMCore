@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+/* oxlint-disable no-console */
 import { PrismaPg } from '@prisma/adapter-pg'
 import { config } from 'dotenv'
 import { Pool } from 'pg'

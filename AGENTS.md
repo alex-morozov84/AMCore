@@ -58,6 +58,13 @@ pnpm + Turborepo monorepo.
   remain downstream-owned.
 - `packages/shared` — Zod schemas, types, constants used by both api and web.
 
+## Lint engines
+
+`pnpm lint` runs paired Oxlint and ESLint checks, plus web Stylelint.
+Use the shared policy guide in `packages/eslint-config/README.md`.
+ESLint alone runs only residual rules. Use the wrapper for complete checks.
+Keep rule ownership explicit when adding rules or inline exceptions.
+
 ## Commands
 
 ```bash

@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+/* oxlint-disable no-console */
 import { Prisma, type PrismaClient } from '../src/generated/prisma/client'
 
 import { AI_CATALOG_SEED } from './seed-ai-catalog.data'

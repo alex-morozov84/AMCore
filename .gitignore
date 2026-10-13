@@ -79,3 +79,5 @@ temp/
 .worktrees/
 playwright-report*/
 test-results*/
+# Short-lived paired-lint configs; policy sources remain tracked.
+.oxlint-run-*.json

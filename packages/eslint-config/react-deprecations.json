@@ -1,0 +1,53 @@
+{
+  "React.renderComponent": ["0.12.0", "React.render"],
+  "React.renderComponentToString": ["0.12.0", "React.renderToString"],
+  "React.renderComponentToStaticMarkup": ["0.12.0", "React.renderToStaticMarkup"],
+  "React.isValidComponent": ["0.12.0", "React.isValidElement"],
+  "React.PropTypes.component": ["0.12.0", "React.PropTypes.element"],
+  "React.PropTypes.renderable": ["0.12.0", "React.PropTypes.node"],
+  "React.isValidClass": ["0.12.0"],
+  "this.transferPropsTo": ["0.12.0", "spread operator ({...})"],
+  "React.addons.classSet": ["0.13.0", "the npm module classnames"],
+  "React.addons.cloneWithProps": ["0.13.0", "React.cloneElement"],
+  "React.render": ["0.14.0", "ReactDOM.render"],
+  "React.unmountComponentAtNode": ["0.14.0", "ReactDOM.unmountComponentAtNode"],
+  "React.findDOMNode": ["0.14.0", "ReactDOM.findDOMNode"],
+  "React.renderToString": ["0.14.0", "ReactDOMServer.renderToString"],
+  "React.renderToStaticMarkup": ["0.14.0", "ReactDOMServer.renderToStaticMarkup"],
+  "React.addons.LinkedStateMixin": ["15.0.0"],
+  "ReactPerf.printDOM": ["15.0.0", "ReactPerf.printOperations"],
+  "Perf.printDOM": ["15.0.0", "Perf.printOperations"],
+  "ReactPerf.getMeasurementsSummaryMap": ["15.0.0", "ReactPerf.getWasted"],
+  "Perf.getMeasurementsSummaryMap": ["15.0.0", "Perf.getWasted"],
+  "React.createClass": ["15.5.0", "the npm module create-react-class"],
+  "React.addons.TestUtils": ["15.5.0", "ReactDOM.TestUtils"],
+  "React.PropTypes": ["15.5.0", "the npm module prop-types"],
+  "React.DOM": ["15.6.0", "the npm module react-dom-factories"],
+  "componentWillMount": [
+    "16.9.0",
+    "UNSAFE_componentWillMount",
+    "https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+  ],
+  "componentWillReceiveProps": [
+    "16.9.0",
+    "UNSAFE_componentWillReceiveProps",
+    "https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+  ],
+  "componentWillUpdate": [
+    "16.9.0",
+    "UNSAFE_componentWillUpdate",
+    "https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+  ],
+  "ReactDOM.render": ["18.0.0", "createRoot", "https://reactjs.org/link/switch-to-createroot"],
+  "ReactDOM.hydrate": ["18.0.0", "hydrateRoot", "https://reactjs.org/link/switch-to-createroot"],
+  "ReactDOM.unmountComponentAtNode": [
+    "18.0.0",
+    "root.unmount",
+    "https://reactjs.org/link/switch-to-createroot"
+  ],
+  "ReactDOMServer.renderToNodeStream": [
+    "18.0.0",
+    "renderToPipeableStream",
+    "https://reactjs.org/docs/react-dom-server.html#rendertonodestream"
+  ]
+}

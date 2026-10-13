@@ -2,6 +2,13 @@ import { localeSeam } from './locale-ownership-seam.mjs'
 
 export const localeCoreSeams = [
   localeSeam(
+    'locale.lint-fixtures',
+    'scripts/fixtures/lint/web.json',
+    { text: '"name": "locale Link"' },
+    ['locale-lint-fixtures'],
+    'lint-fixtures-single-locale'
+  ),
+  localeSeam(
     'locale.proxy-i18n-seam',
     'apps/web/src/proxy.ts',
     { identifiers: ['next-intl/middleware', './i18n/routing', 'handleI18nRouting'] },

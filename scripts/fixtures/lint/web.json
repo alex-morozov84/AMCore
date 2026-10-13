@@ -1,0 +1,667 @@
+[
+  {
+    "name": "routing may enter composition public API",
+    "file": "src/app/api/admission-0-probe.ts",
+    "code": "import * as x from '@/_app/product-api'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "routing may enter organization capability index.server",
+    "file": "src/app/api/admission-1-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "pages cannot enter organization capability index.server",
+    "file": "src/_pages/auth/admission-2-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "routing may enter organization capability index.client",
+    "file": "src/app/api/admission-3-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/index.client'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "pages cannot enter organization capability index.client",
+    "file": "src/_pages/auth/admission-4-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/index.client'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "routing may enter organization capability index.config",
+    "file": "src/app/api/admission-5-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/index.config'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "pages cannot enter organization capability index.config",
+    "file": "src/_pages/auth/admission-6-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/index.config'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "routing cannot enter organization internals",
+    "file": "src/app/api/admission-7-probe.ts",
+    "code": "import * as x from '@/_app/organization-access/ui/mount'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "shared may not import application composition",
+    "file": "src/shared/lib/admission-8-probe.ts",
+    "code": "import * as x from '@/_app/product-api'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "pages may not import application composition",
+    "file": "src/_pages/auth/admission-9-probe.ts",
+    "code": "import * as x from '@/_app/product-api'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "composition may enter named organization server API",
+    "file": "src/_app/product-api/admission-10-probe.ts",
+    "code": "import * as x from '@/entities/organization-context/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "composition cannot enter entity internals",
+    "file": "src/_app/product-api/admission-11-probe.ts",
+    "code": "import * as x from '@/entities/organization-context/api/context.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "composition may enter named invitation server API",
+    "file": "src/_app/product-api/admission-12-probe.ts",
+    "code": "import * as x from '@/entities/invitation-flow/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "composition cannot enter invitation server internals",
+    "file": "src/_app/product-api/admission-13-probe.ts",
+    "code": "import * as x from '@/entities/invitation-flow/api/admission.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "shared cannot import invitation server API",
+    "file": "src/shared/lib/admission-14-probe.ts",
+    "code": "import * as x from '@/entities/invitation-flow/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "routing may enter named invitation composition server API",
+    "file": "src/app/api/admission-15-probe.ts",
+    "code": "import * as x from '@/_app/invitation-flow/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "routing cannot enter invitation composition internals",
+    "file": "src/app/api/admission-16-probe.ts",
+    "code": "import * as x from '@/_app/invitation-flow/ui/mount'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "shared cannot import an entity server API",
+    "file": "src/shared/lib/admission-17-probe.ts",
+    "code": "import * as x from '@/entities/organization-context/index.server'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "an entity cannot import application composition",
+    "file": "src/entities/user/admission-18-probe.ts",
+    "code": "import * as x from '@/_app/product-api'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "shared may not import features",
+    "file": "src/shared/lib/admission-19-probe.ts",
+    "code": "import * as x from '@/features/auth-login'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "features may import entities",
+    "file": "src/features/auth-login/admission-20-probe.ts",
+    "code": "import * as x from '@/entities/user'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "features may import shared",
+    "file": "src/features/auth-login/admission-21-probe.ts",
+    "code": "import * as x from '@/shared/lib'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "a slice may not be entered past its public API",
+    "file": "src/_pages/auth/admission-22-probe.ts",
+    "code": "import * as x from '@/features/auth-login/ui/LoginForm'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "a slice may not import a sibling feature slice",
+    "file": "src/features/auth-login/admission-23-probe.ts",
+    "code": "import * as x from '@/features/locale-switcher'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "a shared segment barrel is fine",
+    "file": "src/_pages/auth/admission-24-probe.ts",
+    "code": "import * as x from '@/shared/lib'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "a shared module import is fine",
+    "file": "src/_pages/auth/admission-25-probe.ts",
+    "code": "import * as x from '@/shared/ui/button'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "a default-palette utility",
+    "file": "src/admission-26-probe.tsx",
+    "code": "export const P=()=><div className=\"bg-red-500\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a palette utility behind variants",
+    "file": "src/admission-27-probe.tsx",
+    "code": "export const P=()=><div className=\"hover:bg-red-500 dark:text-gray-800\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a palette utility behind a breakpoint",
+    "file": "src/admission-28-probe.tsx",
+    "code": "export const P=()=><div className=\"sm:border-blue-300\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "stacked variants",
+    "file": "src/admission-29-probe.tsx",
+    "code": "export const P=()=><div className=\"dark:md:hover:bg-fuchsia-600\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a group variant",
+    "file": "src/admission-30-probe.tsx",
+    "code": "export const P=()=><div className=\"group-hover:text-rose-600\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "an arbitrary variant",
+    "file": "src/admission-31-probe.tsx",
+    "code": "export const P=()=><div className=\"[&>*]:text-slate-500\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a hue that a hand-written list would have missed",
+    "file": "src/admission-32-probe.tsx",
+    "code": "export const P=()=><div className=\"bg-mauve-500\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a raw hex in an arbitrary value",
+    "file": "src/admission-33-probe.tsx",
+    "code": "export const P=()=><div className=\"bg-[#8b5cf6]\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a raw oklch() in an arbitrary value",
+    "file": "src/admission-34-probe.tsx",
+    "code": "export const P=()=><div className=\"ring-[oklch(.5_.2_30)]\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "semantic tokens",
+    "file": "src/admission-35-probe.tsx",
+    "code": "export const P=()=><div className=\"bg-destructive text-muted-foreground\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "a numbered token",
+    "file": "src/admission-36-probe.tsx",
+    "code": "export const P=()=><div className=\"text-chart-1\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "a token whose name resembles a palette class",
+    "file": "src/admission-37-probe.tsx",
+    "code": "export const P=()=><div className=\"bg-brand-primary\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "a numeric spacing utility",
+    "file": "src/admission-38-probe.tsx",
+    "code": "export const P=()=><div className=\"gap-x-100\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "layout utilities and arbitraries",
+    "file": "src/admission-39-probe.tsx",
+    "code": "export const P=()=><div className=\"w-[32px] grid-cols-[1fr_auto] max-w-md\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "a CSS variable in an arbitrary value",
+    "file": "src/admission-40-probe.tsx",
+    "code": "export const P=()=><div className=\"bg-[var(--brand)]\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "scale-less white",
+    "file": "src/admission-41-probe.tsx",
+    "code": "export const P=()=><div className=\"text-white\" />\n",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "zod app",
+    "file": "src/admission-42-guard-fixture.ts",
+    "code": "import {z} from 'zod';export function boom(){z.config(z.locales.ru())}",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "zod test",
+    "file": "src/admission-43-guard-fixture.test.ts",
+    "code": "import {z} from 'zod';z.config(z.locales.ru())",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "nonASCII app",
+    "file": "src/admission-44-guard-fixture.ts",
+    "code": "export const v='Привет'",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "nonASCII test",
+    "file": "src/admission-45-guard-fixture.test.ts",
+    "code": "export const v='Привет'",
+    "rule": "no-restricted-syntax",
+    "expected": false
+  },
+  {
+    "name": "locale Link",
+    "file": "src/admission-46-guard-fixture.ts",
+    "code": "import Link from 'next/link';export const v=Link",
+    "rule": "no-restricted-imports",
+    "expected": true
+  },
+  {
+    "name": "progress Link",
+    "file": "src/admission-47-guard-fixture.ts",
+    "code": "import {Link} from '@/i18n/navigation';export const v=Link",
+    "rule": "no-restricted-imports",
+    "expected": true
+  },
+  {
+    "name": "allowed pathname",
+    "file": "src/admission-48-guard-fixture.ts",
+    "code": "import {usePathname} from '@/i18n/navigation';export const v=usePathname",
+    "rule": "no-restricted-imports",
+    "expected": false
+  },
+  {
+    "name": "DOM style",
+    "file": "src/admission-49-probe.tsx",
+    "code": "export const P=()=> <div style={{width:'32px'}}/>",
+    "rule": "react/forbid-dom-props",
+    "expected": true
+  },
+  {
+    "name": "custom style",
+    "file": "src/admission-50-probe.tsx",
+    "code": "const Foo=(_: {style:object})=>null;export const P=()=> <Foo style={{width:'32px'}}/>",
+    "rule": "react/forbid-dom-props",
+    "expected": false
+  },
+  {
+    "name": "plain color",
+    "file": "src/admission-51-probe.ts",
+    "code": "export const v={primary:'bg-[rgb(139,92,246)]'}",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "template nonASCII",
+    "file": "src/admission-52-guard-fixture.ts",
+    "code": "export const v=`Привет`",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "a11y alt",
+    "file": "src/admission-53-probe.tsx",
+    "code": "export const P=()=> <img src=\"/a.png\"/>",
+    "rule": "jsx-a11y/alt-text",
+    "expected": true
+  },
+  {
+    "name": "a11y positive",
+    "file": "src/admission-54-probe.tsx",
+    "code": "export const P=()=> <img src=\"/a.png\" alt=\"Icon\"/>",
+    "rule": "jsx-a11y/alt-text",
+    "expected": false
+  },
+  {
+    "name": "React legacy createClass",
+    "file": "src/admission-55-probe.tsx",
+    "code": "import React from 'react';export const P=React.createClass({render(){return null}})",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "React legacy render",
+    "file": "src/admission-56-probe.tsx",
+    "code": "import ReactDOM from 'react-dom';ReactDOM.render(null,document.body)",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "React modern component",
+    "file": "src/admission-57-probe.tsx",
+    "code": "export const P=()=> <div/>",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "hook conditional",
+    "file": "src/admission-58-probe.tsx",
+    "code": "import {useState} from 'react';export function P({v}:{v:boolean}){if(v)useState(1);return null}",
+    "rule": "react-hooks/rules-of-hooks",
+    "expected": true
+  },
+  {
+    "name": "hook valid",
+    "file": "src/admission-59-probe.tsx",
+    "code": "import {useState} from 'react';export function P(){const [v]=useState(1);return <div>{v}</div>}",
+    "rule": "react-hooks/rules-of-hooks",
+    "expected": false
+  },
+  {
+    "name": "literal locale path",
+    "file": "src/app/[locale]/admission-0-admission.tsx",
+    "code": "import {z} from 'zod';export function P(){z.config(z.locales.ru());return null}",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "locale palette",
+    "file": "src/app/[locale]/admission-1-admission.tsx",
+    "code": "export const P=()=> <div className=\"bg-red-500\"/>",
+    "rule": "no-restricted-syntax",
+    "expected": true
+  },
+  {
+    "name": "relative upward",
+    "file": "src/shared/lib/admission-2-admission.ts",
+    "code": "import * as x from '../../features/auth-login';export const y=x",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "relative sibling",
+    "file": "src/features/auth-login/admission-3-admission.ts",
+    "code": "import * as x from '../locale-switcher';export const y=x",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "relative public",
+    "file": "src/_pages/auth/admission-4-admission.ts",
+    "code": "import * as x from '../../features/auth-login';export const y=x",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "relative deep",
+    "file": "src/_pages/auth/admission-5-admission.ts",
+    "code": "import * as x from '../../features/auth-login/ui/LoginForm';export const y=x",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "relative shared",
+    "file": "src/features/auth-login/admission-6-admission.ts",
+    "code": "import * as x from '../../shared/ui/button';export const y=x",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "namespace helper",
+    "file": "src/admission-7-admission.ts",
+    "code": "import * as x from '@/i18n/navigation';export const y=x",
+    "rule": "no-restricted-imports",
+    "expected": true
+  },
+  {
+    "name": "DOM style spread",
+    "file": "src/admission-8-admission.tsx",
+    "code": "export const P=()=> <div {...{style:{width:\"32px\"}}}/>",
+    "rule": "react/forbid-dom-props",
+    "expected": false
+  },
+  {
+    "name": "JSX component usage",
+    "file": "src/admission-9-admission.tsx",
+    "code": "const Foo=()=>null;export const P=()=> <Foo/>",
+    "rule": "@typescript-eslint/no-unused-vars",
+    "expected": false
+  },
+  {
+    "name": "jsx React import usage",
+    "file": "src/admission-10-admission.tsx",
+    "code": "import React from 'react';export const P=()=> <div/>",
+    "rule": "@typescript-eslint/no-unused-vars",
+    "expected": false
+  },
+  {
+    "name": "React.renderComponent",
+    "file": "src/admission-0-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=React.renderComponent",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "React.PropTypes",
+    "file": "src/admission-1-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=React.PropTypes",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "React.createClass",
+    "file": "src/admission-2-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=React.createClass",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "React.DOM",
+    "file": "src/admission-3-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=React.DOM",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "ReactDOM.render",
+    "file": "src/admission-4-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=ReactDOM.render",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "ReactDOM.hydrate",
+    "file": "src/admission-5-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=ReactDOM.hydrate",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "ReactDOM.unmountComponentAtNode",
+    "file": "src/admission-6-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=ReactDOM.unmountComponentAtNode",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "ReactDOMServer.renderToNodeStream",
+    "file": "src/admission-7-legacy-probe.tsx",
+    "code": "import React from 'react';import ReactDOM from 'react-dom';import ReactDOMServer from 'react-dom/server';export const v=ReactDOMServer.renderToNodeStream",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "named legacy import",
+    "file": "src/admission-8-legacy-probe.tsx",
+    "code": "import {createClass} from 'react';export const v=createClass",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "React lifecycle",
+    "file": "src/admission-9-legacy-probe.tsx",
+    "code": "import React from 'react';export class A extends React.Component{componentWillMount(){}render(){return null}}",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "nonReact lifecycle",
+    "file": "src/admission-10-legacy-probe.tsx",
+    "code": "class Base{};export class A extends Base{componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "class lifecycle positive",
+    "file": "src/admission-11-legacy-probe.tsx",
+    "code": "import React from 'react';export class A extends React.Component{componentDidMount(){}render(){return null}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "aliased import lifecycle",
+    "file": "src/admission-12-legacy-probe.tsx",
+    "code": "import {Component as C} from 'react';export class A extends C{componentWillMount(){}render(){return null}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "object lifecycle",
+    "file": "src/admission-13-legacy-probe.tsx",
+    "code": "export const A={componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "named Component",
+    "file": "src/lint-regression-0.tsx",
+    "code": "import {Component} from 'react';export class C extends Component {componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "named PureComponent",
+    "file": "src/lint-regression-1.tsx",
+    "code": "import {PureComponent} from 'react';export class C extends PureComponent {componentWillUpdate(){}}",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "ES5 default factory",
+    "file": "src/lint-regression-2.tsx",
+    "code": "export const C=createReactClass({componentWillReceiveProps(){}})",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "computed identifier lifecycle",
+    "file": "src/lint-regression-3.tsx",
+    "code": "export class C extends React.Component {[componentWillMount](){}}",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "computed string baseline gap",
+    "file": "src/lint-regression-4.tsx",
+    "code": "export class C extends React.Component {['componentWillMount'](){}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "unrelated superclass",
+    "file": "src/lint-regression-5.tsx",
+    "code": "export class C extends OtherComponent {componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "unrelated object",
+    "file": "src/lint-regression-6.tsx",
+    "code": "export const C={componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": false
+  },
+  {
+    "name": "explicit JSDoc component",
+    "file": "src/lint-regression-7.tsx",
+    "code": "/** @extends React.Component */\nexport class C extends Base {componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "JSX pragma lifecycle",
+    "file": "src/lint-regression-8.tsx",
+    "code": "/** @jsx R.createElement */\nexport class C extends R.Component {componentWillMount(){}}",
+    "rule": "react/no-deprecated",
+    "expected": true
+  },
+  {
+    "name": "canonical require",
+    "file": "src/lint-regression-9.tsx",
+    "code": "const {createClass}=require('react');export const C=createClass",
+    "rule": "react/no-deprecated",
+    "expected": true
+  }
+]

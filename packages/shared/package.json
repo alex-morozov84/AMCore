@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "lint": "eslint .",
+    "lint": "node ../../scripts/lint.mjs --scope shared",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

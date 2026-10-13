@@ -1,12 +1,13 @@
-import eslint from '@eslint/js'
+import { residualConfig } from './hybrid.js'
+import javascriptRules from './javascript-recommended.json' with { type: 'json' }
 import tseslint from '@typescript-eslint/eslint-plugin'
 import tsparser from '@typescript-eslint/parser'
 import prettier from 'eslint-config-prettier'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
-  eslint.configs.recommended,
+export const policy = [
+  { rules: javascriptRules },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     languageOptions: {
@@ -81,3 +82,5 @@ export default [
   },
   prettier,
 ]
+
+export default residualConfig(policy)

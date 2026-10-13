@@ -12,7 +12,13 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/lint.mjs",
+        "$TURBO_ROOT$/scripts/lib/lint-fixture.mjs",
+        "$TURBO_ROOT$/packages/eslint-config/**"
+      ]
     },
     "typecheck": {
       "dependsOn": ["^build"]

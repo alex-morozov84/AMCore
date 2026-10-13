@@ -122,7 +122,7 @@ function SidebarProvider({
         // `--sidebar-width`/`--skeleton-width` overrides further down this
         // file, which the lint rule can't see because they're passed through
         // `SheetContent`/`Skeleton`, not a raw DOM element.
-        // eslint-disable-next-line react/forbid-dom-props
+        // oxlint-disable-next-line react/forbid-dom-props
         style={
           {
             '--sidebar-width': SIDEBAR_WIDTH,

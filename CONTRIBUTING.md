@@ -12,13 +12,16 @@ Thanks for your interest in contributing. This document explains how to set up t
    development; there is no separate `apps/web/.env.example`.
 3. **Run locally** — `pnpm dev` starts API and web in development mode.
 
+See [the lint policy guide](packages/eslint-config/README.md) for engine ownership,
+inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixes.
+
 ## Development Commands
 
 | Command                                                           | Description                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm dev`                                                        | Start all apps in dev mode                                                                                                                                                                                                                           |
 | `pnpm build`                                                      | Build all apps                                                                                                                                                                                                                                       |
-| `pnpm lint`                                                       | Run ESLint                                                                                                                                                                                                                                           |
+| `pnpm lint`                                                       | Run Oxlint + ESLint and web Stylelint                                                                                                                                                                                                                |
 | `pnpm typecheck`                                                  | Run TypeScript check                                                                                                                                                                                                                                 |
 | `pnpm test`                                                       | Run all unit tests                                                                                                                                                                                                                                   |
 | `pnpm format:check`                                               | Check Prettier formatting                                                                                                                                                                                                                            |

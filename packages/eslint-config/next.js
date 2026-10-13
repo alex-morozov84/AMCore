@@ -1,13 +1,13 @@
-import nextPlugin from '@next/eslint-plugin-next'
-import jsxA11y from 'eslint-plugin-jsx-a11y'
-import react from 'eslint-plugin-react'
 import reactCompiler from 'eslint-plugin-react-compiler'
+import { residualConfig } from './hybrid.js'
+import nextPlugin from '@next/eslint-plugin-next'
+import { reactPolicy as react } from './react-policy.js'
 import reactHooks from 'eslint-plugin-react-hooks'
 
-import baseConfig from './base.js'
+import { policy as baseConfig } from './base.js'
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+export const policy = [
   ...baseConfig,
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
@@ -16,7 +16,6 @@ export default [
       'react-hooks': reactHooks,
       'react-compiler': reactCompiler,
       '@next/next': nextPlugin,
-      'jsx-a11y': jsxA11y,
     },
     languageOptions: {
       parserOptions: {
@@ -69,3 +68,5 @@ export default [
     },
   },
 ]
+
+export default residualConfig(policy)

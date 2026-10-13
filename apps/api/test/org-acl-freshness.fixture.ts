@@ -12,7 +12,7 @@ import { type AppRedisClient, REDIS_CLIENT } from '../src/infrastructure/redis'
 import { type E2ETestContext, signAccessToken } from './helpers'
 
 // Keep the fixture result inferred so its service/client types stay exact.
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+// oxlint-disable-next-line typescript/explicit-function-return-type
 export async function aclFixture(context: E2ETestContext) {
   const { app, prisma } = context
   const redis = app.get<AppRedisClient>(REDIS_CLIENT)

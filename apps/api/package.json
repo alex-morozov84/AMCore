@@ -10,7 +10,7 @@
     "build": "nest build -p tsconfig.build.json && node scripts/build-identity.mjs",
     "start": "node dist/main.js",
     "start:prod": "NODE_ENV=production node dist/main.js",
-    "lint": "eslint .",
+    "lint": "node ../../scripts/lint.mjs --scope api",
     "typecheck": "tsc --noEmit",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest --passWithNoTests",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",

@@ -1,15 +1,18 @@
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
-import nextPlugin from '@next/eslint-plugin-next';
-import storybookPlugin from 'eslint-plugin-storybook';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { residualConfig } from '@amcore/eslint-config/hybrid'
+import javascriptRules from '@amcore/eslint-config/javascript-recommended' with { type: 'json' }
+import tseslint from 'typescript-eslint'
+import {
+  reactPolicy as reactPlugin,
+  accessibilityPolicy as jsxA11yPlugin,
+} from '@amcore/eslint-config/react-policy'
+import reactHooksPlugin from 'eslint-plugin-react-hooks'
+import nextPlugin from '@next/eslint-plugin-next'
+import storybookPlugin from 'eslint-plugin-storybook'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import boundaries from 'eslint-plugin-boundaries';
+import simpleImportSort from 'eslint-plugin-simple-import-sort'
+import boundaries from 'eslint-plugin-boundaries'
 
 // ---------------------------------------------------------------------------
 // Feature-Sliced Design boundaries
@@ -23,12 +26,12 @@ import boundaries from 'eslint-plugin-boundaries';
 // `features/auth/*` and `features/sessions/*`, the only two feature groups,
 // so every feature is now a flat, single-level slice matching
 // `widgets`/`entities`'s shape below.
-const SEGMENTS = 'ui|model|api|lib|config|hooks|store|pwa|providers|stores';
+const SEGMENTS = 'ui|model|api|lib|config|hooks|store|pwa|providers|stores'
 
 // Sliced layers are entered through their index only. `shared` is deliberately
 // absent: it is a collection of independent modules (`@/shared/ui/button`),
 // which is also the only shape the shadcn CLI generates.
-const PUBLIC_API = 'index.{ts,tsx}';
+const PUBLIC_API = 'index.{ts,tsx}'
 
 const ELEMENTS = [
   { type: 'app', pattern: 'src/app/**/*', partialMatch: false },
@@ -44,18 +47,20 @@ const ELEMENTS = [
   { type: 'features', pattern: 'src/features/*', capture: ['slice'] },
   { type: 'entities', pattern: 'src/entities/*', capture: ['slice'] },
   { type: 'shared', pattern: 'src/shared/*', capture: ['segment'] },
-];
+]
 
 /** Layers below may only be entered at their public API. */
 const below = (...types) =>
   types.flatMap((type) => [
     { element: { type, fileInternalPath: PUBLIC_API } },
     ...(type === 'entities'
-      ? ['organization-context', 'invitation-flow'].map(slice => ({ element: { type, captured: { slice }, fileInternalPath: 'index.server.ts' } }))
+      ? ['organization-context', 'invitation-flow'].map((slice) => ({
+          element: { type, captured: { slice }, fileInternalPath: 'index.server.ts' },
+        }))
       : []),
-  ]);
+  ])
 
-const sharedAndNeutral = [{ element: { type: 'shared' } }, { element: { type: 'neutral' } }];
+const sharedAndNeutral = [{ element: { type: 'shared' } }, { element: { type: 'neutral' } }]
 
 // A group's own barrel may reach the slices inside it; a slice may not reach a
 // sibling slice in another group. Without the captured-value match, allowing
@@ -67,7 +72,7 @@ const sameGroup = (type) => ({
     captured: { group: '{{ from.element.captured.slice }}' },
     fileInternalPath: PUBLIC_API,
   },
-});
+})
 
 // `boundaries` cannot see layer-level barrels: `src/features/index.ts` sits
 // inside no element, so there is nothing for it to police. Banned here instead.
@@ -76,7 +81,7 @@ const LAYER_BARREL = {
   message:
     'No layer-level barrels — import the slice public API (@/features/auth-login) ' +
     'or the shared module (@/shared/ui/button). See docs/frontend/.',
-};
+}
 
 // ---------------------------------------------------------------------------
 // Token-only styling
@@ -103,38 +108,38 @@ const LAYER_BARREL = {
  * a hole.
  */
 function tailwindHues() {
-  const themePath = fileURLToPath(import.meta.resolve('tailwindcss/theme.css'));
+  const themePath = fileURLToPath(import.meta.resolve('tailwindcss/theme.css'))
   const hues = new Set(
-    [...readFileSync(themePath, 'utf8').matchAll(/^\s*--color-([a-z]+)-\d+:/gm)].map((m) => m[1]),
-  );
+    [...readFileSync(themePath, 'utf8').matchAll(/^\s*--color-([a-z]+)-\d+:/gm)].map((m) => m[1])
+  )
 
   if (hues.size === 0) {
     throw new Error(
       `No default palette found in ${themePath}. Tailwind changed how the theme is published; ` +
-        'the token-only styling rule cannot be built and would otherwise pass silently.',
-    );
+        'the token-only styling rule cannot be built and would otherwise pass silently.'
+    )
   }
 
-  return [...hues].join('|');
+  return [...hues].join('|')
 }
 
 // `[^a-z-]` rather than a whitespace anchor, so variant prefixes are covered:
 // `hover:bg-red-500`, `dark:text-gray-800`, `[&>*]:bg-red-50`. The scale suffix
 // is what separates a palette colour from a token — `bg-destructive` and
 // `text-chart-1` have no `-500`.
-const PALETTE_CLASS = `(^|[^a-z-])[a-z-]+-(${tailwindHues()})-(50|[1-9]00|950)\\b`;
+const PALETTE_CLASS = `(^|[^a-z-])[a-z-]+-(${tailwindHues()})-(50|[1-9]00|950)\\b`
 const PALETTE_MESSAGE =
   "Tailwind's default palette bypasses the theme — use a semantic token " +
-  '(bg-destructive, text-muted-foreground). See docs/frontend/brand-theme-and-tokens.md.';
+  '(bg-destructive, text-muted-foreground). See docs/frontend/brand-theme-and-tokens.md.'
 
 // Keyed on the value, with no list of colour utilities: `-[#…]` is a colour
 // wherever it appears, so `ring-`, `divide-` and any utility a future Tailwind
 // adds are covered without maintaining a list. `w-[32px]` does not match, and
 // `bg-[var(--brand)]` stays legal because a variable is a token reference.
-const ARBITRARY_COLOUR = '-\\[(#|rgba?\\(|hsla?\\(|oklch\\(|lab\\(|lch\\(|color\\()';
+const ARBITRARY_COLOUR = '-\\[(#|rgba?\\(|hsla?\\(|oklch\\(|lab\\(|lch\\(|color\\()'
 const ARBITRARY_MESSAGE =
   'Raw colour in a Tailwind arbitrary value — use a semantic token, or a CSS variable ' +
-  'if the value must be computed. See docs/frontend/brand-theme-and-tokens.md.';
+  'if the value must be computed. See docs/frontend/brand-theme-and-tokens.md.'
 
 const NAVIGATION_PATHS = [
   {
@@ -152,16 +157,16 @@ const NAVIGATION_PATHS = [
     name: '@/i18n/navigation',
     importNames: ['useRouter', 'Link'],
     message:
-      "Import { useRouteProgressRouter } from " +
+      'Import { useRouteProgressRouter } from ' +
       "'@/shared/lib/route-progress/use-route-progress-router' for useRouter(), or " +
       "{ RouteProgressLink } from '@/shared/ui/route-progress-link' for Link — the raw " +
       'exports bypass the route progress bar. Other exports (usePathname, redirect, ...) ' +
       "still come from '@/i18n/navigation' directly.",
   },
-];
+]
 
 /** @type {import('typescript-eslint').ConfigArray} */
-export default [
+export const policy = [
   // Global ignores
   {
     name: 'project/ignores',
@@ -179,7 +184,7 @@ export default [
   // Base JavaScript rules
   {
     name: 'project/javascript',
-    ...js.configs.recommended,
+    rules: javascriptRules,
   },
 
   {
@@ -262,7 +267,7 @@ export default [
       // "only non-colour" inline styles turned into a hand-maintained list of
       // CSS colour properties — the fragile shape this track exists to avoid.
       // The whole prop is banned instead, using a rule someone else maintains.
-      // A genuinely dynamic value becomes one `eslint-disable` line with a
+      // A genuinely dynamic value becomes one `oxlint-disable` line with a
       // reason, which is reviewable; a regex silently deciding what counts as
       // a colour is not. The tree has no inline styles today.
       'react/forbid-dom-props': [
@@ -324,12 +329,24 @@ export default [
                 to: [
                   { element: { type: 'app' } },
                   ...below('composition', 'pages', 'widgets', 'features', 'entities'),
-                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
-                    element: { type: 'composition', captured: { slice: 'organization-access' }, fileInternalPath },
-                  })),
-                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map((fileInternalPath) => ({
-                    element: { type: 'composition', captured: { slice: 'invitation-flow' }, fileInternalPath },
-                  })),
+                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map(
+                    (fileInternalPath) => ({
+                      element: {
+                        type: 'composition',
+                        captured: { slice: 'organization-access' },
+                        fileInternalPath,
+                      },
+                    })
+                  ),
+                  ...['index.server.ts', 'index.client.ts', 'index.config.ts'].map(
+                    (fileInternalPath) => ({
+                      element: {
+                        type: 'composition',
+                        captured: { slice: 'invitation-flow' },
+                        fileInternalPath,
+                      },
+                    })
+                  ),
                   ...sharedAndNeutral,
                 ],
               },
@@ -447,8 +464,7 @@ export default [
         // requests. Localize with the per-parse error map instead —
         // `useLocalizedForm` / `useZodErrorMap`.
         {
-          selector:
-            "CallExpression[callee.object.name='z'][callee.property.name='config']",
+          selector: "CallExpression[callee.object.name='z'][callee.property.name='config']",
           message:
             'Do not set a global Zod locale — it cannot represent two locales. ' +
             'Use useLocalizedForm() / useZodErrorMap() (per-parse error map).',
@@ -479,7 +495,10 @@ export default [
         { selector: `Literal[value=/${PALETTE_CLASS}/]`, message: PALETTE_MESSAGE },
         { selector: `TemplateElement[value.raw=/${PALETTE_CLASS}/]`, message: PALETTE_MESSAGE },
         { selector: `Literal[value=/${ARBITRARY_COLOUR}/]`, message: ARBITRARY_MESSAGE },
-        { selector: `TemplateElement[value.raw=/${ARBITRARY_COLOUR}/]`, message: ARBITRARY_MESSAGE },
+        {
+          selector: `TemplateElement[value.raw=/${ARBITRARY_COLOUR}/]`,
+          message: ARBITRARY_MESSAGE,
+        },
       ],
     },
   },
@@ -496,8 +515,7 @@ export default [
       'no-restricted-syntax': [
         'error',
         {
-          selector:
-            "CallExpression[callee.object.name='z'][callee.property.name='config']",
+          selector: "CallExpression[callee.object.name='z'][callee.property.name='config']",
           message:
             'Do not set a global Zod locale — it cannot represent two locales. ' +
             'Use useLocalizedForm() / useZodErrorMap() (per-parse error map).',
@@ -514,12 +532,15 @@ export default [
       'no-restricted-syntax': [
         'error',
         {
-          selector: "CallExpression[callee.object.name='page'][callee.property.name='getByRole'][arguments.length=1][arguments.0.value='alert']",
-          message: 'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
+          selector:
+            "CallExpression[callee.object.name='page'][callee.property.name='getByRole'][arguments.length=1][arguments.0.value='alert']",
+          message:
+            'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
         },
         ...['[role="alert"]', "[role='alert']", '[role=alert]'].map((value) => ({
           selector: `CallExpression[callee.object.name='page'][callee.property.name='locator'][arguments.0.value=${JSON.stringify(value)}]`,
-          message: 'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
+          message:
+            'Scope application alerts with data-slot="alert" or a component locator; Next also renders an alert route announcer.',
         })),
       ],
     },
@@ -530,16 +551,24 @@ export default [
     files: ['e2e/**/*.{ts,tsx,js,mjs}'],
     ignores: ['e2e/shared/axe.ts'],
     rules: {
-      'no-restricted-imports': ['error', {
-        paths: [{
-          name: '@axe-core/playwright',
-          message: 'Use e2e/shared/axe.ts expectNoAxeViolations: it waits for fonts and finite visual transitions before scanning.',
-        }, {
-          name: 'axe-core',
-          allowTypeImports: true,
-          message: 'Run accessibility checks through e2e/shared/axe.ts; direct scans bypass visual stabilization.',
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@axe-core/playwright',
+              message:
+                'Use e2e/shared/axe.ts expectNoAxeViolations: it waits for fonts and finite visual transitions before scanning.',
+            },
+            {
+              name: 'axe-core',
+              allowTypeImports: true,
+              message:
+                'Run accessibility checks through e2e/shared/axe.ts; direct scans bypass visual stabilization.',
+            },
+          ],
+        },
+      ],
     },
   },
 
@@ -559,4 +588,6 @@ export default [
   // Storybook rules — story-file/`.storybook/main.ts` linting from the
   // plugin's own recommended flat config, not hand-restated here.
   ...storybookPlugin.configs['flat/recommended'],
-];
+]
+
+export default residualConfig(policy)

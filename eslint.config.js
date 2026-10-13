@@ -1,7 +1,8 @@
-import baseConfig from '@amcore/eslint-config/base'
+import { residualConfig } from '@amcore/eslint-config/hybrid'
+import { policy as baseConfig } from '@amcore/eslint-config/base'
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+export const policy = [
   ...baseConfig,
   {
     ignores: ['apps/**', 'packages/**'],
@@ -26,3 +27,5 @@ export default [
     },
   },
 ]
+
+export default residualConfig(policy)
