@@ -1,5 +1,5 @@
-import { nativeSettings } from './native-settings.js'
 import nativeRules from './native-rules.json' with { type: 'json' }
+import { nativeSettings } from './native-settings.js'
 
 // These checks retain their ESLint implementation and diagnostic context.
 const RESIDUAL = new Set([
@@ -53,6 +53,7 @@ export function nativeConfig(policy, cwd = process.cwd()) {
       )
     ),
     rules: {},
+    options: { respectEslintDisableDirectives: false },
     settings: nativeSettings(policy, cwd),
     ignorePatterns: policy
       .filter((block) => block.ignores && !block.files)

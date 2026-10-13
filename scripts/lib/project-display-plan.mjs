@@ -40,7 +40,7 @@ function insertLocale(plan, root, singles) {
     plan,
     root,
     'apps/web/src/i18n/request.ts',
-    take(singles, 'apps/web/eslint.config.mjs'),
+    take(singles, 'apps/web/eslint.config.mjs', 'scripts/fixtures/lint/web.json'),
     1
   )
   insertTarget(

@@ -17,7 +17,10 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/lint.mjs",
         "$TURBO_ROOT$/scripts/lib/lint-fixture.mjs",
-        "$TURBO_ROOT$/packages/eslint-config/**"
+        "$TURBO_ROOT$/packages/eslint-config/**",
+        "$TURBO_ROOT$/apps/web/node_modules/tailwindcss/theme.css",
+        "$TURBO_ROOT$/packages/typescript-config/**",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
       ]
     },
     "typecheck": {

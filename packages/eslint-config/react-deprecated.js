@@ -1,5 +1,5 @@
-import deprecations from './react-deprecations.json' with { type: 'json' }
 import { atLeast, componentProperties, reactPragma, reactVersion } from './react-component.js'
+import deprecations from './react-deprecations.json' with { type: 'json' }
 
 const MODULES = {
   react: ['React'],

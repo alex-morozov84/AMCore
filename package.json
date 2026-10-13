@@ -80,6 +80,11 @@
       "node scripts/lint.mjs --scope root --fix --no-warn-ignored",
       "node scripts/lint.mjs --scope root --max-warnings=0 --no-warn-ignored",
       "prettier --write"
+    ],
+    "packages/eslint-config/**/*.{js,mjs}": [
+      "node scripts/lint.mjs --scope config --fix --no-warn-ignored",
+      "node scripts/lint.mjs --scope config --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
     ]
   }
 }

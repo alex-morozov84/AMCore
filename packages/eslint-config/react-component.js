@@ -1,11 +1,14 @@
 import { createRequire } from 'node:module'
+import path from 'node:path'
 
 export function reactVersion(context) {
   const settings = context.settings.react ?? {}
   let version = settings.version ?? settings.defaultVersion ?? '999.999.999'
   if (version === 'detect') {
     try {
-      version = createRequire(context.filename)('react/package.json').version
+      version = createRequire(path.resolve(context.cwd, context.filename))(
+        'react/package.json'
+      ).version
     } catch (error) {
       if (error.code !== 'MODULE_NOT_FOUND') throw error
       version = settings.defaultVersion ?? '999.999.999'

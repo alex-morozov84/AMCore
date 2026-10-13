@@ -190,5 +190,7 @@
   "react/require-render-return": "react/require-render-return",
   "require-yield": "require-yield",
   "use-isnan": "use-isnan",
-  "valid-typeof": "valid-typeof"
+  "valid-typeof": "valid-typeof",
+  "react/self-closing-comp": "react/self-closing-comp",
+  "react/jsx-curly-brace-presence": "react/jsx-curly-brace-presence"
 }

@@ -1,7 +1,7 @@
-import { residualConfig } from './hybrid.js'
 import jestPlugin from 'eslint-plugin-jest'
 
 import { policy as baseConfig } from './base.js'
+import { residualConfig } from './hybrid.js'
 
 /** @type {import('eslint').Linter.Config[]} */
 export const policy = [

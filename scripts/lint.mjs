@@ -7,12 +7,19 @@ import { pathToFileURL } from 'node:url'
 import { nativeConfig } from '@amcore/eslint-config/hybrid'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
-const SCOPES = { root: '.', api: 'apps/api', web: 'apps/web', shared: 'packages/shared' }
+const SCOPES = {
+  root: '.',
+  api: 'apps/api',
+  web: 'apps/web',
+  shared: 'packages/shared',
+  config: 'packages/eslint-config',
+}
 
 function argumentsForScope(args) {
   const index = args.indexOf('--scope')
   const scope = args[index + 1]
-  if (index < 0 || !Object.hasOwn(SCOPES, scope)) throw new Error('Use --scope root|api|web|shared')
+  if (index < 0 || !Object.hasOwn(SCOPES, scope))
+    throw new Error('Use --scope root|api|web|shared|config')
   args.splice(index, 2)
   const files = args.filter((arg) => !arg.startsWith('--'))
   const options = args.filter((arg) => arg.startsWith('--'))
@@ -46,7 +53,18 @@ async function lint() {
   try {
     const nativeOptions = options.filter((arg) => arg !== '--no-warn-ignored')
     const capture = options.includes('--format=json')
-    const native = execute('oxlint', ['--config', config, ...nativeOptions, ...files], cwd, capture)
+    const native = execute(
+      'oxlint',
+      [
+        '--config',
+        config,
+        '--report-unused-disable-directives-severity=warn',
+        ...nativeOptions,
+        ...files,
+      ],
+      cwd,
+      capture
+    )
     const residual = execute('eslint', ['--config', configPath, ...options, ...files], cwd, capture)
     if (capture) console.log(JSON.stringify({ scope, engines: [native, residual] }))
     return Math.max(native.exit, residual.exit)

@@ -1,10 +1,10 @@
-import reactCompiler from 'eslint-plugin-react-compiler'
-import { residualConfig } from './hybrid.js'
 import nextPlugin from '@next/eslint-plugin-next'
-import { reactPolicy as react } from './react-policy.js'
+import reactCompiler from 'eslint-plugin-react-compiler'
 import reactHooks from 'eslint-plugin-react-hooks'
 
 import { policy as baseConfig } from './base.js'
+import { residualConfig } from './hybrid.js'
+import { reactPolicy as react } from './react-policy.js'
 
 /** @type {import('eslint').Linter.Config[]} */
 export const policy = [

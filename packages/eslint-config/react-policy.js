@@ -1,6 +1,6 @@
-import recommended from './react-recommended.json' with { type: 'json' }
 import accessibility from './accessibility-recommended.json' with { type: 'json' }
 import noDeprecated from './react-deprecated.js'
+import recommended from './react-recommended.json' with { type: 'json' }
 
 // Preserve the previously enabled policy without installing unsupported peers.
 export const reactPolicy = {

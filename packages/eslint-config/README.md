@@ -14,7 +14,7 @@ A native name proves availability; it does not prove complete semantic equivalen
 The JavaScript, React and accessibility JSON snapshots preserve the previously
 selected recommended rules. Package updates do not silently enable new defaults.
 The maintained `react/no-deprecated` guard uses public ESLint APIs. It preserves
-legacy thresholds and adds missing named class, ES5 and computed identifier cases.
+legacy thresholds ([source license](react-policy.LICENSE)) and adds missing named class, ES5 and computed identifier cases.
 Computed string lifecycle keys retain the historical gap. It is not a complete
 React semantic analyzer.
 
@@ -46,7 +46,7 @@ web CSS -----------------> Stylelint
 
 ## Commands and exceptions
 
-Run `node scripts/lint.mjs --scope api|web|shared|root [files...]` from any directory
+Run `node scripts/lint.mjs --scope api|web|shared|root|config [files...]` from any directory
 using the absolute wrapper path when outside the repository. File arguments resolve
 relative to the selected workspace; absolute paths also work. Options are `--fix`,
 `--max-warnings=0`, `--no-warn-ignored` and `--format=json`. The JSON wrapper preserves
@@ -54,11 +54,12 @@ both engines' raw output. Oxlint custom explanations can appear in `help` rather
 than `message`.
 
 Use `oxlint-disable` with the native rule ID for native exceptions. Use
-`eslint-disable` for residual exceptions. Give each exception a reason. Staged
+`eslint-disable` for residual exceptions. Oxlint ignores ESLint directives explicitly
+and reports unused native directives. Give each exception a reason. Staged
 checks run both engines after fixes and reject warnings. The wrapper fails on
 engine errors or unsupported options. It does not replace typecheck.
 
-Lint task hashes include the wrapper, fixture helper and shared policy files.
+Lint task hashes include the wrapper, fixture helper, shared policy files and the installed Tailwind theme.
 A Turbo cache replay is not an executed lint check. Repeated processes are not
 warm compilers. Verify cache invalidation when adding another configuration input.
 

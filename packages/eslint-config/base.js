@@ -1,9 +1,10 @@
-import { residualConfig } from './hybrid.js'
-import javascriptRules from './javascript-recommended.json' with { type: 'json' }
 import tseslint from '@typescript-eslint/eslint-plugin'
 import tsparser from '@typescript-eslint/parser'
 import prettier from 'eslint-config-prettier'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
+
+import { residualConfig } from './hybrid.js'
+import javascriptRules from './javascript-recommended.json' with { type: 'json' }
 
 /** @type {import('eslint').Linter.Config[]} */
 export const policy = [
