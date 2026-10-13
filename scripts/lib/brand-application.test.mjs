@@ -5,10 +5,16 @@ import { prepareBrandInit } from './brand-init-plan.mjs'
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
 import { filesystemSnapshot } from './filesystem-transaction-test-helpers.mjs'
 import { runInitCommand } from './init-engine.mjs'
-import { createFixtureRepo } from './test-fixture.mjs'
+import { createFixtureRepo, git } from './test-fixture.mjs'
 
 let fixture
 afterEach(() => fixture?.cleanup())
+
+test('fixture disables automatic Git maintenance locally', () => {
+  fixture = createFixtureRepo()
+  assert.equal(git(fixture.root, ['config', '--local', '--bool', 'maintenance.auto']).trim(), 'false')
+  assert.equal(git(fixture.root, ['config', '--local', '--int', 'gc.auto']).trim(), '0')
+})
 
 test('confirmed brand change calls M4 once with the complete plan', async () => {
   fixture = createFixtureRepo()
