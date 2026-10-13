@@ -138,6 +138,9 @@ Rebuild shared so the api/web can import it:
 pnpm --filter @amcore/shared build
 ```
 
+The [shared build contract](shared-package-build.md) describes dual outputs,
+watch mode and checks against the built package.
+
 ### 3. Implement: DTO → service (+ mapper) → controller → module
 
 - **DTO** — wrap each schema with `createSchemaDto()` to retain handler types. Declare the schema in Nest12 parameter metadata;

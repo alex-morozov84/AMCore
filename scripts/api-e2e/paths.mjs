@@ -22,7 +22,7 @@ export function inputHash() {
     resolve(root, 'package.json'),
     resolve(root, 'packages/shared/package.json'),
     resolve(root, 'packages/shared/tsconfig.json'),
-    resolve(root, 'packages/shared/tsup.config.ts'),
+    resolve(root, 'packages/shared/tsdown.config.ts'),
     resolve(api, 'prisma.config.ts'),
     resolve(api, 'tsconfig.json'),
     resolve(api, 'package.json'),

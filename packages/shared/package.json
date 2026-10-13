@@ -19,8 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
@@ -31,8 +31,8 @@
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",
     "@amcore/typescript-config": "workspace:*",
-    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "tsdown": "0.23.1"
   }
 }

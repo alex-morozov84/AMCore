@@ -21,9 +21,6 @@ allowBuilds:
 # pnpm 11 reads overrides here, not from package.json. Remove each exception when
 # its stated parent/removal condition is satisfied and verify the affected consumer.
 overrides:
-  # tsup's ^0.27.0 esbuild line is affected by GHSA-g7r4-m6w7-qqqr (dev server).
-  # Build-only; remove when supported tsup accepts a patched esbuild line.
-  'tsup>esbuild': '0.28.1'
   # MCP accepts ^1.19.9 || ^2.0.5. Keep patched v1 while its transport remains
   # on the current integration; remove after a separately verified v2 update.
   '@modelcontextprotocol/sdk>@hono/node-server': '1.19.17'
