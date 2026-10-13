@@ -38,6 +38,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 COPY packages ./packages
 COPY apps/web ./apps/web
+# Type checking includes lint contract tests that import the shared CLI helper.
+COPY scripts ./scripts
 
 RUN pnpm --filter @amcore/shared build
 

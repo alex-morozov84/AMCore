@@ -1,12 +1,14 @@
+import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-const eslint = new ESLint({ cwd: path.resolve(import.meta.dirname, '../..') })
+import { lintFixture } from '../../../../scripts/lib/lint-fixture.mjs'
 async function imports(code: string, filePath = 'e2e/mocked/fixture.spec.ts') {
-  const [result] = await eslint.lintText(code, { filePath })
-  return result!.messages.filter((message) => message.ruleId === 'no-restricted-imports')
+  return lintFixture(code, filePath).filter(
+    (message: { ruleId: string }) => message.ruleId === 'no-restricted-imports'
+  )
 }
 
 describe('E2E accessibility entrypoint', () => {
@@ -28,12 +30,16 @@ describe('E2E accessibility entrypoint', () => {
       )
     ).toEqual([])
   })
-  it('allows the actual helper to own axe execution', async () => {
-    expect(
-      await imports(
-        "import AxeBuilder from '@axe-core/playwright'; new AxeBuilder({ page });",
-        'e2e/shared/axe.ts'
-      )
-    ).toEqual([])
+  it('allows the actual helper to own axe execution', () => {
+    const cwd = path.resolve(import.meta.dirname, '../..')
+    const helper = 'e2e/shared/axe.ts'
+    expect(readFileSync(path.join(cwd, helper), 'utf8')).toContain('@axe-core/playwright')
+    const run = spawnSync(
+      process.execPath,
+      [path.resolve(cwd, '../../scripts/lint.mjs'), '--scope', 'web', helper],
+      { cwd, encoding: 'utf8' }
+    )
+    expect(run.error).toBeUndefined()
+    expect(run.status, `${run.stdout}${run.stderr}`).toBe(0)
   })
 })
