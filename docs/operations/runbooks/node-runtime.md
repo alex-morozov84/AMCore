@@ -88,7 +88,7 @@ restart alone doesn't stabilize heap usage on the next occurrence.
 ## File descriptors
 
 **Symptom:** `AMCoreFileDescriptorsApproachingLimit` is firing (open FDs above
-90% of the process ulimit for 5m). Linux-only — `prom-client` returns no
+90% of the process ulimit for 5m). Linux-only — `@prometheus-io/client` returns no
 `process_open_fds`/`process_max_fds` off-Linux (e.g. a macOS dev host), so
 this alert is never evaluable there and only becomes live in Docker/Linux.
 

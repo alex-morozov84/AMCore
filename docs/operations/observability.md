@@ -142,10 +142,16 @@ scrape_configs:
 
 ## Metric Families
 
-Every metric is `amcore_`-prefixed (plus default `prom-client` `process_*` /
+Every metric is `amcore_`-prefixed (plus default `@prometheus-io/client` `process_*` /
 `nodejs_*`) and carries only bounded labels. `role` is the emitting process role
 (`web|worker|all`). This is the family reference; the [label rules](#label-rules)
 are the hard contract every label must satisfy.
+
+The API uses `@prometheus-io/client`0.16.1, the maintained successor to `prom-client`.
+Runtime defaults also expose `nodejs_eventloop_utilization_summary` and
+`nodejs_eventloop_utilization_histogram`. These additive families do not change the
+existing application labels, buckets, alert rules or dashboard queries. Tests using
+`NODE_ENV=test` disable default collectors; they do not prove runtime-default behavior.
 
 **HTTP & runtime**
 

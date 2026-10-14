@@ -59,7 +59,7 @@ export class AiRunBacklogCollector {
         )
 
         // Unlike the labeled backlog gauge above, reset() on this zero-label
-        // one does not make it vanish (prom-client keeps an implicit default
+        // one does not make it vanish (the metrics client keeps an implicit default
         // series) — a timeout reads back as a visible 0, not absence. Alert
         // on amcore_metrics_collector_errors_total{collector="ai_run_due"}
         // to tell "timed out" apart from "genuinely 0 due".
