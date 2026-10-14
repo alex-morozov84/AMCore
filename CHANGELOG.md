@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replace the deprecated API metrics client with `@prometheus-io/client`0.16.1.
+  Keep application metric contracts and Prometheus exposition; runtime defaults
+  add event-loop-utilization summary and histogram families.
+
 - API and shared source type checks use the pinned native TypeScript 7 CLI.
   Preserve frontend tooling, SWC emission and shared declaration generation.
 

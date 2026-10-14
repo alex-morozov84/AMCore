@@ -59,7 +59,7 @@ describe('RedisPingMetricsCollector', () => {
     const failedScrape = await pending
 
     // A zero-label gauge does not disappear on reset() the way a labeled one
-    // does (prom-client keeps an implicit default series for it) — it reads
+    // does (the metrics client keeps an implicit default series for it) — it reads
     // back as 0, not absent (see redis-ping-metrics.collector.ts).
     expect(failedScrape).toMatch(new RegExp(`${METRIC_NAMES.redisPingSeconds}\\{[^}]*} 0`))
 

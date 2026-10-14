@@ -89,7 +89,7 @@ describe('AiRunBacklogCollector', () => {
 
     expect(failedScrape).not.toContain(`${METRIC_NAMES.aiRunBacklog}{`)
     // The zero-label `_due` gauge does not disappear on reset() the way the
-    // labeled backlog one does above (prom-client keeps an implicit default
+    // labeled backlog one does above (the metrics client keeps an implicit default
     // series for a zero-label metric) — it reads back as 0, not absent.
     expect(failedScrape).toMatch(new RegExp(`${METRIC_NAMES.aiRunDue}\\{[^}]*} 0`))
 

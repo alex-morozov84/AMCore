@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common'
-import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client'
+import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from '@prometheus-io/client'
 
 import { METRIC_NAMES, METRICS_COLLECTOR_TIMEOUT_MS } from './metrics.constants'
 
@@ -189,7 +189,7 @@ export class MetricsService implements OnModuleDestroy {
       role: this.role,
       node_env: env.get('NODE_ENV'),
     })
-    // prom-client's default event-loop collector uses perf_hooks monitoring that
+    // The metrics client's default event-loop collector uses perf_hooks monitoring that
     // keeps Jest workers alive. Runtime environments still export defaults.
     if (env.get('NODE_ENV') !== 'test') {
       collectDefaultMetrics({ register: this.registry })

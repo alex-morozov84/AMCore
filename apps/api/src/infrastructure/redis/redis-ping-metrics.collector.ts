@@ -28,7 +28,7 @@ export class RedisPingMetricsCollector {
         )
 
         // Unlike a labeled gauge, reset() on a zero-label one does not make
-        // it vanish from the scrape (prom-client keeps an implicit default
+        // it vanish from the scrape (the metrics client keeps an implicit default
         // series) — a timeout reads back as a visible 0, not absence. Alert
         // on amcore_metrics_collector_errors_total{collector="redis_ping"}
         // to tell "timed out" apart from "genuinely 0".

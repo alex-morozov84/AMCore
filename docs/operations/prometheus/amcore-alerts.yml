@@ -135,7 +135,7 @@ groups:
           summary: 'AMCore heap usage approaching the liveness ceiling'
           description: 'Heap used is above 90% of the 1.5GiB liveness threshold (health.controller.ts) for 5m — the next liveness check may restart this process. Keep this threshold in sync with HEALTH_MEMORY_HEAP_BYTES if a fork overrides the default.'
           runbook_path: docs/operations/runbooks/node-runtime.md#heap-usage
-      # process_open_fds/process_max_fds are Linux-only (prom-client returns
+      # process_open_fds/process_max_fds are Linux-only (the metrics client returns
       # nothing off-Linux, e.g. a macOS dev host) — this alert is legitimately
       # never evaluable there and only becomes live in Docker/Linux.
       - alert: AMCoreFileDescriptorsApproachingLimit
@@ -170,7 +170,7 @@ groups:
       # redis_ping specifically — those are zero-label gauges, and a timeout
       # resets them to a visible `0`, not absence, so `absent()` can never
       # catch a stalled collector for them (verified directly against the
-      # installed prom-client: a zero-label gauge survives reset() as a
+      # installed metrics client: a zero-label gauge survives reset() as a
       # bare `0` series, a labeled one does not). It is also the more
       # reliable signal for notification_delivery_backlog/ai_run_backlog
       # over `absent()` alone, since an empty backlog gauge is otherwise
