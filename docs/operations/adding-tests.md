@@ -34,8 +34,9 @@ Use the existing [frontend testing taxonomy and commands](../frontend/testing.md
 It defines unit/component, mocked integration, real-Redis integration, component
 states and browser tests. Real Redis vault/Lua/CAS behavior belongs in
 `src/**/*.integration.test.ts`, run by `pnpm --filter web test:integration`.
-This Docker-backed family runs after unit tests in its own CI job; ordinary mocked
-unit tests cannot replace it. Follow that family's cleanup and lifecycle helpers.
+This Docker-backed family runs after unit tests in the `Test unit and Redis` CI
+job; ordinary mocked unit tests cannot replace it. Follow that family's cleanup
+and lifecycle helpers.
 
 ## Extension conformance
 
