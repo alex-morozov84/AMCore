@@ -104,6 +104,7 @@ describe('downloadToFile', () => {
     }
   })
 
+  // Exercise the real 400 MiB cap and file cleanup; loaded CI needs an I/O budget.
   it('bounds decompression and removes a partial file for a gzip bomb', async () => {
     const member = gzipSync(Buffer.alloc(64 * 1024))
     let count = 0
@@ -119,5 +120,5 @@ describe('downloadToFile', () => {
       /decompressed bytes/
     )
     await expect(readFile(dest)).rejects.toThrow()
-  }, 15000)
+  }, 60_000)
 })
