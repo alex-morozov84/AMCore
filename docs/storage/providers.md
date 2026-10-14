@@ -8,7 +8,7 @@ operations a starter needs without tying application code to one cloud.
 | Provider | Intended use           | Persistence          | Public URLs | Signed URLs |
 | -------- | ---------------------- | -------------------- | ----------- | ----------- |
 | memory   | unit tests             | process memory       | no          | no          |
-| local    | production/development | filesystem           | optional    | no          |
+| local    | production/development | filesystem           | API route   | no          |
 | s3       | production             | S3-compatible bucket | yes         | yes         |
 
 ## S3-Compatible Driver
@@ -23,8 +23,9 @@ maintainers have not run AMCore against the real services yet, so treat each as
 Notable behavior:
 
 - checksum calculation and validation are set to `WHEN_REQUIRED`: with the AWS
-  SDK defaults, S3-compatible servers reject the `x-amz-checksum-*` headers and
-  a presigned PUT returns HTTP 400 (measured on SeaweedFS and Garage);
+  SDK defaults, some S3-compatible providers reject the added `x-amz-checksum-*`
+  headers (provider-documented, for example R2 and B2), and a presigned PUT
+  returns HTTP 400 (measured on SeaweedFS and Garage);
 - visibility is the key namespace (`public/`), not an object tag or an ACL. The
   default `external` mode sends no ACL at all; `acl` mode sends `public-read` for
   `public/` keys on upload and copy ([Public Files](public-files.md));

@@ -30,7 +30,7 @@ export const S3_SOCKET_IDLE_TIMEOUT_MS = 60_000
  * Build an S3 client.
  *
  * Checksum calculation and validation are `WHEN_REQUIRED`: with the SDK defaults the
- * client adds `x-amz-checksum-*` headers that S3-compatible providers reject, and a
+ * client adds `x-amz-checksum-*` headers that some S3-compatible providers reject, and a
  * presigned PUT carries a checksum of an empty body (HTTP 400 measured on SeaweedFS
  * and Garage).
  */

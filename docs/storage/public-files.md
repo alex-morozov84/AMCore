@@ -139,10 +139,21 @@ After every setup change check both directions yourself:
 
 1. Upload an avatar. Copy its `avatarUrl` and open it in a private browser window
    (no cookies): it must return the image.
-2. Take a **private** key, for example `avatars/<user>/v-<version>/original`, and
-   request it at the same base: `<STORAGE_PUBLIC_BASE_URL>/avatars/<user>/v-<version>/original`.
-   It must answer 403 or 404. A 200 means the bucket or prefix you published
-   contains private files: fix the setup before real users upload anything.
+2. Check that private files stay private. Take a **private** key, for example
+   `avatars/<user>/v-<version>/original`:
+   - **Two buckets:** request it from the S3 API without credentials, path-style:
+     `<S3 API endpoint>/<private bucket>/avatars/<user>/v-<version>/original`. It
+     must answer 403. The public base cannot test this layout: that key never
+     exists in the public bucket, so a 404 there proves nothing.
+   - **One bucket:** request it at the public base:
+     `<STORAGE_PUBLIC_BASE_URL>/avatars/<user>/v-<version>/original`. It must
+     answer 403 or 404.
+
+   A 200 in either case means a published bucket or prefix contains private files:
+   fix the setup before real users upload anything. A public domain or website
+   endpoint that you bound to the private bucket outside AMCore is not covered by
+   these requests; never bind one.
+
 3. In `acl` mode repeat step 1 after the first upload. A server that ignores ACLs
    fails here.
 
