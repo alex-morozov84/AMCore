@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- API and shared source type checks use the pinned native TypeScript 7 CLI.
+  Preserve frontend tooling, SWC emission and shared declaration generation.
+
 - Use Fastify as the API’s sole production HTTP adapter, with native cookies, uploads, streaming and the closed read-only queue-board boundary. Express adapters remain development test controls.
 
 - Lint uses Oxlint 1.87 and ESLint 10 across API, web, shared and root tooling.

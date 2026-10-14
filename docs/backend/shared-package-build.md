@@ -1,8 +1,10 @@
 # Shared package build contract
 
 `@amcore/shared` uses tsdown with Rolldown for JavaScript and TypeScript 5.9
-for declarations. The maintained builder replaces tsup. The compiler remains
-TypeScript 5.9; this change does not establish project compatibility with TS7.
+for declarations. The maintained builder replaces tsup. Declaration generation retains TypeScript 5.9.
+`pnpm --filter @amcore/shared typecheck` checks sources with the pinned native
+TypeScript 7 CLI. This partial adoption does not migrate frontend checks,
+compiler API tools or declaration generation.
 
 ## Commands and outputs
 

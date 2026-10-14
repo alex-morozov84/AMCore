@@ -22,7 +22,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "lint": "node ../../scripts/lint.mjs --scope shared",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node ../../scripts/typecheck-native.mjs --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "lint:fix": "node ../../scripts/lint.mjs --scope shared --fix"
   },
@@ -34,6 +34,7 @@
     "@amcore/typescript-config": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3",
-    "tsdown": "0.23.1"
+    "tsdown": "0.23.1",
+    "@typescript/native": "npm:typescript@7.0.2"
   }
 }

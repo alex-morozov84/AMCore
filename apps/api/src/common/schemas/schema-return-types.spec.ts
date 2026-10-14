@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -57,5 +58,79 @@ describe('SchemaResponse return-type enforcement', () => {
     const errors = diagnostics('{ id: number }', '{ id: 42 }')
     expect(errors.map((error) => error.code)).toEqual([1241])
     expect(ts.flattenDiagnosticMessageText(errors[0]!.messageText, '\n')).toContain('id')
+  })
+})
+
+describe.each(['native', 'legacy'] as const)('%s response compiler contract', (compiler) => {
+  const cases = [
+    ['sync', '{ id: string }', '{ id: "valid" }', false],
+    ['async', 'Promise<{ id: string }>', 'Promise.resolve({ id: "valid" })', false],
+    ['array', 'Array<{ id: string }>', '[{ id: "valid" }]', false],
+    ['union', '{ id: string } | { count: number }', '{ count: 1 }', false],
+    ['invalid-sync', '{ id: number }', '{ id: 1 }', true],
+    ['invalid-async', 'Promise<{ id: number }>', 'Promise.resolve({ id: 1 })', true],
+    ['invalid-array', 'Array<{ id: number }>', '[{ id: 1 }]', true],
+    ['invalid-union', '{ other: boolean }', '{ other: true }', true],
+  ] as const
+  it.each(cases)('%s retains route return typing', (name, returnType, result, invalid) => {
+    const directory = mkdtempSync(join(tmpdir(), 'native-schema-types-'))
+    const file = join(directory, 'fixture.ts')
+    const union = name.includes('union')
+    const object = 'z.ZodObject<{ id: z.ZodString }>'
+    const schemaType = union
+      ? `z.ZodUnion<[${object}, z.ZodObject<{ count: z.ZodNumber }>]>`
+      : object
+    const zod = require.resolve('zod').replace(/index\.cjs$/, 'index.d.cts')
+    writeFileSync(
+      file,
+      `import type {z} from ${JSON.stringify(zod)};
+      import {createSchemaDto} from ${JSON.stringify(resolve(__dirname, 'schema-dto'))};
+      import {SchemaResponse} from ${JSON.stringify(resolve(__dirname, 'schema-response'))};
+      declare const schema: ${schemaType}; const Dto = createSchemaDto(schema);
+      class Controller { @SchemaResponse({type:${name.includes('array') ? '[Dto]' : 'Dto'}})
+      handler(): ${returnType} {return ${result}} }`
+    )
+    const config = join(directory, 'tsconfig.json')
+    writeFileSync(
+      config,
+      JSON.stringify({
+        compilerOptions: {
+          noEmit: true,
+          strict: true,
+          skipLibCheck: false,
+          experimentalDecorators: true,
+          esModuleInterop: true,
+          target: 'ES2022',
+          module: 'Preserve',
+          moduleResolution: 'Bundler',
+          types: ['node'],
+          typeRoots: [resolve('node_modules/@types')],
+        },
+        files: [file],
+      })
+    )
+    try {
+      const check = spawnSync(
+        process.execPath,
+        [
+          compiler === 'native'
+            ? resolve(__dirname, '../../../../../scripts/typecheck-native.mjs')
+            : require.resolve('typescript/bin/tsc'),
+          '--noEmit',
+          '-p',
+          config,
+          '--pretty',
+          'false',
+        ],
+        { encoding: 'utf8', timeout: 15000 }
+      )
+      const output = check.stdout + check.stderr
+      const codes = [...output.matchAll(/error TS(\d+)/g)].map((match) => Number(match[1]))
+      expect(codes).toEqual(invalid ? [1241] : [])
+      expect(check.status === 0).toBe(!invalid)
+      expect([...output.matchAll(/fixture\.ts\(.*error TS1241/g)]).toHaveLength(invalid ? 1 : 0)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })
