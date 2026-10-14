@@ -39,12 +39,12 @@ inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixe
 `pnpm test:extension-contracts` runs notification/channel/tool/provider registration
 and migration conformance in an isolated copy with PostgreSQL/Redis Testcontainers.
 Docker is required; ordinary `.env` and owner preview data are excluded. It is
-invoked by the CI Test job; see [channel conformance](docs/notifications/channels.md#run-the-conformance-lane).
+invoked by the notification/AI extension job feeding Test; see [channel conformance](docs/notifications/channels.md#run-the-conformance-lane).
 
 `pnpm test:background-work-contracts` runs the common registration, image and
 transactional durable recipes, administrative controls, queued-email safety,
 queue inventory/observation and read-only Board regression suites against isolated
-Testcontainers. Docker is required; the CI Test job runs this lane. See the
+Testcontainers. Docker is required; the focused API fallback job feeding Test runs this lane. See the
 [background-work contract](docs/backend/background-work.md#verify-a-registration).
 
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
@@ -200,6 +200,12 @@ chore: unify github repository url
   admin; see
   [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt). The security
   scripts require a Unix-like shell (macOS/Linux/WSL).
+
+## Adding tests
+
+Follow [test discovery and CI ownership](docs/operations/adding-tests.md).
+Use the [backend conventions](docs/backend/architecture-and-conventions.md),
+[frontend taxonomy](docs/frontend/testing.md) and [CI gate map](docs/operations/ci-security.md#current-gates).
 
 ## Before Submitting a PR
 

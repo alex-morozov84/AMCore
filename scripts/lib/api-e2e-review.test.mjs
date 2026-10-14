@@ -31,16 +31,20 @@ function preparation(jobs) {
 test('F1 every fresh wrapper job prepares before execution; missing/late/skipped preparation fails', () => {
   const jobs = parse(readFileSync(`${root}/.github/workflows/ci.yml`, 'utf8')).jobs
   preparation(jobs)
-  for (const change of ['missing', 'late', 'skipped']) {
-    const bad = globalThis.structuredClone(jobs)
-    const index = bad.test.steps.findIndex((step) =>
-      /api-e2e-ci.mjs --prepare/.test(step.run || '')
-    )
-    const [step] = bad.test.steps.splice(index, 1)
-    if (change === 'late') bad.test.steps.push(step)
-    if (change === 'skipped') bad.test.steps.splice(index, 0, { ...step, if: 'false' })
-    assert.throws(() => preparation(bad))
-  }
+  const wrappers = Object.entries(jobs).filter(([, job]) =>
+    job.steps?.some((step) => /api-e2e-ci.mjs --prepare/.test(step.run || ''))
+  )
+  assert.ok(wrappers.length >= 3)
+  for (const [name] of wrappers)
+    for (const change of ['missing', 'late', 'skipped']) {
+      const bad = globalThis.structuredClone(jobs)
+      const steps = bad[name].steps
+      const index = steps.findIndex((step) => /api-e2e-ci.mjs --prepare/.test(step.run || ''))
+      const [step] = steps.splice(index, 1)
+      if (change === 'late') steps.push(step)
+      if (change === 'skipped') steps.splice(index, 0, { ...step, if: 'false' })
+      assert.throws(() => preparation(bad), `${name}: ${change}`)
+    }
 })
 function evidence() {
   const all = ['test/first.e2e-spec.ts', 'test/second.e2e-spec.ts']

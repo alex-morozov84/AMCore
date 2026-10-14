@@ -39,11 +39,17 @@ of workflow self-hardening to keep the example forkable.
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
-- **Test** prepares its own API E2E receipt before the focused launcher. It runs API process-role/shutdown-drain E2E and the four focused AI
-  suites: gateway consistency, catalogue degradation, provider receipt settlement
-  and maintenance upgrade. They use isolated PG18/Redis Testcontainers and injected
-  SDK HTTP fixtures. The broader standard API inventory runs in **API E2E**;
-  these focused suites do not claim full API E2E coverage.
+- **Test** is the aggregate for unit+real-Redis, capability extension,
+  notification/AI extension, focused API fallback and **API E2E**.
+  Independent hosted jobs install frozen dependencies and own their preparation.
+  The aggregate runs after dependency failure or skipping and accepts only its
+  exact nonempty dependency set with every result `success`. Missing, skipped,
+  cancelled or unknown outcomes fail; cleanup cannot turn failure into success.
+  The aggregate itself needs no checkout, installation or API receipt.
+  The fallback prepares a fresh API receipt and preserves six focused suites and
+  twenty-three background-work suites. Separate output roots retain both reports.
+  Repeated invocations remain until assertion, condition, natural-exit and cleanup
+  equivalence with full API coverage is demonstrated.
 - **API E2E** provides full standard PR coverage in separate plan, shard and
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
   generates Prisma and builds shared. The measured layout uses three built-in shards
@@ -57,10 +63,13 @@ of workflow self-hardening to keep the example forkable.
   The tracked main ruleset requires the stable **API E2E** aggregate from GitHub
   Actions. Individual shard contexts are not required. Applying the declaration
   to live GitHub protection remains a separate owner-authorized repository action.
-  The six existing focused suites remain in **Test** as additional coverage.
-  Background-work contracts add 17 original-checkout paths; extension contracts
-  add eight disjoint paths in a disposable copy. Their union with those six is
-  31 named paths, rather than the full standard inventory.
+  The six existing focused suites remain in the fallback feeding **Test**.
+  Background-work contracts select 23 original-checkout paths; notification/AI
+  extension contracts select nine copied paths. One path overlaps those groups.
+  Together with six focused files this names 37 distinct stock paths, not the full
+  dynamically discovered API inventory. Extension-copy execution remains separate
+  because its source and process context differ. API91 is the current baseline,
+  not a fixed maximum; ordinary new files enter discovery automatically.
   Initial layout admission requires Linux cold and cached setup evidence, measured
   runner-minutes and three comparable successful final warm observations.
   The [API E2E budget policy](#api-e2e-budget-policy) defines the accepted limits.
@@ -76,7 +85,7 @@ of workflow self-hardening to keep the example forkable.
   Changes to shard selection require evidence. Full API coverage is declared
   mandatory for PRs; switching to full post-merge coverage requires a separate
   owner policy decision.
-- **Test** also runs `pnpm test:capability-extension`: an isolated disposable
+- **Test capability extension** runs `pnpm test:capability-extension`: an isolated disposable
   resource variant compiles shared, API and web consumers and exercises
   authorization against PostgreSQL and Redis Testcontainers. The fixture does
   not add a sample product domain to the shipped starter.
@@ -543,3 +552,14 @@ Forkers can keep this stack lean:
 - block only on checks that protect the current change set or workflow integrity;
 - re-use the production image for image scanning and boot-smoke rather than
   rebuilding separate artifacts.
+
+## Adding tests and changing Test groups
+
+See [adding tests](adding-tests.md) for discovery, local commands and CI ownership.
+New tests in an existing discovered family do not require another focused CI call.
+A new job or test family requires an explicit aggregate, inventory and docs update.
+The required `Test` name is retained; tracked workflows do not prove live protection.
+Scheduling changes require whole-workflow timings and hosted runner-minute evidence.
+Separate queue, setup, cache and container costs; do not infer speed from a shorter step.
+Rollback restores the previous sequential Test graph, focused calls, fresh prepare
+and associated docs together. It does not migrate dependencies or persistent data.

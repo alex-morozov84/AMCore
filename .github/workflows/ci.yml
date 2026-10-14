@@ -94,8 +94,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-  test:
-    name: Test
+  test-unit-redis:
+    name: Test unit and Redis
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     steps:
@@ -118,17 +118,114 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test
+      - name: Run web real-Redis integration
+        run: pnpm --filter web test:integration
+
+  test-capability:
+    name: Test capability extension
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run capability extension
+        run: pnpm test:capability-extension
+
+  test-notification-ai:
+    name: Test notification and AI extension
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run notification and AI extension
+        run: pnpm test:extension-contracts
+
+  test-focused-background:
+    name: Test focused API fallback
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare API E2E fresh job
         run: node scripts/api-e2e-ci.mjs --prepare
+      - name: Run focused API contracts
+        env:
+          API_E2E_OUTPUT: ${{ github.workspace }}/.amcore/test-fallback/focused
+        run: pnpm --filter api test:e2e --runTestsByPath test/process-role.e2e-spec.ts test/shutdown-drain.e2e-spec.ts test/ai-gateway-consistency.e2e-spec.ts test/ai-catalog-degradation.e2e-spec.ts test/ai-provider-receipt.e2e-spec.ts test/ai-gateway-upgrade.e2e-spec.ts
+      - name: Run background-work contracts
+        env:
+          API_E2E_OUTPUT: ${{ github.workspace }}/.amcore/test-fallback/background
+        run: pnpm test:background-work-contracts
+      - name: Retain fallback evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-fallback-${{ github.run_attempt }}
+          path: .amcore/test-fallback/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Run integration tests
-        run: |
-          pnpm --filter api test:e2e --runTestsByPath test/process-role.e2e-spec.ts test/shutdown-drain.e2e-spec.ts test/ai-gateway-consistency.e2e-spec.ts test/ai-catalog-degradation.e2e-spec.ts test/ai-provider-receipt.e2e-spec.ts test/ai-gateway-upgrade.e2e-spec.ts
-          pnpm test:capability-extension
-          pnpm test:extension-contracts
-          pnpm test:background-work-contracts
-          pnpm --filter web test:integration
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ always() }}
+    needs:
+      [test-unit-redis, test-capability, test-notification-ai, test-focused-background, api-e2e]
+    steps:
+      - name: Require every Test dependency
+        env:
+          TEST_RESULTS: ${{ toJSON(needs) }}
+        run: >-
+          node -e 'const expected=["test-unit-redis", "test-capability", "test-notification-ai", "test-focused-background", "api-e2e"]; const results=JSON.parse(process.env.TEST_RESULTS); if (!results || Array.isArray(results) || Object.keys(results).length !== expected.length || expected.some(key => results[key]?.result !== "success")) process.exit(1)'
 
   # Diagnostic full coverage. Live required status is enabled only after Linux admission.
   api-e2e-plan:
