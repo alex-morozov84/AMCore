@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { verifyNativeConsumer } from './native-typecheck-shared.mjs'
 import { verifyExports } from './shared-package-exports.mjs'
 import { verifyConsumer, verifyMaps } from './shared-package-consumer.mjs'
 
@@ -10,7 +11,7 @@ import { root, copyShared, build } from './shared-package-fixture.mjs'
 
 test(
   'packed shared contracts, clean removed module and nonzero build failure',
-  { timeout: 90_000 },
+  { timeout: 180_000 },
   () => {
     const directory = mkdtempSync(join(tmpdir(), 'shared-artifacts-'))
     const consumer = mkdtempSync(join(tmpdir(), 'shared-consumer-'))
@@ -20,6 +21,7 @@ test(
       verifyMaps(directory)
       const values = verifyExports(root, directory)
       verifyConsumer(root, directory, consumer, values)
+      verifyNativeConsumer(root, consumer)
       const index = join(directory, 'src/index.ts')
       const original = readFileSync(index)
       const removed = join(directory, 'src/removed-module.ts')

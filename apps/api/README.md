@@ -50,7 +50,11 @@ rollout. See
 API unit tests use Jest with SWC CommonJS transformation. API E2E uses Jest
 with SWC ESM transformation in a fresh supervised process per suite.
 `jest-swc.config.cjs` shares decorator metadata, target and source-map settings.
-Run `pnpm --filter api typecheck` separately: SWC does not check types.
+Run `pnpm --filter api typecheck` separately. It selects the pinned TypeScript 7
+CLI explicitly; SWC still emits JavaScript. Nest build retains its existing
+compiler API and secondary checker. Avoid bare `tsc`: the two installed CLI
+packages export that name. Native incremental state stays in
+`apps/api/.amcore/typescript7/`, separate from the retained compiler cache.
 
 Email template tests retain Vitest, happy-dom and `vitest.config.ts`.
 `test:email:watch`, `test:email:ui` and `test:email:cov` remain separate commands.

@@ -395,3 +395,10 @@ flows (`pnpm --filter web test:e2e:real-stack`), and `@axe-core/playwright`
 for automated WCAG A/AA scans. Email templates: Vitest. Focus on critical
 paths; see [`docs/frontend/testing.md`](docs/frontend/testing.md) for the web
 taxonomy.
+
+## Compiler selection
+
+Use package `typecheck` commands: API and shared select the native TypeScript 7
+CLI explicitly. Frontend, compiler API tools and shared declarations retain their
+supported compiler versions. Avoid bare `tsc` in API/shared because both packages
+provide that bin name. Preserve the separate Nest checker and SWC emitter.

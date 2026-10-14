@@ -1,0 +1,16 @@
+import { organizationMembersQuerySchema, invitationOperationResponseSchema, aiMessageContentPartSchema } from '@amcore/shared';
+type MemberPage = Assert<Equal<z.output<typeof organizationMembersQuerySchema>['page'], number>>;
+type OperationState = Assert<Equal<z.output<typeof invitationOperationResponseSchema>['state'], 'unknown' | 'committed'>>;
+type AiPartExact = Assert<Equal<z.output<typeof aiMessageContentPartSchema>, {type:'text';text:string} | {type:'artifact_ref';artifactId:string}>>;
+const memberQuery: z.input<typeof organizationMembersQuerySchema> = {page:'2',limit:'10'};
+const unknownOperation: z.output<typeof invitationOperationResponseSchema> = {state:'unknown'};
+// @ts-expect-error committed operation requires its result and intent
+const missingOperationResult: z.output<typeof invitationOperationResponseSchema> = {state:'committed'};
+// @ts-expect-error text part cannot hold an artifact instead of text
+const wrongAiPart: z.output<typeof aiMessageContentPartSchema> = {type:'text',artifactId:'artifact'};
+
+import { avatarResponseSchema } from '@amcore/shared';
+type AvatarExact = Assert<Equal<z.output<typeof avatarResponseSchema>, {avatarUrl:string}>>;
+const uploadedAvatar: z.output<typeof avatarResponseSchema> = {avatarUrl:'https://example.invalid/avatar'};
+// @ts-expect-error uploaded avatar URL is a string
+const invalidAvatar: z.output<typeof avatarResponseSchema> = {avatarUrl:42};

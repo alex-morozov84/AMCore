@@ -14,7 +14,7 @@ cleanup() {
 trap cleanup EXIT
 
 rsync -a \
-  --exclude='/.git/' --exclude='/ai/' --exclude='/.amcore/' \
+  --exclude='/.git/' --exclude='/ai/' --exclude='.amcore/' \
   --exclude='/.worktrees/' --exclude='node_modules/' --exclude='dist/' \
   --exclude='.next/' --exclude='.env*' \
   --exclude='/apps/api/src/generated/prisma/' \
@@ -27,7 +27,7 @@ done
 
 (cd "$fixture_root/packages/shared" && pnpm run build)
 (cd "$fixture_root/apps/api" && ./node_modules/.bin/prisma generate)
-(cd "$fixture_root/apps/api" && ./node_modules/.bin/tsc --noEmit)
+(cd "$fixture_root/apps/api" && pnpm run typecheck)
 (cd "$fixture_root/apps/api" && \
   NODE_OPTIONS=--experimental-vm-modules \
   ./node_modules/.bin/jest --config jest-e2e.config.js --runInBand \

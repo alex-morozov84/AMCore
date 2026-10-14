@@ -24,11 +24,22 @@
       ]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/typecheck-native.mjs",
+        "$TURBO_ROOT$/scripts/lib/native-typecheck*.mjs",
+        "$TURBO_ROOT$/packages/typescript-config/**",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ]
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.env.example"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.env.example",
+        "$TURBO_ROOT$/scripts/typecheck-native.mjs"
+      ]
     },
     "clean": {
       "cache": false
