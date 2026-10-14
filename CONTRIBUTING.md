@@ -105,6 +105,9 @@ select the pinned TypeScript 7 CLI through `scripts/typecheck-native.mjs`.
 Frontend checks, compiler API tools and shared declaration generation retain
 their supported compiler versions. Bare `tsc` is ambiguous in API/shared; use
 the package commands. SWC emission and Nest's secondary checker remain separate.
+An intentional native compiler patch upgrade must update both native aliases,
+the launcher's expected version and its fixtures together. Native checks do not
+permit syntax unsupported by retained compiler API tools or declaration emission.
 Email retains Vitest. `test:watch` and `test:cov` apply to API unit tests.
 
 API E2E tests provision their own Postgres/Redis and test JWT secret; no local
