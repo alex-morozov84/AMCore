@@ -175,6 +175,7 @@ describe('FSD boundaries', () => {
   // today (Track 9 flattened `auth`/`sessions`, the only two), but the
   // `sameGroup` mechanism stays in the policy for `pages` and a future
   // feature group, so this case stays asserted rather than deleted.
+  // Each case starts the real hybrid lint CLI; its startup can exceed five seconds on CI.
   it.each([
     [
       'routing may enter composition public API',
@@ -312,14 +313,18 @@ describe('FSD boundaries', () => {
     ],
     ['a shared segment barrel is fine', 'src/_pages/auth/probe.ts', "'@/shared/lib'", false],
     ['a shared module import is fine', 'src/_pages/auth/probe.ts', "'@/shared/ui/button'", false],
-  ])('%s', async (_name, filePath, source, shouldReport) => {
-    const ids = await ruleIds(`import * as x from ${source}\nexport const y = x\n`, filePath)
-    if (shouldReport) {
-      expect(ids).toContain('boundaries/dependencies')
-    } else {
-      expect(ids).toEqual([])
-    }
-  })
+  ])(
+    '%s',
+    async (_name, filePath, source, shouldReport) => {
+      const ids = await ruleIds(`import * as x from ${source}\nexport const y = x\n`, filePath)
+      if (shouldReport) {
+        expect(ids).toContain('boundaries/dependencies')
+      } else {
+        expect(ids).toEqual([])
+      }
+    },
+    30_000
+  )
 
   // `boundaries` cannot see a layer-level barrel — `src/features/index.ts` is
   // inside no element — so this one is the `no-restricted-imports` pattern, and
