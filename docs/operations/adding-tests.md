@@ -13,7 +13,8 @@ is the assertion. See [backend conventions](../backend/architecture-and-conventi
 ## Backend E2E
 
 Add `*.e2e-spec.ts` under `apps/api/test`. Use the existing helpers, owned-container
-labels and cleanup. Docker must be available. From the repository root:
+labels and cleanup. Install dependencies first and make Docker available. From
+the repository root:
 
 ```sh
 node scripts/api-e2e-ci.mjs --prepare
@@ -25,7 +26,9 @@ once to the complete API plan. The current 91 suites are not a permanent limit.
 Do not add a focused CI call for every feature. No skipped, focused-only or retried
 declarations are admitted. Each child must exit naturally and clean its resources.
 Source or build-config changes can invalidate preparation; prepare again when needed.
-Use separate `API_E2E_OUTPUT` directories when retaining multiple focused reports.
+Use separate absolute `API_E2E_OUTPUT` directories when retaining multiple focused
+reports. `pnpm --filter api` runs from `apps/api`, so relative output paths start
+there rather than at the repository root.
 See [local isolation](local-stands.md) and [CI gates](ci-security.md#current-gates).
 
 ## Frontend
