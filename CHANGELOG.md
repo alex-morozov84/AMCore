@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Run unit/Redis and extension checks in isolated parallel CI groups. Keep `Test`
+  as a strict aggregate and retain focused API repetitions pending equivalence proof.
+  Document how contributors add tests to their CI groups.
+
 - Limit shared declaration-map cleanup to each build’s emitted files, preserving
   the other format’s declarations during overlapping watch rebuilds.
 

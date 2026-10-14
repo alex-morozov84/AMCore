@@ -464,6 +464,9 @@ inspection errors must remain failures. See the
 CI budgets and triggers for repeat measurements live in the
 [API E2E budget policy](../operations/ci-security.md#api-e2e-budget-policy).
 
+See [adding tests and CI ownership](../operations/adding-tests.md) for automatic
+discovery, extension inventories and local preparation.
+
 Cover the critical paths and the project-specific gates:
 
 - **Unit** — service logic in isolation.

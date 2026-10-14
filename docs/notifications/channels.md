@@ -112,7 +112,8 @@ installed SDK or fake-fetch assertion of the actual body/key and cancellation.
 workspace, builds shared contracts, generates Prisma, typechecks the API and runs
 the registered fixtures against isolated PostgreSQL/Redis Testcontainers. It needs
 Docker; it never uses your ordinary `.env` or preview data. Failed copies remain
-for diagnosis, successful copies are removed. The CI Test job invokes this command.
+for diagnosis, successful copies are removed. The notification/AI extension CI
+job invokes this command and feeds the required `Test` aggregate.
 
 The notification cases live in `extension-registration.e2e-spec.ts`,
 `notification-extension-contracts.e2e-spec.ts` and
