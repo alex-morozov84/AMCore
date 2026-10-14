@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { defineConfig } from 'tsdown'
@@ -14,14 +14,16 @@ export default defineConfig({
     dts: format === 'cjs' ? '.d.cts' : '.d.ts',
   }),
   hooks: {
-    // Rolldown retains map URLs after the DTS plugin discards map assets.
-    'build:done': ({ options }) => {
-      for (const name of readdirSync(options.outDir).filter((file) =>
-        /\.d\.(?:ts|cts)$/.test(file)
-      )) {
-        const path = join(options.outDir, name)
+    // Process only this build's emitted files: scanning the shared directory
+    // can overwrite the other format's freshly rebuilt declaration in watch mode.
+    'build:done': ({ chunks }) => {
+      for (const chunk of chunks) {
+        if (!/\.d\.(?:ts|cts)$/.test(chunk.fileName)) continue
+        const path = join(chunk.outDir, chunk.fileName)
         const code = readFileSync(path, 'utf8')
-        writeFileSync(path, code.replace(/\n\/\/# sourceMappingURL=.*(?:\n)?$/, '\n'))
+        // Rolldown retains map URLs after the DTS plugin discards map assets.
+        const cleaned = code.replace(/\n\/\/# sourceMappingURL=.*(?:\n)?$/, '\n')
+        if (cleaned !== code) writeFileSync(path, cleaned)
       }
     },
   },

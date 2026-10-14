@@ -21,8 +21,9 @@ Zod remains an external runtime and declaration dependency. Generated declaratio
 preserve inferred schemas; `isolatedDeclarations` is not required.
 Declaration maps are disabled because the package does not ship its source tree.
 A public build completion hook removes residual declaration map URLs left by
-Rolldown after the declaration plugin discards those map assets. It does not alter
-types or JavaScript maps. Remove this normalization only after the artifact check
+Rolldown after the declaration plugin discards those map assets. The hook processes
+only declarations emitted by its build. It does not scan or rewrite another format's
+files in the shared output directory. It does not alter types or JavaScript maps. Remove this normalization only after the artifact check
 passes without it on an upstream fix.
 
 ## Verification and consumers

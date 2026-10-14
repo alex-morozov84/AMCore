@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Limit shared declaration-map cleanup to each build’s emitted files, preserving
+  the other format’s declarations during overlapping watch rebuilds.
+
 - Replace the deprecated API metrics client with `@prometheus-io/client`0.16.1.
   Keep application metric contracts and Prometheus exposition; runtime defaults
   add event-loop-utilization summary and histogram families.
