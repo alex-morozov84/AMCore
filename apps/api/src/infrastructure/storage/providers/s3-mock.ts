@@ -76,7 +76,11 @@ function store(s: S3Store, key: string, body: Buffer, meta: Partial<StoredObject
   return object
 }
 
-export function setupS3Mock(): { store: S3Store; restore: () => void } {
+export function setupS3Mock(): {
+  store: S3Store
+  mock: ReturnType<typeof mockClient>
+  restore: () => void
+} {
   const objects: S3Store = new Map()
   const multipart = new Map<string, MultipartUpload>()
   let uploadCounter = 0
@@ -201,5 +205,5 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
     return { CopyObjectResult: { ETag: copied.etag, LastModified: copied.lastModified } }
   })
 
-  return { store: objects, restore: () => s3Mock.restore() }
+  return { store: objects, mock: s3Mock, restore: () => s3Mock.restore() }
 }

@@ -25,22 +25,34 @@ describe('local public-only download', () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  it('serves public copies across provider restarts and blocks a subsequent private rewrite', async () => {
+  it('serves public copies across provider restarts, follows a rewrite and stops after a delete', async () => {
     await provider.upload({
-      key: 'avatar.webp',
+      key: 'public/avatar.webp',
       body: Buffer.from('public'),
-      visibility: 'public-read',
       contentType: 'image/webp',
     })
-    const response = await controller.download('avatar.webp')
+    const response = await controller.download('public/avatar.webp')
     let bytes = ''
     for await (const chunk of response.getStream()) bytes += chunk.toString()
     expect(bytes).toBe('public')
     expect(response.getHeaders().type).toBe('image/webp')
     provider = new LocalStorageProvider({ root })
-    expect((await provider.download('avatar.webp')).toString()).toBe('public')
-    await provider.upload({ key: 'avatar.webp', body: Buffer.from('secret') })
-    await expect(controller.download('avatar.webp')).rejects.toMatchObject({ status: 404 })
+    expect((await provider.download('public/avatar.webp')).toString()).toBe('public')
+    await provider.upload({ key: 'public/avatar.webp', body: Buffer.from('second') })
+    const rewritten = await controller.download('public/avatar.webp')
+    let rewrittenBytes = ''
+    for await (const chunk of rewritten.getStream()) rewrittenBytes += chunk.toString()
+    expect(rewrittenBytes).toBe('second')
+    await provider.delete('public/avatar.webp')
+    await expect(controller.download('public/avatar.webp')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('never serves a private key even when a public copy path is guessed for it', async () => {
+    await provider.upload({ key: 'avatars/u1/original', body: Buffer.from('secret') })
+    await expect(controller.download('avatars/u1/original')).rejects.toMatchObject({ status: 404 })
+    await expect(controller.download('public/avatars/u1/original')).rejects.toMatchObject({
+      status: 404,
+    })
   })
 
   it.each(['private.txt', '../meta/private.txt.json', '.amcore-probes/a.bin', 'missing'])(
@@ -53,12 +65,11 @@ describe('local public-only download', () => {
 
   it('neutralizes active HTML even when explicitly public', async () => {
     await provider.upload({
-      key: 'x.html',
+      key: 'public/x.html',
       body: Buffer.from('<script>alert(1)</script>'),
-      visibility: 'public-read',
       contentType: 'text/html',
     })
-    const response = await controller.download('x.html')
+    const response = await controller.download('public/x.html')
     expect(response.getHeaders().type).toBe('application/octet-stream')
     response.getStream().destroy()
   })

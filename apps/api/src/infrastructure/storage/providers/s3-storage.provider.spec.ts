@@ -1,6 +1,18 @@
-import { DeleteObjectsCommand, type DeleteObjectsCommandInput, S3Client } from '@aws-sdk/client-s3'
+import {
+  CopyObjectCommand,
+  CreateMultipartUploadCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  type DeleteObjectsCommandInput,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { mockClient } from 'aws-sdk-client-mock'
 
+import { InvalidObjectKeyError } from '../object-key'
 import { runStorageProviderContract } from '../storage.contract-spec'
 import { StorageDeleteManyException } from '../storage.interface'
 
@@ -13,11 +25,14 @@ function makeProvider(overrides: Partial<S3StorageConfig> = {}): S3StorageProvid
     region: 'us-east-1',
     accessKeyId: 'test-key',
     secretAccessKey: 'test-secret',
+    publicBaseUrl: 'https://cdn.example.com',
     signedUrlDefaultTtl: 3600,
     signedUrlMaxTtl: 604800,
     ...overrides,
   })
 }
+
+const body = Buffer.from('x')
 
 describe('S3StorageProvider', () => {
   describe('contract + backend behavior', () => {
@@ -30,6 +45,14 @@ describe('S3StorageProvider', () => {
     afterEach(() => restore())
 
     runStorageProviderContract('s3', () => makeProvider(), { signedUrls: true, publicUrls: true })
+    runStorageProviderContract(
+      's3 (two buckets, acl mode)',
+      () => makeProvider({ publicBucket: 'public-bucket', publicDelivery: 'acl' }),
+      {
+        signedUrls: true,
+        publicUrls: true,
+      }
+    )
 
     it('uses lib-storage multipart for buffers above the threshold', async () => {
       const provider = makeProvider({ multipartThreshold: 5 * 1024 * 1024 })
@@ -40,11 +63,143 @@ describe('S3StorageProvider', () => {
       const back = await provider.download('big/file.bin')
       expect(back.equals(big)).toBe(true)
     })
+  })
 
-    it('tags public-read visibility in object metadata', async () => {
+  describe('public delivery mode (ACL header)', () => {
+    let mock: ReturnType<typeof setupS3Mock>['mock']
+    let restore: () => void
+
+    beforeEach(() => {
+      ;({ mock, restore } = setupS3Mock())
+    })
+
+    afterEach(() => restore())
+
+    const putAcl = (key: string): unknown =>
+      mock.commandCalls(PutObjectCommand).find((c) => c.args[0].input.Key === key)?.args[0].input
+        .ACL
+
+    it('external (default) never sends an ACL, for public or private keys', async () => {
       const provider = makeProvider()
-      await provider.upload({ key: 'pub.txt', body: Buffer.from('x'), visibility: 'public-read' })
-      expect((await provider.getMetadata('pub.txt')).visibility).toBe('public-read')
+      await provider.upload({ key: 'public/a.webp', body })
+      await provider.upload({ key: 'docs/a.pdf', body })
+      await provider.copy({ source: 'public/a.webp', destination: 'public/b.webp' })
+      expect(putAcl('public/a.webp')).toBeUndefined()
+      expect(putAcl('docs/a.pdf')).toBeUndefined()
+      expect(mock.commandCalls(CopyObjectCommand)[0]?.args[0].input.ACL).toBeUndefined()
+    })
+
+    it('acl sends public-read only for public keys, on upload and on copy', async () => {
+      const provider = makeProvider({ publicDelivery: 'acl' })
+      await provider.upload({ key: 'public/a.webp', body })
+      await provider.upload({ key: 'docs/a.pdf', body })
+      await provider.copy({ source: 'public/a.webp', destination: 'public/b.webp' })
+      await provider.copy({ source: 'docs/a.pdf', destination: 'docs/b.pdf' })
+      expect(putAcl('public/a.webp')).toBe('public-read')
+      expect(putAcl('docs/a.pdf')).toBeUndefined()
+      const copies = mock.commandCalls(CopyObjectCommand).map((c) => c.args[0].input)
+      expect(copies.find((c) => c.Key === 'public/b.webp')?.ACL).toBe('public-read')
+      expect(copies.find((c) => c.Key === 'docs/b.pdf')?.ACL).toBeUndefined()
+    })
+
+    it('acl applies the ACL to multipart uploads of public keys', async () => {
+      const provider = makeProvider({ publicDelivery: 'acl', multipartThreshold: 1024 })
+      await provider.upload({ key: 'public/big.bin', body: Buffer.alloc(6 * 1024 * 1024, 1) })
+      expect(mock.commandCalls(CreateMultipartUploadCommand)[0]?.args[0].input.ACL).toBe(
+        'public-read'
+      )
+    })
+
+    it('does not write a visibility tag into object metadata', async () => {
+      const provider = makeProvider()
+      await provider.upload({ key: 'public/a.webp', body, metadata: { owner: 'u1' } })
+      expect(mock.commandCalls(PutObjectCommand)[0]?.args[0].input.Metadata).toEqual({
+        owner: 'u1',
+      })
+    })
+
+    it('derives metadata visibility from the key, not from object metadata', async () => {
+      const provider = makeProvider()
+      await provider.upload({ key: 'public/a.webp', body })
+      await provider.upload({ key: 'docs/a.pdf', body })
+      expect((await provider.getMetadata('public/a.webp')).visibility).toBe('public-read')
+      expect((await provider.getMetadata('docs/a.pdf')).visibility).toBe('private')
+    })
+  })
+
+  describe('bucket routing', () => {
+    let mock: ReturnType<typeof setupS3Mock>['mock']
+    let restore: () => void
+
+    beforeEach(() => {
+      ;({ mock, restore } = setupS3Mock())
+    })
+
+    afterEach(() => restore())
+
+    const two = (): S3StorageProvider =>
+      makeProvider({ bucket: 'private-bucket', publicBucket: 'public-bucket' })
+
+    it('sends public keys to the public bucket and everything else to the private bucket', async () => {
+      const provider = two()
+      await provider.upload({ key: 'public/a.webp', body })
+      await provider.upload({ key: 'avatars/u1/original', body })
+      await provider.exists('public/a.webp')
+      await provider.getMetadata('avatars/u1/original')
+      await provider.download('public/a.webp')
+      await provider.delete('avatars/u1/original')
+      const bucketOf = (command: typeof PutObjectCommand | typeof HeadObjectCommand, key: string) =>
+        mock
+          .commandCalls(command as typeof PutObjectCommand)
+          .find((c) => c.args[0].input.Key === key)?.args[0].input.Bucket
+      expect(bucketOf(PutObjectCommand, 'public/a.webp')).toBe('public-bucket')
+      expect(bucketOf(PutObjectCommand, 'avatars/u1/original')).toBe('private-bucket')
+      expect(bucketOf(HeadObjectCommand, 'public/a.webp')).toBe('public-bucket')
+      expect(bucketOf(HeadObjectCommand, 'avatars/u1/original')).toBe('private-bucket')
+      expect(mock.commandCalls(GetObjectCommand)[0]?.args[0].input.Bucket).toBe('public-bucket')
+      expect(mock.commandCalls(DeleteObjectCommand)[0]?.args[0].input.Bucket).toBe('private-bucket')
+    })
+
+    it('copies inside the bucket that owns the namespace', async () => {
+      const provider = two()
+      await provider.upload({ key: 'public/a.webp', body })
+      await provider.copy({ source: 'public/a.webp', destination: 'public/b.webp' })
+      expect(mock.commandCalls(CopyObjectCommand)[0]?.args[0].input).toMatchObject({
+        Bucket: 'public-bucket',
+        CopySource: 'public-bucket/public/a.webp',
+        Key: 'public/b.webp',
+      })
+    })
+
+    it('groups deleteMany by bucket', async () => {
+      const provider = two()
+      const calls: { bucket?: string; keys: string[] }[] = []
+      mock.on(DeleteObjectsCommand).callsFake((input: DeleteObjectsCommandInput) => {
+        calls.push({
+          bucket: input.Bucket,
+          keys: (input.Delete?.Objects ?? []).map((o) => o.Key ?? ''),
+        })
+        return {}
+      })
+      await provider.deleteMany(['public/a.webp', 'avatars/u1/original', 'public/b.webp'])
+      expect(calls).toEqual([
+        { bucket: 'public-bucket', keys: ['public/a.webp', 'public/b.webp'] },
+        { bucket: 'private-bucket', keys: ['avatars/u1/original'] },
+      ])
+    })
+
+    it('routes list by prefix and refuses a prefix that spans both buckets', async () => {
+      const provider = two()
+      await provider.list({ prefix: 'public/avatars/u1/' })
+      await provider.list({ prefix: 'avatars/u1/' })
+      const buckets = mock.commandCalls(ListObjectsV2Command).map((c) => c.args[0].input.Bucket)
+      expect(buckets).toEqual(['public-bucket', 'private-bucket'])
+      await expect(provider.list({ prefix: '' })).rejects.toBeInstanceOf(InvalidObjectKeyError)
+      await expect(provider.list({ prefix: 'pu' })).rejects.toBeInstanceOf(InvalidObjectKeyError)
+    })
+
+    it('allows any list prefix when one bucket holds both namespaces', async () => {
+      await expect(makeProvider().list({ prefix: '' })).resolves.toMatchObject({ files: [] })
     })
   })
 
@@ -83,14 +238,10 @@ describe('S3StorageProvider', () => {
 
   describe('signed URLs (TTL clamped server-side)', () => {
     it('clamps the download TTL to the configured max', async () => {
-      const provider = makeProvider({
-        endpoint: 'https://s3.example.com',
-        publicEndpoint: 'https://cdn.example.com',
-      })
+      const provider = makeProvider({ endpoint: 'https://s3.example.com' })
       const url = new URL(
         await provider.getSignedDownloadUrl({ key: 'a/b.png', expiresIn: 999999 })
       )
-      expect(url.host.endsWith('cdn.example.com')).toBe(true) // public endpoint, not internal
       expect(url.searchParams.get('X-Amz-Expires')).toBe('604800')
       expect(url.searchParams.get('X-Amz-Signature')).toBeTruthy()
     })
@@ -103,45 +254,70 @@ describe('S3StorageProvider', () => {
       const url = new URL(await provider.getSignedUploadUrl({ key: 'a/b.png' }))
       expect(url.searchParams.get('X-Amz-Expires')).toBe('1800')
     })
-  })
 
-  describe('getPublicUrl', () => {
-    it('builds a virtual-hosted url from the endpoint', () => {
-      const provider = makeProvider({ endpoint: 'https://s3.example.com', bucket: 'media' })
-      expect(provider.getPublicUrl('a/b.png')).toBe('https://media.s3.example.com/a/b.png')
+    it('signs for the presign endpoint, never for the public base', async () => {
+      const provider = makeProvider({
+        endpoint: 'https://internal.example.com:9000',
+        presignEndpoint: 'https://s3.example.com',
+        forcePathStyle: true,
+        bucket: 'media',
+      })
+      const url = new URL(await provider.getSignedDownloadUrl({ key: 'docs/a.pdf' }))
+      expect(url.origin).toBe('https://s3.example.com')
+      expect(url.pathname).toBe('/media/docs/a.pdf')
     })
 
-    it('builds a path-style url when forcePathStyle is set', () => {
+    it('signs against the bucket that owns the key', async () => {
       const provider = makeProvider({
         endpoint: 'https://s3.example.com',
-        bucket: 'media',
         forcePathStyle: true,
+        bucket: 'private-bucket',
+        publicBucket: 'public-bucket',
       })
-      expect(provider.getPublicUrl('a/b.png')).toBe('https://s3.example.com/media/a/b.png')
-    })
-
-    it('treats the public endpoint as an already-public base (no bucket synthesis)', () => {
-      const provider = makeProvider({
-        endpoint: 'https://internal:9000',
-        publicEndpoint: 'https://cdn.example.com',
-        bucket: 'media',
-      })
-      expect(provider.getPublicUrl('x.png')).toBe('https://cdn.example.com/x.png')
-    })
-
-    it('concatenates onto a public base that includes a path', () => {
-      const provider = makeProvider({
-        publicEndpoint: 'https://cdn.example.com/assets/',
-        bucket: 'media',
-      })
-      expect(provider.getPublicUrl('avatars/u1.webp')).toBe(
-        'https://cdn.example.com/assets/avatars/u1.webp'
+      expect(new URL(await provider.getSignedDownloadUrl({ key: 'public/a.webp' })).pathname).toBe(
+        '/public-bucket/public/a.webp'
+      )
+      expect(new URL(await provider.getSignedDownloadUrl({ key: 'docs/a.pdf' })).pathname).toBe(
+        '/private-bucket/docs/a.pdf'
       )
     })
 
-    it('falls back to the AWS virtual-hosted host without an endpoint', () => {
-      const provider = makeProvider({ bucket: 'media', region: 'eu-west-1' })
-      expect(provider.getPublicUrl('x.png')).toBe('https://media.s3.eu-west-1.amazonaws.com/x.png')
+    it('does not add a checksum to a presigned PUT (providers answer 400 otherwise)', async () => {
+      const provider = makeProvider({ endpoint: 'https://s3.example.com' })
+      const url = new URL(
+        await provider.getSignedUploadUrl({ key: 'quarantine/a.bin', contentType: 'text/plain' })
+      )
+      const names = [...url.searchParams.keys()].map((name) => name.toLowerCase())
+      expect(names.some((name) => name.includes('checksum'))).toBe(false)
+      expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe('host')
+    })
+  })
+
+  describe('getPublicUrl', () => {
+    it('joins the public base and the key, independent of the SDK endpoint', () => {
+      const provider = makeProvider({ endpoint: 'https://internal:9000', bucket: 'media' })
+      expect(provider.getPublicUrl('public/avatars/u1/a.webp')).toBe(
+        'https://cdn.example.com/public/avatars/u1/a.webp'
+      )
+    })
+
+    it('keeps a path in the base and ignores trailing slashes', () => {
+      const provider = makeProvider({ publicBaseUrl: 'https://global.s3.cloud.ru/my-bucket//' })
+      expect(provider.getPublicUrl('public/a.webp')).toBe(
+        'https://global.s3.cloud.ru/my-bucket/public/a.webp'
+      )
+    })
+
+    it('percent-encodes every segment but keeps the separators', () => {
+      expect(makeProvider().getPublicUrl('public/my file/a+b#1.webp')).toBe(
+        'https://cdn.example.com/public/my%20file/a%2Bb%231.webp'
+      )
+    })
+
+    it('refuses a private key', () => {
+      expect(() => makeProvider().getPublicUrl('avatars/u1/original')).toThrow(
+        InvalidObjectKeyError
+      )
     })
   })
 

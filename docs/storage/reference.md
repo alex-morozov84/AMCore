@@ -10,11 +10,10 @@ constructor(private readonly storage: StorageService) {}
 
 ```ts
 await storage.upload({
-  key: 'avatars/user-123',
+  key: 'public/avatars/user-123/v-1-abc/avatar-256.webp',
   body: file.buffer,
   contentType: 'image/png',
   cacheControl: 'public, max-age=31536000',
-  visibility: 'public-read',
 })
 ```
 
@@ -28,7 +27,7 @@ Input:
 | `contentDisposition` | `string?`                     | Metadata / response behavior                 |
 | `cacheControl`       | `string?`                     | Provider cache metadata                      |
 | `metadata`           | `Record<string,string>?`      | Provider metadata                            |
-| `visibility`         | `'private' \| 'public-read'?` | Defaults to `private`                        |
+| `visibility`         | `'private' \| 'public-read'?` | Optional assertion; the key decides (below)  |
 
 Result:
 
@@ -42,6 +41,13 @@ Result:
 ```
 
 `UploadResult` deliberately has no guaranteed URL.
+
+### Visibility follows the key
+
+A key under the reserved `public/` namespace is public; every other key is private.
+`visibility` is an optional assertion: omit it, or pass the value the key implies.
+A contradiction (`public-read` for a key outside `public/`, `private` for one under
+it) throws `InvalidObjectKeyError`. See [Public Files](public-files.md).
 
 Treat `etag` as a provider-specific opaque object version. New local uploads
 use a SHA-256 content digest; existing stored ETags remain valid when reading
@@ -108,8 +114,8 @@ stricter key guard on read/write operations.
 ## URLs
 
 ```ts
-// The avatar was uploaded with visibility: 'public-read'.
-const publicUrl = storage.getPublicUrl('avatars/user-123')
+// The avatar derivative lives under the public/ namespace.
+const publicUrl = storage.getPublicUrl('public/avatars/user-123/v-1-abc/avatar-256.webp')
 const signed = await storage.getSignedDownloadUrl({
   key: 'private/report.pdf',
   expiresIn: 900,
@@ -123,20 +129,20 @@ const uploadUrl = await storage.getSignedUploadUrl({
 
 Capability support:
 
-| Driver | Public URLs                                           | Signed URLs |
-| ------ | ----------------------------------------------------- | ----------- |
-| memory | no                                                    | no          |
-| local  | yes, only when `STORAGE_LOCAL_PUBLIC_BASE_URL` is set | no          |
-| s3     | yes                                                   | yes         |
+| Driver | Public URLs                       | Signed URLs |
+| ------ | --------------------------------- | ----------- |
+| memory | no                                | no          |
+| local  | yes, through the API public route | no          |
+| s3     | yes                               | yes         |
 
 If a driver does not support a capability, `StorageService` throws
 `501 STORAGE_CAPABILITY_UNSUPPORTED`.
 
-`getPublicUrl()` constructs a URL without checking object visibility. Use it
-only after deliberately making the object public; never expose a private key
-through this method. For local storage it points to the unauthenticated API
-endpoint, which checks visibility and serves a separate public copy. For S3,
-actual public delivery depends on object ACL and bucket/CDN policy. It must not
+`getPublicUrl()` accepts only keys under `public/` (a private key throws
+`InvalidObjectKeyError`) and builds the address from `STORAGE_PUBLIC_BASE_URL`
+without contacting the provider: `{base}/{key}` for S3, `{base}?key={key}` for the
+local driver, whose API route serves only the public copy. Whether the provider
+actually serves the file depends on how you published the namespace. It must not
 point at a guarded app download route.
 
 ## Copy And Move
@@ -146,7 +152,9 @@ await storage.copy({ source: 'a.txt', destination: 'b.txt' })
 await storage.move({ source: 'b.txt', destination: 'archive/b.txt' })
 ```
 
-Moving a key onto itself is a no-op.
+Moving a key onto itself is a no-op. A copy or move never crosses the `public/`
+boundary in either direction (`InvalidObjectKeyError`); upload the validated bytes
+again under the target key instead.
 
 ## Object Key Rules
 

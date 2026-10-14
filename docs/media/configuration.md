@@ -22,7 +22,7 @@ Startup validation enforces `MEDIA_AVATAR_MAX_PIXELS ≤ MEDIA_MAX_PIXELS` and
 `MEDIA_SHARP_LIMIT_INPUT_PIXELS ≤ MEDIA_MAX_PIXELS`.
 
 Immutable caching is safe because avatar derivative keys are **versioned**
-per upload (`avatars/{userId}/v-{version}/…`); a re-upload publishes a new URL.
+per upload (`public/avatars/{userId}/v-{version}/…`); a re-upload publishes a new URL.
 
 ## Presets
 
@@ -37,7 +37,7 @@ only shipped preset is `avatar`:
 
 `avatar-256` is the primary derivative whose public URL is stored in
 `User.avatarUrl`. Originals are stored privately (`…/v-{version}/original`) for
-possible future re-derivation; only derivatives are `public-read`.
+possible future re-derivation; only derivatives live in the public namespace.
 
 ## Native Dependency
 
@@ -57,7 +57,7 @@ frontend treats them as remote images:
 export default {
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'cdn.example.com' }, // your STORAGE_PUBLIC_ENDPOINT / CDN host
+      { protocol: 'https', hostname: 'cdn.example.com' }, // the host of your STORAGE_PUBLIC_BASE_URL
     ],
   },
 }

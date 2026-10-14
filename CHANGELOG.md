@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a strict aggregate and retain focused API repetitions pending equivalence proof.
   Document how contributors add tests to their CI groups.
 
+- **Breaking:** storage public files use a reserved key namespace and an explicit
+  delivery mode. Keys under `public/` are public and every other key is private; the
+  `visibility` metadata tag is gone. By default (`STORAGE_PUBLIC_DELIVERY=external`)
+  the application sends no object ACL, so the S3 driver works on AWS default buckets
+  and on providers without object ACLs; `acl` stays an opt-in. A separate public
+  bucket (`STORAGE_PUBLIC_BUCKET`) is supported. Avatar derivatives move to
+  `public/avatars/{userId}/v-{version}/` and private originals never share a
+  publishable prefix. `copy`/`move` cannot cross the namespace. Configuration:
+  `STORAGE_PUBLIC_ENDPOINT` and `STORAGE_LOCAL_PUBLIC_BASE_URL` are replaced by
+  `STORAGE_PUBLIC_BASE_URL` (URL of the public bucket root, required for `s3`),
+  `STORAGE_PRESIGN_ENDPOINT` (a bare S3 API origin used only to sign),
+  `STORAGE_PUBLIC_DELIVERY` and `STORAGE_PUBLIC_BUCKET`. See `docs/storage/public-files.md`.
+
 - Limit shared declaration-map cleanup to each build’s emitted files, preserving
   the other format’s declarations during overlapping watch rebuilds.
 

@@ -11,7 +11,17 @@ export const storageEnv = z.object({
   // S3-compatible config (required when STORAGE_DRIVER=s3; endpoint stays optional —
   // AWS derives it, non-AWS providers set it explicitly).
   STORAGE_ENDPOINT: optionalEnvUrl(),
-  STORAGE_PUBLIC_ENDPOINT: optionalEnvUrl(),
+  // Browser-facing S3 API origin used ONLY to presign URLs (default: STORAGE_ENDPOINT).
+  // It must be a bare origin; the public/CDN base is STORAGE_PUBLIC_BASE_URL.
+  STORAGE_PRESIGN_ENDPOINT: optionalEnvUrl(),
+  // How `public/` objects become readable: `external` never sends an ACL (the operator
+  // publishes the location); `acl` sends `public-read` per object on providers that enforce it.
+  STORAGE_PUBLIC_DELIVERY: z.enum(['external', 'acl']).default('external'),
+  // Bucket for `public/` keys; defaults to STORAGE_BUCKET (one bucket, one public prefix).
+  STORAGE_PUBLIC_BUCKET: optionalEnvString(),
+  // Where a browser fetches public files: the root of the public bucket (CDN, custom or
+  // provider public domain) for s3, or the API public route for the local driver.
+  STORAGE_PUBLIC_BASE_URL: optionalEnvUrl(),
   STORAGE_REGION: z.string().min(1).default('us-east-1'),
   STORAGE_BUCKET: optionalEnvString(),
   STORAGE_ACCESS_KEY_ID: optionalEnvString(),
@@ -22,7 +32,6 @@ export const storageEnv = z.object({
     .transform((v) => v === 'true'),
   // Local driver config.
   STORAGE_LOCAL_ROOT: z.string().min(1).default('./uploads'),
-  STORAGE_LOCAL_PUBLIC_BASE_URL: optionalEnvUrl(),
   // Limits & signed-URL TTLs (seconds). Max TTL is the SigV4 7-day hard limit.
   STORAGE_MAX_FILE_SIZE: z.coerce.number().int().min(1).default(52428800),
   STORAGE_SIGNED_URL_DEFAULT_TTL: z.coerce.number().int().min(1).default(3600),

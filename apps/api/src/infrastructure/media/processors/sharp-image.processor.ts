@@ -14,7 +14,7 @@ import {
 /**
  * `sharp`/libvips-backed image processor.
  *
- * Safety model (ai/MEDIA_PROCESSING_PLAN.md):
+ * Safety model (see docs/media/security.md):
  * - every decode passes `limitInputPixels` (hard libvips guard);
  * - `inspect()` additionally rejects unknown formats, missing dimensions, and
  *   images over the configured dimension/pixel caps before any expensive work;

@@ -65,18 +65,21 @@ function createProvider(env: EnvService): StorageProvider {
     case 'local':
       return new LocalStorageProvider({
         root: env.get('STORAGE_LOCAL_ROOT'),
-        publicBaseUrl: env.get('STORAGE_LOCAL_PUBLIC_BASE_URL'),
+        publicBaseUrl: env.get('STORAGE_PUBLIC_BASE_URL'),
       })
     case 's3':
-      // env.ts superRefine guarantees bucket + credentials are present when
-      // STORAGE_DRIVER === 's3' (boot fails otherwise), so the assertions hold.
+      // env.ts superRefine guarantees bucket, credentials and the public base are
+      // present when STORAGE_DRIVER === 's3' (boot fails otherwise), so the assertions hold.
       return new S3StorageProvider({
         bucket: env.get('STORAGE_BUCKET')!,
+        publicBucket: env.get('STORAGE_PUBLIC_BUCKET'),
         region: env.get('STORAGE_REGION'),
         accessKeyId: env.get('STORAGE_ACCESS_KEY_ID')!,
         secretAccessKey: env.get('STORAGE_SECRET_ACCESS_KEY')!,
         endpoint: env.get('STORAGE_ENDPOINT'),
-        publicEndpoint: env.get('STORAGE_PUBLIC_ENDPOINT'),
+        presignEndpoint: env.get('STORAGE_PRESIGN_ENDPOINT'),
+        publicDelivery: env.get('STORAGE_PUBLIC_DELIVERY'),
+        publicBaseUrl: env.get('STORAGE_PUBLIC_BASE_URL')!,
         forcePathStyle: env.get('STORAGE_FORCE_PATH_STYLE'),
         signedUrlDefaultTtl: env.get('STORAGE_SIGNED_URL_DEFAULT_TTL'),
         signedUrlMaxTtl: env.get('STORAGE_SIGNED_URL_MAX_TTL'),

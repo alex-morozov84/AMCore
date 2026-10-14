@@ -35,6 +35,22 @@ describe('buildDerivativeKey', () => {
     ).toBe('avatars/u1/avatar-128.jpg')
   })
 
+  it('places public-read derivatives under the reserved public namespace only', () => {
+    const parts = {
+      keyspace: 'avatars',
+      ownerId: 'u1',
+      version: 'abc123',
+      variant: 'avatar-256',
+      format: 'webp',
+    } as const
+    expect(buildDerivativeKey({ ...parts, visibility: 'public-read' })).toBe(
+      'public/avatars/u1/v-abc123/avatar-256.webp'
+    )
+    expect(buildDerivativeKey({ ...parts, visibility: 'private' })).toBe(
+      'avatars/u1/v-abc123/avatar-256.webp'
+    )
+  })
+
   it('is deterministic for identical parts', () => {
     const parts = {
       keyspace: 'avatars',

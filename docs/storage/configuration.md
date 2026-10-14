@@ -30,105 +30,181 @@ Required when `STORAGE_DRIVER=s3`:
 ```env
 STORAGE_BUCKET=amcore-prod
 STORAGE_REGION=us-east-1
-STORAGE_ACCESS_KEY_ID=...
-STORAGE_SECRET_ACCESS_KEY=...
+STORAGE_ACCESS_KEY_ID=<access-key-id>
+STORAGE_SECRET_ACCESS_KEY=<secret-access-key>
+STORAGE_PUBLIC_BASE_URL=https://cdn.example.com
 ```
 
-Optional but common:
+The application never guesses a public URL from the SDK endpoint or the bucket
+name, so `STORAGE_PUBLIC_BASE_URL` is required for `s3` and for every production
+deployment of the `local` driver. Boot fails with the variable name when it is
+missing.
+
+### Variable reference
+
+| Variable                    | Default            | Meaning                                                                                                                                                         |
+| --------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_ENDPOINT`          | empty (AWS)        | SDK endpoint. May be internal or private. Set it for every non-AWS provider.                                                                                    |
+| `STORAGE_PRESIGN_ENDPOINT`  | `STORAGE_ENDPOINT` | Browser-facing **S3 API origin** used only to sign URLs. A bare origin (`https://s3.example.com`); a path or query fails boot. Never a CDN.                     |
+| `STORAGE_REGION`            | `us-east-1`        | Signing region. Providers define their own value (`auto`, `ru-central1`, `ru-1`, ...). See [providers](providers.md).                                           |
+| `STORAGE_BUCKET`            | none, required     | Private bucket. Everything outside `public/` lives here.                                                                                                        |
+| `STORAGE_ACCESS_KEY_ID`     | none, required     | Credentials for the application. Grant object read/write/delete (and list) on the buckets below.                                                                |
+| `STORAGE_SECRET_ACCESS_KEY` | none, required     |                                                                                                                                                                 |
+| `STORAGE_FORCE_PATH_STYLE`  | `false`            | Path-style addressing (`https://host/bucket/key`). Most providers accept virtual-hosted style; follow the provider page.                                        |
+| `STORAGE_PUBLIC_DELIVERY`   | `external`         | How `public/` objects become readable: `external` or `acl`. See [Public files](public-files.md).                                                                |
+| `STORAGE_PUBLIC_BUCKET`     | `STORAGE_BUCKET`   | Bucket that holds `public/` keys. A separate bucket is the portable choice; the same bucket works when the provider can publish a prefix.                       |
+| `STORAGE_PUBLIC_BASE_URL`   | none, required     | URL of the **root of the public bucket** as a browser reaches it. The key is appended: `<base>/public/avatars/...`. For the local driver: the API public route. |
+
+Signed URL lifetimes and limits:
 
 ```env
-STORAGE_ENDPOINT=
-STORAGE_PUBLIC_ENDPOINT=
-STORAGE_FORCE_PATH_STYLE=false
 STORAGE_SIGNED_URL_DEFAULT_TTL=3600
 STORAGE_SIGNED_URL_MAX_TTL=604800
 ```
 
-`STORAGE_ENDPOINT` is the SDK endpoint. It may be internal or private.
-`STORAGE_PUBLIC_ENDPOINT` is the browser-facing public/CDN/S3 API endpoint used
-for public URLs and presigning. If it is set, `getPublicUrl(key)` returns:
+`STORAGE_ENDPOINT` and `STORAGE_PRESIGN_ENDPOINT` talk to the S3 API.
+`STORAGE_PUBLIC_BASE_URL` is a different thing: a plain HTTP address that serves
+public objects without credentials, often a CDN or a provider public domain.
+Never put a CDN in `STORAGE_PRESIGN_ENDPOINT`: the SDK signs the host and the
+path, and a CDN host or path produces a URL that no server accepts.
+
+How the public URL is built:
 
 ```text
-{STORAGE_PUBLIC_ENDPOINT}/{key}
+external / acl:   {STORAGE_PUBLIC_BASE_URL}/{key}              (every path segment percent-encoded)
+local driver:     {STORAGE_PUBLIC_BASE_URL}?key={encoded key}   (the API public route)
 ```
 
-No bucket is synthesized onto a configured public endpoint.
+Only keys under `public/` have a public URL; asking for the URL of any other key is an error.
 
 ## Provider Examples
+
+These blocks show which variables each provider needs. They come from the
+providers' own documentation and were **not** run against the real services by
+the maintainers; see the evidence level on each [provider page](providers.md).
+Replace every `<...>` value. Making `public/` readable is a separate step on the
+provider side: follow [Public files](public-files.md).
 
 ### AWS S3
 
 ```env
 STORAGE_DRIVER=s3
-STORAGE_BUCKET=amcore-prod
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
 STORAGE_REGION=us-east-1
-STORAGE_ENDPOINT=
-STORAGE_PUBLIC_ENDPOINT=
-STORAGE_FORCE_PATH_STYLE=false
+STORAGE_PUBLIC_BASE_URL=https://<distribution>.cloudfront.net
 ```
 
-Public URL shape without `STORAGE_PUBLIC_ENDPOINT`:
-
-```text
-https://{bucket}.s3.{region}.amazonaws.com/{key}
-```
-
-The current S3 driver uploads `public-read` objects with a `public-read` ACL.
-New AWS buckets disable ACLs by default, so those uploads fail with
-`AccessControlListNotSupported` unless the bucket deliberately permits ACLs.
-For the shipped public-avatar flow, use an ACL-capable bucket with a deliberate
-public-access policy, or adapt the S3 provider for policy-based delivery before
-using an ACL-disabled bucket. Private uploads and the active file check do not
-need a public ACL. A healthy file check does not verify public object delivery.
-See [AWS Object Ownership](https://docs.aws.amazon.com/AmazonS3/latest/userguide/managing-acls.html).
+New AWS buckets disable ACLs and block public access, so the default `external`
+mode is the right one. Serve the public bucket through CloudFront with origin
+access control, or publish only the `public/*` prefix with a bucket policy.
+`STORAGE_PUBLIC_DELIVERY=acl` fails on a default bucket
+(`AccessControlListNotSupported`).
 
 ### Cloudflare R2
 
 ```env
 STORAGE_DRIVER=s3
-STORAGE_BUCKET=amcore-prod
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
 STORAGE_REGION=auto
-STORAGE_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-STORAGE_PUBLIC_ENDPOINT=https://cdn.example.com/assets
-STORAGE_FORCE_PATH_STYLE=false
+STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+STORAGE_PUBLIC_BASE_URL=https://assets.example.com
 ```
+
+R2 has no object ACLs and publishes a whole bucket through a custom domain
+(`r2.dev` is rate-limited and meant for development). Use a separate public
+bucket and keep the default `external` mode. Presigned URLs work only on the
+`r2.cloudflarestorage.com` endpoint, never on a custom domain.
+
+### Backblaze B2
+
+```env
+STORAGE_DRIVER=s3
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
+STORAGE_REGION=us-west-004
+STORAGE_ENDPOINT=https://s3.us-west-004.backblazeb2.com
+STORAGE_PUBLIC_BASE_URL=https://f<NNN>.backblazeb2.com/file/<public-bucket>
+```
+
+B2 publishes a whole bucket (set it to public) and supports ACLs only at the
+bucket level. Use a separate public bucket and the default `external` mode.
 
 ### DigitalOcean Spaces
 
 ```env
 STORAGE_DRIVER=s3
-STORAGE_BUCKET=amcore-prod
+STORAGE_BUCKET=<private-space>
+STORAGE_PUBLIC_BUCKET=<public-space>
 STORAGE_REGION=nyc3
 STORAGE_ENDPOINT=https://nyc3.digitaloceanspaces.com
-STORAGE_PUBLIC_ENDPOINT=https://cdn.example.com/assets
+STORAGE_PUBLIC_BASE_URL=https://<public-space>.nyc3.cdn.digitaloceanspaces.com
 ```
 
 ### Yandex Object Storage
 
 ```env
 STORAGE_DRIVER=s3
-STORAGE_BUCKET=amcore-prod
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
 STORAGE_REGION=ru-central1
 STORAGE_ENDPOINT=https://storage.yandexcloud.net
-STORAGE_PUBLIC_ENDPOINT=https://cdn.example.com/assets
+STORAGE_PUBLIC_BASE_URL=https://<public-bucket>.storage.yandexcloud.net
 ```
 
-### Backblaze B2
+Yandex supports bucket policies and canned object ACLs, so `external` with a
+prefix policy and `acl` are both possible.
+
+### Selectel
 
 ```env
 STORAGE_DRIVER=s3
-STORAGE_BUCKET=amcore-prod
-STORAGE_REGION=us-west-004
-STORAGE_ENDPOINT=https://s3.us-west-004.backblazeb2.com
-STORAGE_PUBLIC_ENDPOINT=https://cdn.example.com/assets
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
+STORAGE_REGION=ru-1
+STORAGE_ENDPOINT=https://s3.ru-1.storage.selcloud.ru
+STORAGE_PUBLIC_BASE_URL=https://<bucket-uuid>.selstorage.ru
 ```
+
+The S3 API domain accepts only authorized requests. Anonymous reads go through
+the public domain of a public bucket (or your custom domain), which is what
+`STORAGE_PUBLIC_BASE_URL` must name. Selectel has no object ACLs.
+
+### VK Cloud
+
+```env
+STORAGE_DRIVER=s3
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
+STORAGE_REGION=ru-msk
+STORAGE_ENDPOINT=https://hb.ru-msk.vkcloud-storage.ru
+STORAGE_PUBLIC_BASE_URL=https://<public-bucket>.hb.ru-msk.vkcloud-storage.ru
+```
+
+VK Cloud supports ACLs but not bucket policies. Set the **bucket** ACL of the
+public bucket to `public-read` once; the application then sends no ACL.
+
+### Cloud.ru
+
+```env
+STORAGE_DRIVER=s3
+STORAGE_BUCKET=<private-bucket>
+STORAGE_PUBLIC_BUCKET=<public-bucket>
+STORAGE_REGION=ru-central-1
+STORAGE_ENDPOINT=https://s3.cloud.ru
+STORAGE_ACCESS_KEY_ID=<tenant-id>:<key-id>
+STORAGE_PUBLIC_BASE_URL=https://<public-bucket>.s3.cloud.ru
+```
+
+The access key id has the form `<tenant_id>:<key_id>`.
 
 ## Local Driver
 
 ```env
 STORAGE_DRIVER=local
 STORAGE_LOCAL_ROOT=./uploads
-STORAGE_LOCAL_PUBLIC_BASE_URL=http://localhost:5002/api/v1/storage/public
+STORAGE_PUBLIC_BASE_URL=http://localhost:5002/api/v1/storage/public
 ```
 
 The local driver stores bytes under:
@@ -143,9 +219,9 @@ and metadata sidecars under:
 {STORAGE_LOCAL_ROOT}/meta/{key}.json
 ```
 
-`STORAGE_LOCAL_PUBLIC_BASE_URL` points at the browser-facing API endpoint
-`/api/v1/storage/public`; generated URLs encode the object key in `?key=...`.
-It must be reachable through your API reverse proxy. Only explicit public copies
+`STORAGE_PUBLIC_BASE_URL` points at the browser-facing API endpoint
+`/api/v1/storage/public`; generated URLs encode the object key in `?key=...`. In development it defaults to `http://localhost:<API_PORT>/api/v1/storage/public`; production must set it.
+It must be reachable through your API reverse proxy. Only copies of keys under `public/`
 are served, with safe content types, attachment disposition, nosniff and sandbox
 headers. Public copies explicitly permit cross-origin resource embedding so a
 frontend on a different API domain can display images. This does not grant
@@ -153,11 +229,8 @@ access to private files. The web starter's CSP still allows images only from
 its own origin: expose this public endpoint through the product reverse proxy
 under the same origin, or have downstream explicitly allow its trusted public
 asset origin in `img-src`. A public API response does not override the page's CSP.
-Private objects, metadata and probes are never served. Existing local
-public URLs from the old static-mount layout must be migrated; re-upload existing
-public objects through the provider to create their public copies before switching
-URLs, or perform a controlled visibility-aware migration. Do not continue exposing
-the whole objects directory.
+Private objects, metadata and probes are never served. Never expose the
+`objects/` directory or the storage root through a static file server.
 
 ### Local production
 

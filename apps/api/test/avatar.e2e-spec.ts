@@ -34,17 +34,17 @@ describe('Avatar storage (e2e)', () => {
   let storageRoot: string
   let previousStorageDriver: string | undefined
   let previousStorageLocalRoot: string | undefined
-  let previousStorageLocalPublicBaseUrl: string | undefined
+  let previousStoragePublicBaseUrl: string | undefined
 
   beforeAll(async () => {
     previousStorageDriver = process.env.STORAGE_DRIVER
     previousStorageLocalRoot = process.env.STORAGE_LOCAL_ROOT
-    previousStorageLocalPublicBaseUrl = process.env.STORAGE_LOCAL_PUBLIC_BASE_URL
+    previousStoragePublicBaseUrl = process.env.STORAGE_PUBLIC_BASE_URL
 
     storageRoot = await mkdtemp(path.join(tmpdir(), 'amcore-avatar-storage-'))
     process.env.STORAGE_DRIVER = 'local'
     process.env.STORAGE_LOCAL_ROOT = storageRoot
-    process.env.STORAGE_LOCAL_PUBLIC_BASE_URL = 'https://cdn.example.test/assets'
+    process.env.STORAGE_PUBLIC_BASE_URL = 'https://cdn.example.test/assets'
 
     context = await setupE2ETest()
     app = context.app
@@ -57,7 +57,7 @@ describe('Avatar storage (e2e)', () => {
 
     restoreEnv('STORAGE_DRIVER', previousStorageDriver)
     restoreEnv('STORAGE_LOCAL_ROOT', previousStorageLocalRoot)
-    restoreEnv('STORAGE_LOCAL_PUBLIC_BASE_URL', previousStorageLocalPublicBaseUrl)
+    restoreEnv('STORAGE_PUBLIC_BASE_URL', previousStoragePublicBaseUrl)
   }, 120000)
 
   beforeEach(async () => {
@@ -91,7 +91,7 @@ describe('Avatar storage (e2e)', () => {
 
   // Version is rendered `v-<generation>-<rand>` (the monotonic fence prefix).
   const avatarKeyPattern = (userId: string): RegExp =>
-    new RegExp(`^avatars/${userId}/v-[0-9]+-[0-9a-z]+/avatar-256\\.webp$`)
+    new RegExp(`^public/avatars/${userId}/v-[0-9]+-[0-9a-z]+/avatar-256\\.webp$`)
 
   const avatarKey = (avatarUrl: string): string => {
     const url = new URL(avatarUrl)
@@ -228,7 +228,7 @@ describe('Avatar storage (e2e)', () => {
     // live avatar-256 file (empty version dirs may linger — file delete does not
     // prune them on the local driver; S3 has no directories).
     const versionDirs = await readdir(
-      path.join(storageRoot, STORAGE_OBJECTS_DIR, 'avatars', userId)
+      path.join(storageRoot, STORAGE_OBJECTS_DIR, 'public', 'avatars', userId)
     )
     const liveVersions = (
       await Promise.all(
@@ -236,6 +236,7 @@ describe('Avatar storage (e2e)', () => {
           const file = path.join(
             storageRoot,
             STORAGE_OBJECTS_DIR,
+            'public',
             'avatars',
             userId,
             dir,

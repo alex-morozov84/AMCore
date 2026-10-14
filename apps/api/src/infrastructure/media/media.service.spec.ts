@@ -77,13 +77,16 @@ describe('MediaService.processImageNow', () => {
     })
 
     expect(result.derivatives.map((d) => d.key)).toEqual([
-      'avatars/u1/avatar-128.webp',
-      'avatars/u1/avatar-256.webp',
-      'avatars/u1/avatar-512.webp',
+      'public/avatars/u1/avatar-128.webp',
+      'public/avatars/u1/avatar-256.webp',
+      'public/avatars/u1/avatar-512.webp',
     ])
     expect(storage.upload).toHaveBeenCalledTimes(3)
     expect(storage.upload).toHaveBeenCalledWith(
-      expect.objectContaining({ key: 'avatars/u1/avatar-256.webp', visibility: 'public-read' })
+      expect.objectContaining({
+        key: 'public/avatars/u1/avatar-256.webp',
+        visibility: 'public-read',
+      })
     )
     const d512 = result.derivatives[2]
     if (!d512) throw new Error('expected three derivatives')
@@ -91,7 +94,7 @@ describe('MediaService.processImageNow', () => {
       width: 512,
       height: 512,
       contentType: 'image/webp',
-      url: 'https://cdn.test/avatars/u1/avatar-512.webp',
+      url: 'https://cdn.test/public/avatars/u1/avatar-512.webp',
     })
     expect(d512.size).toBeGreaterThan(0)
     expect(metrics.observeMediaOperation).toHaveBeenCalledWith(
@@ -111,7 +114,7 @@ describe('MediaService.processImageNow', () => {
       version: 'abc7',
       visibility: 'public-read',
     })
-    expect(result.derivatives[0]?.key).toBe('avatars/u1/v-abc7/avatar-128.webp')
+    expect(result.derivatives[0]?.key).toBe('public/avatars/u1/v-abc7/avatar-128.webp')
   })
 
   it('writes private and omits URLs when visibility is private', async () => {

@@ -12,7 +12,7 @@ metadata, and generates deterministic WebP derivatives — written back through
 | Processor   | `sharp`/libvips behind an `ImageProcessor` contract; consumers never touch `sharp` |
 | Safety      | Byte/dimension/pixel caps, `limitInputPixels`, EXIF auto-orient, metadata stripped |
 | Derivatives | Named, bounded presets (no client-controlled width/quality) output as WebP         |
-| Storage     | Private originals + public-read generated derivatives via `StorageService`         |
+| Storage     | Private originals + generated derivatives under the public `public/` namespace     |
 | Keys        | Deterministic, per-upload **versioned** keys for immutable caching                 |
 | Cleanup     | List-based sweep of superseded versions; fail-closed delete                        |
 | Avatar      | `POST/DELETE /auth/me/avatar` is the one shipped consumer                          |
@@ -41,15 +41,16 @@ POST /api/v1/auth/me/avatar   (multipart, bearer)
   1. FileValidationPipe        magic-byte validate (JPEG/PNG/WebP, ≤ 2 MB, no SVG)
   2. store original PRIVATE     avatars/{userId}/v-{version}/original
   3. MediaService.processImageNow → public WebP derivatives:
-       avatars/{userId}/v-{version}/avatar-128.webp
-       avatars/{userId}/v-{version}/avatar-256.webp
-       avatars/{userId}/v-{version}/avatar-512.webp
+       public/avatars/{userId}/v-{version}/avatar-128.webp
+       public/avatars/{userId}/v-{version}/avatar-256.webp
+       public/avatars/{userId}/v-{version}/avatar-512.webp
   4. User.avatarUrl = public URL of avatar-256 (compatibility field)
   5. sweep older versions + the legacy flat object (best-effort)
 -> { avatarUrl }
 ```
 
-`DELETE /auth/me/avatar` removes every object under `avatars/{userId}/` plus the
+`DELETE /auth/me/avatar` removes every object under `avatars/{userId}/` and
+`public/avatars/{userId}/` plus the
 legacy flat `avatars/{userId}` object, then clears `avatarUrl`. Delete is
 **fail-closed**: `avatarUrl` is cleared only after storage cleanup succeeds, so a
 failed delete never advertises removal of a still-reachable public object.

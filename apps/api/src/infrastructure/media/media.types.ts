@@ -1,10 +1,9 @@
 /**
  * Media Processing — Image Processor Contract & Types
  *
- * Stage 1 (processor foundation) defines the contract + a `sharp`-backed
- * implementation only. No StorageService, queue, or avatar wiring yet — that is
- * Stage 2+. Consumers never instantiate `sharp` directly; they depend on the
- * `ImageProcessor` contract (see ai/MEDIA_PROCESSING_PLAN.md).
+ * The contract plus a `sharp`-backed implementation; `MediaService` composes it with
+ * `StorageService`. Consumers never instantiate `sharp` directly; they depend on the
+ * `ImageProcessor` contract.
  */
 
 /** Raster formats `inspect()` can report from a decoded source. */

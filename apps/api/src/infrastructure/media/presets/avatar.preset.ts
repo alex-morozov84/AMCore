@@ -3,7 +3,7 @@ import type { ImageDerivativeSpec, SourcePolicy } from '../media.types'
 /**
  * Avatar derivative set. Square `cover` WebP at three densities (1x/2x/4x of a
  * 128px base). WebP only in the baseline; JPEG fallback and AVIF are deferred
- * (see ai/MEDIA_PROCESSING_PLAN.md). Names are semantic and bounded — clients
+ * (see docs/media/security.md). Names are semantic and bounded — clients
  * never pass arbitrary width/quality.
  */
 export const AVATAR_DERIVATIVES: readonly ImageDerivativeSpec[] = [
