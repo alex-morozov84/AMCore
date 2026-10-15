@@ -20,10 +20,14 @@ bucket.
 
 ## Publish the public files
 
-MWS has dropped object ACLs (it calls them deprecated) and supports bucket policies and IAM roles.
-So use the default `external` mode and publish with a **bucket policy**: a separate public bucket,
-or one bucket with a policy that allows anonymous `s3:GetObject` on `public/*` (the shape in the
-[AWS page](aws.md#option-2-publish-only-public-with-a-bucket-policy)). Do not use `acl` mode.
+MWS has dropped object ACLs (the documentation calls them deprecated) and supports bucket policies
+and IAM roles. Use the default `external` mode and publish with a **bucket policy** on a separate
+public bucket. Do not use `acl` mode.
+
+Publishing only `public/` in one bucket with a prefix policy is **not verified** on MWS. A policy
+alone may not publish anything: on Yandex an AWS-shaped prefix policy published nothing until a
+second setting was added (see [Yandex](yandex.md#2-publishing-a-prefix-needs-the-bucket-flag-and-the-policy)).
+If you try it, run `storage:check`; if the public check fails, use a separate public bucket.
 
 ## Limits to know
 

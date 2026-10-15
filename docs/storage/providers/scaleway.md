@@ -22,7 +22,8 @@ Scaleway prefers virtual-hosted addresses (`<bucket>.s3.<region>.scw.cloud`).
 Scaleway documents object visibility, bucket visibility and bucket policies. Pick one:
 
 - default `external` mode with a separate public bucket (make the bucket public), or
-- default `external` mode with a bucket policy that publishes `public/*`, or
+- default `external` mode with a bucket policy that publishes `public/*` (**not verified**: a policy
+  alone may not publish anything, see [Yandex](yandex.md#2-publishing-a-prefix-needs-the-bucket-flag-and-the-policy)), or
 - `acl` mode (the application sends `public-read`), if the object visibility setting matches the
   S3 `public-read` ACL in your account.
 

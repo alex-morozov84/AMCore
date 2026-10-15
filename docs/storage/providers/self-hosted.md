@@ -47,7 +47,8 @@ it and does not recommend it for new setups.
 
 ## Settings
 
-Self-hosted servers usually need path-style addresses and an internal endpoint. Set the public
+Self-hosted servers usually need path-style addresses (`STORAGE_FORCE_PATH_STYLE=true`) and an
+internal endpoint. Set the public
 address of the public bucket in `STORAGE_PUBLIC_BASE_URL`, and see
 [Configuration](../configuration.md). Run
 [`storage:check`](../testing.md#check-a-real-provider-with-storagecheck) against your server.

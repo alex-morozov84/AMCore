@@ -31,11 +31,11 @@ We tested it on a real provider by opening a bucket on purpose: see the
 
 Give the application account only what it needs:
 
-| Needs                                | Permission                                                                    |
-| ------------------------------------ | ----------------------------------------------------------------------------- |
-| Normal operation                     | Read, write, delete and list on the bucket (and the public bucket, if any)    |
-| `acl` delivery mode                  | Also the permission to set object ACLs (for example `s3:PutObjectAcl` on AWS) |
-| `storage:check` and the hourly check | Write and read under the probe prefix (`STORAGE_PROBE_PREFIX`)                |
+| Needs                                | Permission                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| Normal operation                     | Read, write, delete and list on the bucket (and the public bucket, if any)            |
+| `acl` delivery mode                  | Also the permission to set object ACLs (for example `s3:PutObjectAcl` on AWS)         |
+| `storage:check` and the hourly check | Write and read under the probe prefix (`STORAGE_PROBE_PREFIX`) and its `public/` twin |
 
 It does **not** need permission to change bucket policies or public-access settings, and on some
 providers it cannot have it. On Yandex the application key could not read or delete the bucket
@@ -55,9 +55,10 @@ test, revoke the key and delete the account.
 
 ## Browser uploads and CORS
 
-Allow only your web origins and only the methods you need on the bucket CORS rule. A wildcard origin
-lets any site use a presigned URL it obtains. See the executed example on the
-[Yandex page](providers/yandex.md#browser-uploads-cors-executed-2026-10-15).
+Allow only your web origins and only the methods you need on the bucket CORS rule. CORS decides which
+web pages may call the bucket from a browser; it does not protect a presigned URL, because anyone
+who holds the URL can use it from a server regardless of CORS. Keep the rule narrow anyway. See the
+executed example on the [Yandex page](providers/yandex.md#browser-uploads-cors-executed-2026-10-15).
 
 ## Transport and certificates
 

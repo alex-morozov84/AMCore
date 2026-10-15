@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Storage documentation now has one page per S3-compatible provider with an honest status, a
+  testing guide for `storage:check`, troubleshooting, security and migration guides. Yandex
+  Object Storage was verified on a real account on 2026-10-15 (`external` and `acl` modes, CORS,
+  exposure detection). Publishing a prefix on Yandex needs the bucket public-read flag **and** a
+  policy; the earlier example that showed only the policy was wrong and is replaced. A bucket policy
+  on Yandex also denies the application account and the web console unless the policy allows them.
+
 - Upgrade backend AI provider integration to AI SDK 7 public structured output.
   **Breaking for provider extensions:** successful structured results cannot be entirely
   `null` or `undefined`; these produce non-retryable `output_validation_failed`.
@@ -122,13 +129,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage uses three shards and attempt-specific artifacts. The tracked main ruleset requires its stable aggregate check; live protection needs separate owner-authorized activation.
 
 ### Features
-
-- Storage documentation now has one page per S3-compatible provider with an honest status, a
-  testing guide for `storage:check`, troubleshooting, security and migration guides. Yandex
-  Object Storage was verified on a real account on 2026-10-15 (`external` and `acl` modes, CORS,
-  exposure detection). Publishing a prefix on Yandex needs the bucket public-read flag **and** a
-  policy; the earlier example that showed only the policy was wrong and is replaced. A bucket policy
-  on Yandex also denies the application account and the web console unless the policy allows them.
 
 - Operations Console Overview shows the public files check next to the private files
   check: delivery mode, bucket layout and public base URL, a result per state, and a

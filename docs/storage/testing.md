@@ -50,8 +50,9 @@ cd apps/api
 ### What it does
 
 It writes only under the reserved diagnostic folder (`STORAGE_PROBE_PREFIX`, default
-`__amcore_probes__`), removes what it created and never prints credentials, endpoints or provider
-messages. Exit code 0 means every step passed or was skipped.
+`__amcore_probes__`) and its `public/` twin (`public/__amcore_probes__/`), removes what it created
+(except the two canaries below) and never prints credentials, endpoints or provider messages. Exit
+code 0 means every step passed or was skipped.
 
 ```text
 storage:check driver=s3 mode=external buckets=one

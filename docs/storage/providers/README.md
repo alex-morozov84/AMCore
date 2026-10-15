@@ -26,23 +26,23 @@ against your own account; it takes a minute and tells you if anything is wrong.
 bucket ([two-bucket layout](../public-files.md#choose-the-layout)). "Prefix" means you can publish
 only `public/` inside one bucket.
 
-| Provider                                                    | Publish                      | Object ACL (`acl` mode) | Bucket policy | Status                                 |
-| ----------------------------------------------------------- | ---------------------------- | ----------------------- | ------------- | -------------------------------------- |
-| [Yandex Object Storage](yandex.md)                          | Prefix (flag **and** policy) | Works on a plain bucket | Yes           | **Verified 2026-10-15**                |
-| [AWS S3](aws.md)                                            | Prefix, or CloudFront        | Off by default          | Yes           | Provider-documented                    |
-| [Cloudflare R2](cloudflare-r2.md)                           | Whole bucket                 | No                      | No            | Provider-documented                    |
-| [Backblaze B2](backblaze-b2.md)                             | Whole bucket                 | Bucket level only       | —             | Provider-documented                    |
-| [DigitalOcean Spaces](digitalocean-spaces.md)               | Object or policy             | Yes                     | Yes           | Provider-documented                    |
-| [Wasabi](wasabi.md)                                         | Needs a support request      | —                       | Required      | Provider-documented                    |
-| [Hetzner](hetzner.md)                                       | Unclear                      | Unclear                 | Partial       | Provider-documented                    |
-| [Scaleway](scaleway.md)                                     | Object or bucket             | Yes                     | Yes           | Provider-documented                    |
-| [Selectel](selectel.md)                                     | Whole bucket                 | No                      | Yes           | Provider-documented                    |
-| [VK Cloud](vk-cloud.md)                                     | Whole bucket (ACL)           | Yes                     | No            | Provider-documented                    |
-| [Cloud.ru](cloud-ru.md)                                     | Whole bucket                 | Bucket level            | Yes           | Provider-documented                    |
-| [Timeweb Cloud](timeweb.md)                                 | Bucket                       | Bucket level            | Yes           | Provider-documented                    |
-| [MWS](mws.md)                                               | Policy                       | No                      | Yes           | Provider-documented                    |
-| [Beget](beget.md)                                           | Bucket                       | —                       | Yes           | Provider-documented                    |
-| [Self-hosted: SeaweedFS, Garage and others](self-hosted.md) | Varies                       | Accepted and ignored    | Varies        | SeaweedFS and Garage verified emulator |
+| Provider                                                    | Publish                      | Object ACL (`acl` mode)               | Bucket policy | Status                                 |
+| ----------------------------------------------------------- | ---------------------------- | ------------------------------------- | ------------- | -------------------------------------- |
+| [Yandex Object Storage](yandex.md)                          | Prefix (flag **and** policy) | Works on a plain bucket               | Yes           | **Verified 2026-10-15**                |
+| [AWS S3](aws.md)                                            | Prefix, or CloudFront        | Off by default                        | Yes           | Provider-documented                    |
+| [Cloudflare R2](cloudflare-r2.md)                           | Whole bucket                 | No                                    | No            | Provider-documented                    |
+| [Backblaze B2](backblaze-b2.md)                             | Whole bucket                 | Bucket level only                     | —             | Provider-documented                    |
+| [DigitalOcean Spaces](digitalocean-spaces.md)               | Object or policy             | Yes                                   | Yes           | Provider-documented                    |
+| [Wasabi](wasabi.md)                                         | Needs a support request      | —                                     | Required      | Provider-documented                    |
+| [Hetzner](hetzner.md)                                       | Unclear                      | Unclear                               | Partial       | Provider-documented                    |
+| [Scaleway](scaleway.md)                                     | Object or bucket             | Yes                                   | Yes           | Provider-documented                    |
+| [Selectel](selectel.md)                                     | Whole bucket                 | No                                    | Yes           | Provider-documented                    |
+| [VK Cloud](vk-cloud.md)                                     | Whole bucket (ACL)           | Yes                                   | No            | Provider-documented                    |
+| [Cloud.ru](cloud-ru.md)                                     | Whole bucket                 | Bucket level                          | Yes           | Provider-documented                    |
+| [Timeweb Cloud](timeweb.md)                                 | Whole bucket                 | Bucket level                          | Yes           | Provider-documented                    |
+| [MWS](mws.md)                                               | Policy                       | Deprecated                            | Yes           | Provider-documented                    |
+| [Beget](beget.md)                                           | Whole bucket                 | —                                     | Yes           | Provider-documented                    |
+| [Self-hosted: SeaweedFS, Garage and others](self-hosted.md) | Varies                       | Varies (ignored by SeaweedFS, Garage) | Varies        | SeaweedFS and Garage verified emulator |
 
 A dash means we found no statement in the provider's documentation.
 

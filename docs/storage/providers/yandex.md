@@ -1,10 +1,12 @@
 # Yandex Object Storage
 
-**Status: verified on 2026-10-15** with `storage:check` against a real Yandex Cloud account, for the
-`external` and `acl` modes. Everything not listed under [What was not verified](#what-was-not-verified)
-is provider-documented only. See [how to read the status](README.md#how-to-read-the-status).
+**Status: verified on 2026-10-15** with `storage:check` against a real Yandex Cloud account. The
+verified parts are the sections marked "executed 2026-10-15": the `external` recipe, the `acl` recipe
+and the CORS rule. Everything under [What was not verified](#what-was-not-verified), and the notes on
+cleaning up keys, is provider-documented or untested. See
+[how to read the status](README.md#how-to-read-the-status).
 
-Yandex works well, but it has two behaviors that surprise people. Read
+Yandex has two behaviors that surprise people. Read
 [Two things that surprise people](#two-things-that-surprise-people) before you attach a bucket policy.
 
 ## Settings
@@ -32,7 +34,7 @@ the application's own service account (even with the `storage.editor` role) and 
 console**. Without the right statements you see this:
 
 - the application gets `AccessDenied` (HTTP 403) on every call, including a simple list;
-- the console shows "Access denied" when you open the bucket.
+- the web console refuses to open the bucket.
 
 Fix it by listing both in the policy. The application statement uses the service account id:
 
