@@ -117,12 +117,12 @@ test('both frontend URL suite shapes retain unrelated sibling tests', () => {
 test('locale switcher removal preserves the shared AppShell wrapper and siblings', () => {
   const path = 'apps/web/src/widgets/app-shell/ui/AppShell.tsx'
   const source = readFileSync(path, 'utf8').replace(
-    '            <LocaleSwitcher />',
-    '            <LocaleSwitcher />\n            {/* unrelated-shell-sibling */}\n            <span data-shell-sentinel="kept" />'
+    '              <LocaleSwitcher />',
+    '              <LocaleSwitcher />\n              {/* unrelated-shell-sibling */}\n              <span data-shell-sentinel="kept" />'
   )
   const output = apply(path, 'locale.navigation-switcher', { locale: 'ru' }, source)
   assert.doesNotMatch(output, /LocaleSwitcher/)
   assert.match(output, /\{\/\* unrelated-shell-sibling \*\/\}/)
   assert.match(output, /<span data-shell-sentinel="kept" \/>/)
-  assert.match(output, /<SidebarFooter className="gap-3">/)
+  assert.match(output, /\{headerEnd\}/)
 })

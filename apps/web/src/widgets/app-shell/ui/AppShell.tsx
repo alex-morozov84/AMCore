@@ -9,7 +9,6 @@ import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -68,7 +67,7 @@ function NavMenu({ afterDashboard, homeHref }: { afterDashboard?: ReactNode; hom
 
 /**
  * The dashboard app shell: a shadcn/Base UI Sidebar composition (nav,
- * account footer) around the page content. `SidebarProvider` owns the
+ * language switcher in the header) around the page content. `SidebarProvider` owns the
  * open/collapsed state itself (cookie-backed, `useSidebar()`) — there is no
  * separate app-level store for it. Route-level plumbing (session read, the
  * real auth gate, the cookie read below) stays in `(dashboard)/layout.tsx`;
@@ -97,11 +96,6 @@ export function AppShell({
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter className="gap-3">
-            <div className="flex items-center gap-2 px-2">
-              <LocaleSwitcher />
-            </div>
-          </SidebarFooter>
           <SidebarRail toggleLabel={t('toggleSidebar')} />
         </Sidebar>
         {/* `SidebarInset` already renders the page's `<main>` landmark — a
@@ -111,7 +105,10 @@ export function AppShell({
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b border-border px-4">
             <SidebarTrigger toggleLabel={t('toggleSidebar')} />
-            <div className="ml-auto flex items-center gap-2">{headerEnd}</div>
+            <div className="ml-auto flex items-center gap-2">
+              <LocaleSwitcher />
+              {headerEnd}
+            </div>
           </header>
           <div className="mx-auto w-full max-w-7xl p-4">{children}</div>
         </SidebarInset>

@@ -16,7 +16,7 @@ block is built from a public headless operation, so a downstream can move, resty
 | `widgets/app-shell`     | `headerEnd` slot                                    | The shell renders whatever the application passes; it never imports the account blocks                                 |
 | Application composition | `(dashboard)/layout.tsx` and the organization frame | One placement per shell composition (two today): each passes `<AccountMenu />` into `headerEnd`                        |
 
-The shell footer keeps only the locale switcher. **Log out is now in the account menu**: if you
+The header holds the locale switcher next to the account menu (the sidebar has no footer). **Log out is now in the account menu**: if you
 remove the menu, provide your own logout control (`useLogout` from `features/auth-logout`).
 
 ## The headless operation
