@@ -85,9 +85,9 @@ export class StoragePublicCheckService implements OnModuleInit, OnModuleDestroy 
   }
 
   onModuleInit(): void {
-    if (!this.enabled) return
+    // Registered even when the check is off, so the series exist (state "off") on every process.
     this.registerMetrics()
-    void this.boot()
+    if (this.enabled) void this.boot()
   }
 
   onModuleDestroy(): void {
@@ -237,7 +237,7 @@ export class StoragePublicCheckService implements OnModuleInit, OnModuleDestroy 
       labelNames: ['driver', 'state'],
       collect: (gauge) => {
         const snapshot = this.snapshot()
-        for (const state of ['healthy', 'failed', 'unknown', 'stale']) {
+        for (const state of ['healthy', 'failed', 'unknown', 'stale', 'off']) {
           gauge.set({ driver: snapshot.driver, state }, Number(snapshot.state === state))
         }
       },

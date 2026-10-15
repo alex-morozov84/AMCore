@@ -86,12 +86,12 @@ describe('StoragePublicCheckService', () => {
     [{ STORAGE_DRIVER: 'memory' }],
     [{ STORAGE_PUBLIC_CHECK_ENABLED: false }],
     [{ PROCESS_ROLE: 'worker' }],
-  ])('does nothing when it does not apply (%j)', (values) => {
+  ])('only reports state off when it does not apply (%j)', (values) => {
     const { service, upload, gauges } = start(values)
     service.onModuleInit()
     expect(service.enabled).toBe(false)
     expect(upload).not.toHaveBeenCalled()
-    expect(gauges.size).toBe(0)
+    expect(gauges.size).toBe(2)
   })
 
   it('writes the canaries once, then reports healthy and only reads afterwards', async () => {
