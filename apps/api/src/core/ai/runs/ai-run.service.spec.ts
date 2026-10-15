@@ -137,22 +137,28 @@ describe('AiRunService', () => {
   })
 
   describe('cancel', () => {
+    function cancelReads(before: Record<string, unknown>, after: Record<string, unknown>): void {
+      prisma.aiRun.findUnique
+        .mockResolvedValueOnce(before as never)
+        .mockResolvedValueOnce(after as never)
+    }
+
     /** The run row lock (first raw query) reports the status seen UNDER the lock. */
     function lockSees(status: string, cancellationRequestedAt: Date | null = null): void {
       prisma.$queryRaw.mockResolvedValueOnce([{ status, cancellationRequestedAt }] as never)
     }
 
     it('cancels a QUEUED run by CAS under the run lock, skipping a not-started approved tool', async () => {
-      prisma.aiRun.findUnique.mockResolvedValue(fakeRun('user-1', { status: 'QUEUED' }) as never)
-      lockSees('QUEUED')
-      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
-      prisma.aiRun.findUniqueOrThrow.mockResolvedValue(
+      cancelReads(
+        fakeRun('user-1', { status: 'QUEUED' }),
         fakeRun('user-1', {
           status: 'CANCELLED',
           finishedAt: new Date(),
           terminalReasonCode: 'cancelled_by_user',
-        }) as never
+        })
       )
+      lockSees('QUEUED')
+      prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
 
       const result = await service.cancel('user-1', 'run-1')
 
@@ -169,12 +175,12 @@ describe('AiRunService', () => {
     })
 
     it('records a cooperative request for a RUNNING run, preserving the first request time', async () => {
-      prisma.aiRun.findUnique.mockResolvedValue(fakeRun('user-1', { status: 'RUNNING' }) as never)
+      cancelReads(
+        fakeRun('user-1', { status: 'RUNNING' }),
+        fakeRun('user-1', { status: 'RUNNING', cancellationRequestedAt: new Date() })
+      )
       lockSees('RUNNING')
       prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
-      prisma.aiRun.findUniqueOrThrow.mockResolvedValue(
-        fakeRun('user-1', { status: 'RUNNING', cancellationRequestedAt: new Date() }) as never
-      )
 
       const result = await service.cancel('user-1', 'run-1')
 
@@ -188,9 +194,9 @@ describe('AiRunService', () => {
     })
 
     it('is an idempotent no-op on a terminal run (no writes, no lock)', async () => {
-      prisma.aiRun.findUnique.mockResolvedValue(fakeRun('user-1', { status: 'COMPLETED' }) as never)
-      prisma.aiRun.findUniqueOrThrow.mockResolvedValue(
-        fakeRun('user-1', { status: 'COMPLETED' }) as never
+      cancelReads(
+        fakeRun('user-1', { status: 'COMPLETED' }),
+        fakeRun('user-1', { status: 'COMPLETED' })
       )
 
       const result = await service.cancel('user-1', 'run-1')
@@ -201,11 +207,11 @@ describe('AiRunService', () => {
     })
 
     it('does nothing when the run turned terminal before the lock was taken (decided UNDER the lock)', async () => {
-      prisma.aiRun.findUnique.mockResolvedValue(fakeRun('user-1', { status: 'RUNNING' }) as never)
-      lockSees('COMPLETED')
-      prisma.aiRun.findUniqueOrThrow.mockResolvedValue(
-        fakeRun('user-1', { status: 'COMPLETED' }) as never
+      cancelReads(
+        fakeRun('user-1', { status: 'RUNNING' }),
+        fakeRun('user-1', { status: 'COMPLETED' })
       )
+      lockSees('COMPLETED')
 
       const result = await service.cancel('user-1', 'run-1')
 
@@ -223,14 +229,12 @@ describe('AiRunService', () => {
     it('sees QUEUED under the lock when an approve won the race, and cancels it (no lost cancel)', async () => {
       // The pre-lock read still says WAITING_APPROVAL; by the time the run lock is held the approve has
       // re-queued it. The decision is taken from the LOCKED status, so the cancel acts on the queued run.
-      prisma.aiRun.findUnique.mockResolvedValue(
-        fakeRun('user-1', { status: 'WAITING_APPROVAL' }) as never
+      cancelReads(
+        fakeRun('user-1', { status: 'WAITING_APPROVAL' }),
+        fakeRun('user-1', { status: 'CANCELLED' })
       )
       lockSees('QUEUED')
       prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
-      prisma.aiRun.findUniqueOrThrow.mockResolvedValue(
-        fakeRun('user-1', { status: 'CANCELLED' }) as never
-      )
 
       const result = await service.cancel('user-1', 'run-1')
 
@@ -242,17 +246,15 @@ describe('AiRunService', () => {
 
     describe('cancel-while-waiting (Arc E.5)', () => {
       it('locks the RUN first, then the approval, then cancels + voids + skips, with an in-tx audit', async () => {
-        prisma.aiRun.findUnique.mockResolvedValue(
-          fakeRun('user-1', { status: 'WAITING_APPROVAL' }) as never
+        cancelReads(
+          fakeRun('user-1', { status: 'WAITING_APPROVAL' }),
+          fakeRun('user-1', { status: 'CANCELLED' })
         )
         lockSees('WAITING_APPROVAL')
         prisma.$queryRaw.mockResolvedValueOnce([{ approvalId: 'appr-1' }] as never) // approval lock
         prisma.aiRun.updateMany.mockResolvedValue({ count: 1 } as never)
         prisma.aiApproval.updateMany.mockResolvedValue({ count: 1 } as never)
         prisma.aiToolInvocation.updateMany.mockResolvedValue({ count: 1 } as never)
-        prisma.aiRun.findUniqueOrThrow.mockResolvedValue(
-          fakeRun('user-1', { status: 'CANCELLED' }) as never
-        )
 
         const result = await service.cancel('user-1', 'run-1')
 
