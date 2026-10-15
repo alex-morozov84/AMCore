@@ -25,8 +25,10 @@ export function holdMemberTransaction(
     work: (tx: Prisma.TransactionClient) => Promise<unknown>,
     options?: { timeout?: number }
   ) => {
-    if ((memberSetOnly && options?.timeout !== 4000) || captured) return original(work, options)
-    captured = true
+    // Workers can transact before the tested mutation reaches its parent-row lock.
+    // Batch operations are not callbacks and must retain Prisma's original overload.
+    if (typeof work !== 'function' || (memberSetOnly && options?.timeout !== 4000) || captured)
+      return original(work, options)
     return original(
       async (tx) =>
         work(
@@ -58,7 +60,8 @@ export function holdMemberTransaction(
                 const value = await (target.$queryRaw as (...a: unknown[]) => Promise<unknown>)(
                   ...args
                 )
-                if (!String(args[0]).includes('core.organizations')) return value
+                if (captured || !String(args[0]).includes('core.organizations')) return value
+                captured = true
                 trace?.push('parent')
                 entered.resolve()
                 await release.promise

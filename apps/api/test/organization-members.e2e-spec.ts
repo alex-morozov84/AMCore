@@ -660,7 +660,12 @@ describe('Organization member reads and atomic role set (real DB)', () => {
       let second: Promise<unknown> | undefined
       const first = order === 'accept-first' ? accept() : save(input).then((r) => r)
       try {
-        await hold.entered
+        await Promise.race([
+          hold.entered,
+          first.then(() => {
+            throw new Error('Invitation race completed before the parent-lock fence')
+          }),
+        ])
         second = order === 'accept-first' ? save(input).then((r) => r) : accept()
         await waitForDbBlock(pool)
         hold.release()
