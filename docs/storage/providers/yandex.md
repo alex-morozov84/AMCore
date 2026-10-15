@@ -3,9 +3,9 @@
 **Status: verified on 2026-10-15** with `storage:check` against a real Yandex Cloud account. The
 verified parts are the sections marked "executed 2026-10-15" (the `external` recipe, the `acl` recipe
 and the CORS rule) and the measurements in
-[Two things that surprise people](#two-things-that-surprise-people).
-cleaning up keys, is provider-documented or untested. See
-[how to read the status](README.md#how-to-read-the-status).
+[Two things that surprise people](#two-things-that-surprise-people). Everything under
+[What was not verified](#what-was-not-verified), and the notes on cleaning up keys, is
+provider-documented or untested. See [how to read the status](README.md#how-to-read-the-status).
 
 Yandex has two behaviors that surprise people. Read
 [Two things that surprise people](#two-things-that-surprise-people) before you attach a bucket policy.
