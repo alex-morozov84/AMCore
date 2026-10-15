@@ -228,3 +228,12 @@ export const PublicFilesOffLocal: Story = {
     await expect(within(canvasElement).getByText('Off')).toBeVisible()
   },
 }
+export const PublicFilesStale: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: s3Storage,
+      publicDelivery: { ...servedPublic, state: 'stale' },
+    },
+  },
+}

@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 
 import type { OverviewTranslations } from './overview-types'
+import { PRIVATE_EXPOSURE_RUNBOOK_HREF } from './storage-runbook-link'
 
 const OFF_REASONS = {
   local_driver: 'overviewPublicOffLocal',
@@ -56,6 +57,15 @@ export function OverviewExposureBanner({
           )}
         </p>
         <p className="mt-1">{t('overviewPublicExposedAction')}</p>
+        <a
+          href={PRIVATE_EXPOSURE_RUNBOOK_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 inline-block underline"
+        >
+          {t('overviewPublicExposedRunbook')}
+          <span className="sr-only"> {t('overviewPublicOpenNewTab')}</span>
+        </a>
       </AlertDescription>
     </Alert>
   )

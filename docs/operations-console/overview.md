@@ -80,7 +80,7 @@ that the answering API instance runs against the S3 driver, by default once an
 hour (`STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS`). It sends read-only requests.
 Above the rows, a line states the delivery mode (`external`, `acl` or `api`), the
 bucket layout (one or two buckets) and the public base URL. It never shows bucket
-names, the S3 endpoint or credentials.
+names, the S3 endpoint or credentials. The public base URL is shown as configured, so it can contain the provider host or bucket name.
 
 | Public files shows          | Meaning                                                                                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |

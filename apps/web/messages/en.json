@@ -652,7 +652,9 @@
     "overviewPublicExposedTitle": "Private files are readable without signing in",
     "overviewPublicExposedApi": "An anonymous request read a private test file through the storage address.",
     "overviewPublicExposedBase": "An anonymous request read a private test file through the public address.",
-    "overviewPublicExposedAction": "Treat this as an incident: restrict public access to the private files now. See the Private exposure section of the file storage runbook.",
+    "overviewPublicExposedAction": "Treat this as an incident: restrict public access to the private files now.",
+    "overviewPublicExposedRunbook": "Open the Private exposure runbook",
+    "overviewPublicOpenNewTab": "(opens in a new tab)",
     "overviewFilesCostTitle": "S3 checks consume billable requests",
     "overviewFilesCostHelp": "Each API/worker instance independently performs one write, one read and one delete per check. Increase the interval to reduce request costs; failures will take longer to detect. Free allowances and prices depend on your provider. The public check adds read-only requests, by default once an hour.",
     "storageSetting": {

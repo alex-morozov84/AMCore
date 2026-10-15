@@ -2,19 +2,18 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { DEFAULT_LOCALE } from '@amcore/shared'
+import { expect, test } from '@playwright/test'
 
+import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { activeTarget } from '../support/managed-target.mjs'
+
+import { setSystemRole } from './helpers'
 
 const standTarget = activeTarget()
 // Texts come from the active catalogue, so the spec follows the project's locale choice.
 const t = JSON.parse(
   readFileSync(join(standTarget.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
 ).console
-import { expect, test } from '@playwright/test'
-
-import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
-
-import { setSystemRole } from './helpers'
 
 test('role setup refuses an account whose registration has not completed', () => {
   expect(() => setSystemRole(uniqueEmail('console-unregistered'), 'SUPER_ADMIN')).toThrow(

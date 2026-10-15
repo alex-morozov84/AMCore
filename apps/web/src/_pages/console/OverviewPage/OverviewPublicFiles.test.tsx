@@ -8,6 +8,7 @@ import {
   OverviewPublicConfig,
   OverviewPublicState,
 } from './OverviewPublicFiles'
+import { PRIVATE_EXPOSURE_RUNBOOK_HREF } from './storage-runbook-link'
 
 vi.mock('@/shared/ui/console-detail/ConsoleTimestamp', () => ({
   ConsoleTimestamp: ({ value }: { value: string }) => <time>{value}</time>,
@@ -61,6 +62,11 @@ describe('public files overview', () => {
   })
 
   it('reports unknown and stale results', () => {
+    state({ state: 'stale' })
+    expect(screen.getByText('overviewFilesStale')).toBeInTheDocument()
+  })
+
+  it('reports a result that is not checked yet', () => {
     state({ state: 'unknown', checkedAt: null })
     expect(screen.getByText('overviewFilesUnknown')).toBeInTheDocument()
   })
@@ -73,6 +79,25 @@ describe('public files overview', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('overviewPublicExposedTitle')
     expect(screen.getByText('overviewPublicExposedBase')).toBeInTheDocument()
     expect(screen.getByText('overviewPublicExposedAction')).toBeInTheDocument()
+  })
+
+  it('links the runbook in the banner and names the storage-address sentence', () => {
+    render(
+      <OverviewExposureBanner
+        check={{
+          ...base,
+          state: 'failed',
+          failure: 'private_exposed',
+          stage: 'private_exposed_api',
+        }}
+        t={t}
+      />
+    )
+    expect(screen.getByText('overviewPublicExposedApi')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /overviewPublicExposedRunbook/ })
+    expect(link).toHaveAttribute('href', PRIVATE_EXPOSURE_RUNBOOK_HREF)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
   it('renders no banner for an ordinary failure', () => {
