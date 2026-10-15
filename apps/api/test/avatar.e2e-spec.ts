@@ -114,7 +114,7 @@ describe('Avatar storage (e2e)', () => {
     expect(avatarKey(response.body.avatarUrl)).toMatch(avatarKeyPattern(userId))
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    expect(user.avatarUrl).toBe(response.body.avatarUrl)
+    expect(avatarKey(response.body.avatarUrl)).toBe(user.avatarKey)
 
     const profileResponse = await request(app.getHttpServer())
       .get('/auth/me')
@@ -195,7 +195,7 @@ describe('Avatar storage (e2e)', () => {
       .expect(204)
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    expect(user.avatarUrl).toBeNull()
+    expect(user.avatarKey).toBeNull()
   })
 
   // Resolve the local file backing a public avatar URL so concurrency tests can
@@ -203,8 +203,7 @@ describe('Avatar storage (e2e)', () => {
   // local driver stores object bytes under `<root>/objects/<key>`; the public
   // URL carries the normalized object key in its query, not its pathname.
   const STORAGE_OBJECTS_DIR = 'objects'
-  const fileFor = (avatarUrl: string): string =>
-    path.join(storageRoot, STORAGE_OBJECTS_DIR, avatarKey(avatarUrl))
+  const fileFor = (key: string): string => path.join(storageRoot, STORAGE_OBJECTS_DIR, key)
 
   it('serializes concurrent uploads: the surviving avatarUrl resolves to live storage', async () => {
     const { accessToken, userId } = await registerUser()
@@ -221,8 +220,8 @@ describe('Avatar storage (e2e)', () => {
 
     // The DB winner must point to a file that still exists (no cross-version sweep).
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    expect(avatarKey(user.avatarUrl as string)).toMatch(avatarKeyPattern(userId))
-    await expect(access(fileFor(user.avatarUrl as string))).resolves.toBeUndefined()
+    expect(user.avatarKey as string).toMatch(avatarKeyPattern(userId))
+    await expect(access(fileFor(user.avatarKey as string))).resolves.toBeUndefined()
 
     // The loser's published derivative was swept: exactly one version still has a
     // live avatar-256 file (empty version dirs may linger — file delete does not
@@ -250,7 +249,7 @@ describe('Avatar storage (e2e)', () => {
       )
     ).filter((dir): dir is string => dir !== undefined)
     expect(liveVersions).toHaveLength(1)
-    expect(avatarKey(user.avatarUrl as string)).toContain(`/${liveVersions[0]}/`)
+    expect(user.avatarKey as string).toContain(`/${liveVersions[0]}/`)
   })
 
   it('keeps the store consistent under a concurrent upload and delete', async () => {
@@ -275,8 +274,8 @@ describe('Avatar storage (e2e)', () => {
     // Whichever ran last, the invariant holds: a non-null avatarUrl must resolve
     // to live storage; a null one means the avatar was fully removed.
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-    const state = user.avatarUrl
-      ? await access(fileFor(user.avatarUrl)).then(
+    const state = user.avatarKey
+      ? await access(fileFor(user.avatarKey)).then(
           () => 'live',
           () => 'orphaned'
         )

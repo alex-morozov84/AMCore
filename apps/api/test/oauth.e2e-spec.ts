@@ -22,7 +22,7 @@ function createMockProvider(profile?: Partial<OAuthUserProfile>): OAuthProvider 
     email: 'oauth-user@example.com',
     emailVerified: true,
     displayName: 'OAuth User',
-    avatarUrl: null,
+    avatarSourceUrl: null,
     ...profile,
   }
 
@@ -689,7 +689,7 @@ describe('OAuth (e2e)', () => {
           email: 'apple-user@example.com',
           emailVerified: true,
           displayName: null,
-          avatarUrl: null,
+          avatarSourceUrl: null,
         }),
       }
       ;(providerFactory as unknown as { providers: Map<string, OAuthProvider> }).providers.set(

@@ -35,8 +35,8 @@ only shipped preset is `avatar`:
 | `avatar-256` | 256 × 256    | WebP   | 82      |
 | `avatar-512` | 512 × 512    | WebP   | 82      |
 
-`avatar-256` is the primary derivative whose public URL is stored in
-`User.avatarUrl`. Originals are stored privately (`…/v-{version}/original`) for
+`avatar-256` is the primary derivative whose object key is stored in
+`User.avatarKey`; the API computes `avatarUrl` from it on every response. Originals are stored privately (`…/v-{version}/original`) for
 possible future re-derivation; only derivatives live in the public namespace.
 
 ## Native Dependency
@@ -49,7 +49,7 @@ production-image smoke check.
 
 ## Next.js Consumption
 
-The backend returns concrete public derivative URLs (e.g. `User.avatarUrl`). The
+The backend returns concrete public derivative URLs (e.g. the computed `avatarUrl`). The
 frontend treats them as remote images:
 
 ```ts

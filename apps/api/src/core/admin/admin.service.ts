@@ -22,8 +22,10 @@ import type { CleanupResult } from '../../infrastructure/schedule/cleanup.servic
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
 import { acquireXactLock, PrismaService } from '../../prisma'
 import { AuditLogService } from '../audit'
+import { avatarUrlOf } from '../auth/avatar-url'
 
 import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
+import { StorageService } from '@/infrastructure/storage'
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).
@@ -38,7 +40,7 @@ const ADMIN_USER_SELECT = {
   email: true,
   emailVerified: true,
   name: true,
-  avatarUrl: true,
+  avatarKey: true,
   phone: true,
   locale: true,
   timezone: true,
@@ -173,7 +175,8 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly cleanupService: CleanupService,
     private readonly auditLog: AuditLogService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly storage: StorageService
   ) {
     this.logger.setContext(AdminService.name)
   }
@@ -419,7 +422,7 @@ export class AdminService {
       email: row.email,
       emailVerified: row.emailVerified,
       name: row.name,
-      avatarUrl: row.avatarUrl,
+      avatarUrl: avatarUrlOf(this.storage, row.avatarKey),
       phone: row.phone,
       locale: parseSupportedLocale(row.locale),
       timezone: row.timezone,

@@ -10,6 +10,7 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
     email: 'string',
     emailVerified: 'boolean',
     name: 'nullableString',
+    // Derived from the stored avatarKey: the permission names the attribute the API returns.
     avatarUrl: 'nullableString',
     phone: 'nullableString',
     locale: 'string',

@@ -52,7 +52,7 @@ describe('AuthService', () => {
     emailVerified: false,
     passwordHash: 'hashed-password-123',
     name: 'Test User',
-    avatarUrl: null,
+    avatarKey: null,
     avatarGeneration: 0,
     phone: null,
     locale: 'ru',
@@ -168,7 +168,8 @@ describe('AuthService', () => {
       mockLoginRateLimiter,
       mockNotifications as never,
       mockLogger,
-      {} as never
+      {} as never,
+      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never
     )
 
     jest.clearAllMocks()
@@ -693,7 +694,7 @@ describe('AuthService', () => {
         email: mockUser.email,
         emailVerified: mockUser.emailVerified,
         name: mockUser.name,
-        avatarUrl: mockUser.avatarUrl,
+        avatarUrl: null,
         phone: mockUser.phone,
         locale: mockUser.locale,
         timezone: mockUser.timezone,

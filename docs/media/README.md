@@ -44,15 +44,15 @@ POST /api/v1/auth/me/avatar   (multipart, bearer)
        public/avatars/{userId}/v-{version}/avatar-128.webp
        public/avatars/{userId}/v-{version}/avatar-256.webp
        public/avatars/{userId}/v-{version}/avatar-512.webp
-  4. User.avatarUrl = public URL of avatar-256 (compatibility field)
+  4. User.avatarKey = object key of avatar-256 (the API computes avatarUrl from it)
   5. sweep older versions + the legacy flat object (best-effort)
 -> { avatarUrl }
 ```
 
 `DELETE /auth/me/avatar` removes every object under `avatars/{userId}/` and
 `public/avatars/{userId}/` plus the
-legacy flat `avatars/{userId}` object, then clears `avatarUrl`. Delete is
-**fail-closed**: `avatarUrl` is cleared only after storage cleanup succeeds, so a
+legacy flat `avatars/{userId}` object, then clears `avatarKey`. Delete is
+**fail-closed**: `avatarKey` is cleared only after storage cleanup succeeds, so a
 failed delete never advertises removal of a still-reachable public object.
 
 Per-upload versioned keys let derivatives carry immutable cache headers without

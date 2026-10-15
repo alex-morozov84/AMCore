@@ -24,16 +24,19 @@ import {
   lockInvitationSignupEmail,
   lockInvitationUser,
 } from '../../invitations/invitation-locks'
+import { avatarUrlOf } from '../avatar-url'
 import { EmailIdentityService } from '../email-identity.service'
 import { SessionService } from '../session.service'
 import type { AccessTokenPayload } from '../token.service'
 import { UserCacheService } from '../user-cache.service'
 
+import { OAuthAvatarRehostService } from './oauth-avatar-rehost.service'
 import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce'
 import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory'
 
 import type { OAuthProvider, Prisma, User } from '@/generated/prisma/client'
+import { StorageService } from '@/infrastructure/storage'
 
 interface LoginCallbackResult {
   mode: 'login'
@@ -67,7 +70,9 @@ export class OAuthService {
     private readonly emailIdentity: EmailIdentityService,
     private readonly logger: PinoLogger,
     private readonly env: EnvService,
-    private readonly invitationAuthority: InvitationContinuationService
+    private readonly invitationAuthority: InvitationContinuationService,
+    private readonly storage: StorageService,
+    private readonly avatarRehost: OAuthAvatarRehostService
   ) {
     this.logger.setContext(OAuthService.name)
   }
@@ -262,6 +267,8 @@ export class OAuthService {
     }
 
     this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
+    if (!user.avatarKey && profile.avatarSourceUrl)
+      this.avatarRehost.schedule(user.id, profile.avatarSourceUrl)
 
     return {
       mode: 'login',
@@ -410,7 +417,6 @@ export class OAuthService {
         emailCanonical,
         emailVerified: profile.emailVerified,
         name: profile.displayName,
-        avatarUrl: profile.avatarUrl,
         // Seed from the negotiated locale (D2); omit to take the DB default.
         ...(locale ? { locale } : {}),
         lastLoginAt: new Date(),
@@ -425,7 +431,7 @@ export class OAuthService {
       email: user.email,
       emailVerified: user.emailVerified,
       name: user.name,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: avatarUrlOf(this.storage, user.avatarKey),
       phone: user.phone,
       locale: parseSupportedLocale(user.locale),
       timezone: user.timezone,

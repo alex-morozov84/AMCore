@@ -85,7 +85,7 @@ export class TelegramProvider implements OAuthProvider {
       email: null,
       emailVerified: false,
       displayName: (userInfo.name as string) ?? null,
-      avatarUrl: null,
+      avatarSourceUrl: null,
       phone: (userInfo.phone_number as string) ?? null,
     }
   }

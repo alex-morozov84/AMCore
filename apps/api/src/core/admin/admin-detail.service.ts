@@ -22,10 +22,14 @@ import {
 } from './admin-detail-projection'
 
 import { Prisma } from '@/generated/prisma/client'
+import { StorageService } from '@/infrastructure/storage'
 
 @Injectable()
 export class AdminDetailService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService
+  ) {}
 
   async user(
     id: string,
@@ -59,7 +63,7 @@ export class AdminDetailService {
           take: limit,
         })
         return {
-          user: projectDetailUser(user),
+          user: projectDetailUser(user, this.storage),
           membershipCount,
           memberships: {
             data: rows.map((row) => ({

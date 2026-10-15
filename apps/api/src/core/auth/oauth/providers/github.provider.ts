@@ -96,7 +96,7 @@ export class GitHubProvider implements OAuthProvider {
       email: primary?.email ?? user.email ?? null,
       emailVerified: primary?.verified ?? false,
       displayName: user.name ?? user.login,
-      avatarUrl: user.avatar_url ?? null,
+      avatarSourceUrl: user.avatar_url ?? null,
     }
   }
 }

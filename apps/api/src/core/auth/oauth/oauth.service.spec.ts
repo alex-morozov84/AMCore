@@ -138,7 +138,9 @@ describe('OAuthService', () => {
       new EmailIdentityService(),
       mockLogger,
       env as never,
-      invitationAuthority as never
+      invitationAuthority as never,
+      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never,
+      { schedule: jest.fn() } as never
     )
   })
 

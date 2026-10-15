@@ -134,7 +134,7 @@ describe('AppleProvider', () => {
         email: 'user@privaterelay.appleid.com',
         emailVerified: true,
         displayName: null,
-        avatarUrl: null,
+        avatarSourceUrl: null,
       })
     })
 
@@ -152,7 +152,7 @@ describe('AppleProvider', () => {
       const result = await provider.getUserProfile({ accessToken: 'token' })
 
       expect(result.displayName).toBeNull()
-      expect(result.avatarUrl).toBeNull()
+      expect(result.avatarSourceUrl).toBeNull()
     })
   })
 })

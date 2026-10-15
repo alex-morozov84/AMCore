@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a strict aggregate and retain focused API repetitions pending equivalence proof.
   Document how contributors add tests to their CI groups.
 
+- **Breaking:** the database stores the avatar object key, not a URL. `User.avatarUrl` is
+  replaced by `User.avatarKey` (migration `20261015120000_user_avatar_key`, no data
+  migration: re-upload the avatar, or sign in again with OAuth). API responses still return
+  `avatarUrl`, now computed from the key on every response, so a new
+  `STORAGE_PUBLIC_BASE_URL` takes effect without rewriting data. `OAuthUserProfile.avatarUrl`
+  is renamed `avatarSourceUrl`. OAuth profile pictures are copied once into own storage after
+  sign-in (only when the user has no avatar, https allow-listed hosts, no redirects, size and
+  time limits) and the provider URL is never stored or sent to a browser.
+
 - **Breaking:** storage public files use a reserved key namespace and an explicit
   delivery mode. Keys under `public/` are public and every other key is private; the
   `visibility` metadata tag is gone. By default (`STORAGE_PUBLIC_DELIVERY=external`)

@@ -58,15 +58,15 @@ The implementation:
    namespace, `public/avatars/{userId}/v-{version}/`,
    with `cacheControl: public, max-age=31536000, immutable`
    (safe because keys are versioned);
-3. stores the public URL of `avatar-256` in `User.avatarUrl` (unchanged
-   compatibility field) and invalidates the user cache;
+3. stores the object key of `avatar-256` in `User.avatarKey` (the API computes
+   `avatarUrl` from it on every response) and invalidates the user cache;
 4. best-effort sweeps older versions and the legacy flat `avatars/{userId}`
    object after the new version is live.
 
-The HTTP response shape is unchanged: `{ avatarUrl }`.
+The HTTP response shape is unchanged: `{ avatarUrl }`. The URL is derived from the stored key, so it changes with `STORAGE_PUBLIC_BASE_URL` and must not be persisted by clients.
 
 Delete is idempotent and **fail-closed** — it removes every object under
-`avatars/{userId}/` and `public/avatars/{userId}/` plus the legacy flat object, and clears `avatarUrl` only
+`avatars/{userId}/` and `public/avatars/{userId}/` plus the legacy flat object, and clears `avatarKey` only
 after storage cleanup succeeds:
 
 ```http
