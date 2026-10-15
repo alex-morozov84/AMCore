@@ -188,7 +188,7 @@ output and ADR-071 for the safety model. It does:
 3. Return a static locale from `src/i18n/request.ts` — next-intl's
    ["without i18n routing"](https://next-intl.dev/docs/getting-started/app-router/without-i18n-routing)
    setup.
-4. Remove the `LocaleSwitcher` feature and every render call site. The
+4. Remove the `LocaleSwitcher` feature and every render call site (the shell header renders it). The
    backend's `PATCH /auth/me` locale persistence is **not** removed — it
    becomes dead (no caller), not incorrect, and is a manual follow-up if you
    want it gone too.

@@ -52,7 +52,7 @@ re-checks the real bytes. Failures are sorted by HTTP status, never by message t
 <AppShell headerEnd={<AccountMenu />} /* ... */ />
 ```
 
-To move it (sidebar footer, own shell), render `<AccountMenu />` elsewhere. To restyle it, edit the
+To move it (for example into your own sidebar footer or shell), render `<AccountMenu />` elsewhere. To restyle it, edit the
 JSX; it uses shared primitives and semantic tokens. To replace it, build your own UI over
 `useCurrentUser` and `useAvatarEditor` and pass it to `headerEnd`, or drop the slot.
 
@@ -64,6 +64,21 @@ swaps `AccountMenu` for an inline component that uses only `useCurrentUser`, `us
 command to run it. Add `--projected` to prepare it after `init:project` choices. The test uploads
 and removes a photo through the real API and checks that the image loads and the page has no axe
 violations.
+
+## Header layout, loading and cursor
+
+The header end holds two blocks, left to right: the language switcher (rendered by `AppShell`
+itself) and the account menu from the `headerEnd` slot. The sidebar has no footer.
+
+While the current user loads, `AccountMenu` shows a skeleton with the same footprint as the loaded
+trigger, so nothing in the header jumps when the user arrives and nothing flickers on reload. The
+name slot has one fixed width in both states (long names are cut with an ellipsis; the name is
+hidden below the `sm` breakpoint). A replacement block should keep the same rule: reserve its final
+size while loading instead of rendering nothing. When the request ends without a user (signed out),
+the block renders nothing.
+
+Clickable menu items (plain, checkbox, radio and submenu triggers) show the pointer cursor. That
+comes from the shared `dropdown-menu` component, so every menu in the product behaves the same.
 
 ## Where avatars come from
 

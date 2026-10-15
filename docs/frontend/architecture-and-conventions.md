@@ -316,7 +316,7 @@ Locale resolution order: URL prefix → the signed-in user's stored
 `User.locale` (applied at the post-login redirect) → the `NEXT_LOCALE` cookie →
 `Accept-Language` → `DEFAULT_LOCALE`. An explicit URL prefix always wins for
 the request it is on, so following a `/ru/...` link is never overridden
-mid-session. The language switcher writes both the cookie and — when signed
+mid-session. The language switcher (in the shell header) writes both the cookie and — when signed
 in — `PATCH /auth/me`, so the choice follows the user to other devices and to
 their email.
 
