@@ -10,6 +10,8 @@ import {
 } from '@aws-sdk/client-s3'
 import { Injectable } from '@nestjs/common'
 
+import { createS3Client } from './providers/s3-client.factory'
+
 import { EnvService } from '@/env/env.service'
 
 /** Reserved diagnostic bytes never enter the user-object/metadata namespace. */
@@ -20,18 +22,16 @@ export class StorageProbeIo {
 
   constructor(private readonly env: EnvService) {
     if (env.get('STORAGE_DRIVER') !== 's3') return
-    this.client = new S3Client({
-      region: env.get('STORAGE_REGION'),
-      endpoint: env.get('STORAGE_ENDPOINT') || undefined,
-      credentials: {
+    this.client = createS3Client(
+      {
+        region: env.get('STORAGE_REGION'),
+        endpoint: env.get('STORAGE_ENDPOINT'),
         accessKeyId: env.get('STORAGE_ACCESS_KEY_ID')!,
         secretAccessKey: env.get('STORAGE_SECRET_ACCESS_KEY')!,
+        forcePathStyle: env.get('STORAGE_FORCE_PATH_STYLE'),
       },
-      forcePathStyle: env.get('STORAGE_FORCE_PATH_STYLE'),
-      requestChecksumCalculation: 'WHEN_REQUIRED',
-      responseChecksumValidation: 'WHEN_REQUIRED',
-      maxAttempts: 1,
-    })
+      { maxAttempts: 1 }
+    )
   }
 
   async write(key: string, body: Buffer, signal: AbortSignal): Promise<void> {

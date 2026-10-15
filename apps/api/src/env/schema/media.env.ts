@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Media processing (image derivatives — see ai/MEDIA_PROCESSING_PLAN.md). Decode-
+// Media processing (image derivatives). Decode-
 // safety limits applied before/around sharp. Source bytes are capped before
 // download; decoded dimensions/pixels are validated after metadata.
 // `MEDIA_SHARP_LIMIT_INPUT_PIXELS` is the hard libvips decode guard (defense-in-

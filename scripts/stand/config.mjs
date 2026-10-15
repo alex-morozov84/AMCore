@@ -31,6 +31,8 @@ export async function configuration(m) {
     JWT_SECRET: m.jwtSecret,
     GEOIP_ENABLED: 'false',
     STORAGE_DRIVER: 'local',
+    // The browser-facing API origin of this stand, so a public avatar URL resolves.
+    ...(m.origins.api && { STORAGE_PUBLIC_BASE_URL: `${m.origins.api}/api/v1/storage/public` }),
     EMAIL_PROVIDER: 'mock',
     FRONTEND_URL: m.origins.product,
     CORS_ORIGIN: Object.values(m.origins).join(','),

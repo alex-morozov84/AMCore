@@ -22,12 +22,66 @@ function storageRules(env: EnvResolved, ctx: RefinementCtx): void {
     }
   }
 
+  publicLocationRules(env, ctx)
+
   if (env.STORAGE_SIGNED_URL_DEFAULT_TTL > env.STORAGE_SIGNED_URL_MAX_TTL) {
     ctx.addIssue({
       code: 'custom',
       path: ['STORAGE_SIGNED_URL_DEFAULT_TTL'],
       message: 'STORAGE_SIGNED_URL_DEFAULT_TTL must be <= STORAGE_SIGNED_URL_MAX_TTL',
     })
+  }
+}
+
+// Public location: URLs are never synthesized, so a driver that serves public files
+// needs the explicit base, and the presign endpoint must stay a bare S3 API origin
+// (a CDN path there makes the SDK sign a wrong host and path).
+function publicLocationRules(env: EnvResolved, ctx: RefinementCtx): void {
+  if (env.STORAGE_DRIVER !== 'memory' && !env.STORAGE_PUBLIC_BASE_URL) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PUBLIC_BASE_URL'],
+      message: `STORAGE_PUBLIC_BASE_URL is required when STORAGE_DRIVER is ${env.STORAGE_DRIVER}`,
+    })
+  }
+  const base = parseUrl(env.STORAGE_PUBLIC_BASE_URL)
+  if (base && (base.search || base.hash)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PUBLIC_BASE_URL'],
+      message: 'STORAGE_PUBLIC_BASE_URL must not contain a query string or fragment',
+    })
+  }
+  // An ACL can be accepted and silently ignored (measured on SeaweedFS and Garage), and only
+  // the delivery check notices, so `acl` never runs without it.
+  if (
+    env.STORAGE_DRIVER === 's3' &&
+    env.STORAGE_PUBLIC_DELIVERY === 'acl' &&
+    !env.STORAGE_PUBLIC_CHECK_ENABLED
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PUBLIC_CHECK_ENABLED'],
+      message: 'STORAGE_PUBLIC_CHECK_ENABLED must be true when STORAGE_PUBLIC_DELIVERY is acl',
+    })
+  }
+  const presign = parseUrl(env.STORAGE_PRESIGN_ENDPOINT)
+  if (presign && (presign.pathname !== '/' || presign.search || presign.hash)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PRESIGN_ENDPOINT'],
+      message:
+        'STORAGE_PRESIGN_ENDPOINT must be a bare S3 API origin without a path; set the CDN or public base in STORAGE_PUBLIC_BASE_URL',
+    })
+  }
+}
+
+function parseUrl(value: string | undefined): URL | undefined {
+  if (!value) return undefined
+  try {
+    return new URL(value)
+  } catch {
+    return undefined
   }
 }
 

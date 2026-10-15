@@ -85,6 +85,7 @@ describe('env schema fingerprint (behavior-preservation corpus)', () => {
             NODE_ENV: 'production',
             DATABASE_URL: PROD_DB,
             STORAGE_DRIVER: 'local',
+            STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
           })
         )
       ).toMatchSnapshot()
@@ -101,6 +102,7 @@ describe('env schema fingerprint (behavior-preservation corpus)', () => {
             STORAGE_ACCESS_KEY_ID: 'akid',
             STORAGE_SECRET_ACCESS_KEY: 'secret',
             STORAGE_REGION: 'us-east-1',
+            STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
           })
         )
       ).toMatchSnapshot()

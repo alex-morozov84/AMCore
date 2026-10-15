@@ -40,7 +40,7 @@ raster images.
 
 ## Avatar Flow
 
-The shipped avatar consumer is the one explicit public-read example. As of the
+The shipped avatar consumer is the one example that publishes files. As of the
 media-processing arc it runs the validated upload through the
 [Media](../media/README.md) pipeline rather than storing the raw upload.
 
@@ -54,8 +54,9 @@ The implementation:
 
 1. stores the uploaded **original privately** under a per-upload versioned key
    `avatars/{userId}/v-{version}/original`;
-2. generates public WebP derivatives (`avatar-128/256/512.webp`) under the same
-   `v-{version}/` prefix, with `cacheControl: public, max-age=31536000, immutable`
+2. generates public WebP derivatives (`avatar-128/256/512.webp`) under the public
+   namespace, `public/avatars/{userId}/v-{version}/`,
+   with `cacheControl: public, max-age=31536000, immutable`
    (safe because keys are versioned);
 3. stores the public URL of `avatar-256` in `User.avatarUrl` (unchanged
    compatibility field) and invalidates the user cache;
@@ -65,7 +66,7 @@ The implementation:
 The HTTP response shape is unchanged: `{ avatarUrl }`.
 
 Delete is idempotent and **fail-closed** — it removes every object under
-`avatars/{userId}/` plus the legacy flat object, and clears `avatarUrl` only
+`avatars/{userId}/` and `public/avatars/{userId}/` plus the legacy flat object, and clears `avatarUrl` only
 after storage cleanup succeeds:
 
 ```http
@@ -86,7 +87,7 @@ or a Redis outage the upload/delete **fails closed** with a retriable
 
 ## Private Files
 
-For private user files, keep `visibility` omitted or set to `private`. Do not
+For private user files, use a key outside `public/`. Do not
 return `getPublicUrl`. Use either:
 
 - `getSignedDownloadUrl({ key })` for a time-limited S3 URL, or

@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus'
+import { PinoLogger } from 'nestjs-pino'
 
 import { StorageService } from './storage.service'
+import { classifyFailure, type StorageFailureClass } from './storage-failure'
 
 import { EnvService } from '@/env/env.service'
 
@@ -18,23 +20,47 @@ import { EnvService } from '@/env/env.service'
  * credentials can point it inside their allowed prefix (avoids a false 403);
  * Missing-key HEAD may still return 403 without ListBucket; that access
  * ambiguity must not be described as a definitive provider outage.
+ *
+ * `/health/ready` is unauthenticated, so the `down` detail is only a failure
+ * class (`access_denied` or `io_error`). The provider's own message (endpoint,
+ * bucket, request id) goes to the log, never into the response.
  */
 @Injectable()
 export class StorageHealthIndicator {
+  /** Orchestrators poll readiness every few seconds; log only when the failure class changes. */
+  private lastFailure: StorageFailureClass | null = null
+
   constructor(
     private readonly storage: StorageService,
     private readonly healthIndicatorService: HealthIndicatorService,
-    private readonly env: EnvService
+    private readonly env: EnvService,
+    private readonly logger: PinoLogger
   ) {}
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key)
     try {
       await this.storage.exists(this.env.get('STORAGE_HEALTH_PROBE_KEY'))
+      if (this.lastFailure) {
+        this.logger.info({
+          event: 'storage_health_recovered',
+          driver: this.env.get('STORAGE_DRIVER'),
+        })
+        this.lastFailure = null
+      }
       return indicator.up()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Storage health check failed'
-      return indicator.down({ message })
+      const failure = classifyFailure(error)
+      if (failure !== this.lastFailure) {
+        this.logger.warn({
+          event: 'storage_health_failed',
+          driver: this.env.get('STORAGE_DRIVER'),
+          failure,
+          err: error,
+        })
+        this.lastFailure = failure
+      }
+      return indicator.down({ failure })
     }
   }
 }

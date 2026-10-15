@@ -1,6 +1,8 @@
 import { ZodError } from 'zod'
 
 import { validate } from './env'
+import { LOCAL_PUBLIC_ROUTE_PATH } from './env/schema/refinements/derive-defaults'
+import { API_GLOBAL_PREFIX } from './swagger.config'
 
 describe('env validation', () => {
   const baseEnv = {
@@ -320,6 +322,7 @@ describe('env validation', () => {
       ...baseEnv,
       NODE_ENV: 'production',
       STORAGE_DRIVER: 'local',
+      STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
     })
 
@@ -358,6 +361,7 @@ describe('env validation', () => {
       ...baseEnv,
       NODE_ENV: 'production',
       STORAGE_DRIVER: 'local',
+      STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
     })
 
@@ -369,6 +373,7 @@ describe('env validation', () => {
       ...baseEnv,
       NODE_ENV: 'production',
       STORAGE_DRIVER: 'local',
+      STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=verify-full',
     })
 
@@ -380,6 +385,7 @@ describe('env validation', () => {
       ...baseEnv,
       NODE_ENV: 'production',
       STORAGE_DRIVER: 'local',
+      STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=REQUIRE',
     })
 
@@ -402,6 +408,7 @@ describe('env validation', () => {
         ...baseEnv,
         NODE_ENV: 'production',
         STORAGE_DRIVER: 'local',
+        STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
         DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=prefer',
       })
     ).toThrow(ZodError)
@@ -430,6 +437,7 @@ describe('env validation', () => {
       STORAGE_BUCKET: 'amcore-prod',
       STORAGE_ACCESS_KEY_ID: 'AKIA_TEST',
       STORAGE_SECRET_ACCESS_KEY: 'secret-test',
+      STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
     })
 
     expect(env.STORAGE_DRIVER).toBe('s3')
@@ -453,5 +461,153 @@ describe('env validation', () => {
     expect(() =>
       validate({ ...baseEnv, MEDIA_MAX_PIXELS: '1000', MEDIA_SHARP_LIMIT_INPUT_PIXELS: '2000' })
     ).toThrow(ZodError)
+  })
+
+  describe('storage public location', () => {
+    const production = {
+      ...baseEnv,
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/amcore?sslmode=require',
+    }
+    const s3 = {
+      ...production,
+      STORAGE_DRIVER: 's3',
+      STORAGE_BUCKET: 'amcore-prod',
+      STORAGE_ACCESS_KEY_ID: 'AKIA_TEST',
+      STORAGE_SECRET_ACCESS_KEY: 'secret-test',
+    }
+    const issuePaths = (config: Record<string, unknown>): string[] => {
+      try {
+        validate(config)
+        return []
+      } catch (error) {
+        return (error as ZodError).issues.map((issue) => issue.path.join('.'))
+      }
+    }
+
+    it('defaults to the external mode with no public bucket and no presign endpoint', () => {
+      const env = validate(baseEnv)
+      expect(env.STORAGE_PUBLIC_DELIVERY).toBe('external')
+      expect(env.STORAGE_PUBLIC_BUCKET).toBeUndefined()
+      expect(env.STORAGE_PRESIGN_ENDPOINT).toBeUndefined()
+    })
+
+    it('points the local development driver at its own public route without configuration', () => {
+      expect(validate(baseEnv).STORAGE_PUBLIC_BASE_URL).toBe(
+        `http://localhost:5002${LOCAL_PUBLIC_ROUTE_PATH}`
+      )
+      expect(validate({ ...baseEnv, API_PORT: '6100' }).STORAGE_PUBLIC_BASE_URL).toBe(
+        `http://localhost:6100${LOCAL_PUBLIC_ROUTE_PATH}`
+      )
+    })
+
+    it('keeps the local route path equal to the global prefix plus the controller route', () => {
+      expect(LOCAL_PUBLIC_ROUTE_PATH).toBe(`/${API_GLOBAL_PREFIX}/storage/public`)
+    })
+
+    it('never guesses a base in production or for s3', () => {
+      expect(issuePaths({ ...production, STORAGE_DRIVER: 'local' })).toContain(
+        'STORAGE_PUBLIC_BASE_URL'
+      )
+      expect(issuePaths(s3)).toContain('STORAGE_PUBLIC_BASE_URL')
+      expect(issuePaths({ ...baseEnv, STORAGE_DRIVER: 's3' })).toContain('STORAGE_PUBLIC_BASE_URL')
+    })
+
+    it('accepts an s3 deployment with an explicit base, bucket and mode', () => {
+      const env = validate({
+        ...s3,
+        STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+        STORAGE_PUBLIC_BUCKET: 'amcore-public',
+        STORAGE_PUBLIC_DELIVERY: 'acl',
+        STORAGE_PRESIGN_ENDPOINT: 'https://s3.example.com',
+      })
+      expect(env).toMatchObject({
+        STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+        STORAGE_PUBLIC_BUCKET: 'amcore-public',
+        STORAGE_PUBLIC_DELIVERY: 'acl',
+        STORAGE_PRESIGN_ENDPOINT: 'https://s3.example.com',
+      })
+    })
+
+    it('accepts the api delivery mode with the public route as the base', () => {
+      const env = validate({
+        ...s3,
+        STORAGE_PUBLIC_DELIVERY: 'api',
+        STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
+      })
+      expect(env.STORAGE_PUBLIC_DELIVERY).toBe('api')
+      expect(issuePaths({ ...s3, STORAGE_PUBLIC_DELIVERY: 'api' })).toContain(
+        'STORAGE_PUBLIC_BASE_URL'
+      )
+    })
+
+    it('does not need a base for the in-memory test driver', () => {
+      expect(validate({ ...baseEnv, NODE_ENV: 'test' }).STORAGE_PUBLIC_BASE_URL).toBeUndefined()
+    })
+
+    it.each(['https://cdn.example.com/assets?x=1', 'https://cdn.example.com/assets#frag'])(
+      'rejects a public base with a query or fragment: %s',
+      (base) => {
+        expect(issuePaths({ ...s3, STORAGE_PUBLIC_BASE_URL: base })).toContain(
+          'STORAGE_PUBLIC_BASE_URL'
+        )
+      }
+    )
+
+    it.each(['https://cdn.example.com/assets', 'https://s3.example.com/?a=1'])(
+      'rejects a presign endpoint that is not a bare origin: %s',
+      (endpoint) => {
+        expect(
+          issuePaths({
+            ...s3,
+            STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+            STORAGE_PRESIGN_ENDPOINT: endpoint,
+          })
+        ).toContain('STORAGE_PRESIGN_ENDPOINT')
+      }
+    )
+
+    it('defaults the public-delivery check to hourly and enabled', () => {
+      const env = validate(baseEnv)
+      expect(env.STORAGE_PUBLIC_CHECK_ENABLED).toBe(true)
+      expect(env.STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS).toBe(3600)
+      expect(env.STORAGE_PUBLIC_CHECK_TIMEOUT_SECONDS).toBe(10)
+    })
+
+    it.each(['299', '86401'])(
+      'rejects a check interval outside 5 minutes - 24 hours: %s',
+      (value) => {
+        expect(issuePaths({ ...baseEnv, STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS: value })).toContain(
+          'STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS'
+        )
+      }
+    )
+
+    it('does not let acl mode run without the check that can see an ignored ACL', () => {
+      const acl = {
+        ...s3,
+        STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+        STORAGE_PUBLIC_DELIVERY: 'acl',
+      }
+      expect(issuePaths({ ...acl, STORAGE_PUBLIC_CHECK_ENABLED: 'false' })).toContain(
+        'STORAGE_PUBLIC_CHECK_ENABLED'
+      )
+      expect(issuePaths(acl)).not.toContain('STORAGE_PUBLIC_CHECK_ENABLED')
+      expect(
+        issuePaths({
+          ...s3,
+          STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+          STORAGE_PUBLIC_CHECK_ENABLED: 'false',
+        })
+      ).not.toContain('STORAGE_PUBLIC_CHECK_ENABLED')
+    })
+
+    it('rejects an unknown delivery mode and the removed variables are ignored', () => {
+      expect(issuePaths({ ...baseEnv, STORAGE_PUBLIC_DELIVERY: 'public-acl' })).toContain(
+        'STORAGE_PUBLIC_DELIVERY'
+      )
+      const env = validate({ ...baseEnv, STORAGE_PUBLIC_ENDPOINT: 'https://x.test' })
+      expect(env).not.toHaveProperty('STORAGE_PUBLIC_ENDPOINT')
+    })
   })
 })

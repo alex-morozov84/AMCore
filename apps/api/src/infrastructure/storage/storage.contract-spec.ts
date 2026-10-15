@@ -19,18 +19,25 @@ import type { StorageProvider } from './storage.interface'
 export interface StorageContractOptions {
   signedUrls: boolean
   publicUrls: boolean
+  /**
+   * Public and private keys live in different stores (two S3 buckets), so a list prefix
+   * that spans both namespaces (`''`) is ambiguous and refused. When false, an empty
+   * prefix lists every key.
+   */
+  separateNamespaces?: boolean
 }
 
 export function runStorageProviderContract(
   name: string,
-  createProvider: () => StorageProvider,
+  /** A fresh, empty provider per test; a wire backend may create its buckets asynchronously. */
+  createProvider: () => StorageProvider | Promise<StorageProvider>,
   options: StorageContractOptions
 ): void {
   describe(`StorageProvider contract: ${name}`, () => {
     let provider: StorageProvider
 
-    beforeEach(() => {
-      provider = createProvider()
+    beforeEach(async () => {
+      provider = await createProvider()
     })
 
     describe('upload + download', () => {
@@ -81,24 +88,60 @@ export function runStorageProviderContract(
         expect(meta.contentType).toBe('text/plain')
       })
 
+      it('returns the cache control stored at upload, and none when absent', async () => {
+        await provider.upload({
+          key: 'docs/cached.txt',
+          body: Buffer.from('c'),
+          cacheControl: 'public, max-age=60',
+        })
+        await provider.upload({ key: 'docs/uncached.txt', body: Buffer.from('u') })
+        expect((await provider.getMetadata('docs/cached.txt')).cacheControl).toBe(
+          'public, max-age=60'
+        )
+        expect((await provider.getMetadata('docs/uncached.txt')).cacheControl).toBeUndefined()
+      })
+
       it('rejects for a missing key', async () => {
         await expect(provider.getMetadata('docs/missing.txt')).rejects.toThrow()
       })
     })
 
-    describe('visibility (private by default)', () => {
-      it('defaults to private when omitted', async () => {
+    describe('visibility (the key namespace decides)', () => {
+      it('is private for a key outside the public namespace', async () => {
         await provider.upload({ key: 'v/private.txt', body: Buffer.from('p') })
         expect((await provider.getMetadata('v/private.txt')).visibility).toBe('private')
       })
 
-      it('persists an explicit public-read visibility', async () => {
+      it('is public for a key under public/, with or without the explicit value', async () => {
+        await provider.upload({ key: 'public/v/a.txt', body: Buffer.from('p') })
         await provider.upload({
-          key: 'v/public.txt',
+          key: 'public/v/b.txt',
           body: Buffer.from('p'),
           visibility: 'public-read',
         })
-        expect((await provider.getMetadata('v/public.txt')).visibility).toBe('public-read')
+        expect((await provider.getMetadata('public/v/a.txt')).visibility).toBe('public-read')
+        expect((await provider.getMetadata('public/v/b.txt')).visibility).toBe('public-read')
+      })
+
+      it('rejects a visibility that contradicts the key namespace', async () => {
+        await expect(
+          provider.upload({ key: 'v/x.txt', body: Buffer.from('p'), visibility: 'public-read' })
+        ).rejects.toBeInstanceOf(InvalidObjectKeyError)
+        await expect(
+          provider.upload({ key: 'public/v/x.txt', body: Buffer.from('p'), visibility: 'private' })
+        ).rejects.toBeInstanceOf(InvalidObjectKeyError)
+      })
+
+      it('copies and moves within a namespace but never across it', async () => {
+        await provider.upload({ key: 'public/v/src.txt', body: Buffer.from('p') })
+        await provider.copy({ source: 'public/v/src.txt', destination: 'public/v/copy.txt' })
+        expect((await provider.getMetadata('public/v/copy.txt')).visibility).toBe('public-read')
+        await expect(
+          provider.copy({ source: 'public/v/src.txt', destination: 'v/private-copy.txt' })
+        ).rejects.toBeInstanceOf(InvalidObjectKeyError)
+        await expect(
+          provider.move({ source: 'public/v/src.txt', destination: 'v/private-move.txt' })
+        ).rejects.toBeInstanceOf(InvalidObjectKeyError)
       })
     })
 
@@ -147,6 +190,31 @@ export function runStorageProviderContract(
         const { files } = await provider.list({ prefix: 'list/a.txt' })
         expect(files[0]?.size).toBe(1)
       })
+
+      it('lists one namespace with a prefix inside it', async () => {
+        await provider.upload({ key: 'public/list/p.txt', body: Buffer.from('p') })
+        const publicOnly = await provider.list({ prefix: 'public/list/' })
+        expect(publicOnly.files.map((f) => f.key)).toEqual(['public/list/p.txt'])
+        const privateOnly = await provider.list({ prefix: 'list/' })
+        expect(privateOnly.files.map((f) => f.key).sort()).toEqual(['list/a.txt', 'list/b.txt'])
+      })
+
+      if (options.separateNamespaces) {
+        it('refuses an empty prefix because it spans both stores', async () => {
+          await expect(provider.list({ prefix: '' })).rejects.toBeInstanceOf(InvalidObjectKeyError)
+        })
+      } else {
+        it('lists every key, public and private, with an empty prefix', async () => {
+          await provider.upload({ key: 'public/list/p.txt', body: Buffer.from('p') })
+          const { files } = await provider.list({ prefix: '' })
+          expect(files.map((f) => f.key).sort()).toEqual([
+            'list/a.txt',
+            'list/b.txt',
+            'other/c.txt',
+            'public/list/p.txt',
+          ])
+        })
+      }
 
       it('paginates with maxKeys + continuationToken', async () => {
         const first = await provider.list({ prefix: 'list/', maxKeys: 1 })
@@ -241,7 +309,11 @@ export function runStorageProviderContract(
 
       if (!options.publicUrls) {
         it('throws clearly on getPublicUrl when unsupported', () => {
-          expect(() => provider.getPublicUrl('docs/a.txt')).toThrow()
+          expect(() => provider.getPublicUrl('public/docs/a.txt')).toThrow()
+        })
+      } else {
+        it('refuses a public URL for a private key', () => {
+          expect(() => provider.getPublicUrl('docs/a.txt')).toThrow(InvalidObjectKeyError)
         })
       }
     })

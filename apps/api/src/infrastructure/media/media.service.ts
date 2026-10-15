@@ -56,6 +56,7 @@ export class MediaService {
           version: input.version,
           variant: spec.name,
           format: spec.format,
+          visibility: input.visibility,
         })
         await this.storage.upload({
           key,

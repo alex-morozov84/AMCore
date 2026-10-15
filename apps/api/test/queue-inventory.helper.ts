@@ -66,6 +66,8 @@ export async function compileQueueGraph(
     process.env.CORS_ORIGIN = 'https://app.example.com'
     // Production would default to S3 and then demand a bucket and keys: irrelevant to the mount gate.
     process.env.STORAGE_DRIVER = 'local'
+    // Production also needs the explicit public base (nothing is guessed outside development).
+    process.env.STORAGE_PUBLIC_BASE_URL = 'https://api.example.com/api/v1/storage/public'
   }
   process.env.PROCESS_ROLE = role
   delete process.env.ENABLE_BULL_BOARD

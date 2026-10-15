@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { OUTPUT_EXT } from './media.constants'
 import type { ImageOutputFormat } from './media.types'
 
-import { normalizeObjectKey } from '@/infrastructure/storage'
+import { normalizeObjectKey, PUBLIC_KEY_PREFIX } from '@/infrastructure/storage'
 
 /**
  * Generate a per-upload version token for cache-busting derivative keys. base36
@@ -25,6 +25,11 @@ export interface DerivativeKeyParts {
   /** Variant name (e.g. `avatar-256`). */
   variant: string
   format: ImageOutputFormat
+  /**
+   * `public-read` derivatives live under the reserved public namespace so a bucket or
+   * prefix the operator publishes never contains the private originals. Default `private`.
+   */
+  visibility?: 'private' | 'public-read'
 }
 
 /** A single key segment: alphanumerics, `_`, `-` only — no `/`, `.`, `:`, space. */
@@ -54,6 +59,7 @@ export function buildDerivativeKey(parts: DerivativeKeyParts): string {
   if (parts.version !== undefined) assertSafeSegment(parts.version, 'version')
 
   const versionSegment = parts.version ? `v-${parts.version}/` : ''
-  const key = `${parts.keyspace}/${parts.ownerId}/${versionSegment}${parts.variant}.${OUTPUT_EXT[parts.format]}`
+  const namespace = parts.visibility === 'public-read' ? PUBLIC_KEY_PREFIX : ''
+  const key = `${namespace}${parts.keyspace}/${parts.ownerId}/${versionSegment}${parts.variant}.${OUTPUT_EXT[parts.format]}`
   return normalizeObjectKey(key)
 }

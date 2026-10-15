@@ -50,7 +50,9 @@ arbitrary dimensions/quality; only named, server-defined preset variants exist.
 ## Originals vs Derivatives
 
 - Originals are stored **private** (`avatars/{userId}/v-{version}/original`).
-- Only generated raster derivatives are written `public-read`.
+- Only generated raster derivatives are public, and only under the reserved `public/`
+  namespace (`public/avatars/{userId}/v-{version}/…`). A prefix or bucket you publish
+  therefore never contains the originals ([Public Files](../storage/public-files.md)).
 - A public derivative is always a freshly encoded output, never the user-supplied
   original bytes.
 

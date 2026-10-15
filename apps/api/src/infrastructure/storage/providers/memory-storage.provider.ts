@@ -4,7 +4,6 @@ import { Readable } from 'node:stream'
 import { Injectable } from '@nestjs/common'
 
 import { normalizeObjectKey } from '../object-key'
-import { DEFAULT_VISIBILITY } from '../storage.constants'
 import {
   type CopyObjectInput,
   type FileInfo,
@@ -19,6 +18,7 @@ import {
   type UploadInput,
   type UploadResult,
 } from '../storage.interface'
+import { assertSameNamespace, resolveUploadVisibility } from '../storage-namespace'
 
 import { bufferFromBody } from './body.util'
 
@@ -46,13 +46,14 @@ export class MemoryStorageProvider implements StorageProvider {
   async upload(input: UploadInput): Promise<UploadResult> {
     const key = normalizeObjectKey(input.key)
     const body = await bufferFromBody(input.body)
-    const etag = createHash('md5').update(body).digest('hex')
+    const etag = createHash('sha256').update(body).digest('hex')
     const metadata: FileMetadata = {
       contentType: input.contentType,
       contentLength: body.length,
       etag,
       lastModified: new Date(),
-      visibility: input.visibility ?? DEFAULT_VISIBILITY,
+      cacheControl: input.cacheControl,
+      visibility: resolveUploadVisibility(key, input.visibility),
     }
     this.store.set(key, { body, metadata })
     return { key, size: body.length, etag, contentType: input.contentType }
@@ -116,6 +117,7 @@ export class MemoryStorageProvider implements StorageProvider {
   async copy(input: CopyObjectInput): Promise<void> {
     const source = this.require(input.source)
     const destination = normalizeObjectKey(input.destination)
+    assertSameNamespace(normalizeObjectKey(input.source), destination)
     this.store.set(destination, {
       body: Buffer.from(source.body),
       metadata: { ...source.metadata, lastModified: new Date() },

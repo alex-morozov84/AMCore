@@ -11,14 +11,14 @@ import {
   type ObjectIdentifier,
   PutObjectCommand,
   type PutObjectCommandInput,
-  S3Client,
+  type S3Client,
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Injectable } from '@nestjs/common'
 
-import { normalizeObjectKey } from '../object-key'
-import { DEFAULT_VISIBILITY, S3_DELETE_OBJECTS_MAX_KEYS } from '../storage.constants'
+import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key'
+import { S3_DELETE_OBJECTS_MAX_KEYS } from '../storage.constants'
 import {
   type CopyObjectInput,
   type FileMetadata,
@@ -33,21 +33,33 @@ import {
   type StorageProvider,
   type UploadInput,
   type UploadResult,
-  type Visibility,
 } from '../storage.interface'
+import {
+  assertSameNamespace,
+  classifyListPrefix,
+  isPublicKey,
+  PUBLIC_KEY_PREFIX,
+  resolveUploadVisibility,
+  visibilityOf,
+} from '../storage-namespace'
+import { buildBucketRootUrl, buildPublicRouteUrl } from '../storage-public-url'
 
 import { bufferFromBody } from './body.util'
+import { createS3Client, type S3ClientSettings } from './s3-client.factory'
 
-export interface S3StorageConfig {
+/** How a public key becomes readable. `api` is served by the public route, not by this driver. */
+export type S3PublicDelivery = 'external' | 'acl' | 'api'
+
+export interface S3StorageConfig extends S3ClientSettings {
   bucket: string
-  region: string
-  accessKeyId: string
-  secretAccessKey: string
-  /** SDK endpoint (may be internal/Docker). Omit for AWS. */
-  endpoint?: string
-  /** Browser-facing endpoint for public/presigned URLs. Falls back to `endpoint`. */
-  publicEndpoint?: string
-  forcePathStyle?: boolean
+  /** Bucket that holds `public/` keys. Defaults to `bucket` (one bucket, one publishable prefix). */
+  publicBucket?: string
+  /** Browser-facing S3 API origin used only to presign. Defaults to `endpoint`. */
+  presignEndpoint?: string
+  /** `external` never sends an ACL; `acl` sends `public-read` for `public/` keys. */
+  publicDelivery?: S3PublicDelivery
+  /** URL that maps to the root of the public bucket (CDN, custom or provider public domain). */
+  publicBaseUrl: string
   signedUrlDefaultTtl: number
   signedUrlMaxTtl: number
   /** Buffers larger than this go through lib-storage (multipart); default 5 MiB. */
@@ -58,12 +70,13 @@ const DEFAULT_MULTIPART_THRESHOLD = 5 * 1024 * 1024
 const SIGV4_MAX_TTL_SECONDS = 604800 // 7 days — SigV4 hard limit
 
 /**
- * Production S3 driver. Works with any S3-compatible provider (AWS, R2, DO
- * Spaces, Yandex, B2). Checksum calculation/validation are set to
- * `WHEN_REQUIRED` — without this, non-AWS providers reject the default
- * `x-amz-checksum-*` headers (the #1 production issue). Private-by-default;
- * `public-read` is an explicit opt-in via object ACL + a `visibility` metadata
- * tag (so it stays observable through `getMetadata`).
+ * Production S3 driver. Works with any S3-compatible provider (AWS, R2, Yandex,
+ * Selectel, VK Cloud, ...). Private by default. Visibility is the key namespace:
+ * objects under `public/` are the only ones the application publishes. In the
+ * default `external` mode the driver never sends an ACL, so it works where object
+ * ACLs are disabled or unsupported (AWS default buckets, R2, B2, Selectel); the
+ * operator publishes `public/*` or the public bucket. `acl` mode opts in to a
+ * per-object `public-read` for providers that enforce it.
  */
 @Injectable()
 export class S3StorageProvider implements StorageProvider {
@@ -72,22 +85,19 @@ export class S3StorageProvider implements StorageProvider {
   private readonly client: S3Client
   private readonly presignClient: S3Client
   private readonly multipartThreshold: number
+  private readonly publicBucket: string
+  private readonly useAcl: boolean
 
   constructor(private readonly config: S3StorageConfig) {
-    const base = {
-      region: config.region,
-      credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
-      forcePathStyle: config.forcePathStyle ?? false,
-      // CRITICAL: without these, non-AWS providers break (501 / InvalidArgument).
-      requestChecksumCalculation: 'WHEN_REQUIRED' as const,
-      responseChecksumValidation: 'WHEN_REQUIRED' as const,
-    }
-    this.client = new S3Client({ ...base, endpoint: config.endpoint || undefined })
+    this.client = createS3Client(config)
+    const presignOrigin = config.presignEndpoint
     this.presignClient =
-      config.publicEndpoint && config.publicEndpoint !== config.endpoint
-        ? new S3Client({ ...base, endpoint: config.publicEndpoint })
+      presignOrigin && presignOrigin !== config.endpoint
+        ? createS3Client(config, { endpoint: presignOrigin })
         : this.client
     this.multipartThreshold = config.multipartThreshold ?? DEFAULT_MULTIPART_THRESHOLD
+    this.publicBucket = config.publicBucket || config.bucket
+    this.useAcl = config.publicDelivery === 'acl'
   }
 
   async upload(input: UploadInput): Promise<UploadResult> {
@@ -114,7 +124,7 @@ export class S3StorageProvider implements StorageProvider {
     }
     // Stream body: size is unknown until stored — read it back via HEAD.
     const head = await this.client.send(
-      new HeadObjectCommand({ Bucket: this.config.bucket, Key: key })
+      new HeadObjectCommand({ Bucket: this.bucketFor(key), Key: key })
     )
     return {
       key,
@@ -139,7 +149,7 @@ export class S3StorageProvider implements StorageProvider {
     let res
     try {
       res = await this.client.send(
-        new HeadObjectCommand({ Bucket: this.config.bucket, Key: objectKey })
+        new HeadObjectCommand({ Bucket: this.bucketFor(objectKey), Key: objectKey })
       )
     } catch (err) {
       throw this.mapNotFound(err, key)
@@ -149,40 +159,49 @@ export class S3StorageProvider implements StorageProvider {
       contentLength: res.ContentLength ?? 0,
       etag: stripQuotes(res.ETag),
       lastModified: res.LastModified,
-      visibility: res.Metadata?.visibility as Visibility | undefined,
+      cacheControl: res.CacheControl,
+      // The namespace is authoritative by construction; reachability is the operator's
+      // setup, verified by the public-delivery check.
+      visibility: visibilityOf(objectKey),
     }
   }
 
   async delete(key: string): Promise<void> {
+    const objectKey = normalizeObjectKey(key)
     await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.config.bucket, Key: normalizeObjectKey(key) })
+      new DeleteObjectCommand({ Bucket: this.bucketFor(objectKey), Key: objectKey })
     )
   }
 
   async deleteMany(keys: string[]): Promise<void> {
-    const normalized = keys.map((k) => normalizeObjectKey(k))
+    const byBucket = new Map<string, string[]>()
+    for (const key of keys.map((k) => normalizeObjectKey(k))) {
+      const bucket = this.bucketFor(key)
+      byBucket.set(bucket, [...(byBucket.get(bucket) ?? []), key])
+    }
     const failures: StorageDeleteFailure[] = []
-    for (let i = 0; i < normalized.length; i += S3_DELETE_OBJECTS_MAX_KEYS) {
-      const chunk = normalized.slice(i, i + S3_DELETE_OBJECTS_MAX_KEYS)
-      const objects: ObjectIdentifier[] = chunk.map((Key) => ({ Key }))
-      const res = await this.client.send(
-        new DeleteObjectsCommand({
-          Bucket: this.config.bucket,
-          Delete: { Objects: objects, Quiet: true },
-        })
-      )
-      for (const err of res.Errors ?? []) {
-        // Carry only key + code — never credential material / secrets.
-        failures.push({ key: err.Key ?? '', code: err.Code })
+    for (const [bucket, bucketKeys] of byBucket) {
+      for (let i = 0; i < bucketKeys.length; i += S3_DELETE_OBJECTS_MAX_KEYS) {
+        const objects: ObjectIdentifier[] = bucketKeys
+          .slice(i, i + S3_DELETE_OBJECTS_MAX_KEYS)
+          .map((Key) => ({ Key }))
+        const res = await this.client.send(
+          new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: objects, Quiet: true } })
+        )
+        for (const err of res.Errors ?? []) {
+          // Carry only key + code — never credential material / secrets.
+          failures.push({ key: err.Key ?? '', code: err.Code })
+        }
       }
     }
     if (failures.length > 0) throw new StorageDeleteManyException(failures)
   }
 
   async exists(key: string): Promise<boolean> {
+    const objectKey = normalizeObjectKey(key)
     try {
       await this.client.send(
-        new HeadObjectCommand({ Bucket: this.config.bucket, Key: normalizeObjectKey(key) })
+        new HeadObjectCommand({ Bucket: this.bucketFor(objectKey), Key: objectKey })
       )
       return true
     } catch (err) {
@@ -194,7 +213,7 @@ export class S3StorageProvider implements StorageProvider {
   async list(input: ListInput): Promise<ListResult> {
     const res = await this.client.send(
       new ListObjectsV2Command({
-        Bucket: this.config.bucket,
+        Bucket: this.bucketForPrefix(input.prefix),
         Prefix: input.prefix,
         MaxKeys: input.maxKeys,
         ContinuationToken: input.continuationToken,
@@ -213,38 +232,47 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   getPublicUrl(key: string): string {
-    const objectKey = normalizeObjectKey(key)
-    // An explicit public endpoint is already the public base / CDN — concatenate
-    // directly, no bucket synthesis (it's the configured browser-facing root).
-    if (this.config.publicEndpoint) {
-      return `${this.config.publicEndpoint.replace(/\/+$/, '')}/${objectKey}`
-    }
-    // Otherwise derive a bucket-style URL from the SDK endpoint, or the AWS
-    // virtual-hosted default when no endpoint is configured.
-    if (!this.config.endpoint) {
-      return `https://${this.config.bucket}.s3.${this.config.region}.amazonaws.com/${objectKey}`
-    }
-    const url = new URL(this.config.endpoint)
-    if (this.config.forcePathStyle) {
-      return `${url.origin}/${this.config.bucket}/${objectKey}`
-    }
-    return `${url.protocol}//${this.config.bucket}.${url.host}/${objectKey}`
+    // `api` mode: the API public route serves the object with the application's own
+    // credentials, so the address is the route's query form, not a bucket-root form.
+    return this.config.publicDelivery === 'api'
+      ? buildPublicRouteUrl(this.config.publicBaseUrl, key)
+      : buildBucketRootUrl(this.config.publicBaseUrl, key)
   }
 
   async getSignedDownloadUrl(input: SignedDownloadInput): Promise<string> {
+    const key = normalizeObjectKey(input.key)
     const command = new GetObjectCommand({
-      Bucket: this.config.bucket,
-      Key: normalizeObjectKey(input.key),
+      Bucket: this.bucketFor(key),
+      Key: key,
       ResponseContentDisposition: input.contentDisposition,
       ResponseContentType: input.contentType,
     })
     return getSignedUrl(this.presignClient, command, { expiresIn: this.clampTtl(input.expiresIn) })
   }
 
+  /**
+   * The address the SDK uses for `key` (path-style or virtual-hosted, per provider
+   * configuration), minus the signature. Requesting it without credentials must be denied
+   * for a private object; deriving it from the SDK keeps the addressing rules in one place.
+   */
+  async getUnsignedObjectUrl(key: string): Promise<string> {
+    const objectKey = normalizeObjectKey(key)
+    const signed = new URL(
+      await getSignedUrl(
+        this.client,
+        new GetObjectCommand({ Bucket: this.bucketFor(objectKey), Key: objectKey }),
+        { expiresIn: 60 }
+      )
+    )
+    signed.search = ''
+    return signed.toString()
+  }
+
   async getSignedUploadUrl(input: SignedUploadInput): Promise<string> {
+    const key = normalizeObjectKey(input.key)
     const command = new PutObjectCommand({
-      Bucket: this.config.bucket,
-      Key: normalizeObjectKey(input.key),
+      Bucket: this.bucketFor(key),
+      Key: key,
       ContentType: input.contentType,
     })
     return getSignedUrl(this.presignClient, command, { expiresIn: this.clampTtl(input.expiresIn) })
@@ -252,12 +280,18 @@ export class S3StorageProvider implements StorageProvider {
 
   async copy(input: CopyObjectInput): Promise<void> {
     const source = normalizeObjectKey(input.source)
+    const destination = normalizeObjectKey(input.destination)
+    assertSameNamespace(source, destination)
+    const bucket = this.bucketFor(source)
     const encodedSource = source.split('/').map(encodeURIComponent).join('/')
     await this.client.send(
       new CopyObjectCommand({
-        Bucket: this.config.bucket,
-        CopySource: `${this.config.bucket}/${encodedSource}`,
-        Key: normalizeObjectKey(input.destination),
+        Bucket: bucket,
+        CopySource: `${bucket}/${encodedSource}`,
+        Key: destination,
+        // A copy does not inherit the source ACL (AWS sets it to private), so `acl`
+        // mode applies it again; `external` mode sends no ACL at all.
+        ACL: this.aclFor(destination),
       })
     )
   }
@@ -270,17 +304,33 @@ export class S3StorageProvider implements StorageProvider {
     await this.delete(input.source)
   }
 
+  private bucketFor(key: string): string {
+    return isPublicKey(key) ? this.publicBucket : this.config.bucket
+  }
+
+  private bucketForPrefix(prefix: string): string {
+    const scope = classifyListPrefix(prefix)
+    if (scope === 'public') return this.publicBucket
+    if (scope === 'private' || this.publicBucket === this.config.bucket) return this.config.bucket
+    throw new InvalidObjectKeyError(
+      `list prefix "${prefix}" spans both namespaces; use a prefix inside "${PUBLIC_KEY_PREFIX}" or outside it`
+    )
+  }
+
+  private aclFor(key: string): 'public-read' | undefined {
+    return this.useAcl && isPublicKey(key) ? 'public-read' : undefined
+  }
+
   private putParams(key: string, input: UploadInput): PutObjectCommandInput {
-    const visibility: Visibility = input.visibility ?? DEFAULT_VISIBILITY
+    resolveUploadVisibility(key, input.visibility)
     return {
-      Bucket: this.config.bucket,
+      Bucket: this.bucketFor(key),
       Key: key,
       ContentType: input.contentType,
       ContentDisposition: input.contentDisposition,
       CacheControl: input.cacheControl,
-      // Tag visibility in user metadata so it survives and is readable via HEAD.
-      Metadata: { ...input.metadata, visibility },
-      ACL: visibility === 'public-read' ? 'public-read' : undefined,
+      Metadata: input.metadata,
+      ACL: this.aclFor(key),
     }
   }
 
@@ -295,7 +345,7 @@ export class S3StorageProvider implements StorageProvider {
     let res: GetObjectCommandOutput
     try {
       res = await this.client.send(
-        new GetObjectCommand({ Bucket: this.config.bucket, Key: objectKey })
+        new GetObjectCommand({ Bucket: this.bucketFor(objectKey), Key: objectKey })
       )
     } catch (err) {
       throw this.mapNotFound(err, key)

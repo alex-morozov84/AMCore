@@ -95,6 +95,7 @@ COMPOSE_DATABASE_URL=postgresql://…?sslmode=require
 COMPOSE_REDIS_URL=rediss://…
 STORAGE_DRIVER=s3
 STORAGE_BUCKET=…  STORAGE_ACCESS_KEY_ID=…  STORAGE_SECRET_ACCESS_KEY=…  # + region/endpoint
+STORAGE_PUBLIC_BASE_URL=https://cdn.example.com   # root of the public bucket (see public files)
 # MIGRATION_DATABASE_URL=…              # only if COMPOSE_DATABASE_URL points at a pooler
 ```
 
@@ -107,7 +108,8 @@ docker compose up             # bundled postgres/redis skipped; migrate runs aga
 > Postgres/Redis. Set `COMPOSE_PROFILES=` empty for remote mode.
 
 Compose supplies `STORAGE_DRIVER=local` when it is unset, even with
-`NODE_ENV=production`. Select `STORAGE_DRIVER=s3` explicitly for this S3 example.
+`NODE_ENV=production`. Select `STORAGE_DRIVER=s3` explicitly for this S3 example, and
+publish the public location as described in [Public Files](../storage/public-files.md).
 For production files on the same VPS instead, use the
 [local storage setup](#production-local-files) below.
 
@@ -482,7 +484,7 @@ The dev-friendly Compose defaults are not a production configuration. With
 `NODE_ENV=production`, API environment validation requires:
 
 - `DATABASE_URL` includes `sslmode=require` or `sslmode=verify-full`;
-- S3 credentials when the selected driver is `s3`;
+- S3 credentials when the selected driver is `s3`, and `STORAGE_PUBLIC_BASE_URL` for `s3` and for `local`;
 - `JWT_SECRET` is a real secret ≥ 32 chars (`openssl rand -base64 32`).
 
 Choose `STORAGE_DRIVER` explicitly for production. Without Compose, an unset
@@ -520,7 +522,7 @@ Set the following values in `.env` when using the reference Compose stack:
 ```env
 STORAGE_DRIVER=local
 STORAGE_LOCAL_ROOT=/app/uploads
-STORAGE_LOCAL_PUBLIC_BASE_URL=https://api.example.com/api/v1/storage/public
+STORAGE_PUBLIC_BASE_URL=https://api.example.com/api/v1/storage/public
 ```
 
 Use your actual public API origin. If changing `STORAGE_LOCAL_ROOT`, change both
@@ -529,7 +531,7 @@ objects/meta/public together, and
 verify files after container recreation. A successful live probe alone does not
 establish persistence. Multi-host replicas need shared storage or S3.
 
-The API serves only explicitly public copies, with encoded keys. Never expose
+The API serves only copies of keys under `public/`, with encoded keys. Never expose
 the entire objects or metadata directory through a static server. See
 [local production](../storage/configuration.md#local-production)
 for the volume/backup/public-file contract and independent monitoring settings.

@@ -7,7 +7,6 @@ import { Readable } from 'node:stream'
 import { Injectable } from '@nestjs/common'
 
 import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key'
-import { DEFAULT_VISIBILITY } from '../storage.constants'
 import {
   type CopyObjectInput,
   type FileInfo,
@@ -21,22 +20,28 @@ import {
   type StorageProvider,
   type UploadInput,
   type UploadResult,
-  type Visibility,
 } from '../storage.interface'
+import {
+  assertSameNamespace,
+  isPublicKey,
+  resolveUploadVisibility,
+  visibilityOf,
+} from '../storage-namespace'
+import { buildPublicRouteUrl } from '../storage-public-url'
 
 import { bufferFromBody } from './body.util'
 
 export interface LocalStorageConfig {
   root: string
-  /** Absolute API /api/v1/storage/public endpoint; only explicit public copies are served. */
+  /** Absolute API /api/v1/storage/public endpoint; only `public/` copies are served. */
   publicBaseUrl?: string
 }
 
-/** Sidecar JSON kept alongside each object so visibility/contentType survive restarts. */
+/** Sidecar JSON kept alongside each object so contentType/etag survive restarts. */
 interface SidecarMeta {
   contentType?: string
-  visibility: Visibility
   etag: string
+  cacheControl?: string
 }
 
 const DEFAULT_MAX_KEYS = 1000
@@ -50,9 +55,9 @@ const META_DIR = 'meta'
 /**
  * Filesystem storage driver (dev default). Stores object bytes under
  * `<root>/objects/<key>` and per-object metadata under `<root>/meta/<key>.json`,
- * so `visibility` is observable and the object key namespace is never shadowed
- * by metadata. Signed URLs are unsupported; `getPublicUrl` works only when a
- * public base is configured.
+ * so the object key namespace is never shadowed by metadata. Keys under `public/`
+ * also get a copy under `<root>/public/<key>`, the only tree the API public route
+ * serves. Signed URLs are unsupported; `getPublicUrl` needs the public route base.
  */
 @Injectable()
 export class LocalStorageProvider implements StorageProvider {
@@ -64,31 +69,28 @@ export class LocalStorageProvider implements StorageProvider {
 
   async upload(input: UploadInput): Promise<UploadResult> {
     const key = normalizeObjectKey(input.key)
+    resolveUploadVisibility(key, input.visibility)
     const body = await bufferFromBody(input.body)
     const etag = createHash('sha256').update(body).digest('hex')
-    // Remove old public bytes before a private rewrite, never expose private bytes.
+    // Drop any stale public bytes first so a rewrite never serves old content.
     await rm(this.publicPath(key), { force: true })
     await this.writeFileAt(this.objectPath(key), body)
     const meta: SidecarMeta = {
       contentType: input.contentType,
-      visibility: input.visibility ?? DEFAULT_VISIBILITY,
       etag,
+      cacheControl: input.cacheControl,
     }
     await this.writeFileAt(this.metaPath(key), Buffer.from(JSON.stringify(meta)))
-    if (meta.visibility === 'public-read') await this.writeFileAt(this.publicPath(key), body)
+    if (isPublicKey(key)) await this.writeFileAt(this.publicPath(key), body)
     return { key, size: body.length, etag, contentType: input.contentType }
   }
 
   async download(key: string): Promise<Buffer> {
-    const full = this.objectPath(key)
-    await this.statFileOrThrow(full, key)
-    return readFile(full)
+    return readFile(await this.existingObjectPath(key))
   }
 
   async downloadStream(key: string): Promise<Readable> {
-    const full = this.objectPath(key)
-    await this.statFileOrThrow(full, key)
-    return createReadStream(full)
+    return createReadStream(await this.existingObjectPath(key))
   }
 
   async getMetadata(key: string): Promise<FileMetadata> {
@@ -99,7 +101,8 @@ export class LocalStorageProvider implements StorageProvider {
       contentLength: stats.size,
       etag: meta?.etag,
       lastModified: stats.mtime,
-      visibility: meta?.visibility,
+      cacheControl: meta?.cacheControl,
+      visibility: visibilityOf(key),
     }
   }
 
@@ -141,10 +144,10 @@ export class LocalStorageProvider implements StorageProvider {
   getPublicUrl(key: string): string {
     if (!this.config.publicBaseUrl) {
       throw new Error(
-        'Public URLs are not configured for the local storage driver (set STORAGE_LOCAL_PUBLIC_BASE_URL)'
+        'Public URLs are not configured for the local storage driver (set STORAGE_PUBLIC_BASE_URL)'
       )
     }
-    return `${this.config.publicBaseUrl.replace(/\/+$/, '')}?key=${encodeURIComponent(normalizeObjectKey(key))}`
+    return buildPublicRouteUrl(this.config.publicBaseUrl, key)
   }
 
   async getSignedDownloadUrl(_input: SignedDownloadInput): Promise<string> {
@@ -158,6 +161,7 @@ export class LocalStorageProvider implements StorageProvider {
   async copy(input: CopyObjectInput): Promise<void> {
     const sourceKey = normalizeObjectKey(input.source)
     const destKey = normalizeObjectKey(input.destination)
+    assertSameNamespace(sourceKey, destKey)
     await this.statFileOrThrow(this.objectPath(sourceKey), input.source)
     await rm(this.publicPath(destKey), { force: true })
     await this.copyFileAt(this.objectPath(sourceKey), this.objectPath(destKey))
@@ -166,8 +170,8 @@ export class LocalStorageProvider implements StorageProvider {
     } catch (err) {
       if (!this.isErrno(err, 'ENOENT')) throw err
     }
-    if ((await this.readSidecar(destKey))?.visibility === 'public-read') {
-      await this.copyFileAt(this.publicPath(sourceKey), this.publicPath(destKey))
+    if (isPublicKey(destKey)) {
+      await this.copyFileAt(this.objectPath(sourceKey), this.publicPath(destKey))
     }
   }
 
@@ -178,6 +182,18 @@ export class LocalStorageProvider implements StorageProvider {
     if (sourceKey === destKey) return
     await this.copy(input)
     await this.delete(input.source)
+  }
+
+  /**
+   * The absolute path of an existing object, resolved and checked against the objects root
+   * right here, so the path that is read is the path that was verified.
+   */
+  private async existingObjectPath(key: string): Promise<string> {
+    const root = path.resolve(this.config.root, OBJECTS_DIR) + path.sep
+    const file = path.resolve(root, normalizeObjectKey(key))
+    if (!file.startsWith(root)) throw new InvalidObjectKeyError('path outside object storage')
+    await this.statFileOrThrow(file, key)
+    return file
   }
 
   private objectPath(key: string): string {

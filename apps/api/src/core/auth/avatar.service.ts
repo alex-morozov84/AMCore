@@ -12,7 +12,7 @@ import { UserCacheService } from './user-cache.service'
 
 import { EnvService } from '@/env/env.service'
 import { generateUploadVersion, MediaService } from '@/infrastructure/media'
-import { normalizeObjectKey, StorageService } from '@/infrastructure/storage'
+import { normalizeObjectKey, PUBLIC_KEY_PREFIX, StorageService } from '@/infrastructure/storage'
 
 /** The validated multipart file shape the avatar upload consumes. */
 export interface AvatarUploadFile {
@@ -200,16 +200,22 @@ export class AvatarService {
    * is safe even if the caller's lease was lost.
    */
   private async sweep(userId: string, generation: number): Promise<void> {
-    const prefix = `avatars/${userId}/`
-    const keys = await this.listKeys(prefix)
+    const keys = await this.listUserKeys(`avatars/${userId}/`)
     keys.push(`avatars/${userId}`) // legacy flat object (no trailing slash; not under prefix)
     const toDelete = keys.filter((k) => generationOf(k) < generation)
     if (toDelete.length > 0) await this.storage.deleteMany(toDelete)
   }
 
   private async cleanupVersion(userId: string, version: string): Promise<void> {
-    const keys = await this.listKeys(`avatars/${userId}/v-${version}/`)
+    const keys = await this.listUserKeys(`avatars/${userId}/v-${version}/`)
     if (keys.length > 0) await this.storage.deleteMany(keys)
+  }
+
+  /** Private originals live under `avatars/…`, public derivatives under `public/avatars/…`. */
+  private async listUserKeys(suffix: string): Promise<string[]> {
+    const privateKeys = await this.listKeys(suffix)
+    const publicKeys = await this.listKeys(`${PUBLIC_KEY_PREFIX}${suffix}`)
+    return [...privateKeys, ...publicKeys]
   }
 
   private async listKeys(prefix: string): Promise<string[]> {

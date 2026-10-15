@@ -2,23 +2,24 @@
  * Storage Service Types & Provider Contract
  *
  * Cloud-agnostic file storage. The same `StorageProvider` interface is
- * implemented by the s3 (production), local (dev), and memory (test) drivers
- * in later stages. Stage 1 defines only the contract + types.
+ * implemented by the s3 (production), local, and memory (test) drivers.
  *
- * Design notes (locked in STORAGE_PLAN.md):
+ * Design notes:
  * - Object-param method style for anything with optional fields, so call sites
  *   stay readable as the option set grows.
  * - `UploadResult` NEVER guarantees a URL. URLs are obtained explicitly via
- *   `getPublicUrl` (public-read objects only) or `getSignedDownloadUrl`.
- * - Private-by-default: omitting `visibility` means `private`.
+ *   `getPublicUrl` (public objects only) or `getSignedDownloadUrl`.
+ * - Private-by-default, and the key is the visibility: only keys under the
+ *   reserved `public/` namespace (see `storage-namespace.ts`) are public.
  */
 
 import type { Readable } from 'node:stream'
 
 /**
- * Object access model. `private` (default) objects are reachable only via the
- * authenticated app or a time-limited signed URL; `public-read` objects get a
- * stable unauthenticated public URL (the avatar example is the one opt-in).
+ * Object access model, derived from the key namespace. `private` (default)
+ * objects are reachable only via the authenticated app or a time-limited signed
+ * URL; `public-read` objects live under `public/` and get a stable unauthenticated
+ * public URL once the operator has published that namespace.
  */
 export type Visibility = 'private' | 'public-read'
 
@@ -33,7 +34,11 @@ export interface UploadInput {
   contentDisposition?: string
   cacheControl?: string
   metadata?: Record<string, string>
-  /** Defaults to `private` (see {@link Visibility}). */
+  /**
+   * Optional assertion. Visibility follows the key: `public/…` keys are public and
+   * every other key is private. A value that contradicts the key namespace is
+   * rejected with `InvalidObjectKeyError`.
+   */
   visibility?: Visibility
 }
 
@@ -58,10 +63,12 @@ export interface FileMetadata {
   contentLength: number
   etag?: string
   lastModified?: Date
+  /** The `Cache-Control` stored with the object, when the caller set one at upload. */
+  cacheControl?: string
   /**
-   * The local and memory drivers persist this so `public-read` vs `private` is
-   * observable in e2e tests. May be absent on the s3 driver (S3 has no single
-   * "visibility" field — it is derived from ACL/bucket policy).
+   * Derived from the key namespace by every driver. It states what the application
+   * intended, not what the provider serves: whether `public/` is actually readable
+   * depends on the operator's bucket setup and is verified by the public-delivery check.
    */
   visibility?: Visibility
 }
@@ -85,8 +92,9 @@ export interface SignedUploadInput {
   /** Seconds. Clamped server-side to `STORAGE_SIGNED_URL_MAX_TTL` (<= 604800). */
   expiresIn?: number
   // NOTE: bytes go client -> provider directly, so the server cannot
-  // magic-byte-validate them. See the "presigned direct upload" security note
-  // in STORAGE_PLAN.md — strong validation requires post-upload verification.
+  // magic-byte-validate them, and the presigned PUT signs only the host: neither the
+  // content type nor the size is enforced. Strong validation requires a quarantine
+  // prefix and post-upload verification (see the uploads guide).
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +218,12 @@ export interface StorageProvider {
   getSignedUploadUrl(input: SignedUploadInput): Promise<string>
   /** Pure URL constructor for public-read objects ONLY — never the app-mediated download route. */
   getPublicUrl(key: string): string
+  /**
+   * Where an anonymous client would reach `key` through the storage API itself, with no
+   * credentials or signature. Only the s3 driver has one; the public-delivery check reads
+   * it to prove that a private object is not exposed.
+   */
+  getUnsignedObjectUrl?(key: string): Promise<string>
 
   // Copy / move
   copy(input: CopyObjectInput): Promise<void>

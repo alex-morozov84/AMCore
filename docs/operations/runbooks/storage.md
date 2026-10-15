@@ -43,7 +43,89 @@ can leave a tiny canary. Configure prefix-only lifecycle cleanup for S3, includi
 noncurrent versions when versioning is enabled, or periodically remove old files
 only inside the local reserved `.amcore-probes` folders inside objects/meta. Never apply this cleanup to user
 objects. A successful canary does not prove backups, persistent mounts across
-container recreation, public/CDN URLs or capacity of S3.
+container recreation or capacity of S3. Public delivery has its own check, see [Public delivery](#public-delivery).
+
+## Public delivery
+
+`AMCoreStoragePublicDeliveryFailed` (ticket) fires when the public-delivery check has
+been failed, stale or unmeasured for five minutes. The check runs on every API process
+with the `s3` driver (a dedicated worker skips it). After one idempotent write of two fixed canary
+objects at start-up it only **reads**, once per `STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS`
+(one hour by default): it fetches the public canary from `STORAGE_PUBLIC_BASE_URL` as an
+anonymous browser would, and it asks the storage API for the private canary without
+credentials. It never affects API readiness.
+
+```promql
+max without (state) (amcore_storage_public_check_state{state=~"failed|stale|unknown"}) == 1
+```
+
+1. Find the affected `instance`, then read its `storage_public_check_failed` log event.
+   The `stage` and `failure` fields say what happened:
+
+   | `stage` / `failure`                  | Meaning                                                      | First action                                                                 |
+   | ------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+   | `public_read` / `public_not_served`  | The public canary answered 401/403/404/3xx                   | The public location is not published, or the base URL is wrong. See below.   |
+   | `public_read` / `public_unreachable` | Network error or HTTP 5xx from the public base               | CDN or provider incident, DNS, TLS. Check the base URL from outside the VPC. |
+   | `public_read` / `content_mismatch`   | HTTP 200 with other bytes (an error page, a CDN placeholder) | Compare with `curl`; fix the CDN origin or cache rule.                       |
+   | `setup` / `check_error`              | The canaries could not be written                            | Grant object write on both buckets to the application credentials.           |
+   | any / `timeout`                      | No answer within `STORAGE_PUBLIC_CHECK_TIMEOUT_SECONDS`      | Same as unreachable; raise the timeout only for a proven slow origin.        |
+
+2. Reproduce with the operator command. It prints PASS/FAIL per step and never prints a
+   credential, endpoint or provider message:
+
+   ```bash
+   pnpm --filter api storage:check          # from a checkout
+   node dist/cli/storage-check.js           # from the production image
+   ```
+
+3. A 403 or 404 on the public canary means nothing publishes the `public/` namespace.
+   Re-apply the provider step from [Public Files](../../storage/public-files.md#publish-the-location):
+   the bucket policy, the public bucket setting, the custom domain or the CDN origin.
+   In `acl` mode a 403 after a successful upload also means the server ignored the ACL:
+   switch to `external`.
+4. After the fix the next scheduled check clears the state; restart the process to check
+   at once. Uploads of public files are not blocked by this alert, but their URLs do not
+   work until the location is published.
+
+In `api` mode the public canary is fetched from the API's own public route at
+`STORAGE_PUBLIC_BASE_URL`, so the address must also be reachable **from the API process**
+(a reverse proxy or load balancer in front of it counts). `public_unreachable` right after
+switching to `api` usually means the base URL names an address the container cannot reach,
+for example a public host name behind a firewall that blocks hairpin traffic. The check
+also asks the route for the private canary; any 2xx there is a `private_exposed_base`
+incident, and a 404 or 403 is correct.
+
+The canaries sit under `public/<STORAGE_PROBE_PREFIX>/` and `<STORAGE_PROBE_PREFIX>/`.
+They are tiny and fixed; if a lifecycle rule removes them, the check writes them again.
+
+## Private exposure
+
+`AMCoreStoragePrivateExposed` (**page**) fires when the check read its **private** canary
+without any credential for five minutes. Treat it as a data exposure incident, not as a
+monitoring fault.
+
+```promql
+amcore_storage_private_exposed == 1
+```
+
+1. Read the `storage_public_check_failed` event: `stage=private_exposed_api` means the
+   private bucket itself answers anonymous requests through the storage API
+   (a public ACL or policy on the whole bucket); `stage=private_exposed_base` means the
+   public base also serves private keys because one bucket holds both namespaces and
+   the published rule or domain covers more than `public/`.
+2. Remove the public grant first, investigate second: restore the private bucket
+   policy or ACL, or narrow the rule to the `public/` prefix, or move the public files
+   to their own bucket. Confirm with an unsigned request that the private canary now
+   answers 401, 403 or 404.
+3. Decide what was reachable. The canary proves the path was open, not that an object
+   was fetched. Review the provider's access logs for anonymous reads of private keys
+   (for example `avatars/<user>/…/original`) during the exposure window, and follow your
+   incident process for any real access.
+4. Rotate credentials only if the incident also involved them; an anonymous read does not
+   use them.
+5. A provider public domain or website that is bound to the **private** bucket without
+   the application's knowledge cannot be seen by this check. The
+   [Public Files](../../storage/public-files.md#verify-the-setup) checklist covers it.
 
 ## Interval configuration
 

@@ -212,15 +212,25 @@ describe('AvatarService', () => {
       avatarUrl: 'https://cdn/avatars/u1/v-0-a/avatar-256.webp',
       avatarGeneration: 0,
     })
-    storage.list.mockResolvedValue({
-      files: [{ key: 'avatars/u1/v-0-a/avatar-256.webp', size: 1 }],
+    // Private originals live under avatars/…, public derivatives under public/avatars/….
+    storage.list.mockImplementation(async ({ prefix }: { prefix: string }) => ({
+      files: prefix.startsWith('public/')
+        ? [{ key: 'public/avatars/u1/v-0-a/avatar-256.webp', size: 1 }]
+        : [{ key: 'avatars/u1/v-0-a/original', size: 1 }],
       isTruncated: false,
-    })
+    }))
 
     await service.removeAvatar('u1')
 
     const deleted = storage.deleteMany.mock.calls[0]?.[0] as string[]
-    expect(deleted).toEqual(['avatars/u1/v-0-a/avatar-256.webp', 'avatars/u1'])
+    expect(storage.list).toHaveBeenCalledWith(
+      expect.objectContaining({ prefix: 'public/avatars/u1/' })
+    )
+    expect(deleted).toEqual([
+      'avatars/u1/v-0-a/original',
+      'public/avatars/u1/v-0-a/avatar-256.webp',
+      'avatars/u1',
+    ])
     expect(prisma.user.updateMany).toHaveBeenCalledWith({
       where: { id: 'u1', avatarGeneration: { lt: 1 } },
       data: { avatarUrl: null, avatarGeneration: 1 },

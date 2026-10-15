@@ -5,6 +5,7 @@ export * from './storage.interface'
 export { StorageModule } from './storage.module'
 export { StorageService } from './storage.service'
 export { StorageDownloadService } from './storage-download.service'
+export { isPublicKey, PUBLIC_KEY_PREFIX, visibilityOf } from './storage-namespace'
 export { StorageProbeService } from './storage-probe.service'
 export { StoragePublicModule } from './storage-public.module'
 export {

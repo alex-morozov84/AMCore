@@ -1,17 +1,16 @@
 /**
  * Storage module constants — injection tokens and shared defaults.
  *
- * Stage 1 (interface + types + env) only. Providers, service, and module
- * wiring arrive in later stages; nothing here imports the AWS SDK or NestJS
- * runtime so it stays safe to pull into the early `env.ts` validation path.
+ * Nothing here imports the AWS SDK or NestJS runtime, so it stays safe to pull
+ * into the early `env.ts` validation path.
  */
 
 import type { Visibility } from './storage.interface'
 
 /**
  * Injection token for the active `StorageProvider`. The dynamic
- * `StorageModule` (later stage) binds this to the driver selected by
- * `STORAGE_DRIVER`; `StorageService` injects it.
+ * `StorageModule` binds this to the driver selected by `STORAGE_DRIVER`;
+ * `StorageService` injects it.
  */
 export const STORAGE_PROVIDER = Symbol('StorageProvider')
 
@@ -20,8 +19,8 @@ export const STORAGE_DRIVERS = ['s3', 'local', 'memory'] as const
 export type StorageDriver = (typeof STORAGE_DRIVERS)[number]
 
 /**
- * Private-by-default (Decision A). Every upload without an explicit
- * `visibility` is `private`; `public-read` is an opt-in.
+ * Private-by-default. Every key outside the reserved `public/` namespace is
+ * `private`; a public object needs a `public/` key (see `storage-namespace.ts`).
  */
 export const DEFAULT_VISIBILITY: Visibility = 'private'
 

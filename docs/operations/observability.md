@@ -237,6 +237,12 @@ ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
   `AMCoreStorageProbeFailed` holds unhealthy state for five minutes before firing.
   Configure a downstream notification receiver once.
   See [storage runbook](runbooks/storage.md#file-diagnostic).
+- `storage_public_check_state{driver,state}` and `storage_private_exposed{driver}` come from
+  the public-delivery check (a process where the check is off reports `state="off"`): one anonymous read of the public canary and
+  an unsigned read of the private canary every hour by default. Exactly one of healthy/failed/unknown/stale/off is 1;
+  `storage_private_exposed` is 1 when the private canary was readable without credentials.
+  `AMCoreStoragePublicDeliveryFailed` (ticket) and `AMCoreStoragePrivateExposed` (page)
+  fire after five minutes. See [storage runbook](runbooks/storage.md#public-delivery).
 
 - `storage_operations_total{driver,operation,result,role}` and
   `storage_operation_duration_seconds{driver,operation,result,role}` —

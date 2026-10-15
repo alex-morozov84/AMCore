@@ -31,12 +31,14 @@ import { bufferFromBody } from './body.util'
 interface StoredObject {
   body: Buffer
   contentType?: string
+  cacheControl?: string
   metadata?: Record<string, string>
   etag: string
   lastModified: Date
 }
 
 interface MultipartUpload {
+  cacheControl?: string
   contentType?: string
   metadata?: Record<string, string>
   parts: Map<number, Buffer>
@@ -68,6 +70,7 @@ function store(s: S3Store, key: string, body: Buffer, meta: Partial<StoredObject
   const object: StoredObject = {
     body,
     contentType: meta.contentType,
+    cacheControl: meta.cacheControl,
     metadata: meta.metadata,
     etag: etagOf(body),
     lastModified: new Date(),
@@ -76,7 +79,11 @@ function store(s: S3Store, key: string, body: Buffer, meta: Partial<StoredObject
   return object
 }
 
-export function setupS3Mock(): { store: S3Store; restore: () => void } {
+export function setupS3Mock(): {
+  store: S3Store
+  mock: ReturnType<typeof mockClient>
+  restore: () => void
+} {
   const objects: S3Store = new Map()
   const multipart = new Map<string, MultipartUpload>()
   let uploadCounter = 0
@@ -85,6 +92,7 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
   s3Mock.on(PutObjectCommand).callsFake(async (input) => {
     const object = store(objects, input.Key, await toBuffer(input.Body), {
       contentType: input.ContentType,
+      cacheControl: input.CacheControl,
       metadata: input.Metadata,
     })
     return { ETag: object.etag }
@@ -94,6 +102,7 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
     const uploadId = `mpu-${++uploadCounter}`
     multipart.set(uploadId, {
       contentType: input.ContentType,
+      cacheControl: input.CacheControl,
       metadata: input.Metadata,
       parts: new Map(),
     })
@@ -113,6 +122,7 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
     const ordered = [...mpu.parts.entries()].sort((a, b) => a[0] - b[0]).map(([, buf]) => buf)
     const object = store(objects, input.Key, Buffer.concat(ordered), {
       contentType: mpu.contentType,
+      cacheControl: mpu.cacheControl,
       metadata: mpu.metadata,
     })
     multipart.delete(input.UploadId ?? '')
@@ -125,6 +135,7 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
     return {
       Body: Readable.from(object.body),
       ContentType: object.contentType,
+      CacheControl: object.cacheControl,
       ContentLength: object.body.length,
       ETag: object.etag,
       LastModified: object.lastModified,
@@ -137,6 +148,7 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
     if (!object) throw s3Error('NotFound', 404)
     return {
       ContentType: object.contentType,
+      CacheControl: object.cacheControl,
       ContentLength: object.body.length,
       ETag: object.etag,
       LastModified: object.lastModified,
@@ -196,10 +208,11 @@ export function setupS3Mock(): { store: S3Store; restore: () => void } {
     if (!object) throw s3Error('NoSuchKey', 404)
     const copied = store(objects, input.Key, object.body, {
       contentType: object.contentType,
+      cacheControl: object.cacheControl,
       metadata: object.metadata,
     })
     return { CopyObjectResult: { ETag: copied.etag, LastModified: copied.lastModified } }
   })
 
-  return { store: objects, restore: () => s3Mock.restore() }
+  return { store: objects, mock: s3Mock, restore: () => s3Mock.restore() }
 }

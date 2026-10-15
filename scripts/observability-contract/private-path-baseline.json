@@ -116,12 +116,6 @@
       "kind": "debt"
     },
     {
-      "file": "apps/api/src/env/schema/media.env.ts",
-      "target": "ai/MEDIA_PROCESSING_PLAN.md",
-      "count": 1,
-      "kind": "debt"
-    },
-    {
       "file": "apps/api/src/env/schema/storage.env.ts",
       "target": "ai/STORAGE_PLAN.md",
       "count": 1,
@@ -130,24 +124,6 @@
     {
       "file": "apps/api/src/infrastructure/email/templates/notification.integration.spec.ts",
       "target": "ai/TESTING.md",
-      "count": 1,
-      "kind": "debt"
-    },
-    {
-      "file": "apps/api/src/infrastructure/media/media.types.ts",
-      "target": "ai/MEDIA_PROCESSING_PLAN.md",
-      "count": 1,
-      "kind": "debt"
-    },
-    {
-      "file": "apps/api/src/infrastructure/media/presets/avatar.preset.ts",
-      "target": "ai/MEDIA_PROCESSING_PLAN.md",
-      "count": 1,
-      "kind": "debt"
-    },
-    {
-      "file": "apps/api/src/infrastructure/media/processors/sharp-image.processor.ts",
-      "target": "ai/MEDIA_PROCESSING_PLAN.md",
       "count": 1,
       "kind": "debt"
     },
