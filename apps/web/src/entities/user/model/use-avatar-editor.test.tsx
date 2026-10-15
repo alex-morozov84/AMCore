@@ -117,6 +117,15 @@ describe('useAvatarEditor', () => {
     })
     await waitFor(() => expect(authApi.getMe).toHaveBeenCalledTimes(1))
     expect(result.current.outcome).toMatchObject({ kind: 'unknown' })
+
+    // The reread brings the server's real avatar, and the hook shows it.
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      user: { id: 'u1', avatarUrl: 'https://f/real.webp' },
+    } as never)
+    await act(async () => {
+      await result.current.upload(png())
+    })
+    await waitFor(() => expect(result.current.avatarUrl).toBe('https://f/real.webp'))
   })
 
   it.each([

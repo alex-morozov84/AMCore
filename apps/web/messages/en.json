@@ -1433,7 +1433,7 @@
       "tooLarge": "This photo is larger than 2 MB. Choose a smaller one.",
       "invalidType": "This file type is not supported. Use a JPEG, PNG or WebP image.",
       "busy": "Another photo change is in progress. Try again in a moment.",
-      "unknown": "We could not confirm the change. We checked your current photo again; try once more if it is not what you expect."
+      "unknown": "We could not confirm the change. We are checking your current photo; try once more if it is not what you expect."
     }
   },
   "memberAccess": {
