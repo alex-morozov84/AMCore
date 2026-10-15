@@ -50,3 +50,19 @@ export const ProfileOpen: Story = {
     await waitFor(() => expect(dialog).toBeVisible())
   },
 }
+
+export const Loading: Story = {
+  decorators: [
+    (Story) => {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      queryClient.setQueryDefaults(userKeys.me(), { queryFn: () => new Promise(() => {}) })
+      return (
+        <QueryClientProvider client={queryClient}>
+          <div className="flex min-h-72 justify-end p-4">
+            <Story />
+          </div>
+        </QueryClientProvider>
+      )
+    },
+  ],
+}

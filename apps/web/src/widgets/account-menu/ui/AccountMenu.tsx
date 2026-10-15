@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu'
+import { Skeleton } from '@/shared/ui/skeleton'
 
 import { ProfileDialog } from './ProfileDialog'
 
@@ -27,12 +28,14 @@ import { ProfileDialog } from './ProfileDialog'
 export function AccountMenu() {
   const t = useTranslations('account')
   const tAuth = useTranslations('auth')
-  const { data } = useCurrentUser()
+  const { data, isPending } = useCurrentUser()
   const logout = useLogout()
   const [profileOpen, setProfileOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const user = data?.user
 
+  // Same footprint as the loaded trigger, so the header does not jump when the user arrives.
+  if (isPending) return <AccountMenuSkeleton />
   if (!user) return null
   const label = user.name || user.email
 
@@ -67,5 +70,14 @@ export function AccountMenu() {
       </DropdownMenu>
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} finalFocus={trigger} />
     </>
+  )
+}
+
+function AccountMenuSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex items-center gap-2 px-2 py-1">
+      <Skeleton className="size-8 rounded-full" />
+      <Skeleton className="hidden h-4 w-24 sm:block" />
+    </div>
   )
 }

@@ -46,6 +46,18 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
+  it('shows a placeholder of the same footprint while the user loads', () => {
+    vi.mocked(authApi.getMe).mockReturnValue(new Promise(() => {}) as never)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <AccountMenu />
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(2)
+  })
+
   it('shows the name on the trigger and both identities in the menu', async () => {
     renderMenu(ada)
     const trigger = screen.getByRole('button', { name: 'account.menuLabel' })
