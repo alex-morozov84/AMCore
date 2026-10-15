@@ -69,6 +69,10 @@ test('rewrites structural startup and single-locale login contributions', () => 
   const startup = materialize('apps/web/src/instrumentation.ts', 'console.startup-hook')
   assert.equal(startup.includes('validateAdminConsoleStartupOrExit'), false)
   assert.ok(startup.includes('onRequestError'))
+  // The public files origin check is not Console-owned: the hook keeps it.
+  assert.ok(startup.includes('export async function register'))
+  assert.ok(startup.includes('assertPublicFilesOrigin()'))
+  assert.equal(startup.includes('invitationLocalOrigin'), false)
 
   const login = materialize(
     'apps/web/src/app/[locale]/admin/(auth)/login/page.tsx',

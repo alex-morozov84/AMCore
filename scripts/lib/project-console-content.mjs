@@ -30,7 +30,18 @@ function removeStartup(model, _params, ctx) {
     (candidate) => ts.isFunctionDeclaration(candidate) && candidate.name?.text === 'register',
     { ...ctx, describe: 'register function' }
   )
-  model.removeNode(node, ctx)
+  // The public files origin check is not a Console concern: a fork without the Console still
+  // needs the start-up refusal, so `register` keeps only that check.
+  model.replaceNode(
+    node,
+    `export async function register(): Promise<void> {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { assertPublicFilesOrigin } = await import('@/shared/lib/csp/public-files-origin')
+    assertPublicFilesOrigin()
+  }
+}`,
+    ctx
+  )
 }
 
 function rewriteLogin(model, _params, ctx) {
