@@ -144,7 +144,8 @@ provide an operator interface for admin session management.
 - **[Product administration foundation](product-admin/README.md)** — the
   organization selector and read-only overview, one-placement integration and
   headless extension path, members/roles, the [role definitions API and ready Roles tab](product-admin/role-definitions.md), the
-  [member access explanation](product-admin/member-access.md)
+  [member access explanation](product-admin/member-access.md), the
+  [account menu, profile and avatar](product-admin/account-menu-and-profile.md)
   and [invitations](product-admin/invitations.md);
   product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional

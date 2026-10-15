@@ -21,8 +21,10 @@ import { BusinessRuleViolationException, NotFoundException } from '../../common/
 import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
 import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service.js'
 import { CleanupService } from '../../infrastructure/schedule/cleanup.service.js'
+import { StorageService } from '../../infrastructure/storage/index.js'
 import { acquireXactLock, PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
+import { avatarUrlOf } from '../auth/avatar-url.js'
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).
@@ -37,7 +39,7 @@ const ADMIN_USER_SELECT = {
   email: true,
   emailVerified: true,
   name: true,
-  avatarUrl: true,
+  avatarKey: true,
   phone: true,
   locale: true,
   timezone: true,
@@ -172,7 +174,8 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly cleanupService: CleanupService,
     private readonly auditLog: AuditLogService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly storage: StorageService
   ) {
     this.logger.setContext(AdminService.name)
   }
@@ -418,7 +421,7 @@ export class AdminService {
       email: row.email,
       emailVerified: row.emailVerified,
       name: row.name,
-      avatarUrl: row.avatarUrl,
+      avatarUrl: avatarUrlOf(this.storage, row.avatarKey),
       phone: row.phone,
       locale: parseSupportedLocale(row.locale),
       timezone: row.timezone,

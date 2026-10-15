@@ -228,10 +228,10 @@ It must be reachable through your API reverse proxy. Only copies of keys under `
 are served, with safe content types, attachment disposition, nosniff and sandbox
 headers. Public copies explicitly permit cross-origin resource embedding so a
 frontend on a different API domain can display images. This does not grant
-access to private files. The web starter's CSP still allows images only from
-its own origin: expose this public endpoint through the product reverse proxy
-under the same origin, or have downstream explicitly allow its trusted public
-asset origin in `img-src`. A public API response does not override the page's CSP.
+access to private files. The web starter's CSP allows images only from its own origin
+plus the single origin set in `WEB_PUBLIC_FILES_ORIGIN`: set it to the origin of
+`STORAGE_PUBLIC_BASE_URL`, or expose this endpoint under the web origin through the product
+reverse proxy. A public API response does not override the page's CSP.
 Private objects, metadata and probes are never served. Never expose the
 `objects/` directory or the storage root through a static file server.
 

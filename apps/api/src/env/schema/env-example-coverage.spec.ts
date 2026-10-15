@@ -53,6 +53,8 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'WEB_TRUSTED_ORIGINS',
   // Web invitation proof-cookie startup policy; validated by apps/web, not the API.
   'WEB_INVITATION_LOCAL_HTTP_ORIGIN',
+  // apps/web-only: the origin public files (avatars) load from, added to the browser CSP img-src.
+  'WEB_PUBLIC_FILES_ORIGIN',
   // apps/web-only (ADR-072): which inbound header apps/web trusts as the
   // real visitor IP before relaying it to apps/api — same reasoning as
   // WEB_TRUSTED_ORIGINS above.

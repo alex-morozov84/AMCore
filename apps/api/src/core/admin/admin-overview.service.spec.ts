@@ -51,8 +51,36 @@ describe('AdminOverviewService', () => {
           intervalSeconds: 60,
           staleAfterSeconds: 180,
         }),
+      } as any,
+      {
+        snapshot: () => ({
+          driver: 'memory',
+          state: 'off',
+          offReason: 'memory_driver',
+          delivery: 'external',
+          layout: 'one',
+          publicBaseUrl: null,
+          checkedAt: null,
+          stage: null,
+          failure: null,
+        }),
       } as any
     )
+  })
+
+  it('adds the public-files check without the driver name', async () => {
+    readiness.check.mockResolvedValue({ status: 'ok', details: {} } as any)
+    const overview = await service.getOverview()
+    expect(overview.publicDelivery).toEqual({
+      state: 'off',
+      offReason: 'memory_driver',
+      delivery: 'external',
+      layout: 'one',
+      publicBaseUrl: null,
+      checkedAt: null,
+      stage: null,
+      failure: null,
+    })
   })
 
   it('reports observed readiness with sanitized dependency statuses', async () => {
@@ -196,6 +224,19 @@ describe('AdminOverviewService', () => {
           stage: null,
           intervalSeconds: 60,
           staleAfterSeconds: 180,
+        }),
+      } as any,
+      {
+        snapshot: () => ({
+          driver: 'memory',
+          state: 'off',
+          offReason: 'memory_driver',
+          delivery: 'external',
+          layout: 'one',
+          publicBaseUrl: null,
+          checkedAt: null,
+          stage: null,
+          failure: null,
         }),
       } as any
     )

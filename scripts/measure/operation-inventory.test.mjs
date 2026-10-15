@@ -22,7 +22,10 @@ describe('operation inventory against the real plans', () => {
       // The locale lint fixture adds one edit/fact/claim/final operation in each
       // of the three single-locale measured scenarios: three of each overall.
       // The Console-only AI runbook seam adds two semantic claims without a new operation.
-      { name: 'measured operations', expected: 671, actual: inventory.operations.length },
+      // The account menu changes the shell header, adds the account catalogue namespace and
+      // re-registers four e2e surfaces: +4 operations, +1 fact, -5 claims, +4 final operations
+      // (measured against the previous baseline of 671/933/1649/654).
+      { name: 'measured operations', expected: 675, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -41,17 +44,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 933,
+        expected: 934,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1649,
+        expected: 1644,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 654,
+        expected: 658,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

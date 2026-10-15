@@ -175,7 +175,12 @@ export const userResponseSchema = z.object({
   email: z.email(),
   emailVerified: z.boolean(),
   name: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
+  avatarUrl: z
+    .string()
+    .nullable()
+    .describe(
+      'Public URL of the avatar, computed from the stored avatar key. It changes when the public storage base changes, so do not persist it.'
+    ),
   phone: z.string().nullable(),
   // Reuses the single supported-locale source so the public response contract
   // matches what registration/profile accept (the mapper boundary parses the

@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { logServerError } from '@/shared/lib/server-logger'
 
-import { onRequestError } from './instrumentation'
+import { onRequestError, register } from './instrumentation'
 
+vi.mock('server-only', () => ({}))
 vi.mock('@/shared/lib/server-logger', () => ({ logServerError: vi.fn() }))
 
 beforeEach(() => {
@@ -46,5 +47,26 @@ describe('onRequestError', () => {
       digest: undefined,
       errorName: 'string',
     })
+  })
+})
+
+describe('register', () => {
+  const original = { ...process.env }
+  afterEach(() => {
+    process.env = { ...original }
+  })
+
+  it('refuses to start when WEB_PUBLIC_FILES_ORIGIN is set but unusable', async () => {
+    process.env.NEXT_RUNTIME = 'nodejs'
+    process.env.WEB_PUBLIC_FILES_ORIGIN = 'http://cdn.example.com'
+    await expect(register()).rejects.toThrow(/WEB_PUBLIC_FILES_ORIGIN/)
+  })
+
+  it('starts with a valid or empty WEB_PUBLIC_FILES_ORIGIN', async () => {
+    process.env.NEXT_RUNTIME = 'nodejs'
+    process.env.WEB_PUBLIC_FILES_ORIGIN = 'https://cdn.example.com'
+    await expect(register()).resolves.toBeUndefined()
+    process.env.WEB_PUBLIC_FILES_ORIGIN = ''
+    await expect(register()).resolves.toBeUndefined()
   })
 })

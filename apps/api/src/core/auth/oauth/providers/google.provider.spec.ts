@@ -112,7 +112,7 @@ describe('GoogleProvider', () => {
         email: 'user@example.com',
         emailVerified: true,
         displayName: 'Test User',
-        avatarUrl: 'https://example.com/avatar.jpg',
+        avatarSourceUrl: 'https://example.com/avatar.jpg',
       })
     })
 
@@ -129,7 +129,7 @@ describe('GoogleProvider', () => {
       const result = await provider.getUserProfile({ accessToken: 'token' })
 
       expect(result.displayName).toBeNull()
-      expect(result.avatarUrl).toBeNull()
+      expect(result.avatarSourceUrl).toBeNull()
       expect(result.emailVerified).toBe(false)
     })
   })

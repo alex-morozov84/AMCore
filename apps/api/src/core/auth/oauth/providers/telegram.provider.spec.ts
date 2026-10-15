@@ -88,7 +88,7 @@ describe('TelegramProvider', () => {
         email: null,
         emailVerified: false,
         displayName: 'Telegram User',
-        avatarUrl: null,
+        avatarSourceUrl: null,
         phone: '+79001234567',
       })
     })

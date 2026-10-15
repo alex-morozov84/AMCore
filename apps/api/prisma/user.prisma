@@ -75,7 +75,9 @@ model User {
   emailVerified    Boolean @default(false)
   passwordHash     String?
   name             String?
-  avatarUrl        String?
+  // Object key of the primary public avatar derivative. The API computes `avatarUrl` from it,
+  // so changing the public base never needs a data migration. Never a URL.
+  avatarKey        String?
   // Monotonic fence for avatar mutations: a conditional CAS update (only when the
   // stored value is older) makes a stale lock holder unable to publish over, or
   // sweep, a newer concurrent version. See ADR-049.

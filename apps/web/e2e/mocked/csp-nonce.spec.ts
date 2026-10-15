@@ -31,6 +31,12 @@ test('the CSP header is Report-Only by default and carries a fresh nonce', async
 
   const nonceMatch = csp!.match(/'nonce-([^']+)'/)
   expect(nonceMatch).not.toBeNull()
+
+  // The configured public files origin (playwright.config.ts) reaches img-src, reduced to the
+  // origin, and no other directive.
+  expect(csp).toContain(`img-src 'self' data: blob: https://files.example.test;`)
+  expect(csp!.split('files.example.test')).toHaveLength(2)
+  expect(csp).toContain(`connect-src 'self';`)
 })
 
 test('every inline <script> the server returns carries the CSP nonce, none are bare', async ({

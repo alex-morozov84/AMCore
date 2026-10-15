@@ -144,3 +144,96 @@ export const StorageCheckInProgress: Story = {
     },
   },
 }
+
+const s3Storage = { ...overviewFixture.storage, driver: 's3' } as const
+const servedPublic = {
+  state: 'healthy',
+  offReason: null,
+  delivery: 'external',
+  layout: 'two',
+  publicBaseUrl: 'https://files.example.test',
+  checkedAt: '2026-09-30T12:00:00.000Z',
+  stage: null,
+  failure: null,
+} as const
+
+export const PublicFilesServed: Story = {
+  args: { overview: { ...overviewFixture, storage: s3Storage, publicDelivery: servedPublic } },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText('Public files')).toBeVisible()
+    await expect(within(canvasElement).getByText('Served')).toBeVisible()
+  },
+}
+export const PublicFilesNotServed: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: s3Storage,
+      publicDelivery: {
+        ...servedPublic,
+        state: 'failed',
+        delivery: 'acl',
+        stage: 'public_read',
+        failure: 'public_not_served',
+      },
+    },
+  },
+}
+export const PublicFilesExposed: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: s3Storage,
+      publicDelivery: {
+        ...servedPublic,
+        state: 'failed',
+        layout: 'one',
+        stage: 'private_exposed_base',
+        failure: 'private_exposed',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Private files are readable without signing in')
+    ).toBeVisible()
+  },
+}
+export const PublicFilesNotCheckedYet: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: s3Storage,
+      publicDelivery: { ...servedPublic, state: 'unknown', checkedAt: null },
+    },
+  },
+}
+export const PublicFilesOffWorker: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: s3Storage,
+      publicDelivery: {
+        ...servedPublic,
+        state: 'off',
+        offReason: 'worker_process',
+        checkedAt: null,
+      },
+    },
+  },
+}
+export const PublicFilesOffLocal: Story = {
+  args: { overview: overviewFixture },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText('Off')).toBeVisible()
+  },
+}
+export const PublicFilesStale: Story = {
+  args: {
+    overview: {
+      ...overviewFixture,
+      storage: s3Storage,
+      publicDelivery: { ...servedPublic, state: 'stale' },
+    },
+  },
+}

@@ -204,7 +204,9 @@ node dist/cli/storage-check.js       # from the production image
 or website endpoint that you bound to the **private** bucket outside AMCore is not
 covered by the requests above; never bind one. After a change, upload an avatar, copy
 its `avatarUrl` and open it in a private browser window (no cookies): it must show the
-image.
+image. In the web app the avatar must also render: if it does not, check that
+`WEB_PUBLIC_FILES_ORIGIN` equals the origin of `STORAGE_PUBLIC_BASE_URL` (a blocked image
+shows up as a CSP `img-src` report).
 
 ## Failure reference
 

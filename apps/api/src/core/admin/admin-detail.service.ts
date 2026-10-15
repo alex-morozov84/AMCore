@@ -10,6 +10,7 @@ import {
 
 import { NotFoundException } from '../../common/exceptions/index.js'
 import { Prisma } from '../../generated/prisma/client.js'
+import { StorageService } from '../../infrastructure/storage/index.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import {
@@ -24,7 +25,10 @@ import {
 
 @Injectable()
 export class AdminDetailService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService
+  ) {}
 
   async user(
     id: string,
@@ -58,7 +62,7 @@ export class AdminDetailService {
           take: limit,
         })
         return {
-          user: projectDetailUser(user),
+          user: projectDetailUser(user, this.storage),
           membershipCount,
           memberships: {
             data: rows.map((row) => ({

@@ -36,7 +36,7 @@ describe('AdminService', () => {
     emailVerified: false,
     passwordHash: 'argon2-hash-should-never-leak',
     name: 'Test User',
-    avatarUrl: null,
+    avatarKey: null,
     avatarGeneration: 0,
     phone: null,
     locale: 'ru',
@@ -101,7 +101,8 @@ describe('AdminService', () => {
       prisma as unknown as PrismaService,
       cleanupService as unknown as CleanupService,
       auditLog as unknown as AuditLogService,
-      logger
+      logger,
+      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never
     )
     // Delegate $transaction callbacks to the same prisma mock so test
     // mocks set on the outer prisma instance (findUnique, count,

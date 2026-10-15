@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, uniqueEmail } from './helpers'
+import { registerViaUi, signOutViaUi, uniqueEmail } from './helpers'
 
 /**
  * Real-stack lane (Track 7 FINAL PLAN §4, `ai/models-talk.md`): a real
@@ -22,6 +22,6 @@ test('register creates an account, lands on the dashboard, and logout signs out'
   await expect(page).toHaveURL(/\/en\/?$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome!')
 
-  await page.getByRole('button', { name: /sign out/i }).click()
+  await signOutViaUi(page)
   await expect(page).toHaveURL(/\/en\/login/)
 })

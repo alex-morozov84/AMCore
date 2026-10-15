@@ -328,6 +328,10 @@ server scheduler) and `inProgress`. Never derive scheduling from `checkedAt` plu
 cadence: it records result publication, including timeout, rather than start time.
 During an active or stopped probe, no next transaction start is promised.
 
+The overview response also carries a `publicDelivery` object (state, off reason, delivery
+mode, bucket layout, public base URL, last check time, stage and failure) mapped from
+the public check service. It never carries bucket names, endpoints or credentials.
+
 ## Runtime interval editor
 
 Overview's File storage editor is a client leaf in `features/console-storage-setting`.

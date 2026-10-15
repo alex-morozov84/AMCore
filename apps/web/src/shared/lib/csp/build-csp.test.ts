@@ -58,3 +58,22 @@ describe('buildCspDirectives', () => {
     expect(csp).toContain(`report-to ${CSP_REPORTING_GROUP_NAME}`)
   })
 })
+
+describe('buildCspDirectives image origin', () => {
+  it('limits img-src to the web origin, data and blob by default', () => {
+    const csp = buildCspDirectives({ nonce: 'n', isDev: false })
+    expect(csp).toContain(`img-src 'self' data: blob:;`)
+  })
+
+  it('adds exactly the configured public files origin to img-src and nowhere else', () => {
+    const csp = buildCspDirectives({
+      nonce: 'n',
+      isDev: false,
+      imageOrigin: 'https://cdn.example.com',
+    })
+    expect(csp).toContain(`img-src 'self' data: blob: https://cdn.example.com;`)
+    expect(csp.split('https://cdn.example.com')).toHaveLength(2)
+    expect(csp).toContain(`default-src 'self'`)
+    expect(csp).toContain(`connect-src 'self';`)
+  })
+})

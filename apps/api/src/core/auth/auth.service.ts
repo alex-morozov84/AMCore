@@ -26,6 +26,7 @@ import { AppException } from '../../common/exceptions/index.js'
 import { EnvService } from '../../env/env.service.js'
 import { AuditActorType, AuditTargetType, type User } from '../../generated/prisma/client.js'
 import { EmailService } from '../../infrastructure/email/index.js'
+import { StorageService } from '../../infrastructure/storage/index.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
 import {
@@ -42,6 +43,7 @@ import {
 } from '../invitations/invitation-locks.js'
 import { NotificationsService } from '../notifications/notifications.service.js'
 
+import { avatarUrlOf } from './avatar-url.js'
 import { EmailIdentityService } from './email-identity.service.js'
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
 import { SessionService } from './session.service.js'
@@ -88,7 +90,8 @@ export class AuthService {
     private readonly loginRateLimiter: LoginRateLimiterService,
     private readonly notifications: NotificationsService,
     private readonly logger: PinoLogger,
-    private readonly invitation: InvitationContinuationService
+    private readonly invitation: InvitationContinuationService,
+    private readonly storage: StorageService
   ) {
     this.logger.setContext(AuthService.name)
   }
@@ -756,7 +759,7 @@ export class AuthService {
     email: string
     emailVerified: boolean
     name: string | null
-    avatarUrl: string | null
+    avatarKey: string | null
     phone: string | null
     locale: string
     timezone: string
@@ -768,7 +771,7 @@ export class AuthService {
       email: user.email,
       emailVerified: user.emailVerified,
       name: user.name,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: avatarUrlOf(this.storage, user.avatarKey),
       phone: user.phone,
       locale: parseSupportedLocale(user.locale),
       timezone: user.timezone,

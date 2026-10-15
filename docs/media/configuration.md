@@ -35,8 +35,8 @@ only shipped preset is `avatar`:
 | `avatar-256` | 256 × 256    | WebP   | 82      |
 | `avatar-512` | 512 × 512    | WebP   | 82      |
 
-`avatar-256` is the primary derivative whose public URL is stored in
-`User.avatarUrl`. Originals are stored privately (`…/v-{version}/original`) for
+`avatar-256` is the primary derivative whose object key is stored in
+`User.avatarKey`; the API computes `avatarUrl` from it on every response. Originals are stored privately (`…/v-{version}/original`) for
 possible future re-derivation; only derivatives live in the public namespace.
 
 ## Native Dependency
@@ -49,27 +49,17 @@ production-image smoke check.
 
 ## Next.js Consumption
 
-The backend returns concrete public derivative URLs (e.g. `User.avatarUrl`). The
-frontend treats them as remote images:
+The backend returns concrete public derivative URLs (the computed `avatarUrl`). The web starter
+shows them with `UserAvatar` (`entities/user`), which renders `next/image` with `unoptimized`:
+the derivatives are already sized WebP files, so the Next.js image optimizer (a server-side fetch
+of a remote URL) is not used and no `images.remotePatterns` list is needed.
 
-```ts
-// next.config.ts
-export default {
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'cdn.example.com' }, // the host of your STORAGE_PUBLIC_BASE_URL
-    ],
-  },
-}
-```
-
-```tsx
-import Image from 'next/image'
-
-export function Avatar({ user }: { user: { avatarUrl: string } }) {
-  return <Image src={user.avatarUrl} alt="" width={256} height={256} />
-}
-```
+The browser still has to be allowed to load the image. Set `WEB_PUBLIC_FILES_ORIGIN` on the web
+service to the origin of `STORAGE_PUBLIC_BASE_URL` (a CDN or public bucket host, or the API origin
+when the API serves public files). It is added to the CSP `img-src` directive and nowhere else.
+Only an exact `https` origin, or a loopback `http` origin for local development, is accepted;
+anything else stops the web app at start-up with an error that names the variable. An empty value leaves images limited to the web origin. See
+[browser security and CSP](../frontend/browser-security-and-csp.md).
 
 - Use the backend-provided URL directly; do not have the backend know Next.js
   internals.

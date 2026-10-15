@@ -90,15 +90,14 @@ separately:
 - public URLs may change when a CDN or bucket hostname changes.
 
 For private files, store only the key. Generate signed/app-mediated access at
-read time. For public avatars, AMCore currently stores `User.avatarUrl`, built
-from `STORAGE_PUBLIC_BASE_URL` when the avatar is uploaded. Public avatar objects
+read time. For public avatars, AMCore stores `User.avatarKey` and computes `avatarUrl` from
+`STORAGE_PUBLIC_BASE_URL` on every response. Public avatar objects
 use versioned keys under `public/avatars/{userId}/v-{version}/`, so a published
 URL is immutable and can be cached safely.
 
 To move to another provider or CDN, copy all objects with their keys unchanged
-(`public/...` keeps its prefix), then set the new `STORAGE_PUBLIC_BASE_URL`. A
-stored `avatarUrl` keeps the old host until the avatar is uploaded again, so
-rewrite the stored URLs with the new base or ask users to re-upload.
+(`public/...` keeps its prefix), then set the new `STORAGE_PUBLIC_BASE_URL`. Responses
+use the new host at once: no stored URL needs rewriting.
 
 ## Media Processing
 

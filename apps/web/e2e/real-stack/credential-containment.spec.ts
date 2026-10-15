@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { directApi, proveOwnedRefresh, rawWebRequest } from './credential-containment.helpers'
-import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
+import { loginViaUi, registerViaUi, signOutViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 const METHODS = ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
 const DENIED = [
@@ -98,7 +98,7 @@ test('user-only auth, authenticated denial, internal refresh and direct org API 
     expect(registration.status()).toBe(201)
     const registered = await safeJson(registration)
     await expect(page).toHaveURL(/\/en\/?$/)
-    await page.getByRole('button', { name: /sign out/i }).click()
+    await signOutViaUi(page)
     await expect(page).toHaveURL(/\/en\/login/)
     const pendingLogin = page.waitForResponse(
       (r) => r.url().endsWith('/api/auth/login') && r.request().method() === 'POST'

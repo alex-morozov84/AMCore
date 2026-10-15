@@ -23,7 +23,7 @@ export interface AvatarUploadFile {
   mimetype: string
 }
 
-/** Derivative whose public URL becomes `User.avatarUrl` (the compatibility field). */
+/** Derivative whose object key becomes `User.avatarKey`; the API computes `avatarUrl` from it. */
 const PRIMARY_VARIANT = 'avatar-256'
 
 /** Per-user lock budget — serialization only; correctness is the DB-generation CAS. */
@@ -62,7 +62,7 @@ function generationOf(urlOrKey: string): number {
  * Avatar consumer of the media pipeline. Each upload stores the original
  * privately under a per-upload **versioned** key family
  * (`avatars/<userId>/v-<gen>-<rand>/…`) and generates public WebP derivatives.
- * The primary derivative's URL is stored in `User.avatarUrl`.
+ * The primary derivative's key is stored in `User.avatarKey`.
  *
  * Concurrency safety (ADR-049). A per-user Redis lock serializes the common
  * case, but it is only best-effort — a paused holder can lose its lease. The
@@ -84,8 +84,27 @@ export class AvatarService {
   ) {}
 
   async setAvatar(userId: string, file: AvatarUploadFile): Promise<string> {
+    const url = await this.store(userId, file, false)
+    return url!
+  }
+
+  /**
+   * Store an avatar only while the user has none (the OAuth picture copy). Returns `null` when
+   * an avatar already exists, so a picture copied in the background never replaces an upload.
+   */
+  async setAvatarIfAbsent(userId: string, file: AvatarUploadFile): Promise<string | null> {
+    return this.store(userId, file, true)
+  }
+
+  private async store(
+    userId: string,
+    file: AvatarUploadFile,
+    onlyIfEmpty: boolean
+  ): Promise<string | null> {
     return this.withUserLock(userId, async () => {
-      const generation = (await this.currentGeneration(userId)) + 1
+      const current = await this.currentState(userId)
+      if (onlyIfEmpty && current.avatarKey) return null
+      const generation = current.avatarGeneration + 1
       const version = `${generation}-${generateUploadVersion()}`
       const originalKey = normalizeObjectKey(`avatars/${userId}/v-${version}/original`)
       await this.storage.upload({
@@ -95,9 +114,9 @@ export class AvatarService {
         visibility: 'private', // originals stay private; only derivatives are public
       })
 
-      const avatarUrl = await this.deriveOrRollback(userId, originalKey, version)
-      await this.publish(userId, generation, version, avatarUrl)
-      return avatarUrl
+      const avatarKey = await this.deriveOrRollback(userId, originalKey, version)
+      await this.publish(userId, generation, version, avatarKey)
+      return this.storage.getPublicUrl(avatarKey)
     })
   }
 
@@ -105,9 +124,9 @@ export class AvatarService {
     await this.withUserLock(userId, async () => {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { avatarUrl: true, avatarGeneration: true },
+        select: { avatarKey: true, avatarGeneration: true },
       })
-      if (!user?.avatarUrl) return // idempotent: nothing to remove
+      if (!user?.avatarKey) return // idempotent: nothing to remove
 
       const generation = user.avatarGeneration + 1
       // Fail closed: delete storage before clearing the row, so a failed delete
@@ -118,7 +137,7 @@ export class AvatarService {
       // CAS clear: only succeeds if no newer generation has been published.
       const { count } = await this.prisma.user.updateMany({
         where: { id: userId, avatarGeneration: { lt: generation } },
-        data: { avatarUrl: null, avatarGeneration: generation },
+        data: { avatarKey: null, avatarGeneration: generation },
       })
       if (count === 0) throw new StaleAvatarOperationError()
       await this.userCache.invalidateUser(userId)
@@ -140,12 +159,14 @@ export class AvatarService {
     }
   }
 
-  private async currentGeneration(userId: string): Promise<number> {
+  private async currentState(
+    userId: string
+  ): Promise<{ avatarKey: string | null; avatarGeneration: number }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { avatarGeneration: true },
+      select: { avatarKey: true, avatarGeneration: true },
     })
-    return user?.avatarGeneration ?? 0
+    return user ?? { avatarKey: null, avatarGeneration: 0 }
   }
 
   /** Generate derivatives; on any failure best-effort delete the half-written version. */
@@ -164,26 +185,26 @@ export class AvatarService {
         cacheControl: this.env.get('MEDIA_AVATAR_CACHE_CONTROL'),
       })
       const primary = result.derivatives.find((d) => d.name === PRIMARY_VARIANT)
-      if (!primary?.url) throw new Error('avatar primary derivative produced no public URL')
-      return primary.url
+      if (!primary) throw new Error('avatar primary derivative missing')
+      return primary.key
     } catch (err) {
       await this.cleanupVersion(userId, version).catch(() => undefined)
       throw err
     }
   }
 
-  /** Conditionally publish the URL (CAS on generation), invalidate cache, then sweep. */
+  /** Conditionally publish the key (CAS on generation), invalidate cache, then sweep. */
   private async publish(
     userId: string,
     generation: number,
     version: string,
-    avatarUrl: string
+    avatarKey: string
   ): Promise<void> {
     // CAS fence: matches only while the stored generation is still older, so a
     // stale holder whose lease was reassigned cannot overwrite a newer version.
     const { count } = await this.prisma.user.updateMany({
       where: { id: userId, avatarGeneration: { lt: generation } },
-      data: { avatarUrl, avatarGeneration: generation },
+      data: { avatarKey, avatarGeneration: generation },
     })
     if (count === 0) {
       await this.cleanupVersion(userId, version).catch(() => undefined)

@@ -5,7 +5,8 @@ export interface OAuthUserProfile {
   email: string | null
   emailVerified: boolean
   displayName: string | null
-  avatarUrl: string | null
+  /** Provider-hosted picture URL; only downloaded once into our storage, never persisted or sent to a browser. */
+  avatarSourceUrl: string | null
   phone?: string | null
 }
 

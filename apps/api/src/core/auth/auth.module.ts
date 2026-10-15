@@ -33,6 +33,7 @@ import { InvitationHandoffsController } from './invitation-handoffs.controller.j
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
 import { OAuthController } from './oauth/oauth.controller.js'
 import { OAuthService } from './oauth/oauth.service.js'
+import { OAuthAvatarRehostService } from './oauth/oauth-avatar-rehost.service.js'
 import { OAuthClientService } from './oauth/oauth-client.service.js'
 import { OAuthLoginTicketService } from './oauth/oauth-login-ticket.service.js'
 import { OAuthStateService } from './oauth/oauth-state.service.js'
@@ -79,6 +80,7 @@ import { UserCacheService } from './user-cache.service.js'
     OAuthClientService,
     OAuthLoginTicketService,
     OAuthProviderFactory,
+    OAuthAvatarRehostService,
     OAuthService,
     OAuthStateService,
     TokenService,

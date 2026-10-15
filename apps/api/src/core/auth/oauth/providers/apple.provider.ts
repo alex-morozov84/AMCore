@@ -108,7 +108,7 @@ export class AppleProvider implements OAuthProvider {
       emailVerified: (userInfo.email_verified as boolean) ?? false,
       // Name is only available on first login via form_post body (not in userinfo)
       displayName: null,
-      avatarUrl: null,
+      avatarSourceUrl: null,
     }
   }
 }

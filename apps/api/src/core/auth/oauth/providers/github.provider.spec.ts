@@ -110,7 +110,7 @@ describe('GitHubProvider', () => {
         email: 'primary@example.com',
         emailVerified: true,
         displayName: 'Test User',
-        avatarUrl: 'https://github.com/avatar.jpg',
+        avatarSourceUrl: 'https://github.com/avatar.jpg',
       })
     })
 

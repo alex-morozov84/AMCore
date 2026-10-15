@@ -78,7 +78,7 @@ export class GoogleProvider implements OAuthProvider {
       email: userInfo.email ?? null,
       emailVerified: userInfo.email_verified ?? false,
       displayName: (userInfo.name as string) ?? null,
-      avatarUrl: (userInfo.picture as string) ?? null,
+      avatarSourceUrl: (userInfo.picture as string) ?? null,
     }
   }
 }

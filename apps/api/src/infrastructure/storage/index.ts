@@ -8,6 +8,7 @@ export { StorageDownloadService } from './storage-download.service.js'
 export { isPublicKey, PUBLIC_KEY_PREFIX, visibilityOf } from './storage-namespace.js'
 export { StorageProbeService } from './storage-probe.service.js'
 export { StoragePublicModule } from './storage-public.module.js'
+export { StoragePublicCheckService } from './storage-public-check.service.js'
 export {
   type FileValidationOptions,
   FileValidationPipe,
