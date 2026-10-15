@@ -1,9 +1,8 @@
 import { z } from 'zod'
 
-import type { AiToolContract } from '../ai-tool.types'
-import { NoDomainToolAuthority, NoDomainToolAuthorityModule } from '../no-domain-tool-authority'
-
-import { AiToolRiskClass } from '@/generated/prisma/client'
+import { AiToolRiskClass } from '../../../../generated/prisma/client.js'
+import type { AiToolContract } from '../ai-tool.types.js'
+import { NoDomainToolAuthority, NoDomainToolAuthorityModule } from '../no-domain-tool-authority.js'
 
 const parameters = z.object({}).strict()
 export const currentTimeContract: AiToolContract<Record<string, never>> = {

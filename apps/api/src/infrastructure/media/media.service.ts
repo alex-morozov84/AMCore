@@ -2,7 +2,11 @@ import { performance } from 'node:perf_hooks'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IMAGE_PROCESSOR } from './media.constants'
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService } from '../observability/index.js'
+import { StorageService } from '../storage/index.js'
+
+import { IMAGE_PROCESSOR } from './media.constants.js'
 import {
   type ImageDerivativeRecord,
   type ImageProcessor,
@@ -10,14 +14,10 @@ import {
   MediaProcessingError,
   type ProcessImageInput,
   type ProcessImageResult,
-} from './media.types'
-import { buildDerivativeKey } from './media-key'
-import { MEDIA_PRESETS } from './presets/media-presets'
-import { assertSourceAllowed } from './source-policy'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { StorageService } from '@/infrastructure/storage'
+} from './media.types.js'
+import { buildDerivativeKey } from './media-key.js'
+import { MEDIA_PRESETS } from './presets/media-presets.js'
+import { assertSourceAllowed } from './source-policy.js'
 
 /**
  * Generates deterministic image derivatives on top of `StorageService`.

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { TELEGRAM_BOT_USERNAME_PATTERN } from '../../core/notifications/channels/telegram/telegram.constants'
+import { TELEGRAM_BOT_USERNAME_PATTERN } from '../../core/notifications/channels/telegram/telegram.constants.js'
 
 // Return the stable public base type (`z.ZodType`) rather than the concrete
 // `z.preprocess` wrapper: its internal shape churns across zod minor releases

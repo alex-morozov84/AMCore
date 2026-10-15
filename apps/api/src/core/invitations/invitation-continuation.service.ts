@@ -10,26 +10,25 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { AppException } from '../../common/exceptions/index.js'
+import type { OrgInvite, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
 import {
   type InvitationCredential,
   invitationCredentialHint,
   invitationSecretHash,
-} from './invitation-credential'
-import { InvitationLiveSessionService } from './invitation-live-session.service'
+} from './invitation-credential.js'
+import { InvitationLiveSessionService } from './invitation-live-session.service.js'
 import {
   invalidInvitation,
   invitationClock,
   lockInvitation,
   lockInvitationOrg,
   lockInvitationUser,
-} from './invitation-locks'
-import { currentInvitationIntent, type IntentRole } from './invitation-role-intent'
-import { invitationTransaction } from './invitation-transaction'
-
-import type { OrgInvite, Prisma } from '@/generated/prisma/client'
+} from './invitation-locks.js'
+import { currentInvitationIntent, type IntentRole } from './invitation-role-intent.js'
+import { invitationTransaction } from './invitation-transaction.js'
 
 @Injectable()
 export class InvitationContinuationService {

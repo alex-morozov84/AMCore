@@ -1,1 +1,1 @@
-export * from '../invitations/invitation-locks'
+export * from '../invitations/invitation-locks.js'

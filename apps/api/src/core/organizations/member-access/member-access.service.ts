@@ -8,18 +8,18 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
-import { AppException, ForbiddenException } from '../../../common/exceptions'
-import { PrismaService } from '../../../prisma'
-import { CapabilityRegistry } from '../capability-registry.service'
+import { AppException, ForbiddenException } from '../../../common/exceptions/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { CapabilityRegistry } from '../capability-registry.service.js'
 
-import { AccessUnavailableError } from './access-budget'
+import { AccessUnavailableError } from './access-budget.js'
 import {
   type AccessCapability,
   assertCatalogueWithinLimits,
   defaultCapabilities,
-} from './access-capabilities'
-import { explainAccess } from './access-evaluator'
-import { loadAccess } from './access-loader'
+} from './access-capabilities.js'
+import { explainAccess } from './access-evaluator.js'
+import { loadAccess } from './access-loader.js'
 
 /** The whole answer must fit the API cap; a larger one is refused, never shortened. */
 export function assertResponseWithinCap(result: MemberAccess): void {

@@ -4,13 +4,13 @@ import { z } from 'zod'
 
 import { createUuidV7 as uuidv7 } from '@amcore/shared'
 
-import { DEFAULT_JOB_OPTIONS } from '../queue/interfaces/job-options.interface'
+import { DEFAULT_JOB_OPTIONS } from '../queue/interfaces/job-options.interface.js'
 
-import { managedJobKey } from './managed-job-key'
-import { initializeManagedQueue } from './scripts/initialize-queue'
-import type { WorkDefinition } from './work-definition'
-import { canonicalWire, parseWorkPayload } from './work-payload'
-import { WorkReadiness } from './work-readiness'
+import { managedJobKey } from './managed-job-key.js'
+import { initializeManagedQueue } from './scripts/initialize-queue.js'
+import type { WorkDefinition } from './work-definition.js'
+import { canonicalWire, parseWorkPayload } from './work-payload.js'
+import { WorkReadiness } from './work-readiness.js'
 
 const optionsSchema = z.strictObject({
   jobId: z

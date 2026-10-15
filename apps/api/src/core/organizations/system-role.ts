@@ -1,8 +1,7 @@
 import { HttpStatus } from '@nestjs/common'
 
-import { AppException } from '../../common/exceptions'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { AppException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 /** Nullable composite uniqueness does not guarantee one global template. */
 export async function getSystemRoleId(

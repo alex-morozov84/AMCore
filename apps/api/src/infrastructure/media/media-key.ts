@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto'
 
-import { OUTPUT_EXT } from './media.constants'
-import type { ImageOutputFormat } from './media.types'
+import { normalizeObjectKey, PUBLIC_KEY_PREFIX } from '../storage/index.js'
 
-import { normalizeObjectKey, PUBLIC_KEY_PREFIX } from '@/infrastructure/storage'
+import { OUTPUT_EXT } from './media.constants.js'
+import type { ImageOutputFormat } from './media.types.js'
 
 /**
  * Generate a per-upload version token for cache-busting derivative keys. base36

@@ -3,12 +3,11 @@ import { ApiExcludeEndpoint } from '@nestjs/swagger'
 
 import { AuthType } from '@amcore/shared'
 
-import { Auth } from '../../../auth/decorators/auth.decorator'
+import { RateLimit } from '../../../../infrastructure/throttling/index.js'
+import { VerifyWebhook } from '../../../../infrastructure/webhooks/index.js'
+import { Auth } from '../../../auth/decorators/auth.decorator.js'
 
-import { TelegramWebhookService } from './telegram-webhook.service'
-
-import { RateLimit } from '@/infrastructure/throttling'
-import { VerifyWebhook } from '@/infrastructure/webhooks'
+import { TelegramWebhookService } from './telegram-webhook.service.js'
 
 /**
  * Inbound Telegram webhook (Arc D / D.6). `AuthType.None` (no bearer) + `@VerifyWebhook('telegram')`

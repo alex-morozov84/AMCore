@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import type { WorkJob, WorkOperation, WorkReason } from '@amcore/shared'
 
-import type { NotificationDelivery } from '@/generated/prisma/client'
+import type { NotificationDelivery } from '../../../generated/prisma/client.js'
 
 export const NOTIFICATION_CONTROL_RETENTION_MS = 30 * 86400000
 export const notificationWorkDigest = (value: unknown): string =>

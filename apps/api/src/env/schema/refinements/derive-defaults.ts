@@ -1,4 +1,4 @@
-import type { EnvInput } from '../base'
+import type { EnvInput } from '../base.js'
 
 // The resolved env after cross-field defaults: the three env-derived fields are no
 // longer optional. Declared explicitly (not `ReturnType<...>`) so the transform has

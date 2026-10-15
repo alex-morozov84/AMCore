@@ -4,9 +4,9 @@ import { z } from 'zod'
 
 import { aiCapabilityMapSchema, aiSlugSchema } from '@amcore/shared'
 
-import type { ResolvedAiModel } from './ai-registry.types'
+import { AiProviderType } from '../../../generated/prisma/client.js'
 
-import { AiProviderType } from '@/generated/prisma/client'
+import type { ResolvedAiModel } from './ai-registry.types.js'
 
 const id = z.string().min(1).max(128)
 const cap = z.number().int().positive().max(2147483647).nullable()

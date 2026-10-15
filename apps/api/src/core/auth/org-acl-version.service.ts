@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
-import { NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { NotFoundException } from '../../common/exceptions/index.js'
+import { PrismaService } from '../../prisma/index.js'
 
 /** Select the current permission-cache fence from the primary database. */
 @Injectable()

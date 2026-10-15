@@ -8,15 +8,7 @@ import type {
   AiRunStatusValue,
 } from '@amcore/shared'
 
-import { NotFoundException } from '../../../common/exceptions'
-import { AI_APPROVAL_RUN_CANCELLED, AI_RUN_CANCELLED_BY_USER } from '../ai-run.constants'
-import { lockRun } from '../ai-run-locks'
-
-import { toAiRunResponse } from './ai-run.mapper'
-import { archivedRunError } from './ai-run-archive'
-import { decodeAiRunCursor, encodeAiRunCursor } from './ai-run-cursor'
-
-import { AuditLogService } from '@/core/audit'
+import { NotFoundException } from '../../../common/exceptions/index.js'
 import {
   AiApprovalState,
   AiRunStatus,
@@ -24,8 +16,15 @@ import {
   AuditActorType,
   AuditTargetType,
   Prisma,
-} from '@/generated/prisma/client'
-import { PrismaService } from '@/prisma'
+} from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { AuditLogService } from '../../audit/index.js'
+import { AI_APPROVAL_RUN_CANCELLED, AI_RUN_CANCELLED_BY_USER } from '../ai-run.constants.js'
+import { lockRun } from '../ai-run-locks.js'
+
+import { toAiRunResponse } from './ai-run.mapper.js'
+import { archivedRunError } from './ai-run-archive.js'
+import { decodeAiRunCursor, encodeAiRunCursor } from './ai-run-cursor.js'
 
 /** Rolls the cancel-while-waiting transaction back when the parked gate raced out from under it. */
 class CancelRaceError extends Error {}

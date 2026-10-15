@@ -3,24 +3,23 @@ import { Injectable } from '@nestjs/common'
 
 import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
 
-import { OrgAclVersionService } from '../org-acl-version.service'
+import type { Organization, Permission, Role, User } from '../../../generated/prisma/client.js'
+import { OrgAclVersionService } from '../org-acl-version.service.js'
 import {
   assertVerifiedContext,
   type VerifiedOrganizationContext,
-} from '../organization-context/verified-organization-context'
-import { PermissionsCacheService } from '../permissions-cache.service'
-import type { PrivilegedAdmission } from '../privileged-admission.service'
+} from '../organization-context/verified-organization-context.js'
+import { PermissionsCacheService } from '../permissions-cache.service.js'
+import type { PrivilegedAdmission } from '../privileged-admission.service.js'
 
-import { OWN_USER_READ_FIELDS, OWN_USER_UPDATE_FIELDS } from './org-role-defaults'
+import { OWN_USER_READ_FIELDS, OWN_USER_UPDATE_FIELDS } from './org-role-defaults.js'
 import {
   type AbilityPermission,
   hasFullTeamAccess,
   narrowPermissions,
   normalizeOwnerPermissions,
-} from './permission-normalization'
-import { createPrismaAbility, type PrismaQuery, type Subjects } from './prisma-ability'
-
-import type { Organization, Permission, Role, User } from '@/generated/prisma/client'
+} from './permission-normalization.js'
+import { createPrismaAbility, type PrismaQuery, type Subjects } from './prisma-ability.js'
 
 type AppSubjects =
   | 'all'

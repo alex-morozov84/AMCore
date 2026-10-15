@@ -7,5 +7,13 @@
     "**/*.test.ts",
     "**/__tests__/*",
     "**/__mocks__/*"
-  ]
+  ],
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

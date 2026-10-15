@@ -1,6 +1,6 @@
 import type { Redis } from 'ioredis'
 
-import { JOB_READ_FIELDS, JOB_READ_LUA } from './scripts/job-read.lua'
+import { JOB_READ_FIELDS, JOB_READ_LUA } from './scripts/job-read.lua.js'
 
 export type RawJobObservation =
   | { readonly status: 'unavailable'; readonly reason: string }

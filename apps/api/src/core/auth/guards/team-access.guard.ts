@@ -3,15 +3,15 @@ import { Reflector } from '@nestjs/core'
 
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { ForbiddenException } from '../../../common/exceptions'
-import { PrismaService } from '../../../prisma'
-import type { TeamAccessDecision } from '../casl/ability.factory'
-import { TEAM_ACCESS_KEY } from '../decorators/require-team-access.decorator'
+import { ForbiddenException } from '../../../common/exceptions/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import type { TeamAccessDecision } from '../casl/ability.factory.js'
+import { TEAM_ACCESS_KEY } from '../decorators/require-team-access.decorator.js'
 import {
   assertVerifiedContext,
   type VerifiedOrganizationContext,
-} from '../organization-context/verified-organization-context'
-import type { PrivilegedAdmission } from '../privileged-admission.service'
+} from '../organization-context/verified-organization-context.js'
+import type { PrivilegedAdmission } from '../privileged-admission.service.js'
 
 @Injectable()
 export class TeamAccessGuard implements CanActivate {

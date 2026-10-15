@@ -15,11 +15,10 @@ import {
   Subject,
 } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import type { AppAbility, TeamAccessDecision } from '../auth/casl/ability.factory'
-import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
-
-import type { Organization } from '@/generated/prisma/client'
+import { AppException } from '../../common/exceptions/index.js'
+import type { Organization } from '../../generated/prisma/client.js'
+import type { AppAbility, TeamAccessDecision } from '../auth/casl/ability.factory.js'
+import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults.js'
 
 export interface CapabilityAdapter {
   operation: string

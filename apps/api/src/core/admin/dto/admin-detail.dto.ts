@@ -5,7 +5,7 @@ import {
   adminUserDetailResponseSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 export class AdminUserDetailQueryDto extends createSchemaDto(adminUserDetailQuerySchema) {}
 export class AdminOrganizationDetailQueryDto extends createSchemaDto(

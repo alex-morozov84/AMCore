@@ -6,8 +6,8 @@ import type {
   WebhookVerificationInput,
   WebhookVerificationResult,
   WebhookVerifier,
-} from './webhook.types'
-import { constantTimeEquals, createHmacHex } from './webhook-crypto'
+} from './webhook.types.js'
+import { constantTimeEquals, createHmacHex } from './webhook-crypto.js'
 
 const standardHeadersSchema = z.object({
   id: z.string().min(1),

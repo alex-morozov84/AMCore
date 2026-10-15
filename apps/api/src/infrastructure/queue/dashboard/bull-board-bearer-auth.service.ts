@@ -3,8 +3,8 @@ import { JwtService } from '@nestjs/jwt'
 
 import { type JwtPayload, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../../common/exceptions'
-import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service'
+import { UnauthorizedException } from '../../../common/exceptions/index.js'
+import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service.js'
 
 export type BullBoardBearerAccess =
   | { readonly kind: 'authorized'; readonly userId: string }

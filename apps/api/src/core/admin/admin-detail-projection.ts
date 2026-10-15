@@ -4,7 +4,7 @@ import {
   parseSupportedLocale,
 } from '@amcore/shared'
 
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 export const DETAIL_USER_SELECT = {
   id: true,

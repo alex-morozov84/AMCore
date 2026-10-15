@@ -4,13 +4,14 @@ import { Injectable } from '@nestjs/common'
 
 import { InviteErrorCode } from '@amcore/shared'
 
-import { NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import { NotFoundException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
-import type { InvitationActor } from './invitation-actor'
-import { InvitationAuthorization } from './invitation-authorization'
-import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks'
+import type { InvitationActor } from './invitation-actor.js'
+import { InvitationAuthorization } from './invitation-authorization.js'
+import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks.js'
 import {
   completeInvitationOperation,
   INVITATION_RETENTION_MS,
@@ -18,10 +19,8 @@ import {
   invitationFingerprint,
   lockInvitationOperation,
   replayInvitationOperation,
-} from './invitation-operation'
-import { invitationTransaction } from './invitation-transaction'
-
-import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
+} from './invitation-operation.js'
+import { invitationTransaction } from './invitation-transaction.js'
 
 @Injectable()
 export class InviteRevokeService {

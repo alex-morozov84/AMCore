@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import type { WorkJob, WorkOperation, WorkReason } from '@amcore/shared'
 
-import type { AiRun } from '@/generated/prisma/client'
+import type { AiRun } from '../../../generated/prisma/client.js'
 
 export const AI_CLEANUP_AGE_MS = 30 * 86400000
 

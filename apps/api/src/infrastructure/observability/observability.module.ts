@@ -3,10 +3,10 @@ import { HttpAdapterHost } from '@nestjs/core'
 import type { Request, Response } from 'express'
 import type { FastifyInstance } from 'fastify'
 
-import { HttpMetricsMiddleware } from './http-metrics.middleware'
-import { MetricsController } from './metrics.controller'
-import { MetricsService } from './metrics.service'
-import { MetricsAuthGuard } from './metrics-auth.guard'
+import { HttpMetricsMiddleware } from './http-metrics.middleware.js'
+import { MetricsController } from './metrics.controller.js'
+import { MetricsService } from './metrics.service.js'
+import { MetricsAuthGuard } from './metrics-auth.guard.js'
 
 @Global()
 @Module({

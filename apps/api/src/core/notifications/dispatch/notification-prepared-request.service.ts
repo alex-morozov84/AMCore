@@ -1,25 +1,24 @@
 import { Injectable } from '@nestjs/common'
 
+import { EnvService } from '../../../env/env.service.js'
+import { Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
 import type {
   ChannelDeliverer,
   DeliveryContext,
   NotStarted,
-} from '../channels/channel-deliverer.types'
-import { NotificationChannelRegistry } from '../channels/notification-channel.registry'
+} from '../channels/channel-deliverer.types.js'
+import { NotificationChannelRegistry } from '../channels/notification-channel.registry.js'
 import {
   NotificationPreparationError,
   type PreparedNotificationRequest,
   validatePreparedRequest,
-} from '../channels/notification-prepared-request'
-import { notificationProviderScope } from '../control/notification-provider-scope'
-import { NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS } from '../notification-dispatch.constants'
+} from '../channels/notification-prepared-request.js'
+import { notificationProviderScope } from '../control/notification-provider-scope.js'
+import { NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS } from '../notification-dispatch.constants.js'
 
-import { cancelClaimedDelivery } from './notification-delivery-cancellation'
-import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch'
-
-import { EnvService } from '@/env/env.service'
-import { Prisma } from '@/generated/prisma/client'
-import { PrismaService } from '@/prisma'
+import { cancelClaimedDelivery } from './notification-delivery-cancellation.js'
+import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch.js'
 
 export type PreparedRequestResult =
   PreparedNotificationRequest | NotStarted | { status: 'permanent'; errorCode: string }

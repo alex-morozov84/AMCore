@@ -4,10 +4,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt'
 
 import { type JwtPayload, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../../common/exceptions'
-import { EnvService } from '../../../env/env.service'
-import { PrivilegedRoleService } from '../privileged-role.service'
-import { UserCacheService } from '../user-cache.service'
+import { UnauthorizedException } from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
+import { PrivilegedRoleService } from '../privileged-role.service.js'
+import { UserCacheService } from '../user-cache.service.js'
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {

@@ -6,7 +6,7 @@ import {
   telegramLinkResponseSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../../common/schemas/schema-dto.js'
 
 /** `POST /notifications/telegram/link` → one-time deep-link URL + expiry. */
 export class TelegramLinkResponseDto extends createSchemaDto(telegramLinkResponseSchema) {}

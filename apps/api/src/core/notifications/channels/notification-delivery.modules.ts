@@ -1,14 +1,13 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common'
 
-import { NotificationExecutionModule } from '../dispatch/notification-execution.module'
-import { NotificationPreparedRequestService } from '../dispatch/notification-prepared-request.service'
+import { EmailModule } from '../../../infrastructure/email/index.js'
+import { PrismaModule } from '../../../prisma/index.js'
+import { NotificationExecutionModule } from '../dispatch/notification-execution.module.js'
+import { NotificationPreparedRequestService } from '../dispatch/notification-prepared-request.service.js'
 
-import { EmailChannelDeliverer } from './email-channel.deliverer'
-import { TelegramBotApiClient } from './telegram/telegram-bot-api.client'
-import { TelegramChannelDeliverer } from './telegram/telegram-channel.deliverer'
-
-import { EmailModule } from '@/infrastructure/email'
-import { PrismaModule } from '@/prisma'
+import { EmailChannelDeliverer } from './email-channel.deliverer.js'
+import { TelegramBotApiClient } from './telegram/telegram-bot-api.client.js'
+import { TelegramChannelDeliverer } from './telegram/telegram-channel.deliverer.js'
 
 @Module({})
 export class EmailNotificationDeliveryModule {

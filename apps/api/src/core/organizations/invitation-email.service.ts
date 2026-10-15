@@ -3,8 +3,8 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
 
-import { EnvService } from '../../env/env.service'
-import { EmailService } from '../../infrastructure/email'
+import { EnvService } from '../../env/env.service.js'
+import { EmailService } from '../../infrastructure/email/index.js'
 
 /** Ephemeral issuance-time display snapshot; never persisted or queued with its secret. */
 export type InvitationMailSnapshot = {

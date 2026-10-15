@@ -9,15 +9,15 @@ import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 
 import { AuthType } from '@amcore/shared'
 
-import { InvalidObjectKeyError, normalizeObjectKey } from './object-key'
-import { type FileMetadata, StorageObjectNotFoundError } from './storage.interface'
-import { StorageService } from './storage.service'
-import { isPublicKey } from './storage-namespace'
+import { AppException, NotFoundException } from '../../common/exceptions/index.js'
+import { Auth } from '../../core/auth/decorators/auth.decorator.js'
+import { EnvService } from '../../env/env.service.js'
+import { RateLimit } from '../throttling/index.js'
 
-import { AppException, NotFoundException } from '@/common/exceptions'
-import { Auth } from '@/core/auth/decorators/auth.decorator'
-import { EnvService } from '@/env/env.service'
-import { RateLimit } from '@/infrastructure/throttling'
+import { InvalidObjectKeyError, normalizeObjectKey } from './object-key.js'
+import { type FileMetadata, StorageObjectNotFoundError } from './storage.interface.js'
+import { StorageService } from './storage.service.js'
+import { isPublicKey } from './storage-namespace.js'
 
 /** Content types a browser may show inline; everything else downloads as opaque bytes. */
 const SAFE_TYPE = /^(image\/(png|jpeg|webp|gif|avif)|application\/pdf|text\/plain)$/

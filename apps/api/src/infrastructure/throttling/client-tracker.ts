@@ -1,7 +1,7 @@
 import type { Request } from 'express'
 
-import { resolveVerifiedVisitorIp } from '../../common/utils/verified-visitor-ip'
-import type { EnvService } from '../../env/env.service'
+import { resolveVerifiedVisitorIp } from '../../common/utils/verified-visitor-ip.js'
+import type { EnvService } from '../../env/env.service.js'
 
 /** Existing global tracker semantics, including the unknown-address sentinel. */
 export function resolveTracker(req: Request, env: EnvService): string {

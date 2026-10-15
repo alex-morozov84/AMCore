@@ -2,9 +2,13 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 
 import { AuthErrorCode, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { AppException, ForbiddenException, UnauthorizedException } from '@/common/exceptions'
-import { EnvService } from '@/env/env.service'
-import type { ControlTransaction } from '@/infrastructure/background-work/control-transaction'
+import {
+  AppException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import type { ControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
 
 /** All reads/actions use current primary session; dispatch repeats this check inside its tx. */
 @Injectable()

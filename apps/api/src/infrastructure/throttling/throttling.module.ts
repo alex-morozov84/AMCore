@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 
-import { GcraRedisLimiter } from './gcra-redis-limiter.service'
-import { RateLimitGuard } from './rate-limit.guard'
+import { GcraRedisLimiter } from './gcra-redis-limiter.service.js'
+import { RateLimitGuard } from './rate-limit.guard.js'
 
 /**
  * Rate limiting (GCRA, Option O — ADR-039/ADR-073). Owns the entire

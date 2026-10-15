@@ -2,8 +2,8 @@ import { HttpStatus } from '@nestjs/common'
 
 import { AuthErrorCode, type RequestPrincipal } from '@amcore/shared'
 
-import { AppException } from '@/common/exceptions'
-import { PrismaService } from '@/prisma'
+import { AppException } from '../../common/exceptions/index.js'
+import { PrismaService } from '../../prisma/index.js'
 
 /** The 403 STEP_UP_REQUIRED an unfresh privileged action raises (client → `POST /auth/step-up`). */
 function stepUpRequired(): AppException {

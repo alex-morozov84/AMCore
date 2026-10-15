@@ -1,8 +1,8 @@
 import type { BoardHooks, UIConfig } from '@bull-board/api/typings/app'
 
-import { BOARD_LOCALE_HEADER } from './bull-board-boundary.middleware'
-import { boardCopy, type BoardLocale } from './bull-board-copy'
-import { projectJobBody, projectQueuesBody } from './bull-board-projection'
+import { BOARD_LOCALE_HEADER } from './bull-board-boundary.middleware.js'
+import { boardCopy, type BoardLocale } from './bull-board-copy.js'
+import { projectJobBody, projectQueuesBody } from './bull-board-projection.js'
 
 /** Board routes (as the Board names them) that may run at all; everything else is denied up front. */
 const ALLOWED_ROUTES: ReadonlyMap<string, 'queues' | 'job' | 'logs'> = new Map([

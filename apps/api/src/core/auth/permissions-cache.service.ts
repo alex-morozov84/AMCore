@@ -1,14 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
+import type { Permission } from '../../generated/prisma/client.js'
+import { Prisma } from '../../generated/prisma/client.js'
+import { MetricsService } from '../../infrastructure/observability/index.js'
+import {
+  type AppRedisClient,
+  REDIS_CLIENT,
+  RedisLockService,
+} from '../../infrastructure/redis/index.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { memberPermissionSnapshot } from './member-permission-snapshot'
-
-import type { Permission } from '@/generated/prisma/client'
-import { Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+import { memberPermissionSnapshot } from './member-permission-snapshot.js'
 
 const PERMISSIONS_CACHE_TTL_MS = 3600 * 1000
 const LOCK_TTL_MS = 5 * 1000

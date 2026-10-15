@@ -2,20 +2,19 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common'
 import type { Queue } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import { NotFoundException } from '../../common/exceptions'
+import { NotFoundException } from '../../common/exceptions/index.js'
 import type {
   ManagedJobIdentity,
   ManagedJobOptions,
   ManagedProducer,
-} from '../background-work/managed-producer'
-import { MANAGED_PRODUCERS } from '../background-work/registration'
-import type { WorkDefinition } from '../background-work/work-definition'
+} from '../background-work/managed-producer.js'
+import { MANAGED_PRODUCERS } from '../background-work/registration.js'
+import type { WorkDefinition } from '../background-work/work-definition.js'
+import { MetricsService } from '../observability/index.js'
 
-import { QUEUE_REGISTRY } from './constants/queue-inventory.constant'
-import type { QueueName } from './constants/queues.constant'
-import type { IQueueService } from './interfaces/queue.interface'
-
-import { MetricsService } from '@/infrastructure/observability'
+import { QUEUE_REGISTRY } from './constants/queue-inventory.constant.js'
+import type { QueueName } from './constants/queues.constant.js'
+import type { IQueueService } from './interfaces/queue.interface.js'
 
 @Injectable()
 export class QueueService implements IQueueService, OnModuleInit {

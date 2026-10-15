@@ -1,6 +1,6 @@
 import sharp, { type Metadata, type Sharp } from 'sharp'
 
-import { DECODABLE_SOURCE_FORMATS, OUTPUT_CONTENT_TYPE } from '../media.constants'
+import { DECODABLE_SOURCE_FORMATS, OUTPUT_CONTENT_TYPE } from '../media.constants.js'
 import {
   type ImageDerivativeOutput,
   type ImageDerivativeSpec,
@@ -9,7 +9,7 @@ import {
   type ImageSourceFormat,
   MediaProcessingError,
   type SharpProcessorConfig,
-} from '../media.types'
+} from '../media.types.js'
 
 /**
  * `sharp`/libvips-backed image processor.

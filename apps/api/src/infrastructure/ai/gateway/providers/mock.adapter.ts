@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
-import { normalizeAiUsage } from '../../usage/ai-usage-v2'
-import { AiGatewayException } from '../ai-gateway.error'
+import { AiProviderType } from '../../../../generated/prisma/client.js'
+import { normalizeAiUsage } from '../../usage/ai-usage-v2.js'
+import { AiGatewayException } from '../ai-gateway.error.js'
 import type {
   AiAdapterCall,
   AiGatewayTool,
@@ -11,10 +12,8 @@ import type {
   AiToolCall,
   AiUsage,
   AiUserContentPart,
-} from '../ai-gateway.types'
-import { attachProviderReceipt, observeProviderReceipt } from '../provider-receipt'
-
-import { AiProviderType } from '@/generated/prisma/client'
+} from '../ai-gateway.types.js'
+import { attachProviderReceipt, observeProviderReceipt } from '../provider-receipt.js'
 
 /** Rough deterministic token estimate (~4 chars/token) for the key-less mock. */
 function estimateTokens(text: string): number {

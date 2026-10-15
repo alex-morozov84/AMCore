@@ -2,17 +2,16 @@ import { Injectable } from '@nestjs/common'
 
 import { aiMessageContentSchema, aiModelSelectionSchema, type WorkReason } from '@amcore/shared'
 
-import { aiRunInputFingerprint } from '../runs/ai-run-input-fingerprint'
-
-import { aiRunBasicCapability } from './ai-work-policy'
-
-import { EnvService } from '@/env/env.service'
-import { AiAuthorType, AiMessageRole, type AiRun, AiRunStepType, Prisma } from '@/generated/prisma/client'
+import { EnvService } from '../../../env/env.service.js'
+import { AiAuthorType, AiMessageRole, type AiRun, AiRunStepType, Prisma } from '../../../generated/prisma/client.js'
 import {
   aiExecutionDescriptorSchema,
   freezeAiModel,
-} from '@/infrastructure/ai/registry/ai-execution-descriptor'
-import { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
+} from '../../../infrastructure/ai/registry/ai-execution-descriptor.js'
+import { AiModelRegistry } from '../../../infrastructure/ai/registry/ai-model-registry.service.js'
+import { aiRunInputFingerprint } from '../runs/ai-run-input-fingerprint.js'
+
+import { aiRunBasicCapability } from './ai-work-policy.js'
 
 interface PreparedRetry {
   availableAt: Date

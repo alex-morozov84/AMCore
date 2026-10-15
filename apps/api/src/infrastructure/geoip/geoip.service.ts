@@ -6,9 +6,9 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { type SessionLocation, type SupportedLocale } from '@amcore/shared'
 
-import { EnvService } from '../../env/env.service'
+import { EnvService } from '../../env/env.service.js'
 
-import { normalizeIpForGeoLookup } from './ip-normalize'
+import { normalizeIpForGeoLookup } from './ip-normalize.js'
 
 /**
  * Approximate IP-to-location reader. Holds one long-lived `Reader`

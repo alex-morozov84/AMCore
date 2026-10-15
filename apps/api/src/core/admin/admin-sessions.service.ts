@@ -10,15 +10,14 @@ import {
   type SupportedLocale,
 } from '@amcore/shared'
 
-import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
-import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
-import { acquireXactLock, PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
-import { sessionCoordinationLockKey } from '../auth/session-lock-key'
+import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType } from '../../generated/prisma/client.js'
+import { GeoIpService } from '../../infrastructure/geoip/geoip.service.js'
+import { acquireXactLock, PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
+import { sessionCoordinationLockKey } from '../auth/session-lock-key.js'
 
-import { querySessionPage, type SessionListRow } from './admin-session-query'
-
-import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
+import { querySessionPage, type SessionListRow } from './admin-session-query.js'
 
 /**
  * SUPER_ADMIN session viewer/revocation for another user's account.

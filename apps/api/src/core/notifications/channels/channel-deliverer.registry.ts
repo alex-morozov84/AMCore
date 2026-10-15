@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import type { NotificationChannel } from '../notification.constants'
+import type { NotificationChannel } from '../notification.constants.js'
 
-import type { ChannelDeliverer } from './channel-deliverer.types'
+import type { ChannelDeliverer } from './channel-deliverer.types.js'
 
 /**
  * DI token for the set of active channel deliverers. Provided as an array so each

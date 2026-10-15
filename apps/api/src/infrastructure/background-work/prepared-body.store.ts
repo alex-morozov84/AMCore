@@ -6,8 +6,8 @@ import { z } from 'zod'
 
 import { type WorkReason, workReasonSchema } from '@amcore/shared'
 
-import { managedJobKey } from './managed-job-key'
-import { PREPARED_BODY_LUA } from './scripts/prepared-body.lua'
+import { managedJobKey } from './managed-job-key.js'
+import { PREPARED_BODY_LUA } from './scripts/prepared-body.lua.js'
 
 const identitySchema = z.strictObject({
   incarnation: z.uuidv7(),

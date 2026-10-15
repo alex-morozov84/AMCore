@@ -1,7 +1,7 @@
-import { type ControlTransaction, sampleControlClock } from './control-transaction'
-import { WorkPolicyError } from './work-policy-error'
+import type { BackgroundBudget } from '../../generated/prisma/client.js'
 
-import type { BackgroundBudget } from '@/generated/prisma/client'
+import { type ControlTransaction, sampleControlClock } from './control-transaction.js'
+import { WorkPolicyError } from './work-policy-error.js'
 
 /** Fixed quota-row authority shared by ADMIN accounting and provider-window safety admission. */
 export async function lockControlBudget(

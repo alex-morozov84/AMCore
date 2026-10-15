@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common'
 
-import { IMAGE_PROCESSOR } from './media.constants'
-import { MediaService } from './media.service'
-import { SharpImageProcessor } from './processors/sharp-image.processor'
+import { EnvModule } from '../../env/env.module.js'
+import { EnvService } from '../../env/env.service.js'
+import { ObservabilityModule } from '../observability/index.js'
 
-import { EnvModule } from '@/env/env.module'
-import { EnvService } from '@/env/env.service'
-import { ObservabilityModule } from '@/infrastructure/observability'
+import { IMAGE_PROCESSOR } from './media.constants.js'
+import { MediaService } from './media.service.js'
+import { SharpImageProcessor } from './processors/sharp-image.processor.js'
 
 /**
  * Media processing module. Binds the active `ImageProcessor` (sharp, configured

@@ -1,9 +1,9 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common'
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from '@prometheus-io/client'
 
-import { METRIC_NAMES, METRICS_COLLECTOR_TIMEOUT_MS } from './metrics.constants'
+import { EnvService } from '../../env/env.service.js'
 
-import { EnvService } from '@/env/env.service'
+import { METRIC_NAMES, METRICS_COLLECTOR_TIMEOUT_MS } from './metrics.constants.js'
 
 type HttpLabels = {
   method: string

@@ -1,5 +1,5 @@
-import { AiConversationControl, AiConversationState, Prisma } from '@/generated/prisma/client'
-import { PrismaService } from '@/prisma'
+import { AiConversationControl, AiConversationState, Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
 
 /**
  * Conversation ownership fence (Track C — ADR-054 / ADR-049, Arc F, worker role). A run freezes its

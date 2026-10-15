@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'crypto'
 
 import type { InvitationOAuthCorrelation, SystemRole } from '@amcore/shared'
 
-import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis'
+import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
 
 const TICKET_TTL_MS = 60 * 1000
 

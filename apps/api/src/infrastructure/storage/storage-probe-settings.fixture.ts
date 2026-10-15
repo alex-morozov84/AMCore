@@ -1,7 +1,6 @@
-import type { SettingsReader } from '../settings/settings-reader'
-import type { StorageSettingDefinition } from '../settings/storage-setting.definition'
-
-import type { EnvService } from '@/env/env.service'
+import type { EnvService } from '../../env/env.service.js'
+import type { SettingsReader } from '../settings/settings-reader.js'
+import type { StorageSettingDefinition } from '../settings/storage-setting.definition.js'
 
 /** Explicit env-only reader for isolated canary I/O tests. */
 export function storageProbeSettingsFixture(

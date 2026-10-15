@@ -7,10 +7,10 @@ import type {
   UpdateNotificationPreferenceInput,
 } from '@amcore/shared'
 
-import { BadRequestException } from '../../common/exceptions'
+import { BadRequestException } from '../../common/exceptions/index.js'
 
-import { NotificationDefinitionRegistry } from './notification-definition.registry'
-import { NotificationPreferenceRepository } from './notification-preference.repository'
+import { NotificationDefinitionRegistry } from './notification-definition.registry.js'
+import { NotificationPreferenceRepository } from './notification-preference.repository.js'
 
 /**
  * Builds the user-facing preferences/capabilities views and applies preference

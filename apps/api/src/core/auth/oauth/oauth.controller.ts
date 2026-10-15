@@ -23,30 +23,34 @@ import {
   type OAuthProvidersResponse,
 } from '@amcore/shared'
 
-import { AppException, NotFoundException } from '../../../common/exceptions'
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip'
-import { EnvService } from '../../../env/env.service'
-import { invitationHandoffProof } from '../../invitations/invitation-auth-handoff'
-import { invalidInvitation } from '../../invitations/invitation-locks'
-import { Auth } from '../decorators/auth.decorator'
-import { CurrentUser } from '../decorators/current-user.decorator'
-import { OAuthExchangeDto, OAuthExchangeResponseDto, OAuthProvidersResponseDto } from '../dto'
-import { OriginCheckGuard } from '../guards'
-import { negotiateLocale } from '../locale-negotiation'
-import { SessionService } from '../session.service'
-import { TokenService } from '../token.service'
+import { AppException, NotFoundException } from '../../../common/exceptions/index.js'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip.js'
+import { EnvService } from '../../../env/env.service.js'
+import { invitationHandoffProof } from '../../invitations/invitation-auth-handoff.js'
+import { invalidInvitation } from '../../invitations/invitation-locks.js'
+import { Auth } from '../decorators/auth.decorator.js'
+import { CurrentUser } from '../decorators/current-user.decorator.js'
+import {
+  OAuthExchangeDto,
+  OAuthExchangeResponseDto,
+  OAuthProvidersResponseDto,
+} from '../dto/index.js'
+import { OriginCheckGuard } from '../guards/index.js'
+import { negotiateLocale } from '../locale-negotiation.js'
+import { SessionService } from '../session.service.js'
+import { TokenService } from '../token.service.js'
 
-import { parseAppleUserName } from './apple-user'
-import { OAuthService } from './oauth.service'
+import { parseAppleUserName } from './apple-user.js'
+import { OAuthService } from './oauth.service.js'
 import {
   clearOAuthBindingCookie,
   isFormPostProvider,
   readOAuthBindingNonce,
   setOAuthBindingCookie,
-} from './oauth-binding-cookie'
-import { OAuthLoginTicketService } from './oauth-login-ticket.service'
-import { OAuthProviderFactory } from './providers/oauth-provider.factory'
+} from './oauth-binding-cookie.js'
+import { OAuthLoginTicketService } from './oauth-login-ticket.service.js'
+import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
 @ApiTags('oauth')
 @Controller('auth/oauth')

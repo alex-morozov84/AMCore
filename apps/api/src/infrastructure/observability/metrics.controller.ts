@@ -5,18 +5,18 @@ import type { Response } from 'express'
 
 import { AuthType } from '@amcore/shared'
 
-import { METRICS_ROUTE } from './metrics.constants'
-import { MetricsService } from './metrics.service'
-import { MetricsAuthGuard } from './metrics-auth.guard'
-
-import { AppException } from '@/common/exceptions'
-import { Auth } from '@/core/auth/decorators/auth.decorator'
+import { AppException } from '../../common/exceptions/index.js'
+import { Auth } from '../../core/auth/decorators/auth.decorator.js'
 // Import the decorator file directly, NOT the `infrastructure/throttling`
 // barrel: the barrel re-exports GcraRedisLimiter, which imports
 // MetricsService from this module (`../observability`) — going through the
 // barrel here would close that cycle back on itself. rate-limit.decorator.ts
 // has no transitive dependency on observability, so this is cycle-free.
-import { SkipRateLimit } from '@/infrastructure/throttling/rate-limit.decorator'
+import { SkipRateLimit } from '../throttling/rate-limit.decorator.js'
+
+import { METRICS_ROUTE } from './metrics.constants.js'
+import { MetricsService } from './metrics.service.js'
+import { MetricsAuthGuard } from './metrics-auth.guard.js'
 
 @Controller(METRICS_ROUTE)
 @Auth(AuthType.None)

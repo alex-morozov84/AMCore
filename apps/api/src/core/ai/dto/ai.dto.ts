@@ -19,7 +19,7 @@ import {
   takeoverConversationSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /**
  * AI run/conversation HTTP DTOs (Track C — ADR-054, Arc C). Thin `createSchemaDto` wrappers over the

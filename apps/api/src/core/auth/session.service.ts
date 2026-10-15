@@ -4,19 +4,18 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode, type SessionsListResponse, type SupportedLocale } from '@amcore/shared'
 
-import { AppException, NotFoundException } from '../../common/exceptions'
-import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
-import { acquireXactLock, PrismaService } from '../../prisma'
+import { AppException, NotFoundException } from '../../common/exceptions/index.js'
+import type { Prisma, Session, User } from '../../generated/prisma/client.js'
+import { GeoIpService } from '../../infrastructure/geoip/geoip.service.js'
+import { acquireXactLock, PrismaService } from '../../prisma/index.js'
 import {
   type InvitationHandoffProof,
   lockInvitationAuthAttempt,
-} from '../invitations/invitation-auth-handoff'
-import { invitationClock } from '../invitations/invitation-locks'
+} from '../invitations/invitation-auth-handoff.js'
+import { invitationClock } from '../invitations/invitation-locks.js'
 
-import { sessionCoordinationLockKey } from './session-lock-key'
-import { TokenService } from './token.service'
-
-import type { Prisma, Session, User } from '@/generated/prisma/client'
+import { sessionCoordinationLockKey } from './session-lock-key.js'
+import { TokenService } from './token.service.js'
 
 export interface CreateSessionParams {
   handoff?: InvitationHandoffProof

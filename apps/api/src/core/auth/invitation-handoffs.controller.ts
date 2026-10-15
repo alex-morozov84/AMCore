@@ -18,19 +18,19 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../common/schemas/schema-dto'
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { RateLimit } from '../../infrastructure/throttling'
-import { invitationHandoffProof } from '../invitations/invitation-auth-handoff'
-import { InvitationAuthHandoffService } from '../invitations/invitation-auth-handoff.service'
-import { InvitationRequestGuard } from '../invitations/invitation-request.guard'
+import { createSchemaDto } from '../../common/schemas/schema-dto.js'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { RateLimit } from '../../infrastructure/throttling/index.js'
+import { invitationHandoffProof } from '../invitations/invitation-auth-handoff.js'
+import { InvitationAuthHandoffService } from '../invitations/invitation-auth-handoff.service.js'
+import { InvitationRequestGuard } from '../invitations/invitation-request.guard.js'
 
-import { Auth } from './decorators/auth.decorator'
-import { CurrentUser } from './decorators/current-user.decorator'
+import { Auth } from './decorators/auth.decorator.js'
+import { CurrentUser } from './decorators/current-user.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from './organization-context/request-context-policy'
+} from './organization-context/request-context-policy.js'
 
 class HandoffConfirmedDto extends createSchemaDto(invitationHandoffConfirmedSchema) {}
 class HandoffAbortedDto extends createSchemaDto(invitationHandoffAbortedSchema) {}

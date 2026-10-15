@@ -1,18 +1,21 @@
 import { Injectable } from '@nestjs/common'
 
-import { ServiceUnavailableException } from '../../common/exceptions'
+import { ServiceUnavailableException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { generateUploadVersion, MediaService } from '../../infrastructure/media/index.js'
 import {
   LockUnavailableError,
   type MutexOptions,
   RedisMutexService,
-} from '../../infrastructure/redis'
-import { PrismaService } from '../../prisma'
+} from '../../infrastructure/redis/index.js'
+import {
+  normalizeObjectKey,
+  PUBLIC_KEY_PREFIX,
+  StorageService,
+} from '../../infrastructure/storage/index.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { UserCacheService } from './user-cache.service'
-
-import { EnvService } from '@/env/env.service'
-import { generateUploadVersion, MediaService } from '@/infrastructure/media'
-import { normalizeObjectKey, PUBLIC_KEY_PREFIX, StorageService } from '@/infrastructure/storage'
+import { UserCacheService } from './user-cache.service.js'
 
 /** The validated multipart file shape the avatar upload consumes. */
 export interface AvatarUploadFile {

@@ -6,7 +6,17 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { DEFAULT_LOCALE } from '@amcore/shared'
 
-import { sendEmailJobDataSchema } from './email.schema'
+import { redactEmail } from '../../common/utils/index.js'
+import { EnvService } from '../../env/env.service.js'
+import {
+  type EmailMetricsMode,
+  type EmailMetricsTemplate,
+  MetricsService,
+} from '../observability/index.js'
+import { JobName, QueueName } from '../queue/constants/queues.constant.js'
+import { QueueService } from '../queue/queue.service.js'
+
+import { sendEmailJobDataSchema } from './email.schema.js'
 import type {
   EmailProvider,
   EmailVerificationData,
@@ -19,25 +29,18 @@ import type {
   SendEmailParams,
   SendEmailResult,
   WelcomeEmailData,
-} from './email.types'
-import { EmailTemplate, QUEUEABLE_EMAIL_TEMPLATES } from './email.types'
-import type { Locale } from './messages'
-import { preparedEmailBodySchema, serializeNotificationEmail } from './prepared-email'
-import { EmailVerificationEmail, getEmailVerificationSubject } from './templates/email-verification'
-import { NotificationEmail } from './templates/notification'
-import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite'
-import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset'
-import { getWelcomeSubject, WelcomeEmail } from './templates/welcome'
-
-import { redactEmail } from '@/common/utils'
-import { EnvService } from '@/env/env.service'
+} from './email.types.js'
+import { EmailTemplate, QUEUEABLE_EMAIL_TEMPLATES } from './email.types.js'
+import type { Locale } from './messages.js'
+import { preparedEmailBodySchema, serializeNotificationEmail } from './prepared-email.js'
 import {
-  type EmailMetricsMode,
-  type EmailMetricsTemplate,
-  MetricsService,
-} from '@/infrastructure/observability'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
-import { QueueService } from '@/infrastructure/queue/queue.service'
+  EmailVerificationEmail,
+  getEmailVerificationSubject,
+} from './templates/email-verification.js'
+import { NotificationEmail } from './templates/notification.js'
+import { getOrgInviteSubject, OrgInviteEmail } from './templates/org-invite.js'
+import { getPasswordResetSubject, PasswordResetEmail } from './templates/password-reset.js'
+import { getWelcomeSubject, WelcomeEmail } from './templates/welcome.js'
 
 /**
  * Email Service

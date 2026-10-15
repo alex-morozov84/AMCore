@@ -1,18 +1,19 @@
 import { generateObject, generateText, type LanguageModel, NoObjectGeneratedError } from 'ai'
 import type { ZodType } from 'zod'
 
-import { AiGatewayException } from '../ai-gateway.error'
+import type { AiProviderType } from '../../../../generated/prisma/client.js'
+import { AiGatewayException } from '../ai-gateway.error.js'
 import type {
   AiAdapterCall,
   AiObjectResult,
   AiProviderAdapter,
   AiTextResult,
-} from '../ai-gateway.types'
+} from '../ai-gateway.types.js'
 import {
   type AiProviderReceipt,
   attachProviderReceipt,
   observeProviderReceipt,
-} from '../provider-receipt'
+} from '../provider-receipt.js'
 
 import {
   mapProviderError,
@@ -20,9 +21,7 @@ import {
   mapUsage,
   toModelMessages,
   toSdkTools,
-} from './ai-sdk-mapping'
-
-import type { AiProviderType } from '@/generated/prisma/client'
+} from './ai-sdk-mapping.js'
 
 /** The fetch shape both the global and the AI SDK's injectable `fetch` option satisfy. */
 export type AdapterFetch = typeof globalThis.fetch

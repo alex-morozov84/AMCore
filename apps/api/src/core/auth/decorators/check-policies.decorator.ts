@@ -1,6 +1,6 @@
 import { type CustomDecorator, SetMetadata } from '@nestjs/common'
 
-import type { AppAbility } from '../casl/ability.factory'
+import type { AppAbility } from '../casl/ability.factory.js'
 
 /**
  * Metadata key for policy handlers

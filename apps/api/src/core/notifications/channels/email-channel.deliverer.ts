@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common'
 
 import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
 
-import { NotificationPreparedRequestService } from '../dispatch/notification-prepared-request.service'
-import { NotificationChannel } from '../notification.constants'
-import { resolveExternalMode } from '../notification-content-policy'
-import { NotificationDefinitionRegistry } from '../notification-definition.registry'
-import type { RenderedNotificationContent } from '../notification-definition.types'
+import { EnvService } from '../../../env/env.service.js'
+import { EmailService, EmailTemplate } from '../../../infrastructure/email/index.js'
+import { emailMessages } from '../../../infrastructure/email/messages.js'
+import { serializeNotificationEmail } from '../../../infrastructure/email/prepared-email.js'
+import { NotificationPreparedRequestService } from '../dispatch/notification-prepared-request.service.js'
+import { NotificationChannel } from '../notification.constants.js'
+import { resolveExternalMode } from '../notification-content-policy.js'
+import { NotificationDefinitionRegistry } from '../notification-definition.registry.js'
+import type { RenderedNotificationContent } from '../notification-definition.types.js'
 
 import {
   type ChannelDeliverer,
@@ -15,17 +19,12 @@ import {
   type DeliveryResult,
   isNotStarted,
   type NotStarted,
-} from './channel-deliverer.types'
+} from './channel-deliverer.types.js'
 import {
   NotificationPreparationError,
   type PreparedNotificationRequest,
   preparedNotificationRequest,
-} from './notification-prepared-request'
-
-import { EnvService } from '@/env/env.service'
-import { EmailService, EmailTemplate } from '@/infrastructure/email'
-import { emailMessages } from '@/infrastructure/email/messages'
-import { serializeNotificationEmail } from '@/infrastructure/email/prepared-email'
+} from './notification-prepared-request.js'
 
 /** Bounded email-channel error codes (attempt `errorCode` / terminal reason). */
 const EmailDeliveryError = {

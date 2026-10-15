@@ -1,25 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AiGatewayException } from '../gateway/ai-gateway.error'
-import { AiCredentialResolver } from '../gateway/credential-resolver'
+import { EnvService } from '../../../env/env.service.js'
+import { AiProviderType, Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import type { ObservedTransactionRunner } from '../../../prisma/observed-transaction.js'
+import { MetricsService } from '../../observability/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../redis/index.js'
+import { AiGatewayException } from '../gateway/ai-gateway.error.js'
+import { AiCredentialResolver } from '../gateway/credential-resolver.js'
 
-import { AiCatalogCache } from './ai-catalog-cache'
-import { AiCatalogLoad } from './ai-catalog-load'
-import type { AiExecutionDescriptor } from './ai-execution-descriptor'
+import { AiCatalogCache } from './ai-catalog-cache.js'
+import { AiCatalogLoad } from './ai-catalog-load.js'
+import type { AiExecutionDescriptor } from './ai-execution-descriptor.js'
 import {
   type AiCatalogSnapshot,
   aiCatalogSnapshotSchema,
   type ResolvedAiModel,
   resolvedAiModelSchema,
-} from './ai-registry.types'
-
-import { EnvService } from '@/env/env.service'
-import { AiProviderType, Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
-import { PrismaService } from '@/prisma'
-import type { ObservedTransactionRunner } from '@/prisma/observed-transaction'
+} from './ai-registry.types.js'
 
 /** Bounded cache-aside selection; fresh primary permission remains separate. */
 @Injectable()

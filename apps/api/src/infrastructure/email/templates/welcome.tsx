@@ -2,8 +2,18 @@ import { createIntl } from '@formatjs/intl'
 
 import { DEFAULT_LOCALE } from '@amcore/shared'
 
-import { emailMessages, type Locale } from '../messages'
-import { Body, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '../react-email'
+import { emailMessages, type Locale } from '../messages.js'
+import {
+  Body,
+  Container,
+  Head,
+  Heading,
+  Hr,
+  Html,
+  Preview,
+  Section,
+  Text,
+} from '../react-email/index.js'
 
 export interface WelcomeEmailProps {
   name: string

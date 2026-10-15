@@ -2,14 +2,14 @@ import { z } from 'zod'
 
 import { type WorkCommand, workReasonSchema } from '@amcore/shared'
 
-import type { BrokerCommandPort } from './background-command-service'
-import type { CommandOutcome } from './background-command-settlement'
-import { backgroundControlError } from './background-control-error'
+import type { BackgroundCommandTarget } from '../../generated/prisma/client.js'
+import { ControlConnection } from '../../infrastructure/background-work/control-connection.js'
+import { readQueueSnapshot } from '../../infrastructure/background-work/queue-snapshot.js'
+import { applyQueueControl } from '../../infrastructure/background-work/scripts/queue-control.js'
 
-import type { BackgroundCommandTarget } from '@/generated/prisma/client'
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
-import { readQueueSnapshot } from '@/infrastructure/background-work/queue-snapshot'
-import { applyQueueControl } from '@/infrastructure/background-work/scripts/queue-control'
+import type { BrokerCommandPort } from './background-command-service.js'
+import type { CommandOutcome } from './background-command-settlement.js'
+import { backgroundControlError } from './background-control-error.js'
 
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const dispatchSnapshot = z.object({

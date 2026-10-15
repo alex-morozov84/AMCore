@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { SettingDefinition, SettingRow } from './setting-definition'
+import type { SettingDefinition, SettingRow } from './setting-definition.js'
 
 const envelopeSchema = z.strictObject({ value: z.json() })
 export const SETTING_BYTES_LIMIT = 16_384

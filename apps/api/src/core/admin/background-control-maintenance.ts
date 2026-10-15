@@ -2,14 +2,14 @@ import { Injectable, Optional } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { BackgroundCommandSettlement } from './background-command-settlement'
-import { backgroundControlError } from './background-control-error'
+import { lockControlBudget } from '../../infrastructure/background-work/control-budget-store.js'
+import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
+import { backgroundControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
+import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { lockControlBudget } from '@/infrastructure/background-work/control-budget-store'
-import { CONTROL_LIMITS } from '@/infrastructure/background-work/control-limits'
-import { backgroundControlTransaction } from '@/infrastructure/background-work/control-transaction'
-import { ProviderEvidenceStore } from '@/infrastructure/background-work/provider-evidence.store'
-import { PrismaService } from '@/prisma'
+import { BackgroundCommandSettlement } from './background-command-settlement.js'
+import { backgroundControlError } from './background-control-error.js'
 
 /** Worker-only bounded expiration; failed audit/commit leaves the original pending receipt visible. */
 @Injectable()

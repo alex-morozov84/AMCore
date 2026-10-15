@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common'
 import { TerminusModule } from '@nestjs/terminus'
 
-import { HealthController } from './health.controller'
-import { PrismaHealthIndicator } from './indicators/prisma.health'
-import { RedisHealthIndicator } from './indicators/redis.health'
-import { ReadinessCheckService } from './readiness-check.service'
+import { PrismaModule } from '../prisma/prisma.module.js'
 
-import { PrismaModule } from '@/prisma/prisma.module'
+import { HealthController } from './health.controller.js'
+import { PrismaHealthIndicator } from './indicators/prisma.health.js'
+import { RedisHealthIndicator } from './indicators/redis.health.js'
+import { ReadinessCheckService } from './readiness-check.service.js'
 
 @Module({
   imports: [

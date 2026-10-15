@@ -1,6 +1,6 @@
 import { createApiKeyResponseSchema } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /**
  * `POST /api-keys` response DTO (Arc C). Carries the one-time plaintext `key`

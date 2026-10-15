@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-import { resolveTrustProxy } from '../../common/utils/trust-proxy'
-import { resolveTrustedWebPeers } from '../../common/utils/trusted-web-peer'
+import { resolveTrustProxy } from '../../common/utils/trust-proxy.js'
+import { resolveTrustedWebPeers } from '../../common/utils/trusted-web-peer.js'
 
 // Core runtime/process wiring: environment, process role, HTTP surface.
 export const runtimeEnv = z.object({

@@ -1,6 +1,6 @@
-import type { RetryAfterConstraint } from '../background-work/provider-window-clock'
+import type { RetryAfterConstraint } from '../background-work/provider-window-clock.js'
 
-export type { RetryAfterConstraint } from '../background-work/provider-window-clock'
+export type { RetryAfterConstraint } from '../background-work/provider-window-clock.js'
 
 /**
  * Normalize an HTTP `Retry-After` response header into a delay in milliseconds (RFC 9110

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
 
-import { PrismaModule } from '../../prisma'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { AuditLogService } from './audit-log.service'
+import { AuditLogService } from './audit-log.service.js'
 
 @Module({
   imports: [PrismaModule],

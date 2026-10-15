@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common'
 import type { Job } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AiRunDispatchService } from './ai-run-dispatch.service'
-import { aiRunWakeJobSchema } from './ai-run-wake.schema'
+import type { WorkHandler } from '../../background-work/work-definition.js'
+import { MetricsService } from '../../observability/index.js'
+import { JobName, QueueName } from '../../queue/constants/queues.constant.js'
 
-import type { WorkHandler } from '@/infrastructure/background-work/work-definition'
-import { MetricsService } from '@/infrastructure/observability'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
+import { AiRunDispatchService } from './ai-run-dispatch.service.js'
+import { aiRunWakeJobSchema } from './ai-run-wake.schema.js'
 
 /**
  * BullMQ consumer for `QueueName.AI_RUNS` (Track C — ADR-054, ADR-052 pattern, worker role only).

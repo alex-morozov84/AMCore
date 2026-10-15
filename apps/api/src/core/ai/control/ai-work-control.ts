@@ -2,19 +2,18 @@ import { Injectable } from '@nestjs/common'
 
 import type { WorkCommand, WorkReason } from '@amcore/shared'
 
-import { AiRunService } from '../runs/ai-run.service'
-
-import { AiWorkCleanup } from './ai-work-cleanup'
-import { aiRunBasicCapability, aiRunRevision, aiWorkDigest } from './ai-work-policy'
-import { AiWorkRetry } from './ai-work-retry'
-
-import { type AiRun, Prisma } from '@/generated/prisma/client'
+import { type AiRun, Prisma } from '../../../generated/prisma/client.js'
 import type {
   DurableControlState,
   DurableOutcome,
   DurableTransactionContext,
   DurableWorkControl,
-} from '@/infrastructure/background-work'
+} from '../../../infrastructure/background-work/index.js'
+import { AiRunService } from '../runs/ai-run.service.js'
+
+import { AiWorkCleanup } from './ai-work-cleanup.js'
+import { aiRunBasicCapability, aiRunRevision, aiWorkDigest } from './ai-work-policy.js'
+import { AiWorkRetry } from './ai-work-retry.js'
 
 interface BusinessState {
   gate?: { paused: boolean; revision: number }

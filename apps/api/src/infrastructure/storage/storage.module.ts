@@ -1,20 +1,20 @@
 import { type DynamicModule, Global, Module } from '@nestjs/common'
 import { TerminusModule } from '@nestjs/terminus'
 
-import { STORAGE_PROVIDER } from './storage.constants'
-import { StorageHealthIndicator } from './storage.health'
-import type { StorageProvider } from './storage.interface'
-import { StorageService } from './storage.service'
-import { ANONYMOUS_READ, readAnonymously } from './storage-anonymous-read'
-import { StorageDownloadService } from './storage-download.service'
-import { StorageProbeIo } from './storage-probe.io'
-import { StorageProbeService } from './storage-probe.service'
-import { createStorageProvider } from './storage-provider.factory'
-import { StoragePublicCheckService } from './storage-public-check.service'
+import { EnvModule } from '../../env/env.module.js'
+import { EnvService } from '../../env/env.service.js'
+import { ObservabilityModule } from '../observability/index.js'
 
-import { EnvModule } from '@/env/env.module'
-import { EnvService } from '@/env/env.service'
-import { ObservabilityModule } from '@/infrastructure/observability'
+import { STORAGE_PROVIDER } from './storage.constants.js'
+import { StorageHealthIndicator } from './storage.health.js'
+import type { StorageProvider } from './storage.interface.js'
+import { StorageService } from './storage.service.js'
+import { ANONYMOUS_READ, readAnonymously } from './storage-anonymous-read.js'
+import { StorageDownloadService } from './storage-download.service.js'
+import { StorageProbeIo } from './storage-probe.io.js'
+import { StorageProbeService } from './storage-probe.service.js'
+import { createStorageProvider } from './storage-provider.factory.js'
+import { StoragePublicCheckService } from './storage-public-check.service.js'
 
 /**
  * Global storage module. The active driver is chosen by `STORAGE_DRIVER`

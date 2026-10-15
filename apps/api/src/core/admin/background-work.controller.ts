@@ -24,14 +24,15 @@ import {
   type WorkSummary,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { SystemRoles } from '../auth/decorators/system-roles.decorator'
+import { NotFoundException } from '../../common/exceptions/index.js'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 
-import { BackgroundWorkService } from './background-work.service'
-import { BackgroundWorkCatalogue } from './background-work-catalogue'
-import { BackgroundWorkReader } from './background-work-reader'
+import { BackgroundWorkService } from './background-work.service.js'
+import { BackgroundWorkCatalogue } from './background-work-catalogue.js'
+import { BackgroundWorkReader } from './background-work-reader.js'
 import {
   BackgroundWorkCatalogueDto,
   BackgroundWorkCommandDto,
@@ -40,9 +41,7 @@ import {
   BackgroundWorkPageDto,
   BackgroundWorkReceiptDto,
   BackgroundWorkReconciliationDto,
-} from './dto/background-work.dto'
-
-import { NotFoundException } from '@/common/exceptions'
+} from './dto/background-work.dto.js'
 
 @ApiTags('admin')
 @ApiBearerAuth()

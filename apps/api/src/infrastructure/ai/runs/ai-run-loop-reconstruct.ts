@@ -1,11 +1,10 @@
-import { AI_TOOL_REJECTION_NOTICE } from '../tools/ai-tool.constants'
+import { AiRunStepType, AiToolInvocationStatus, type Prisma } from '../../../generated/prisma/client.js'
+import type { PrismaService } from '../../../prisma/index.js'
+import { CUTOFF, type Cutoff } from '../../worker-lifecycle/index.js'
+import { AI_TOOL_REJECTION_NOTICE } from '../tools/ai-tool.constants.js'
 
-import type { CompletedToolRound } from './ai-run-transcript'
-import { INVOCATION_SELECT, type InvocationRow } from './ai-tool-invocation.store'
-
-import { AiRunStepType, AiToolInvocationStatus, type Prisma } from '@/generated/prisma/client'
-import { CUTOFF, type Cutoff } from '@/infrastructure/worker-lifecycle'
-import type { PrismaService } from '@/prisma'
+import type { CompletedToolRound } from './ai-run-transcript.js'
+import { INVOCATION_SELECT, type InvocationRow } from './ai-tool-invocation.store.js'
 
 /**
  * Runs ONE database operation under the shutdown latch: sealed → not invoked, `CUTOFF`. Every query of a

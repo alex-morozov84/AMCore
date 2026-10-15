@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import { type SystemRole } from '@amcore/shared'
 
-import { PrismaService } from '../../prisma'
+import { PrismaService } from '../../prisma/index.js'
 
 /**
  * Privileged-role freshness reader (OB-06a / ADR-037).

@@ -9,7 +9,14 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/typecheck-native.mjs",
+        "$TURBO_ROOT$/scripts/lib/native-typecheck*.mjs",
+        "$TURBO_ROOT$/packages/typescript-config/**",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ]
     },
     "lint": {
       "dependsOn": ["^build"],

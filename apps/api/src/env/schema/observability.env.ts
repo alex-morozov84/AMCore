@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { optionalEnvString } from './helpers'
+import { optionalEnvString } from './helpers.js'
 
 const optionalDeploymentLabel = (max: number): z.ZodType<string | undefined> =>
   z.preprocess(

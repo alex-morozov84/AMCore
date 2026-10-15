@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 
-import { PrismaService } from '../../prisma'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks'
-import { invitationTransaction } from './invitation-transaction'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks.js'
+import { invitationTransaction } from './invitation-transaction.js'
 
 const RETENTION_MS = 30 * 86400000
 @Injectable()

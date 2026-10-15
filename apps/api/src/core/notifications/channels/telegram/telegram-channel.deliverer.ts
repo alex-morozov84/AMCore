@@ -2,15 +2,18 @@ import { Injectable } from '@nestjs/common'
 
 import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
 
-import { PrismaService } from '../../../../prisma'
-import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
-import type { ClaimedDelivery } from '../../dispatch/notification-dispatch.types'
-import { NotificationPreparedRequestService } from '../../dispatch/notification-prepared-request.service'
-import { NotificationShutdownLatch } from '../../dispatch/notification-shutdown.latch'
-import { NotificationChannel } from '../../notification.constants'
-import { resolveExternalMode } from '../../notification-content-policy'
-import { NotificationDefinitionRegistry } from '../../notification-definition.registry'
-import type { RenderedNotificationContent } from '../../notification-definition.types'
+import { canonicalJsonHash } from '../../../../common/utils/canonical-json.js'
+import { EnvService } from '../../../../env/env.service.js'
+import { Prisma, TelegramConnectionStatus } from '../../../../generated/prisma/client.js'
+import { PrismaService } from '../../../../prisma/index.js'
+import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation.js'
+import type { ClaimedDelivery } from '../../dispatch/notification-dispatch.types.js'
+import { NotificationPreparedRequestService } from '../../dispatch/notification-prepared-request.service.js'
+import { NotificationShutdownLatch } from '../../dispatch/notification-shutdown.latch.js'
+import { NotificationChannel } from '../../notification.constants.js'
+import { resolveExternalMode } from '../../notification-content-policy.js'
+import { NotificationDefinitionRegistry } from '../../notification-definition.registry.js'
+import type { RenderedNotificationContent } from '../../notification-definition.types.js'
 import {
   type ChannelDeliverer,
   type DeliveryAdmission,
@@ -19,23 +22,19 @@ import {
   isNotStarted,
   type NotStarted,
   type TargetRefusal,
-} from '../channel-deliverer.types'
+} from '../channel-deliverer.types.js'
 import {
   NotificationPreparationError,
   preparedNotificationRequest,
-} from '../notification-prepared-request'
+} from '../notification-prepared-request.js'
 
 import {
   TELEGRAM_FENCING_ERROR_CODES,
   TelegramCancelReason,
   TelegramDeliveryError,
-} from './telegram.constants'
-import { TelegramBotApiClient } from './telegram-bot-api.client'
-import { telegramGenericMessages } from './telegram-messages'
-
-import { canonicalJsonHash } from '@/common/utils/canonical-json'
-import { EnvService } from '@/env/env.service'
-import { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
+} from './telegram.constants.js'
+import { TelegramBotApiClient } from './telegram-bot-api.client.js'
+import { telegramGenericMessages } from './telegram-messages.js'
 
 interface ConnectionRow {
   userId: string

@@ -2,17 +2,17 @@ import { HttpStatus } from '@nestjs/common'
 
 import { Action, PermissionErrorCode, Subject, SystemRole } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
+import { AppException } from '../../../common/exceptions/index.js'
 
-import { isEpochMilliseconds, normalizeDateConditions } from './normalize-date-conditions'
+import { isEpochMilliseconds, normalizeDateConditions } from './normalize-date-conditions.js'
 import {
   isModelSubject,
   MODEL_FIELDS,
   MODEL_SUBJECTS,
   type ModelSubject,
   type ScalarKind,
-} from './permission-model-fields'
-import { prismaQuery } from './prisma-ability'
+} from './permission-model-fields.js'
+import { prismaQuery } from './prisma-ability.js'
 
 type Code = `${PermissionErrorCode}`
 export interface PermissionWriteInput {

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import type { Redis } from 'ioredis'
 import { z } from 'zod'
 
-import { QUEUE_READ_LUA } from './scripts/queue-read.lua'
+import { QUEUE_READ_LUA } from './scripts/queue-read.lua.js'
 
 const countsSchema = z.tuple(
   Array.from({ length: 5 }, () => z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)) as [

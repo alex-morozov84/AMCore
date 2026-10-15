@@ -11,17 +11,16 @@ import {
   AppException,
   ForbiddenException,
   ServiceUnavailableException,
-} from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+} from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
-import { recordMemberRoles } from './member-role-audit'
-import { lockOrganizationMembers } from './organization-mutation-lock'
-import { OrganizationsService } from './organizations.service'
-import { assignableRolesWhere } from './role-assignability-policy'
-import { getSystemRoleId } from './system-role'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { recordMemberRoles } from './member-role-audit.js'
+import { lockOrganizationMembers } from './organization-mutation-lock.js'
+import { OrganizationsService } from './organizations.service.js'
+import { assignableRolesWhere } from './role-assignability-policy.js'
+import { getSystemRoleId } from './system-role.js'
 
 @Injectable()
 export class MemberRoleSetService {

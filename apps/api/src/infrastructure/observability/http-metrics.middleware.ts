@@ -1,9 +1,9 @@
 import { Injectable, NestMiddleware } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
 
-import { METRICS_HTTP_PATH } from './metrics.constants'
-import { MetricsService } from './metrics.service'
-import { normalizeRouteTemplate } from './route-template'
+import { METRICS_HTTP_PATH } from './metrics.constants.js'
+import { MetricsService } from './metrics.service.js'
+import { normalizeRouteTemplate } from './route-template.js'
 
 @Injectable()
 export class HttpMetricsMiddleware implements NestMiddleware {

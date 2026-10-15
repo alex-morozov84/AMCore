@@ -1,7 +1,7 @@
-import { defineWork } from '../../background-work/work-definition'
-import { JobName, QueueName } from '../../queue/constants/queues.constant'
+import { defineWork } from '../../background-work/work-definition.js'
+import { JobName, QueueName } from '../../queue/constants/queues.constant.js'
 
-import { type AiRunWakeJob,aiRunWakeJobSchema } from './ai-run-wake.schema'
+import { type AiRunWakeJob,aiRunWakeJobSchema } from './ai-run-wake.schema.js'
 
 export const aiRunsWork = defineWork({
   id: 'ai-runs',

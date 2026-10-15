@@ -20,9 +20,9 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import {
   AiConversationResponseDto,
   AiMessageResponseDto,
@@ -31,9 +31,9 @@ import {
   PostOperatorMessageDto,
   ReleaseConversationDto,
   TakeoverConversationDto,
-} from '../dto/ai.dto'
+} from '../dto/ai.dto.js'
 
-import { AiConversationOperatorService } from './ai-conversation-operator.service'
+import { AiConversationOperatorService } from './ai-conversation-operator.service.js'
 
 /**
  * Human takeover / release surface (Track C — ADR-054, Arc F.3) — web role, **bearer-only** (the

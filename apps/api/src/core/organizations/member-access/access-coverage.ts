@@ -1,7 +1,7 @@
 import { Action, Subject } from '@amcore/shared'
 
-import type { AccessCapability } from './access-capabilities'
-import type { StoredPolicyRule } from './access-facts'
+import type { AccessCapability } from './access-capabilities.js'
+import type { StoredPolicyRule } from './access-facts.js'
 
 const ORG_ACTIONS = new Set<string>([Action.Read, Action.Update, Action.Delete, Action.Manage])
 /** Inverted rules on these subjects veto team administration whatever their action or fields. */

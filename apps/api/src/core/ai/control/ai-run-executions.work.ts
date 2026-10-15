@@ -1,4 +1,4 @@
-import { defineDurableWork } from '@/infrastructure/background-work'
+import { defineDurableWork } from '../../../infrastructure/background-work/index.js'
 
 export const aiRunExecutionsWork = defineDurableWork({
   id: 'ai-run-executions',

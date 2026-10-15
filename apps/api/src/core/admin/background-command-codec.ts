@@ -8,10 +8,10 @@ import {
   workReceiptSchema,
 } from '@amcore/shared'
 
-import { backgroundControlError } from './background-control-error'
+import type { BackgroundCommand, BackgroundCommandTarget } from '../../generated/prisma/client.js'
+import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
 
-import type { BackgroundCommand, BackgroundCommandTarget } from '@/generated/prisma/client'
-import { CONTROL_LIMITS } from '@/infrastructure/background-work/control-limits'
+import { backgroundControlError } from './background-control-error.js'
 
 export function canonicalWorkCommand(
   input: WorkCommand,

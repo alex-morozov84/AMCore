@@ -1,7 +1,7 @@
 import * as React from 'react'
 
-import { markAsElement } from './element-marker'
-import { marginProperties, paddingProperties } from './utils/margin-properties'
+import { markAsElement } from './element-marker.js'
+import { marginProperties, paddingProperties } from './utils/margin-properties.js'
 
 export type BodyProps = Readonly<React.HtmlHTMLAttributes<HTMLBodyElement>>
 

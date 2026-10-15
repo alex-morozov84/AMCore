@@ -1,24 +1,23 @@
 import { Injectable } from '@nestjs/common'
 
-import { PrismaService } from '../../../prisma'
+import { Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
 import type {
   ChannelDeliverer,
   DeliveryAdmission,
   DeliveryContext,
   NotStarted,
   NotStartedReason,
-} from '../channels/channel-deliverer.types'
-import { NotificationControlTargets } from '../channels/notification-control-targets'
+} from '../channels/channel-deliverer.types.js'
+import { NotificationControlTargets } from '../channels/notification-control-targets.js'
 import {
   NOTIFICATION_ADMISSION_LOCK_TIMEOUT_MS,
   NOTIFICATION_LEASE_TTL_MS,
-} from '../notification-dispatch.constants'
+} from '../notification-dispatch.constants.js'
 
-import { cancelClaimedDelivery } from './notification-delivery-cancellation'
-import { markNotificationTransport } from './notification-effect-evidence'
-import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch'
-
-import { Prisma } from '@/generated/prisma/client'
+import { cancelClaimedDelivery } from './notification-delivery-cancellation.js'
+import { markNotificationTransport } from './notification-effect-evidence.js'
+import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch.js'
 
 /** What the dispatcher needs to know about the single transport call an admission authorized. */
 export interface AdmissionRuntime {

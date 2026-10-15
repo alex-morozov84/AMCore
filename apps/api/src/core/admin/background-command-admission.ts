@@ -3,29 +3,31 @@ import { z } from 'zod'
 
 import { type RequestPrincipal, type WorkCommand, workJobIdSchema } from '@amcore/shared'
 
-import { AuditLogService } from '../audit/audit-log.service'
-
-import { assertNewWorkCommandTime, canonicalWorkCommand } from './background-command-codec'
-import { BackgroundControlAuthority } from './background-control-authority'
-import { BackgroundControlBudgets, type LockedControlBudgets } from './background-control-budgets'
-import { backgroundControlError } from './background-control-error'
-import { BackgroundControlReservations } from './background-control-reservations'
-
-import { AppException } from '@/common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
 import {
   AuditActorType,
   AuditCategory,
   AuditTargetType,
   type BackgroundCommand,
   type BackgroundCommandTarget,
-} from '@/generated/prisma/client'
-import { CONTROL_LIMITS } from '@/infrastructure/background-work/control-limits'
+} from '../../generated/prisma/client.js'
+import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
 import {
   backgroundControlTransaction,
   type ControlTransaction,
-} from '@/infrastructure/background-work/control-transaction'
-import type { ControlSnapshot } from '@/infrastructure/background-work/durable-work'
-import { PrismaService } from '@/prisma'
+} from '../../infrastructure/background-work/control-transaction.js'
+import type { ControlSnapshot } from '../../infrastructure/background-work/durable-work.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/audit-log.service.js'
+
+import { assertNewWorkCommandTime, canonicalWorkCommand } from './background-command-codec.js'
+import { BackgroundControlAuthority } from './background-control-authority.js'
+import {
+  BackgroundControlBudgets,
+  type LockedControlBudgets,
+} from './background-control-budgets.js'
+import { backgroundControlError } from './background-control-error.js'
+import { BackgroundControlReservations } from './background-control-reservations.js'
 
 const targetSnapshotSchema = z.strictObject({
   id: workJobIdSchema,

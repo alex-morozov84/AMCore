@@ -4,9 +4,9 @@ import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
 import { z } from 'zod'
 
-import { decodeBoundedJob, type RawJobObservation } from './bounded-job-reader'
-import { managedJobKey } from './managed-job-key'
-import { JOB_MEMBERSHIP_READ_LUA } from './scripts/job-membership.lua'
+import { decodeBoundedJob, type RawJobObservation } from './bounded-job-reader.js'
+import { managedJobKey } from './managed-job-key.js'
+import { JOB_MEMBERSHIP_READ_LUA } from './scripts/job-membership.lua.js'
 
 const numeric = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const metadataSchema = z.strictObject({

@@ -4,10 +4,9 @@ import {
   AppException,
   ConflictException,
   ServiceUnavailableException,
-} from '../../common/exceptions'
-import type { PrismaService } from '../../prisma'
-
-import type { Prisma } from '@/generated/prisma/client'
+} from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import type { PrismaService } from '../../prisma/index.js'
 
 function sqlState(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined

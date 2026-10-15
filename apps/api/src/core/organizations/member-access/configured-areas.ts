@@ -1,15 +1,15 @@
 import type { AccessArea, AccessLimit } from '@amcore/shared'
 
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
-import { CAPABILITY_ADAPTERS } from '../capability-registry.service'
-import { classifyStoredRule, ruleSignature } from '../role-definition-classifier'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
+import { CAPABILITY_ADAPTERS } from '../capability-registry.service.js'
+import { classifyStoredRule, ruleSignature } from '../role-definition-classifier.js'
 
-import type { AccessCapability } from './access-capabilities'
-import type { StoredPolicyRule } from './access-facts'
-import { aggregatePrerequisite, type Prerequisite } from './access-prerequisites'
-import { coversAnyField, coversField, isUnconditional } from './access-rule-utils'
-import { roleRefs } from './access-sources'
-import { denyCovers, type Masking, type Scan } from './configured-scan'
+import type { AccessCapability } from './access-capabilities.js'
+import type { StoredPolicyRule } from './access-facts.js'
+import { aggregatePrerequisite, type Prerequisite } from './access-prerequisites.js'
+import { coversAnyField, coversField, isUnconditional } from './access-rule-utils.js'
+import { roleRefs } from './access-sources.js'
+import { denyCovers, type Masking, type Scan } from './configured-scan.js'
 
 export type Kind = AccessArea['kind']
 export const KIND_ORDER: readonly Kind[] = ['all', 'assigned', 'own', 'custom']

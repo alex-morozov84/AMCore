@@ -1,6 +1,6 @@
 import { sessionsListResponseSchema } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /**
  * Paginated `GET /auth/sessions` response DTO (ADR-036 / OB-05).

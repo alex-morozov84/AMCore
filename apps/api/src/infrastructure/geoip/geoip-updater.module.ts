@@ -1,9 +1,9 @@
 import { Injectable, Module, type OnModuleInit } from '@nestjs/common'
 
-import { SingletonCronRunner } from '../schedule/singleton-cron.runner'
+import { SingletonCronRunner } from '../schedule/singleton-cron.runner.js'
 
-import { GeoipModule } from './geoip.module'
-import { GeoIpUpdateService } from './geoip-update.service'
+import { GeoipModule } from './geoip.module.js'
+import { GeoIpUpdateService } from './geoip-update.service.js'
 
 @Injectable()
 class GeoIpBootstrapService implements OnModuleInit {

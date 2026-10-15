@@ -1,24 +1,26 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common'
 
-import { PrismaModule } from '../../prisma'
+import { bindWorkHandlers } from '../../infrastructure/background-work/registration.js'
+import { SingletonCronRunner } from '../../infrastructure/schedule/singleton-cron.runner.js'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { CHANNEL_DELIVERERS, ChannelDelivererRegistry } from './channels/channel-deliverer.registry'
-import type { ChannelDeliverer } from './channels/channel-deliverer.types'
-import type { NotificationChannelDescriptor } from './channels/notification-channel.types'
-import { NotificationAttemptAdmission } from './dispatch/notification-attempt-admission'
-import { NotificationDeliveryRepository } from './dispatch/notification-delivery.repository'
-import { NotificationDeliveryBacklogCollector } from './dispatch/notification-delivery-backlog.collector'
-import { NotificationDispatchProcessor } from './dispatch/notification-dispatch.processor'
-import { NotificationDispatchService } from './dispatch/notification-dispatch.service'
-import { NotificationExecutionModule } from './dispatch/notification-execution.module'
-import { NotificationRecoveryService } from './dispatch/notification-recovery.service'
-import { NOTIFICATION_CHANNELS } from './notification-composition'
-import { NotificationRetentionService } from './notification-retention.service'
-import { NotificationsModule } from './notifications.module'
-import { notificationsWork } from './notifications.work'
-
-import { bindWorkHandlers } from '@/infrastructure/background-work/registration'
-import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
+import {
+  CHANNEL_DELIVERERS,
+  ChannelDelivererRegistry,
+} from './channels/channel-deliverer.registry.js'
+import type { ChannelDeliverer } from './channels/channel-deliverer.types.js'
+import type { NotificationChannelDescriptor } from './channels/notification-channel.types.js'
+import { NotificationAttemptAdmission } from './dispatch/notification-attempt-admission.js'
+import { NotificationDeliveryRepository } from './dispatch/notification-delivery.repository.js'
+import { NotificationDeliveryBacklogCollector } from './dispatch/notification-delivery-backlog.collector.js'
+import { NotificationDispatchProcessor } from './dispatch/notification-dispatch.processor.js'
+import { NotificationDispatchService } from './dispatch/notification-dispatch.service.js'
+import { NotificationExecutionModule } from './dispatch/notification-execution.module.js'
+import { NotificationRecoveryService } from './dispatch/notification-recovery.service.js'
+import { NOTIFICATION_CHANNELS } from './notification-composition.js'
+import { NotificationRetentionService } from './notification-retention.service.js'
+import { NotificationsModule } from './notifications.module.js'
+import { notificationsWork } from './notifications.work.js'
 
 /**
  * Notifications worker slice (ADR-041 / ADR-052) — `worker`/`all` roles only. Houses the

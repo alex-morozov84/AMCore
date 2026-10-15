@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import type { InvitationOAuthCorrelation, SupportedLocale } from '@amcore/shared'
 
-import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis'
+import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
 
 const STATE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 

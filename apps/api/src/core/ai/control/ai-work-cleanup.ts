@@ -2,11 +2,10 @@ import { Injectable } from '@nestjs/common'
 
 import { aiMessageContentSchema, type WorkReason } from '@amcore/shared'
 
-import { aiRunInputFingerprint } from '../runs/ai-run-input-fingerprint'
+import { AiAuthorType, AiMessageRole, type AiRun, Prisma } from '../../../generated/prisma/client.js'
+import { aiRunInputFingerprint } from '../runs/ai-run-input-fingerprint.js'
 
-import { aiRunBasicCapability } from './ai-work-policy'
-
-import { AiAuthorType, AiMessageRole, type AiRun, Prisma } from '@/generated/prisma/client'
+import { aiRunBasicCapability } from './ai-work-policy.js'
 
 @Injectable()
 export class AiWorkCleanup {

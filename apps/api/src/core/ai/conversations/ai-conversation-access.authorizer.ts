@@ -2,13 +2,12 @@ import { Injectable } from '@nestjs/common'
 
 import { aiControlReasonSchema, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { BadRequestException, NotFoundException } from '../../../common/exceptions'
-import { assertSessionFresh } from '../../auth/session-freshness'
+import { BadRequestException, NotFoundException } from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { assertSessionFresh } from '../../auth/session-freshness.js'
 
-import type { ControlActor } from './ai-conversation-control.service'
-
-import { EnvService } from '@/env/env.service'
-import { PrismaService } from '@/prisma'
+import type { ControlActor } from './ai-conversation-control.service.js'
 
 /** The authorization verdict for one privileged action on a conversation (Track C — ADR-054, Arc F). */
 export interface AuthorizedActor {

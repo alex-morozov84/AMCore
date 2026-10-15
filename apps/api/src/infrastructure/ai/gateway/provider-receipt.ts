@@ -1,8 +1,7 @@
-import { normalizeAiUsage } from '../usage/ai-usage-v2'
+import type { AiProviderType } from '../../../generated/prisma/client.js'
+import { normalizeAiUsage } from '../usage/ai-usage-v2.js'
 
-import type { AiAdapterCall, AiUsage } from './ai-gateway.types'
-
-import type { AiProviderType } from '@/generated/prisma/client'
+import type { AiAdapterCall, AiUsage } from './ai-gateway.types.js'
 
 /** Content-free observation; never place this carrier (or the SDK cause) in AppException.details. */
 export interface AiProviderReceipt {

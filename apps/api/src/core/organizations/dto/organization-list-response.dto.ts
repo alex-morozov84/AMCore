@@ -1,6 +1,6 @@
 import { organizationListResponseSchema, roleListResponseSchema } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /**
  * Paginated list response DTOs for `/organizations` and

@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common'
 
-import { bindWorkHandlers } from '../background-work/registration'
-import { PROVIDER_WINDOW_EXECUTION } from '../background-work/work-execution.service'
+import { bindWorkHandlers } from '../background-work/registration.js'
+import { PROVIDER_WINDOW_EXECUTION } from '../background-work/work-execution.service.js'
 
-import { EmailModule } from './email.module'
-import { emailWork } from './email.work'
-import { QueuedEmailHandler } from './queued-email.handler'
-import { QueuedEmailExecution } from './queued-email-execution'
+import { EmailModule } from './email.module.js'
+import { emailWork } from './email.work.js'
+import { QueuedEmailHandler } from './queued-email.handler.js'
+import { QueuedEmailExecution } from './queued-email-execution.js'
 
 /**
  * Email worker module (ADR-041).

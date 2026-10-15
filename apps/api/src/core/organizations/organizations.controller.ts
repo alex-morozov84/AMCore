@@ -33,34 +33,34 @@ import {
   type SwitchOrgResponse,
 } from '@amcore/shared'
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import type { AppAbility } from '../auth/casl/ability.factory'
-import type { TeamAccessDecision } from '../auth/casl/ability.factory'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentAbility } from '../auth/decorators/current-ability.decorator'
-import { CurrentTeamAccess } from '../auth/decorators/current-team-access.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import type { AppAbility } from '../auth/casl/ability.factory.js'
+import type { TeamAccessDecision } from '../auth/casl/ability.factory.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentAbility } from '../auth/decorators/current-ability.decorator.js'
+import { CurrentTeamAccess } from '../auth/decorators/current-team-access.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
+} from '../auth/organization-context/request-context-policy.js'
 import {
   CurrentOrganizationContext,
   type VerifiedOrganizationContext,
-} from '../auth/organization-context/verified-organization-context'
-import { TokenService } from '../auth/token.service'
+} from '../auth/organization-context/verified-organization-context.js'
+import { TokenService } from '../auth/token.service.js'
 
 import {
   CreateOrganizationDto,
   OrgResponseDto,
   SwitchOrgResponseDto,
   UpdateOrganizationDto,
-} from './dto'
-import { OrganizationContextResponseDto } from './dto/organization-context-response.dto'
-import { OrganizationListResponseDto } from './dto/organization-list-response.dto'
-import { OrganizationsService } from './organizations.service'
+} from './dto/index.js'
+import { OrganizationContextResponseDto } from './dto/organization-context-response.dto.js'
+import { OrganizationListResponseDto } from './dto/organization-list-response.dto.js'
+import { OrganizationsService } from './organizations.service.js'
 
 /**
  * Class-level `@Auth(AuthType.Bearer, AuthType.ApiKey)` is an explicit

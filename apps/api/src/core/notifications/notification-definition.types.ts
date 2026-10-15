@@ -6,7 +6,7 @@ import type {
   NotificationCategory,
   NotificationChannel,
   NotificationContentClass,
-} from './notification.constants'
+} from './notification.constants.js'
 
 /** Server-rendered, localized in-app content. */
 export interface RenderedNotificationContent {

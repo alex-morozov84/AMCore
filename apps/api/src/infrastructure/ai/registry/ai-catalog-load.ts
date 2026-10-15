@@ -1,4 +1,4 @@
-import type { ObservedTransactionResult } from '@/prisma/observed-transaction'
+import type { ObservedTransactionResult } from '../../../prisma/observed-transaction.js'
 
 interface Waiter<T> {
   cacheToken: string | null

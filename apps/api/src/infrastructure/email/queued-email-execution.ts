@@ -5,46 +5,45 @@ import type { Job, Queue } from 'bullmq'
 import { DelayedError, UnrecoverableError } from 'bullmq'
 import { z } from 'zod'
 
-import { readBoundedJob } from '../background-work/bounded-job-reader'
-import { ControlConnection } from '../background-work/control-connection'
-import { managedJobKey } from '../background-work/managed-job-key'
-import { parseManagedJob } from '../background-work/managed-job-profile'
-import { PgOutcomeBuffer } from '../background-work/pg-outcome-buffer'
-import { preparedBody } from '../background-work/prepared-body.store'
+import { readBoundedJob } from '../background-work/bounded-job-reader.js'
+import { ControlConnection } from '../background-work/control-connection.js'
+import { managedJobKey } from '../background-work/managed-job-key.js'
+import { parseManagedJob } from '../background-work/managed-job-profile.js'
+import { PgOutcomeBuffer } from '../background-work/pg-outcome-buffer.js'
+import { preparedBody } from '../background-work/prepared-body.store.js'
 import {
   type ProviderAttempt,
   ProviderEvidenceStore,
   type ProviderOutcome,
   type ProviderOutcomeWitness,
-} from '../background-work/provider-evidence.store'
-import { readQueueSnapshot } from '../background-work/queue-snapshot'
-import { reportManagedInvocation } from '../background-work/scripts/invocation-report'
-import { deferProviderCooldown } from '../background-work/scripts/provider-defer'
-import { fenceProviderAttempt } from '../background-work/scripts/provider-fence'
+} from '../background-work/provider-evidence.store.js'
+import { readQueueSnapshot } from '../background-work/queue-snapshot.js'
+import { reportManagedInvocation } from '../background-work/scripts/invocation-report.js'
+import { deferProviderCooldown } from '../background-work/scripts/provider-defer.js'
+import { fenceProviderAttempt } from '../background-work/scripts/provider-fence.js'
 import type {
   WorkDefinition,
   WorkHandler,
   WorkInvocation,
-} from '../background-work/work-definition'
-import type { ProviderWindowExecution } from '../background-work/work-execution.service'
+} from '../background-work/work-definition.js'
+import type { ProviderWindowExecution } from '../background-work/work-execution.service.js'
 import {
   isPermanentWorkFailure,
   WorkFailure,
   workFailureCode,
-} from '../background-work/work-failure'
-import { WorkPolicyError } from '../background-work/work-policy-error'
-import { WorkReadiness } from '../background-work/work-readiness'
+} from '../background-work/work-failure.js'
+import { WorkPolicyError } from '../background-work/work-policy-error.js'
+import { WorkReadiness } from '../background-work/work-readiness.js'
+import { type EmailMetricsTemplate, MetricsService } from '../observability/index.js'
 
-import { type EmailProvider, EmailTemplate, SECRET_EMAIL_TEMPLATES } from './email.types'
-import { applyLegacyQueuedEmail, prepareLegacyQueuedEmail } from './legacy-queued-email'
-import type { QueuedEmailOutcome } from './queued-email-provider'
+import { type EmailProvider, EmailTemplate, SECRET_EMAIL_TEMPLATES } from './email.types.js'
+import { applyLegacyQueuedEmail, prepareLegacyQueuedEmail } from './legacy-queued-email.js'
+import type { QueuedEmailOutcome } from './queued-email-provider.js'
 import {
   type QueuedTransportFence,
   sampleLocalClock,
   sendFrozenQueuedEmail,
-} from './queued-email-transport'
-
-import { type EmailMetricsTemplate, MetricsService } from '@/infrastructure/observability'
+} from './queued-email-transport.js'
 
 const pendingSchema = z.strictObject({
   workId: z.string().min(1).max(64),

@@ -1,21 +1,20 @@
 import { type DynamicModule, Module } from '@nestjs/common'
 
-import { PrismaModule } from '../../prisma'
+import { EnvService } from '../../env/env.service.js'
+import { QueueModule } from '../../infrastructure/queue/index.js'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry'
-import type { ChannelTargetResolver } from './channels/channel-target-resolver.types'
-import { NotificationChannelRegistry } from './channels/notification-channel.registry'
-import type { NotificationChannelDescriptor } from './channels/notification-channel.types'
-import { NotificationControlTargets } from './channels/notification-control-targets'
-import { NotificationDefinitionRegistry } from './notification-definition.registry'
-import type { NotificationDefinitionRegistration } from './notification-definition.types'
-import { NotificationPreferenceRepository } from './notification-preference.repository'
-import { NotificationPreferenceResolver } from './notification-preference.resolver'
-import { NotificationsService } from './notifications.service'
-import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
-
-import { EnvService } from '@/env/env.service'
-import { QueueModule } from '@/infrastructure/queue'
+import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry.js'
+import type { ChannelTargetResolver } from './channels/channel-target-resolver.types.js'
+import { NotificationChannelRegistry } from './channels/notification-channel.registry.js'
+import type { NotificationChannelDescriptor } from './channels/notification-channel.types.js'
+import { NotificationControlTargets } from './channels/notification-control-targets.js'
+import { NotificationDefinitionRegistry } from './notification-definition.registry.js'
+import type { NotificationDefinitionRegistration } from './notification-definition.types.js'
+import { NotificationPreferenceRepository } from './notification-preference.repository.js'
+import { NotificationPreferenceResolver } from './notification-preference.resolver.js'
+import { NotificationsService } from './notifications.service.js'
+import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher.js'
 
 export interface NotificationRegistration {
   definitions: readonly NotificationDefinitionRegistration[]

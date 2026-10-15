@@ -7,17 +7,17 @@ import {
   type NotificationPreferencesResponse,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 
 import {
   NotificationCapabilitiesResponseDto,
   NotificationPreferencesResponseDto,
   UpdateNotificationPreferenceDto,
   UpdateNotificationSettingsDto,
-} from './dto/notification.dto'
-import { NotificationPreferenceService } from './notification-preference.service'
+} from './dto/notification.dto.js'
+import { NotificationPreferenceService } from './notification-preference.service.js'
 
 /**
  * Notification preferences, capabilities, and the master toggle (Arc A.6),

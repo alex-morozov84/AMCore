@@ -16,16 +16,16 @@ import {
   ORGANIZATION_CONTEXT_FAMILY,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
+} from '../auth/organization-context/request-context-policy.js'
 
-import { CapabilityRegistry } from './capability-registry.service'
-import { CapabilityCatalogueResponseDto } from './dto/capability.dto'
+import { CapabilityRegistry } from './capability-registry.service.js'
+import { CapabilityCatalogueResponseDto } from './dto/capability.dto.js'
 
 @ApiTags('organizations')
 @ApiBearerAuth()

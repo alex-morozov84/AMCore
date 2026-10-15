@@ -1,7 +1,7 @@
-import { CONTROL_LIMITS } from './control-limits'
+import type { Prisma } from '../../generated/prisma/client.js'
+import type { PrismaService } from '../../prisma/index.js'
 
-import type { Prisma } from '@/generated/prisma/client'
-import type { PrismaService } from '@/prisma'
+import { CONTROL_LIMITS } from './control-limits.js'
 
 export interface ControlTransaction {
   readonly tx: Prisma.TransactionClient

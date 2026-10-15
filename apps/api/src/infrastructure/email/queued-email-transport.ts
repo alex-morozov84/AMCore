@@ -3,9 +3,9 @@ import { performance } from 'node:perf_hooks'
 import {
   PROVIDER_WINDOW_CLOCK,
   transportFenceEligible,
-} from '../background-work/provider-window-clock'
+} from '../background-work/provider-window-clock.js'
 
-import type { QueuedEmailOutcome, QueuedEmailProvider } from './queued-email-provider'
+import type { QueuedEmailOutcome, QueuedEmailProvider } from './queued-email-provider.js'
 
 export interface LocalClockSample {
   readonly wall: number

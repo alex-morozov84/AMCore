@@ -1,14 +1,14 @@
 import { Global, Module } from '@nestjs/common'
 
-import { SETTING_DEFINITIONS, SettingRegistry } from './setting-registry'
-import { SettingRepository } from './setting-repository'
-import { SettingWriter } from './setting-writer'
-import { SettingsReader } from './settings-reader'
-import { StorageSettingDefinition } from './storage-setting.definition'
+import { AuditModule } from '../../core/audit/index.js'
+import { EnvModule } from '../../env/env.module.js'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { AuditModule } from '@/core/audit'
-import { EnvModule } from '@/env/env.module'
-import { PrismaModule } from '@/prisma'
+import { SETTING_DEFINITIONS, SettingRegistry } from './setting-registry.js'
+import { SettingRepository } from './setting-repository.js'
+import { SettingWriter } from './setting-writer.js'
+import { SettingsReader } from './settings-reader.js'
+import { StorageSettingDefinition } from './storage-setting.definition.js'
 
 @Global()
 @Module({

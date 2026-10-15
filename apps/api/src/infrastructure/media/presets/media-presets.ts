@@ -1,6 +1,6 @@
-import type { MediaPreset, MediaPresetName } from '../media.types'
+import type { MediaPreset, MediaPresetName } from '../media.types.js'
 
-import { AVATAR_DERIVATIVES, AVATAR_SOURCE_POLICY } from './avatar.preset'
+import { AVATAR_DERIVATIVES, AVATAR_SOURCE_POLICY } from './avatar.preset.js'
 
 /**
  * Registry of named presets the `MediaService` can produce. A preset bundles the

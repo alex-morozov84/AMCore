@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common'
 
 import type { WorkReason } from '@amcore/shared'
 
-import { AppException } from '@/common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
 
 /** Closed operator codes; no provider, Redis or database error text in the response. */
 export function backgroundControlError(reason: WorkReason, retryAfterMs?: number): AppException {

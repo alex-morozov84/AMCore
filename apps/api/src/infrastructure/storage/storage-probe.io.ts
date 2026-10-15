@@ -10,9 +10,9 @@ import {
 } from '@aws-sdk/client-s3'
 import { Injectable } from '@nestjs/common'
 
-import { createS3Client } from './providers/s3-client.factory'
+import { EnvService } from '../../env/env.service.js'
 
-import { EnvService } from '@/env/env.service'
+import { createS3Client } from './providers/s3-client.factory.js'
 
 /** Reserved diagnostic bytes never enter the user-object/metadata namespace. */
 @Injectable()

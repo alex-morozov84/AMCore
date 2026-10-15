@@ -4,11 +4,15 @@ import { HttpStatus, Injectable, StreamableFile } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import type { Response } from 'express'
 
-import { AppException, BadRequestException, NotFoundException } from '../../common/exceptions'
+import {
+  AppException,
+  BadRequestException,
+  NotFoundException,
+} from '../../common/exceptions/index.js'
 
-import { InvalidObjectKeyError, normalizeObjectKey } from './object-key'
-import { type FileMetadata, StorageObjectNotFoundError } from './storage.interface'
-import { StorageService } from './storage.service'
+import { InvalidObjectKeyError, normalizeObjectKey } from './object-key.js'
+import { type FileMetadata, StorageObjectNotFoundError } from './storage.interface.js'
+import { StorageService } from './storage.service.js'
 
 const OCTET_STREAM = 'application/octet-stream'
 

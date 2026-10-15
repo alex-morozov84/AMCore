@@ -2,9 +2,9 @@ import type { Configuration } from 'openid-client'
 
 import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
 
-import type { OAuthClientService } from '../oauth-client.service'
+import type { OAuthClientService } from '../oauth-client.service.js'
 
-import type { OAuthProvider } from './oauth-provider.interface'
+import type { OAuthProvider } from './oauth-provider.interface.js'
 
 export interface TelegramProviderConfig {
   botToken: string

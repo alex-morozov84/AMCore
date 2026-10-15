@@ -8,8 +8,9 @@ import {
   escapeLikeLiteral,
 } from '@amcore/shared'
 
-import { NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { NotFoundException } from '../../common/exceptions/index.js'
+import { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
 import {
   DETAIL_ORGANIZATION_SELECT,
@@ -19,9 +20,7 @@ import {
   projectDetailUser,
   projectRoles,
   USER_MEMBERSHIP_SELECT,
-} from './admin-detail-projection'
-
-import { Prisma } from '@/generated/prisma/client'
+} from './admin-detail-projection.js'
 
 @Injectable()
 export class AdminDetailService {

@@ -1,9 +1,9 @@
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
-import { hasFullTeamAccess } from '../../auth/casl/permission-normalization'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
+import { hasFullTeamAccess } from '../../auth/casl/permission-normalization.js'
 
-import type { AccessOperationBudget } from './access-budget'
-import type { AccessCapability } from './access-capabilities'
-import { coversField, isRelevant, isUnconditional } from './access-rule-utils'
+import type { AccessOperationBudget } from './access-budget.js'
+import type { AccessCapability } from './access-capabilities.js'
+import { coversField, isRelevant, isUnconditional } from './access-rule-utils.js'
 
 export type Prerequisite = 'notRequired' | 'met' | 'unproven' | 'missing' | 'blocked'
 

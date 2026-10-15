@@ -1,5 +1,8 @@
-import { NotificationContentClass, type NotificationExternalMode } from './notification.constants'
-import type { NotificationDefinition } from './notification-definition.types'
+import {
+  NotificationContentClass,
+  type NotificationExternalMode,
+} from './notification.constants.js'
+import type { NotificationDefinition } from './notification-definition.types.js'
 
 /**
  * Content exposure policy for external channels (ADR-052).

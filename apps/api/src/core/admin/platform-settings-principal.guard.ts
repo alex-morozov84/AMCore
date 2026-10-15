@@ -2,7 +2,7 @@ import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/com
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { ForbiddenException } from '@/common/exceptions'
+import { ForbiddenException } from '../../common/exceptions/index.js'
 
 /** Platform settings cannot be reached with an organization-exchanged credential. */
 @Injectable()

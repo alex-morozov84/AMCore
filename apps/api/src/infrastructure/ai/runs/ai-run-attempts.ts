@@ -1,4 +1,4 @@
-import { AiRunAttemptOutcome, Prisma } from '@/generated/prisma/client'
+import { AiRunAttemptOutcome, Prisma } from '../../../generated/prisma/client.js'
 
 /**
  * Attempt-history and in-flight-tool bookkeeping shared by every transition that takes a run out of

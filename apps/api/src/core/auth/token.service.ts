@@ -4,10 +4,10 @@ import { randomBytes } from 'crypto'
 
 import { type SystemRole } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../common/exceptions'
-import { EnvService } from '../../env/env.service'
+import { UnauthorizedException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
 
-import { hashRefreshToken } from './utils/refresh-token-hash'
+import { hashRefreshToken } from './utils/refresh-token-hash.js'
 
 export interface AccessTokenPayload {
   sub: string

@@ -1,4 +1,4 @@
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 /** Metadata becomes purge-eligible thirty days after its first terminal moment. */
 export const API_KEY_TERMINAL_RETENTION_DAYS = 30

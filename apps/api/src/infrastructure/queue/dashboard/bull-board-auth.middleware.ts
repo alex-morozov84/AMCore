@@ -6,10 +6,10 @@ import {
   parseBoardRenderContext,
 } from '@amcore/shared'
 
-import type { BullBoardAuthService } from './bull-board-auth.service'
-import type { BullBoardBearerAuthService } from './bull-board-bearer-auth.service'
-import type { BoardRequestLocals } from './bull-board-boundary.middleware'
-import { type BoardEvent, type BoardEventSink, NOOP_BOARD_EVENTS } from './bull-board-events'
+import type { BullBoardAuthService } from './bull-board-auth.service.js'
+import type { BullBoardBearerAuthService } from './bull-board-bearer-auth.service.js'
+import type { BoardRequestLocals } from './bull-board-boundary.middleware.js'
+import { type BoardEvent, type BoardEventSink, NOOP_BOARD_EVENTS } from './bull-board-events.js'
 
 /**
  * Read the `refresh_token` cookie straight from the raw `Cookie` header.

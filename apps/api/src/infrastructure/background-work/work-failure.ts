@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { workFailureCodeSchema, type WorkFailureDiagnostic } from '@amcore/shared'
 
-import type { WorkDefinition } from './work-definition'
+import type { WorkDefinition } from './work-definition.js'
 
 /** Handler-owned classification; diagnostic recognition never changes permanence. */
 export class WorkFailure extends Error {

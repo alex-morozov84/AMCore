@@ -1,6 +1,6 @@
 import { type CustomDecorator, SetMetadata } from '@nestjs/common'
 
-import type { RateLimitPolicy } from './rate-limit-policies'
+import type { RateLimitPolicy } from './rate-limit-policies.js'
 
 /** Metadata key for a route/controller's rate-limit policy override. */
 export const RATE_LIMIT_POLICY_KEY = 'amcore:rateLimit:policy'

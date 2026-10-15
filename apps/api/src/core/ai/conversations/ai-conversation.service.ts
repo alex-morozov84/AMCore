@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common'
 
 import type { AiConversationResponse, CreateAiConversationInput } from '@amcore/shared'
 
-import { BadRequestException, NotFoundException } from '../../../common/exceptions'
-import { toAiConversationResponse } from '../runs/ai-run.mapper'
-
-import { PrismaService } from '@/prisma'
+import { BadRequestException, NotFoundException } from '../../../common/exceptions/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { toAiConversationResponse } from '../runs/ai-run.mapper.js'
 
 /**
  * Conversation surface (Track C — ADR-054, Arc C, web role). Owns create + owner-scoped fetch of

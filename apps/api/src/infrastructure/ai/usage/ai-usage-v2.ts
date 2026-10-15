@@ -1,6 +1,5 @@
-import type { AiUsage } from '../gateway/ai-gateway.types'
-
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../../generated/prisma/client.js'
+import type { AiUsage } from '../gateway/ai-gateway.types.js'
 
 function count(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 2147483647

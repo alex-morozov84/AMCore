@@ -9,12 +9,11 @@ import {
   type RoleDefinitionPreset,
 } from '@amcore/shared'
 
-import { AppException, BadRequestException } from '../../common/exceptions'
+import { AppException, BadRequestException } from '../../common/exceptions/index.js'
+import type { Prisma, Role } from '../../generated/prisma/client.js'
 
-import { CAPABILITY_ADAPTERS } from './capability-registry.service'
-import { assignableRolesWhere } from './role-assignability-policy'
-
-import type { Prisma, Role } from '@/generated/prisma/client'
+import { CAPABILITY_ADAPTERS } from './capability-registry.service.js'
+import { assignableRolesWhere } from './role-assignability-policy.js'
 
 type Tx = Prisma.TransactionClient
 

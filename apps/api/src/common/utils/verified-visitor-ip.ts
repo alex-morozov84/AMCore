@@ -4,7 +4,7 @@ import type { Request } from 'express'
 
 import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
 
-import type { EnvService } from '../../env/env.service'
+import type { EnvService } from '../../env/env.service.js'
 
 /** Trust only a valid internal claim from an allowlisted actual socket peer. */
 export function resolveVerifiedVisitorIp(req: Request, env: EnvService): string | undefined {

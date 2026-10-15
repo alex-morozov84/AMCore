@@ -10,30 +10,29 @@ import type {
 } from '@amcore/shared'
 import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
-import { EnvService } from '../../../env/env.service'
-import { PrismaService } from '../../../prisma'
+import { AppException } from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
+import type { OAuthProvider, Prisma, User } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
 import {
   type InvitationHandoffProof,
   lockInvitationAuthAttempt,
-} from '../../invitations/invitation-auth-handoff'
-import { InvitationContinuationService } from '../../invitations/invitation-continuation.service'
+} from '../../invitations/invitation-auth-handoff.js'
+import { InvitationContinuationService } from '../../invitations/invitation-continuation.service.js'
 import {
   invalidInvitation,
   invitationClock,
   lockInvitationSignupEmail,
   lockInvitationUser,
-} from '../../invitations/invitation-locks'
-import { EmailIdentityService } from '../email-identity.service'
-import { SessionService } from '../session.service'
-import type { AccessTokenPayload } from '../token.service'
-import { UserCacheService } from '../user-cache.service'
+} from '../../invitations/invitation-locks.js'
+import { EmailIdentityService } from '../email-identity.service.js'
+import { SessionService } from '../session.service.js'
+import type { AccessTokenPayload } from '../token.service.js'
+import { UserCacheService } from '../user-cache.service.js'
 
-import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce'
-import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service'
-import { OAuthProviderFactory } from './providers/oauth-provider.factory'
-
-import type { OAuthProvider, Prisma, User } from '@/generated/prisma/client'
+import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce.js'
+import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service.js'
+import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
 interface LoginCallbackResult {
   mode: 'login'

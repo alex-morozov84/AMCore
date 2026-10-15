@@ -4,8 +4,8 @@ import {
   NotificationCategory,
   NotificationChannel,
   NotificationContentClass,
-} from '../notification.constants'
-import type { NotificationDefinition } from '../notification-definition.types'
+} from '../notification.constants.js'
+import type { NotificationDefinition } from '../notification-definition.types.js'
 
 /**
  * Best-effort confirmation that a Telegram account was just linked (Arc D / D.6). Produced by the

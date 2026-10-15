@@ -10,23 +10,22 @@ import {
   type SystemRole,
 } from '@amcore/shared'
 
-import type { CapabilityRegistry } from '../capability-registry.service'
+import type { Organization } from '../../../generated/prisma/client.js'
+import type { CapabilityRegistry } from '../capability-registry.service.js'
 
-import { type AccessOperationBudget, AccessOperationBudget as Budget } from './access-budget'
+import { type AccessOperationBudget, AccessOperationBudget as Budget } from './access-budget.js'
 import {
   type AccessCapability,
   assertCatalogueWithinLimits,
   defaultCapabilities,
   type ItemSpec,
   itemSpecs,
-} from './access-capabilities'
-import { isCovered } from './access-coverage'
-import { AccessPolicy, exactCapabilityIds, type StoredPolicyRule } from './access-facts'
-import { conditionKeys } from './access-rule-utils'
-import { roleRefs, sourcesFor } from './access-sources'
-import { evaluateConfigured } from './configured-access'
-
-import type { Organization } from '@/generated/prisma/client'
+} from './access-capabilities.js'
+import { isCovered } from './access-coverage.js'
+import { AccessPolicy, exactCapabilityIds, type StoredPolicyRule } from './access-facts.js'
+import { conditionKeys } from './access-rule-utils.js'
+import { roleRefs, sourcesFor } from './access-sources.js'
+import { evaluateConfigured } from './configured-access.js'
 
 type Item = MemberAccess['items'][number]
 

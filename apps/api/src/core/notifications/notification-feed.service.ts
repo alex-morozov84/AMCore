@@ -8,14 +8,13 @@ import {
   type SupportedLocale,
 } from '@amcore/shared'
 
-import { PrismaService } from '../../prisma'
+import type { Notification } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { NotificationDefinitionRegistry } from './notification-definition.registry'
-import { inAppFeedWhere } from './notification-feed.predicate'
-import { decodeFeedCursor, encodeFeedCursor } from './notification-feed-cursor'
-import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
-
-import type { Notification } from '@/generated/prisma/client'
+import { NotificationDefinitionRegistry } from './notification-definition.registry.js'
+import { inAppFeedWhere } from './notification-feed.predicate.js'
+import { decodeFeedCursor, encodeFeedCursor } from './notification-feed-cursor.js'
+import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher.js'
 
 export interface FeedQuery {
   cursor?: string

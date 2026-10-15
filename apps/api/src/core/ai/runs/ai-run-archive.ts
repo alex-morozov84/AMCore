@@ -2,8 +2,8 @@ import { HttpStatus } from '@nestjs/common'
 
 import { aiRunArchivedSchema, ResourceErrorCode } from '@amcore/shared'
 
-import { AppException } from '@/common/exceptions'
-import type { AiRunTombstone } from '@/generated/prisma/client'
+import { AppException } from '../../../common/exceptions/index.js'
+import type { AiRunTombstone } from '../../../generated/prisma/client.js'
 
 export function archivedRunError(row: AiRunTombstone): AppException {
   const details = aiRunArchivedSchema.parse({

@@ -3,15 +3,14 @@ import { subject as caslSubject } from '@casl/ability'
 import { Action, type MemberAccess, Subject } from '@amcore/shared'
 import { ACCESS_ROLE_REFS_LIMIT, ACCESS_SOURCES_PER_ITEM } from '@amcore/shared'
 
-import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults'
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
-import { createPrismaAbility } from '../../auth/casl/prisma-ability'
-import { classifyStoredRule } from '../role-definition-classifier'
+import type { Organization } from '../../../generated/prisma/client.js'
+import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults.js'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
+import { createPrismaAbility } from '../../auth/casl/prisma-ability.js'
+import { classifyStoredRule } from '../role-definition-classifier.js'
 
-import type { ItemSpec } from './access-capabilities'
-import type { StoredPolicyRule } from './access-facts'
-
-import type { Organization } from '@/generated/prisma/client'
+import type { ItemSpec } from './access-capabilities.js'
+import type { StoredPolicyRule } from './access-facts.js'
 
 type Source = Extract<MemberAccess['items'][number]['sources'][number], { kind: 'rule' }>
 type Via = Source['via']

@@ -9,17 +9,16 @@ import {
   AppException,
   ServiceUnavailableException,
   UnauthorizedException,
-} from '../../../common/exceptions'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
-import { AiRunService } from '../runs/ai-run.service'
-import { ApiArchivedRunResponse } from '../runs/ai-run-archive.openapi'
+} from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
+import { AiRunService } from '../runs/ai-run.service.js'
+import { ApiArchivedRunResponse } from '../runs/ai-run-archive.openapi.js'
 
-import { AiRunRealtimeHub } from './ai-run-realtime.hub'
-import type { AiRunStreamConnection } from './ai-run-stream.connection'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
+import { AiRunRealtimeHub } from './ai-run-realtime.hub.js'
+import type { AiRunStreamConnection } from './ai-run-stream.connection.js'
 
 /** SSE response headers (ADR-053): no caching/buffering, keep-alive event stream. */
 const SSE_HEADERS = {
