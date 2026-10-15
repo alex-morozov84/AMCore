@@ -84,7 +84,21 @@ async function seedCase(m, api, record, name, headers) {
     unit.runId = (await response.json()).id
     await save(m)
   }
-  if (unit.staged || name === 'queued') {
+  if (unit.staged) {
+    if (name === 'retryable' && !unit.counterCorrected) {
+      await sql(
+        m,
+        `UPDATE ai.ai_runs SET "attemptCount" = 2 WHERE id = :'run_id'
+        AND status = 'FAILED' AND "attemptCount" = 3 AND "maxAttempts" = 3
+        AND "leaseEpoch" = 3 AND "terminalReasonCode" = 'attempts_exhausted';`,
+        { run_id: unit.runId }
+      )
+      unit.counterCorrected = true
+      await save(m)
+    }
+    return
+  }
+  if (name === 'queued') {
     unit.staged = true
     await save(m)
     return
@@ -103,7 +117,7 @@ async function seedCase(m, api, record, name, headers) {
     await sql(
       m,
       `UPDATE ai.ai_runs SET status = 'FAILED', "terminalReasonCode" = 'attempts_exhausted',
-      "errorCode" = 'provider_timeout', "attemptCount" = 3, "maxAttempts" = 3,
+      "errorCode" = 'provider_timeout', "attemptCount" = 2, "maxAttempts" = 3,
       "leaseEpoch" = 3, "finishedAt" = clock_timestamp() WHERE id = :'run_id' AND status = 'QUEUED';
       INSERT INTO ai.ai_run_attempts (id, "runId", epoch, outcome, "errorCode", "endedAt")
       SELECT gen_random_uuid()::text, :'run_id', epoch, 'RETRY_SCHEDULED',

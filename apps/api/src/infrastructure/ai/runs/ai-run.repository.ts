@@ -113,7 +113,8 @@ export class AiRunRepository {
     const leaseToken = randomUUID()
     const ttlSeconds = AI_RUN_LEASE_TTL_MS / 1000
 
-    const rows = await this.prisma.$transaction(
+    const rows = await this.latch.transaction(
+      this.prisma,
       async (tx) => {
         await tx.$queryRaw`SELECT set_config('lock_timeout', '1000ms', true)`
         const [gate] = await tx.$queryRaw<{ paused: boolean }[]>`
@@ -148,6 +149,7 @@ export class AiRunRepository {
       },
       { timeout: 5000 }
     )
+    if (rows === CUTOFF) return []
 
     return rows.map((row) => ({
       id: row.id,

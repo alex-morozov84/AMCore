@@ -96,12 +96,11 @@ export class AiWorkReader {
       throw new BadRequestException('Invalid AI work filter')
     const offset = (query.page - 1) * query.limit
     const now = await this.clock()
-    const states = buckets[query.state] ?? []
+    const states = (buckets[query.state] ?? []).filter((state) => !native || state === native)
     if (states.length === 0) return this.page([], false, now)
     const rows = await this.db.aiRun.findMany({
       where: {
         status: { in: states as AiRun['status'][] },
-        ...(native ? { status: native as AiRun['status'] } : {}),
         ...(query.state === 'delayed'
           ? { OR: [{ nextAttemptAt: { gt: now } }, { availableAt: { gt: now } }] }
           : {}),

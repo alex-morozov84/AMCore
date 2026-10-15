@@ -151,4 +151,22 @@ describe('registered work card', () => {
     expect(screen.getByText('Failed').nextElementSibling).toHaveTextContent('2')
     expect(screen.queryByText('Finished')).not.toBeInTheDocument()
   })
+  it('keeps the finished count for a legacy six-counter summary', () => {
+    const count = (value: number) => ({ value, truncated: false })
+    view({
+      ...work,
+      kind: 'durable',
+      counts: {
+        pending: count(0),
+        due: count(0),
+        processing: count(0),
+        failed: count(2),
+        terminal: count(5),
+        unresolved: count(0),
+      },
+    })
+    expect(screen.getByText('Finished').nextElementSibling).toHaveTextContent('5')
+    expect(screen.getByText('Failed').nextElementSibling).toHaveTextContent('2')
+    expect(screen.queryByText('Completed')).not.toBeInTheDocument()
+  })
 })

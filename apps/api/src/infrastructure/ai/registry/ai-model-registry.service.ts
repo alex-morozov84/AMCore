@@ -54,6 +54,28 @@ export class AiModelRegistry {
     return snapshot.find((model) => model.slug === slug) ?? null
   }
 
+  /** Current primary-PG selection inside a caller-owned command transaction. No cache or second pool lease. */
+  async resolveModelInTransaction(
+    tx: Prisma.TransactionClient,
+    slug: string
+  ): Promise<ResolvedAiModel | null> {
+    const row = await tx.aiModel.findUnique({ where: { slug }, include: { provider: true } })
+    if (!row?.enabled || !row.provider.enabled) return null
+    const parsed = resolvedAiModelSchema.safeParse(row)
+    return parsed.success ? parsed.data : null
+  }
+
+  /** Fresh model binding through the same transaction that locks the source run. */
+  async resolveLiveModelInTransaction(
+    tx: Prisma.TransactionClient,
+    id: string
+  ): Promise<ResolvedAiModel | null> {
+    const row = await tx.aiModel.findUnique({ where: { id }, include: { provider: true } })
+    if (!row?.enabled || !row.provider.enabled) return null
+    const parsed = resolvedAiModelSchema.safeParse(row)
+    return parsed.success ? parsed.data : null
+  }
+
   /**
    * The selectable default model: the `isDefault` row when its provider has a usable credential,
    * else the key-less `mock` provider's model, else `null` (empty/unconfigured catalog).

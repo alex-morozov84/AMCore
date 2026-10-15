@@ -66,6 +66,27 @@ describe('AiRunRepository', () => {
       })
       expect(run?.leaseToken).toEqual(expect.any(String))
     })
+
+    it('starts no claim SQL after the gate read settles past shutdown seal', async () => {
+      let releaseGate!: (rows: { paused: boolean }[]) => void
+      let gateStarted!: () => void
+      const gate = new Promise<{ paused: boolean }[]>((resolve) => (releaseGate = resolve))
+      const started = new Promise<void>((resolve) => (gateStarted = resolve))
+      prisma.$queryRaw
+        .mockResolvedValueOnce([] as never)
+        .mockImplementationOnce((() => {
+          gateStarted()
+          return gate
+        }) as never)
+      const claim = repo.claimDueBatch()
+      await started
+      latch.seal()
+      expect(await claim).toEqual([])
+      releaseGate([{ paused: false }])
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+      expect(latch.outstandingCount).toBe(0)
+    })
   })
 
   describe('finalizers (CAS)', () => {

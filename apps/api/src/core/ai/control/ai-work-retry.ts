@@ -7,7 +7,7 @@ import { aiRunInputFingerprint } from '../runs/ai-run-input-fingerprint'
 import { aiRunBasicCapability } from './ai-work-policy'
 
 import { EnvService } from '@/env/env.service'
-import { AiAuthorType, AiMessageRole, type AiRun, Prisma } from '@/generated/prisma/client'
+import { AiAuthorType, AiMessageRole, type AiRun, AiRunStepType, Prisma } from '@/generated/prisma/client'
 import {
   aiExecutionDescriptorSchema,
   freezeAiModel,
@@ -43,7 +43,7 @@ export class AiWorkRetry {
       !attempts.length ||
       attempts.length !== run.leaseEpoch ||
       attempts.length > 128 ||
-      run.attemptCount !== run.maxAttempts ||
+      run.attemptCount + 1 !== run.maxAttempts ||
       run.errorCode !== attempts.at(-1)?.errorCode ||
       attempts.some(
         (attempt, index) =>
@@ -54,13 +54,43 @@ export class AiWorkRetry {
       )
     )
       return { reason: 'INCONSISTENT_STATE' }
-    const [tools, approvals, steps, output] = await Promise.all([
+    const [tools, approvals, steps, finalizations, output] = await Promise.all([
       tx.aiToolInvocation.count({ where: { runId: run.id } }),
       tx.aiApproval.count({ where: { runId: run.id } }),
-      tx.aiRunStep.count({ where: { runId: run.id } }),
+      tx.aiRunStep.count({
+        where: {
+          runId: run.id,
+          type: {
+            notIn: [
+              AiRunStepType.PROVIDER_CALL,
+              AiRunStepType.GUARDRAIL_CHECK,
+              AiRunStepType.FINALIZATION,
+            ],
+          },
+        },
+      }),
+      tx.aiRunStep.findMany({
+        where: { runId: run.id, type: AiRunStepType.FINALIZATION },
+        select: { detail: true },
+        take: 129,
+      }),
       tx.aiMessage.count({ where: { runId: run.id, role: AiMessageRole.ASSISTANT } }),
     ])
-    if (tools || approvals || steps || output) return { reason: 'EFFECT_UNKNOWN' }
+    if (
+      tools ||
+      approvals ||
+      steps ||
+      output ||
+      finalizations.length > 128 ||
+      finalizations.some(
+        (step) =>
+          !step.detail ||
+          typeof step.detail !== 'object' ||
+          Array.isArray(step.detail) ||
+          step.detail.kind !== 'provider_retry_restriction'
+      )
+    )
+      return { reason: 'EFFECT_UNKNOWN' }
     const input = await tx.aiMessage.findUnique({ where: { id: run.inputMessageId! } })
     if (
       !input ||
@@ -108,7 +138,7 @@ export class AiWorkRetry {
       if (!selection.success) return { reason: 'PROVIDER_CHANGED' }
       let selectedId: string | null = null
       for (const slug of [selection.data.modelSlug, ...selection.data.fallback]) {
-        const candidate = await this.models.resolveModel(slug)
+        const candidate = await this.models.resolveModelInTransaction(tx, slug)
         if (candidate && this.models.hasCredential(candidate)) {
           selectedId = candidate.id
           break
@@ -116,7 +146,7 @@ export class AiWorkRetry {
       }
       if (selectedId !== frozen.data.modelId) return { reason: 'PROVIDER_CHANGED' }
     }
-    const live = await this.models.resolveLiveModel(frozen.data.modelId)
+    const live = await this.models.resolveLiveModelInTransaction(tx, frozen.data.modelId)
     if (
       !live ||
       !this.models.hasCredential(live) ||

@@ -106,6 +106,7 @@ model AiRun {
   @@index([status, availableAt])
   @@index([status, nextAttemptAt])
   @@index([status, leaseExpiresAt])
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "ai_runs_status_createdAt_id_idx")
   @@map("ai_runs")
   @@schema("ai")
 }

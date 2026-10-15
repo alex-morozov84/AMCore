@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import { v7 as uuidv7 } from 'uuid'
 
@@ -15,6 +16,11 @@ import { AiConversationOperatorService } from '../src/core/ai/conversations/ai-c
 import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { aiRunInputFingerprint } from '../src/core/ai/runs/ai-run-input-fingerprint'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import {
+  AI_PROVIDER_ADAPTERS,
+  type AiProviderAdapter,
+} from '../src/infrastructure/ai/gateway/ai-gateway.types'
+import { MockAiAdapter } from '../src/infrastructure/ai/gateway/providers/mock.adapter'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
@@ -152,11 +158,42 @@ describe('AI run durable control (real PostgreSQL)', () => {
       data: { status: 'FAILED', finishedAt },
     })
     const summary = await reader.readSummary()
-    expect(summary.counts?.completed.value).toBe(1)
+    expect(summary.counts?.completed?.value).toBe(1)
     expect(summary.counts?.failed.value).toBe(1)
     expect(summary.counts?.terminal.value).toBe(2)
     expect((await reader.list({ state: 'completed', page: 1, limit: 25 })).rows).toHaveLength(1)
     expect((await reader.list({ state: 'failed', page: 1, limit: 25 })).rows).toHaveLength(1)
+  })
+
+  it('intersects the selected work state with native status, including delayed runs', async () => {
+    const { run: failed } = await fixture()
+    const { run: completed } = await fixture('completed-filter-key')
+    const { run: delayed } = await fixture('delayed-filter-key')
+    await context.prisma.aiRun.update({
+      where: { id: failed.id },
+      data: { status: 'FAILED', finishedAt: new Date() },
+    })
+    await context.prisma.aiRun.update({
+      where: { id: completed.id },
+      data: { status: 'COMPLETED', finishedAt: new Date() },
+    })
+    await context.prisma.aiRun.update({
+      where: { id: delayed.id },
+      data: { availableAt: new Date(Date.now() + 60000) },
+    })
+    const query = { page: 1, limit: 25 }
+    expect(
+      (await reader.list({ ...query, state: 'failed', filters: { status: 'FAILED' } })).rows
+    ).toHaveLength(1)
+    expect(
+      (await reader.list({ ...query, state: 'failed', filters: { status: 'COMPLETED' } })).rows
+    ).toHaveLength(0)
+    expect(
+      (await reader.list({ ...query, state: 'delayed', filters: { status: 'QUEUED' } })).rows
+    ).toHaveLength(1)
+    expect(
+      (await reader.list({ ...query, state: 'waiting', filters: { status: 'QUEUED' } })).rows
+    ).toHaveLength(0)
   })
 
   it('makes two competing claims wait for a committing pause', async () => {
@@ -415,28 +452,49 @@ describe('AI run durable control (real PostgreSQL)', () => {
 
   it('creates one linked text child with its own deadline and executes its source input', async () => {
     const { user, run } = await fixture()
-    await context.prisma.aiRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'FAILED',
-        terminalReasonCode: 'attempts_exhausted',
-        errorCode: 'provider_timeout',
-        attemptCount: 1,
-        maxAttempts: 1,
-        leaseEpoch: 1,
-        finishedAt: new Date(),
-      },
-    })
-    await context.prisma.aiRunAttempt.create({
-      data: {
-        runId: run.id,
-        epoch: 1,
-        outcome: 'FAILED',
-        errorCode: 'provider_timeout',
-        endedAt: new Date(),
-      },
-    })
+    const adapters = context.app.get<AiProviderAdapter[]>(AI_PROVIDER_ADAPTERS, { strict: false })
+    const mock = adapters.find((adapter) => adapter instanceof MockAiAdapter) as MockAiAdapter
+    const failure = jest.spyOn(mock, 'generateText').mockRejectedValue(new Error('transient'))
+    try {
+      const budget = (await context.prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } }))
+        .maxAttempts
+      for (let attempt = 1; attempt <= budget; attempt += 1) {
+        await dispatch.drainDueBatches()
+        if (attempt < budget)
+          await context.prisma.aiRun.update({
+            where: { id: run.id },
+            data: { nextAttemptAt: new Date(Date.now() - 1000) },
+          })
+      }
+    } finally {
+      failure.mockRestore()
+    }
     const source = await context.prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } })
+    expect(source).toMatchObject({
+      status: 'FAILED',
+      terminalReasonCode: 'attempts_exhausted',
+      errorCode: 'provider_unavailable',
+      attemptCount: source.maxAttempts - 1,
+    })
+    expect(await context.prisma.aiRunAttempt.count({ where: { runId: source.id } })).toBe(
+      source.maxAttempts
+    )
+    expect({
+      tools: await context.prisma.aiToolInvocation.count({ where: { runId: source.id } }),
+      approvals: await context.prisma.aiApproval.count({ where: { runId: source.id } }),
+      steps: await context.prisma.aiRunStep.findMany({
+        where: { runId: source.id },
+        select: { type: true },
+      }),
+      output: await context.prisma.aiMessage.count({
+        where: { runId: source.id, role: 'ASSISTANT' },
+      }),
+    }).toEqual({
+      tools: 0,
+      approvals: 0,
+      steps: Array.from({ length: source.maxAttempts }, () => ({ type: 'FINALIZATION' })),
+      output: 0,
+    })
     const commandId = uuidv7()
     const command: WorkCommand = {
       contractVersion: 1,
@@ -450,18 +508,31 @@ describe('AI run durable control (real PostgreSQL)', () => {
       reason: 'Transient provider outage',
       parameters: {},
     }
-    const result = await context.prisma.$transaction(async (tx) => {
-      const ctx: DurableTransactionContext = {
-        tx,
-        now: new Date(),
-        commandId,
-        dispatchId: uuidv7(),
-        dispatchNotAfter: new Date(Date.now() + 60000),
-        principal: { type: 'jwt', sub: user.id, sid: 'test', systemRole: SystemRole.SuperAdmin },
-      }
-      const locked = await control.lock(ctx, command)
-      return (await control.apply(ctx, locked, command)).get(source.id)
-    })
+    const registry = context.app.get(AiModelRegistry, { strict: false })
+    const cached = jest.spyOn(registry, 'resolveModel').mockRejectedValue(new Error('cache used'))
+    const separate = jest
+      .spyOn(registry, 'resolveLiveModel')
+      .mockRejectedValue(new Error('pool used'))
+    let result
+    try {
+      result = await context.prisma.$transaction(async (tx) => {
+        const ctx: DurableTransactionContext = {
+          tx,
+          now: new Date(),
+          commandId,
+          dispatchId: uuidv7(),
+          dispatchNotAfter: new Date(Date.now() + 60000),
+          principal: { type: 'jwt', sub: user.id, sid: 'test', systemRole: SystemRole.SuperAdmin },
+        }
+        const locked = await control.lock(ctx, command)
+        return (await control.apply(ctx, locked, command)).get(source.id)
+      })
+      expect(cached).not.toHaveBeenCalled()
+      expect(separate).not.toHaveBeenCalled()
+    } finally {
+      cached.mockRestore()
+      separate.mockRestore()
+    }
     expect(result).toEqual({ state: 'applied' })
     const child = await context.prisma.aiRun.findFirstOrThrow({
       where: { retryOfRunId: source.id },
@@ -538,7 +609,7 @@ describe('AI run durable control (real PostgreSQL)', () => {
         status: 'FAILED',
         terminalReasonCode: 'attempts_exhausted',
         errorCode: 'provider_timeout',
-        attemptCount: 1,
+        attemptCount: 0,
         maxAttempts: 1,
         leaseEpoch: 1,
       },

@@ -92,7 +92,7 @@ export class AiRunExecutorService {
 
   private async runAttempt(claim: ClaimedRun, runtime: AttemptRuntime): Promise<void> {
     if (await this.actions.resolvePendingUnknown(claim)) return
-    const plan = await this.preflight(claim)
+    const plan = await this.preflight(claim, runtime)
     // A null plan means pre-flight already reached a terminal/handled state (cancel, deadline, bad
     // snapshot, missing input, guardrail refusal) — nothing more to do this attempt.
     if (plan === null) return
@@ -132,7 +132,7 @@ export class AiRunExecutorService {
    * terminal transition. Returns `null` when the attempt is already handled (cancelled/expired/
    * permanent-failed/refused).
    */
-  private async preflight(claim: ClaimedRun): Promise<RunPlan | null> {
+  private async preflight(claim: ClaimedRun, runtime: AttemptRuntime): Promise<RunPlan | null> {
     // Admission: lease (fresh clock), a cancel that landed after claim, a human takeover, the deadline and
     // shutdown are all evaluated together under the run guard before any pre-flight work.
     const admitted = await this.guard.admit(claim, async () => undefined)
@@ -286,7 +286,10 @@ export class AiRunExecutorService {
       let selectedId: string | null = null
       if (selection.success) {
         for (const slug of [selection.data.modelSlug, ...selection.data.fallback]) {
-          const candidate = await this.models.resolveModel(slug)
+          const candidate = await this.latch.run(() =>
+            this.models.resolveModel(slug, runtime.attempt.signal)
+          )
+          if (candidate === CUTOFF) return null
           if (candidate && this.models.hasCredential(candidate)) {
             selectedId = candidate.id
             break

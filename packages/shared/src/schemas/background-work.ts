@@ -158,6 +158,11 @@ export const workListWireQuerySchema = z.preprocess((input) => {
 }, workListQuerySchema)
 export type WorkListQuery = z.infer<typeof workListQuerySchema>
 
+const workCountSchema = z.strictObject({
+  value: z.number().int().min(0).max(10000),
+  truncated: z.boolean(),
+})
+
 export const workSummarySchema = z.strictObject({
   id: adminQueueNameSchema,
   kind: z.enum(['ordinary', 'wake', 'external', 'durable']),
@@ -167,10 +172,15 @@ export const workSummarySchema = z.strictObject({
   revision: workRevisionSchema.optional(),
   epoch: z.uuid().optional(),
   counts: z
-    .record(
-      z.enum(['pending', 'due', 'processing', 'failed', 'completed', 'terminal', 'unresolved']),
-      z.strictObject({ value: z.number().int().min(0).max(10000), truncated: z.boolean() })
-    )
+    .strictObject({
+      pending: workCountSchema,
+      due: workCountSchema,
+      processing: workCountSchema,
+      failed: workCountSchema,
+      terminal: workCountSchema,
+      unresolved: workCountSchema,
+      completed: workCountSchema.optional(),
+    })
     .optional(),
   paused: z.boolean().optional(),
   providerEvidence: z.boolean().optional(),

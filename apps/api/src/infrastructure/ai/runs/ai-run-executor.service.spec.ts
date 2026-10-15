@@ -15,7 +15,7 @@ import type { AiToolActionService } from './ai-tool-action.service'
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
 import { StorageObjectNotFoundError } from '@/infrastructure/storage'
-import { type AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
+import { AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
 /**
@@ -48,7 +48,11 @@ describe('AiRunExecutorService', () => {
   let guard: { admit: jest.Mock }
   let transitions: { stop: jest.Mock; failed: jest.Mock; retry: jest.Mock; refusal: jest.Mock }
   let latch: { closed: boolean; run: jest.Mock }
-  const runtime = {} as AttemptRuntime
+  const runtime = new AttemptRuntime({
+    signal: new AbortController().signal,
+    abort: () => undefined,
+    dispose: () => undefined,
+  })
   let loop: { run: jest.Mock }
   let publisher: { publish: jest.Mock }
   let storage: { download: jest.Mock }
@@ -617,6 +621,56 @@ describe('AiRunExecutorService', () => {
       release(Buffer.from('png'))
       await attempt
 
+      expect(loop.run).not.toHaveBeenCalled()
+      expect(transitions.failed).not.toHaveBeenCalled()
+    })
+
+    it('passes the attempt signal and stops a child after delayed model lookup', async () => {
+      const real = sealable()
+      const attemptRuntime = new AttemptRuntime(real.openAttempt())
+      const content = [{ type: 'text' as const, text: 'hi there' }]
+      prisma.aiRun.findUnique
+        .mockResolvedValueOnce({
+          inputMessageId: 'input-1',
+          retryOfRunId: 'source-1',
+          inputFingerprint: aiRunInputFingerprint(content),
+          assistantBindingCaptured: true,
+          assistantIdAtCreation: 'assistant-1',
+        } as never)
+        .mockResolvedValueOnce({
+          conversationId: 'conv-1',
+          inputMessageId: 'input-1',
+          inputFingerprint: aiRunInputFingerprint(content),
+          status: 'FAILED',
+        } as never)
+      prisma.aiConversation.findUnique.mockResolvedValue({
+        ownerUserId: 'u1',
+        assistantId: 'assistant-1',
+        organizationId: null,
+        assistant: {
+          enabled: true,
+          modelSelection: { modelSlug: 'mock-default' },
+          toolAllowlist: [],
+        },
+      } as never)
+      prisma.aiMessage.findUnique.mockResolvedValue({
+        id: 'input-1', content, role: 'USER', authorType: 'USER', authorUserId: 'u1',
+        conversationId: 'conv-1', runId: 'source-1', archivedRunId: null,
+      } as never)
+      let release!: (value: unknown) => void
+      let started!: () => void
+      const lookupStarted = new Promise<void>((resolve) => (started = resolve))
+      models.resolveModel.mockImplementation(() => {
+        started()
+        return new Promise((resolve) => (release = resolve))
+      })
+      const attempt = executor.execute(claim(), attemptRuntime)
+      await lookupStarted
+      expect(models.resolveModel).toHaveBeenCalledWith('mock-default', attemptRuntime.attempt.signal)
+      real.seal()
+      expect(attemptRuntime.attempt.signal.aborted).toBe(true)
+      release({ id: 'mock-default' })
+      await attempt
       expect(loop.run).not.toHaveBeenCalled()
       expect(transitions.failed).not.toHaveBeenCalled()
     })
