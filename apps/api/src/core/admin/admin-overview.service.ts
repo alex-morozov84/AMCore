@@ -9,12 +9,15 @@ function isKnownDependencyName(name: string): name is KnownDependencyName {
   return (ADMIN_OVERVIEW_DEPENDENCY_NAMES as readonly string[]).includes(name)
 }
 
-import { AdminOverviewResourcesService } from './admin-overview-resources.service'
+import { EnvService } from '../../env/env.service.js'
+import { ReadinessCheckService } from '../../health/index.js'
+import { readBuildIdentity } from '../../infrastructure/build-identity.js'
+import {
+  StorageProbeService,
+  StoragePublicCheckService,
+} from '../../infrastructure/storage/index.js'
 
-import { EnvService } from '@/env/env.service'
-import { ReadinessCheckService } from '@/health'
-import { readBuildIdentity } from '@/infrastructure/build-identity'
-import { StorageProbeService, StoragePublicCheckService } from '@/infrastructure/storage'
+import { AdminOverviewResourcesService } from './admin-overview-resources.service.js'
 
 /**
  * Console Overview status.

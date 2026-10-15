@@ -3,10 +3,10 @@ import type { Request } from 'express'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { PrismaService } from '../../../prisma'
-import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
-import { registerApiKeyAdmission } from '../api-key-admission'
-import { ApiKeysService } from '../api-keys.service'
+import { PrismaService } from '../../../prisma/index.js'
+import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service.js'
+import { registerApiKeyAdmission } from '../api-key-admission.js'
+import { ApiKeysService } from '../api-keys.service.js'
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {

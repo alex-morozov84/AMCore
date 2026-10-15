@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AvatarService } from '../avatar.service'
+import { AvatarService } from '../avatar.service.js'
 
-import { downloadAvatarSource, OAuthAvatarError } from './oauth-avatar-source'
+import { downloadAvatarSource, OAuthAvatarError } from './oauth-avatar-source.js'
 
 /**
  * Copies an OAuth profile picture into our own storage once, so no third-party URL is ever

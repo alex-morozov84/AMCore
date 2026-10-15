@@ -9,7 +9,7 @@ import {
   updateNotificationSettingsSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /** Feed query (`?cursor=&limit=`) and response DTOs (ADR-050 typed surface). */
 export class NotificationFeedQueryDto extends createSchemaDto(notificationFeedQuerySchema) {}

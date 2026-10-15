@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import type { AdminQueuesResponse } from '@amcore/shared'
 
-import { BULL_BOARD_MOUNT, QueueObservationService } from '@/infrastructure/queue'
+import { BULL_BOARD_MOUNT, QueueObservationService } from '../../infrastructure/queue/index.js'
 
 /**
  * Console Background work summary. A failing row is typed `unavailable` data inside a 200,

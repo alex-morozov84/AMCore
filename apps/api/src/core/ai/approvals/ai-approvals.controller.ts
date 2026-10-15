@@ -25,17 +25,17 @@ import {
 
 import { type AiApprovalListResponse, type AiApprovalResponse, AuthType } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import {
   AiApprovalListQueryDto,
   AiApprovalListResponseDto,
   AiApprovalResponseDto,
   DecideAiApprovalDto,
-} from '../dto/ai.dto'
+} from '../dto/ai.dto.js'
 
-import { AiApprovalService } from './ai-approval.service'
+import { AiApprovalService } from './ai-approval.service.js'
 
 /**
  * AI human-in-the-loop approval surface (Track C — ADR-054, Arc E.5), bearer-authenticated and

@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common'
-import Redis, { type RedisOptions } from 'ioredis'
+import { Redis, type RedisOptions } from 'ioredis'
 
-import { buildBullConnection } from '../queue/redis-connection.config'
+import { AppException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { buildBullConnection } from '../queue/redis-connection.config.js'
 
-import { CONTROL_LIMITS } from './control-limits'
-
-import { AppException } from '@/common/exceptions'
-import { EnvService } from '@/env/env.service'
+import { CONTROL_LIMITS } from './control-limits.js'
 
 /** Mutations must never inherit producer reconnect, offline buffering or automatic resends. */
 export function controlConnectionOptions(redisUrl: string): RedisOptions {

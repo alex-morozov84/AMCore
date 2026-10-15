@@ -3,12 +3,18 @@ import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import type { ZodType } from 'zod'
 
-import { endpointBinding, freezeAiModel } from '../registry/ai-execution-descriptor'
-import { AiModelRegistry } from '../registry/ai-model-registry.service'
-import type { ResolvedAiModel } from '../registry/ai-registry.types'
-import { AiUsageLedgerService } from '../usage/ai-usage-ledger.service'
+import { EnvService } from '../../../env/env.service.js'
+import {
+  type AiMetricsOperation,
+  type AiMetricsProvider,
+  MetricsService,
+} from '../../observability/index.js'
+import { endpointBinding, freezeAiModel } from '../registry/ai-execution-descriptor.js'
+import { AiModelRegistry } from '../registry/ai-model-registry.service.js'
+import type { ResolvedAiModel } from '../registry/ai-registry.types.js'
+import { AiUsageLedgerService } from '../usage/ai-usage-ledger.service.js'
 
-import { AiGatewayException } from './ai-gateway.error'
+import { AiGatewayException } from './ai-gateway.error.js'
 import {
   AI_PROVIDER_ADAPTERS,
   type AiAdapterCall,
@@ -17,17 +23,10 @@ import {
   type AiProviderAdapter,
   type AiTextResult,
   type AiUsage,
-} from './ai-gateway.types'
-import { AiCredentialResolver } from './credential-resolver'
-import { findUnsupportedMultimodalCapability } from './multimodal-capability'
-import { providerReceipt } from './provider-receipt'
-
-import { EnvService } from '@/env/env.service'
-import {
-  type AiMetricsOperation,
-  type AiMetricsProvider,
-  MetricsService,
-} from '@/infrastructure/observability'
+} from './ai-gateway.types.js'
+import { AiCredentialResolver } from './credential-resolver.js'
+import { findUnsupportedMultimodalCapability } from './multimodal-capability.js'
+import { providerReceipt } from './provider-receipt.js'
 
 /** Low-cardinality metric label: the lowercase wire form of the catalog provider type. */
 function providerLabel(model: ResolvedAiModel): AiMetricsProvider {

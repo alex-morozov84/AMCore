@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common'
 
-import { AppException } from './app.exception'
+import { AppException } from './app.exception.js'
 
 /**
  * Generic forbidden exception (403)

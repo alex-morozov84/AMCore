@@ -14,14 +14,15 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import type { Prisma, Role } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
-import { CapabilityRegistry } from './capability-registry.service'
-import { lockOrganization } from './organization-mutation-lock'
-import { OrganizationsService } from './organizations.service'
-import { fullControlTransition, recordRoleDefinition } from './role-definition-audit'
-import { presetKey } from './role-definition-classifier'
+import { CapabilityRegistry } from './capability-registry.service.js'
+import { lockOrganization } from './organization-mutation-lock.js'
+import { OrganizationsService } from './organizations.service.js'
+import { fullControlTransition, recordRoleDefinition } from './role-definition-audit.js'
+import { presetKey } from './role-definition-classifier.js'
 import {
   buildRoleDetail,
   isOversized,
@@ -29,7 +30,7 @@ import {
   projectionOversized,
   type RulePreflight,
   rulePreflight,
-} from './role-definition-detail'
+} from './role-definition-detail.js'
 import {
   assertAcknowledgments,
   assertNameBounds,
@@ -44,15 +45,13 @@ import {
   normalizeDescription,
   oversized,
   selfHolds,
-} from './role-definition-guards'
+} from './role-definition-guards.js'
 import {
   attachPreset,
   collectOrphans,
   detachAndCollect,
   planPresetChange,
-} from './role-definition-rules'
-
-import type { Prisma, Role } from '@/generated/prisma/client'
+} from './role-definition-rules.js'
 
 type Tx = Prisma.TransactionClient
 

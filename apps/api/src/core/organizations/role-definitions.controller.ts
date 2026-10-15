@@ -36,15 +36,15 @@ import {
   type SaveRoleDefinitionResponse,
 } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import { AppException } from '../../common/exceptions/index.js'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
+} from '../auth/organization-context/request-context-policy.js'
 
 import {
   CreateRoleDefinitionDto,
@@ -55,9 +55,9 @@ import {
   RoleDefinitionListResponseDto,
   SaveRoleDefinitionDto,
   SaveRoleDefinitionResponseDto,
-} from './dto/role-definition.dto'
-import { RoleDefinitionCommandService } from './role-definition-command.service'
-import { RoleDefinitionQueryService } from './role-definition-query.service'
+} from './dto/role-definition.dto.js'
+import { RoleDefinitionCommandService } from './role-definition-command.service.js'
+import { RoleDefinitionQueryService } from './role-definition-query.service.js'
 
 const unavailable = (): never => {
   throw new AppException(

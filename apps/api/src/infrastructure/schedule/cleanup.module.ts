@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common'
 
-import { InvitationAuthorityModule } from '../../core/invitations/invitation-authority.module'
+import { InvitationAuthorityModule } from '../../core/invitations/invitation-authority.module.js'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { CleanupService } from './cleanup.service'
-import { SingletonCronRunner } from './singleton-cron.runner'
-
-import { PrismaModule } from '@/prisma'
+import { CleanupService } from './cleanup.service.js'
+import { SingletonCronRunner } from './singleton-cron.runner.js'
 
 /**
  * Cleanup logic (ADR-041): provides `CleanupService` (and the reusable

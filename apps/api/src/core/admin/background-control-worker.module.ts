@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
 
-import { BackgroundControlModule } from './background-control.module'
-import { BackgroundControlMaintenance } from './background-control-maintenance'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { PrismaModule } from '@/prisma'
+import { BackgroundControlModule } from './background-control.module.js'
+import { BackgroundControlMaintenance } from './background-control-maintenance.js'
 
 @Module({
   imports: [PrismaModule, BackgroundControlModule],

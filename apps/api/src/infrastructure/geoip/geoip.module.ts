@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { GeoIpService } from './geoip.service'
+import { GeoIpService } from './geoip.service.js'
 
 /** Read-only lookup available in every process; updates belong to worker/all. */
 @Module({ providers: [GeoIpService], exports: [GeoIpService] })

@@ -5,12 +5,12 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { NotificationSseReason } from '@amcore/shared'
 
-import { composeRealtimeChannel } from './notification-realtime.constants'
-import type { NotificationRealtimeEnvelope } from './notification-realtime.schema'
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
 
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
+import { composeRealtimeChannel } from './notification-realtime.constants.js'
+import type { NotificationRealtimeEnvelope } from './notification-realtime.schema.js'
 
 /**
  * Publishes the disposable realtime invalidation hint (ADR-053) to the

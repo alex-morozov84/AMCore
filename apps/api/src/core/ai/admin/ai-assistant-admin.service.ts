@@ -11,19 +11,18 @@ import type {
   UpdateAiAssistantInput,
 } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../../common/exceptions'
-import { AuditLogService } from '../../audit'
-
-import { toAiAssistantResponse } from './ai-assistant-admin.mapper'
-
+import { ConflictException, NotFoundException } from '../../../common/exceptions/index.js'
 import {
   type AiAssistant,
   AuditActorType,
   AuditTargetType,
   Prisma,
-} from '@/generated/prisma/client'
-import { type AiMetricsAssistantAdminAction, MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+} from '../../../generated/prisma/client.js'
+import { type AiMetricsAssistantAdminAction, MetricsService } from '../../../infrastructure/observability/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { AuditLogService } from '../../audit/index.js'
+
+import { toAiAssistantResponse } from './ai-assistant-admin.mapper.js'
 
 /** Which bounded audit action + metric a mutation records. */
 type AssistantAdminAction =

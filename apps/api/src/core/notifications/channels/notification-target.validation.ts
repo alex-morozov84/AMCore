@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-import type { ResolvedDeliveryTarget } from './channel-target-resolver.types'
+import { strictJson } from '../../../common/utils/strict-json.js'
 
-import { strictJson } from '@/common/utils/strict-json'
+import type { ResolvedDeliveryTarget } from './channel-target-resolver.types.js'
 
 const targetSchema = z
   .object({

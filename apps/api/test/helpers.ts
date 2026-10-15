@@ -319,6 +319,7 @@ export async function cleanDatabase(
   await prisma.aiArtifact.deleteMany()
   await prisma.aiApproval.deleteMany()
   await prisma.aiMessage.deleteMany()
+  await prisma.aiRun.deleteMany({ where: { retryOfRunId: { not: null } } })
   await prisma.aiRun.deleteMany()
   await prisma.aiConversation.deleteMany()
   await prisma.aiAssistant.deleteMany()

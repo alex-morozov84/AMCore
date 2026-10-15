@@ -158,6 +158,11 @@ export const workListWireQuerySchema = z.preprocess((input) => {
 }, workListQuerySchema)
 export type WorkListQuery = z.infer<typeof workListQuerySchema>
 
+const workCountSchema = z.strictObject({
+  value: z.number().int().min(0).max(10000),
+  truncated: z.boolean(),
+})
+
 export const workSummarySchema = z.strictObject({
   id: adminQueueNameSchema,
   kind: z.enum(['ordinary', 'wake', 'external', 'durable']),
@@ -167,10 +172,15 @@ export const workSummarySchema = z.strictObject({
   revision: workRevisionSchema.optional(),
   epoch: z.uuid().optional(),
   counts: z
-    .record(
-      z.enum(['pending', 'due', 'processing', 'failed', 'terminal', 'unresolved']),
-      z.strictObject({ value: z.number().int().min(0).max(10000), truncated: z.boolean() })
-    )
+    .strictObject({
+      pending: workCountSchema,
+      due: workCountSchema,
+      processing: workCountSchema,
+      failed: workCountSchema,
+      terminal: workCountSchema,
+      unresolved: workCountSchema,
+      completed: workCountSchema.optional(),
+    })
     .optional(),
   paused: z.boolean().optional(),
   providerEvidence: z.boolean().optional(),
@@ -214,6 +224,7 @@ const workJobFieldsSchema = z.strictObject({
     })
     .optional(),
   nativeState: z.string().max(64).optional(),
+  cancellationRequestedAt: z.iso.datetime().optional(),
   nextAttemptAt: z.iso.datetime().optional(),
   projection: z.record(
     z.string().max(64),
@@ -235,6 +246,16 @@ export const workAttemptHistorySchema = z.strictObject({
             'transient_failure',
             'permanent_failure',
             'abandoned',
+            'succeeded',
+            'retry_scheduled',
+            'failed',
+            'cancelled',
+            'expired',
+            'superseded',
+            'awaiting_approval',
+            'lease_lost',
+            'reaped',
+            'effect_unknown',
           ]),
           certainty: z.enum(['none', 'accepted', 'unknown']),
           reason: z.string().max(64).optional(),

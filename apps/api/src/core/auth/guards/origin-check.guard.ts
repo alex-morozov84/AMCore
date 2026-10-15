@@ -3,8 +3,8 @@ import type { Request } from 'express'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
-import { EnvService } from '../../../env/env.service'
+import { AppException } from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
 
 @Injectable()
 export class OriginCheckGuard implements CanActivate {

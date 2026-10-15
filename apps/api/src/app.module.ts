@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { appProviders, coreImports, webImports, workerImports } from './app-imports'
+import { appProviders, coreImports, webImports, workerImports } from './app-imports.js'
 
 /**
  * Root module for `PROCESS_ROLE=all` (dev / single-node): HTTP API + BullMQ

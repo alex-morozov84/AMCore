@@ -1,4 +1,4 @@
-import type { Permission, Prisma, Role } from '@/generated/prisma/client'
+import type { Permission, Prisma, Role } from '../../generated/prisma/client.js'
 
 /** Same safe-role filtering and complete payload for cache fills and locked writes. */
 export async function memberPermissionSnapshot(

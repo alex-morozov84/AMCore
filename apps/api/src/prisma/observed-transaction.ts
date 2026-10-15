@@ -1,10 +1,10 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import type { Pool } from 'pg'
 
-import { ObservedPgAdapter, PhysicalTransaction } from './observed-pg-adapter'
-import { observedPgPool } from './observed-pg-pool'
+import { type Prisma, PrismaClient } from '../generated/prisma/client.js'
 
-import { type Prisma, PrismaClient } from '@/generated/prisma/client'
+import { ObservedPgAdapter, PhysicalTransaction } from './observed-pg-adapter.js'
+import { observedPgPool } from './observed-pg-pool.js'
 
 export interface ObservedTransactionResult<T> {
   result: Promise<T>

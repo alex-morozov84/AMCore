@@ -22,35 +22,34 @@ import {
   parseSupportedLocale,
 } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { EnvService } from '../../env/env.service'
-import { EmailService } from '../../infrastructure/email'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import { AppException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { AuditActorType, AuditTargetType, type User } from '../../generated/prisma/client.js'
+import { EmailService } from '../../infrastructure/email/index.js'
+import { StorageService } from '../../infrastructure/storage/index.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 import {
   type InvitationHandoffProof,
   lockInvitationAuthAttempt,
-} from '../invitations/invitation-auth-handoff'
-import { InvitationContinuationService } from '../invitations/invitation-continuation.service'
-import { invitationCredentialHint } from '../invitations/invitation-credential'
+} from '../invitations/invitation-auth-handoff.js'
+import { InvitationContinuationService } from '../invitations/invitation-continuation.service.js'
+import { invitationCredentialHint } from '../invitations/invitation-credential.js'
 import {
   invalidInvitation,
   invitationClock,
   lockInvitationSignupEmail,
   lockInvitationUser,
-} from '../invitations/invitation-locks'
-import { NotificationsService } from '../notifications/notifications.service'
+} from '../invitations/invitation-locks.js'
+import { NotificationsService } from '../notifications/notifications.service.js'
 
-import { avatarUrlOf } from './avatar-url'
-import { EmailIdentityService } from './email-identity.service'
-import { LoginRateLimiterService } from './login-rate-limiter.service'
-import { SessionService } from './session.service'
-import { TokenService } from './token.service'
-import { TokenManagerService } from './token-manager.service'
-import { UserCacheService } from './user-cache.service'
-
-import { AuditActorType, AuditTargetType, type User } from '@/generated/prisma/client'
-import { StorageService } from '@/infrastructure/storage'
+import { avatarUrlOf } from './avatar-url.js'
+import { EmailIdentityService } from './email-identity.service.js'
+import { LoginRateLimiterService } from './login-rate-limiter.service.js'
+import { SessionService } from './session.service.js'
+import { TokenService } from './token.service.js'
+import { TokenManagerService } from './token-manager.service.js'
+import { UserCacheService } from './user-cache.service.js'
 
 export interface AuthResult {
   user: UserResponse

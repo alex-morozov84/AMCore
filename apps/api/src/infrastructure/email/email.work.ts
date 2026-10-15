@@ -1,7 +1,7 @@
-import { defineOrdinaryWork } from '../background-work/work-definition'
-import { JobName, QueueName } from '../queue/constants/queues.constant'
+import { defineOrdinaryWork } from '../background-work/work-definition.js'
+import { JobName, QueueName } from '../queue/constants/queues.constant.js'
 
-import { type SendEmailJobData, sendEmailJobDataSchema } from './email.schema'
+import { type SendEmailJobData, sendEmailJobDataSchema } from './email.schema.js'
 
 export const emailWork = defineOrdinaryWork({
   id: 'email',

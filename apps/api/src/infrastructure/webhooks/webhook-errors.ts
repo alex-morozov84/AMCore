@@ -1,8 +1,8 @@
 import { HttpStatus } from '@nestjs/common'
 
-import type { WebhookFailureReason } from './webhook.types'
+import { AppException } from '../../common/exceptions/index.js'
 
-import { AppException } from '@/common/exceptions'
+import type { WebhookFailureReason } from './webhook.types.js'
 
 const WEBHOOK_STATUS: Record<WebhookFailureReason, HttpStatus> = {
   WEBHOOK_SIGNATURE_INVALID: HttpStatus.UNAUTHORIZED,

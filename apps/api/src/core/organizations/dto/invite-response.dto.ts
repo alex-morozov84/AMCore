@@ -4,7 +4,7 @@ import {
   inviteResponseSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /**
  * Response DTOs for the pending-invite surface (OB-02).

@@ -1,4 +1,4 @@
-export { AttemptRuntime } from './attempt-runtime'
-export { CapacityGate } from './capacity-gate'
-export { guardTransactionClient, ShutdownCutoffError } from './guarded-transaction-client'
-export { CUTOFF, type Cutoff, ShutdownLatch, type TransactionRunner } from './shutdown-latch'
+export { AttemptRuntime } from './attempt-runtime.js'
+export { CapacityGate } from './capacity-gate.js'
+export { guardTransactionClient, ShutdownCutoffError } from './guarded-transaction-client.js'
+export { CUTOFF, type Cutoff, ShutdownLatch, type TransactionRunner } from './shutdown-latch.js'

@@ -2,15 +2,15 @@ import { Inject, Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
+import { AI_APPROVAL_EXPIRY_BATCH_LIMIT } from '../../../core/ai/ai-run.constants.js'
+import { ApprovalRaceError, expireApproval } from '../../../core/ai/approvals/ai-approval-expiry.js'
+import { AuditLogService } from '../../../core/audit/index.js'
+import { Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { MetricsService } from '../../observability/index.js'
+import { CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
 
-import { AI_APPROVAL_EXPIRY_BATCH_LIMIT } from '@/core/ai/ai-run.constants'
-import { ApprovalRaceError, expireApproval } from '@/core/ai/approvals/ai-approval-expiry'
-import { AuditLogService } from '@/core/audit'
-import { Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
-import { PrismaService } from '@/prisma'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
 
 /** One due approval claimed by the sweep (its run is guaranteed `WAITING_APPROVAL` by the query). */
 interface DueApprovalRow {

@@ -1,4 +1,4 @@
-import type { StorageService } from '@/infrastructure/storage'
+import type { StorageService } from '../../infrastructure/storage/index.js'
 
 /**
  * The public URL of a stored avatar key, or `null` for no avatar. The database keeps only the

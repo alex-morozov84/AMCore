@@ -11,18 +11,17 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
-import { ServiceUnavailableException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { invitationDefaultRole } from '../invitations/invitation-role-intent'
+import { ServiceUnavailableException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { invitationDefaultRole } from '../invitations/invitation-role-intent.js'
 
-import type { InvitationActor } from './invitation-actor'
-import { InvitationAuthorization } from './invitation-authorization'
-import { invitationClock } from './invitation-locks'
-import { INVITATION_RETENTION_MS, parseInvitationOperationId } from './invitation-operation'
-import { invitationFailure } from './invitation-transaction'
-import { assignableRolesWhere, isRoleAssignable } from './role-assignability-policy'
-
-import type { Prisma } from '@/generated/prisma/client'
+import type { InvitationActor } from './invitation-actor.js'
+import { InvitationAuthorization } from './invitation-authorization.js'
+import { invitationClock } from './invitation-locks.js'
+import { INVITATION_RETENTION_MS, parseInvitationOperationId } from './invitation-operation.js'
+import { invitationFailure } from './invitation-transaction.js'
+import { assignableRolesWhere, isRoleAssignable } from './role-assignability-policy.js'
 
 const roleProjection = { id: true, name: true, description: true, isSystem: true } as const
 @Injectable()

@@ -1,11 +1,9 @@
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { createRequire } from 'node:module'
+import configuration from '../../apps/api/jest-e2e.config.js'
 import { api, root, jest } from '../api-e2e/paths.mjs'
 import { supervise, readRows } from '../api-e2e/process.mjs'
 
-const require = createRequire(join(api, 'package.json'))
-const configuration = require(join(api, 'jest-e2e.config.js'))
 const output = join(root, '.amcore/j-lifecycle')
 
 export async function exercise(id, body) {

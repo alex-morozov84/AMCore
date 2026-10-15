@@ -1,6 +1,10 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService } from '../observability/index.js'
+import { METRIC_NAMES } from '../observability/metrics.constants.js'
+
 import {
   canaryKeys,
   checkPublicDelivery,
@@ -9,14 +13,10 @@ import {
   type PublicCheckResult,
   type PublicCheckStage,
   type PublicDeliveryDeps,
-} from './public-delivery-check'
-import { STORAGE_PROVIDER } from './storage.constants'
-import type { StorageProvider } from './storage.interface'
-import { ANONYMOUS_READ, type AnonymousRead } from './storage-anonymous-read'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { METRIC_NAMES } from '@/infrastructure/observability/metrics.constants'
+} from './public-delivery-check.js'
+import { STORAGE_PROVIDER } from './storage.constants.js'
+import type { StorageProvider } from './storage.interface.js'
+import { ANONYMOUS_READ, type AnonymousRead } from './storage-anonymous-read.js'
 
 export type PublicCheckState = 'healthy' | 'failed' | 'unknown' | 'stale' | 'off'
 export type PublicCheckOffReason = 'local_driver' | 'memory_driver' | 'disabled' | 'worker_process'

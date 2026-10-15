@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { encodeSetting } from './setting-codec'
-import type { SettingDefinition } from './setting-definition'
+import { encodeSetting } from './setting-codec.js'
+import type { SettingDefinition } from './setting-definition.js'
 export const SETTING_DEFINITIONS = Symbol('SETTING_DEFINITIONS')
 
 @Injectable()

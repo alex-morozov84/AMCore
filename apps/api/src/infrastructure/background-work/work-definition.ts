@@ -9,7 +9,7 @@ import {
   workPresentationSchema,
 } from '@amcore/shared'
 
-import type { PayloadVersion } from './work-payload'
+import type { PayloadVersion } from './work-payload.js'
 
 export type WorkKind = 'ordinary' | 'wake' | 'external' | 'durable'
 export type ReplayPolicy =

@@ -13,20 +13,8 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
-} from '../../../common/exceptions'
-import { AI_APPROVAL_LIST_LIMIT } from '../ai-run.constants'
-import { lockRun, runIdOfApproval } from '../ai-run-locks'
-import type { AiRunWakeJob } from '../runs/ai-run-producer.service'
-
-import {
-  type AiApprovalWithTool,
-  APPROVAL_TOOL_SELECT,
-  toAiApprovalResponse,
-} from './ai-approval.mapper'
-import { ApprovalRaceError, expireApproval } from './ai-approval-expiry'
-
-import { canonicalJsonEqual } from '@/common/utils/canonical-json'
-import { AuditLogService } from '@/core/audit'
+} from '../../../common/exceptions/index.js'
+import { canonicalJsonEqual } from '../../../common/utils/canonical-json.js'
 import {
   AiApprovalState,
   AiRunStatus,
@@ -34,13 +22,24 @@ import {
   AuditActorType,
   AuditTargetType,
   Prisma,
-} from '@/generated/prisma/client'
-import { AiToolContractRegistry } from '@/infrastructure/ai/tools/ai-tool-contract.registry'
-import { readToolIntent } from '@/infrastructure/ai/tools/ai-tool-intent'
-import { MetricsService } from '@/infrastructure/observability'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
-import { QueueService } from '@/infrastructure/queue/queue.service'
-import { PrismaService } from '@/prisma'
+} from '../../../generated/prisma/client.js'
+import { AiToolContractRegistry } from '../../../infrastructure/ai/tools/ai-tool-contract.registry.js'
+import { readToolIntent } from '../../../infrastructure/ai/tools/ai-tool-intent.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { JobName, QueueName } from '../../../infrastructure/queue/constants/queues.constant.js'
+import { QueueService } from '../../../infrastructure/queue/queue.service.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { AuditLogService } from '../../audit/index.js'
+import { AI_APPROVAL_LIST_LIMIT } from '../ai-run.constants.js'
+import { lockRun, runIdOfApproval } from '../ai-run-locks.js'
+import type { AiRunWakeJob } from '../runs/ai-run-producer.service.js'
+
+import {
+  type AiApprovalWithTool,
+  APPROVAL_TOOL_SELECT,
+  toAiApprovalResponse,
+} from './ai-approval.mapper.js'
+import { ApprovalRaceError, expireApproval } from './ai-approval-expiry.js'
 
 /** Row of the `FOR UPDATE OF a, r` lock join (enum columns cast to text for JS comparison). */
 interface ApprovalLockRow {

@@ -1,6 +1,6 @@
 import type { WorkReason } from '@amcore/shared'
 
-import type { NotificationDelivery, Prisma } from '@/generated/prisma/client'
+import type { NotificationDelivery, Prisma } from '../../../generated/prisma/client.js'
 
 export interface NotificationControlTarget {
   readonly channel: string

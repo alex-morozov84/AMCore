@@ -1,4 +1,4 @@
-import type { ImageDerivativeSpec, SourcePolicy } from '../media.types'
+import type { ImageDerivativeSpec, SourcePolicy } from '../media.types.js'
 
 /**
  * Avatar derivative set. Square `cover` WebP at three densities (1x/2x/4x of a

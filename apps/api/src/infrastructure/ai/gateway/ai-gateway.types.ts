@@ -1,11 +1,10 @@
 import type { ZodType } from 'zod'
 
-import type { AiExecutionDescriptor } from '../registry/ai-execution-descriptor'
-import type { ResolvedAiModel } from '../registry/ai-registry.types'
+import type { AiProviderType } from '../../../generated/prisma/client.js'
+import type { AiExecutionDescriptor } from '../registry/ai-execution-descriptor.js'
+import type { ResolvedAiModel } from '../registry/ai-registry.types.js'
 
-import type { AiProviderReceipt } from './provider-receipt'
-
-import type { AiProviderType } from '@/generated/prisma/client'
+import type { AiProviderReceipt } from './provider-receipt.js'
 
 /**
  * Gateway request/result contracts (Track C — ADR-054, Arc B). The cross-provider common

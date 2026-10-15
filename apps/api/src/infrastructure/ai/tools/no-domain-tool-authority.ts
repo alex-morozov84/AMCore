@@ -1,8 +1,8 @@
 import { Injectable, Module } from '@nestjs/common'
 
-import type { AiToolAuthority, AiToolIntent } from './ai-tool.types'
+import type { Prisma } from '../../../generated/prisma/client.js'
 
-import type { Prisma } from '@/generated/prisma/client'
+import type { AiToolAuthority, AiToolIntent } from './ai-tool.types.js'
 
 /** Explicit authority for the reference read-only tool that touches no domain resource. */
 @Injectable()

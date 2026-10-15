@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
-import { SCRIPT_PROVENANCE } from './scripts/script-provenance'
+import { SCRIPT_PROVENANCE } from './scripts/script-provenance.js'
 
 export interface ScriptSourceReader {
   readonly version: string

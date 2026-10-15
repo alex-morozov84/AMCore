@@ -1,6 +1,9 @@
 import type { Queue } from 'bullmq'
 
-import type { ManagedJobIdentity, ManagedJobOptions } from '../../background-work/managed-producer'
+import type {
+  ManagedJobIdentity,
+  ManagedJobOptions,
+} from '../../background-work/managed-producer.js'
 
 /** Compatibility facade. New producers inject their definition's typed producer token. */
 export interface IQueueService {

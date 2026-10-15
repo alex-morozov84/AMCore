@@ -8,45 +8,45 @@ import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
 import { v4 as uuidv4 } from 'uuid'
 
-import { BACKGROUND_WORK } from './background-work.composition'
-import { createLoggingConfig } from './common/config'
+import { BACKGROUND_WORK } from './background-work.composition.js'
+import { createLoggingConfig } from './common/config/index.js'
 import {
   AllExceptionsFilter,
   HttpExceptionFilter,
   PrismaClientExceptionFilter,
-} from './common/exceptions/filters'
-import { SchemaResponseInterceptor } from './common/schemas/schema-response.interceptor'
-import { createSchemaValidationPipe } from './common/schemas/schema-validation'
-import { anonymizeIp, getClientIp } from './common/utils'
-import { AdminModule } from './core/admin/admin.module'
-import { AiWebModule } from './core/ai/ai-web.module'
-import { AuthModule } from './core/auth/auth.module'
-import { NotificationsModule } from './core/notifications/notifications.module'
-import { NotificationsWebModule } from './core/notifications/notifications-web.module'
-import { OrganizationsModule } from './core/organizations/organizations.module'
-import { envConfigOptions } from './env/env.config'
-import { EnvModule } from './env/env.module'
-import { EnvService } from './env/env.service'
-import { HealthModule } from './health'
-import { AiCatalogModule } from './infrastructure/ai/ai-catalog.module'
+} from './common/exceptions/filters/index.js'
+import { SchemaResponseInterceptor } from './common/schemas/schema-response.interceptor.js'
+import { createSchemaValidationPipe } from './common/schemas/schema-validation.js'
+import { anonymizeIp, getClientIp } from './common/utils/index.js'
+import { AdminModule } from './core/admin/admin.module.js'
+import { AiWebModule } from './core/ai/ai-web.module.js'
+import { AuthModule } from './core/auth/auth.module.js'
+import { NotificationsModule } from './core/notifications/notifications.module.js'
+import { NotificationsWebModule } from './core/notifications/notifications-web.module.js'
+import { OrganizationsModule } from './core/organizations/organizations.module.js'
+import { envConfigOptions } from './env/env.config.js'
+import { EnvModule } from './env/env.module.js'
+import { EnvService } from './env/env.service.js'
+import { HealthModule } from './health/index.js'
+import { AiCatalogModule } from './infrastructure/ai/ai-catalog.module.js'
 import {
   composeBackgroundWork,
   type WorkProcessRole,
-} from './infrastructure/background-work/compose-background-work'
-import type { WorkRegistration } from './infrastructure/background-work/work-definition'
-import { EmailModule } from './infrastructure/email/email.module'
-import { IdempotencyModule } from './infrastructure/idempotency'
-import { ObservabilityModule } from './infrastructure/observability'
-import { QueueModule } from './infrastructure/queue'
-import { BullBoardHttpModule } from './infrastructure/queue/dashboard/bull-board-http.module'
-import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis'
-import { ScheduleModule } from './infrastructure/schedule/schedule.module'
-import { SettingsModule } from './infrastructure/settings/settings.module'
-import { StorageModule, StoragePublicModule } from './infrastructure/storage'
-import { ThrottlingModule } from './infrastructure/throttling'
-import { WebhooksModule } from './infrastructure/webhooks'
-import { PrismaModule } from './prisma'
-import { ShutdownService } from './shutdown.service'
+} from './infrastructure/background-work/compose-background-work.js'
+import type { WorkRegistration } from './infrastructure/background-work/work-definition.js'
+import { EmailModule } from './infrastructure/email/email.module.js'
+import { IdempotencyModule } from './infrastructure/idempotency/index.js'
+import { ObservabilityModule } from './infrastructure/observability/index.js'
+import { BullBoardHttpModule } from './infrastructure/queue/dashboard/bull-board-http.module.js'
+import { QueueModule } from './infrastructure/queue/index.js'
+import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis/index.js'
+import { ScheduleModule } from './infrastructure/schedule/schedule.module.js'
+import { SettingsModule } from './infrastructure/settings/settings.module.js'
+import { StorageModule, StoragePublicModule } from './infrastructure/storage/index.js'
+import { ThrottlingModule } from './infrastructure/throttling/index.js'
+import { WebhooksModule } from './infrastructure/webhooks/index.js'
+import { PrismaModule } from './prisma/index.js'
+import { ShutdownService } from './shutdown.service.js'
 
 type Imports = NonNullable<ModuleMetadata['imports']>
 
@@ -201,10 +201,10 @@ export const webImports: Imports = [
  */
 export function workerImports(): Imports {
   return [
-    import('./core/admin/background-control-worker.module').then(
+    import('./core/admin/background-control-worker.module.js').then(
       ({ BackgroundControlWorkerModule }) => ({ module: BackgroundControlWorkerModule })
     ),
-    import('./infrastructure/queue/queue-metrics.module').then(({ QueueMetricsModule }) => ({
+    import('./infrastructure/queue/queue-metrics.module.js').then(({ QueueMetricsModule }) => ({
       module: QueueMetricsModule,
     })),
     ScheduleModule,

@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common'
 
 import { type RequestPrincipal, type SystemRole as Role, SystemRole } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../common/exceptions'
+import { UnauthorizedException } from '../../common/exceptions/index.js'
 
-import { PrivilegedRoleService } from './privileged-role.service'
+import { PrivilegedRoleService } from './privileged-role.service.js'
 
 /** Request-local evidence; original credential facts never become effective grants. */
 export interface PrivilegedAdmission {

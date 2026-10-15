@@ -3,13 +3,12 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 
 import { AuthErrorCode, type RequestPrincipal } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { AppException } from '../../common/exceptions/index.js'
+import type { InvitationAuthHandoff, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { equalHandoffKey, type InvitationHandoffProof } from './invitation-auth-handoff'
-import { invitationClock } from './invitation-locks'
-
-import type { InvitationAuthHandoff, Prisma } from '@/generated/prisma/client'
+import { equalHandoffKey, type InvitationHandoffProof } from './invitation-auth-handoff.js'
+import { invitationClock } from './invitation-locks.js'
 
 @Injectable()
 export class InvitationAuthHandoffService {

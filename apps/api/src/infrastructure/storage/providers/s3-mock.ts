@@ -26,7 +26,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { mockClient } from 'aws-sdk-client-mock'
 
-import { bufferFromBody } from './body.util'
+import { bufferFromBody } from './body.util.js'
 
 interface StoredObject {
   body: Buffer

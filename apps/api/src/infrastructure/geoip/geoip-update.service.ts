@@ -6,11 +6,11 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { open } from 'maxmind'
 import { PinoLogger } from 'nestjs-pino'
 
-import { EnvService } from '../../env/env.service'
-import { SingletonCronRunner } from '../schedule/singleton-cron.runner'
+import { EnvService } from '../../env/env.service.js'
+import { SingletonCronRunner } from '../schedule/singleton-cron.runner.js'
 
-import { GeoIpService } from './geoip.service'
-import { buildDbIpDownloadUrl, currentEdition, downloadToFile } from './geoip-download'
+import { GeoIpService } from './geoip.service.js'
+import { buildDbIpDownloadUrl, currentEdition, downloadToFile } from './geoip-download.js'
 
 const LOCK_KEY = 'amcore:schedule:geoip:lock'
 // Bounded task deadline, kept comfortably shorter than the lock TTL below so a

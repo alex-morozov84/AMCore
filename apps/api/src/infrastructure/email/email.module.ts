@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { EmailService } from './email.service'
-import type { EmailProvider } from './email.types'
-import { MockEmailProvider } from './providers/mock.provider'
-import { ResendEmailProvider } from './providers/resend.provider'
+import { EnvModule } from '../../env/env.module.js'
+import { EnvService } from '../../env/env.service.js'
+import { ControlConnection } from '../background-work/control-connection.js'
+import { MetricsService, ObservabilityModule } from '../observability/index.js'
+import { QueueModule, QueueService } from '../queue/index.js'
 
-import { EnvModule } from '@/env/env.module'
-import { EnvService } from '@/env/env.service'
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
-import { MetricsService, ObservabilityModule } from '@/infrastructure/observability'
-import { QueueModule, QueueService } from '@/infrastructure/queue'
+import { EmailService } from './email.service.js'
+import type { EmailProvider } from './email.types.js'
+import { MockEmailProvider } from './providers/mock.provider.js'
+import { ResendEmailProvider } from './providers/resend.provider.js'
 
 /**
  * Email Module

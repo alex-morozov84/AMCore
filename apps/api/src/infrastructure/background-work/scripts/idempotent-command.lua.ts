@@ -1,6 +1,6 @@
-import { HORIZON_CHECK_OVERHEAD_MS, PROVIDER_WINDOW_CLOCK } from '../provider-window-clock'
+import { HORIZON_CHECK_OVERHEAD_MS, PROVIDER_WINDOW_CLOCK } from '../provider-window-clock.js'
 
-import { JOB_MEMBERSHIP_GUARD_LUA } from './job-membership.lua'
+import { JOB_MEMBERSHIP_GUARD_LUA } from './job-membership.lua.js'
 
 /**
  * Standalone narrowed transitions from BullMQ 6.3.11 reprocessJob/removeJob (MIT).

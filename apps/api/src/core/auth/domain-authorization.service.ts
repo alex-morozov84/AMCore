@@ -3,14 +3,13 @@ import { Injectable } from '@nestjs/common'
 
 import { Action, Subject } from '@amcore/shared'
 
-import { ForbiddenException } from '../../common/exceptions'
+import { ForbiddenException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
 
-import { OWN_USER_READ_FIELDS, OWN_USER_UPDATE_FIELDS } from './casl/org-role-defaults'
-import { normalizeOwnerPermissions } from './casl/permission-normalization'
-import { createPrismaAbility } from './casl/prisma-ability'
-import { memberPermissionSnapshot } from './member-permission-snapshot'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { OWN_USER_READ_FIELDS, OWN_USER_UPDATE_FIELDS } from './casl/org-role-defaults.js'
+import { normalizeOwnerPermissions } from './casl/permission-normalization.js'
+import { createPrismaAbility } from './casl/prisma-ability.js'
+import { memberPermissionSnapshot } from './member-permission-snapshot.js'
 
 /** Primary, transaction-aware domain rights. No HTTP admission or privileged-role synthesis. */
 @Injectable()

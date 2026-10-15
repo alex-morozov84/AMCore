@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { AiRunRealtimePublisher } from './ai-run-realtime.publisher'
+import { AiRunRealtimePublisher } from './ai-run-realtime.publisher.js'
 
 /**
  * AI realtime publisher module (Track C — ADR-054, Arc C.5; ADR-053 pattern). Provides and exports

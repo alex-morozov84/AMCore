@@ -3,21 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { AiTextResult } from '../gateway/ai-gateway.types'
-import type { AiTool } from '../tools/ai-tool.types'
-import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
-import { prepareToolIntent, toolIntentData } from '../tools/ai-tool-intent'
-
-import { AiRunRepository } from './ai-run.repository'
-import type { ClaimedRun } from './ai-run-dispatch.types'
-import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service'
-import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence'
-import type { RunPlan } from './ai-run-plan'
-import { applyStop } from './ai-run-transitions.service'
-import { findByOrigin, providerCallCount } from './ai-tool-invocation.store'
-
-import { AuditLogService } from '@/core/audit'
-import { EnvService } from '@/env/env.service'
+import { AuditLogService } from '../../../core/audit/index.js'
+import { EnvService } from '../../../env/env.service.js'
 import {
   AiApprovalKind,
   AiApprovalState,
@@ -25,8 +12,20 @@ import {
   AuditActorType,
   AuditTargetType,
   Prisma,
-} from '@/generated/prisma/client'
-import { type AiMetricsToolRiskClass, MetricsService } from '@/infrastructure/observability'
+} from '../../../generated/prisma/client.js'
+import { type AiMetricsToolRiskClass, MetricsService } from '../../observability/index.js'
+import type { AiTextResult } from '../gateway/ai-gateway.types.js'
+import type { AiTool } from '../tools/ai-tool.types.js'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry.js'
+import { prepareToolIntent, toolIntentData } from '../tools/ai-tool-intent.js'
+
+import { AiRunRepository } from './ai-run.repository.js'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
+import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service.js'
+import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence.js'
+import type { RunPlan } from './ai-run-plan.js'
+import { applyStop } from './ai-run-transitions.service.js'
+import { findByOrigin, providerCallCount } from './ai-tool-invocation.store.js'
 
 /** What parking resolved to: parked behind an approval, run terminalized (stop cause), or nothing written. */
 export type ParkOutcome = 'parked' | 'terminal' | 'exit'

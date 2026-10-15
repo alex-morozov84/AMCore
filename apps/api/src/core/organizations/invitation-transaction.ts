@@ -1,1 +1,1 @@
-export { invitationFailure, invitationTransaction } from '../invitations/invitation-transaction'
+export { invitationFailure, invitationTransaction } from '../invitations/invitation-transaction.js'

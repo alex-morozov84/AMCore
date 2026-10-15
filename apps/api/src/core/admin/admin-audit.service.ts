@@ -7,15 +7,14 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { BadRequestException } from '../../common/exceptions'
-import { EnvService } from '../../env/env.service'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import { BadRequestException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { AuditActorType, AuditCategory, type Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
-import { AuditCursorCodec } from './audit-cursor'
-import { projectAuditRow, safeAuditId } from './audit-projection'
-
-import { AuditActorType, AuditCategory, type Prisma } from '@/generated/prisma/client'
+import { AuditCursorCodec } from './audit-cursor.js'
+import { projectAuditRow, safeAuditId } from './audit-projection.js'
 
 const SELECT = {
   id: true,

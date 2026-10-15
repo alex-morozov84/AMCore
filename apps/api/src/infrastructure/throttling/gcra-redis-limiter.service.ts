@@ -1,19 +1,19 @@
 import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { MetricsService } from '../observability'
-import { REDIS_CLIENT } from '../redis/redis.constants'
-import type { AppRedisClient } from '../redis/redis-connection.service'
+import { MetricsService } from '../observability/index.js'
+import { REDIS_CLIENT } from '../redis/redis.constants.js'
+import type { AppRedisClient } from '../redis/redis-connection.service.js'
 
 import {
   DEGRADE_LOG_INTERVAL_MS,
   GCRA_SCRIPT,
   KEY_PREFIX,
   REDIS_CALL_TIMEOUT_MS,
-} from './gcra.constants'
-import { GcraMemoryLimiter } from './gcra-memory-limiter'
-import type { RateLimitDecision, RateLimiter } from './rate-limit-decision'
-import { type RateLimitPolicy, resolveBurst } from './rate-limit-policies'
+} from './gcra.constants.js'
+import { GcraMemoryLimiter } from './gcra-memory-limiter.js'
+import type { RateLimitDecision, RateLimiter } from './rate-limit-decision.js'
+import { type RateLimitPolicy, resolveBurst } from './rate-limit-policies.js'
 
 /**
  * Redis-backed GCRA limiter (ADR-039/ADR-073) — the global rate-limit

@@ -2,12 +2,11 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { staleTerminalApiKeyWhere } from '../../core/api-keys/api-key-lifecycle'
-import { InvitationRetentionService } from '../../core/invitations/invitation-retention.service'
+import { staleTerminalApiKeyWhere } from '../../core/api-keys/api-key-lifecycle.js'
+import { InvitationRetentionService } from '../../core/invitations/invitation-retention.service.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { SingletonCronRunner } from './singleton-cron.runner'
-
-import { PrismaService } from '@/prisma'
+import { SingletonCronRunner } from './singleton-cron.runner.js'
 
 /** Record types swept by cleanup; also the identifiers used in `failures`. */
 export type CleanupRecordType =

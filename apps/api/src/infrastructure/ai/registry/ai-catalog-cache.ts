@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import type { AppRedisClient } from '@/infrastructure/redis'
+import type { AppRedisClient } from '../../redis/index.js'
 
 const KEYS = ['ai:{catalog-v2}:generation', 'ai:{catalog-v2}:data']
 const PROBE =

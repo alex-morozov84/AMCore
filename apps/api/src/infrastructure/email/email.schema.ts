@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 import { SUPPORTED_LOCALES } from '@amcore/shared'
 
-import type { WelcomeEmailData } from './email.types'
-import { EmailTemplate } from './email.types'
+import type { WelcomeEmailData } from './email.types.js'
+import { EmailTemplate } from './email.types.js'
 
 /**
  * Runtime validation for queued email jobs (EQS-07).

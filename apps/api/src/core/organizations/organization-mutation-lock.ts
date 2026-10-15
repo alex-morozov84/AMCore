@@ -2,9 +2,8 @@ import { HttpStatus } from '@nestjs/common'
 
 import { OrganizationMemberErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { AppException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 /** All supported existing-org ACL writers lock the parent before child SQL. */
 export async function lockOrganization(

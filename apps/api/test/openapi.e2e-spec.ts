@@ -507,7 +507,7 @@ describe('OpenAPI success surface (e2e)', () => {
 
   it('documents AI run creation errors (idempotency conflict, ownership, no model) and the cancel contract', () => {
     const create = document.paths['/ai/runs']!.post!
-    for (const status of ['201', '404', '409', '503'])
+    for (const status of ['201', '404', '409', '410', '503'])
       expect(create.responses[status]).toBeDefined()
     expect(create.responses['409']).toEqual(
       expect.objectContaining({
@@ -517,8 +517,24 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(create.description).toContain('AI_RUN_DEADLINE_MS')
     expect(create.security).toEqual([{ bearer: [] }])
     const cancel = document.paths['/ai/runs/{id}/cancel']!.post!
-    for (const status of ['200', '404']) expect(cancel.responses[status]).toBeDefined()
+    for (const status of ['200', '404', '410']) expect(cancel.responses[status]).toBeDefined()
     expect(cancel.description).toContain('never lost')
+    for (const operation of [
+      create,
+      cancel,
+      document.paths['/ai/runs/{id}']!.get!,
+      document.paths['/ai/runs/{id}/stream']!.get!,
+    ]) {
+      const archived = JSON.stringify(operation.responses['410'])
+      for (const field of [
+        'AI_RUN_ARCHIVED',
+        'details',
+        'terminalStatus',
+        'finishedAt',
+        'archivedAt',
+      ])
+        expect(archived).toContain(field)
+    }
   })
 
   it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {

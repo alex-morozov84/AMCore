@@ -7,12 +7,12 @@ import {
   type TelegramLinkResponse,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../../common/schemas/schema-response'
-import { Auth } from '../../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../../../common/schemas/schema-response.js'
+import { Auth } from '../../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../../auth/decorators/current-user.decorator.js'
 
-import { TelegramConnectionResponseDto, TelegramLinkResponseDto } from './telegram.dto'
-import { TelegramLinkService } from './telegram-link.service'
+import { TelegramConnectionResponseDto, TelegramLinkResponseDto } from './telegram.dto.js'
+import { TelegramLinkService } from './telegram-link.service.js'
 
 /**
  * Bearer-authenticated Telegram linking surface (Arc D / D.6). The raw link token is returned only

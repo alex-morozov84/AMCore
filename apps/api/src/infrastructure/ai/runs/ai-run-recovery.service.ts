@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AiRunDispatchService } from './ai-run-dispatch.service'
+import { AiRunDispatchService } from './ai-run-dispatch.service.js'
 
 /**
  * Worker-only AI run recovery poller (Track C — ADR-054, ADR-052 pattern). Runs on **every** worker

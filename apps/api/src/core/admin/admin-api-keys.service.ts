@@ -2,11 +2,10 @@ import { Injectable } from '@nestjs/common'
 
 import type { AdminApiKeyListResponse, AdminApiKeyQuery } from '@amcore/shared'
 
-import { PrismaService } from '../../prisma'
-import { apiKeyStatus, apiKeyStatusWhere } from '../api-keys/api-key-lifecycle'
-import { AuditLogService } from '../audit'
-
-import { AuditActorType, Prisma } from '@/generated/prisma/client'
+import { AuditActorType, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { apiKeyStatus, apiKeyStatusWhere } from '../api-keys/api-key-lifecycle.js'
+import { AuditLogService } from '../audit/index.js'
 
 /** Cross-platform metadata only; verifier columns never enter the projection. */
 @Injectable()

@@ -1,6 +1,6 @@
 import { type Readable, Transform } from 'node:stream'
 
-import { PayloadTooLargeException } from '../common/exceptions/domain'
+import { PayloadTooLargeException } from '../common/exceptions/domain/index.js'
 
 type EncodedStream = Readable & { receivedEncodedLength?: number }
 

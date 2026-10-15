@@ -5,10 +5,10 @@ import { HttpException } from '@nestjs/common'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import type { Response } from 'express'
 
-import { PayloadTooLargeException } from '../common/exceptions/domain'
-import { configureFastifyIdempotency } from '../infrastructure/idempotency/fastify-idempotency-response'
-import { applyBoardHeaders } from '../infrastructure/queue/dashboard/bull-board-boundary.middleware'
-import { safeErrorResult } from '../infrastructure/queue/dashboard/bull-board-errors'
+import { PayloadTooLargeException } from '../common/exceptions/domain/index.js'
+import { configureFastifyIdempotency } from '../infrastructure/idempotency/fastify-idempotency-response.js'
+import { applyBoardHeaders } from '../infrastructure/queue/dashboard/bull-board-boundary.middleware.js'
+import { safeErrorResult } from '../infrastructure/queue/dashboard/bull-board-errors.js'
 
 class AmcoreFastifyAdapter extends FastifyAdapter<Server> {
   override mapException(error: unknown): unknown {

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
 
-import { DomainAuthorizationService } from './domain-authorization.service'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { PrismaModule } from '@/prisma'
+import { DomainAuthorizationService } from './domain-authorization.service.js'
 
 @Module({
   imports: [PrismaModule],

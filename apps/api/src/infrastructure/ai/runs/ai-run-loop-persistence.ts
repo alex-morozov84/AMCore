@@ -1,10 +1,9 @@
-import type { AiTextResult } from '../gateway/ai-gateway.types'
-import { usageLedgerV2 } from '../usage/ai-usage-v2'
+import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '../../../generated/prisma/client.js'
+import type { AiTextResult } from '../gateway/ai-gateway.types.js'
+import { usageLedgerV2 } from '../usage/ai-usage-v2.js'
 
-import type { ClaimedRun } from './ai-run-dispatch.types'
-import type { RunAttribution } from './ai-run-plan'
-
-import { AiAuthorType, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
+import type { RunAttribution } from './ai-run-plan.js'
 
 /**
  * Free transactional-write helpers for the bounded tool loop (Track C — ADR-054, Arc E, worker role

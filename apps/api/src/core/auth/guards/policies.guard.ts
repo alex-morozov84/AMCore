@@ -1,13 +1,13 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
-import { ForbiddenException } from '../../../common/exceptions'
-import type { AppAbility } from '../casl/ability.factory'
+import { ForbiddenException } from '../../../common/exceptions/index.js'
+import type { AppAbility } from '../casl/ability.factory.js'
 import {
   CHECK_POLICIES_KEY,
   type IPolicyHandler,
   type PolicyHandler,
-} from '../decorators/check-policies.decorator'
+} from '../decorators/check-policies.decorator.js'
 
 /**
  * PoliciesGuard

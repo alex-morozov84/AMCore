@@ -2,7 +2,7 @@ import {
   AI_RUN_BACKOFF_BASE_MS,
   AI_RUN_BACKOFF_CAP_MS,
   AI_RUN_BACKOFF_JITTER,
-} from './ai-run.constants'
+} from './ai-run.constants.js'
 
 /**
  * Exponential backoff with full jitter for the next run retry (ADR-052: Postgres owns the retry

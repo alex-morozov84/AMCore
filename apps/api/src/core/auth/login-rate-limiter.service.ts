@@ -4,7 +4,7 @@ import type { Cache } from 'cache-manager'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
 
 const IP_MAX = 100
 const USER_IP_MAX = 5

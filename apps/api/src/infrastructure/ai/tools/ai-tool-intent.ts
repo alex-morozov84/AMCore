@@ -2,14 +2,14 @@ import { z } from 'zod'
 
 import { aiApprovalPreviewSchema, SUPPORTED_LOCALES } from '@amcore/shared'
 
-import { toolRequiresApproval } from './ai-tool.constants'
-import type { AiTool, AiToolContext, AiToolIntent } from './ai-tool.types'
-import type { AiToolContractRegistry } from './ai-tool-contract.registry'
-import { boundedToolHook } from './ai-tool-hook'
+import { canonicalJsonEqual, canonicalJsonHash } from '../../../common/utils/canonical-json.js'
+import { strictJson } from '../../../common/utils/strict-json.js'
+import { Prisma } from '../../../generated/prisma/client.js'
 
-import { canonicalJsonEqual, canonicalJsonHash } from '@/common/utils/canonical-json'
-import { strictJson } from '@/common/utils/strict-json'
-import { Prisma } from '@/generated/prisma/client'
+import { toolRequiresApproval } from './ai-tool.constants.js'
+import type { AiTool, AiToolContext, AiToolIntent } from './ai-tool.types.js'
+import type { AiToolContractRegistry } from './ai-tool-contract.registry.js'
+import { boundedToolHook } from './ai-tool-hook.js'
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/)
 const intentSchema = z

@@ -3,11 +3,11 @@ import { randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { IDEMPOTENCY_KEY_PREFIX } from './idempotency.constants'
-import type { CompletedIdempotencyRecord, IdempotencyReserveResult } from './idempotency.types'
+import { REDIS_CLIENT } from '../redis/redis.constants.js'
+import type { AppRedisClient } from '../redis/redis-connection.service.js'
 
-import { REDIS_CLIENT } from '@/infrastructure/redis/redis.constants'
-import type { AppRedisClient } from '@/infrastructure/redis/redis-connection.service'
+import { IDEMPOTENCY_KEY_PREFIX } from './idempotency.constants.js'
+import type { CompletedIdempotencyRecord, IdempotencyReserveResult } from './idempotency.types.js'
 
 const RESERVE_SCRIPT = `
 local current = redis.call("GET", KEYS[1])

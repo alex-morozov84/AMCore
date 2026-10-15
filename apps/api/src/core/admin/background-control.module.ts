@@ -1,16 +1,15 @@
 import { Module } from '@nestjs/common'
 
-import { AuditModule } from '../audit'
+import { EnvModule } from '../../env/env.module.js'
+import { PrismaModule } from '../../prisma/index.js'
+import { AuditModule } from '../audit/index.js'
 
-import { BackgroundCommandAdmission } from './background-command-admission'
-import { BackgroundCommandService } from './background-command-service'
-import { BackgroundCommandSettlement } from './background-command-settlement'
-import { BackgroundControlAuthority } from './background-control-authority'
-import { BackgroundControlBudgets } from './background-control-budgets'
-import { BackgroundControlReservations } from './background-control-reservations'
-
-import { EnvModule } from '@/env/env.module'
-import { PrismaModule } from '@/prisma'
+import { BackgroundCommandAdmission } from './background-command-admission.js'
+import { BackgroundCommandService } from './background-command-service.js'
+import { BackgroundCommandSettlement } from './background-command-settlement.js'
+import { BackgroundControlAuthority } from './background-control-authority.js'
+import { BackgroundControlBudgets } from './background-control-budgets.js'
+import { BackgroundControlReservations } from './background-control-reservations.js'
 
 const providers = [
   BackgroundCommandAdmission,

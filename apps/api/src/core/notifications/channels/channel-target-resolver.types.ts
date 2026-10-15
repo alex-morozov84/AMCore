@@ -1,7 +1,6 @@
-import type { NotificationChannel } from '../notification.constants'
-import type { NotificationDefinition } from '../notification-definition.types'
-
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../../generated/prisma/client.js'
+import type { NotificationChannel } from '../notification.constants.js'
+import type { NotificationDefinition } from '../notification-definition.types.js'
 
 /**
  * Recipient facts a target resolver may read. Loaded once by the producer inside its

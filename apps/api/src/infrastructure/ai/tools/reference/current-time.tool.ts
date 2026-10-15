@@ -1,6 +1,6 @@
-import type { AiTool } from '../ai-tool.types'
+import type { AiTool } from '../ai-tool.types.js'
 
-import { currentTimeContract } from './current-time.contract'
+import { currentTimeContract } from './current-time.contract.js'
 
 /**
  * SAFE reference tool (Track C — ADR-054, Arc E) — the documented pattern for a code-owned tool.

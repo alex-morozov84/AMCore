@@ -1,4 +1,4 @@
-import { AVATAR_VALIDATION } from '@/infrastructure/storage'
+import { AVATAR_VALIDATION } from '../../../infrastructure/storage/index.js'
 
 /**
  * Hosts an OAuth profile picture may be downloaded from. Explicit and short on purpose: the

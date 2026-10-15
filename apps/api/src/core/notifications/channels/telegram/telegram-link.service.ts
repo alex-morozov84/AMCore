@@ -4,15 +4,14 @@ import { Injectable } from '@nestjs/common'
 
 import type { TelegramConnectionResponse, TelegramLinkResponse } from '@amcore/shared'
 
-import { PrismaService } from '../../../../prisma'
-import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
-import { NotificationChannel } from '../../notification.constants'
+import { EnvService } from '../../../../env/env.service.js'
+import { AuditActorType, AuditTargetType, Prisma } from '../../../../generated/prisma/client.js'
+import { PrismaService } from '../../../../prisma/index.js'
+import { AuditLogService } from '../../../audit/audit-log.service.js'
+import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation.js'
+import { NotificationChannel } from '../../notification.constants.js'
 
-import { TELEGRAM_LINK_TOKEN_TTL_MS, TelegramCancelReason } from './telegram.constants'
-
-import { AuditLogService } from '@/core/audit/audit-log.service'
-import { EnvService } from '@/env/env.service'
-import { AuditActorType, AuditTargetType, Prisma } from '@/generated/prisma/client'
+import { TELEGRAM_LINK_TOKEN_TTL_MS, TelegramCancelReason } from './telegram.constants.js'
 
 /** SHA-256 hex of a raw token — only the hash is ever stored (mirrors reset-token hygiene). */
 function hashToken(raw: string): string {

@@ -1,4 +1,4 @@
-import { canonicalJson } from './canonical-json'
+import { canonicalJson } from './canonical-json.js'
 
 /** Validate the JSON domain before canonicalization can discard or coerce values. */
 export function strictJson(value: unknown, maxBytes: number, maxDepth = 20): string {

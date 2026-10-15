@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common'
 
-import { ForbiddenException } from '../../common/exceptions'
+import { ForbiddenException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
 
-import { isRoleAssignable } from './role-assignability-policy'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { isRoleAssignable } from './role-assignability-policy.js'
 
 type PrismaTx = Prisma.TransactionClient
 

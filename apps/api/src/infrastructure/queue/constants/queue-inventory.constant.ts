@@ -1,6 +1,6 @@
 import type { WorkPresentation } from '@amcore/shared'
 
-import { BACKGROUND_WORK } from '@/background-work.composition'
+import { BACKGROUND_WORK } from '../../../background-work.composition.js'
 
 /** Compatibility projection of the application work collection; never another registration list. */
 export type QueueKind = 'work' | 'wake' | 'extension'

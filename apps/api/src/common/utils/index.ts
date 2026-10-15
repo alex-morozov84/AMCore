@@ -1,3 +1,3 @@
-export * from './anonymize-ip'
-export * from './redact-email'
-export * from './sanitize-headers'
+export * from './anonymize-ip.js'
+export * from './redact-email.js'
+export * from './sanitize-headers.js'

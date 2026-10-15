@@ -1,4 +1,6 @@
-module.exports = {
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+export default {
   testEnvironment: 'node',
   setupFiles: ['<rootDir>/test/setup-nest-loader.cjs'],
   rootDir: '.',

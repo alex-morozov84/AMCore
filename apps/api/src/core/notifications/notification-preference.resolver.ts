@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
-import type { NotificationChannel } from './notification.constants'
-import type { NotificationDefinition } from './notification-definition.types'
+import type { NotificationChannel } from './notification.constants.js'
+import type { NotificationDefinition } from './notification-definition.types.js'
 
 /** A stored user preference row (structurally compatible with the Prisma model). */
 export interface PreferenceRow {

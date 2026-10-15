@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { RedisLockService } from './redis-lock.service'
+import { RedisLockService } from './redis-lock.service.js'
 
 export interface MutexOptions {
   /** Lease length in ms. */

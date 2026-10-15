@@ -1,9 +1,9 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common'
 
-import type { AiToolRegistration } from './ai-tool.types'
-import { ConfiguredAiToolContractsModule } from './ai-tool-contracts-core.module'
-import { currentTimeContract } from './reference/current-time.contract'
-import { currentTimeTool } from './reference/current-time.tool'
+import type { AiToolRegistration } from './ai-tool.types.js'
+import { ConfiguredAiToolContractsModule } from './ai-tool-contracts-core.module.js'
+import { currentTimeContract } from './reference/current-time.contract.js'
+import { currentTimeTool } from './reference/current-time.tool.js'
 
 export const CURRENT_TIME_EXECUTOR = Symbol('CURRENT_TIME_EXECUTOR')
 @Module({})

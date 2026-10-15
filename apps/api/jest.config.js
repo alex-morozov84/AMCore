@@ -1,4 +1,6 @@
-module.exports = {
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+export default {
   transform: { '^.+\\.tsx?$': ['@swc/jest', require('./jest-swc.config.cjs')()] },
   testEnvironment: 'node',
   rootDir: '.',
@@ -15,6 +17,7 @@ module.exports = {
   coverageDirectory: './coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',
   },
 }

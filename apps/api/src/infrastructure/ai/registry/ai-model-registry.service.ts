@@ -1,25 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AiGatewayException } from '../gateway/ai-gateway.error'
-import { AiCredentialResolver } from '../gateway/credential-resolver'
+import { EnvService } from '../../../env/env.service.js'
+import { AiProviderType, Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import type { ObservedTransactionRunner } from '../../../prisma/observed-transaction.js'
+import { MetricsService } from '../../observability/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../redis/index.js'
+import { AiGatewayException } from '../gateway/ai-gateway.error.js'
+import { AiCredentialResolver } from '../gateway/credential-resolver.js'
 
-import { AiCatalogCache } from './ai-catalog-cache'
-import { AiCatalogLoad } from './ai-catalog-load'
-import type { AiExecutionDescriptor } from './ai-execution-descriptor'
+import { AiCatalogCache } from './ai-catalog-cache.js'
+import { AiCatalogLoad } from './ai-catalog-load.js'
+import type { AiExecutionDescriptor } from './ai-execution-descriptor.js'
 import {
   type AiCatalogSnapshot,
   aiCatalogSnapshotSchema,
   type ResolvedAiModel,
   resolvedAiModelSchema,
-} from './ai-registry.types'
-
-import { EnvService } from '@/env/env.service'
-import { AiProviderType, Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
-import { PrismaService } from '@/prisma'
-import type { ObservedTransactionRunner } from '@/prisma/observed-transaction'
+} from './ai-registry.types.js'
 
 /** Bounded cache-aside selection; fresh primary permission remains separate. */
 @Injectable()
@@ -52,6 +51,28 @@ export class AiModelRegistry {
   async resolveModel(slug: string, signal?: AbortSignal): Promise<ResolvedAiModel | null> {
     const snapshot = await this.getSnapshot(signal)
     return snapshot.find((model) => model.slug === slug) ?? null
+  }
+
+  /** Current primary-PG selection inside a caller-owned command transaction. No cache or second pool lease. */
+  async resolveModelInTransaction(
+    tx: Prisma.TransactionClient,
+    slug: string
+  ): Promise<ResolvedAiModel | null> {
+    const row = await tx.aiModel.findUnique({ where: { slug }, include: { provider: true } })
+    if (!row?.enabled || !row.provider.enabled) return null
+    const parsed = resolvedAiModelSchema.safeParse(row)
+    return parsed.success ? parsed.data : null
+  }
+
+  /** Fresh model binding through the same transaction that locks the source run. */
+  async resolveLiveModelInTransaction(
+    tx: Prisma.TransactionClient,
+    id: string
+  ): Promise<ResolvedAiModel | null> {
+    const row = await tx.aiModel.findUnique({ where: { id }, include: { provider: true } })
+    if (!row?.enabled || !row.provider.enabled) return null
+    const parsed = resolvedAiModelSchema.safeParse(row)
+    return parsed.success ? parsed.data : null
   }
 
   /**

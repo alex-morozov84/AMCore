@@ -1,7 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common'
 
-import type { AiToolAuthority, AiToolRegistration } from './ai-tool.types'
-import { AiToolContractRegistry } from './ai-tool-contract.registry'
+import type { AiToolAuthority, AiToolRegistration } from './ai-tool.types.js'
+import { AiToolContractRegistry } from './ai-tool-contract.registry.js'
 
 @Module({})
 export class ConfiguredAiToolContractsModule {

@@ -1,11 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
-
-import type { User } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+import type { User } from '../../generated/prisma/client.js'
+import { MetricsService } from '../../infrastructure/observability/index.js'
+import {
+  type AppRedisClient,
+  REDIS_CLIENT,
+  RedisLockService,
+} from '../../infrastructure/redis/index.js'
+import { PrismaService } from '../../prisma/index.js'
 
 type UserCacheEnvelope =
   | {

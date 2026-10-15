@@ -17,19 +17,19 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
+} from '../auth/organization-context/request-context-policy.js'
 
-import { CapabilityRegistry } from './capability-registry.service'
-import { PermissionResponseDto } from './dto'
-import { CreatePresetPermissionDto } from './dto/capability.dto'
-import { RoleService } from './role.service'
+import { CapabilityRegistry } from './capability-registry.service.js'
+import { CreatePresetPermissionDto } from './dto/capability.dto.js'
+import { PermissionResponseDto } from './dto/index.js'
+import { RoleService } from './role.service.js'
 
 @ApiTags('organizations')
 @ApiBearerAuth()

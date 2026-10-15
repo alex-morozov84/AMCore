@@ -1,15 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AI_RUN_GUARD_LOCK_TIMEOUT_MS, AI_RUN_LEASE_TTL_MS } from './ai-run.constants'
-import type { ClaimedRun, StopCause } from './ai-run-dispatch.types'
-import { isBotOwnershipStale, lockBotOwnership } from './ai-run-ownership-fence'
-import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
+import { Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { MetricsService } from '../../observability/index.js'
+import { CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
 
-import { Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
-import { PrismaService } from '@/prisma'
+import { AI_RUN_GUARD_LOCK_TIMEOUT_MS, AI_RUN_LEASE_TTL_MS } from './ai-run.constants.js'
+import type { ClaimedRun, StopCause } from './ai-run-dispatch.types.js'
+import { isBotOwnershipStale, lockBotOwnership } from './ai-run-ownership-fence.js'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
 
 /** Thrown inside a guarded transaction when a CAS finds the run no longer leased by this claim. */
 export class RunLeaseLostError extends Error {

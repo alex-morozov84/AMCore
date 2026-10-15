@@ -1,13 +1,13 @@
 import { InviteErrorCode } from '@amcore/shared'
 
-import { AppException, ForbiddenException } from '../../common/exceptions'
-import { isRoleAssignable } from '../organizations/role-assignability-policy'
+import { AppException, ForbiddenException } from '../../common/exceptions/index.js'
+import { isRoleAssignable } from '../organizations/role-assignability-policy.js'
 
-import { invalidInvitation } from './invitation-locks'
+import { invalidInvitation } from './invitation-locks.js'
 const invitationConflict = (code: InviteErrorCode): AppException =>
   new AppException('Invalid invitation role intent', 409, code)
 
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '../../generated/prisma/client.js'
 
 export type IntentRole = { id: string; name: string; description: string | null }
 export async function lockInvitationRoles(

@@ -6,11 +6,10 @@ import {
   InviteErrorCode,
 } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
+import type { InvitationOperation, Prisma } from '../../generated/prisma/client.js'
 
-import { invitationClock } from './invitation-locks'
-
-import type { InvitationOperation, Prisma } from '@/generated/prisma/client'
+import { invitationClock } from './invitation-locks.js'
 
 export const INVITATION_RETENTION_MS = 30 * 86_400_000
 export function invitationConflict(code: InviteErrorCode): AppException {

@@ -1,6 +1,6 @@
-import { HORIZON_CHECK_OVERHEAD_MS, PROVIDER_WINDOW_CLOCK } from '../provider-window-clock'
+import { HORIZON_CHECK_OVERHEAD_MS, PROVIDER_WINDOW_CLOCK } from '../provider-window-clock.js'
 
-import { JOB_READ_GUARD_LUA } from './job-read.lua'
+import { JOB_READ_GUARD_LUA } from './job-read.lua.js'
 
 /** A PG reservation is not permission to send: current broker identity and time must agree. */
 export const PROVIDER_FENCE_LUA =

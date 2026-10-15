@@ -13,28 +13,28 @@ import type { Request, Response } from 'express'
 
 import { AuthType } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip'
-import { EnvService } from '../../env/env.service'
-import { RateLimit } from '../../infrastructure/throttling'
-import { AuthService } from '../auth/auth.service'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { AuthResponseDto } from '../auth/dto'
-import { negotiateLocale } from '../auth/locale-negotiation'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip.js'
+import { EnvService } from '../../env/env.service.js'
+import { RateLimit } from '../../infrastructure/throttling/index.js'
+import { AuthService } from '../auth/auth.service.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { AuthResponseDto } from '../auth/dto/index.js'
+import { negotiateLocale } from '../auth/locale-negotiation.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
-import { invitationHandoffProof } from '../invitations/invitation-auth-handoff'
-import { InvitationContinuationService } from '../invitations/invitation-continuation.service'
-import { InvitationRequestGuard } from '../invitations/invitation-request.guard'
+} from '../auth/organization-context/request-context-policy.js'
+import { invitationHandoffProof } from '../invitations/invitation-auth-handoff.js'
+import { InvitationContinuationService } from '../invitations/invitation-continuation.service.js'
+import { InvitationRequestGuard } from '../invitations/invitation-request.guard.js'
 
 import {
   InvitationAdmissionDto,
   InvitationAdmissionResponseDto,
   InvitationContextDto,
   InvitedRegisterDto,
-} from './dto/invitation-recipient.dto'
+} from './dto/invitation-recipient.dto.js'
 
 @ApiTags('auth')
 @ApiBadRequestResponse({ description: 'Invalid, expired or superseded invitation' })

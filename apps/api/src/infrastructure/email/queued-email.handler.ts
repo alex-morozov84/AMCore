@@ -2,13 +2,12 @@ import { Injectable } from '@nestjs/common'
 import { type Job, UnrecoverableError } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { WorkHandler, WorkInvocation } from '../background-work/work-definition'
+import type { WorkHandler, WorkInvocation } from '../background-work/work-definition.js'
+import { type EmailMetricsTemplate, MetricsService } from '../observability/index.js'
+import { QueueName } from '../queue/constants/queues.constant.js'
 
-import { EmailService } from './email.service'
-import { EmailTemplate } from './email.types'
-
-import { type EmailMetricsTemplate, MetricsService } from '@/infrastructure/observability'
-import { QueueName } from '@/infrastructure/queue/constants/queues.constant'
+import { EmailService } from './email.service.js'
+import { EmailTemplate } from './email.types.js'
 
 /** Approved recipe has no direct provider access; its effect port admits immutable bytes once. */
 @Injectable()

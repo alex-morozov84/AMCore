@@ -1,9 +1,9 @@
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
 
-import type { AccessOperationBudget } from './access-budget'
-import type { ItemSpec } from './access-capabilities'
-import { coversAnyField, coversField, isRelevant, isUnconditional } from './access-rule-utils'
-import { DenyIndex } from './configured-mask-index'
+import type { AccessOperationBudget } from './access-budget.js'
+import type { ItemSpec } from './access-capabilities.js'
+import { coversAnyField, coversField, isRelevant, isUnconditional } from './access-rule-utils.js'
+import { DenyIndex } from './configured-mask-index.js'
 
 /** The rules that can say something about one item, split by effect. */
 export interface Scan {

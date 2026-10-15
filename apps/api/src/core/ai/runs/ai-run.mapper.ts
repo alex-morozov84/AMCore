@@ -9,7 +9,7 @@ import type {
   AiRunStatusValue,
 } from '@amcore/shared'
 
-import type { AiArtifact, AiConversation, AiMessage, AiRun } from '@/generated/prisma/client'
+import type { AiArtifact, AiConversation, AiMessage, AiRun } from '../../../generated/prisma/client.js'
 
 /**
  * DB → wire projections for the AI run/conversation surface (Track C — ADR-054, Arc C). The wire
@@ -21,11 +21,15 @@ import type { AiArtifact, AiConversation, AiMessage, AiRun } from '@/generated/p
 
 export function toAiRunResponse(
   run: AiRun,
-  pendingApprovalId: string | null = null
+  pendingApprovalId: string | null = null,
+  retriedByRunId: string | null = null
 ): AiRunResponse {
   return {
     id: run.id,
     conversationId: run.conversationId,
+    retryOfRunId: run.retryOfRunId,
+    retriedByRunId,
+    operatorRetry: run.retryOfRunId !== null,
     status: run.status.toLowerCase() as AiRunStatusValue,
     errorCode: run.errorCode,
     terminalReasonCode: run.terminalReasonCode,
@@ -42,11 +46,17 @@ export function toAiRunResponse(
  * the validated structured-parts JSON and re-validated by `@SchemaResponse` on the way out. The wire
  * `role`/`authorType` are the lowercase projection of the Prisma SCREAMING_CASE tokens.
  */
-export function toAiMessageResponse(message: AiMessage): AiMessageResponse {
+export function toAiMessageResponse(
+  message: AiMessage,
+  operatorRetryOfRunId: string | null = null
+): AiMessageResponse {
   return {
     id: message.id,
     conversationId: message.conversationId,
     runId: message.runId,
+    originRunId: message.runId ?? message.archivedRunId,
+    originArchived: message.archivedRunId !== null,
+    operatorRetryOfRunId: message.role === 'ASSISTANT' ? operatorRetryOfRunId : null,
     sequence: message.sequence,
     role: message.role.toLowerCase() as AiMessageResponse['role'],
     authorType: message.authorType.toLowerCase() as AiMessageResponse['authorType'],

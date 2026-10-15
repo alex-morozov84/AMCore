@@ -1,34 +1,34 @@
 import { Module } from '@nestjs/common'
 
-import { bindWorkHandlers } from '../background-work/registration'
+import { AiRealtimeModule } from '../../core/ai/realtime/ai-realtime.module.js'
+import { AuditModule } from '../../core/audit/index.js'
+import { PrismaModule } from '../../prisma/index.js'
+import { bindWorkHandlers } from '../background-work/registration.js'
 
-import { AiGatewayModule } from './ai-gateway.module'
-import { AiApprovalExpiryService } from './runs/ai-approval-expiry.service'
-import { AiRunRepository } from './runs/ai-run.repository'
-import { AiRunApprovalParker } from './runs/ai-run-approval-parker.service'
-import { AiRunBacklogCollector } from './runs/ai-run-backlog.collector'
-import { AiRunDispatchProcessor } from './runs/ai-run-dispatch.processor'
-import { AiRunDispatchService } from './runs/ai-run-dispatch.service'
-import { AiRunExecutorService } from './runs/ai-run-executor.service'
-import { AiRunGuard } from './runs/ai-run-guard.service'
-import { AiRunLoopExecutor } from './runs/ai-run-loop-executor.service'
-import { AiRunLoopFinalizer } from './runs/ai-run-loop-finalizer.service'
-import { AiRunRecoveryService } from './runs/ai-run-recovery.service'
+import { AiCatalogModule } from './ai-catalog.module.js'
+import { AiGatewayModule } from './ai-gateway.module.js'
+import { AiApprovalExpiryService } from './runs/ai-approval-expiry.service.js'
+import { AiRunRepository } from './runs/ai-run.repository.js'
+import { AiRunApprovalParker } from './runs/ai-run-approval-parker.service.js'
+import { AiRunBacklogCollector } from './runs/ai-run-backlog.collector.js'
+import { AiRunDispatchProcessor } from './runs/ai-run-dispatch.processor.js'
+import { AiRunDispatchService } from './runs/ai-run-dispatch.service.js'
+import { AiRunExecutorService } from './runs/ai-run-executor.service.js'
+import { AiRunGuard } from './runs/ai-run-guard.service.js'
+import { AiRunLoopExecutor } from './runs/ai-run-loop-executor.service.js'
+import { AiRunLoopFinalizer } from './runs/ai-run-loop-finalizer.service.js'
+import { AiRunRecoveryService } from './runs/ai-run-recovery.service.js'
 import {
   AI_RUN_CAPACITY_GATE,
   AI_RUN_SHUTDOWN_LATCH,
   AiRunCapacityGate,
   AiRunShutdownLatch,
-} from './runs/ai-run-shutdown'
-import { AiRunTransitions } from './runs/ai-run-transitions.service'
-import { aiRunsWork } from './runs/ai-runs.work'
-import { AiToolActionService } from './runs/ai-tool-action.service'
-import { AiToolRecoveryService } from './runs/ai-tool-recovery.service'
-import { AiToolsModule } from './tools/ai-tools.module'
-
-import { AiRealtimeModule } from '@/core/ai/realtime/ai-realtime.module'
-import { AuditModule } from '@/core/audit'
-import { PrismaModule } from '@/prisma'
+} from './runs/ai-run-shutdown.js'
+import { AiRunTransitions } from './runs/ai-run-transitions.service.js'
+import { aiRunsWork } from './runs/ai-runs.work.js'
+import { AiToolActionService } from './runs/ai-tool-action.service.js'
+import { AiToolRecoveryService } from './runs/ai-tool-recovery.service.js'
+import { AiToolsModule } from './tools/ai-tools.module.js'
 
 /**
  * AI worker slice (Track C — ADR-054, Arc C.4) — `worker`/`all` roles only. Houses the durable run
@@ -46,7 +46,14 @@ import { PrismaModule } from '@/prisma'
  * `AiRunRealtimePublisher` the executor uses to emit status hints (the SSE receive side is web-only).
  */
 @Module({
-  imports: [AiGatewayModule, PrismaModule, AiRealtimeModule, AiToolsModule, AuditModule],
+  imports: [
+    AiCatalogModule,
+    AiGatewayModule,
+    PrismaModule,
+    AiRealtimeModule,
+    AiToolsModule,
+    AuditModule,
+  ],
   providers: [
     AiRunRepository,
     AiRunBacklogCollector,
@@ -74,7 +81,8 @@ import { PrismaModule } from '@/prisma'
 })
 class AiRunImplementationModule {}
 
-const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor },
-  [AiRunImplementationModule])
+const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor }, [
+  AiRunImplementationModule,
+])
 @Module({ imports: [AiRunImplementationModule, bindings], exports: [bindings] })
 export class AiWorkerModule {}

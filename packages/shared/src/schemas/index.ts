@@ -370,6 +370,8 @@ export {
   aiMessageContentSchema,
   type AiMessageResponse,
   aiMessageResponseSchema,
+  type AiRunArchived,
+  aiRunArchivedSchema,
   type AiRunCancelResponse,
   aiRunCancelResponseSchema,
   type AiRunListQuery,

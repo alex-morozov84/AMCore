@@ -3,13 +3,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { AiConversationResponse } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../../common/exceptions'
-import { AI_RUN_SUPERSEDED_BY_HUMAN } from '../ai-run.constants'
-import { lockQueuedRunsOfConversation, lockWaitingRunsOfConversation } from '../ai-run-locks'
-import { ApprovalRaceError } from '../approvals/ai-approval-expiry'
-import { toAiConversationResponse } from '../runs/ai-run.mapper'
-
-import { AuditLogService } from '@/core/audit'
+import { ConflictException, NotFoundException } from '../../../common/exceptions/index.js'
 import {
   AiApprovalState,
   AiConversationControl,
@@ -19,13 +13,18 @@ import {
   AuditActorType,
   AuditTargetType,
   Prisma,
-} from '@/generated/prisma/client'
+} from '../../../generated/prisma/client.js'
 import {
   type AiMetricsControlAction,
   type AiMetricsControlActorRole,
   MetricsService,
-} from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+} from '../../../infrastructure/observability/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { AuditLogService } from '../../audit/index.js'
+import { AI_RUN_SUPERSEDED_BY_HUMAN } from '../ai-run.constants.js'
+import { lockQueuedRunsOfConversation, lockWaitingRunsOfConversation } from '../ai-run-locks.js'
+import { ApprovalRaceError } from '../approvals/ai-approval-expiry.js'
+import { toAiConversationResponse } from '../runs/ai-run.mapper.js'
 
 /** The human acting on a conversation: the owner, or a cross-user SUPER_ADMIN operator. */
 export interface ControlActor {

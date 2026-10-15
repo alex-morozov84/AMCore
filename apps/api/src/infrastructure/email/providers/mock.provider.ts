@@ -3,11 +3,10 @@ import { createHash } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types'
-import type { QueuedEmailProvider } from '../queued-email-provider'
-
-import { EnvService } from '@/env/env.service'
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
+import { EnvService } from '../../../env/env.service.js'
+import { ControlConnection } from '../../background-work/control-connection.js'
+import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types.js'
+import type { QueuedEmailProvider } from '../queued-email-provider.js'
 
 const MOCK_ACCEPT_LUA = `
 local kind = redis.call('TYPE',KEYS[1]).ok

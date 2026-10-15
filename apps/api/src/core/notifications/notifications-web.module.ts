@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common'
 
-import { PrismaModule } from '../../prisma'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { NOTIFICATION_CHANNELS } from './notification-composition'
-import { NotificationFeedService } from './notification-feed.service'
-import { NotificationPreferenceService } from './notification-preference.service'
-import { NotificationPreferencesController } from './notification-preferences.controller'
-import { NotificationStreamController } from './notification-stream.controller'
-import { NotificationsController } from './notifications.controller'
-import { NotificationsModule } from './notifications.module'
-import { NotificationRealtimeHub } from './realtime/notification-realtime.hub'
-import { NotificationRealtimeSubscriber } from './realtime/notification-realtime.subscriber'
+import { NOTIFICATION_CHANNELS } from './notification-composition.js'
+import { NotificationFeedService } from './notification-feed.service.js'
+import { NotificationPreferenceService } from './notification-preference.service.js'
+import { NotificationPreferencesController } from './notification-preferences.controller.js'
+import { NotificationStreamController } from './notification-stream.controller.js'
+import { NotificationsController } from './notifications.controller.js'
+import { NotificationsModule } from './notifications.module.js'
+import { NotificationRealtimeHub } from './realtime/notification-realtime.hub.js'
+import { NotificationRealtimeSubscriber } from './realtime/notification-realtime.subscriber.js'
 
 /**
  * Notifications HTTP surface (web/all only): the bearer-authenticated feed/read,

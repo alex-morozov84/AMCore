@@ -3,14 +3,14 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import type { RequestPrincipal } from '@amcore/shared'
 import { ResourceErrorCode } from '@amcore/shared'
 
-import { canonicalValue, decodeSetting, encodeSetting } from './setting-codec'
-import type { SettingDefinition, SettingRow } from './setting-definition'
-import { SettingRegistry } from './setting-registry'
+import { AppException, ServiceUnavailableException } from '../../common/exceptions/index.js'
+import { AuditLogService } from '../../core/audit/index.js'
+import { AuditActorType, AuditTargetType, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { AppException, ServiceUnavailableException } from '@/common/exceptions'
-import { AuditLogService } from '@/core/audit'
-import { AuditActorType, AuditTargetType, Prisma } from '@/generated/prisma/client'
-import { PrismaService } from '@/prisma'
+import { canonicalValue, decodeSetting, encodeSetting } from './setting-codec.js'
+import type { SettingDefinition, SettingRow } from './setting-definition.js'
+import { SettingRegistry } from './setting-registry.js'
 
 /** Internal primitive: the domain facade authorizes actor/target before entry. */
 @Injectable()

@@ -1,33 +1,46 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { AiRunSseReason, AiRunStatusValue } from '@amcore/shared'
+import {
+  aiMessageContentSchema,
+  aiModelSelectionSchema,
+  type AiRunSseReason,
+  type AiRunStatusValue,
+} from '@amcore/shared'
 
-import { capabilityForArtifactKind } from '../../../core/ai/artifacts/ai-artifact.constants'
-import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher'
-import type { AiGenerateMessage, AiUserContentPart } from '../gateway/ai-gateway.types'
-import { scanInput } from '../guardrails/input-guard'
+import { capabilityForArtifactKind } from '../../../core/ai/artifacts/ai-artifact.constants.js'
+import { AiRunRealtimePublisher } from '../../../core/ai/realtime/ai-run-realtime.publisher.js'
+import { aiRunInputFingerprint } from '../../../core/ai/runs/ai-run-input-fingerprint.js'
+import { EnvService } from '../../../env/env.service.js'
+import {
+  AiArtifactKind,
+  AiAuthorType,
+  AiMessageRole,
+  AiRunStatus,
+  AiRunStepType,
+  Prisma,
+} from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { MetricsService } from '../../observability/index.js'
+import { StorageObjectNotFoundError, StorageService } from '../../storage/index.js'
+import { type AttemptRuntime, CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
+import type { AiGenerateMessage, AiUserContentPart } from '../gateway/ai-gateway.types.js'
+import { scanInput } from '../guardrails/input-guard.js'
 import {
   buildTrustBoundaryRequest,
   multimodalUntrustedPolicy,
-} from '../guardrails/trust-boundary.builder'
-import { aiExecutionDescriptorSchema, descriptorFailure } from '../registry/ai-execution-descriptor'
+} from '../guardrails/trust-boundary.builder.js'
+import { aiExecutionDescriptorSchema, descriptorFailure } from '../registry/ai-execution-descriptor.js'
+import { AiModelRegistry } from '../registry/ai-model-registry.service.js'
 
-import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
-import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
-import { AiRunGuard } from './ai-run-guard.service'
-import { AiRunLoopExecutor } from './ai-run-loop-executor.service'
-import type { RunPlan } from './ai-run-plan'
-import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
-import { AiRunTransitions } from './ai-run-transitions.service'
-import { AiToolActionService } from './ai-tool-action.service'
-
-import { EnvService } from '@/env/env.service'
-import { AiArtifactKind, AiMessageRole, AiRunStepType, Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { StorageObjectNotFoundError, StorageService } from '@/infrastructure/storage'
-import { type AttemptRuntime, CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
-import { PrismaService } from '@/prisma'
+import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants.js'
+import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types.js'
+import { AiRunGuard } from './ai-run-guard.service.js'
+import { AiRunLoopExecutor } from './ai-run-loop-executor.service.js'
+import type { RunPlan } from './ai-run-plan.js'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
+import { AiRunTransitions } from './ai-run-transitions.service.js'
+import { AiToolActionService } from './ai-tool-action.service.js'
 
 /** The single bounded realtime reason (Track C — ADR-054, Arc C.5); no content ever rides it. */
 const RUN_STATUS_CHANGED: AiRunSseReason = 'status_changed'
@@ -54,7 +67,8 @@ export class AiRunExecutorService {
     private readonly env: EnvService,
     private readonly metrics: MetricsService,
     private readonly logger: PinoLogger,
-    private readonly actions: AiToolActionService
+    private readonly actions: AiToolActionService,
+    private readonly models: AiModelRegistry
   ) {
     this.logger.setContext(AiRunExecutorService.name)
   }
@@ -77,7 +91,7 @@ export class AiRunExecutorService {
 
   private async runAttempt(claim: ClaimedRun, runtime: AttemptRuntime): Promise<void> {
     if (await this.actions.resolvePendingUnknown(claim)) return
-    const plan = await this.preflight(claim)
+    const plan = await this.preflight(claim, runtime)
     // A null plan means pre-flight already reached a terminal/handled state (cancel, deadline, bad
     // snapshot, missing input, guardrail refusal) — nothing more to do this attempt.
     if (plan === null) return
@@ -117,7 +131,7 @@ export class AiRunExecutorService {
    * terminal transition. Returns `null` when the attempt is already handled (cancelled/expired/
    * permanent-failed/refused).
    */
-  private async preflight(claim: ClaimedRun): Promise<RunPlan | null> {
+  private async preflight(claim: ClaimedRun, runtime: AttemptRuntime): Promise<RunPlan | null> {
     // Admission: lease (fresh clock), a cancel that landed after claim, a human takeover, the deadline and
     // shutdown are all evaluated together under the run guard before any pre-flight work.
     const admitted = await this.guard.admit(claim, async () => undefined)
@@ -144,22 +158,110 @@ export class AiRunExecutorService {
           ownerUserId: true,
           assistantId: true,
           organizationId: true,
-          assistant: { select: { toolAllowlist: true, systemPrompt: true, enabled: true } },
+          assistant: {
+            select: {
+              toolAllowlist: true,
+              systemPrompt: true,
+              enabled: true,
+              modelSelection: true,
+            },
+          },
         },
       })
     )
     if (conversation === CUTOFF) return null
-    // The run's OWN input turn is bound by `runId` (not the max-sequence message) so several runs
-    // queued on one conversation before execution each read their own input.
-    const input = await this.latch.run(() =>
-      this.prisma.aiMessage.findFirst({
-        where: { runId: claim.id, role: AiMessageRole.USER },
-        orderBy: { sequence: 'asc' },
-        select: { content: true },
+    const run = await this.latch.run(() =>
+      this.prisma.aiRun.findUnique({
+        where: { id: claim.id },
+        select: {
+          inputMessageId: true,
+          retryOfRunId: true,
+          inputFingerprint: true,
+          assistantBindingCaptured: true,
+          assistantIdAtCreation: true,
+        },
       })
     )
+    if (run === CUTOFF) return null
+    // Pre-migration runs retain the old lookup. New runs must never fall back after losing their
+    // direct input link: that would silently substitute another conversation turn.
+    const input = await this.latch.run(() =>
+      run?.assistantBindingCaptured
+        ? run.inputMessageId
+          ? this.prisma.aiMessage.findUnique({
+              where: { id: run.inputMessageId },
+              select: {
+                id: true,
+                content: true,
+                role: true,
+                authorType: true,
+                authorUserId: true,
+                conversationId: true,
+                runId: true,
+                archivedRunId: true,
+              },
+            })
+          : Promise.resolve(null)
+        : this.prisma.aiMessage.findFirst({
+            where: { runId: claim.id, role: AiMessageRole.USER },
+            orderBy: { sequence: 'asc' },
+            select: {
+              id: true,
+              content: true,
+              role: true,
+              authorType: true,
+              authorUserId: true,
+              conversationId: true,
+              runId: true,
+              archivedRunId: true,
+            },
+          })
+    )
     if (input === CUTOFF) return null
-    if (conversation === null || input === null) {
+    const source = run?.retryOfRunId
+      ? await this.latch.run(() =>
+          this.prisma.aiRun.findUnique({
+            where: { id: run.retryOfRunId! },
+            select: {
+              conversationId: true,
+              inputMessageId: true,
+              inputFingerprint: true,
+              status: true,
+            },
+          })
+        )
+      : null
+    if (source === CUTOFF) return null
+    if (
+      conversation === null ||
+      run === null ||
+      input === null ||
+      (run.assistantBindingCaptured &&
+        (input.role !== AiMessageRole.USER ||
+          input.authorType !== AiAuthorType.USER ||
+          input.authorUserId !== conversation.ownerUserId ||
+          input.conversationId !== claim.conversationId ||
+          !!input.archivedRunId)) ||
+      (run.assistantBindingCaptured && conversation.assistantId !== run.assistantIdAtCreation) ||
+      (run.assistantBindingCaptured &&
+        (!aiMessageContentSchema.safeParse(input.content).success ||
+          aiRunInputFingerprint(input.content) !== run.inputFingerprint)) ||
+      (run.retryOfRunId &&
+        (input.runId !== run.retryOfRunId ||
+          source === null ||
+          source.status !== AiRunStatus.FAILED ||
+          source.conversationId !== claim.conversationId ||
+          source.inputMessageId !== input.id ||
+          source.inputFingerprint !== run.inputFingerprint ||
+          !Array.isArray(input.content) ||
+          input.content.some(
+            (part) =>
+              typeof part === 'object' &&
+              part !== null &&
+              'type' in part &&
+              part.type === 'artifact_ref'
+          )))
+    ) {
       await this.transitions.failed(claim, AiRunErrorCode.INPUT_MISSING)
       return null
     }
@@ -177,6 +279,26 @@ export class AiRunExecutorService {
         AiRunTerminalReason.ASSISTANT_DISABLED
       )
       return null
+    }
+    if (run.retryOfRunId && conversation.assistant) {
+      const selection = aiModelSelectionSchema.safeParse(conversation.assistant.modelSelection)
+      let selectedId: string | null = null
+      if (selection.success) {
+        for (const slug of [selection.data.modelSlug, ...selection.data.fallback]) {
+          const candidate = await this.latch.run(() =>
+            this.models.resolveModel(slug, runtime.attempt.signal)
+          )
+          if (candidate === CUTOFF) return null
+          if (candidate && this.models.hasCredential(candidate)) {
+            selectedId = candidate.id
+            break
+          }
+        }
+      }
+      if (selectedId !== execution.modelId) {
+        await this.transitions.failed(claim, 'model_binding_changed')
+        return null
+      }
     }
 
     // Arc G: a turn is valid with either non-empty text OR at least one artifact_ref — an

@@ -1,10 +1,10 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { canonicalValue, decodeSetting, immutable } from './setting-codec'
-import type { SettingDefinition, SettingRow, SettingSnapshot } from './setting-definition'
-import { SettingRegistry } from './setting-registry'
-import { SettingRepository } from './setting-repository'
+import { canonicalValue, decodeSetting, immutable } from './setting-codec.js'
+import type { SettingDefinition, SettingRow, SettingSnapshot } from './setting-definition.js'
+import { SettingRegistry } from './setting-registry.js'
+import { SettingRepository } from './setting-repository.js'
 
 interface Entry {
   snapshot: SettingSnapshot<unknown>

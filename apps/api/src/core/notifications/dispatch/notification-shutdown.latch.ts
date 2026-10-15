@@ -6,7 +6,7 @@ import {
   type Cutoff,
   ShutdownLatch,
   type TransactionRunner,
-} from '@/infrastructure/worker-lifecycle'
+} from '../../../infrastructure/worker-lifecycle/index.js'
 
 export { CUTOFF, type Cutoff, type TransactionRunner }
 

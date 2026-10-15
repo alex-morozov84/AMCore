@@ -7,20 +7,20 @@ import type { Redis } from 'ioredis'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 
-import { readBoundedJob } from './bounded-job-reader'
-import { managedJobKey } from './managed-job-key'
-import { parseManagedJob } from './managed-job-profile'
-import { startIdempotentInvocation } from './scripts/idempotent-start'
-import { reportManagedInvocation } from './scripts/invocation-report'
+import { readBoundedJob } from './bounded-job-reader.js'
+import { managedJobKey } from './managed-job-key.js'
+import { parseManagedJob } from './managed-job-profile.js'
+import { startIdempotentInvocation } from './scripts/idempotent-start.js'
+import { reportManagedInvocation } from './scripts/invocation-report.js'
 import {
   jobVersions,
   type WorkDefinition,
   type WorkHandler,
   type WorkInvocation,
-} from './work-definition'
-import { isPermanentWorkFailure, workFailureCode } from './work-failure'
-import { parseWorkPayload } from './work-payload'
-import { WorkReadiness } from './work-readiness'
+} from './work-definition.js'
+import { isPermanentWorkFailure, workFailureCode } from './work-failure.js'
+import { parseWorkPayload } from './work-payload.js'
+import { WorkReadiness } from './work-readiness.js'
 
 export const PROVIDER_WINDOW_EXECUTION = Symbol('PROVIDER_WINDOW_EXECUTION')
 export interface ProviderWindowExecution {

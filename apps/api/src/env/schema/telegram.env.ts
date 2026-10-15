@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-import { DEFAULT_TELEGRAM_API_BASE_URL } from '../../core/notifications/channels/telegram/telegram.constants'
+import { DEFAULT_TELEGRAM_API_BASE_URL } from '../../core/notifications/channels/telegram/telegram.constants.js'
 
-import { optionalEnvString, optionalEnvUrl, optionalTelegramUsername } from './helpers'
+import { optionalEnvString, optionalEnvUrl, optionalTelegramUsername } from './helpers.js'
 
 // Telegram OAuth login + notifications channel (Arc D). These share
 // TELEGRAM_BOT_TOKEN but are independently optional; the composed refinement gates

@@ -11,24 +11,23 @@ import {
   workSummarySchema,
 } from '@amcore/shared'
 
-import { NotificationChannelRegistry } from '../channels/notification-channel.registry'
-import { NotificationControlTargets } from '../channels/notification-control-targets'
+import { BadRequestException } from '../../../common/exceptions/index.js'
+import { redactEmail } from '../../../common/utils/index.js'
+import { type NotificationDelivery, Prisma } from '../../../generated/prisma/client.js'
+import { resolveWorkFailure } from '../../../infrastructure/background-work/work-failure.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { NotificationChannelRegistry } from '../channels/notification-channel.registry.js'
+import { NotificationControlTargets } from '../channels/notification-control-targets.js'
 
 import {
   deliveryCapability,
   deliveryRevision,
   deliveryState,
   notificationWorkDigest,
-} from './notification-control-policy'
-import { notificationControlProjection } from './notification-control-projection'
-import { notificationDeliveriesWork } from './notification-deliveries.work'
-import { notificationWorkFailures } from './notification-work-failures'
-
-import { BadRequestException } from '@/common/exceptions'
-import { redactEmail } from '@/common/utils'
-import { type NotificationDelivery, Prisma } from '@/generated/prisma/client'
-import { resolveWorkFailure } from '@/infrastructure/background-work/work-failure'
-import { PrismaService } from '@/prisma'
+} from './notification-control-policy.js'
+import { notificationControlProjection } from './notification-control-projection.js'
+import { notificationDeliveriesWork } from './notification-deliveries.work.js'
+import { notificationWorkFailures } from './notification-work-failures.js'
 
 const states: Record<string, string[]> = {
   waiting: ['PENDING'],
@@ -58,6 +57,7 @@ export class NotificationWorkReader {
           AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= ${gate.now})`,
         processing: Prisma.sql`status = 'PROCESSING'`,
         failed: Prisma.sql`status = 'FAILED'`,
+        completed: Prisma.sql`status IN ('DELIVERED', 'SKIPPED', 'CANCELLED')`,
         terminal: Prisma.sql`status IN ('DELIVERED', 'FAILED', 'SKIPPED', 'CANCELLED')`,
         unresolved: Prisma.sql`"unresolvedEffectCount" > 0 OR "legacyUnverified"`,
       }

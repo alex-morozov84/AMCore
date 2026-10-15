@@ -1,4 +1,4 @@
-import type { RetryAfterConstraint } from './retry-after'
+import type { RetryAfterConstraint } from './retry-after.js'
 
 export interface QueuedEmailOutcome {
   readonly certainty: 'none' | 'accepted' | 'unknown'

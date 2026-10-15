@@ -10,21 +10,21 @@ import {
   workSummarySchema,
 } from '@amcore/shared'
 
-import { BackgroundControlAuthority } from './background-control-authority'
-import { BackgroundControlBudgets } from './background-control-budgets'
-
-import { AppException } from '@/common/exceptions'
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
-import { backgroundControlTransaction } from '@/infrastructure/background-work/control-transaction'
-import type { DurableWorkReader } from '@/infrastructure/background-work/durable-work'
-import { readQueueSnapshot } from '@/infrastructure/background-work/queue-snapshot'
-import { WORK_REGISTRATIONS } from '@/infrastructure/background-work/registration'
+import { AppException } from '../../common/exceptions/index.js'
+import { ControlConnection } from '../../infrastructure/background-work/control-connection.js'
+import { backgroundControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
+import type { DurableWorkReader } from '../../infrastructure/background-work/durable-work.js'
+import { readQueueSnapshot } from '../../infrastructure/background-work/queue-snapshot.js'
+import { WORK_REGISTRATIONS } from '../../infrastructure/background-work/registration.js'
 import type {
   WorkDefinition,
   WorkRegistration,
-} from '@/infrastructure/background-work/work-definition'
-import { QUEUE_REGISTRY } from '@/infrastructure/queue/constants/queue-inventory.constant'
-import { PrismaService } from '@/prisma'
+} from '../../infrastructure/background-work/work-definition.js'
+import { QUEUE_REGISTRY } from '../../infrastructure/queue/constants/queue-inventory.constant.js'
+import { PrismaService } from '../../prisma/index.js'
+
+import { BackgroundControlAuthority } from './background-control-authority.js'
+import { BackgroundControlBudgets } from './background-control-budgets.js'
 
 /** Registration is the catalogue. Redis failure affects resource availability, never authorization. */
 @Injectable()

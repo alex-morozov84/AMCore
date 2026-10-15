@@ -1,7 +1,7 @@
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
 
-import type { AccessOperationBudget } from './access-budget'
-import type { AccessCapability } from './access-capabilities'
+import type { AccessOperationBudget } from './access-budget.js'
+import type { AccessCapability } from './access-capabilities.js'
 
 /** Key-order independent JSON of a condition; `null` and `{}` both mean unconditional. */
 function canonicalJson(value: unknown): string {

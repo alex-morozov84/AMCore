@@ -141,7 +141,7 @@ The command prints one roles page address per organization.
 The default also prepares SUPER_ADMIN when the Console feature is enabled.
 For notification delivery acceptance, create a fresh ID with
 `pnpm stand preview --id notification-work --profile notification-work`.
-This profile adds an internal fake Telegram provider and17 repeatable delivery
+This profile adds an internal fake Telegram provider and 17 repeatable delivery
 cases. It sends no real messages. Five actual client HTTP429 witnesses establish
 one safe retry case; its sixth call can receive fake acceptance. Claims initially
 start paused. Other cases cover pending cancellation, a reserved/spent grant,
@@ -149,6 +149,11 @@ unknown effects, permanent failure, changed version/target, protected legacy
 history, old/recent cleanup and truncated/expired history. Repeated preview keeps
 the owner's changes and does not reseed removed deliveries. The fake provider
 counter uses an owned volume; stop/purge follows the usual managed commands.
+For AI run control acceptance, use `pnpm stand preview --id ai-run-control
+--profile ai-run-control`. This profile pauses new AI claims and creates five text
+runs through the owner API: queued, transient retryable, permanent failure,
+recent cancellation and cancellation older than 30 days. It uses the mock model.
+Repeated preview keeps the owner's changes.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared
@@ -426,3 +431,10 @@ resource/process removal is proved. Retaining a stand requires an explicit owner
 decision recorded with its identity, reason and responsible person; retain the
 needed source/recovery location too. Preview remains available during acceptance,
 then the default closeout removes it.
+
+## API compiler changes
+
+Managed stands retain their isolated resource ownership with the ESM API.
+For manual Nest watch sessions, see [API build guidance](../backend/api-build.md)
+for asynchronous diagnostics and explicit restarts after configuration/shared changes.
+A successful E2E preparation receipt does not certify compiled API freshness.

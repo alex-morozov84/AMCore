@@ -1,24 +1,24 @@
 import { z } from 'zod'
 
-import { EmailChannelDeliverer } from './channels/email-channel.deliverer'
-import { EmailTargetResolver } from './channels/email-target.resolver'
-import type { NotificationChannelDescriptor } from './channels/notification-channel.types'
+import { canonicalJsonHash } from '../../common/utils/canonical-json.js'
+import { preparedEmailBodySchema } from '../../infrastructure/email/prepared-email.js'
+
+import { EmailChannelDeliverer } from './channels/email-channel.deliverer.js'
+import { EmailTargetResolver } from './channels/email-target.resolver.js'
+import type { NotificationChannelDescriptor } from './channels/notification-channel.types.js'
 import {
   EmailNotificationDeliveryModule,
   TelegramNotificationDeliveryModule,
-} from './channels/notification-delivery.modules'
+} from './channels/notification-delivery.modules.js'
 import {
   EmailTargetReaderModule,
   TelegramTargetReaderModule,
-} from './channels/notification-target-reader.modules'
-import { TelegramChannelDeliverer } from './channels/telegram/telegram-channel.deliverer'
-import { TelegramTargetResolver } from './channels/telegram/telegram-target.resolver'
-import { TelegramNotificationWebModule } from './channels/telegram/telegram-web.module'
-import { NOTIFICATION_DEFINITIONS } from './definitions'
-import { NotificationsCoreModule } from './notifications-core.module'
-
-import { canonicalJsonHash } from '@/common/utils/canonical-json'
-import { preparedEmailBodySchema } from '@/infrastructure/email/prepared-email'
+} from './channels/notification-target-reader.modules.js'
+import { TelegramChannelDeliverer } from './channels/telegram/telegram-channel.deliverer.js'
+import { TelegramTargetResolver } from './channels/telegram/telegram-target.resolver.js'
+import { TelegramNotificationWebModule } from './channels/telegram/telegram-web.module.js'
+import { NOTIFICATION_DEFINITIONS } from './definitions/index.js'
+import { NotificationsCoreModule } from './notifications-core.module.js'
 
 /** Application composition entry; neutral/core barrels do not import this inventory. */
 export const NOTIFICATION_CHANNELS: readonly NotificationChannelDescriptor[] = [

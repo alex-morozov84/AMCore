@@ -1,4 +1,4 @@
-import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant'
+import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant.js'
 
 /** Names that are registered with BullMQ and observed. */
 export function enabledQueueNames(

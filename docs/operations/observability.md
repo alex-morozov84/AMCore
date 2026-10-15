@@ -420,8 +420,8 @@ Readiness and liveness retain their separate check sets and configured limits.
 The authenticated `/admin/overview` endpoint projects readiness as data, including
 `degraded` and `not_ready`; a failed observation remains a separate request error.
 API Jest entry points enable experimental VM modules to load Terminus's ESM
-package. Production retains Node 24 CommonJS loading; no API module-mode migration
-is required.
+package. Production runs the API as ESM on Node 24. See
+[API build and module boundaries](../backend/api-build.md).
 
 ## Web and Worker Roles
 

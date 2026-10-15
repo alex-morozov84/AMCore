@@ -2,12 +2,11 @@ import { Injectable } from '@nestjs/common'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { UnauthorizedException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { invitationClock } from './invitation-locks'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { invitationClock } from './invitation-locks.js'
 
 /** Invitation endpoints opt into live session validation; ordinary JWT auth stays stateless. */
 @Injectable()

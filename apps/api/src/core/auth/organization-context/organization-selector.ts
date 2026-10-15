@@ -2,9 +2,9 @@ import type { Request } from 'express'
 
 import { isOrganizationContextId } from '@amcore/shared'
 
-import { BadRequestException } from '../../../common/exceptions'
+import { BadRequestException } from '../../../common/exceptions/index.js'
 
-import type { RequestContextPolicyDefinition } from './request-context-policy'
+import type { RequestContextPolicyDefinition } from './request-context-policy.js'
 
 export const ORGANIZATION_HEADER = 'x-amcore-organization-id'
 

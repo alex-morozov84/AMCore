@@ -1,4 +1,4 @@
-import type { GUARDRAIL_INPUT_CATEGORY, GUARDRAIL_OUTPUT_CATEGORY } from './guardrail.constants'
+import type { GUARDRAIL_INPUT_CATEGORY, GUARDRAIL_OUTPUT_CATEGORY } from './guardrail.constants.js'
 
 /**
  * Guardrail verdict + result contracts (Track C — ADR-054 / ADR-055, Arc D). Server-owned and

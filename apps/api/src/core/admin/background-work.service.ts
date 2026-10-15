@@ -4,19 +4,19 @@ import type { Queue } from 'bullmq'
 
 import type { RequestPrincipal, WorkCommand, WorkReceipt, WorkReconciliation } from '@amcore/shared'
 
-import { BackgroundCommandService, type BrokerCommandPort } from './background-command-service'
-import { backgroundControlError } from './background-control-error'
-import { ordinaryJobCommandPort } from './background-job-command'
-import { queueCommandPort } from './background-queue-command'
+import { ControlConnection } from '../../infrastructure/background-work/control-connection.js'
+import type { DurableWorkControl } from '../../infrastructure/background-work/durable-work.js'
+import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { PROVIDER_WINDOW_CLOCK } from '../../infrastructure/background-work/provider-window-clock.js'
+import { WORK_REGISTRATIONS } from '../../infrastructure/background-work/registration.js'
+import type { WorkRegistration } from '../../infrastructure/background-work/work-definition.js'
+import type { EmailProvider } from '../../infrastructure/email/email.types.js'
+import { QUEUE_REGISTRY } from '../../infrastructure/queue/constants/queue-inventory.constant.js'
 
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
-import type { DurableWorkControl } from '@/infrastructure/background-work/durable-work'
-import { ProviderEvidenceStore } from '@/infrastructure/background-work/provider-evidence.store'
-import { PROVIDER_WINDOW_CLOCK } from '@/infrastructure/background-work/provider-window-clock'
-import { WORK_REGISTRATIONS } from '@/infrastructure/background-work/registration'
-import type { WorkRegistration } from '@/infrastructure/background-work/work-definition'
-import type { EmailProvider } from '@/infrastructure/email/email.types'
-import { QUEUE_REGISTRY } from '@/infrastructure/queue/constants/queue-inventory.constant'
+import { BackgroundCommandService, type BrokerCommandPort } from './background-command-service.js'
+import { backgroundControlError } from './background-control-error.js'
+import { ordinaryJobCommandPort } from './background-job-command.js'
+import { queueCommandPort } from './background-queue-command.js'
 
 /** HTTP-neutral application entry: registration chooses every backend control owner. */
 @Injectable()

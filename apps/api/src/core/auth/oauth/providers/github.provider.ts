@@ -3,9 +3,9 @@ import { HttpStatus } from '@nestjs/common'
 import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../../../common/exceptions'
+import { AppException } from '../../../../common/exceptions/index.js'
 
-import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface'
+import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface.js'
 
 interface GitHubUser {
   id: number

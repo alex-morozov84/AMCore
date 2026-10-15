@@ -1,4 +1,4 @@
-import type { GuardVerdict } from '../guardrail.types'
+import type { GuardVerdict } from '../guardrail.types.js'
 
 /**
  * Adversarial prompt-injection corpus (Track C — ADR-054 / ADR-055, Arc D). A small, **in-repo,

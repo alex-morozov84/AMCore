@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { TELEGRAM_LINK_TOKEN_PATTERN } from './telegram.constants'
+import { TELEGRAM_LINK_TOKEN_PATTERN } from './telegram.constants.js'
 
 /**
  * Two-stage bounded parse of a Telegram webhook update (R4). Bot API updates are intentionally

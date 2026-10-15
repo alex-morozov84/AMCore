@@ -1,9 +1,9 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 
-import { decodeSetting } from './setting-codec'
-import type { SettingDefinition, SettingRow } from './setting-definition'
+import { PrismaService } from '../../prisma/index.js'
 
-import { PrismaService } from '@/prisma'
+import { decodeSetting } from './setting-codec.js'
+import type { SettingDefinition, SettingRow } from './setting-definition.js'
 
 @Injectable()
 export class SettingRepository {

@@ -3,8 +3,8 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common'
 import type { Request } from 'express'
 
-import { AppException } from '@/common/exceptions'
-import { EnvService } from '@/env/env.service'
+import { AppException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
 
 @Injectable()
 export class MetricsAuthGuard implements CanActivate {

@@ -3,31 +3,30 @@ import { performance } from 'node:perf_hooks'
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { PrismaService } from '../../../prisma'
-import { ChannelDelivererRegistry } from '../channels/channel-deliverer.registry'
+import { WorkReadiness } from '../../../infrastructure/background-work/work-readiness.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { QueueName } from '../../../infrastructure/queue/constants/queues.constant.js'
+import { AttemptRuntime } from '../../../infrastructure/worker-lifecycle/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { ChannelDelivererRegistry } from '../channels/channel-deliverer.registry.js'
 import {
   type DeliveryResult,
   isNotStarted,
   type NotStarted,
-} from '../channels/channel-deliverer.types'
-import type { NotificationChannel } from '../notification.constants'
+} from '../channels/channel-deliverer.types.js'
+import type { NotificationChannel } from '../notification.constants.js'
 import {
   NOTIFICATION_MAX_DRAIN_DELIVERIES,
   NOTIFICATION_PROVIDER_TIMEOUT_MS,
   NOTIFICATION_SHUTDOWN_GRACE_MS,
   NotificationErrorCode,
-} from '../notification-dispatch.constants'
+} from '../notification-dispatch.constants.js'
 
-import { NotificationAttemptAdmission } from './notification-attempt-admission'
-import { NotificationDeliveryRepository } from './notification-delivery.repository'
-import { NotificationDispatchGate } from './notification-dispatch.gate'
-import type { ClaimedDelivery, FinalizeResult } from './notification-dispatch.types'
-import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch'
-
-import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
-import { MetricsService } from '@/infrastructure/observability'
-import { QueueName } from '@/infrastructure/queue/constants/queues.constant'
-import { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import { NotificationAttemptAdmission } from './notification-attempt-admission.js'
+import { NotificationDeliveryRepository } from './notification-delivery.repository.js'
+import { NotificationDispatchGate } from './notification-dispatch.gate.js'
+import type { ClaimedDelivery, FinalizeResult } from './notification-dispatch.types.js'
+import { CUTOFF, NotificationShutdownLatch } from './notification-shutdown.latch.js'
 
 /**
  * Drains due notification deliveries (ADR-052). Invoked by both the BullMQ wake job and the

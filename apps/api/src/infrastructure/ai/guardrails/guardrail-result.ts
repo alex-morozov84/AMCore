@@ -1,4 +1,4 @@
-import type { GuardResult, GuardVerdict } from './guardrail.types'
+import type { GuardResult, GuardVerdict } from './guardrail.types.js'
 
 /**
  * Accumulates content-free guard findings as `category → count` (Track C — ADR-054 / ADR-055,

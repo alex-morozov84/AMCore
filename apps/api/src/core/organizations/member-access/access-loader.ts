@@ -6,13 +6,12 @@ import {
   OrganizationMemberErrorCode,
 } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
+import { AppException } from '../../../common/exceptions/index.js'
+import type { Organization } from '../../../generated/prisma/client.js'
+import { Prisma } from '../../../generated/prisma/client.js'
 
-import { AccessUnavailableError } from './access-budget'
-import type { StoredPolicyRule } from './access-facts'
-
-import type { Organization } from '@/generated/prisma/client'
-import { Prisma } from '@/generated/prisma/client'
+import { AccessUnavailableError } from './access-budget.js'
+import type { StoredPolicyRule } from './access-facts.js'
 
 export interface LoadedAccess {
   organization: Organization

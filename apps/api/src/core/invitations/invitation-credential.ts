@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto'
 
 import { invitationAdmissionResponseSchema, inviteTokenSchema } from '@amcore/shared'
 
-import { invalidInvitation } from './invitation-locks'
+import type { OrgInvite, Prisma } from '../../generated/prisma/client.js'
 
-import type { OrgInvite, Prisma } from '@/generated/prisma/client'
+import { invalidInvitation } from './invitation-locks.js'
 
 export type InvitationCredential = { token: string } | { continuation: string }
 export const invitationSecretHash = (secret: string): string =>

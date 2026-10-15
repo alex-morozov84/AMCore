@@ -4,10 +4,9 @@ import {
   parseSupportedLocale,
 } from '@amcore/shared'
 
-import { avatarUrlOf } from '../auth/avatar-url'
-
-import type { Prisma } from '@/generated/prisma/client'
-import type { StorageService } from '@/infrastructure/storage'
+import type { Prisma } from '../../generated/prisma/client.js'
+import type { StorageService } from '../../infrastructure/storage/index.js'
+import { avatarUrlOf } from '../auth/avatar-url.js'
 
 export const DETAIL_USER_SELECT = {
   id: true,

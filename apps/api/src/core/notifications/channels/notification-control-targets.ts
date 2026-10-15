@@ -3,16 +3,19 @@ import { ModuleRef } from '@nestjs/core'
 
 import type { WorkReason } from '@amcore/shared'
 
-import { notificationProviderScope } from '../control/notification-provider-scope'
-import { resolveExternalMode } from '../notification-content-policy'
-import { NotificationDefinitionRegistry } from '../notification-definition.registry'
+import { EnvService } from '../../../env/env.service.js'
+import type {
+  Notification,
+  NotificationDelivery,
+  Prisma,
+} from '../../../generated/prisma/client.js'
+import { notificationProviderScope } from '../control/notification-provider-scope.js'
+import { resolveExternalMode } from '../notification-content-policy.js'
+import { NotificationDefinitionRegistry } from '../notification-definition.registry.js'
 
-import { NotificationChannelRegistry } from './notification-channel.registry'
-import type { NotificationControlTarget } from './notification-control-target'
-import { validatePreparedRequest } from './notification-prepared-request'
-
-import { EnvService } from '@/env/env.service'
-import type { Notification, NotificationDelivery, Prisma } from '@/generated/prisma/client'
+import { NotificationChannelRegistry } from './notification-channel.registry.js'
+import type { NotificationControlTarget } from './notification-control-target.js'
+import { validatePreparedRequest } from './notification-prepared-request.js'
 
 /** Core-only validators use the supplied transaction and never resolve a new target. */
 @Injectable()

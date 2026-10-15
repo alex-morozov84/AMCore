@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 
-import { aiRunExecutionEligibility } from './ai-run-execution-eligibility'
+import { AiRunStatus, Prisma } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { METRIC_NAMES, MetricsService } from '../../observability/index.js'
 
-import { AiRunStatus, Prisma } from '@/generated/prisma/client'
-import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+import { aiRunExecutionEligibility } from './ai-run-execution-eligibility.js'
 
 /**
  * Non-terminal `AiRun` statuses — the real backlog behind the `ai-runs`

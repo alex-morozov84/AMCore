@@ -1,3 +1,7 @@
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
 /* oxlint-disable no-console -- an operator CLI reports to stdout (mirrors telegram-setup.ts) */
 /**
  * Operator check of the configured file storage against the REAL provider:
@@ -11,14 +15,14 @@
  * the reserved diagnostic folder, removes what it created and never prints credentials,
  * endpoints or provider messages. Exit code 0 means every step passed or was skipped.
  */
-import { validate } from '../env'
-import { readAnonymously } from '../infrastructure/storage/storage-anonymous-read'
+import { validate } from '../env.js'
+import { readAnonymously } from '../infrastructure/storage/storage-anonymous-read.js'
 import {
   formatStorageCheck,
   runStorageCheck,
   storageCheckPassed,
-} from '../infrastructure/storage/storage-check.runner'
-import { createStorageProvider } from '../infrastructure/storage/storage-provider.factory'
+} from '../infrastructure/storage/storage-check.runner.js'
+import { createStorageProvider } from '../infrastructure/storage/storage-provider.factory.js'
 
 async function main(): Promise<boolean> {
   let env: ReturnType<typeof validate>
@@ -65,6 +69,9 @@ async function main(): Promise<boolean> {
 }
 
 // Run only when invoked directly (not when imported by a test).
-if (require.main === module) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
+) {
   void main().then((ok) => process.exit(ok ? 0 : 1))
 }

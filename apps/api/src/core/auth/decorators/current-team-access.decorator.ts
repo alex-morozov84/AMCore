@@ -1,6 +1,6 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common'
 
-import type { TeamAccessDecision } from '../casl/ability.factory'
+import type { TeamAccessDecision } from '../casl/ability.factory.js'
 
 export const CurrentTeamAccess = createParamDecorator(
   (_: unknown, context: ExecutionContext): TeamAccessDecision => {

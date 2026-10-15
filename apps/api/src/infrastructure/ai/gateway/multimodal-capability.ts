@@ -1,6 +1,6 @@
-import type { ResolvedAiModel } from '../registry/ai-registry.types'
+import type { ResolvedAiModel } from '../registry/ai-registry.types.js'
 
-import type { AiGenerateMessage } from './ai-gateway.types'
+import type { AiGenerateMessage } from './ai-gateway.types.js'
 
 /**
  * Multimodal capability keys the gateway gates on (Track C — ADR-054, Arc G). An `image` content
