@@ -45,6 +45,14 @@ export const storageEnv = z.object({
     .max(128)
     .regex(/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/)
     .default('__amcore_probes__'),
+  // Public-delivery check (s3 only): reads, never writes, after one idempotent canary write
+  // at boot. Environment-only; it does not join the runtime-setting machinery.
+  STORAGE_PUBLIC_CHECK_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS: z.coerce.number().int().min(300).max(86400).default(3600),
+  STORAGE_PUBLIC_CHECK_TIMEOUT_SECONDS: z.coerce.number().int().min(1).max(30).default(10),
   // Opt-in storage readiness check (Decision B): off by default.
   STORAGE_HEALTH_ENABLED: z
     .enum(['true', 'false'])

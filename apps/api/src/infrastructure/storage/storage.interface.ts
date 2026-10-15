@@ -216,6 +216,12 @@ export interface StorageProvider {
   getSignedUploadUrl(input: SignedUploadInput): Promise<string>
   /** Pure URL constructor for public-read objects ONLY — never the app-mediated download route. */
   getPublicUrl(key: string): string
+  /**
+   * Where an anonymous client would reach `key` through the storage API itself, with no
+   * credentials or signature. Only the s3 driver has one; the public-delivery check reads
+   * it to prove that a private object is not exposed.
+   */
+  getUnsignedObjectUrl?(key: string): Promise<string>
 
   // Copy / move
   copy(input: CopyObjectInput): Promise<void>

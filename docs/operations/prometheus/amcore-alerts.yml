@@ -470,3 +470,21 @@ groups:
           summary: 'AMCore file storage diagnostic unhealthy'
           description: 'A failed, unmeasured or stale cached file-check result has remained visible for 5m. This does not prove continuous failed I/O. API readiness may remain healthy; investigate this instance.'
           runbook_path: docs/operations/runbooks/storage.md#file-diagnostic
+      - alert: AMCoreStoragePublicDeliveryFailed
+        expr: max without (state) (amcore_storage_public_check_state{state=~"failed|stale|unknown"}) == 1
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'AMCore public file delivery check unhealthy'
+          description: 'The cached public-delivery check failed, is unmeasured or stale for 5m. Public files (for example avatars) may not be served; the private-exposure alert covers the opposite failure. API readiness stays healthy.'
+          runbook_path: docs/operations/runbooks/storage.md#public-delivery
+      - alert: AMCoreStoragePrivateExposed
+        expr: amcore_storage_private_exposed == 1
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'AMCore private storage object readable without credentials'
+          description: 'The public-delivery check read its private canary without credentials for 5m. A bucket, prefix or domain that should be private is public. Treat every private object in it as exposed until proven otherwise.'
+          runbook_path: docs/operations/runbooks/storage.md#private-exposure

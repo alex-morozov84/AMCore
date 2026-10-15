@@ -13,7 +13,7 @@ is selected by `STORAGE_DRIVER`.
 | Validation | Server-side magic-byte validation with image/document presets                                          |
 | URLs       | URL generation for public objects; signed URLs only on drivers that support them                       |
 | Downloads  | Reusable app-mediated download primitive for authorized consumers                                      |
-| Health     | Independent active file checks; separately opt-in readiness                                            |
+| Health     | Independent active file checks and a public-delivery check; separately opt-in readiness                |
 | Avatar     | `POST/DELETE /auth/me/avatar` as the public-file example consumer                                      |
 
 ## Mental Model

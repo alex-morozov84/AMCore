@@ -3,7 +3,7 @@ import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/term
 import { PinoLogger } from 'nestjs-pino'
 
 import { StorageService } from './storage.service'
-import { classifyFailure } from './storage-failure'
+import { classifyFailure, type StorageFailureClass } from './storage-failure'
 
 import { EnvService } from '@/env/env.service'
 
@@ -27,6 +27,9 @@ import { EnvService } from '@/env/env.service'
  */
 @Injectable()
 export class StorageHealthIndicator {
+  /** Orchestrators poll readiness every few seconds; log only when the failure class changes. */
+  private lastFailure: StorageFailureClass | null = null
+
   constructor(
     private readonly storage: StorageService,
     private readonly healthIndicatorService: HealthIndicatorService,
@@ -38,15 +41,25 @@ export class StorageHealthIndicator {
     const indicator = this.healthIndicatorService.check(key)
     try {
       await this.storage.exists(this.env.get('STORAGE_HEALTH_PROBE_KEY'))
+      if (this.lastFailure) {
+        this.logger.info({
+          event: 'storage_health_recovered',
+          driver: this.env.get('STORAGE_DRIVER'),
+        })
+        this.lastFailure = null
+      }
       return indicator.up()
     } catch (error) {
       const failure = classifyFailure(error)
-      this.logger.warn({
-        event: 'storage_health_failed',
-        driver: this.env.get('STORAGE_DRIVER'),
-        failure,
-        err: error,
-      })
+      if (failure !== this.lastFailure) {
+        this.logger.warn({
+          event: 'storage_health_failed',
+          driver: this.env.get('STORAGE_DRIVER'),
+          failure,
+          err: error,
+        })
+        this.lastFailure = failure
+      }
       return indicator.down({ failure })
     }
   }

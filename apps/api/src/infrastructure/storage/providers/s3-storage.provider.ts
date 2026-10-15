@@ -245,6 +245,24 @@ export class S3StorageProvider implements StorageProvider {
     return getSignedUrl(this.presignClient, command, { expiresIn: this.clampTtl(input.expiresIn) })
   }
 
+  /**
+   * The address the SDK uses for `key` (path-style or virtual-hosted, per provider
+   * configuration), minus the signature. Requesting it without credentials must be denied
+   * for a private object; deriving it from the SDK keeps the addressing rules in one place.
+   */
+  async getUnsignedObjectUrl(key: string): Promise<string> {
+    const objectKey = normalizeObjectKey(key)
+    const signed = new URL(
+      await getSignedUrl(
+        this.client,
+        new GetObjectCommand({ Bucket: this.bucketFor(objectKey), Key: objectKey }),
+        { expiresIn: 60 }
+      )
+    )
+    signed.search = ''
+    return signed.toString()
+  }
+
   async getSignedUploadUrl(input: SignedUploadInput): Promise<string> {
     const key = normalizeObjectKey(input.key)
     const command = new PutObjectCommand({

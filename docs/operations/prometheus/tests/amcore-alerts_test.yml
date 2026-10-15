@@ -1140,3 +1140,56 @@ tests:
               summary: 'AMCore file storage diagnostic unhealthy'
               description: 'A failed, unmeasured or stale cached file-check result has remained visible for 5m. This does not prove continuous failed I/O. API readiness may remain healthy; investigate this instance.'
               runbook_path: docs/operations/runbooks/storage.md#file-diagnostic
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_storage_public_check_state{driver="s3",state="failed",instance="api:5002"}'
+        values: '1+0x10'
+      - series: 'amcore_storage_public_check_state{driver="s3",state="healthy",instance="api:5002"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AMCoreStoragePublicDeliveryFailed
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: AMCoreStoragePublicDeliveryFailed
+        exp_alerts:
+          - exp_labels:
+              driver: s3
+              instance: api:5002
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore public file delivery check unhealthy'
+              description: 'The cached public-delivery check failed, is unmeasured or stale for 5m. Public files (for example avatars) may not be served; the private-exposure alert covers the opposite failure. API readiness stays healthy.'
+              runbook_path: docs/operations/runbooks/storage.md#public-delivery
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_storage_public_check_state{driver="s3",state="healthy",instance="api:5002"}'
+        values: '1+0x10'
+      - series: 'amcore_storage_public_check_state{driver="s3",state="failed",instance="api:5002"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreStoragePublicDeliveryFailed
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'amcore_storage_private_exposed{driver="s3",instance="api:5002"}'
+        values: '0+0x2 1+0x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AMCoreStoragePrivateExposed
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: AMCoreStoragePrivateExposed
+        exp_alerts:
+          - exp_labels:
+              driver: s3
+              instance: api:5002
+              severity: page
+            exp_annotations:
+              summary: 'AMCore private storage object readable without credentials'
+              description: 'The public-delivery check read its private canary without credentials for 5m. A bucket, prefix or domain that should be private is public. Treat every private object in it as exposed until proven otherwise.'
+              runbook_path: docs/operations/runbooks/storage.md#private-exposure

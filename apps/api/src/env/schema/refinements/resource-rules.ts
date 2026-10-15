@@ -52,6 +52,19 @@ function publicLocationRules(env: EnvResolved, ctx: RefinementCtx): void {
       message: 'STORAGE_PUBLIC_BASE_URL must not contain a query string or fragment',
     })
   }
+  // An ACL can be accepted and silently ignored (measured on SeaweedFS and Garage), and only
+  // the delivery check notices, so `acl` never runs without it.
+  if (
+    env.STORAGE_DRIVER === 's3' &&
+    env.STORAGE_PUBLIC_DELIVERY === 'acl' &&
+    !env.STORAGE_PUBLIC_CHECK_ENABLED
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PUBLIC_CHECK_ENABLED'],
+      message: 'STORAGE_PUBLIC_CHECK_ENABLED must be true when STORAGE_PUBLIC_DELIVERY is acl',
+    })
+  }
   const presign = parseUrl(env.STORAGE_PRESIGN_ENDPOINT)
   if (presign && (presign.pathname !== '/' || presign.search || presign.hash)) {
     ctx.addIssue({

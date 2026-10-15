@@ -42,18 +42,21 @@ missing.
 
 ### Variable reference
 
-| Variable                    | Default            | Meaning                                                                                                                                                         |
-| --------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `STORAGE_ENDPOINT`          | empty (AWS)        | SDK endpoint. May be internal or private. Set it for every non-AWS provider.                                                                                    |
-| `STORAGE_PRESIGN_ENDPOINT`  | `STORAGE_ENDPOINT` | Browser-facing **S3 API origin** used only to sign URLs. A bare origin (`https://s3.example.com`); a path or query fails boot. Never a CDN.                     |
-| `STORAGE_REGION`            | `us-east-1`        | Signing region. Providers define their own value (`auto`, `ru-central1`, `ru-1`, ...). See [providers](providers.md).                                           |
-| `STORAGE_BUCKET`            | none, required     | Private bucket. Everything outside `public/` lives here.                                                                                                        |
-| `STORAGE_ACCESS_KEY_ID`     | none, required     | Credentials for the application. Grant object read/write/delete (and list) on the buckets below.                                                                |
-| `STORAGE_SECRET_ACCESS_KEY` | none, required     |                                                                                                                                                                 |
-| `STORAGE_FORCE_PATH_STYLE`  | `false`            | Path-style addressing (`https://host/bucket/key`). Most providers accept virtual-hosted style; follow the provider page.                                        |
-| `STORAGE_PUBLIC_DELIVERY`   | `external`         | How `public/` objects become readable: `external` or `acl`. See [Public files](public-files.md).                                                                |
-| `STORAGE_PUBLIC_BUCKET`     | `STORAGE_BUCKET`   | Bucket that holds `public/` keys. A separate bucket is the portable choice; the same bucket works when the provider can publish a prefix.                       |
-| `STORAGE_PUBLIC_BASE_URL`   | none, required     | URL of the **root of the public bucket** as a browser reaches it. The key is appended: `<base>/public/avatars/...`. For the local driver: the API public route. |
+| Variable                                | Default            | Meaning                                                                                                                                                         |
+| --------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_ENDPOINT`                      | empty (AWS)        | SDK endpoint. May be internal or private. Set it for every non-AWS provider.                                                                                    |
+| `STORAGE_PRESIGN_ENDPOINT`              | `STORAGE_ENDPOINT` | Browser-facing **S3 API origin** used only to sign URLs. A bare origin (`https://s3.example.com`); a path or query fails boot. Never a CDN.                     |
+| `STORAGE_REGION`                        | `us-east-1`        | Signing region. Providers define their own value (`auto`, `ru-central1`, `ru-1`, ...). See [providers](providers.md).                                           |
+| `STORAGE_BUCKET`                        | none, required     | Private bucket. Everything outside `public/` lives here.                                                                                                        |
+| `STORAGE_ACCESS_KEY_ID`                 | none, required     | Credentials for the application. Grant object read/write/delete (and list) on the buckets below.                                                                |
+| `STORAGE_SECRET_ACCESS_KEY`             | none, required     |                                                                                                                                                                 |
+| `STORAGE_FORCE_PATH_STYLE`              | `false`            | Path-style addressing (`https://host/bucket/key`). Most providers accept virtual-hosted style; follow the provider page.                                        |
+| `STORAGE_PUBLIC_DELIVERY`               | `external`         | How `public/` objects become readable: `external` or `acl`. See [Public files](public-files.md).                                                                |
+| `STORAGE_PUBLIC_BUCKET`                 | `STORAGE_BUCKET`   | Bucket that holds `public/` keys. A separate bucket is the portable choice; the same bucket works when the provider can publish a prefix.                       |
+| `STORAGE_PUBLIC_BASE_URL`               | none, required     | URL of the **root of the public bucket** as a browser reaches it. The key is appended: `<base>/public/avatars/...`. For the local driver: the API public route. |
+| `STORAGE_PUBLIC_CHECK_ENABLED`          | `true`             | The [public-delivery check](public-files.md#verify-the-setup) (s3 only). Must stay `true` when `STORAGE_PUBLIC_DELIVERY=acl`.                                   |
+| `STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS` | `3600`             | Time between read-only checks, 300 to 86400 seconds. Environment only.                                                                                          |
+| `STORAGE_PUBLIC_CHECK_TIMEOUT_SECONDS`  | `10`               | Deadline of one check, 1 to 30 seconds.                                                                                                                         |
 
 Signed URL lifetimes and limits:
 
@@ -346,6 +349,31 @@ follow [Alertmanager receiver setup](../operations/observability.md#local-verifi
 See the [storage runbook](../operations/runbooks/storage.md) for failure recovery.
 
 The optional Console displays the cached file-check result; it does not send alerts.
+
+## Public delivery monitoring
+
+The file check above covers private storage. The `s3` driver adds a second, independent
+observation of the public boundary: after one idempotent write of two fixed canary
+objects at start-up it only **reads**, so it adds no write cost and needs no cleanup.
+Each check makes two or three small anonymous GET requests:
+
+1. the public canary (`public/<STORAGE_PROBE_PREFIX>/public-canary`) at
+   `STORAGE_PUBLIC_BASE_URL`;
+2. the private canary (`<STORAGE_PROBE_PREFIX>/private-canary`) through the storage API
+   without credentials, which must be refused (401, 403 or 404);
+3. with one bucket only, the private canary at the public base, which must be refused.
+
+Defaults run it once an hour per API process (a dedicated worker skips it); `STORAGE_PUBLIC_CHECK_ENABLED=false`
+turns it off (not allowed in `acl` mode). The result appears as the metrics
+`amcore_storage_public_check_state{driver,state}` and `amcore_storage_private_exposed{driver}`,
+the alerts `AMCoreStoragePublicDeliveryFailed` (ticket) and `AMCoreStoragePrivateExposed`
+(page), and log events written on a change. It never changes API readiness. The application
+credentials need object write on both buckets for the start-up canary write and object read;
+the canaries sit in the same reserved folder as the private file check, so the same
+prefix-only lifecycle rule can clean them. The operator command
+`pnpm --filter api storage:check` runs these checks and more on demand. See
+[Public Files](public-files.md#verify-the-setup) and the
+[runbook](../operations/runbooks/storage.md#public-delivery).
 
 ## Limits
 

@@ -135,39 +135,54 @@ wait for the API-served mode.
 
 A healthy [file check](configuration.md#active-file-monitoring-and-readiness)
 proves private write/read/delete. It does not prove that public delivery works.
-After every setup change check both directions yourself:
+Three tools cover that.
 
-1. Upload an avatar. Copy its `avatarUrl` and open it in a private browser window
-   (no cookies): it must return the image.
-2. Check that private files stay private. Take a **private** key, for example
-   `avatars/<user>/v-<version>/original`:
-   - **Two buckets:** request it from the S3 API without credentials, path-style:
-     `<S3 API endpoint>/<private bucket>/avatars/<user>/v-<version>/original`. It
-     must answer 403. The public base cannot test this layout: that key never
-     exists in the public bucket, so a 404 there proves nothing.
-   - **One bucket:** request it at the public base:
-     `<STORAGE_PUBLIC_BASE_URL>/avatars/<user>/v-<version>/original`. It must
-     answer 403 or 404.
+**The public-delivery check** runs inside every API process that uses the `s3` driver
+(`STORAGE_PUBLIC_CHECK_ENABLED`, on by default; a dedicated worker skips it because the
+result depends on the deployment, not on the process). At start-up it writes two
+fixed canary objects, one under `public/` and one private. Every
+`STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS` (one hour by default) it then only reads:
 
-   A 200 in either case means a published bucket or prefix contains private files:
-   fix the setup before real users upload anything. A public domain or website
-   endpoint that you bound to the private bucket outside AMCore is not covered by
-   these requests; never bind one.
+1. The public canary must be served anonymously at `STORAGE_PUBLIC_BASE_URL` with its
+   own bytes. A 403 or 404 means nothing publishes the namespace; in `acl` mode it also
+   catches a server that accepted the ACL and ignored it.
+2. The private canary must be refused (401, 403 or 404) when requested from the storage
+   API without credentials. A 2xx means the private bucket is open to everyone.
+3. With **one** bucket, the private canary must also be refused at the public base. With
+   two buckets this request would test nothing, because the private key never exists in
+   the public bucket, so the check does not make it.
 
-3. In `acl` mode repeat step 1 after the first upload. A server that ignores ACLs
-   fails here.
+The result is the metrics `storage_public_check_state` and `storage_private_exposed`
+(alerts `AMCoreStoragePublicDeliveryFailed` and `AMCoreStoragePrivateExposed`) and the
+log events `storage_public_check_failed` and `storage_public_check_recovered`, written
+when the state changes. It never affects API readiness. See the
+[runbook](../operations/runbooks/storage.md#public-delivery).
 
-An automatic check of both directions is planned; until it ships, these steps are
-the verification.
+**The operator command** runs the same checks on demand, plus presigned download and
+upload, multipart upload, copy, list and cleanup, against the configured provider. It
+prints PASS, FAIL or SKIP per step and never prints credentials, endpoints or provider
+messages. Use it after every setup change and once on every new provider:
+
+```bash
+pnpm --filter api storage:check      # from a checkout
+node dist/cli/storage-check.js       # from the production image
+```
+
+**A manual check** still matters for what the application cannot see. A public domain
+or website endpoint that you bound to the **private** bucket outside AMCore is not
+covered by the requests above; never bind one. After a change, upload an avatar, copy
+its `avatarUrl` and open it in a private browser window (no cookies): it must show the
+image.
 
 ## Failure reference
 
-| Symptom                                                   | Cause                                                      | Fix                                                                  |
-| --------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
-| Upload fails with `AccessControlListNotSupported`         | `acl` mode on a bucket with ACLs disabled (AWS default)    | Use `external` and publish the location                              |
-| Upload fails with `NotImplemented` mentioning `x-amz-acl` | `acl` mode on a provider without object ACLs (R2, ...)     | Use `external`                                                       |
-| Upload succeeds, the image URL answers 403                | Nothing publishes `public/`, or the server ignored the ACL | Publish the location; in `acl` mode switch to `external`             |
-| Image URL answers 404                                     | `STORAGE_PUBLIC_BASE_URL` does not map to the bucket root  | Compare the URL with the real object address; fix the base           |
-| Boot error naming `STORAGE_PUBLIC_BASE_URL`               | Missing base for `s3`, or `local` in production            | Set the base                                                         |
-| Boot error naming `STORAGE_PRESIGN_ENDPOINT`              | The value has a path (often a CDN address)                 | Use the bare S3 API origin; put the CDN in `STORAGE_PUBLIC_BASE_URL` |
-| Presigned URL has a wrong host (`<bucket>.<your CDN>`)    | CDN used as the presign endpoint                           | Same as above                                                        |
+| Symptom                                                   | Cause                                                      | Fix                                                                                             |
+| --------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Upload fails with `AccessControlListNotSupported`         | `acl` mode on a bucket with ACLs disabled (AWS default)    | Use `external` and publish the location                                                         |
+| Upload fails with `NotImplemented` mentioning `x-amz-acl` | `acl` mode on a provider without object ACLs (R2, ...)     | Use `external`                                                                                  |
+| Upload succeeds, the image URL answers 403                | Nothing publishes `public/`, or the server ignored the ACL | Publish the location; in `acl` mode switch to `external`. The check reports `public_not_served` |
+| Alert `AMCoreStoragePrivateExposed`                       | The check read a private canary without credentials        | Treat as an incident: [runbook](../operations/runbooks/storage.md#private-exposure)             |
+| Image URL answers 404                                     | `STORAGE_PUBLIC_BASE_URL` does not map to the bucket root  | Compare the URL with the real object address; fix the base                                      |
+| Boot error naming `STORAGE_PUBLIC_BASE_URL`               | Missing base for `s3`, or `local` in production            | Set the base                                                                                    |
+| Boot error naming `STORAGE_PRESIGN_ENDPOINT`              | The value has a path (often a CDN address)                 | Use the bare S3 API origin; put the CDN in `STORAGE_PUBLIC_BASE_URL`                            |
+| Presigned URL has a wrong host (`<bucket>.<your CDN>`)    | CDN used as the presign endpoint                           | Same as above                                                                                   |

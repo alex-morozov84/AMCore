@@ -14,7 +14,7 @@ describe('StorageHealthIndicator', () => {
   let down: jest.Mock
   let healthIndicatorService: jest.Mocked<HealthIndicatorService>
   let env: { get: jest.Mock }
-  let logger: { warn: jest.Mock }
+  let logger: { warn: jest.Mock; info: jest.Mock }
   let indicator: StorageHealthIndicator
 
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('StorageHealthIndicator', () => {
     env = {
       get: jest.fn((key: string) => (key === 'STORAGE_DRIVER' ? 's3' : PROBE_KEY)),
     }
-    logger = { warn: jest.fn() }
+    logger = { warn: jest.fn(), info: jest.fn() }
     indicator = new StorageHealthIndicator(
       storage as unknown as StorageService,
       healthIndicatorService,
@@ -59,6 +59,27 @@ describe('StorageHealthIndicator', () => {
     expect(JSON.stringify(down.mock.calls)).not.toContain('internal.example.com')
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'storage_health_failed', driver: 's3', failure: 'io_error' })
+    )
+  })
+
+  it('logs once per failure class and once on recovery, however often readiness is polled', async () => {
+    storage.exists.mockRejectedValue(new Error('boom'))
+    await indicator.isHealthy('storage')
+    await indicator.isHealthy('storage')
+    await indicator.isHealthy('storage')
+    expect(logger.warn).toHaveBeenCalledTimes(1)
+
+    storage.exists.mockRejectedValue(Object.assign(new Error('x'), { name: 'AccessDenied' }))
+    await indicator.isHealthy('storage')
+    await indicator.isHealthy('storage')
+    expect(logger.warn).toHaveBeenCalledTimes(2)
+
+    storage.exists.mockResolvedValue(true)
+    await indicator.isHealthy('storage')
+    await indicator.isHealthy('storage')
+    expect(logger.info).toHaveBeenCalledTimes(1)
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'storage_health_recovered' })
     )
   })
 

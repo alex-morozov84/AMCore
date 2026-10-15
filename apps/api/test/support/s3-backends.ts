@@ -243,3 +243,20 @@ function adminClient(
     responseChecksumValidation: 'WHEN_REQUIRED',
   })
 }
+
+/**
+ * An anonymous reader for Garage website buckets. Their address carries the bucket in the
+ * host name (`<bucket>.web.garage.localhost`), which not every resolver maps to loopback, so
+ * the request goes to the mapped port on the container host with the original Host header.
+ */
+export function garageRead(garage: GarageBackend): (url: string) => Promise<AnonymousResponse> {
+  const endpoint = new URL(garage.endpoint)
+  return (url) => {
+    const target = new URL(url)
+    if (!target.hostname.endsWith(GARAGE_WEB_ROOT)) return anonymousGet(url)
+    return anonymousGet(
+      `http://${endpoint.hostname}:${target.port}${target.pathname}${target.search}`,
+      target.host
+    )
+  }
+}

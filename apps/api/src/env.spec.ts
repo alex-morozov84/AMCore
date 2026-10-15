@@ -555,6 +555,41 @@ describe('env validation', () => {
       }
     )
 
+    it('defaults the public-delivery check to hourly and enabled', () => {
+      const env = validate(baseEnv)
+      expect(env.STORAGE_PUBLIC_CHECK_ENABLED).toBe(true)
+      expect(env.STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS).toBe(3600)
+      expect(env.STORAGE_PUBLIC_CHECK_TIMEOUT_SECONDS).toBe(10)
+    })
+
+    it.each(['299', '86401'])(
+      'rejects a check interval outside 5 minutes - 24 hours: %s',
+      (value) => {
+        expect(issuePaths({ ...baseEnv, STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS: value })).toContain(
+          'STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS'
+        )
+      }
+    )
+
+    it('does not let acl mode run without the check that can see an ignored ACL', () => {
+      const acl = {
+        ...s3,
+        STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+        STORAGE_PUBLIC_DELIVERY: 'acl',
+      }
+      expect(issuePaths({ ...acl, STORAGE_PUBLIC_CHECK_ENABLED: 'false' })).toContain(
+        'STORAGE_PUBLIC_CHECK_ENABLED'
+      )
+      expect(issuePaths(acl)).not.toContain('STORAGE_PUBLIC_CHECK_ENABLED')
+      expect(
+        issuePaths({
+          ...s3,
+          STORAGE_PUBLIC_BASE_URL: 'https://cdn.example.com',
+          STORAGE_PUBLIC_CHECK_ENABLED: 'false',
+        })
+      ).not.toContain('STORAGE_PUBLIC_CHECK_ENABLED')
+    })
+
     it('rejects an unknown delivery mode and the removed variables are ignored', () => {
       expect(issuePaths({ ...baseEnv, STORAGE_PUBLIC_DELIVERY: 'public-acl' })).toContain(
         'STORAGE_PUBLIC_DELIVERY'

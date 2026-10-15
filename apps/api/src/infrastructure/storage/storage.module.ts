@@ -1,16 +1,16 @@
 import { type DynamicModule, Global, Module } from '@nestjs/common'
 import { TerminusModule } from '@nestjs/terminus'
 
-import { LocalStorageProvider } from './providers/local-storage.provider'
-import { MemoryStorageProvider } from './providers/memory-storage.provider'
-import { S3StorageProvider } from './providers/s3-storage.provider'
 import { STORAGE_PROVIDER } from './storage.constants'
 import { StorageHealthIndicator } from './storage.health'
 import type { StorageProvider } from './storage.interface'
 import { StorageService } from './storage.service'
+import { ANONYMOUS_READ, readAnonymously } from './storage-anonymous-read'
 import { StorageDownloadService } from './storage-download.service'
 import { StorageProbeIo } from './storage-probe.io'
 import { StorageProbeService } from './storage-probe.service'
+import { createStorageProvider } from './storage-provider.factory'
+import { StoragePublicCheckService } from './storage-public-check.service'
 
 import { EnvModule } from '@/env/env.module'
 import { EnvService } from '@/env/env.service'
@@ -39,52 +39,23 @@ export class StorageModule {
         {
           provide: STORAGE_PROVIDER,
           inject: [EnvService],
-          useFactory: (env: EnvService): StorageProvider => createProvider(env),
+          useFactory: (env: EnvService): StorageProvider => createStorageProvider(env),
         },
         StorageService,
         StorageDownloadService,
         StorageHealthIndicator,
         StorageProbeIo,
+        { provide: ANONYMOUS_READ, useValue: readAnonymously },
         StorageProbeService,
+        StoragePublicCheckService,
       ],
       exports: [
         StorageService,
         StorageDownloadService,
         StorageHealthIndicator,
         StorageProbeService,
+        StoragePublicCheckService,
       ],
     }
-  }
-}
-
-function createProvider(env: EnvService): StorageProvider {
-  const driver = env.get('STORAGE_DRIVER')
-  switch (driver) {
-    case 'memory':
-      return new MemoryStorageProvider()
-    case 'local':
-      return new LocalStorageProvider({
-        root: env.get('STORAGE_LOCAL_ROOT'),
-        publicBaseUrl: env.get('STORAGE_PUBLIC_BASE_URL'),
-      })
-    case 's3':
-      // env.ts superRefine guarantees bucket, credentials and the public base are
-      // present when STORAGE_DRIVER === 's3' (boot fails otherwise), so the assertions hold.
-      return new S3StorageProvider({
-        bucket: env.get('STORAGE_BUCKET')!,
-        publicBucket: env.get('STORAGE_PUBLIC_BUCKET'),
-        region: env.get('STORAGE_REGION'),
-        accessKeyId: env.get('STORAGE_ACCESS_KEY_ID')!,
-        secretAccessKey: env.get('STORAGE_SECRET_ACCESS_KEY')!,
-        endpoint: env.get('STORAGE_ENDPOINT'),
-        presignEndpoint: env.get('STORAGE_PRESIGN_ENDPOINT'),
-        publicDelivery: env.get('STORAGE_PUBLIC_DELIVERY'),
-        publicBaseUrl: env.get('STORAGE_PUBLIC_BASE_URL')!,
-        forcePathStyle: env.get('STORAGE_FORCE_PATH_STYLE'),
-        signedUrlDefaultTtl: env.get('STORAGE_SIGNED_URL_DEFAULT_TTL'),
-        signedUrlMaxTtl: env.get('STORAGE_SIGNED_URL_MAX_TTL'),
-      })
-    default:
-      throw new Error(`Unknown storage driver: ${String(driver)}`)
   }
 }

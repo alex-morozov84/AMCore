@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `STORAGE_PRESIGN_ENDPOINT` (a bare S3 API origin used only to sign),
   `STORAGE_PUBLIC_DELIVERY` and `STORAGE_PUBLIC_BUCKET`. See `docs/storage/public-files.md`.
 
+- Add a read-only public-delivery check for the `s3` driver and the operator command
+  `storage:check`. After writing two fixed canary objects at start-up, each process
+  reads the public canary anonymously and verifies that the private one is refused,
+  without credentials. Results are metrics (`amcore_storage_public_check_state`,
+  `amcore_storage_private_exposed`), two alerts and log events; readiness is unchanged.
+  The unauthenticated readiness response now reports only a failure class when the
+  optional storage check fails, and logs once per change.
+
 - Limit shared declaration-map cleanup to each build’s emitted files, preserving
   the other format’s declarations during overlapping watch rebuilds.
 
