@@ -17,6 +17,7 @@ function deps(overrides: Partial<StorageCheckDeps> = {}): StorageCheckDeps {
     send: unreachable,
     fetchBody: unreachable,
     publicBaseUrl: '',
+    urlForm: 'bucket-root',
     singleBucket: true,
     probePrefix: '__amcore_probes__',
     ...overrides,

@@ -1,6 +1,7 @@
 import type { StorageProvider } from './storage.interface'
 import type { AnonymousRead } from './storage-anonymous-read'
 import { PUBLIC_KEY_PREFIX } from './storage-namespace'
+import { buildDiagnosticUrl, type PublicUrlForm } from './storage-public-url'
 
 /** Fixed bytes. The two canaries differ, so one can never be mistaken for the other. */
 export const PUBLIC_CANARY_BYTES = Buffer.from('amcore-public-canary-v1')
@@ -25,6 +26,8 @@ export interface PublicDeliveryDeps {
   read: AnonymousRead
   /** `STORAGE_PUBLIC_BASE_URL`: the root of the public bucket as a browser reaches it. */
   publicBaseUrl: string
+  /** Bucket-root addresses (`<base>/<key>`) or the API route's query form (`<base>?key=<key>`). */
+  urlForm: PublicUrlForm
   /** One bucket holds both namespaces, so the public base could also reach private keys. */
   singleBucket: boolean
   /** `STORAGE_PROBE_PREFIX`: the reserved folder for diagnostic objects. */
@@ -57,10 +60,6 @@ export async function ensureCanaries(deps: PublicDeliveryDeps): Promise<void> {
     body: PRIVATE_CANARY_BYTES,
     contentType: 'application/octet-stream',
   })
-}
-
-function bucketRootUrl(base: string, key: string): string {
-  return `${base.replace(/\/+$/, '')}/${key.split('/').map(encodeURIComponent).join('/')}`
 }
 
 async function attempt(
@@ -112,8 +111,10 @@ export async function checkPublicDelivery(
     const result = await refused(deps.read, url, signal, 'private_exposed_api')
     if (result) return result
   }
-  if (deps.singleBucket) {
-    const url = bucketRootUrl(deps.publicBaseUrl, privateKey)
+  // The route form always asks the API (it can read both buckets); a bucket-root base only
+  // matters when one bucket holds both namespaces.
+  if (deps.singleBucket || deps.urlForm === 'route') {
+    const url = buildDiagnosticUrl(deps.urlForm, deps.publicBaseUrl, privateKey)
     const result = await refused(deps.read, url, signal, 'private_exposed_base')
     if (result) return result
   }

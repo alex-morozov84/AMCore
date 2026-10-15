@@ -18,11 +18,23 @@ import { EnvService } from '@/env/env.service'
 import { MetricsService } from '@/infrastructure/observability'
 import { METRIC_NAMES } from '@/infrastructure/observability/metrics.constants'
 
-export type PublicCheckState = 'healthy' | 'failed' | 'unknown' | 'stale'
+export type PublicCheckState = 'healthy' | 'failed' | 'unknown' | 'stale' | 'off'
+export type PublicCheckOffReason = 'local_driver' | 'memory_driver' | 'disabled' | 'worker_process'
+export type PublicDeliveryMode = 'external' | 'acl' | 'api'
 
+/**
+ * What the Console shows about public files: the configuration that matters to an operator
+ * (never a bucket name, endpoint or credential) and the last result of this API instance.
+ */
 export interface PublicCheckSnapshot {
   driver: string
   state: PublicCheckState
+  /** `null` while the check runs; otherwise why this instance does not run it. */
+  offReason: PublicCheckOffReason | null
+  delivery: PublicDeliveryMode
+  /** `one` bucket (a published prefix) or `two` buckets (private and public). */
+  layout: 'one' | 'two'
+  publicBaseUrl: string | null
   checkedAt: string | null
   stage: PublicCheckStage | null
   failure: PublicCheckFailure | null
@@ -60,11 +72,16 @@ export class StoragePublicCheckService implements OnModuleInit, OnModuleDestroy 
    * a dedicated worker skips it instead of duplicating requests and exposure alerts.
    */
   get enabled(): boolean {
-    return (
-      this.env.get('STORAGE_DRIVER') === 's3' &&
-      this.env.get('STORAGE_PUBLIC_CHECK_ENABLED') &&
-      this.env.get('PROCESS_ROLE') !== 'worker'
-    )
+    return this.offReason() === null
+  }
+
+  /** Why this process does not run the check, or `null` when it does. */
+  private offReason(): PublicCheckOffReason | null {
+    const driver = this.env.get('STORAGE_DRIVER')
+    if (driver === 'local') return 'local_driver'
+    if (driver !== 's3') return 'memory_driver'
+    if (!this.env.get('STORAGE_PUBLIC_CHECK_ENABLED')) return 'disabled'
+    return this.env.get('PROCESS_ROLE') === 'worker' ? 'worker_process' : null
   }
 
   onModuleInit(): void {
@@ -83,9 +100,32 @@ export class StoragePublicCheckService implements OnModuleInit, OnModuleDestroy 
     const { checkedAt, stage, failure } = this.result
     const staleAfterMs = this.env.get('STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS') * 3 * 1000
     const stale = checkedAt !== null && Date.now() - Date.parse(checkedAt) > staleAfterMs
-    const state: PublicCheckState =
-      checkedAt === null ? 'unknown' : failure ? 'failed' : stale ? 'stale' : 'healthy'
-    return { driver, state, checkedAt, stage, failure }
+    const offReason = this.offReason()
+    const state: PublicCheckState = offReason
+      ? 'off'
+      : checkedAt === null
+        ? 'unknown'
+        : failure
+          ? 'failed'
+          : stale
+            ? 'stale'
+            : 'healthy'
+    return {
+      driver,
+      state,
+      offReason,
+      delivery: this.env.get('STORAGE_PUBLIC_DELIVERY'),
+      layout: this.singleBucket() ? 'one' : 'two',
+      publicBaseUrl: this.env.get('STORAGE_PUBLIC_BASE_URL') ?? null,
+      checkedAt: offReason ? null : checkedAt,
+      stage: offReason ? null : stage,
+      failure: offReason ? null : failure,
+    }
+  }
+
+  private singleBucket(): boolean {
+    const publicBucket = this.env.get('STORAGE_PUBLIC_BUCKET')
+    return !publicBucket || publicBucket === this.env.get('STORAGE_BUCKET')
   }
 
   /** Write the canaries, check once, then schedule the read-only checks. */
@@ -154,13 +194,12 @@ export class StoragePublicCheckService implements OnModuleInit, OnModuleDestroy 
   }
 
   private deps(): PublicDeliveryDeps {
-    const bucket = this.env.get('STORAGE_BUCKET')
-    const publicBucket = this.env.get('STORAGE_PUBLIC_BUCKET')
     return {
       storage: this.provider,
       read: this.read,
       publicBaseUrl: this.env.get('STORAGE_PUBLIC_BASE_URL') as string,
-      singleBucket: !publicBucket || publicBucket === bucket,
+      urlForm: this.env.get('STORAGE_PUBLIC_DELIVERY') === 'api' ? 'route' : 'bucket-root',
+      singleBucket: this.singleBucket(),
       probePrefix: this.env.get('STORAGE_PROBE_PREFIX'),
     }
   }

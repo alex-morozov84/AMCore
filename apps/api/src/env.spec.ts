@@ -529,6 +529,18 @@ describe('env validation', () => {
       })
     })
 
+    it('accepts the api delivery mode with the public route as the base', () => {
+      const env = validate({
+        ...s3,
+        STORAGE_PUBLIC_DELIVERY: 'api',
+        STORAGE_PUBLIC_BASE_URL: 'https://api.example.com/api/v1/storage/public',
+      })
+      expect(env.STORAGE_PUBLIC_DELIVERY).toBe('api')
+      expect(issuePaths({ ...s3, STORAGE_PUBLIC_DELIVERY: 'api' })).toContain(
+        'STORAGE_PUBLIC_BASE_URL'
+      )
+    })
+
     it('does not need a base for the in-memory test driver', () => {
       expect(validate({ ...baseEnv, NODE_ENV: 'test' }).STORAGE_PUBLIC_BASE_URL).toBeUndefined()
     })

@@ -42,13 +42,13 @@ import {
   resolveUploadVisibility,
   visibilityOf,
 } from '../storage-namespace'
-import { buildBucketRootUrl } from '../storage-public-url'
+import { buildBucketRootUrl, buildPublicRouteUrl } from '../storage-public-url'
 
 import { bufferFromBody } from './body.util'
 import { createS3Client, type S3ClientSettings } from './s3-client.factory'
 
 /** How a public key becomes readable. `api` is served by the public route, not by this driver. */
-export type S3PublicDelivery = 'external' | 'acl'
+export type S3PublicDelivery = 'external' | 'acl' | 'api'
 
 export interface S3StorageConfig extends S3ClientSettings {
   bucket: string
@@ -159,6 +159,7 @@ export class S3StorageProvider implements StorageProvider {
       contentLength: res.ContentLength ?? 0,
       etag: stripQuotes(res.ETag),
       lastModified: res.LastModified,
+      cacheControl: res.CacheControl,
       // The namespace is authoritative by construction; reachability is the operator's
       // setup, verified by the public-delivery check.
       visibility: visibilityOf(objectKey),
@@ -231,7 +232,11 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   getPublicUrl(key: string): string {
-    return buildBucketRootUrl(this.config.publicBaseUrl, key)
+    // `api` mode: the API public route serves the object with the application's own
+    // credentials, so the address is the route's query form, not a bucket-root form.
+    return this.config.publicDelivery === 'api'
+      ? buildPublicRouteUrl(this.config.publicBaseUrl, key)
+      : buildBucketRootUrl(this.config.publicBaseUrl, key)
   }
 
   async getSignedDownloadUrl(input: SignedDownloadInput): Promise<string> {

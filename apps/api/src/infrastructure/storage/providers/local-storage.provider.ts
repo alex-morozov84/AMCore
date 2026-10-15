@@ -41,6 +41,7 @@ export interface LocalStorageConfig {
 interface SidecarMeta {
   contentType?: string
   etag: string
+  cacheControl?: string
 }
 
 const DEFAULT_MAX_KEYS = 1000
@@ -74,7 +75,11 @@ export class LocalStorageProvider implements StorageProvider {
     // Drop any stale public bytes first so a rewrite never serves old content.
     await rm(this.publicPath(key), { force: true })
     await this.writeFileAt(this.objectPath(key), body)
-    const meta: SidecarMeta = { contentType: input.contentType, etag }
+    const meta: SidecarMeta = {
+      contentType: input.contentType,
+      etag,
+      cacheControl: input.cacheControl,
+    }
     await this.writeFileAt(this.metaPath(key), Buffer.from(JSON.stringify(meta)))
     if (isPublicKey(key)) await this.writeFileAt(this.publicPath(key), body)
     return { key, size: body.length, etag, contentType: input.contentType }
@@ -100,6 +105,7 @@ export class LocalStorageProvider implements StorageProvider {
       contentLength: stats.size,
       etag: meta?.etag,
       lastModified: stats.mtime,
+      cacheControl: meta?.cacheControl,
       visibility: visibilityOf(key),
     }
   }

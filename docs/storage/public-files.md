@@ -50,9 +50,9 @@ bucket**; AMCore appends the key. With a public bucket at
 ### `external` (default)
 
 The application never sends an ACL. You publish the public location with the
-provider's own tools. This is the only mode that works on every provider: AWS
-default buckets, Cloudflare R2, Backblaze B2, Selectel and MWS reject or lack
-object ACLs.
+provider's own tools. It works on every provider that can publish a bucket or a prefix:
+AWS default buckets, Cloudflare R2, Backblaze B2, Selectel and MWS reject or lack object
+ACLs, so they need this mode or `api`.
 
 ### `acl` (opt-in)
 
@@ -66,8 +66,40 @@ it). Two risks make it a deliberate choice:
 - Some servers (SeaweedFS and Garage, measured) accept the header and **ignore**
   it. The upload succeeds and the file stays private. Always [verify](#verify-the-setup).
 
-A planned API-served mode (the API streams `public/` objects with its own
-credentials) is not available yet.
+### `api`
+
+The API serves `public/` objects itself. The unauthenticated route
+`GET /api/v1/storage/public?key=<key>` reads the object from the storage with the
+application's own credentials and streams it, so **nothing has to be public on the
+provider**: the buckets stay private, no bucket policy, public-access setting, ACL or CDN
+origin is involved. It is the only mode that works on every provider, including accounts
+that cannot publish a bucket at all (Wasabi accounts created after 2023-03-13, locked-down
+AWS organizations).
+
+Set `STORAGE_PUBLIC_BASE_URL` to the absolute address of that route as a browser reaches
+it, for example `https://api.example.com/api/v1/storage/public`. Public URLs then have the
+form `<base>?key=public%2Favatars%2F...`. The route behaves like this:
+
+- it serves only keys under `public/`; any other key, a traversal attempt or a missing
+  object answers 404, and a storage fault answers 500 without provider text;
+- it sets `X-Content-Type-Options: nosniff`, a sandbox `Content-Security-Policy` and
+  `Cross-Origin-Resource-Policy: cross-origin` (so a web app on another origin can show the
+  image), and it serves anything except a small allow-list of image, PDF and plain-text types
+  as an opaque download;
+- `Cache-Control` is the value stored with the object (versioned avatars are stored
+  `immutable`), and `no-store` for an object without one. `ETag` is sent when the driver
+  knows it; conditional requests are not answered with 304;
+- it has its own limit of 600 requests per minute (burst 300) for each address, so a page
+  with dozens of avatars does not hit the default limit.
+
+The price is that every public file passes through the API: bandwidth, CPU and two storage
+requests per uncached request (a metadata `HEAD` and the `GET` of the body), both billed as
+reads by most providers. Immutable cache headers keep that low for avatars; put a CDN in
+front of the route for real traffic. Use `external` with a CDN when you can, and `api` when
+you cannot publish a bucket or want the simplest possible setup.
+
+The local driver always serves public files through this route and ignores
+`STORAGE_PUBLIC_DELIVERY`.
 
 ## Publish the location
 
@@ -128,8 +160,8 @@ Do not put private files into a bucket you publish this way.
 
 Wasabi accounts created after 2023-03-13 cannot enable public access without a
 support request, and some organizations forbid public buckets. Then no `external`
-setup is possible. Put a CDN with origin authentication in front of the bucket, or
-wait for the API-served mode.
+setup is possible. Use the [`api` mode](#api), or put a CDN with origin authentication in
+front of the bucket.
 
 ## Verify the setup
 

@@ -7,6 +7,7 @@ import {
 } from './public-delivery-check'
 import type { StorageProvider } from './storage.interface'
 import type { AnonymousRead } from './storage-anonymous-read'
+import type { PublicUrlForm } from './storage-public-url'
 
 export interface CheckStep {
   name: string
@@ -24,6 +25,7 @@ export interface StorageCheckDeps {
   /** Download the body of a GET (presigned download). */
   fetchBody: (url: string) => Promise<Buffer>
   publicBaseUrl: string
+  urlForm: PublicUrlForm
   singleBucket: boolean
   probePrefix: string
   timeoutMs?: number
@@ -127,6 +129,7 @@ export async function runStorageCheck(deps: StorageCheckDeps): Promise<CheckStep
       storage: provider,
       read: deps.read,
       publicBaseUrl: deps.publicBaseUrl,
+      urlForm: deps.urlForm,
       singleBucket: deps.singleBucket,
       probePrefix: deps.probePrefix,
     }

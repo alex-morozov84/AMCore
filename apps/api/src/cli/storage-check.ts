@@ -53,6 +53,10 @@ async function main(): Promise<boolean> {
       ).status,
     fetchBody: async (url) => Buffer.from(await (await fetch(url)).arrayBuffer()),
     publicBaseUrl: env.STORAGE_PUBLIC_BASE_URL ?? '',
+    urlForm:
+      env.STORAGE_DRIVER === 'local' || env.STORAGE_PUBLIC_DELIVERY === 'api'
+        ? 'route'
+        : 'bucket-root',
     singleBucket,
     probePrefix: env.STORAGE_PROBE_PREFIX,
   })

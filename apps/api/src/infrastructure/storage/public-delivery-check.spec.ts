@@ -36,6 +36,7 @@ function makeDeps(
     },
     read,
     publicBaseUrl: 'https://cdn.example.com',
+    urlForm: 'bucket-root',
     singleBucket: false,
     probePrefix: PREFIX,
     ...overrides,
@@ -182,5 +183,75 @@ describe('public delivery check', () => {
         status: 200,
       })
     })
+  })
+})
+
+describe('public delivery check, route form (api mode and local driver)', () => {
+  const ROUTE_PUBLIC =
+    'https://api.example.com/api/v1/storage/public?key=public%2F__amcore_probes__%2Fpublic-canary'
+  const ROUTE_PRIVATE =
+    'https://api.example.com/api/v1/storage/public?key=__amcore_probes__%2Fprivate-canary'
+
+  function routeDeps(responses: Responses, overrides: Partial<PublicDeliveryDeps> = {}) {
+    return makeDeps(responses, {
+      urlForm: 'route',
+      publicBaseUrl: 'https://api.example.com/api/v1/storage/public',
+      singleBucket: false,
+      ...overrides,
+      storage: {
+        upload: jest.fn(),
+        getPublicUrl: jest.fn(() => ROUTE_PUBLIC),
+        getUnsignedObjectUrl: jest.fn(async () => API_URL),
+      },
+    })
+  }
+
+  it('asks the route for the private canary even with two buckets, in the route address form', async () => {
+    const { deps, requested } = routeDeps({
+      [ROUTE_PUBLIC]: served,
+      [API_URL]: status(403),
+      [ROUTE_PRIVATE]: status(404),
+    })
+    await expect(checkPublicDelivery(deps, live())).resolves.toEqual({ ok: true })
+    expect(requested).toContain(ROUTE_PRIVATE)
+  })
+
+  it('reports an exposure when the route would serve a private key', async () => {
+    const { deps } = routeDeps({
+      [ROUTE_PUBLIC]: served,
+      [API_URL]: status(403),
+      [ROUTE_PRIVATE]: { status: 200, body: PRIVATE_CANARY_BYTES },
+    })
+    await expect(checkPublicDelivery(deps, live())).resolves.toEqual({
+      ok: false,
+      stage: 'private_exposed_base',
+      failure: 'private_exposed',
+      status: 200,
+    })
+  })
+
+  it('does not call a route that fails to answer an exposure', async () => {
+    const { deps } = routeDeps({
+      [ROUTE_PUBLIC]: served,
+      [API_URL]: status(403),
+      [ROUTE_PRIVATE]: status(502),
+    })
+    await expect(checkPublicDelivery(deps, live())).resolves.toMatchObject({
+      stage: 'private_exposed_base',
+      failure: 'check_error',
+      status: 502,
+    })
+  })
+
+  it('keeps the bucket-root address unasked in route form (it would hit the route without a key)', async () => {
+    const { deps, requested } = routeDeps({
+      [ROUTE_PUBLIC]: served,
+      [API_URL]: status(403),
+      [ROUTE_PRIVATE]: status(404),
+    })
+    await checkPublicDelivery(deps, live())
+    expect(requested).not.toContain(
+      'https://api.example.com/api/v1/storage/public/__amcore_probes__/private-canary'
+    )
   })
 })

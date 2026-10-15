@@ -90,6 +90,14 @@ describe('S3StorageProvider', () => {
       expect(mock.commandCalls(CopyObjectCommand)[0]?.args[0].input.ACL).toBeUndefined()
     })
 
+    it('api mode never sends an ACL either: the API reads the object with its own credentials', async () => {
+      const provider = makeProvider({ publicDelivery: 'api' })
+      await provider.upload({ key: 'public/a.webp', body })
+      await provider.copy({ source: 'public/a.webp', destination: 'public/b.webp' })
+      expect(putAcl('public/a.webp')).toBeUndefined()
+      expect(mock.commandCalls(CopyObjectCommand)[0]?.args[0].input.ACL).toBeUndefined()
+    })
+
     it('acl sends public-read only for public keys, on upload and on copy', async () => {
       const provider = makeProvider({ publicDelivery: 'acl' })
       await provider.upload({ key: 'public/a.webp', body })
@@ -295,6 +303,17 @@ describe('S3StorageProvider', () => {
   })
 
   describe('getPublicUrl', () => {
+    it('api mode builds the route address, not a bucket-root address', () => {
+      const provider = makeProvider({
+        publicDelivery: 'api',
+        publicBaseUrl: 'https://api.example.com/api/v1/storage/public/',
+      })
+      expect(provider.getPublicUrl('public/avatars/u1/v-1/a b.webp')).toBe(
+        'https://api.example.com/api/v1/storage/public?key=public%2Favatars%2Fu1%2Fv-1%2Fa%20b.webp'
+      )
+      expect(() => provider.getPublicUrl('avatars/u1/original')).toThrow(InvalidObjectKeyError)
+    })
+
     it('joins the public base and the key, independent of the SDK endpoint', () => {
       const provider = makeProvider({ endpoint: 'https://internal:9000', bucket: 'media' })
       expect(provider.getPublicUrl('public/avatars/u1/a.webp')).toBe(

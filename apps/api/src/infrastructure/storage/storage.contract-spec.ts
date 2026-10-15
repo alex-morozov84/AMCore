@@ -88,6 +88,19 @@ export function runStorageProviderContract(
         expect(meta.contentType).toBe('text/plain')
       })
 
+      it('returns the cache control stored at upload, and none when absent', async () => {
+        await provider.upload({
+          key: 'docs/cached.txt',
+          body: Buffer.from('c'),
+          cacheControl: 'public, max-age=60',
+        })
+        await provider.upload({ key: 'docs/uncached.txt', body: Buffer.from('u') })
+        expect((await provider.getMetadata('docs/cached.txt')).cacheControl).toBe(
+          'public, max-age=60'
+        )
+        expect((await provider.getMetadata('docs/uncached.txt')).cacheControl).toBeUndefined()
+      })
+
       it('rejects for a missing key', async () => {
         await expect(provider.getMetadata('docs/missing.txt')).rejects.toThrow()
       })

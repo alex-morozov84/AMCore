@@ -87,6 +87,14 @@ max without (state) (amcore_storage_public_check_state{state=~"failed|stale|unkn
    at once. Uploads of public files are not blocked by this alert, but their URLs do not
    work until the location is published.
 
+In `api` mode the public canary is fetched from the API's own public route at
+`STORAGE_PUBLIC_BASE_URL`, so the address must also be reachable **from the API process**
+(a reverse proxy or load balancer in front of it counts). `public_unreachable` right after
+switching to `api` usually means the base URL names an address the container cannot reach,
+for example a public host name behind a firewall that blocks hairpin traffic. The check
+also asks the route for the private canary; any 2xx there is a `private_exposed_base`
+incident, and a 404 or 403 is correct.
+
 The canaries sit under `public/<STORAGE_PROBE_PREFIX>/` and `<STORAGE_PROBE_PREFIX>/`.
 They are tiny and fixed; if a lifecycle rule removes them, the check writes them again.
 

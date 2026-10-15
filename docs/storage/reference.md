@@ -145,9 +145,9 @@ If a driver does not support a capability, `StorageService` throws
 
 `getPublicUrl()` accepts only keys under `public/` (a private key throws
 `InvalidObjectKeyError`) and builds the address from `STORAGE_PUBLIC_BASE_URL`
-without contacting the provider: `{base}/{key}` for S3, `{base}?key={key}` for the
-local driver, whose API route serves only the public copy. Whether the provider
-actually serves the file depends on how you published the namespace. It must not
+without contacting the provider: `{base}/{key}` for S3 in `external` and `acl` mode,
+`{base}?key={key}` for the API public route (the local driver and S3 in `api` mode). Whether
+the provider actually serves the file depends on how you published the namespace. It must not
 point at a guarded app download route.
 
 ## Copy And Move

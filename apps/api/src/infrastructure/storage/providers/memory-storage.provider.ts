@@ -52,6 +52,7 @@ export class MemoryStorageProvider implements StorageProvider {
       contentLength: body.length,
       etag,
       lastModified: new Date(),
+      cacheControl: input.cacheControl,
       visibility: resolveUploadVisibility(key, input.visibility),
     }
     this.store.set(key, { body, metadata })

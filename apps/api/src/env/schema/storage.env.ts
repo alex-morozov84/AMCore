@@ -15,12 +15,15 @@ export const storageEnv = z.object({
   // It must be a bare origin; the public/CDN base is STORAGE_PUBLIC_BASE_URL.
   STORAGE_PRESIGN_ENDPOINT: optionalEnvUrl(),
   // How `public/` objects become readable: `external` never sends an ACL (the operator
-  // publishes the location); `acl` sends `public-read` per object on providers that enforce it.
-  STORAGE_PUBLIC_DELIVERY: z.enum(['external', 'acl']).default('external'),
+  // publishes the location); `acl` sends `public-read` per object on providers that enforce it;
+  // `api` serves them through this API's public route with the application's own credentials,
+  // so nothing needs to be public on the provider.
+  STORAGE_PUBLIC_DELIVERY: z.enum(['external', 'acl', 'api']).default('external'),
   // Bucket for `public/` keys; defaults to STORAGE_BUCKET (one bucket, one public prefix).
   STORAGE_PUBLIC_BUCKET: optionalEnvString(),
   // Where a browser fetches public files: the root of the public bucket (CDN, custom or
-  // provider public domain) for s3, or the API public route for the local driver.
+  // provider public domain) for `external`/`acl`; the absolute URL of this API's public
+  // route for `api` and for the local driver.
   STORAGE_PUBLIC_BASE_URL: optionalEnvUrl(),
   STORAGE_REGION: z.string().min(1).default('us-east-1'),
   STORAGE_BUCKET: optionalEnvString(),

@@ -27,6 +27,7 @@ interface Harness {
 function build(values: Record<string, unknown> = {}): Harness {
   const env: Record<string, unknown> = {
     STORAGE_DRIVER: 's3',
+    STORAGE_PUBLIC_DELIVERY: 'external',
     STORAGE_PUBLIC_CHECK_ENABLED: true,
     STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS: 3600,
     STORAGE_PUBLIC_CHECK_TIMEOUT_SECONDS: 10,
@@ -219,5 +220,75 @@ describe('StoragePublicCheckService', () => {
       expect.objectContaining({ stage: 'setup', failure: 'check_error' })
     )
     expect(service.snapshot().state).toBe('healthy') // the canaries already existed
+  })
+
+  describe('snapshot for the Console', () => {
+    it('reports the delivery configuration without bucket names or endpoints', async () => {
+      const { service } = start()
+      await service.boot()
+      expect(service.snapshot()).toEqual({
+        driver: 's3',
+        state: 'healthy',
+        offReason: null,
+        delivery: 'external',
+        layout: 'two',
+        publicBaseUrl: 'https://cdn.example.com',
+        checkedAt: expect.any(String),
+        stage: null,
+        failure: null,
+      })
+      expect(JSON.stringify(service.snapshot())).not.toMatch(/private|public"|s3\.example/)
+    })
+
+    it('reports one bucket when the public bucket is unset or equal to the private one', () => {
+      expect(start({ STORAGE_PUBLIC_BUCKET: undefined }).service.snapshot().layout).toBe('one')
+      expect(start({ STORAGE_PUBLIC_BUCKET: 'private' }).service.snapshot().layout).toBe('one')
+    })
+
+    it.each([
+      [{ STORAGE_DRIVER: 'local' }, 'local_driver'],
+      [{ STORAGE_DRIVER: 'memory' }, 'memory_driver'],
+      [{ STORAGE_PUBLIC_CHECK_ENABLED: false }, 'disabled'],
+      [{ PROCESS_ROLE: 'worker' }, 'worker_process'],
+    ])('says why it is off (%j)', (values, reason) => {
+      expect(start(values).service.snapshot()).toMatchObject({
+        state: 'off',
+        offReason: reason,
+        checkedAt: null,
+        stage: null,
+        failure: null,
+      })
+    })
+
+    it('keeps the mode and the base visible when the check is off', () => {
+      expect(
+        start({
+          STORAGE_PUBLIC_DELIVERY: 'api',
+          STORAGE_PUBLIC_CHECK_ENABLED: false,
+        }).service.snapshot()
+      ).toMatchObject({ delivery: 'api', publicBaseUrl: 'https://cdn.example.com' })
+    })
+  })
+
+  describe('api mode', () => {
+    it('asks the route for the private canary in the route form, whatever the bucket layout', async () => {
+      const routePrivate = 'https://cdn.example.com?key=__amcore_probes__%2Fprivate-canary'
+      const { service, responses } = start({ STORAGE_PUBLIC_DELIVERY: 'api' })
+      responses.set(routePrivate, { status: 200, body: PRIVATE_CANARY_BYTES })
+      await service.boot()
+      expect(service.snapshot()).toMatchObject({
+        state: 'failed',
+        stage: 'private_exposed_base',
+        failure: 'private_exposed',
+        delivery: 'api',
+      })
+    })
+
+    it('is healthy when the route refuses the private canary', async () => {
+      const { service, responses } = start({ STORAGE_PUBLIC_DELIVERY: 'api' })
+      responses.set('https://cdn.example.com?key=__amcore_probes__%2Fprivate-canary', status(404))
+      await service.boot()
+      expect(service.snapshot()).toMatchObject({ state: 'healthy', delivery: 'api' })
+    })
   })
 })

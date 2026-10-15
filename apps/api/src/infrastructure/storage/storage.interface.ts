@@ -63,6 +63,8 @@ export interface FileMetadata {
   contentLength: number
   etag?: string
   lastModified?: Date
+  /** The `Cache-Control` stored with the object, when the caller set one at upload. */
+  cacheControl?: string
   /**
    * Derived from the key namespace by every driver. It states what the application
    * intended, not what the provider serves: whether `public/` is actually readable
