@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `STORAGE_PRESIGN_ENDPOINT` (a bare S3 API origin used only to sign),
   `STORAGE_PUBLIC_DELIVERY` and `STORAGE_PUBLIC_BUCKET`. See `docs/storage/public-files.md`.
 
+- Add an account menu to the product shell header: avatar and name (email when there is no
+  name), **Profile** (a dialog with read-only name and email and photo upload, replace and
+  confirmed removal) and **Log out**. The reusable operation is the headless `useAvatarEditor`
+  in `entities/user` (outcomes `committed`, `rejected`, `busy`, `unknown`, `retired`; a result
+  after the signed-in user changed is dropped). `AppShell` gets a `headerEnd` slot and no longer
+  imports the logout button or shows the email in its footer, so a downstream that removes the
+  account menu must provide its own logout control. See `docs/product-admin/account-menu-and-profile.md`.
+
 - Show avatars from another origin in the web starter: `WEB_PUBLIC_FILES_ORIGIN` (the origin of
   `STORAGE_PUBLIC_BASE_URL`) is added to the CSP `img-src` and nowhere else, only as one exact
   `https` (or loopback `http`) origin; avatars render with `next/image` `unoptimized`, so no

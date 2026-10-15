@@ -124,5 +124,5 @@ test('locale switcher removal preserves the shared AppShell wrapper and siblings
   assert.doesNotMatch(output, /LocaleSwitcher/)
   assert.match(output, /\{\/\* unrelated-shell-sibling \*\/\}/)
   assert.match(output, /<span data-shell-sentinel="kept" \/>/)
-  assert.match(output, /<LogoutButton variant="ghost" showText=\{false\} \/>/)
+  assert.match(output, /<SidebarFooter className="gap-3">/)
 })

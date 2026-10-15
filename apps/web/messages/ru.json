@@ -1408,6 +1408,34 @@
     "areaConfigured": "Настроено: {configured} из {total}",
     "noCapabilityMatches": "Ничего не найдено."
   },
+  "account": {
+    "menuLabel": "Меню аккаунта",
+    "profile": "Профиль",
+    "noName": "Имя не указано",
+    "profileTitle": "Профиль",
+    "profileDescription": "Данные вашего аккаунта и фото.",
+    "nameLabel": "Имя",
+    "emailLabel": "Email",
+    "avatar": {
+      "photoLabel": "Фото",
+      "hint": "JPEG, PNG или WebP, до 2 МБ.",
+      "choose": "Выбрать фото",
+      "change": "Сменить фото",
+      "remove": "Удалить фото",
+      "uploading": "Загрузка…",
+      "removing": "Удаление…",
+      "uploaded": "Фото обновлено.",
+      "removed": "Фото удалено.",
+      "removeTitle": "Удалить фото?",
+      "removeDescription": "Фото будет удалено, вместо него появятся ваши инициалы.",
+      "removeConfirm": "Удалить",
+      "cancel": "Отмена",
+      "tooLarge": "Фото больше 2 МБ. Выберите файл поменьше.",
+      "invalidType": "Этот тип файла не поддерживается. Используйте JPEG, PNG или WebP.",
+      "busy": "Сейчас идёт другое изменение фото. Попробуйте через минуту.",
+      "unknown": "Не удалось подтвердить изменение. Обновите страницу, чтобы увидеть текущее фото."
+    }
+  },
   "memberAccess": {
     "title": "Доступ",
     "description": "Что этот человек может делать в организации, исходя из его ролей.",

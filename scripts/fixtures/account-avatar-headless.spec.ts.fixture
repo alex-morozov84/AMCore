@@ -1,0 +1,23 @@
+import { expect, test } from '@playwright/test'
+import { expectNoAxeViolations } from '../shared/axe'
+import { registerViaUi, uniqueEmail } from './helpers'
+
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+
+test('a different inline custom UI uses the public headless avatar editor with the real BFF and no ready block', async ({ page }) => {
+  await registerViaUi(page, uniqueEmail('custom-account'), { name: 'Custom Account' })
+  await expect(page.getByTestId('custom-headless-account')).toBeVisible()
+  await expect(page.getByRole('button', { name: /account menu/i })).toHaveCount(0)
+
+  const response = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/auth/me/avatar'))
+  await page.getByLabel('Custom photo').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: PNG })
+  expect((await response).status()).toBeLessThan(300)
+  await expect(page.getByTestId('custom-account-outcome')).toHaveText('committed')
+  const image = page.getByTestId('custom-headless-account').getByRole('img')
+  await expect.poll(() => image.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+
+  await page.getByRole('button', { name: 'Delete photo' }).click()
+  await expect(page.getByTestId('custom-account-outcome')).toHaveText('committed')
+  await expect(page.getByTestId('custom-headless-account').getByRole('img')).toHaveCount(0)
+  await expectNoAxeViolations(page)
+})

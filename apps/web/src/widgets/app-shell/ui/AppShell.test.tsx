@@ -6,7 +6,6 @@ import { AppShell } from './AppShell'
 vi.mock('next-intl', () => ({
   useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }))
-vi.mock('@/features/auth-logout', () => ({ LogoutButton: () => null }))
 vi.mock('@/features/locale-switcher', () => ({ LocaleSwitcher: () => null }))
 vi.mock('@/shared/ui/route-progress-link', () => ({
   RouteProgressLink: (props: React.ComponentProps<'a'>) => <a {...props}>{props.children}</a>,

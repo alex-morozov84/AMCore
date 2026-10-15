@@ -1408,6 +1408,34 @@
     "areaConfigured": "{configured} of {total} configured",
     "noCapabilityMatches": "No capability matches."
   },
+  "account": {
+    "menuLabel": "Account menu",
+    "profile": "Profile",
+    "noName": "No name set",
+    "profileTitle": "Profile",
+    "profileDescription": "Your account details and photo.",
+    "nameLabel": "Name",
+    "emailLabel": "Email",
+    "avatar": {
+      "photoLabel": "Photo",
+      "hint": "JPEG, PNG or WebP, up to 2 MB.",
+      "choose": "Choose a photo",
+      "change": "Change photo",
+      "remove": "Remove photo",
+      "uploading": "Uploading…",
+      "removing": "Removing…",
+      "uploaded": "Photo updated.",
+      "removed": "Photo removed.",
+      "removeTitle": "Remove your photo?",
+      "removeDescription": "Your photo will be deleted and your initials will be shown instead.",
+      "removeConfirm": "Remove",
+      "cancel": "Cancel",
+      "tooLarge": "This photo is larger than 2 MB. Choose a smaller one.",
+      "invalidType": "This file type is not supported. Use a JPEG, PNG or WebP image.",
+      "busy": "Another photo change is in progress. Try again in a moment.",
+      "unknown": "We could not confirm the change. Reload the page to see your current photo."
+    }
+  },
   "memberAccess": {
     "title": "Access",
     "description": "What this person can do in this organization, worked out from their roles.",

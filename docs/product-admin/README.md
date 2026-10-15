@@ -45,6 +45,9 @@ required. The Sessions route remains independent at `/settings/sessions`.
 Server admission and the standard client missing-session link both use `/login`.
 Placement does not relocate login or implement a return-after-login journey.
 
+The shell header shows an [account menu with profile and avatar editing](account-menu-and-profile.md),
+built on public headless operations.
+
 See [integration](integration.md) for route/layout/error wiring, a custom-shell
 ready mount, explicit nonhierarchical routes and a CRM headless block. Configure
 brand and project initialization choices **before** moving downstream routes.

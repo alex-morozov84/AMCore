@@ -21,7 +21,10 @@ describe('operation inventory against the real plans', () => {
       // content facts are counted in shared and Console streams, while writes coalesce.
       // The locale lint fixture adds one edit/fact/claim/final operation in each
       // of the three single-locale measured scenarios: three of each overall.
-      { name: 'measured operations', expected: 670, actual: inventory.operations.length },
+      // The account menu changes the shell header/footer, adds the account catalogue namespace and
+      // re-registers four e2e surfaces: +4 operations, +1 fact, -5 claims, +4 final operations
+      // (measured against the previous baseline of 670/932/1642/653).
+      { name: 'measured operations', expected: 674, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -40,17 +43,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 932,
+        expected: 933,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1642,
+        expected: 1637,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 653,
+        expected: 657,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

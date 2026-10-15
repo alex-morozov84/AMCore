@@ -45,13 +45,13 @@ function outputs(locale) {
   return new Map(E2E_UI_SURFACES.map((surface) => [surface.path, apply(surface, locale)]))
 }
 
-test('AST-aware inventory fixes the bounded 205-expectation denominator', () => {
+test('AST-aware inventory fixes the bounded 204-expectation denominator', () => {
   const count = E2E_UI_SURFACES.reduce((total, surface) => {
     const model = parseStructuralModel(surface.path, source(surface.path))
     return total + e2eUiExpectationInventory(model, surface.namespaces).count
   }, 0)
   assert.equal(count, E2E_UI_EXPECTATION_DENOMINATOR)
-  assert.equal(count, 205)
+  assert.equal(count, 204)
 })
 
 test('EN is byte-identical and RU has only concrete selected-catalogue expectations', () => {
@@ -62,8 +62,10 @@ test('EN is byte-identical and RU has only concrete selected-catalogue expectati
 
 test('RU keeps technical strings and test semantics outside localized selectors', () => {
   const projected = outputs('ru')
-  const containment = projected.get('apps/web/e2e/real-stack/credential-containment.spec.ts')
-  assert.match(containment, /name: \/выйти\/i/)
+  // Logout moved into the shared helper, so this spec carries no localized selector and is not a
+  // projected surface any more; its technical content is checked as it is.
+  const containment = source('apps/web/e2e/real-stack/credential-containment.spec.ts')
+  assert.doesNotMatch(containment, /sign out/i)
   assert.match(containment, /Auth\/Login/)
   assert.match(containment, /'accessToken' in body/)
   assert.equal([...containment.matchAll(/^test\(/gm)].length, 4)
