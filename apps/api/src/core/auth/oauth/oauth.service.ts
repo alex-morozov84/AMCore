@@ -194,7 +194,7 @@ export class OAuthService {
       )
     }
 
-    const { user, session, refreshToken } = await this.prisma.$transaction(
+    const { user, accountCreated, session, refreshToken } = await this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
         const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
@@ -224,7 +224,7 @@ export class OAuthService {
           )
           if (invite.emailCanonical !== emailCanonical) throw invalidInvitation()
         }
-        const user = await this.findOrCreateUser(
+        const { user, accountCreated } = await this.findOrCreateUser(
           tx,
           profile,
           providerName,
@@ -255,7 +255,7 @@ export class OAuthService {
           new Date(stateData.invitation.expiresAt) <= (await invitationClock(tx))
         )
           throw invalidInvitation()
-        return { user, ...issuance }
+        return { user, accountCreated, ...issuance }
       },
       { maxWait: 2000, timeout: 4000 }
     )
@@ -267,7 +267,9 @@ export class OAuthService {
     }
 
     this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
-    if (!user.avatarKey && profile.avatarSourceUrl)
+    // Copied once, when this sign-in created the account or linked this provider for the first time.
+    // A repeat sign-in never copies again, so an avatar the user removed stays removed.
+    if (accountCreated && !user.avatarKey && profile.avatarSourceUrl)
       this.avatarRehost.schedule(user.id, profile.avatarSourceUrl)
 
     return {
@@ -341,7 +343,7 @@ export class OAuthService {
     locale?: SupportedLocale,
     invited = false,
     expectedUserId?: string
-  ): Promise<User> {
+  ): Promise<{ user: User; accountCreated: boolean }> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
     const existing = await tx.oAuthAccount.findUnique({
@@ -359,7 +361,7 @@ export class OAuthService {
         where: { id: existing.userId },
         data: { lastLoginAt: new Date() },
       })
-      return existing.user
+      return { user: existing.user, accountCreated: false }
     }
 
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
@@ -373,12 +375,15 @@ export class OAuthService {
         )
       // Existing account linked by email — keep its stored locale (D2: never
       // overwrite an established preference with a browser hint).
-      return this.linkAndReturnUser(tx, userByEmail, profile, provider)
+      return {
+        user: await this.linkAndReturnUser(tx, userByEmail, profile, provider),
+        accountCreated: true,
+      }
     }
 
     if (!invited && !this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
       throw new AppException('Public signup is disabled', 403, AuthErrorCode.PUBLIC_SIGNUP_DISABLED)
-    return this.createOAuthUser(tx, profile, provider, locale)
+    return { user: await this.createOAuthUser(tx, profile, provider, locale), accountCreated: true }
   }
 
   private async linkAndReturnUser(

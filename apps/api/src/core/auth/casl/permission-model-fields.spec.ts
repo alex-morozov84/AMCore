@@ -1,17 +1,8 @@
 import { Subject } from '@amcore/shared'
 
-import { MODEL_FIELDS } from './permission-model-fields'
+import { DERIVED_FIELDS, MODEL_FIELDS, type ModelSubject } from './permission-model-fields'
 
 import { Prisma } from '@/generated/prisma/client'
-
-/**
- * Response attributes that exist in the permission vocabulary but are not stored columns.
- * `avatarUrl` is computed from the stored `avatarKey`; the permission names the attribute the API
- * returns, so installed default permission rows keep their exact field lists.
- */
-const DERIVED_ATTRIBUTES: Partial<Record<Subject, string[]>> = {
-  [Subject.User]: ['avatarUrl'],
-}
 
 describe('permission model field grammar', () => {
   it('reviews every generated scalar when a model changes', () => {
@@ -26,13 +17,14 @@ describe('permission model field grammar', () => {
       [Subject.Permission, Prisma.PermissionScalarFieldEnum, ['conditions', 'fields']],
     ] as const
     for (const [subject, generated, excluded] of cases) {
-      const derived = DERIVED_ATTRIBUTES[subject] ?? []
+      const derived = DERIVED_FIELDS[subject as ModelSubject] ?? []
       const stored = Object.keys(MODEL_FIELDS[subject]).filter((field) => !derived.includes(field))
       expect([...stored, ...excluded].sort()).toEqual(Object.values(generated).sort())
     }
   })
 
-  it('keeps the derived avatar attribute in the vocabulary', () => {
+  it('declares the derived avatar attribute and keeps the stored key out of the vocabulary', () => {
+    expect(DERIVED_FIELDS[Subject.User]).toEqual(['avatarUrl'])
     expect(MODEL_FIELDS[Subject.User]).toHaveProperty('avatarUrl', 'nullableString')
     expect(MODEL_FIELDS[Subject.User]).not.toHaveProperty('avatarKey')
   })

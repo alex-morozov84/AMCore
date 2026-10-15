@@ -8,7 +8,8 @@ import { downloadAvatarSource, OAuthAvatarError } from './oauth-avatar-source'
 /**
  * Copies an OAuth profile picture into our own storage once, so no third-party URL is ever
  * persisted or sent to a browser. It runs after the sign-in response is decided and never
- * throws: a failure leaves the user without an avatar, and the next sign-in tries again.
+ * throws: a failure leaves the user without an avatar and is not retried (the caller schedules the
+ * copy only when the account is created or a provider is first linked).
  * It only fills an empty avatar, so it cannot replace one the user uploaded.
  */
 @Injectable()
