@@ -65,20 +65,9 @@ command to run it. Add `--projected` to prepare it after `init:project` choices.
 and removes a photo through the real API and checks that the image loads and the page has no axe
 violations.
 
-## Header layout, loading and cursor
-
-The header end holds two blocks, left to right: the language switcher (rendered by `AppShell`
-itself) and the account menu from the `headerEnd` slot. The sidebar has no footer.
-
-While the current user loads, `AccountMenu` shows a skeleton with the same footprint as the loaded
-trigger, so nothing in the header jumps when the user arrives and nothing flickers on reload. The
-name slot has one fixed width in both states (long names are cut with an ellipsis; the name is
-hidden below the `sm` breakpoint). A replacement block should keep the same rule: reserve its final
-size while loading instead of rendering nothing. When the request ends without a user (signed out),
-the block renders nothing.
-
-Clickable menu items (plain, checkbox, radio and submenu triggers) show the pointer cursor. That
-comes from the shared `dropdown-menu` component, so every menu in the product behaves the same.
+`AppShell` renders the language switcher itself, next to the `headerEnd` block. A replacement for
+`AccountMenu` should reserve its final size while the user loads (a skeleton), so the header does
+not jump when the user arrives.
 
 ## Where avatars come from
 
