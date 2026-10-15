@@ -25,7 +25,8 @@ export async function resetConsistencyData(context: E2ETestContext): Promise<voi
 export async function queuedConsistencyRun(
   context: E2ETestContext,
   data: Prisma.AiRunUpdateInput = {},
-  assistantId?: string
+  assistantId?: string,
+  inputText = 'hello'
 ): Promise<{ run: AiRun; conversation: AiConversation; user: User }> {
   const prisma = context.prisma
   const email = `consistency-${crypto.randomUUID()}@example.com`
@@ -37,7 +38,7 @@ export async function queuedConsistencyRun(
   })
   const run = await context.app.get(AiRunProducerService, { strict: false }).create(user.id, {
     conversationId: conversation.id,
-    inputParts: [{ type: 'text', text: 'hello' }],
+    inputParts: [{ type: 'text', text: inputText }],
   })
   if (Object.keys(data).length) await prisma.aiRun.update({ where: { id: run.id }, data })
   return {
