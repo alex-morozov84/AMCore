@@ -167,13 +167,20 @@ describe('OpenAICompatibleAdapter', () => {
     const fetchImpl = fakeFetch(objectCompletion)
     const adapter = new OpenAICompatibleAdapter(fetchImpl)
 
-    const result = await adapter.generateObject(
-      // structured_output capability → provider-side json_schema, not degraded json_object.
-      call(AiProviderType.OPENAI, 'gpt-4o', null, { text: true, structured_output: true }),
-      z.object({ answer: z.string() })
-    )
+    const request = call(AiProviderType.OPENAI, 'gpt-4o', null, {
+      text: true,
+      structured_output: true,
+    })
+    request.system = 'Trusted compatible structured instructions'
+    const result = await adapter.generateObject(request, z.object({ answer: z.string() }))
 
     expect(result.object).toEqual({ answer: '42' })
+    expect(fetchImpl.calls[0]?.body).toMatchObject({
+      messages: [
+        { role: 'system', content: 'Trusted compatible structured instructions' },
+        { role: 'user', content: 'hi' },
+      ],
+    })
     expect(result.usage).toEqual({
       source: 'reported',
       availability: 'complete',
@@ -278,5 +285,25 @@ describe('OpenAICompatibleAdapter', () => {
     expect(result.text).toBe('')
     expect(JSON.stringify(result)).not.toContain('provider-refusal-sentinel')
     expect(result.usage).toMatchObject({ source: 'reported', totalTokens: 12 })
+  })
+})
+
+// The original successful-undefined control/red gate is retained in admission evidence.
+describe('structured-output nullish result contract', () => {
+  it('rejects transformed root undefined with available receipt', async () => {
+    const fetchImpl = fakeFetch(completion('{"value":"ok"}'))
+    const adapter = new OpenAICompatibleAdapter(fetchImpl)
+    const failure = await adapter
+      .generateObject(
+        call(AiProviderType.OPENAI_COMPATIBLE, 'm', 'https://endpoint.example/v1', {
+          text: true,
+          structured_output: true,
+        }),
+        z.object({ value: z.string() }).transform(() => undefined)
+      )
+      .catch((error: unknown) => error)
+    expect(failure).toMatchObject({ code: 'output_validation_failed', retryable: false })
+    expect(providerReceipt(failure)?.usage.totalTokens).toBe(12)
+    expect(fetchImpl.calls).toHaveLength(1)
   })
 })

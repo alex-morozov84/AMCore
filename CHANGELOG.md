@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgrade backend AI provider integration to AI SDK 7 public structured output.
+  **Breaking for provider extensions:** successful structured results cannot be entirely
+  `null` or `undefined`; these produce non-retryable `output_validation_failed`.
+  Nullable/optional fields remain supported. Available usage receipts remain accountable.
+- Pin the Anthropic endpoint through its public provider setting, ignoring ambient endpoint
+  configuration. Strengthen auth E2E mocks with actual handler-hit and unexpected-traffic checks.
+
 - API production output now uses ESM through maintained Nest CLI + SWC.
   API build checks types before emission; operator commands and Jest retain
   their supported execution boundaries. See [API build guidance](docs/backend/api-build.md).

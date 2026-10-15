@@ -1,4 +1,4 @@
-import { generateObject, generateText, type LanguageModel, NoObjectGeneratedError } from 'ai'
+import { generateText, isStepCount, type LanguageModel, NoObjectGeneratedError, Output } from 'ai'
 import type { ZodType } from 'zod'
 
 import type { AiProviderType } from '../../../../generated/prisma/client.js'
@@ -48,69 +48,99 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
   async generateText(call: AiAdapterCall): Promise<AiTextResult> {
     assertNotAborted(call)
     const started = performance.now()
+    const signal = callSignal(call)
     let receipt: AiProviderReceipt | undefined
     const hasTools = call.tools !== undefined && call.tools.length > 0
     try {
       const result = await generateText({
         model: this.resolveLanguageModel(call),
-        system: call.system,
+        instructions: call.system,
         messages: toModelMessages(call.messages),
-        // Tools are offered without an `execute`, and no `stopWhen` is set, so the SDK does exactly
+        // Tools are offered without an `execute`, and an explicit stop condition permits exactly
         // ONE step and returns the model's tool calls UNEXECUTED (Arc E invariant 1) — AMCore owns
         // the loop and host-side execution. `toolChoice: 'auto'` lets the model answer or call a tool.
         tools: hasTools ? toSdkTools(call.tools!) : undefined,
         toolChoice: hasTools ? 'auto' : undefined,
         maxOutputTokens: call.maxOutputTokens,
-        abortSignal: callSignal(call),
+        abortSignal: signal,
         // The SDK must not retry: retry is Postgres-owned at the durable-run layer (Arc C,
         // ADR-052). Hidden SDK retries would double-count attempts and fight that schedule.
         maxRetries: 0,
+        stopWhen: isStepCount(1),
       })
       receipt = observeProviderReceipt(
         call,
-        mapUsage(result.usage, call.model.provider.type),
+        mapUsage(result.finalStep.usage, call.model.provider.type),
         result.finishReason,
         started,
         result.toolCalls.length
       )
-      return { ...mapTextResult(result, call), receipt }
+      assertCallActive(call, signal)
+      return {
+        ...mapTextResult(
+          {
+            text: result.text,
+            finishReason: result.finishReason,
+            toolCalls: result.toolCalls,
+            usage: result.finalStep.usage,
+          },
+          call
+        ),
+        receipt,
+      }
     } catch (error) {
       throw attachProviderReceipt(
         receipt?.finishReason === 'content_filtered' && !call.abortSignal?.aborted
           ? AiGatewayException.contentFiltered(call.model.provider.type)
-          : mapAdapterError(error, call),
+          : mapAdapterError(error, call, signal),
         receipt
       )
     }
   }
 
-  async generateObject<T>(call: AiAdapterCall, schema: ZodType<T>): Promise<AiObjectResult<T>> {
+  async generateObject<T>(
+    call: AiAdapterCall,
+    schema: ZodType<T>
+  ): Promise<AiObjectResult<Exclude<T, null | undefined>>> {
     assertNotAborted(call)
     const started = performance.now()
+    const signal = callSignal(call)
     let receipt: AiProviderReceipt | undefined
     try {
-      const result = await generateObject({
+      const result = await generateText({
         model: this.resolveLanguageModel(call),
-        schema,
-        system: call.system,
+        output: Output.object({ schema }),
+        instructions: call.system,
         messages: toModelMessages(call.messages),
         maxOutputTokens: call.maxOutputTokens,
-        abortSignal: callSignal(call),
+        abortSignal: signal,
         maxRetries: 0,
+        stopWhen: isStepCount(1),
+        onStepEnd: (step) => {
+          receipt = observeProviderReceipt(
+            call,
+            mapUsage(step.usage, call.model.provider.type),
+            step.finishReason,
+            started
+          )
+        },
       })
       receipt = observeProviderReceipt(
         call,
-        mapUsage(result.usage, call.model.provider.type),
+        mapUsage(result.finalStep.usage, call.model.provider.type),
         result.finishReason,
         started
       )
-      assertNotAborted(call)
+      assertCallActive(call, signal)
       if (receipt.finishReason === 'content_filtered')
         throw AiGatewayException.contentFiltered(call.model.provider.type)
+      const object = result.output
+      if (!hasStructuredValue(object))
+        throw AiGatewayException.outputValidationFailed(call.model.provider.type)
       return {
         receipt,
-        object: result.object,
-        usage: mapUsage(result.usage, call.model.provider.type),
+        object,
+        usage: mapUsage(result.finalStep.usage, call.model.provider.type),
         modelSlug: call.model.slug,
         providerType: call.model.provider.type,
       }
@@ -132,7 +162,7 @@ export abstract class AbstractAiSdkAdapter implements AiProviderAdapter {
       throw attachProviderReceipt(
         receipt?.finishReason === 'content_filtered' && !call.abortSignal?.aborted
           ? AiGatewayException.contentFiltered(call.model.provider.type)
-          : mapAdapterError(error, call),
+          : mapAdapterError(error, call, signal),
         receipt
       )
     }
@@ -149,9 +179,14 @@ function callSignal(call: AiAdapterCall): AbortSignal {
  * Normalize an SDK failure. A caller abort (run deadline / shutdown) is surfaced as the
  * non-retryable `aborted` error — never as a provider timeout that an ordinary retry would repeat.
  */
-function mapAdapterError(error: unknown, call: AiAdapterCall): AiGatewayException {
+function mapAdapterError(
+  error: unknown,
+  call: AiAdapterCall,
+  signal: AbortSignal
+): AiGatewayException {
   if (call.abortSignal?.aborted === true)
     return AiGatewayException.aborted(call.model.provider.type)
+  if (signal.aborted) return AiGatewayException.providerTimeout(call.model.provider.type)
   return mapProviderError(error, call.model.provider.type)
 }
 
@@ -160,4 +195,14 @@ function assertNotAborted(call: AiAdapterCall): void {
   if (call.abortSignal?.aborted === true) {
     throw AiGatewayException.aborted(call.model.provider.type)
   }
+}
+
+/** Root nullish results are invalid; nullish object fields remain schema-owned. */
+function hasStructuredValue<T>(value: T): value is Exclude<T, null | undefined> {
+  return value !== null && value !== undefined
+}
+
+function assertCallActive(call: AiAdapterCall, signal: AbortSignal): void {
+  assertNotAborted(call)
+  if (signal.aborted) throw AiGatewayException.providerTimeout(call.model.provider.type)
 }

@@ -35,8 +35,8 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.125",
-    "@ai-sdk/openai-compatible": "^2.0.80",
+    "@ai-sdk/anthropic": "4.0.80",
+    "@ai-sdk/openai-compatible": "3.0.69",
     "@amcore/shared": "workspace:^",
     "@aws-sdk/client-s3": "^3.1142.0",
     "@aws-sdk/lib-storage": "^3.1142.0",
@@ -71,7 +71,7 @@
     "@react-email/render": "^2.1.0",
     "@redis/client": "^5.12.1",
     "accepts": "2.0.0",
-    "ai": "^6.0.296",
+    "ai": "7.0.141",
     "argon2": "^0.45.1",
     "axios": "^1.20.0",
     "bullmq": "6.3.11",

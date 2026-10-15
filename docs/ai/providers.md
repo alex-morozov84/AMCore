@@ -162,3 +162,28 @@ The private adapter-bound client releases the load only after acknowledged termi
 SQL, driver release and logical settlement. Unknown physical completion quarantines
 that capability until process restart; it does not repeatedly start new loads after
 cooldown. See [deployment](../operations/deployment.md#graceful-shutdown).
+
+## Schema-validated structured results
+
+The application-owned `ModelGateway.generateObject(request, schema)` capability uses
+the public AI SDK `generateText` with `Output.object`. SDK types stay inside the adapter.
+The successful result type is `AiObjectResult<Exclude<T, null | undefined>>`.
+The entire validated result must be present: root `null` and `undefined` produce
+non-retryable `output_validation_failed`. This is an intentional extension-contract change.
+Nullable and optional fields inside a result remain governed by its schema. Non-nullish
+branches of nullable schemas, supported unions, arrays and transforms remain supported.
+A nullable schema is not rejected merely because one branch permits root null.
+
+Provider observation precedes structured validation/result access. Available usage and
+receipt survive rejected output; durable finalization records authoritative spend once.
+Content filtering, caller cancellation and provider timeout retain distinct bounded errors.
+Finite asynchronous schema validation must settle before the call completes; an expired
+deadline or caller abort cannot become a successful result after validation finishes.
+There is no promise that arbitrary never-settling user validation can be stopped.
+
+Both text and structured generation permit one SDK step with SDK retries disabled.
+AMCore owns tools, approvals, durable retry/replay and unknown-effect recovery.
+No deprecated SDK object-generation fallback or hidden schema wrapper is selected.
+The Anthropic factory passes the fixed public `baseURL` explicitly; ambient
+`ANTHROPIC_BASE_URL` and catalogue `baseUrl` cannot replace that endpoint.
+Injected credentials and redirect refusal remain mandatory.
