@@ -79,7 +79,12 @@ Publish the public location as described in [Public Files](./public-files.md). S
 - [Public Files](./public-files.md) — the `public/` namespace, delivery modes, publishing and verification.
 - [Uploads](./uploads.md) — validated uploads, avatar flow, presigned upload caveats.
 - [API Reference](./reference.md) — `StorageService` methods and error behavior.
-- [Providers](./providers.md) — provider differences and gotchas.
+- [Drivers](./providers.md) — memory, local and S3 driver behavior, private downloads.
+- [Provider matrix](./providers/README.md) — one page per S3-compatible provider (Yandex verified), with status and how to publish.
+- [Testing](./testing.md) — test layers, `storage:check` against your real provider.
+- [Troubleshooting](./troubleshooting.md) — symptom, cause, fix.
+- [Security](./security.md) — private by default, least privilege, presigned URLs, CORS.
+- [Moving providers or a CDN](./migration.md) — copy keys, change one setting.
 
 ## HTTP upload and download integration
 
