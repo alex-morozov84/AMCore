@@ -1,3 +1,4 @@
+import { aiRunExecutionsWork } from './core/ai/control/ai-run-executions.work'
 import { notificationDeliveriesWork } from './core/notifications/control/notification-deliveries.work'
 import { notificationsWork } from './core/notifications/notifications.work'
 import { aiRunsWork } from './infrastructure/ai/runs/ai-runs.work'
@@ -15,6 +16,11 @@ const defaultWork = defineWork({
 
 /** One application registration collection. Lazy loaders keep executable workers out of web. */
 export const BACKGROUND_WORK = [
+  {
+    definition: aiRunExecutionsWork,
+    core: async () => (await import('./core/ai/control/ai-work.module')).AiWorkModule,
+    control: async () => (await import('./core/ai/control/ai-work.module')).AiWorkModule,
+  },
   {
     definition: notificationDeliveriesWork,
     core: async () =>

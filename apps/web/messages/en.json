@@ -98,6 +98,7 @@
     "ROLE_SAVE_UNAVAILABLE": "The role change could not be confirmed. Review the current role before trying again.",
     "SETTING_REVISION_CONFLICT": "The saved setting changed. Your draft is preserved; review the current revision before saving again.",
     "AI_RUN_IDEMPOTENCY_CONFLICT": "This idempotency key was already used for a different request. Use a new key, or repeat the original request unchanged.",
+    "AI_RUN_ARCHIVED": "This AI run was archived. Its identity and input remain in the conversation history.",
     "AUTH_HANDOFF_ALREADY_STARTED": "This sign-in attempt has already started. Sign in again from the invitation.",
     "AUTH_HANDOFF_CONFIRMED": "This sign-in has already been confirmed."
   },
@@ -709,6 +710,7 @@
         "loadingJobs": "Loading jobs…",
         "noJobs": "No results",
         "attempts": "Started: {started} · Finished attempts: {made} · Manual grant: {grant}",
+        "aiAttempts": "Lease epochs: {started} · Consumed retries: {made} · Manual child: {grant}",
         "grants": {
           "none": "unused",
           "reserved": "reserved",
@@ -774,6 +776,17 @@
           "accepted": "Request acceptance is confirmed. This does not guarantee delivery or completion.",
           "unknown": "The service may have performed the request, but confirmation is missing. A repeat may create a duplicate."
         },
+        "aiCertainty": {
+          "none": "No tool effect recorded",
+          "accepted": "Tool effect recorded",
+          "unknown": "Tool effect uncertain"
+        },
+        "aiCertaintyHelp": {
+          "none": "No modifying tool effect is recorded. This does not describe model calls or provider charges.",
+          "accepted": "A modifying tool completed and its result was applied. This does not describe model calls or provider charges.",
+          "unknown": "A tool may have produced an effect without a confirmed result. Do not infer that repeating it is safe."
+        },
+        "aiCleanupAgeHelp": "AI cleanup requires at least 30 days since cancellation or expiry and no started execution.",
         "reasonHelp": "Explain why you are taking this action. The comment is saved in the audit log to help other operators understand the change. It does not control job execution.",
         "reasonExamples": {
           "retry": "service settings corrected, retrying processing",
@@ -793,6 +806,7 @@
         "cutoffHelp": "Each selected job completion date is checked. Newer records and records protected by retention are not removed. Enter time in the displayed time zone.",
         "manualRetrySpentHelp": "The manual retry has already been used. Each job has one manual retry, counted separately from automatic attempts.",
         "manualRetryHelp": "Each job has one manual retry, counted separately from automatic attempts.",
+        "linkedRetryHelp": "One eligible source may create one linked child. The child cannot receive another manual retry.",
         "manualRetryReservedHelp": "A manual retry has already been requested. Another manual retry is not currently available for this job.",
         "sectionDescription": "Choose a type of work to view its tasks and available actions. A green status means data can be read, not that a worker is running.",
         "additionalLimits": "Additional restrictions",
@@ -813,6 +827,11 @@
         "allFilter": "All",
         "nextAttempt": "Next attempt:",
         "claimsPauseHelp": "Pause prevents new delivery claims. Already claimed attempts may finish.",
+        "aiClaimsPauseHelp": "Pause stops new AI run claims. Active model calls and tools may finish; deadlines and approval expiry continue.",
+        "aiCancelEffect": "A queued AI run stops now. A waiting approval is voided. For a running run, this records a cancellation request; an in-flight model call or tool may finish before the run stops.",
+        "linkedRetryEffect": "Create one linked AI run from this text input. The original stays final. The new run may call the model and tools multiple times until its deadline; provider charges or tool effects may repeat.",
+        "aiCleanupEffect": "Archive only cancelled or expired AI runs that never started and finished at least 30 days ago. Keep the original input and audit history.",
+        "cancellationRequested": "Cancellation requested; the active run may still finish work:",
         "scheduledRetryEffect": "Reserve one additional attempt for this delivery. Its earliest permitted time remains unchanged.",
         "retainedCleanupEffect": "Remove selected resolved external deliveries that finished at least 30 days ago. Keep the notification and audit history.",
         "countBounded": "+",
@@ -828,13 +847,24 @@
           "delivered": "Delivered",
           "transient_failure": "Temporary failure",
           "permanent_failure": "Permanent failure",
-          "abandoned": "Interrupted"
+          "abandoned": "Interrupted",
+          "succeeded": "Succeeded",
+          "retry_scheduled": "Retry scheduled",
+          "failed": "Failed",
+          "cancelled": "Cancelled",
+          "expired": "Expired",
+          "superseded": "Superseded",
+          "awaiting_approval": "Waiting for approval",
+          "lease_lost": "Lease lost",
+          "reaped": "Reaped",
+          "effect_unknown": "Tool effect unknown"
         },
         "counts": {
           "pending": "Pending",
           "due": "Due now",
           "processing": "Processing",
           "failed": "Failed",
+          "completed": "Completed",
           "terminal": "Finished",
           "unresolved": "Unresolved effect"
         },

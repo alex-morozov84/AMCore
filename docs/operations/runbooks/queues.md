@@ -259,6 +259,23 @@ lease length (10 minutes).
    starts no additional call. Inspect the run's invocations, steps and downstream
    effects before any manual repair or new run.
 
+The `ai-run-executions` registration reads database state; `ai-runs` carries
+wake signals. An audited pause stops new claims, including recovery claims;
+existing leases, deadline expiry and approval expiry continue. Resume through
+the background-work command API after the incident. A running cancellation is
+only a recorded request until the worker settles it. Operator retry creates
+one linked text-only child after proved transient exhaustion without tools or
+output. Artifact input and uncertain effects refuse retry. Cleanup archives
+only never-started cancelled or expired runs after 30 days and preserves their
+identity.
+
+<!-- AMCORE_CONSOLE_AI_RUN_RUNBOOK_START -->
+
+The optional Operations Console shows this state on the `ai-run-executions`
+card in [Background work](../../operations-console/background-work.md).
+It exposes the same audited commands when the frontend is enabled.
+<!-- AMCORE_CONSOLE_AI_RUN_RUNBOOK_END -->
+
 **Do not** reset a run's status or counters directly in SQL: the retry budget, the
 attempt history and the tool records are one state machine, and a hand edit can
 re-run a side effect. Use the cancel endpoint to stop a run; start a new run to

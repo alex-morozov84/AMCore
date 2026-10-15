@@ -20,6 +20,9 @@ function createWrapper() {
 const run = {
   id: 'run-1',
   conversationId: 'conv-1',
+  retryOfRunId: null,
+  retriedByRunId: null,
+  operatorRetry: false,
   status: 'queued' as const,
   errorCode: null,
   terminalReasonCode: null,

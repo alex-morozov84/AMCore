@@ -66,6 +66,7 @@ pages accessible from the lists and from current identities in Audit.
 Background work provides pause, resume, retry, cancel and cleanup when the
 registered policy permits them. The queue board remains read-only.
 
-Notification deliveries use the common Background work controls. Their wake queue remains separate.
-Historical metrics and AI run control adapters are not available.
+Notification deliveries and AI run executions use the common
+[Background work controls](background-work.md#ai-run-executions). Their wake queues
+remain separate. Historical metrics are not available.
 Product administration belongs in a separate area with its own roles and permissions.

@@ -51,6 +51,7 @@ const verification = [
   'scripts/stand/notification-work-provider.mjs',
   'scripts/stand/notification-work-provider.test.mjs',
   'scripts/stand/notification-work-fixture.mjs',
+  'scripts/stand/ai-run-control-fixture.mjs',
   'scripts/stand/wrapper-cancellation.test.mjs',
   'scripts/run-console-session-e2e.mjs',
   'scripts/run-console-single-locale-proxy-smoke.mjs',

@@ -127,6 +127,24 @@ describe('Notification adapter through the common HTTP authority', () => {
     return tg.prisma.notificationDelivery.findUniqueOrThrow({ where: { id: row.id } })
   }
 
+  it('separates completed and failed counts while retaining the terminal aggregate', async () => {
+    const { row } = await produce()
+    await tg.prisma.notificationDelivery.update({
+      where: { id: row.id },
+      data: { status: 'FAILED', failedAt: new Date(), terminalAt: new Date() },
+    })
+    const works = await request(tg.app.getHttpServer())
+      .get(`${base}/works`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+    const delivery = works.body.find(
+      (item: { id: string }) => item.id === 'notification-deliveries'
+    )
+    expect(delivery.counts.completed.value).toBe(1)
+    expect(delivery.counts.failed.value).toBe(1)
+    expect(delivery.counts.terminal.value).toBe(2)
+  })
+
   it('records five full Telegram HTTP429 attempts and permits exactly one sixth via HTTP, replay and audit', async () => {
     const row = await exhausted()
     expect(row).toMatchObject({ status: 'FAILED', retryableExhaustion: true, acceptedSeen: false })

@@ -83,13 +83,13 @@ describe('observed provider receipt and atomic durable accounting (PG + installe
     'blocked output settles one safe receipt, usage %s and canned refusal',
     async (availability) => {
       if (availability !== 'estimated') await selectSdkModel(context)
-      const { run, conversation } = await queuedConsistencyRun(context)
-      if (availability === 'estimated') {
-        await context.prisma.aiMessage.updateMany({
-          where: { runId: run.id, role: 'USER' },
-          data: { content: [{ type: 'text', text: '__mock_leak__' }] },
-        })
-      } else {
+      const { run, conversation } = await queuedConsistencyRun(
+        context,
+        {},
+        undefined,
+        availability === 'estimated' ? '__mock_leak__' : 'hello'
+      )
+      if (availability !== 'estimated') {
         sdkFixture.finish = 'content_filter'
         sdkFixture.content = 'blocked-provider-sentinel'
         sdkFixture.usage =

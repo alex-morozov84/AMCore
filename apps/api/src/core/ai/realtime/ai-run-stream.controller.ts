@@ -13,6 +13,7 @@ import {
 import { Auth } from '../../auth/decorators/auth.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator'
 import { AiRunService } from '../runs/ai-run.service'
+import { ApiArchivedRunResponse } from '../runs/ai-run-archive.openapi'
 
 import { AiRunRealtimeHub } from './ai-run-realtime.hub'
 import type { AiRunStreamConnection } from './ai-run-stream.connection'
@@ -68,6 +69,7 @@ export class AiRunStreamController {
     description: 'A text/event-stream of disposable run-status hints.',
     content: { 'text/event-stream': { schema: { type: 'string' } } },
   })
+  @ApiArchivedRunResponse()
   async stream(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') runId: string,

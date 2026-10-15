@@ -39,6 +39,11 @@ const messages = {
         notPausedHelp:
           'Workers may claim the next job. This does not confirm that a worker is running.',
         inspectJobs: 'Inspect jobs',
+        counts: {
+          completed: 'Completed',
+          failed: 'Failed',
+          terminal: 'Finished',
+        },
         actions: {
           pause: 'Pause',
           resume: 'Resume',
@@ -126,5 +131,42 @@ describe('registered work card', () => {
     view({ ...work, status: 'disabled' })
     expect(screen.getByText('Disabled')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Inspect jobs' })).toBeDisabled()
+  })
+  it('shows nonoverlapping counts when completed is available', () => {
+    const count = (value: number) => ({ value, truncated: false })
+    view({
+      ...work,
+      kind: 'durable',
+      counts: {
+        pending: count(0),
+        due: count(0),
+        processing: count(0),
+        completed: count(3),
+        failed: count(2),
+        terminal: count(5),
+        unresolved: count(0),
+      },
+    })
+    expect(screen.getByText('Completed').nextElementSibling).toHaveTextContent('3')
+    expect(screen.getByText('Failed').nextElementSibling).toHaveTextContent('2')
+    expect(screen.queryByText('Finished')).not.toBeInTheDocument()
+  })
+  it('keeps the finished count for a legacy six-counter summary', () => {
+    const count = (value: number) => ({ value, truncated: false })
+    view({
+      ...work,
+      kind: 'durable',
+      counts: {
+        pending: count(0),
+        due: count(0),
+        processing: count(0),
+        failed: count(2),
+        terminal: count(5),
+        unresolved: count(0),
+      },
+    })
+    expect(screen.getByText('Finished').nextElementSibling).toHaveTextContent('5')
+    expect(screen.getByText('Failed').nextElementSibling).toHaveTextContent('2')
+    expect(screen.queryByText('Completed')).not.toBeInTheDocument()
   })
 })

@@ -21,6 +21,7 @@ export function WorkJobDetails({
   const locale = useLocale()
   const t = useTranslations('console.backgroundWork.control')
   const errors = useTranslations('errors')
+  const aiRun = work.presentation?.commandSemantics?.retry === 'linked-new-run'
   const unavailable = row.capabilities.filter(
     (item) =>
       !item.allowed && item.reason && ['retry', 'cancel', 'cleanup'].includes(item.operation)
@@ -36,7 +37,7 @@ export function WorkJobDetails({
     if (reason === 'MANUAL_GRANT_SPENT')
       return t(row.manualGrant === 'reserved' ? 'manualRetryReservedHelp' : 'manualRetrySpentHelp')
     if (reason === 'COOLDOWN' && operation === 'cleanup' && work.presentation?.commandSemantics)
-      return t('cleanupAgeHelp')
+      return t(aiRun ? 'aiCleanupAgeHelp' : 'cleanupAgeHelp')
     if (reason === 'STATE_CHANGED') return t('actionReasons.changed')
     return errors(reason)
   }
@@ -53,11 +54,17 @@ export function WorkJobDetails({
           {t('nextAttempt')} <ConsoleTimestamp value={row.nextAttemptAt} variant="inline" seconds />
         </p>
       )}
+      {row.cancellationRequestedAt && (
+        <p className="text-sm">
+          {t('cancellationRequested')}{' '}
+          <ConsoleTimestamp value={row.cancellationRequestedAt} variant="inline" seconds />
+        </p>
+      )}
       <p className="text-sm">
         <ConsoleTimestamp value={row.sampledAt} variant="inline" seconds />
       </p>
       <p className="text-sm text-muted-foreground">
-        {t('attempts', {
+        {t(aiRun ? 'aiAttempts' : 'attempts', {
           started: row.attemptsStarted,
           made: row.attemptsMade ?? t('notDisplayed'),
           grant: t(`grants.${row.manualGrant}`),
@@ -65,8 +72,10 @@ export function WorkJobDetails({
       </p>
       {row.certainty && (
         <div className="flex items-center gap-1.5 text-sm">
-          <span>{t(`certainty.${row.certainty}`)}</span>
-          <InfoTooltip label={t(`certaintyHelp.${row.certainty}`)} />
+          <span>{t(`${aiRun ? 'aiCertainty' : 'certainty'}.${row.certainty}`)}</span>
+          <InfoTooltip
+            label={t(`${aiRun ? 'aiCertaintyHelp' : 'certaintyHelp'}.${row.certainty}`)}
+          />
         </div>
       )}
       {row.report === 'unrecorded' && (

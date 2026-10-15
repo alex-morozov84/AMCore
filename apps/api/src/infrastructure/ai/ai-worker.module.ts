@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 
 import { bindWorkHandlers } from '../background-work/registration'
 
+import { AiCatalogModule } from './ai-catalog.module'
 import { AiGatewayModule } from './ai-gateway.module'
 import { AiApprovalExpiryService } from './runs/ai-approval-expiry.service'
 import { AiRunRepository } from './runs/ai-run.repository'
@@ -46,7 +47,14 @@ import { PrismaModule } from '@/prisma'
  * `AiRunRealtimePublisher` the executor uses to emit status hints (the SSE receive side is web-only).
  */
 @Module({
-  imports: [AiGatewayModule, PrismaModule, AiRealtimeModule, AiToolsModule, AuditModule],
+  imports: [
+    AiCatalogModule,
+    AiGatewayModule,
+    PrismaModule,
+    AiRealtimeModule,
+    AiToolsModule,
+    AuditModule,
+  ],
   providers: [
     AiRunRepository,
     AiRunBacklogCollector,
@@ -74,7 +82,8 @@ import { PrismaModule } from '@/prisma'
 })
 class AiRunImplementationModule {}
 
-const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor },
-  [AiRunImplementationModule])
+const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor }, [
+  AiRunImplementationModule,
+])
 @Module({ imports: [AiRunImplementationModule, bindings], exports: [bindings] })
 export class AiWorkerModule {}

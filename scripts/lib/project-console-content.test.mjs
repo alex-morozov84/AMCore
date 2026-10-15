@@ -43,6 +43,20 @@ test('disabled Console docs preserve API audit redaction without a dead guide li
   assert.doesNotMatch(after, /operations-console\/configuration|With the optional Console/)
 })
 
+test('disabled Console runbook removes its UI note and retains AI control guidance', () => {
+  const after = materialize(
+    'docs/operations/runbooks/queues.md',
+    'console.background-work.docs/operations/runbooks/queues.md'
+  )
+  assert.doesNotMatch(
+    after,
+    /operations-console\/background-work\.md|AMCORE_CONSOLE_AI_RUN_RUNBOOK/
+  )
+  assert.match(after, /Resume through\s+the background-work command API/)
+  assert.match(after, /Operator retry creates/)
+  assert.match(after, /Cleanup archives/)
+})
+
 test('treats the Console guide as a whole-feature root instead of shared content', () => {
   const pathname = 'docs/operations-console/README.md'
   assert.throws(

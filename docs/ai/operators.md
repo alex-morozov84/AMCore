@@ -67,3 +67,9 @@ missing or not-visible conversations return no-leak `404`.
   `authorType=operator`, preserving who wrote the assistant-seat turn.
 - A different SUPER_ADMIN cannot take over a conversation already held by another
   human (`409`).
+- A run archived after queued cancellation or expiry keeps its original USER
+  message. The transcript reports `originRunId` and `originArchived`. An archived
+  replay with the same key and input returns `410` even after takeover or closure.
+- A linked operator retry adds no USER turn. Child assistant messages report
+  `operatorRetryOfRunId`; transcript access stays under this endpoint's owner or
+  audited cross-user authorization.

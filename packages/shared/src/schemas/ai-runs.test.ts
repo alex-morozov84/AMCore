@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { aiMessageContentSchema, aiUsageSummarySchema, createAiRunSchema } from './ai-runs'
+import {
+  aiMessageContentSchema,
+  aiMessageResponseSchema,
+  aiRunArchivedSchema,
+  aiRunResponseSchema,
+  aiUsageSummarySchema,
+  createAiRunSchema,
+} from './ai-runs'
 
 /**
  * Contract tests for the AI run/message contracts (Track C — ADR-054, Arc A): the multimodal
@@ -49,6 +56,51 @@ describe('createAiRunSchema', () => {
     expect(
       createAiRunSchema.safeParse({ conversationId: 'conv_1', inputParts: 'Hello' }).success
     ).toBe(false)
+  })
+})
+
+describe('linked and archived run wire contracts', () => {
+  it('requires explicit lineage on run and transcript messages', () => {
+    expect(
+      aiRunResponseSchema.safeParse({
+        id: 'child',
+        conversationId: 'conv',
+        status: 'queued',
+        errorCode: null,
+        terminalReasonCode: null,
+        pendingApprovalId: null,
+        createdAt: '2026-10-15T00:00:00.000Z',
+        startedAt: null,
+        finishedAt: null,
+      })
+    ).toMatchObject({ success: false })
+    expect(
+      aiMessageResponseSchema.safeParse({
+        id: 'm',
+        conversationId: 'conv',
+        runId: 'child',
+        originRunId: 'child',
+        originArchived: false,
+        operatorRetryOfRunId: 'source',
+        sequence: 1,
+        role: 'assistant',
+        authorType: 'assistant',
+        content: [{ type: 'text', text: 'answer' }],
+        createdAt: '2026-10-15T00:00:00.000Z',
+      }).success
+    ).toBe(true)
+  })
+
+  it('bounds archived details to identity, state and timestamps', () => {
+    const value = aiRunArchivedSchema.parse({
+      id: 'old',
+      conversationId: 'conv',
+      terminalStatus: 'cancelled',
+      finishedAt: '2026-09-01T00:00:00.000Z',
+      archivedAt: '2026-10-15T00:00:00.000Z',
+      prompt: 'secret',
+    })
+    expect(value).not.toHaveProperty('prompt')
   })
 })
 

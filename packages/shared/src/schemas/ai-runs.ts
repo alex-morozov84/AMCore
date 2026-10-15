@@ -78,6 +78,9 @@ export const aiMessageResponseSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
   runId: z.string().nullable(),
+  originRunId: z.string().nullable(),
+  originArchived: z.boolean(),
+  operatorRetryOfRunId: z.string().nullable(),
   sequence: z.number().int().nonnegative(),
   role: aiMessageRoleSchema,
   authorType: aiAuthorTypeSchema,
@@ -91,6 +94,9 @@ export type AiMessageResponse = z.infer<typeof aiMessageResponseSchema>
 export const aiRunResponseSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
+  retryOfRunId: z.string().nullable(),
+  retriedByRunId: z.string().nullable(),
+  operatorRetry: z.boolean(),
   status: aiRunStatusSchema,
   errorCode: z.string().nullable(),
   terminalReasonCode: z.string().nullable(),
@@ -104,6 +110,16 @@ export const aiRunResponseSchema = z.object({
   finishedAt: z.iso.datetime().nullable(),
 })
 export type AiRunResponse = z.infer<typeof aiRunResponseSchema>
+
+/** Bounded identity returned inside AI_RUN_ARCHIVED error details after owner authorization. */
+export const aiRunArchivedSchema = z.object({
+  id: z.string(),
+  conversationId: z.string(),
+  terminalStatus: aiRunStatusSchema,
+  finishedAt: z.iso.datetime(),
+  archivedAt: z.iso.datetime(),
+})
+export type AiRunArchived = z.infer<typeof aiRunArchivedSchema>
 
 /**
  * Create (queue) a run on a conversation. `inputParts` is the user's structured input turn —
