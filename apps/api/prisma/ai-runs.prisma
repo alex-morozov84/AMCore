@@ -53,6 +53,12 @@ enum AiRunAttemptOutcome {
 model AiRun {
   id                       String      @id @default(cuid())
   conversationId           String
+  incarnation              String      @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  controlRevision          Int         @default(0)
+  inputMessageId           String?
+  retryOfRunId             String?     @unique
+  assistantBindingCaptured Boolean     @default(false)
+  assistantIdAtCreation    String?
   status                   AiRunStatus @default(QUEUED)
   // Snapshot of the owning conversation's `ownershipGeneration` at run creation (ADR-049 fence,
   // activated Arc F). The worker refuses to write into the conversation once its generation moves
@@ -91,6 +97,9 @@ model AiRun {
   messages        AiMessage[]
   approvals       AiApproval[]
   artifacts       AiArtifact[]
+  inputMessage    AiMessage?         @relation("AiRunInput", fields: [inputMessageId], references: [id], onDelete: SetNull)
+  retryOf         AiRun?             @relation("AiRunRetries", fields: [retryOfRunId], references: [id], onDelete: Restrict)
+  retriedBy       AiRun[]            @relation("AiRunRetries")
 
   @@unique([conversationId, idempotencyKey])
   @@index([conversationId])
@@ -98,6 +107,40 @@ model AiRun {
   @@index([status, nextAttemptAt])
   @@index([status, leaseExpiresAt])
   @@map("ai_runs")
+  @@schema("ai")
+}
+
+/// PG authority for new AI run claims; retained without the optional Console frontend.
+model AiRunControl {
+  id        Int      @id
+  paused    Boolean  @default(false)
+  revision  Int      @default(0)
+  updatedAt DateTime @default(now())
+
+  @@map("ai_run_control")
+  @@schema("ai")
+}
+
+/// Identity retained after the narrow no-execution cleanup; deleted with its input/conversation.
+model AiRunTombstone {
+  id                 String      @id
+  conversationId     String
+  inputMessageId     String      @unique
+  inputFingerprint   String
+  idempotencyKey     String?
+  terminalStatus     AiRunStatus
+  terminalReasonCode String?
+  finishedAt         DateTime
+  archivedAt         DateTime    @default(now())
+  cleanupActorId     String
+  cleanupCommandId   String
+
+  conversation     AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inputMessage     AiMessage      @relation("AiRunTombstoneInput", fields: [inputMessageId], references: [id], onDelete: Cascade)
+  archivedMessages AiMessage[]    @relation("AiMessageArchivedOrigin")
+
+  @@unique([conversationId, idempotencyKey])
+  @@map("ai_run_tombstones")
   @@schema("ai")
 }
 

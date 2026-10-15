@@ -168,7 +168,7 @@ export const workSummarySchema = z.strictObject({
   epoch: z.uuid().optional(),
   counts: z
     .record(
-      z.enum(['pending', 'due', 'processing', 'failed', 'terminal', 'unresolved']),
+      z.enum(['pending', 'due', 'processing', 'failed', 'completed', 'terminal', 'unresolved']),
       z.strictObject({ value: z.number().int().min(0).max(10000), truncated: z.boolean() })
     )
     .optional(),
@@ -214,6 +214,7 @@ const workJobFieldsSchema = z.strictObject({
     })
     .optional(),
   nativeState: z.string().max(64).optional(),
+  cancellationRequestedAt: z.iso.datetime().optional(),
   nextAttemptAt: z.iso.datetime().optional(),
   projection: z.record(
     z.string().max(64),
@@ -235,6 +236,16 @@ export const workAttemptHistorySchema = z.strictObject({
             'transient_failure',
             'permanent_failure',
             'abandoned',
+            'succeeded',
+            'retry_scheduled',
+            'failed',
+            'cancelled',
+            'expired',
+            'superseded',
+            'awaiting_approval',
+            'lease_lost',
+            'reaped',
+            'effect_unknown',
           ]),
           certainty: z.enum(['none', 'accepted', 'unknown']),
           reason: z.string().max(64).optional(),

@@ -112,6 +112,8 @@ describe('init-project --admin-console', () => {
       'docs/backend/recipes/image-work.sql',
       'docs/backend/recipes/db-owned-work.sql',
       'apps/api/src/core/admin/background-work.controller.ts',
+      'apps/api/src/core/ai/control/ai-work.module.ts',
+      'apps/api/src/core/ai/control/ai-run-executions.work.ts',
       'apps/api/src/infrastructure/background-work',
       'apps/api/src/core/admin/admin.controller.ts',
       'apps/api/src/core/auth/guards/fresh-auth.guard.ts',
@@ -121,6 +123,10 @@ describe('init-project --admin-console', () => {
     ]) {
       assert.equal(existsSync(path.join(root, rel)), true, rel)
     }
+    assert.match(
+      readFileSync(path.join(root, 'apps/api/src/background-work.composition.ts'), 'utf8'),
+      /aiRunExecutionsWork/
+    )
     for (const rel of [
       'README.md',
       'docs/README.md',

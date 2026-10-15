@@ -103,13 +103,24 @@ export function WorkCommandConfirmation({
           <DialogDescription>
             {t(
               operation === 'pause' && work.presentation?.commandSemantics?.pause === 'claims'
-                ? 'claimsPauseHelp'
-                : operation === 'retry' &&
-                    work.presentation?.commandSemantics?.retry === 'scheduled-single-grant'
-                  ? 'scheduledRetryEffect'
-                  : operation === 'cleanup' && work.presentation?.commandSemantics
-                    ? 'retainedCleanupEffect'
-                    : `${operation}Effect`
+                ? work.presentation?.commandSemantics?.retry === 'linked-new-run'
+                  ? 'aiClaimsPauseHelp'
+                  : 'claimsPauseHelp'
+                : operation === 'cancel' &&
+                    work.presentation?.commandSemantics?.retry === 'linked-new-run'
+                  ? 'aiCancelEffect'
+                  : operation === 'retry' &&
+                      work.presentation?.commandSemantics?.retry === 'linked-new-run'
+                    ? 'linkedRetryEffect'
+                    : operation === 'retry' &&
+                        work.presentation?.commandSemantics?.retry === 'scheduled-single-grant'
+                      ? 'scheduledRetryEffect'
+                      : operation === 'cleanup' &&
+                          work.presentation?.commandSemantics?.retry === 'linked-new-run'
+                        ? 'aiCleanupEffect'
+                        : operation === 'cleanup' && work.presentation?.commandSemantics
+                          ? 'retainedCleanupEffect'
+                          : `${operation}Effect`
             )}
           </DialogDescription>
           <div>
@@ -117,7 +128,13 @@ export function WorkCommandConfirmation({
           </div>
           {operation === 'retry' && (
             <div>
-              <InfoTooltip label={t('manualRetryHelp')} />
+              <InfoTooltip
+                label={t(
+                  work.presentation?.commandSemantics?.retry === 'linked-new-run'
+                    ? 'linkedRetryHelp'
+                    : 'manualRetryHelp'
+                )}
+              />
             </div>
           )}
         </DialogHeader>

@@ -142,6 +142,13 @@ strict request, response and error contracts.
 
 ## Replay, effects and uncertain outcomes
 
+Console manual retry refuses every source run with any tool invocation or
+approval record, regardless of the last attempt's result. It also refuses
+unknown effects and assistant output. A retryable source creates a new child
+run; that child can execute the normal bounded tool loop and may request owner
+approval. `maxAttempts=1` limits automatic retry after started work, not the
+number of model or tool calls inside that child.
+
 One originating provider call produces one durable invocation. Its
 `context.idempotencyKey` is `ai-tool:<invocationId>` throughout its lifetime.
 A crash, timeout, deployment or approval resume does not create a replacement

@@ -259,6 +259,15 @@ lease length (10 minutes).
    starts no additional call. Inspect the run's invocations, steps and downstream
    effects before any manual repair or new run.
 
+The Console `ai-run-executions` card shows the database state behind the
+`ai-runs` wake queue. A paused card stops new claims, including recovery
+claims; existing leases, deadline expiry and approval expiry continue. Resume
+the card after the incident. A running cancel is only a recorded request until
+the worker settles it. The Console can create one linked text-only child after
+proved transient exhaustion without tools or output. It cannot retry an
+artifact input or an uncertain effect. Cleanup removes only never-started
+cancelled/expired runs after 30 days and preserves an archived identity.
+
 **Do not** reset a run's status or counters directly in SQL: the retry budget, the
 attempt history and the tool records are one state machine, and a hand edit can
 re-run a side effect. Use the cancel endpoint to stop a run; start a new run to

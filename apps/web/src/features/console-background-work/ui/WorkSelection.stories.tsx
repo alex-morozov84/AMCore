@@ -158,6 +158,7 @@ const draining: WorkSummary = {
     pending: { value: 2, truncated: false },
     due: { value: 1, truncated: false },
     failed: { value: 0, truncated: false },
+    completed: { value: 0, truncated: false },
     terminal: { value: 0, truncated: false },
     unresolved: { value: 1, truncated: false },
   },

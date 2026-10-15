@@ -113,7 +113,14 @@ export class AiRunRepository {
     const leaseToken = randomUUID()
     const ttlSeconds = AI_RUN_LEASE_TTL_MS / 1000
 
-    const rows = await this.prisma.$queryRaw<ClaimedRow[]>(Prisma.sql`
+    const rows = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT set_config('lock_timeout', '1000ms', true)`
+        const [gate] = await tx.$queryRaw<{ paused: boolean }[]>`
+        SELECT paused FROM ai.ai_run_control WHERE id = 1 FOR SHARE`
+        if (!gate) throw new Error('ai_run_claim_authority_missing')
+        if (gate.paused) return [] as ClaimedRow[]
+        return tx.$queryRaw<ClaimedRow[]>(Prisma.sql`
       WITH timing AS MATERIALIZED (SELECT clock_timestamp() AS at), claimed AS (
         UPDATE "ai"."ai_runs" AS r
         SET status = 'RUNNING'::"ai"."AiRunStatus",
@@ -137,7 +144,10 @@ export class AiRunRepository {
         SELECT gen_random_uuid()::text, id, "leaseEpoch" FROM claimed
       )
       SELECT * FROM claimed
-    `)
+      `)
+      },
+      { timeout: 5000 }
+    )
 
     return rows.map((row) => ({
       id: row.id,

@@ -43,6 +43,11 @@ describe('Background work catalogue', () => {
     expect(keys(ru.console.backgroundWork).sort()).toEqual(keys(en.console.backgroundWork).sort())
   })
 
+  it('names the exclusive completed count in both locales', () => {
+    expect(en.console.backgroundWork.control.counts.completed).toBe('Completed')
+    expect(ru.console.backgroundWork.control.counts.completed).toBe('Завершены')
+  })
+
   it('has copy for every stock queue and every kind', () => {
     for (const name of ['email', 'default', 'notifications', 'ai-runs']) {
       expect(en.console.backgroundWork.queues).toHaveProperty(name)

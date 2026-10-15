@@ -87,10 +87,12 @@ describe('AiRunProducerService', () => {
     prisma.$transaction.mockImplementation(((cb: (tx: PrismaService) => Promise<unknown>) =>
       cb(prisma)) as never)
     prisma.$queryRaw.mockResolvedValue([
-      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE' },
+      { ownershipGeneration: 0, controlledBy: 'BOT', state: 'ACTIVE', assistantId: null },
     ] as never)
     prisma.aiMessage.aggregate.mockResolvedValue({ _max: { sequence: null } } as never)
     prisma.aiRun.create.mockResolvedValue(fakeRun() as never)
+    prisma.aiRun.update.mockResolvedValue(fakeRun({ inputMessageId: 'message-1' }) as never)
+    prisma.aiMessage.create.mockResolvedValue({ id: 'message-1' } as never)
   })
 
   it('queues a run, persists the USER message at sequence 0, and wakes the worker', async () => {
@@ -114,11 +116,9 @@ describe('AiRunProducerService', () => {
     expect(prisma.aiRun.create.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.aiMessage.create.mock.invocationCallOrder[0] ?? Infinity
     )
-    expect(queue.add).toHaveBeenCalledWith(
-      QueueName.AI_RUNS,
-      JobName.AI_RUN_WAKE,
-      { runId: 'run-1' }
-    )
+    expect(queue.add).toHaveBeenCalledWith(QueueName.AI_RUNS, JobName.AI_RUN_WAKE, {
+      runId: 'run-1',
+    })
   })
 
   it('freezes identity and logical slot without secrets, base URL, or config', async () => {
@@ -141,7 +141,7 @@ describe('AiRunProducerService', () => {
   it('freezes the conversation ownershipGeneration onto the run (ADR-049 fence, Arc F)', async () => {
     // The FOR UPDATE lock returns the conversation's current generation; the run snapshots it.
     prisma.$queryRaw.mockResolvedValue([
-      { ownershipGeneration: 7, controlledBy: 'BOT', state: 'ACTIVE' },
+      { ownershipGeneration: 7, controlledBy: 'BOT', state: 'ACTIVE', assistantId: null },
     ] as never)
 
     await service.create('user-1', INPUT)

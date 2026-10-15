@@ -20,6 +20,9 @@ export async function preview(m, profile = 'default') {
   if (profile === 'notification-work' && m.fixtureProfile !== profile)
     throw new Error('Notification work preview needs a fresh stand created with this profile')
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_END
+  // AMCORE_CONSOLE_AI_PROFILE_START
+  profiles.push('ai-run-control')
+  // AMCORE_CONSOLE_AI_PROFILE_END
   if (!profiles.includes(profile)) throw new Error('Unknown fixture profile')
   await admitInvocation(m)
   const labels = await previewLabels(m)
@@ -53,6 +56,12 @@ export async function preview(m, profile = 'default') {
       await notificationWorkFixture(m)
     }
     // AMCORE_CONSOLE_NOTIFICATION_FIXTURE_END
+    // AMCORE_CONSOLE_AI_FIXTURE_START
+    if (profile === 'ai-run-control') {
+      const { aiRunControlFixture } = await import('./ai-run-control-fixture.mjs')
+      await aiRunControlFixture(m, api)
+    }
+    // AMCORE_CONSOLE_AI_FIXTURE_END
     for (const account of m.accounts) {
       const existing = await sql(
         m,
@@ -96,6 +105,10 @@ export async function preview(m, profile = 'default') {
           if (profile === 'notification-work') {
             const { notificationWorkPreview } = await import('./notification-work-fixture.mjs')
             await notificationWorkPreview(page, m, SUPPORTED_LOCALES)
+          }
+          if (profile === 'ai-run-control') {
+            const { aiRunControlPreview } = await import('./ai-run-control-fixture.mjs')
+            await aiRunControlPreview(page, m)
           }
         }
         // AMCORE_CONSOLE_PREVIEW_ACCESS_END

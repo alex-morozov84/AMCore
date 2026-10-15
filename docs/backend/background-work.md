@@ -267,8 +267,9 @@ personal authorization, fresh authentication, confirmations, distributed budgets
 receipts, replay rules and audit. Register the adapter module in the registration's
 `core` and `control` loaders; downstream code does not duplicate these surfaces.
 
-The shipped [notification delivery adapter](../notifications/control.md) is a
-production example of durable authority alongside a separate wake registration.
+The shipped [notification delivery adapter](../notifications/control.md) and
+[AI run adapter](../ai/runs.md#operations-console-control) are production examples
+of durable authority alongside separate wake registrations.
 Its shared presentation adds bounded registered filters, native state labels,
 counts and detail-only attempt history. Filters remain adapter-owned; arbitrary
 filters do not become broker query options.

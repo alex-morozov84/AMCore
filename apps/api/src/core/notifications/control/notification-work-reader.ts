@@ -58,6 +58,7 @@ export class NotificationWorkReader {
           AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= ${gate.now})`,
         processing: Prisma.sql`status = 'PROCESSING'`,
         failed: Prisma.sql`status = 'FAILED'`,
+        completed: Prisma.sql`status IN ('DELIVERED', 'SKIPPED', 'CANCELLED')`,
         terminal: Prisma.sql`status IN ('DELIVERED', 'FAILED', 'SKIPPED', 'CANCELLED')`,
         unresolved: Prisma.sql`"unresolvedEffectCount" > 0 OR "legacyUnverified"`,
       }

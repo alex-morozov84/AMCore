@@ -58,10 +58,13 @@ supported witness. Historical attempted deliveries remain explicitly unverified.
 
 ## Reads and retention
 
-The common API returns counts of pending, due, processing, failed, terminal and
-unresolved deliveries. Each count is capped at 10000 with an extra-row truncation
-witness. Counts share a PostgreSQL sample. Channel options derive from registrations
-and `in_app`. Filters use one URL-encoded JSON object, at most 1024 UTF-8 bytes,
+The common API returns counts of pending, due, processing, failed, completed,
+terminal and unresolved deliveries. `completed` excludes failed deliveries and
+matches the Completed list. `terminal` includes both completed and failed
+deliveries for existing API clients. Each count is capped at 10000 with an
+extra-row truncation witness. Counts share a PostgreSQL sample. Channel options
+derive from registrations and `in_app`. Filters use one URL-encoded JSON object,
+at most 1024 UTF-8 bytes,
 four string entries and 64 characters per value. Unknown filters refuse the read.
 
 Lists order by `createdAt DESC, id DESC`, inspect 512 rows plus one truncation

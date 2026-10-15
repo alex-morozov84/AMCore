@@ -20,7 +20,9 @@ model, the extension points, and the invariants OpenAPI does not express.
 - **Conversations & runs** — owner-scoped durable transcripts; a run is one user
   turn plus its worker execution. Run creation is idempotent (the same key with
   a different input is a conflict); state lives in Postgres, not the worker; every
-  run has an absolute lifetime and a bounded attempt history. See [Runs](./runs.md).
+  run has an absolute lifetime and a bounded attempt history. The Operations
+  Console supports narrow pause, cancel, text-only linked retry and cleanup.
+  See [Runs](./runs.md#operations-console-control).
 - **Worker-owned execution** — the web role never calls a provider. A worker
   resolves a frozen model snapshot, calls the `ModelGateway`, retries, recovers
   leases, and writes the transcript and usage ledger durably. Only the current
