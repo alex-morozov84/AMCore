@@ -142,7 +142,7 @@ strict request, response and error contracts.
 
 ## Replay, effects and uncertain outcomes
 
-Console manual retry refuses every source run with any tool invocation or
+Operator manual retry refuses every source run with any tool invocation or
 approval record, regardless of the last attempt's result. It also refuses
 unknown effects and assistant output. A retryable source creates a new child
 run; that child can execute the normal bounded tool loop and may request owner

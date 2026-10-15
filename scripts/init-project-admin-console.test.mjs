@@ -127,6 +127,17 @@ describe('init-project --admin-console', () => {
       readFileSync(path.join(root, 'apps/api/src/background-work.composition.ts'), 'utf8'),
       /aiRunExecutionsWork/
     )
+    const queueRunbook = readFileSync(path.join(root, 'docs/operations/runbooks/queues.md'), 'utf8')
+    assert.doesNotMatch(queueRunbook, /operations-console\/background-work\.md/)
+    assert.match(queueRunbook, /background-work command API/)
+    assert.match(queueRunbook, /Operator retry creates/)
+    const aiRunsGuide = readFileSync(path.join(root, 'docs/ai/runs.md'), 'utf8')
+    assert.match(aiRunsGuide, /## Operator run control/)
+    assert.match(aiRunsGuide, /backend API when the optional Console frontend is disabled/)
+    assert.match(
+      readFileSync(path.join(root, 'docs/backend/background-work.md'), 'utf8'),
+      /\.\.\/ai\/runs\.md#operator-run-control/
+    )
     for (const rel of [
       'README.md',
       'docs/README.md',

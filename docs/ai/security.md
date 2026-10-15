@@ -56,7 +56,7 @@ integration.
 - Approval previews are immutable plain text bound to the action hash. Only the
   owner with current domain read rights sees the preview; approval and execution
   recheck current rights. SUPER_ADMIN cannot decide for another owner. Raw intent,
-  arguments and prepared notification requests remain private and outside Console
+  arguments and prepared notification requests remain private and outside admin
   diagnostics and queue payloads.
 - Attempt history and terminal reasons carry bounded codes without prompt,
   output or tool arguments. History is keyed by run and epoch; the guard's
@@ -65,13 +65,13 @@ integration.
   forcibly stopped; the worker waits at most its timeout, records the outcome and
   starts nothing further. Abort signals are forwarded to providers and tools, but a
   provider that ignores them may still complete or bill the call.
-- Console pause gates every new database claim, including wake and recovery
+- Administrative pause gates every new database claim, including wake and recovery
   paths. Active leases may continue. A missing gate stops claims.
-- Console retry requires a complete transient history and zero tool invocations,
+- Operator retry requires a complete transient history and zero tool invocations,
   approvals and assistant output. It accepts text only and creates one linked
   child. The child may make several model calls and tool effects within its
-  deadline; the Console does not promise zero duplicate provider billing.
-- Console cleanup removes only cancelled or expired runs without started
+  deadline; the control API does not promise zero duplicate provider billing.
+- Operator cleanup removes only cancelled or expired runs without started
   execution after 30 days. The input, idempotency identity and audit remain;
   archived owner reads return bounded identity without prompt or model data.
 

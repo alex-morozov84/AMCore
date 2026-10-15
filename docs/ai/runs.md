@@ -67,13 +67,14 @@ before new-run admission. It returns `410` even when the conversation is now
 human-controlled or closed. A foreign or missing run ID returns `404`; a different
 input under the archived key returns `409` without archived details.
 
-## Operations Console control
+## Operator run control
 
-The `ai-run-executions` card reads database-owned runs. The `ai-runs` queue
-still carries wake signals only. Pausing the card stops **new claims** after the
-pause commits. Active model calls and tools may finish. Recovery, deadlines and
-approval expiry continue. Resume relies on ordinary database polling; it does
-not require a Redis wake signal.
+The `ai-run-executions` registration reads database-owned runs. The `ai-runs`
+queue still carries wake signals only. An audited pause stops **new claims**
+after it commits. Active model calls and tools may finish. Recovery, deadlines
+and approval expiry continue. Resume relies on ordinary database polling; it
+does not require a Redis wake signal. These controls remain available through
+the backend API when the optional Console frontend is disabled.
 
 A SUPER_ADMIN may request cancellation through the common audited command. A
 queued run becomes `cancelled`; a waiting approval is voided. A running run first

@@ -87,7 +87,7 @@ terminal and not completed:
 This avoids stale writes and takeover bypass while allowing retry after failures
 where the uploaded bytes were not the problem.
 
-Console manual retry is a separate, narrower action. It refuses every run whose
+Operator manual retry is a separate, narrower action. It refuses every run whose
 original input contains `artifact_ref`, even when its uploaded bytes still exist.
 The command never downloads, copies or rebinds an artifact. A user may start a
 new run through the ordinary API, subject to the binding rules above.

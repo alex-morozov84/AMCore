@@ -193,7 +193,7 @@ Deploy every new role before allowing writers to restart. Verify the singleton
 `ai.ai_run_control` row exists and inspect its `paused` value. A missing row
 fails new claims closed. A paused row remains paused across restart; do not
 reset it during deployment. Recovery can still expire deadlines and approvals
-while paused. Resume only through the audited Console command after checking
+while paused. Resume through the audited background-work command API after checking
 the new worker fleet. Rollback requires restoring the pre-migration backup;
 mixed old and new writers cannot uphold the pause guarantee.
 
