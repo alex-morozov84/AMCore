@@ -697,6 +697,7 @@ describe('OpenAPI success surface (e2e)', () => {
         'completedAt',
         'build',
         'storage',
+        'publicDelivery',
         'storageHealthEnabled',
         'api',
         'process',

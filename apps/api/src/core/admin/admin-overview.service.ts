@@ -14,7 +14,7 @@ import { AdminOverviewResourcesService } from './admin-overview-resources.servic
 import { EnvService } from '@/env/env.service'
 import { ReadinessCheckService } from '@/health'
 import { readBuildIdentity } from '@/infrastructure/build-identity'
-import { StorageProbeService } from '@/infrastructure/storage'
+import { StorageProbeService, StoragePublicCheckService } from '@/infrastructure/storage'
 
 /**
  * Console Overview status.
@@ -32,7 +32,8 @@ export class AdminOverviewService {
     private readonly readiness: ReadinessCheckService,
     private readonly env: EnvService,
     private readonly resources: AdminOverviewResourcesService,
-    private readonly storageProbe: StorageProbeService
+    private readonly storageProbe: StorageProbeService,
+    private readonly publicCheck: StoragePublicCheckService
   ) {}
 
   async getOverview(): Promise<AdminOverviewResponse> {
@@ -51,11 +52,18 @@ export class AdminOverviewService {
       api,
       build: readBuildIdentity(),
       storage: this.storageProbe.snapshot(),
+      publicDelivery: this.publicDelivery(),
       completedAt: new Date().toISOString(),
       version: api.version ?? 'unknown',
       processRole: this.env.get('PROCESS_ROLE'),
       storageHealthEnabled: this.env.get('STORAGE_HEALTH_ENABLED'),
     }
+  }
+
+  /** The S2 check result without the driver name (the driver is already in `storage`). */
+  private publicDelivery(): AdminOverviewResponse['publicDelivery'] {
+    const { driver: _driver, ...snapshot } = this.publicCheck.snapshot()
+    return snapshot
   }
 
   private async observeReadiness(): Promise<

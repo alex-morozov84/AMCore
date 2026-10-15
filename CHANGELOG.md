@@ -107,6 +107,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Operations Console Overview shows the public files check next to the private files
+  check: delivery mode, bucket layout and public base URL, a result per state, and a
+  destructive banner when private files are reachable anonymously. The Overview API
+  response gains `publicDelivery` (no bucket names, endpoints or credentials).
+
 - Notification deliveries use common work control with durable pause, one safe
   lifetime retry grant, pending cancellation, protected cleanup, channel filters
   and bounded attempt history. Unknown provider effects remain protected. Upgrade

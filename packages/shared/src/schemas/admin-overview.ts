@@ -90,6 +90,31 @@ export const adminOverviewStorageSchema = z.object({
 })
 export type AdminOverviewStorage = z.infer<typeof adminOverviewStorageSchema>
 
+/**
+ * The public-files check of the answering API instance (never a bucket name, S3 endpoint or
+ * credential). `off` carries the reason the instance does not run the check.
+ */
+export const adminOverviewPublicDeliverySchema = z.object({
+  state: z.enum(['healthy', 'failed', 'unknown', 'stale', 'off']),
+  offReason: z.enum(['local_driver', 'memory_driver', 'disabled', 'worker_process']).nullable(),
+  delivery: z.enum(['external', 'acl', 'api']),
+  layout: z.enum(['one', 'two']),
+  publicBaseUrl: z.string().max(2048).nullable(),
+  checkedAt: sampledAt.nullable(),
+  stage: z.enum(['setup', 'public_read', 'private_exposed_api', 'private_exposed_base']).nullable(),
+  failure: z
+    .enum([
+      'public_not_served',
+      'public_unreachable',
+      'content_mismatch',
+      'private_exposed',
+      'check_error',
+      'timeout',
+    ])
+    .nullable(),
+})
+export type AdminOverviewPublicDelivery = z.infer<typeof adminOverviewPublicDeliverySchema>
+
 /** A successful observation is 200 even if not ready; request errors are separate.
  * Numeric samples are independent of the readiness indicator's actual samples.
  */
@@ -106,6 +131,7 @@ export const adminOverviewResponseSchema = z.object({
   completedAt: sampledAt,
   build: z.object({ id: declaredMetadata, version: declaredMetadata, commit: declaredMetadata }),
   storage: adminOverviewStorageSchema,
+  publicDelivery: adminOverviewPublicDeliverySchema,
   storageHealthEnabled: z.boolean(),
   api: z.object({
     version: declaredMetadata,
