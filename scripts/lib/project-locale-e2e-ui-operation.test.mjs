@@ -76,7 +76,16 @@ test('RU keeps technical strings and test semantics outside localized selectors'
   assert.match(progress, /data-route-progress-ready/)
   assert.match(progress, /transition-duration/)
   const oauth = projected.get('apps/web/e2e/server-mocked/oauth-visibility.spec.ts')
-  assert.match(oauth, /providers: \['google'\]/)
+  assert.match(oauth, /authMocks\.providers\(\['google'\]\)/)
+  assert.match(oauth, /authMocks\.providers\(\[\]\)/)
+  assert.equal(
+    [...oauth.matchAll(/expect\(authMocks\.hits\.providers\)\.toBeGreaterThan\(0\)/g)].length,
+    2
+  )
+  assert.equal(
+    [...oauth.matchAll(/expect\(authMocks\.hits\.signup\)\.toBeGreaterThan\(0\)/g)].length,
+    2
+  )
 })
 
 test('every represented English localized class is rejected when restored', () => {

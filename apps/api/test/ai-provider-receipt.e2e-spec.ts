@@ -293,4 +293,24 @@ describe('observed provider receipt and atomic durable accounting (PG + installe
       ).toBe(boundary === 'stale' ? 0 : 1)
     }
   )
+  it.each(['null', 'undefined'] as const)(
+    'rejects root %s with exactly one authoritative usage row',
+    async (root) => {
+      await selectSdkModel(context)
+      sdkFixture.content = root === 'null' ? 'null' : '{"answer":"ok"}'
+      const schema: z.ZodType<null | undefined> =
+        root === 'null' ? z.null() : z.object({ answer: z.string() }).transform(() => undefined)
+      const error = await context.app
+        .get(ModelGateway)
+        .generateObject(
+          { modelSlug: 'fixture-model', messages: [{ role: 'user', content: 'hello' }] },
+          schema
+        )
+        .catch((failure: unknown) => failure)
+      expect(error).toMatchObject({ code: 'output_validation_failed', retryable: false })
+      expect(providerReceipt(error)?.usage.totalTokens).toBe(12)
+      expect(await context.prisma.aiUsageLedger.count()).toBe(1)
+      expect(sdkFixture.calls).toHaveLength(1)
+    }
+  )
 })
