@@ -29,7 +29,7 @@ export const workPresentationSchema = z
     commandSemantics: z
       .strictObject({
         pause: z.enum(['claims', 'broker']),
-        retry: z.enum(['scheduled-single-grant', 'ordinary']),
+        retry: z.enum(['scheduled-single-grant', 'ordinary', 'linked-new-run']),
         cleanupMinimumAgeSeconds: z
           .number()
           .int()

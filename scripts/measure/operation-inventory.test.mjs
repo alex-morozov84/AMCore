@@ -21,7 +21,8 @@ describe('operation inventory against the real plans', () => {
       // content facts are counted in shared and Console streams, while writes coalesce.
       // The locale lint fixture adds one edit/fact/claim/final operation in each
       // of the three single-locale measured scenarios: three of each overall.
-      { name: 'measured operations', expected: 670, actual: inventory.operations.length },
+      // The Console-only AI runbook seam adds two semantic claims without a new operation.
+      { name: 'measured operations', expected: 671, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -40,17 +41,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 932,
+        expected: 933,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1642,
+        expected: 1649,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 653,
+        expected: 654,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

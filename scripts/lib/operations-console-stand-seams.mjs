@@ -23,6 +23,8 @@ export const operationsConsoleStandSeams = [
   entry('scripts/stand/start.mjs', 'NOTIFICATION_START'),
   entry('scripts/stand/preview.mjs', 'NOTIFICATION_PROFILE'),
   entry('scripts/stand/preview.mjs', 'NOTIFICATION_FIXTURE'),
+  entry('scripts/stand/preview.mjs', 'AI_PROFILE'),
+  entry('scripts/stand/preview.mjs', 'AI_FIXTURE'),
   entry('scripts/e2e-ci-plan.mjs', 'CI_LANES'),
   entry('scripts/e2e-ci.mjs', 'CI_COMMAND'),
   entry('scripts/stand.mjs', 'LANES'),

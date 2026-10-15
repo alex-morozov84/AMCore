@@ -23,6 +23,7 @@ import { AI_APPROVAL_RUN_CANCELLED, AI_RUN_CANCELLED_BY_USER } from '../ai-run.c
 import { lockRun } from '../ai-run-locks.js'
 
 import { toAiRunResponse } from './ai-run.mapper.js'
+import { archivedRunError } from './ai-run-archive.js'
 import { decodeAiRunCursor, encodeAiRunCursor } from './ai-run-cursor.js'
 
 /** Rolls the cancel-while-waiting transaction back when the parked gate raced out from under it. */
@@ -61,10 +62,13 @@ export class AiRunService {
         },
       },
     })
-    if (!run || run.conversation.ownerUserId !== userId) {
-      throw new NotFoundException('Ai run', id)
-    }
-    return toAiRunResponse(run, run.approvals[0]?.id ?? null)
+    if (!run) return this.throwArchivedOrMissing(userId, id)
+    if (run.conversation.ownerUserId !== userId) throw new NotFoundException('Ai run', id)
+    const child = await this.prisma.aiRun.findFirst({
+      where: { retryOfRunId: id },
+      select: { id: true },
+    })
+    return toAiRunResponse(run, run.approvals[0]?.id ?? null, child?.id ?? null)
   }
 
   /** Keyset-paged runs the caller owns, newest first, optionally scoped to one conversation. */
@@ -112,34 +116,46 @@ export class AiRunService {
       where: { id },
       include: { conversation: { select: { ownerUserId: true } } },
     })
-    if (!run || run.conversation.ownerUserId !== userId) {
-      throw new NotFoundException('Ai run', id)
-    }
+    if (!run) return this.throwArchivedOrMissing(userId, id)
+    if (run.conversation.ownerUserId !== userId) throw new NotFoundException('Ai run', id)
 
     if (!TERMINAL_STATUSES.has(run.status)) await this.requestCancel(userId, id)
-    return this.projectCancel(id)
+    return this.projectCancel(userId, id)
+  }
+
+  private async throwArchivedOrMissing(userId: string, id: string): Promise<never> {
+    const archived = await this.prisma.aiRunTombstone.findUnique({
+      where: { id },
+      include: { conversation: { select: { ownerUserId: true } } },
+    })
+    if (!archived || archived.conversation.ownerUserId !== userId)
+      throw new NotFoundException('Ai run', id)
+    throw archivedRunError(archived)
   }
 
   /** Lock the run, then cancel according to the status seen UNDER the lock (lock order: run → approval). */
   private async requestCancel(userId: string, id: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const locked = await lockRun(tx, id)
-      if (locked === null) return
-      switch (locked.status) {
-        case AiRunStatus.QUEUED:
-          return this.cancelQueued(tx, id)
-        case AiRunStatus.WAITING_APPROVAL:
-          return this.cancelWaitingApproval(tx, userId, id)
-        case AiRunStatus.RUNNING:
-          await tx.aiRun.updateMany({
-            where: { id, status: AiRunStatus.RUNNING, cancellationRequestedAt: null },
-            data: { cancellationRequestedAt: new Date() },
-          })
-          return
-        default:
-          return // terminal (or an unclaimable state): idempotent no-op
-      }
-    })
+    await this.prisma.$transaction((tx) => this.cancelInTx(tx, id, userId))
+  }
+
+  /** Shared domain transition; caller supplies authorization, actor and transaction. */
+  async cancelInTx(tx: Prisma.TransactionClient, id: string, actorId: string): Promise<void> {
+    const locked = await lockRun(tx, id)
+    if (locked === null) return
+    switch (locked.status) {
+      case AiRunStatus.QUEUED:
+        return this.cancelQueued(tx, id)
+      case AiRunStatus.WAITING_APPROVAL:
+        return this.cancelWaitingApproval(tx, actorId, id)
+      case AiRunStatus.RUNNING:
+        await tx.aiRun.updateMany({
+          where: { id, status: AiRunStatus.RUNNING, cancellationRequestedAt: null },
+          data: { cancellationRequestedAt: new Date(), controlRevision: { increment: 1 } },
+        })
+        return
+      default:
+        return // terminal (or an unclaimable state): idempotent no-op
+    }
   }
 
   /** Cancel a `QUEUED` run; an approved-but-not-started tool never runs (a started effect is kept). */
@@ -157,6 +173,7 @@ export class AiRunService {
         status: AiRunStatus.CANCELLED,
         finishedAt: new Date(),
         terminalReasonCode: AI_RUN_CANCELLED_BY_USER,
+        controlRevision: { increment: 1 },
       },
     })
   }
@@ -181,6 +198,7 @@ export class AiRunService {
         status: AiRunStatus.CANCELLED,
         finishedAt: now,
         terminalReasonCode: AI_RUN_CANCELLED_BY_USER,
+        controlRevision: { increment: 1 },
       },
     })
     if (run.count !== 1) throw new CancelRaceError()
@@ -232,8 +250,9 @@ export class AiRunService {
     )
   }
 
-  private async projectCancel(id: string): Promise<AiRunCancelResponse> {
-    const run = await this.prisma.aiRun.findUniqueOrThrow({ where: { id } })
+  private async projectCancel(userId: string, id: string): Promise<AiRunCancelResponse> {
+    const run = await this.prisma.aiRun.findUnique({ where: { id } })
+    if (!run) return this.throwArchivedOrMissing(userId, id)
     return {
       id: run.id,
       status: run.status.toLowerCase() as AiRunStatusValue,

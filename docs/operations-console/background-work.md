@@ -98,8 +98,9 @@ Console time zone. See [the display time zone](README.md#display-time-zone).
 
 - **Whether workers are running.** It shows where work waits. A queue can be
   "Not paused" with a growing Waiting count because no worker is running.
-- **The state of notifications and AI runs.** Their queues only carry wake-up
-  signals; the real work is stored in the database.
+- **The state from a wake queue alone.** `notifications` and `ai-runs` carry
+  wake-up signals. Inspect the `notification-deliveries` or `ai-run-executions`
+  work card for database-owned state.
 - **One server or the whole fleet.** The numbers come from the queues in the
   Redis configured for this API, which every API and worker process shares.
 - **An exact oldest job.** The age comes from a small sample taken at the front
@@ -118,7 +119,7 @@ Console time zone. See [the display time zone](README.md#display-time-zone).
 | **Failed** is above 0                                    | For registered work, use **Inspect jobs**, select **Failed**, and read **Reason for failure** and **What to do**. If the reason is unavailable, ask the maintainer to inspect protected worker diagnostics. See the [email runbook](../operations/runbooks/email.md) for email. |
 | A row says **Unavailable**                               | The queue's numbers could not be read in time. Redis being down or slow is the usual cause, but not the only one. Use **Refresh**; if it persists, check the API logs and the [Redis runbook](../operations/runbooks/redis.md).                                                 |
 | Every row says **Unavailable**                           | No queue could be read. Nothing is known about the queues right now. Check Redis, the API and its logs.                                                                                                                                                                         |
-| `notifications` or `ai-runs` is **Empty** but users wait | Look in the database state, not here. These queues only wake workers.                                                                                                                                                                                                           |
+| `notifications` or `ai-runs` is **Empty** but users wait | Inspect the corresponding database-owned work card. These queues only wake workers.                                                                                                                                                                                             |
 
 If the whole page shows "temporarily unavailable", the API could not be reached
 at all, or the session check could not complete. Use **Retry**.
@@ -126,7 +127,40 @@ at all, or the session check could not complete. Use **Retry**.
 For queues without supported native job inspection, use the read-only
 [queue board](queue-board.md) and ask the maintainer to inspect protected worker diagnostics.
 Notification and AI wake queues do not describe their database-owned business work;
-inspect that domain's state instead.
+inspect the `notification-deliveries` and `ai-run-executions` cards instead.
+Durable cards show **Completed** and **Failed** as separate counts. Each count
+matches its list filter. The API also retains the older `terminal` aggregate for
+clients that need all final states, including failures; the card does not show
+that overlapping total.
+
+## AI run executions
+
+The `ai-run-executions` card shows durable AI run state beside the read-only
+`ai-runs` wake queue. Filter by native run state, then open a run to inspect its
+bounded reason, attempts, lease and deadline times, approval wait, cancellation
+request and linked source. The card omits prompts, transcript, file keys, tool
+arguments, model configuration and raw provider errors. Transcript and artifact
+reads use separate owner or audited cross-user permissions.
+
+- **Pause** stops new run claims on all workers after the command commits.
+  Already claimed model calls and tools may finish. Deadlines and approval
+  expiry continue. **Resume** lets normal database polling claim due runs.
+- **Cancel** ends a queued run immediately or voids a waiting approval. On a
+  running run it records a request. The run stays running until its worker
+  settles; an in-flight model call or tool may finish first.
+- **Retry** is offered only for proved transient exhaustion without tools,
+  approvals or assistant output, with the original text input still valid.
+  It creates one linked child and leaves the source final. The child can make
+  several model calls and execute tools before its new deadline. Provider
+  charges may repeat. Any file, image or PDF reference blocks this action.
+- **Cleanup** archives only cancelled or expired runs that never began
+  execution and finished at least 30 days ago. It preserves the input,
+  idempotency identity and audit. Other completed or failed runs remain.
+
+An unavailable or disabled action shows a reason. `waiting_human` is a legacy
+state and cannot be retried. The completed filter includes completed, cancelled
+and expired native states; their badges remain distinct. An applied cancellation
+receipt means the request was recorded. Refresh the run to see its final state.
 
 ## Failure diagnostics
 

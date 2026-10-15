@@ -76,7 +76,9 @@ function HistoryContent({ workId, row }: { workId: string; row: WorkJob }) {
             <p>
               {t(`historyOutcomes.${attempt.outcome}`)}
               {t('separator')}
-              {t(`certainty.${attempt.certainty}`)}
+              {t(
+                `${workId === 'ai-run-executions' ? 'aiCertainty' : 'certainty'}.${attempt.certainty}`
+              )}
             </p>
             <p>
               {t('historyStarted')} {t('separator')}

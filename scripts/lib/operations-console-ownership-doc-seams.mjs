@@ -249,6 +249,16 @@ export const operationsConsoleDocSeams = [
     )
   ),
   entry(
+    'console.ai-run-runbook',
+    'docs/operations/runbooks/queues.md',
+    block(
+      '<!-- AMCORE_CONSOLE_AI_RUN_RUNBOOK_START -->',
+      '<!-- AMCORE_CONSOLE_AI_RUN_RUNBOOK_END -->'
+    ),
+    ['../../operations-console/background-work.md'],
+    { operationKey: 'console.background-work.docs/operations/runbooks/queues.md' }
+  ),
+  entry(
     'console.overview-observability',
     'docs/operations/observability.md',
     block(

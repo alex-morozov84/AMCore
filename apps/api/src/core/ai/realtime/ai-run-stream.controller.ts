@@ -15,6 +15,7 @@ import { MetricsService } from '../../../infrastructure/observability/index.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import { AiRunService } from '../runs/ai-run.service.js'
+import { ApiArchivedRunResponse } from '../runs/ai-run-archive.openapi.js'
 
 import { AiRunRealtimeHub } from './ai-run-realtime.hub.js'
 import type { AiRunStreamConnection } from './ai-run-stream.connection.js'
@@ -67,6 +68,7 @@ export class AiRunStreamController {
     description: 'A text/event-stream of disposable run-status hints.',
     content: { 'text/event-stream': { schema: { type: 'string' } } },
   })
+  @ApiArchivedRunResponse()
   async stream(
     @CurrentUser() principal: RequestPrincipal,
     @Param('id') runId: string,

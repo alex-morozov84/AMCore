@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Operations Console now shows database-owned AI runs with gated pause/resume,
+  cooperative cancellation, one linked text-only retry for proven transient
+  failures, and 30-day cleanup of never-started cancelled or expired runs.
+  Archived identities preserve owner replay and transcript lineage.
+
 ### Changed
 
 - API production output now uses ESM through maintained Nest CLI + SWC.

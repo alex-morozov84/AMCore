@@ -94,17 +94,19 @@ export function WorkCard({
         )}
         {work.counts && (
           <dl className="grid grid-cols-2 gap-2 text-sm">
-            {Object.entries(work.counts).map(([key, count]) => (
-              <div key={key}>
-                <dt className="text-muted-foreground">
-                  {t(`counts.${key as keyof NonNullable<WorkSummary['counts']>}`)}
-                </dt>
-                <dd>
-                  {count.value}
-                  {count.truncated ? t('countBounded') : ''}
-                </dd>
-              </div>
-            ))}
+            {Object.entries(work.counts)
+              .filter(([key]) => key !== 'terminal' || !work.counts?.completed)
+              .map(([key, count]) => (
+                <div key={key}>
+                  <dt className="text-muted-foreground">
+                    {t(`counts.${key as keyof NonNullable<WorkSummary['counts']>}`)}
+                  </dt>
+                  <dd>
+                    {count.value}
+                    {count.truncated ? t('countBounded') : ''}
+                  </dd>
+                </div>
+              ))}
           </dl>
         )}
         {reason && <p className="text-sm text-muted-foreground">{errors(reason)}</p>}

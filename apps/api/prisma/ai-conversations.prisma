@@ -72,6 +72,7 @@ model AiConversation {
   assistant    AiAssistant?  @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   messages     AiMessage[]
   runs         AiRun[]
+  runTombstones AiRunTombstone[]
   approvals    AiApproval[]
   artifacts    AiArtifact[]
 
@@ -88,6 +89,7 @@ model AiMessage {
   id             String        @id @default(cuid())
   conversationId String
   runId          String?
+  archivedRunId  String?
   sequence       Int // monotonic order within the conversation
   role           AiMessageRole
   authorType     AiAuthorType
@@ -98,9 +100,13 @@ model AiMessage {
 
   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   run          AiRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  inputForRuns AiRun[]        @relation("AiRunInput")
+  tombstoneInput AiRunTombstone? @relation("AiRunTombstoneInput")
+  archivedRun  AiRunTombstone? @relation("AiMessageArchivedOrigin", fields: [archivedRunId], references: [id], onDelete: SetNull)
 
   @@unique([conversationId, sequence])
   @@index([runId])
+  @@index([archivedRunId])
   @@map("ai_messages")
   @@schema("ai")
 }

@@ -5,6 +5,7 @@ import { AuditModule } from '../../core/audit/index.js'
 import { PrismaModule } from '../../prisma/index.js'
 import { bindWorkHandlers } from '../background-work/registration.js'
 
+import { AiCatalogModule } from './ai-catalog.module.js'
 import { AiGatewayModule } from './ai-gateway.module.js'
 import { AiApprovalExpiryService } from './runs/ai-approval-expiry.service.js'
 import { AiRunRepository } from './runs/ai-run.repository.js'
@@ -45,7 +46,14 @@ import { AiToolsModule } from './tools/ai-tools.module.js'
  * `AiRunRealtimePublisher` the executor uses to emit status hints (the SSE receive side is web-only).
  */
 @Module({
-  imports: [AiGatewayModule, PrismaModule, AiRealtimeModule, AiToolsModule, AuditModule],
+  imports: [
+    AiCatalogModule,
+    AiGatewayModule,
+    PrismaModule,
+    AiRealtimeModule,
+    AiToolsModule,
+    AuditModule,
+  ],
   providers: [
     AiRunRepository,
     AiRunBacklogCollector,
@@ -73,7 +81,8 @@ import { AiToolsModule } from './tools/ai-tools.module.js'
 })
 class AiRunImplementationModule {}
 
-const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor },
-  [AiRunImplementationModule])
+const bindings = bindWorkHandlers(aiRunsWork, { 'ai-run-wake@1': AiRunDispatchProcessor }, [
+  AiRunImplementationModule,
+])
 @Module({ imports: [AiRunImplementationModule, bindings], exports: [bindings] })
 export class AiWorkerModule {}

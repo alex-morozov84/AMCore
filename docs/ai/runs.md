@@ -51,16 +51,62 @@ Send an `idempotencyKey` (up to the schema limit) when a client may retry a
 create — a lost response, a double click, a queue redelivery. The key is scoped
 to the conversation.
 
-| Request                              | Result                                                                   |
-| ------------------------------------ | ------------------------------------------------------------------------ |
-| New key                              | A new run is queued.                                                     |
-| Same key, **same** `inputParts`      | The original run is returned. Nothing is created, bound or woken.        |
-| Same key, **different** `inputParts` | `409 AI_RUN_IDEMPOTENCY_CONFLICT`. Use a new key or repeat the original. |
+| Request                                 | Result                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| New key                                 | A new run is queued.                                                     |
+| Same key, **same** `inputParts`         | The original run is returned. Nothing is created, bound or woken.        |
+| Same key, **different** `inputParts`    | `409 AI_RUN_IDEMPOTENCY_CONFLICT`. Use a new key or repeat the original. |
+| Same key and input after narrow cleanup | `410 AI_RUN_ARCHIVED` with bounded archived identity.                    |
 
 "Same input" means the same ordered `inputParts`, artifact ids included
 (object key order is irrelevant; part order is not). The comparison never
 depends on the model, the assistant or the artifact bindings as they look today,
 so a replay after a configuration change still returns the original run.
+If the original run was archived, replay checks the retained validated input
+before new-run admission. It returns `410` even when the conversation is now
+human-controlled or closed. A foreign or missing run ID returns `404`; a different
+input under the archived key returns `409` without archived details.
+
+## Operator run control
+
+The `ai-run-executions` registration reads database-owned runs. The `ai-runs`
+queue still carries wake signals only. An audited pause stops **new claims**
+after it commits. Active model calls and tools may finish. Recovery, deadlines
+and approval expiry continue. Resume relies on ordinary database polling; it
+does not require a Redis wake signal. These controls remain available through
+the backend API when the optional Console frontend is disabled.
+
+A SUPER_ADMIN may request cancellation through the common audited command. A
+queued run becomes `cancelled`; a waiting approval is voided. A running run first
+shows a cancellation request and stays `running` until the worker settles it.
+The command receipt records the request, not a guaranteed terminal result.
+
+Manual retry creates at most one **new linked run** for a failed source. The
+source remains terminal. Eligible sources have a complete transient attempt
+history ending in `provider_timeout` or `provider_unavailable`, no tool,
+approval or assistant output, and a valid text-only original input. Current
+owner, conversation control, assistant/model binding, credentials, deadline and
+provider floor are checked again. A child has `maxAttempts=1` and a new
+`AI_RUN_DEADLINE_MS` lifetime. It can still make several model calls and execute
+tools within its normal bounded loop. Provider billing may repeat. A child
+cannot receive another manual retry. Inputs containing `artifact_ref` are refused.
+
+`GET /ai/runs/:id` exposes `retryOfRunId`, `retriedByRunId` and `operatorRetry`.
+The transcript retains one original USER message. An assistant message from the
+child carries `operatorRetryOfRunId` and `originRunId`; ordinary messages use
+`null` lineage. A headless client can display this in English as “Operator
+retry of run {id}” and in Russian as “Повтор оператором запуска {id}”. It must
+use the existing transcript authorization and never invent a second USER turn.
+
+Cleanup has a narrow 30-day floor from `finishedAt`. It archives only cancelled
+or expired runs that never started execution and have no protected relations.
+It retains the USER input, idempotency identity, audit and an immutable
+tombstone. `GET` and cancel of an owned archived run return `410
+AI_RUN_ARCHIVED` with only `id`, `conversationId`, `terminalStatus`, `finishedAt`
+and `archivedAt` in `details`; the SSE endpoint does so before stream headers.
+The run list omits tombstones. Transcript messages retain `originRunId` and set
+`originArchived=true`. A deleted conversation also deletes its tombstone and
+input; future message retention must preserve their deduplication relationship.
 
 ## Run Lifecycle
 

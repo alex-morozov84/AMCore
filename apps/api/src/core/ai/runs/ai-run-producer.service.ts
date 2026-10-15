@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import {
+  aiMessageContentSchema,
   aiModelSelectionSchema,
   type AiRunResponse,
   type CreateAiRunInput,
@@ -31,10 +32,7 @@ import type { ResolvedAiModel } from '../../../infrastructure/ai/registry/ai-reg
 import { JobName, QueueName } from '../../../infrastructure/queue/constants/queues.constant.js'
 import { QueueService } from '../../../infrastructure/queue/queue.service.js'
 import { PrismaService } from '../../../prisma/index.js'
-import {
-  AI_MODEL_NOT_CONFIGURED,
-  AI_RUN_DEFAULT_MAX_ATTEMPTS,
-} from '../ai-run.constants.js'
+import { AI_MODEL_NOT_CONFIGURED, AI_RUN_DEFAULT_MAX_ATTEMPTS } from '../ai-run.constants.js'
 import {
   AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE,
   AI_ARTIFACT_REBIND_BLOCKED_STATUSES,
@@ -43,6 +41,7 @@ import {
 } from '../artifacts/ai-artifact.constants.js'
 
 import { toAiRunResponse } from './ai-run.mapper.js'
+import { archivedRunError } from './ai-run-archive.js'
 import { aiRunInputFingerprint } from './ai-run-input-fingerprint.js'
 
 /** A resolved model plus the bound assistant's modality restriction, if any (Arc G). */
@@ -112,11 +111,35 @@ export class AiRunProducerService {
     userId: string,
     input: CreateAiRunInput
   ): Promise<{ run: Prisma.AiRunGetPayload<object>; created: boolean }> {
-    const { ownershipGeneration, assistantId } = await this.lockOwnedConversation(
-      tx,
-      input.conversationId,
-      userId
-    )
+    const conversation = await this.lockOwnedConversation(tx, input.conversationId, userId)
+
+    if (input.idempotencyKey) {
+      const archived = await tx.aiRunTombstone.findUnique({
+        where: {
+          conversationId_idempotencyKey: {
+            conversationId: input.conversationId,
+            idempotencyKey: input.idempotencyKey,
+          },
+        },
+        include: { inputMessage: { select: { content: true, role: true, conversationId: true } } },
+      })
+      if (archived) {
+        const message = archived.inputMessage
+        const original = aiMessageContentSchema.safeParse(message.content)
+        if (
+          message.role !== AiMessageRole.USER ||
+          message.conversationId !== input.conversationId ||
+          !original.success ||
+          archived.inputFingerprint !== aiRunInputFingerprint(original.data)
+        )
+          throw this.idempotencyConflict()
+        if (archived.inputFingerprint !== aiRunInputFingerprint(input.inputParts))
+          throw this.idempotencyConflict()
+        throw archivedRunError(archived)
+      }
+    }
+    this.assertConversationAdmitsRun(conversation)
+    const { ownershipGeneration, assistantId } = conversation
 
     if (input.idempotencyKey) {
       const existing = await tx.aiRun.findFirst({
@@ -151,6 +174,8 @@ export class AiRunProducerService {
         conversationId: input.conversationId,
         status: AiRunStatus.QUEUED,
         ownershipGeneration,
+        assistantBindingCaptured: true,
+        assistantIdAtCreation: assistantId,
         modelSnapshot,
         idempotencyKey: input.idempotencyKey ?? null,
         maxAttempts: AI_RUN_DEFAULT_MAX_ATTEMPTS,
@@ -177,6 +202,10 @@ export class AiRunProducerService {
         content: input.inputParts as unknown as Prisma.InputJsonValue,
       },
     })
+    const ready = await tx.aiRun.update({
+      where: { id: run.id },
+      data: { inputMessageId: message.id },
+    })
 
     // Bind last, in the same transaction: the earlier FOR UPDATE locks (held for the whole tx) make
     // this the only writer that can land on each artifact for this attempt.
@@ -187,7 +216,7 @@ export class AiRunProducerService {
       })
     }
 
-    return { run, created: true }
+    return { run: ready, created: true }
   }
 
   /**
@@ -317,7 +346,12 @@ export class AiRunProducerService {
     tx: Prisma.TransactionClient,
     conversationId: string,
     userId: string
-  ): Promise<{ ownershipGeneration: number; assistantId: string | null }> {
+  ): Promise<{
+    ownershipGeneration: number
+    assistantId: string | null
+    controlledBy: string
+    state: string
+  }> {
     const rows = await tx.$queryRaw<
       {
         ownershipGeneration: number
@@ -338,18 +372,18 @@ export class AiRunProducerService {
     if (row === undefined) {
       throw new NotFoundException('Conversation', conversationId)
     }
-    // A new bot run cannot be queued while a human holds the conversation or it is closed (ADR-049
-    // fence, Arc F, invariant #6): the bot must not act under human control. 409 — the owner (or
-    // operator) releases control first. The worker fence is the backstop; this is the front-door gate.
+    return row
+  }
+
+  private assertConversationAdmitsRun(conversation: { controlledBy: string; state: string }): void {
     if (
-      row.controlledBy !== AiConversationControl.BOT ||
-      row.state !== AiConversationState.ACTIVE
+      conversation.controlledBy !== AiConversationControl.BOT ||
+      conversation.state !== AiConversationState.ACTIVE
     ) {
       throw new ConflictException(
         'This conversation is under human control or closed; a new AI run cannot be started.'
       )
     }
-    return { ownershipGeneration: row.ownershipGeneration, assistantId: row.assistantId ?? null }
   }
 
   private async nextSequence(
@@ -418,11 +452,7 @@ export class AiRunProducerService {
   /** Swallow queue/Redis errors — the recovery cron drains the QUEUED run regardless. */
   private async enqueueWake(runId: string): Promise<void> {
     try {
-      await this.queue.add(
-        QueueName.AI_RUNS,
-        JobName.AI_RUN_WAKE,
-        { runId } satisfies AiRunWakeJob
-      )
+      await this.queue.add(QueueName.AI_RUNS, JobName.AI_RUN_WAKE, { runId } satisfies AiRunWakeJob)
     } catch (err) {
       this.logger.warn(
         {

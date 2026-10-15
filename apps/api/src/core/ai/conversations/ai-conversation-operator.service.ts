@@ -101,6 +101,14 @@ export class AiConversationOperatorService {
     const hasMore = rows.length > query.limit
     const page = hasMore ? rows.slice(0, query.limit) : rows
     const nextCursor = hasMore ? String(page[page.length - 1]!.sequence) : null
+    const runIds = [...new Set(page.flatMap((message) => (message.runId ? [message.runId] : [])))]
+    const lineages = runIds.length
+      ? await this.prisma.aiRun.findMany({
+          where: { id: { in: runIds } },
+          select: { id: true, retryOfRunId: true },
+        })
+      : []
+    const retryOf = new Map(lineages.map((run) => [run.id, run.retryOfRunId]))
 
     if (authorized.isCrossUser) {
       // Fail-CLOSED accountability (ADR-045): recorded with `failOpen: false` and awaited BEFORE the
@@ -126,7 +134,13 @@ export class AiConversationOperatorService {
       )
     }
 
-    return { data: page.map(toAiMessageResponse), nextCursor, hasMore }
+    return {
+      data: page.map((message) =>
+        toAiMessageResponse(message, message.runId ? (retryOf.get(message.runId) ?? null) : null)
+      ),
+      nextCursor,
+      hasMore,
+    }
   }
 
   /**

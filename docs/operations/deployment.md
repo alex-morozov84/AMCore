@@ -184,6 +184,25 @@ The executable upgrade matrix is
 
 #### AI run engine upgrade (maintenance stop)
 
+The `20261015120000_ai_run_control` migration adds the database claim gate,
+linked input identity and narrow cleanup tombstone. Stop every old `web`,
+`worker` and `all` API process and disable auto-restart before applying it.
+Old workers do not read the gate. The migration checks known AMCore connection
+names, but operators must also stop clients that use another connection name.
+Deploy every new role before allowing writers to restart. Verify the singleton
+`ai.ai_run_control` row exists and inspect its `paused` value. A missing row
+fails new claims closed. A paused row remains paused across restart; do not
+reset it during deployment. Recovery can still expire deadlines and approvals
+while paused. Resume through the audited background-work command API after checking
+the new worker fleet. Rollback requires restoring the pre-migration backup;
+mixed old and new writers cannot uphold the pause guarantee.
+
+The migration does not backfill `inputMessageId` or assistant binding on older
+runs. Their queued execution keeps the old input lookup, while manual retry
+refuses them. New runs require the direct link and never fall back after it is
+lost. The backend gate, control API and worker remain installed when the
+optional Console frontend is disabled.
+
 The migrations `20261005120000_ai_run_ownership_and_effect_identity`,
 `20261005120100_ai_run_legacy_state_conversion` and
 `20261007180000_ai_gateway_consistency` change what an AI run's retry
