@@ -147,3 +147,13 @@ retain observed usage when the SDK supplies response evidence. A timeout before
 observation does not invent usage. See [Runs](./runs.md#usage-after-refusal) and
 [Providers](./providers.md#frozen-execution-and-live-permission) for atomic
 settlement and credential-destination admission.
+
+### Structured result and endpoint boundaries
+
+A structured result that is entirely `null` or `undefined` fails with non-retryable
+`output_validation_failed`; nullable/optional fields remain valid when the schema allows them.
+This deliberately changes the provider extension contract. Available provider receipts/usage
+remain accountable even when output access or validation fails. Cancellation and timeout
+remain distinct errors; no schema failure enables an automatic SDK retry.
+Anthropic uses an explicit code-owned public base URL, ignoring `ANTHROPIC_BASE_URL`.
+The generic compatible family retains its canonical endpoint binding and redirect refusal.

@@ -1,43 +1,25 @@
 import { expect } from '@playwright/test'
-import { http, HttpResponse } from 'msw'
 
 import { test } from '../shared/auth-test'
 
-/**
- * `getOAuthProviders()` (`shared/api/bff/oauth-providers.ts`) is a
- * server-side `fetch` from the Next server to `apps/api` — a boundary
- * `page.route()` (the `mocked` lane) cannot reach, since nothing crosses
- * the browser. Next's own `experimental/testmode/playwright/msw` fixture
- * intercepts it instead, via `next.config.ts`'s `experimental.testProxy`
- * (only enabled under this Playwright project's `webServer.env`).
- *
- * Proven against this exact page and endpoint in the Track 7 spike before
- * being adopted (`ai/models-talk.md` — "Spike results"): the fixture worked
- * on the first real attempt, both against `next dev` and, after a since-
- * documented standalone file-tracing workaround, the production build.
- */
+/** Server fetches require real handler hits; the application's empty fallback is not mock proof. */
+test.use({ oauthProvidersDefault: false })
 
 test('shows the Google entry point when the backend reports it configured', async ({
   page,
-  msw,
+  authMocks,
 }) => {
-  msw.use(
-    http.get('http://api.mocked.invalid/api/v1/auth/oauth/providers', () =>
-      HttpResponse.json({ providers: ['google'] })
-    )
-  )
-
+  authMocks.providers(['google'])
   await page.goto('/en/login')
   await expect(page.getByRole('link', { name: /continue with google/i })).toBeVisible()
+  expect(authMocks.hits.providers).toBeGreaterThan(0)
+  expect(authMocks.hits.signup).toBeGreaterThan(0)
 })
 
-test('hides the Google entry point when no provider is configured', async ({ page, msw }) => {
-  msw.use(
-    http.get('http://api.mocked.invalid/api/v1/auth/oauth/providers', () =>
-      HttpResponse.json({ providers: [] })
-    )
-  )
-
+test('hides the Google entry point when no provider is configured', async ({ page, authMocks }) => {
+  authMocks.providers([])
   await page.goto('/en/login')
   await expect(page.getByRole('link', { name: /continue with google/i })).toHaveCount(0)
+  expect(authMocks.hits.providers).toBeGreaterThan(0)
+  expect(authMocks.hits.signup).toBeGreaterThan(0)
 })

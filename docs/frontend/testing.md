@@ -602,3 +602,18 @@ commands before each scenario. The global bucket uses the guard’s existing SHA
 controller/handler/IP identity. Per-email and other budgets
 remain intact; production limits are unchanged. Rate-limit enforcement is checked
 separately in API tests. This fixture cannot run against an owner preview.
+
+### Public-auth server mocks must prove handler use
+
+Tests using `e2e/shared/auth-test.ts` install per-test signup-policy and explicit empty
+OAuth-provider handlers. OAuth visibility tests replace the provider default explicitly.
+Handler counters prove that the server requested each auth dependency. A hidden Google
+button alone proves nothing: the application returns an empty list after provider-fetch errors.
+The fixture rejects unexpected upstream/browser traffic and fails teardown when it occurs.
+Auth-page scenarios require provider and signup-policy handler hits. New auth scenarios must
+use this fixture and preserve those checks. Reset-password scenarios need no invented auth hits.
+
+When changing this boundary, omit the provider handler in an explicit-empty scenario,
+run that whole test command with retries disabled, and require a missing-handler failure.
+Restore the handler and verify success. Repeat the signup-policy absence check. Preserve
+the negative result separately; startup errors are not missing-handler evidence.

@@ -5,6 +5,7 @@ import {
   type LanguageModelUsage,
   type ModelMessage,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   type TextPart,
   tool,
   type ToolSet,
@@ -183,7 +184,11 @@ function isAbortError(error: unknown): boolean {
 export function mapProviderError(error: unknown, providerType: AiProviderType): AiGatewayException {
   if (error instanceof AiGatewayException) return error
   if (isAbortError(error)) return AiGatewayException.providerTimeout(providerType)
-  if (NoObjectGeneratedError.isInstance(error) || TypeValidationError.isInstance(error)) {
+  if (
+    NoObjectGeneratedError.isInstance(error) ||
+    NoOutputGeneratedError.isInstance(error) ||
+    TypeValidationError.isInstance(error)
+  ) {
     return AiGatewayException.outputValidationFailed(providerType)
   }
   if (APICallError.isInstance(error)) {

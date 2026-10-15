@@ -26,7 +26,7 @@ import {
 } from './ai-gateway.types.js'
 import { AiCredentialResolver } from './credential-resolver.js'
 import { findUnsupportedMultimodalCapability } from './multimodal-capability.js'
-import { providerReceipt } from './provider-receipt.js'
+import { attachProviderReceipt, providerReceipt } from './provider-receipt.js'
 
 /** Low-cardinality metric label: the lowercase wire form of the catalog provider type. */
 function providerLabel(model: ResolvedAiModel): AiMetricsProvider {
@@ -86,7 +86,7 @@ export class ModelGateway {
   async generateObject<T>(
     request: AiGenerateRequest,
     schema: ZodType<T>
-  ): Promise<AiObjectResult<T>> {
+  ): Promise<AiObjectResult<Exclude<T, null | undefined>>> {
     const { model, adapter } = await this.prepare(request)
     if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
     if (model.capabilities.structured_output !== true || adapter.generateObject === undefined) {
@@ -96,6 +96,12 @@ export class ModelGateway {
     const call = this.adapterCall(model, request)
     try {
       const result = await adapter.generateObject(call, schema)
+      if (result.object === null || result.object === undefined) {
+        throw attachProviderReceipt(
+          AiGatewayException.outputValidationFailed(model.provider.type),
+          result.receipt
+        )
+      }
       await this.settle(model, 'object', result.usage, request)
       return result
     } catch (error) {

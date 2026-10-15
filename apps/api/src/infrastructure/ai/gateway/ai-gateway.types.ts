@@ -167,7 +167,10 @@ export interface AiAdapterCall {
 export interface AiProviderAdapter {
   readonly supportedTypes: readonly AiProviderType[]
   generateText(call: AiAdapterCall): Promise<AiTextResult>
-  generateObject?<T>(call: AiAdapterCall, schema: ZodType<T>): Promise<AiObjectResult<T>>
+  generateObject?<T>(
+    call: AiAdapterCall,
+    schema: ZodType<T>
+  ): Promise<AiObjectResult<Exclude<T, null | undefined>>>
 }
 
 /** DI token for the list of registered provider adapters the gateway dispatches across. */
