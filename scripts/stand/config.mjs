@@ -56,6 +56,8 @@ export async function configuration(m) {
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
       WEB_TRUSTED_ORIGINS: m.origins.product,
+      // The stand's API serves public files, so its origin may load images.
+      WEB_PUBLIC_FILES_ORIGIN: m.origins.api ?? '',
       WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:')
         ? m.origins.product
         : '',

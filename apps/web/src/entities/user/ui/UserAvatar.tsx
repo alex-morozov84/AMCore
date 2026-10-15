@@ -48,6 +48,9 @@ export function UserAvatar({ name, avatarUrl, size = 'md', className }: UserAvat
         alt={name || 'User avatar'}
         width={sizePx[size]}
         height={sizePx[size]}
+        // Served as stored: derivatives are already sized WebP files, so the Next.js image optimizer
+        // (a server-side fetch of a remote URL) is not needed and no remote host list is required.
+        unoptimized
         className={cn(baseClasses, sizeClasses[size], 'object-cover', className)}
       />
     )

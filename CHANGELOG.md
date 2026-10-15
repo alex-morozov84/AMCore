@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `STORAGE_PRESIGN_ENDPOINT` (a bare S3 API origin used only to sign),
   `STORAGE_PUBLIC_DELIVERY` and `STORAGE_PUBLIC_BUCKET`. See `docs/storage/public-files.md`.
 
+- Show avatars from another origin in the web starter: `WEB_PUBLIC_FILES_ORIGIN` (the origin of
+  `STORAGE_PUBLIC_BASE_URL`) is added to the CSP `img-src` and nowhere else, only as one exact
+  `https` (or loopback `http`) origin; avatars render with `next/image` `unoptimized`, so no
+  `images.remotePatterns` list is needed.
+
 - Add the `api` public delivery mode (`STORAGE_PUBLIC_DELIVERY=api`). The unauthenticated
   `GET /api/v1/storage/public?key=` route now also serves `public/` objects of the `s3`
   driver, reading them with the application's own credentials, so no bucket, ACL, policy or

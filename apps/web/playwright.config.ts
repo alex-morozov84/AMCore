@@ -58,6 +58,8 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       PLAYWRIGHT_TEST_PROXY: 'true',
+      // Origin public files load from; the CSP spec asserts it reaches img-src and nothing else.
+      WEB_PUBLIC_FILES_ORIGIN: 'https://files.example.test/public',
     },
   },
 })

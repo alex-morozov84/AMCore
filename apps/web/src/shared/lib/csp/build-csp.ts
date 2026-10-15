@@ -5,6 +5,8 @@ export interface BuildCspDirectivesOptions {
   nonce: string
   /** `process.env.NODE_ENV === 'development'` at the call site. */
   isDev: boolean
+  /** Exact origin of the public files (avatars), from `WEB_PUBLIC_FILES_ORIGIN`; `null` for web-origin only. */
+  imageOrigin?: string | null
 }
 
 /**
@@ -38,13 +40,17 @@ export interface BuildCspDirectivesOptions {
  * an assumption — left as a documented follow-up rather than silently
  * promised.
  */
-export function buildCspDirectives({ nonce, isDev }: BuildCspDirectivesOptions): string {
+export function buildCspDirectives({
+  nonce,
+  isDev,
+  imageOrigin = null,
+}: BuildCspDirectivesOptions): string {
   const directives = [
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
     `style-src-elem 'self' 'nonce-${nonce}'`,
     `style-src-attr 'unsafe-inline'`,
-    `img-src 'self' data: blob:`,
+    `img-src 'self' data: blob:${imageOrigin ? ` ${imageOrigin}` : ''}`,
     `font-src 'self'`,
     `connect-src 'self'`,
     // Covers both public/sw.js (2.11) and any future Web Worker.

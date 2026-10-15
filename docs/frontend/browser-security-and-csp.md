@@ -33,7 +33,7 @@ default-src 'self';
 script-src 'self' 'nonce-<per-request>' 'strict-dynamic';
 style-src-elem 'self' 'nonce-<per-request>';
 style-src-attr 'unsafe-inline';
-img-src 'self' data: blob:;
+img-src 'self' data: blob: <WEB_PUBLIC_FILES_ORIGIN, when set>;
 font-src 'self';
 connect-src 'self';
 worker-src 'self';
@@ -161,6 +161,17 @@ editing the `Strict-Transport-Security` value in `next.config.ts` directly
 and submitting to [hstspreload.org](https://hstspreload.org) yourself —
 this is a one-time, deliberate operational decision, not a configuration
 flag this starter flips for you.
+
+## Public files (avatars)
+
+Avatars and other public files are loaded from the origin of `STORAGE_PUBLIC_BASE_URL`, which is
+usually not the web origin. Set `WEB_PUBLIC_FILES_ORIGIN` on the web service to that origin. The
+proxy adds it to `img-src` only (`parsePublicFilesOrigin`, covered by `public-files-origin.test.ts`
+and `build-csp.test.ts`). The value is reduced to one exact origin: `https`, or `http` on
+`localhost`/`127.0.0.1` for local stands. A wildcard, a credential, a plain-`http` public host or a
+malformed value is ignored, so a typo can never widen the policy. `connect-src`, `script-src` and
+the other directives are unchanged. Images are rendered with `next/image` `unoptimized`, so the
+Next.js server never fetches them and no `images.remotePatterns` list exists.
 
 ## Adding a third-party origin safely
 

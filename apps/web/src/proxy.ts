@@ -11,6 +11,7 @@ import {
 } from '@/shared/lib/csp/constants'
 import { getCspMode } from '@/shared/lib/csp/csp-mode'
 import { generateNonce } from '@/shared/lib/csp/generate-nonce'
+import { getPublicFilesOrigin } from '@/shared/lib/csp/public-files-origin'
 
 import { routing } from './i18n/routing'
 
@@ -79,7 +80,7 @@ export default function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === 'development'
   const mode = getCspMode()
   const cspHeaderName = mode === 'enforce' ? CSP_ENFORCE_HEADER : CSP_REPORT_ONLY_HEADER
-  const cspHeaderValue = buildCspDirectives({ nonce, isDev })
+  const cspHeaderValue = buildCspDirectives({ nonce, isDev, imageOrigin: getPublicFilesOrigin() })
 
   request.headers.delete(CSP_ENFORCE_HEADER)
   request.headers.delete(CSP_REPORT_ONLY_HEADER)
