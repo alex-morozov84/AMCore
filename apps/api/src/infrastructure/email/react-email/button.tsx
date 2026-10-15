@@ -1,8 +1,8 @@
 import * as React from 'react'
 
-import { markAsElement } from './element-marker'
-import { parsePadding } from './utils/parse-padding'
-import { pxToPt } from './utils/px-to-pt'
+import { markAsElement } from './element-marker.js'
+import { parsePadding } from './utils/parse-padding.js'
+import { pxToPt } from './utils/px-to-pt.js'
 
 export type ButtonProps = Readonly<React.ComponentPropsWithoutRef<'a'>>
 

@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { AiUsage, AiUsageContext } from '../gateway/ai-gateway.types'
+import { PrismaService } from '../../../prisma/index.js'
+import type { AiUsage, AiUsageContext } from '../gateway/ai-gateway.types.js'
 
-import { usageLedgerV2 } from './ai-usage-v2'
-
-import { PrismaService } from '@/prisma'
+import { usageLedgerV2 } from './ai-usage-v2.js'
 
 /** What the gateway records after a successful generation. No prompt/response content, no secret. */
 export interface AiUsageRecord {

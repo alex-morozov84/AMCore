@@ -1,5 +1,5 @@
-import type { EnvResolved } from './derive-defaults'
-import type { RefinementCtx } from './refinement-ctx'
+import type { EnvResolved } from './derive-defaults.js'
+import type { RefinementCtx } from './refinement-ctx.js'
 
 // Storage: when the s3 driver is selected, credentials + target are mandatory.
 // STORAGE_ENDPOINT stays optional (AWS derives it; non-AWS providers set it

@@ -1,9 +1,9 @@
-import { lockControlBudget } from './control-budget-store'
-import { CONTROL_LIMITS } from './control-limits'
-import type { ControlTransaction } from './control-transaction'
-import { WorkPolicyError } from './work-policy-error'
+import type { BackgroundBudget } from '../../generated/prisma/client.js'
 
-import type { BackgroundBudget } from '@/generated/prisma/client'
+import { lockControlBudget } from './control-budget-store.js'
+import { CONTROL_LIMITS } from './control-limits.js'
+import type { ControlTransaction } from './control-transaction.js'
+import { WorkPolicyError } from './work-policy-error.js'
 
 export interface EvidenceBudgets {
   readonly global: BackgroundBudget

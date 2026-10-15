@@ -1,9 +1,9 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
 import type { Request } from 'express'
 
-import { UnauthorizedException } from '../../../common/exceptions'
-import { SessionService } from '../session.service'
-import { TokenService } from '../token.service'
+import { UnauthorizedException } from '../../../common/exceptions/index.js'
+import { SessionService } from '../session.service.js'
+import { TokenService } from '../token.service.js'
 
 /**
  * Guard для валидации refresh token из cookie

@@ -1,9 +1,9 @@
 import type { Redis } from 'ioredis'
 import { z } from 'zod'
 
-import type { ProviderAttempt } from '../provider-evidence.store'
+import type { ProviderAttempt } from '../provider-evidence.store.js'
 
-import { PROVIDER_FENCE_LUA } from './provider-fence.lua'
+import { PROVIDER_FENCE_LUA } from './provider-fence.lua.js'
 
 const fenceSchema = z.strictObject({
   incarnation: z.uuidv7(),

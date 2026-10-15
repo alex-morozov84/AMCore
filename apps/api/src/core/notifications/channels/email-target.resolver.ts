@@ -1,14 +1,13 @@
-import { NotificationChannel } from '../notification.constants'
-import { NotificationTerminalReason } from '../notification-dispatch.constants'
+import { redactEmail } from '../../../common/utils/index.js'
+import { Prisma } from '../../../generated/prisma/client.js'
+import { NotificationChannel } from '../notification.constants.js'
+import { NotificationTerminalReason } from '../notification-dispatch.constants.js'
 
 import type {
   ChannelTargetResolver,
   ResolvedDeliveryTarget,
   TargetResolutionContext,
-} from './channel-target-resolver.types'
-
-import { redactEmail } from '@/common/utils'
-import { Prisma } from '@/generated/prisma/client'
+} from './channel-target-resolver.types.js'
 
 /** Bounded terminal reason: the account email is not a usable notification target. */
 export const EMAIL_SKIP_UNVERIFIED = NotificationTerminalReason.DESTINATION_UNVERIFIED

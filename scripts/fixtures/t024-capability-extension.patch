@@ -32,19 +32,18 @@ index 0000000..24bd3e1
 +);
 +CREATE INDEX fixture_orders_organization_id_idx ON core.fixture_orders ("organizationId");
 diff --git a/apps/api/src/core/auth/casl/ability.factory.ts b/apps/api/src/core/auth/casl/ability.factory.ts
-index 0ad0ca1..c9a01ef 100644
 --- a/apps/api/src/core/auth/casl/ability.factory.ts
 +++ b/apps/api/src/core/auth/casl/ability.factory.ts
-@@ -20,7 +20,7 @@ import {
- } from './permission-normalization'
- import { createPrismaAbility, type PrismaQuery, type Subjects } from './prisma-ability'
+@@ -3,7 +3,7 @@
  
--import type { Organization, Permission, Role, User } from '@/generated/prisma/client'
-+import type { FixtureOrder, Organization, Permission, Role, User } from '@/generated/prisma/client'
+ import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
  
- type AppSubjects =
-   | 'all'
-@@ -30,6 +30,7 @@ type AppSubjects =
+-import type { Organization, Permission, Role, User } from '../../../generated/prisma/client.js'
++import type { FixtureOrder, Organization, Permission, Role, User } from '../../../generated/prisma/client.js'
+ import { OrgAclVersionService } from '../org-acl-version.service.js'
+ import {
+   assertVerifiedContext,
+@@ -29,6 +29,7 @@
        Organization: Organization
        Role: Role
        Permission: Permission
@@ -328,15 +327,15 @@ diff --git a/apps/api/src/core/organizations/organizations.module.ts b/apps/api/
 index 48c5b9d..8d2b9bd 100644
 --- a/apps/api/src/core/organizations/organizations.module.ts
 +++ b/apps/api/src/core/organizations/organizations.module.ts
-@@ -29,6 +29,7 @@ import { MembersController } from './members.controller'
- import { OrganizationsController } from './organizations.controller'
- import { OrganizationsService } from './organizations.service'
- import { PresetPermissionsController } from './preset-permissions.controller'
+@@ -29,6 +29,7 @@ import { MembersController } from './members.controller.js'
+ import { OrganizationsController } from './organizations.controller.js'
+ import { OrganizationsService } from './organizations.service.js'
+ import { PresetPermissionsController } from './preset-permissions.controller.js'
 +import { FixtureOrdersController } from './fixture-orders.controller'
- import { RoleService } from './role.service'
- import { RoleAssignabilityService } from './role-assignability.service'
- import { RoleDefinitionCommandService } from './role-definition-command.service'
-@@ -48,6 +49,7 @@ import { RolesController } from './roles.controller'
+ import { RoleService } from './role.service.js'
+ import { RoleAssignabilityService } from './role-assignability.service.js'
+ import { RoleDefinitionCommandService } from './role-definition-command.service.js'
+@@ -48,6 +49,7 @@ import { RolesController } from './roles.controller.js'
      OrganizationsController,
      CapabilitiesController,
      PresetPermissionsController,

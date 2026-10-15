@@ -1,4 +1,4 @@
-import { type NotificationDelivery, Prisma } from '@/generated/prisma/client'
+import { type NotificationDelivery, Prisma } from '../../generated/prisma/client.js'
 
 /** Parents are already exclusively locked. Lock every sibling globally by ID. */
 export async function lockRetentionChildren(

@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks'
 import { Injectable, type OnModuleDestroy } from '@nestjs/common'
 import { z } from 'zod'
 
-import { CONTROL_LIMITS } from './control-limits'
+import { CONTROL_LIMITS } from './control-limits.js'
 
 type OutcomeOwner = 'command' | 'provider'
 type SafePayload = z.infer<ReturnType<typeof z.json>>

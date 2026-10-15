@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import type { Request } from 'express'
 
-import { normalizeRouteTemplate } from '@/infrastructure/observability/route-template'
+import { normalizeRouteTemplate } from '../observability/route-template.js'
 
 export function createIdempotencyFingerprint(req: Request & { rawBody?: Buffer }): string {
   const route = normalizeRouteTemplate(req)

@@ -3,7 +3,7 @@ import {
   NOTIFICATION_BACKOFF_CAP_MS,
   NOTIFICATION_BACKOFF_JITTER,
   NOTIFICATION_RETRY_AFTER_MAX_MS,
-} from '../notification-dispatch.constants'
+} from '../notification-dispatch.constants.js'
 
 /**
  * Exponential backoff with full jitter for the next retry (ADR-052: Postgres owns the

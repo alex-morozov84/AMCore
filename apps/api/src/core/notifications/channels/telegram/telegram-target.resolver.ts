@@ -1,13 +1,12 @@
-import { NotificationChannel } from '../../notification.constants'
+import { Prisma, TelegramConnectionStatus } from '../../../../generated/prisma/client.js'
+import { NotificationChannel } from '../../notification.constants.js'
 import type {
   ChannelTargetResolver,
   ResolvedDeliveryTarget,
   TargetResolutionContext,
-} from '../channel-target-resolver.types'
+} from '../channel-target-resolver.types.js'
 
-import { TelegramTerminalReason } from './telegram.constants'
-
-import { Prisma, TelegramConnectionStatus } from '@/generated/prisma/client'
+import { TelegramTerminalReason } from './telegram.constants.js'
 
 /**
  * Redact a chat id for the durable `destinationSnapshot` (no full id in the snapshot view):

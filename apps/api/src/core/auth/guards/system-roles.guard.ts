@@ -3,8 +3,8 @@ import { Reflector } from '@nestjs/core'
 
 import { type SystemRole } from '@amcore/shared'
 
-import { ForbiddenException } from '../../../common/exceptions'
-import { SYSTEM_ROLES_KEY } from '../decorators/system-roles.decorator'
+import { ForbiddenException } from '../../../common/exceptions/index.js'
+import { SYSTEM_ROLES_KEY } from '../decorators/system-roles.decorator.js'
 
 /** Exact original-credential AND primary-role requirement, using admission evidence. */
 @Injectable()

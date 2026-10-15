@@ -1,6 +1,6 @@
 import type { PrismaQueryOf } from '@casl/prisma/runtime'
 
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../../generated/prisma/client.js'
 
 export type { Subjects } from '@casl/prisma/runtime'
 export {

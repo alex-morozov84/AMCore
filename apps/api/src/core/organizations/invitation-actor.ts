@@ -2,9 +2,9 @@ import { createParamDecorator, type ExecutionContext } from '@nestjs/common'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { ForbiddenException } from '../../common/exceptions'
-import { apiKeyAdmission, type ApiKeyEvidence } from '../api-keys/api-key-admission'
-import type { PrivilegedAdmission } from '../auth/privileged-admission.service'
+import { ForbiddenException } from '../../common/exceptions/index.js'
+import { apiKeyAdmission, type ApiKeyEvidence } from '../api-keys/api-key-admission.js'
+import type { PrivilegedAdmission } from '../auth/privileged-admission.service.js'
 
 export interface InvitationActor {
   readonly principal: Readonly<RequestPrincipal>

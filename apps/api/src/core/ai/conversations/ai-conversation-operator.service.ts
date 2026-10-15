@@ -10,13 +10,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { ConflictException, NotFoundException } from '../../../common/exceptions'
-import { toAiMessageResponse } from '../runs/ai-run.mapper'
-
-import { AiConversationAccessAuthorizer } from './ai-conversation-access.authorizer'
-import { AiConversationControlService } from './ai-conversation-control.service'
-
-import { AuditLogService } from '@/core/audit'
+import { ConflictException, NotFoundException } from '../../../common/exceptions/index.js'
 import {
   AiAuthorType,
   AiConversationControl,
@@ -24,9 +18,14 @@ import {
   AuditActorType,
   AuditTargetType,
   Prisma,
-} from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+} from '../../../generated/prisma/client.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { AuditLogService } from '../../audit/index.js'
+import { toAiMessageResponse } from '../runs/ai-run.mapper.js'
+
+import { AiConversationAccessAuthorizer } from './ai-conversation-access.authorizer.js'
+import { AiConversationControlService } from './ai-conversation-control.service.js'
 
 /** The conversation's holder columns, read under `FOR UPDATE` for the operator-message write. */
 interface HolderRow {

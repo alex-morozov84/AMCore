@@ -4,9 +4,9 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { EnvService } from '../../env/env.service'
-import { PrismaService } from '../../prisma'
+import { AppException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { PrismaService } from '../../prisma/index.js'
 
 export interface GeneratedToken {
   token: string // Plain token — for email link

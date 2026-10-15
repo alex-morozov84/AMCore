@@ -6,7 +6,7 @@ import type {
   WorkDefinition,
   WorkHandler,
   WorkRegistration,
-} from './work-definition'
+} from './work-definition.js'
 
 export const WORK_REGISTRATIONS = Symbol('WORK_REGISTRATIONS')
 export const MANAGED_PRODUCERS = Symbol('MANAGED_PRODUCERS')

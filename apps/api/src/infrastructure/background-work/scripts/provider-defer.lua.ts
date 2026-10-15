@@ -1,6 +1,6 @@
-import { PROVIDER_WINDOW_CLOCK } from '../provider-window-clock'
+import { PROVIDER_WINDOW_CLOCK } from '../provider-window-clock.js'
 
-import { JOB_MEMBERSHIP_GUARD_LUA } from './job-membership.lua'
+import { JOB_MEMBERSHIP_GUARD_LUA } from './job-membership.lua.js'
 
 /**
  * Narrowed BullMQ 6.3.11 moveToDelayed/getDelayedScore/marker transitions (MIT).

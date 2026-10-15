@@ -1,4 +1,4 @@
-import type { RateLimitPolicy } from './rate-limit-policies'
+import type { RateLimitPolicy } from './rate-limit-policies.js'
 
 /** GCRA admission decision, shared by both limiter implementations. */
 export interface RateLimitDecision {

@@ -1,8 +1,8 @@
 import { notificationActionSchema } from '@amcore/shared'
 
-import type { NotificationDefinition } from './notification-definition.types'
-import { notificationFingerprint } from './notification-fingerprint'
-import type { NotifyInput } from './notifications.service'
+import type { NotificationDefinition } from './notification-definition.types.js'
+import { notificationFingerprint } from './notification-fingerprint.js'
+import type { NotifyInput } from './notifications.service.js'
 
 /** Retained normalization is part of the occurrence contract, including replay. */
 export function notificationIntent(

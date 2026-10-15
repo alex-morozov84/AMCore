@@ -6,10 +6,10 @@ export type {
   DurableTransactionContext,
   DurableWorkControl,
   DurableWorkReader,
-} from './durable-work'
-export type { ManagedJobIdentity, ManagedJobOptions } from './managed-producer'
-export { ManagedProducer } from './managed-producer'
-export { bindWorkHandlers } from './registration'
+} from './durable-work.js'
+export type { ManagedJobIdentity, ManagedJobOptions } from './managed-producer.js'
+export { ManagedProducer } from './managed-producer.js'
+export { bindWorkHandlers } from './registration.js'
 export type {
   HandlerBindings,
   JobBinding,
@@ -19,7 +19,7 @@ export type {
   WorkInvocation,
   WorkPayload,
   WorkRegistration,
-} from './work-definition'
-export { defineDurableWork, defineOrdinaryWork, defineWork } from './work-definition'
-export { resolveWorkFailure, WorkFailure } from './work-failure'
-export { WorkReadiness } from './work-readiness'
+} from './work-definition.js'
+export { defineDurableWork, defineOrdinaryWork, defineWork } from './work-definition.js'
+export { resolveWorkFailure, WorkFailure } from './work-failure.js'
+export { WorkReadiness } from './work-readiness.js'

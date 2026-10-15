@@ -1,9 +1,8 @@
-import type { AiGenerateRequest, AiTextResult } from '../gateway/ai-gateway.types'
-import type { ModelGateway } from '../gateway/model-gateway.service'
+import type { AttemptRuntime } from '../../worker-lifecycle/index.js'
+import type { AiGenerateRequest, AiTextResult } from '../gateway/ai-gateway.types.js'
+import type { ModelGateway } from '../gateway/model-gateway.service.js'
 
-import type { ClaimedRun } from './ai-run-dispatch.types'
-
-import type { AttemptRuntime } from '@/infrastructure/worker-lifecycle'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
 
 /** Why a provider call was aborted by the caller: the worker is shutting down, or the run lifetime ended. */
 export type AiRunStopSignal = 'shutdown' | 'deadline'

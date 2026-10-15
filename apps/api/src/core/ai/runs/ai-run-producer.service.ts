@@ -8,28 +8,14 @@ import {
   ResourceErrorCode,
 } from '@amcore/shared'
 
+import { AppException } from '../../../common/exceptions/domain/index.js'
 import {
   BadRequestException,
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
-} from '../../../common/exceptions'
-import {
-  AI_MODEL_NOT_CONFIGURED,
-  AI_RUN_DEFAULT_MAX_ATTEMPTS,
-} from '../ai-run.constants'
-import {
-  AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE,
-  AI_ARTIFACT_REBIND_BLOCKED_STATUSES,
-  capabilityForArtifactKind,
-  modalityForArtifactKind,
-} from '../artifacts/ai-artifact.constants'
-
-import { toAiRunResponse } from './ai-run.mapper'
-import { aiRunInputFingerprint } from './ai-run-input-fingerprint'
-
-import { AppException } from '@/common/exceptions/domain'
-import { EnvService } from '@/env/env.service'
+} from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
 import {
   AiArtifactKind,
   AiAuthorType,
@@ -38,13 +24,26 @@ import {
   AiMessageRole,
   AiRunStatus,
   Prisma,
-} from '@/generated/prisma/client'
-import { freezeAiModel } from '@/infrastructure/ai/registry/ai-execution-descriptor'
-import { AiModelRegistry } from '@/infrastructure/ai/registry/ai-model-registry.service'
-import type { ResolvedAiModel } from '@/infrastructure/ai/registry/ai-registry.types'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
-import { QueueService } from '@/infrastructure/queue/queue.service'
-import { PrismaService } from '@/prisma'
+} from '../../../generated/prisma/client.js'
+import { freezeAiModel } from '../../../infrastructure/ai/registry/ai-execution-descriptor.js'
+import { AiModelRegistry } from '../../../infrastructure/ai/registry/ai-model-registry.service.js'
+import type { ResolvedAiModel } from '../../../infrastructure/ai/registry/ai-registry.types.js'
+import { JobName, QueueName } from '../../../infrastructure/queue/constants/queues.constant.js'
+import { QueueService } from '../../../infrastructure/queue/queue.service.js'
+import { PrismaService } from '../../../prisma/index.js'
+import {
+  AI_MODEL_NOT_CONFIGURED,
+  AI_RUN_DEFAULT_MAX_ATTEMPTS,
+} from '../ai-run.constants.js'
+import {
+  AI_ARTIFACT_MAX_TOTAL_RAW_BYTES_PER_MESSAGE,
+  AI_ARTIFACT_REBIND_BLOCKED_STATUSES,
+  capabilityForArtifactKind,
+  modalityForArtifactKind,
+} from '../artifacts/ai-artifact.constants.js'
+
+import { toAiRunResponse } from './ai-run.mapper.js'
+import { aiRunInputFingerprint } from './ai-run-input-fingerprint.js'
 
 /** A resolved model plus the bound assistant's modality restriction, if any (Arc G). */
 interface ResolvedRunModel {

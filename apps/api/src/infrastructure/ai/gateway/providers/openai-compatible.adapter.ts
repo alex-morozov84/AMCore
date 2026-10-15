@@ -1,13 +1,12 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 
-import { canonicalCompatibleEndpoint } from '../../registry/ai-execution-descriptor'
-import { AiGatewayException } from '../ai-gateway.error'
-import type { AiAdapterCall } from '../ai-gateway.types'
+import { AiProviderType } from '../../../../generated/prisma/client.js'
+import { canonicalCompatibleEndpoint } from '../../registry/ai-execution-descriptor.js'
+import { AiGatewayException } from '../ai-gateway.error.js'
+import type { AiAdapterCall } from '../ai-gateway.types.js'
 
-import { AbstractAiSdkAdapter } from './ai-sdk.adapter.base'
-
-import { AiProviderType } from '@/generated/prisma/client'
+import { AbstractAiSdkAdapter } from './ai-sdk.adapter.base.js'
 
 /**
  * OpenAI-compatible adapter (Track C — ADR-054, Arc B) — one adapter for every OpenAI-shaped

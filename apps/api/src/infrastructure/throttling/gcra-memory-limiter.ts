@@ -1,7 +1,7 @@
 import type { OnApplicationShutdown } from '@nestjs/common'
 
-import type { RateLimitDecision, RateLimiter } from './rate-limit-decision'
-import { type RateLimitPolicy, resolveBurst } from './rate-limit-policies'
+import type { RateLimitDecision, RateLimiter } from './rate-limit-decision.js'
+import { type RateLimitPolicy, resolveBurst } from './rate-limit-policies.js'
 
 const SWEEP_INTERVAL_MS = 30_000
 

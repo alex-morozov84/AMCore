@@ -8,14 +8,13 @@ import { PinoLogger } from 'nestjs-pino'
 import type { ApiKeyListResponse } from '@amcore/shared'
 import type { CreateApiKeyInput } from '@amcore/shared'
 
-import { ForbiddenException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import { ForbiddenException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
-import { apiKeyStatus, apiKeyStatusWhere } from './api-key-lifecycle'
-import { ApiKeyRevocationService } from './api-key-revocation.service'
-
-import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
+import { apiKeyStatus, apiKeyStatusWhere } from './api-key-lifecycle.js'
+import { ApiKeyRevocationService } from './api-key-revocation.service.js'
 
 export interface CreateApiKeyResult {
   id: string

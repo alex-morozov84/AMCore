@@ -4,29 +4,32 @@ import { z } from 'zod'
 
 import { coerceSupportedLocale, type NotificationAction } from '@amcore/shared'
 
-import { PrismaService } from '../../prisma'
+import {
+  type Notification,
+  NotificationDeliveryStatus,
+  Prisma,
+} from '../../generated/prisma/client.js'
+import { JobName, QueueName } from '../../infrastructure/queue/constants/queues.constant.js'
+import { QueueService } from '../../infrastructure/queue/queue.service.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry'
-import type { TargetRecipient } from './channels/channel-target-resolver.types'
-import { NotificationChannelRegistry } from './channels/notification-channel.registry'
-import { validateNotificationTargets } from './channels/notification-target.validation'
-import { NotificationChannel } from './notification.constants'
-import { NotificationIdempotencyConflictError } from './notification.errors'
-import { NotificationDefinitionRegistry } from './notification-definition.registry'
-import type { NotificationDefinition } from './notification-definition.types'
+import { ChannelTargetResolverRegistry } from './channels/channel-target-resolver.registry.js'
+import type { TargetRecipient } from './channels/channel-target-resolver.types.js'
+import { NotificationChannelRegistry } from './channels/notification-channel.registry.js'
+import { validateNotificationTargets } from './channels/notification-target.validation.js'
+import { NotificationChannel } from './notification.constants.js'
+import { NotificationIdempotencyConflictError } from './notification.errors.js'
+import { NotificationDefinitionRegistry } from './notification-definition.registry.js'
+import type { NotificationDefinition } from './notification-definition.types.js'
 import {
   NOTIFICATION_EXTERNAL_MAX_ATTEMPTS,
   NOTIFICATION_IN_APP_MAX_ATTEMPTS,
-} from './notification-dispatch.constants'
-import type { DispatchDueJob } from './notification-dispatch.schema'
-import { notificationIntent } from './notification-intent'
-import { NotificationPreferenceRepository } from './notification-preference.repository'
-import { NotificationPreferenceResolver } from './notification-preference.resolver'
-import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher'
-
-import { type Notification, NotificationDeliveryStatus, Prisma } from '@/generated/prisma/client'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
-import { QueueService } from '@/infrastructure/queue/queue.service'
+} from './notification-dispatch.constants.js'
+import type { DispatchDueJob } from './notification-dispatch.schema.js'
+import { notificationIntent } from './notification-intent.js'
+import { NotificationPreferenceRepository } from './notification-preference.repository.js'
+import { NotificationPreferenceResolver } from './notification-preference.resolver.js'
+import { NotificationRealtimePublisher } from './realtime/notification-realtime.publisher.js'
 
 /** Input a trusted module passes to create a notification. */
 export interface NotifyInput {

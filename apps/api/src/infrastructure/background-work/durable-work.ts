@@ -8,7 +8,7 @@ import type {
   WorkSummary,
 } from '@amcore/shared'
 
-import type { ControlTransaction } from './control-transaction'
+import type { ControlTransaction } from './control-transaction.js'
 
 export interface ControlSnapshot {
   readonly id: string

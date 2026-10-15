@@ -6,7 +6,7 @@ import { Readable } from 'node:stream'
 
 import { Injectable } from '@nestjs/common'
 
-import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key'
+import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key.js'
 import {
   type CopyObjectInput,
   type FileInfo,
@@ -20,16 +20,16 @@ import {
   type StorageProvider,
   type UploadInput,
   type UploadResult,
-} from '../storage.interface'
+} from '../storage.interface.js'
 import {
   assertSameNamespace,
   isPublicKey,
   resolveUploadVisibility,
   visibilityOf,
-} from '../storage-namespace'
-import { buildPublicRouteUrl } from '../storage-public-url'
+} from '../storage-namespace.js'
+import { buildPublicRouteUrl } from '../storage-public-url.js'
 
-import { bufferFromBody } from './body.util'
+import { bufferFromBody } from './body.util.js'
 
 export interface LocalStorageConfig {
   root: string

@@ -10,7 +10,9 @@ interface BuildIdentity {
 /** Build output, never a runtime environment declaration or production attestation. */
 export function readBuildIdentity(): BuildIdentity {
   try {
-    const data = JSON.parse(readFileSync(path.join(__dirname, '../build-identity.json'), 'utf8'))
+    const data = JSON.parse(
+      readFileSync(path.join(import.meta.dirname, '../build-identity.json'), 'utf8')
+    )
     if (!/^[a-f0-9]{64}$/.test(data.id) || !/^[A-Za-z0-9._+-]{1,128}$/.test(data.version)) {
       throw new Error('Invalid build identity')
     }

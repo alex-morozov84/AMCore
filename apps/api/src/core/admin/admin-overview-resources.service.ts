@@ -10,10 +10,10 @@ import {
   type AdminOverviewResponse,
 } from '@amcore/shared'
 
-import { sampleOverviewFilesystem } from './admin-overview-filesystem'
+import { EnvService } from '../../env/env.service.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { EnvService } from '@/env/env.service'
-import { PrismaService } from '@/prisma'
+import { sampleOverviewFilesystem } from './admin-overview-filesystem.js'
 
 /** Safe independent snapshots. No cross-request state, timer, cache or health verdict. */
 @Injectable()

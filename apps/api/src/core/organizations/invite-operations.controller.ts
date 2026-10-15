@@ -12,17 +12,17 @@ import {
 
 import { AuthType, ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { RequireTeamAccess } from '../auth/decorators/require-team-access.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
+} from '../auth/organization-context/request-context-policy.js'
 
-import { ManagerInviteOperationResponseDto } from './dto/invitation-management.dto'
-import { CurrentInvitationActor, type InvitationActor } from './invitation-actor'
-import { InviteService } from './invite.service'
+import { ManagerInviteOperationResponseDto } from './dto/invitation-management.dto.js'
+import { CurrentInvitationActor, type InvitationActor } from './invitation-actor.js'
+import { InviteService } from './invite.service.js'
 
 @ApiTags('organizations')
 @ApiBearerAuth()

@@ -7,7 +7,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
 
 // Mirror ApiKeyAbuseLimiterService constants (AK-07): per-IP cap for
 // any source, per-token-fingerprint cap so a single leaked token can't

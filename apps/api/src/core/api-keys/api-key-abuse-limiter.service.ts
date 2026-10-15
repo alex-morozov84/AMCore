@@ -7,7 +7,7 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
 
 // Defaults match the LoginRateLimiterService style (hardcoded starter
 // constants; tune by code change, not env). IP and fingerprint counters

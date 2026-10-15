@@ -4,8 +4,8 @@ import type {
   WebhookVerificationInput,
   WebhookVerificationResult,
   WebhookVerifier,
-} from './webhook.types'
-import { constantTimeEquals } from './webhook-crypto'
+} from './webhook.types.js'
+import { constantTimeEquals } from './webhook-crypto.js'
 
 /**
  * The header Telegram attaches to every webhook POST when `setWebhook(secret_token=…)`

@@ -1,6 +1,6 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common'
 
-import type { AppAbility } from '../casl/ability.factory'
+import type { AppAbility } from '../casl/ability.factory.js'
 
 /**
  * @CurrentAbility() decorator - Extract CASL ability from request

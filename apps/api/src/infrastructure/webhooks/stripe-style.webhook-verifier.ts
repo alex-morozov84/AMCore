@@ -4,8 +4,8 @@ import type {
   WebhookVerificationInput,
   WebhookVerificationResult,
   WebhookVerifier,
-} from './webhook.types'
-import { constantTimeEquals, createHmacHex } from './webhook-crypto'
+} from './webhook.types.js'
+import { constantTimeEquals, createHmacHex } from './webhook-crypto.js'
 
 @Injectable()
 export class StripeStyleWebhookVerifier implements WebhookVerifier<void> {

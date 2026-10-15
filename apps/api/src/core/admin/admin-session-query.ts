@@ -1,6 +1,6 @@
 import type { AdminSessionsQuery } from '@amcore/shared'
 
-import type { PrismaService } from '../../prisma'
+import type { PrismaService } from '../../prisma/index.js'
 
 export interface SessionListRow {
   familyId: string

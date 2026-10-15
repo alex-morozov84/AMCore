@@ -60,6 +60,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 # Source, then build the shared package and the API.
 COPY packages ./packages
 COPY apps/api ./apps/api
+COPY scripts/typecheck-native.mjs ./scripts/typecheck-native.mjs
 RUN pnpm --filter @amcore/shared build
 RUN pnpm --filter api db:generate
 ARG BUILD_SOURCE_COMMIT

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-import { WorkPolicyError } from './work-policy-error'
+import type { BackgroundEffectEvidence } from '../../generated/prisma/client.js'
 
-import type { BackgroundEffectEvidence } from '@/generated/prisma/client'
+import { WorkPolicyError } from './work-policy-error.js'
 
 const safeResult = z.union([
   z.strictObject({

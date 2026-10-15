@@ -6,15 +6,15 @@ import type { Redis } from 'ioredis'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 
-import { readBoundedJob } from '../background-work/bounded-job-reader'
-import { managedJobKey } from '../background-work/managed-job-key'
-import { parseManagedJob } from '../background-work/managed-job-profile'
-import type { ManagedEnvelope } from '../background-work/managed-producer'
-import { readQueueSnapshot } from '../background-work/queue-snapshot'
-import { JOB_READ_GUARD_LUA } from '../background-work/scripts/job-read.lua'
-import type { WorkDefinition } from '../background-work/work-definition'
+import { readBoundedJob } from '../background-work/bounded-job-reader.js'
+import { managedJobKey } from '../background-work/managed-job-key.js'
+import { parseManagedJob } from '../background-work/managed-job-profile.js'
+import type { ManagedEnvelope } from '../background-work/managed-producer.js'
+import { readQueueSnapshot } from '../background-work/queue-snapshot.js'
+import { JOB_READ_GUARD_LUA } from '../background-work/scripts/job-read.lua.js'
+import type { WorkDefinition } from '../background-work/work-definition.js'
 
-import { sendEmailJobDataSchema } from './email.schema'
+import { sendEmailJobDataSchema } from './email.schema.js'
 
 const ADOPT_LEGACY_LUA =
   JOB_READ_GUARD_LUA +

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
-import { RedisConnectionService } from './redis-connection.service'
+import { METRIC_NAMES, MetricsService } from '../observability/index.js'
 
-import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
+import { RedisConnectionService } from './redis-connection.service.js'
 
 /**
  * Scrape-time `PING` round-trip latency against the shared `@redis/client`

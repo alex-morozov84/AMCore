@@ -1,4 +1,4 @@
-import type { AiRunStepType, Prisma } from '@/generated/prisma/client'
+import type { AiRunStepType, Prisma } from '../../../generated/prisma/client.js'
 
 /**
  * Why a run must stop before its next action (deterministic precedence when several apply at once:

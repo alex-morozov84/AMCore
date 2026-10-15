@@ -1,4 +1,4 @@
-import { canonicalJsonHash } from '@/common/utils/canonical-json'
+import { canonicalJsonHash } from '../../../common/utils/canonical-json.js'
 
 /** Version prefix of the stored run-input fingerprint; bump together with any change to the recipe below. */
 const AI_RUN_FINGERPRINT_VERSION = 'v1'

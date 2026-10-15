@@ -3,10 +3,10 @@ import fastifyHelmet from '@fastify/helmet'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { Request, Response } from 'express'
 
-import { createBullBoardEdgeGuard } from '../infrastructure/queue/dashboard/bull-board-edge.middleware'
-import { BULL_BOARD_MOUNT } from '../infrastructure/queue/dashboard/bull-board-mount-state'
+import { createBullBoardEdgeGuard } from '../infrastructure/queue/dashboard/bull-board-edge.middleware.js'
+import { BULL_BOARD_MOUNT } from '../infrastructure/queue/dashboard/bull-board-mount-state.js'
 
-import { configureFastifyBodyParser } from './configure-fastify-body-parser'
+import { configureFastifyBodyParser } from './configure-fastify-body-parser.js'
 
 /** Production HTTP bootstrap shared with E2E fixtures, before routes are registered. */
 export async function configureHttp(

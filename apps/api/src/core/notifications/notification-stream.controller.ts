@@ -9,15 +9,14 @@ import {
   AppException,
   ServiceUnavailableException,
   UnauthorizedException,
-} from '../../common/exceptions'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+} from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService } from '../../infrastructure/observability/index.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 
-import { NotificationRealtimeHub } from './realtime/notification-realtime.hub'
-import type { NotificationStreamConnection } from './realtime/notification-stream.connection'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
+import { NotificationRealtimeHub } from './realtime/notification-realtime.hub.js'
+import type { NotificationStreamConnection } from './realtime/notification-stream.connection.js'
 
 /** SSE response headers (ADR-053): no caching/buffering, keep-alive event stream. */
 const SSE_HEADERS = {

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 
-import { NotificationDispatchGate } from './notification-dispatch.gate'
-import { NotificationShutdownLatch } from './notification-shutdown.latch'
+import { NotificationDispatchGate } from './notification-dispatch.gate.js'
+import { NotificationShutdownLatch } from './notification-shutdown.latch.js'
 
 /** Shared worker capability; importing the same module preserves physical capacity. */
 @Module({

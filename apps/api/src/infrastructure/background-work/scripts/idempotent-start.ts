@@ -2,7 +2,7 @@ import type { Redis } from 'ioredis'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 
-import { IDEMPOTENT_START_LUA } from './idempotent-start.lua'
+import { IDEMPOTENT_START_LUA } from './idempotent-start.lua.js'
 
 const requestSchema = z.strictObject({
   incarnation: z.uuid(),

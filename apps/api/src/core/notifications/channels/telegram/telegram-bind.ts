@@ -2,14 +2,13 @@ import { createHash } from 'node:crypto'
 
 import { HttpStatus } from '@nestjs/common'
 
-import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation'
-import { NotificationChannel } from '../../notification.constants'
+import { AppException } from '../../../../common/exceptions/index.js'
+import { Prisma } from '../../../../generated/prisma/client.js'
+import { cancelActiveDeliveries } from '../../dispatch/notification-delivery-cancellation.js'
+import { NotificationChannel } from '../../notification.constants.js'
 
-import { TelegramCancelReason } from './telegram.constants'
-import type { TelegramStartCommand } from './telegram-update.schema'
-
-import { AppException } from '@/common/exceptions'
-import { Prisma } from '@/generated/prisma/client'
+import { TelegramCancelReason } from './telegram.constants.js'
+import type { TelegramStartCommand } from './telegram-update.schema.js'
 
 /** A successful bind, signalled to the post-commit confirmation/audit step. */
 export interface BindResult {

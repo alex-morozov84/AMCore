@@ -1,6 +1,6 @@
-import { NotificationChannel } from './notification.constants'
+import { NotificationDeliveryStatus, type Prisma } from '../../generated/prisma/client.js'
 
-import { NotificationDeliveryStatus, type Prisma } from '@/generated/prisma/client'
+import { NotificationChannel } from './notification.constants.js'
 
 /**
  * The ONE definition of "what is in a user's in-app feed" (ADR-052 §§2/9): a canonical

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
-import { PrismaService } from './prisma.service'
+import { METRIC_NAMES, MetricsService } from '../infrastructure/observability/index.js'
 
-import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
+import { PrismaService } from './prisma.service.js'
 
 @Injectable()
 export class DbPoolMetricsCollector {

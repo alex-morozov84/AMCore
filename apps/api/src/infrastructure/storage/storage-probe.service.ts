@@ -5,17 +5,16 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { type AdminOverviewStorage, type StorageProbeSettingResponse } from '@amcore/shared'
 
-import type { SettingSnapshot } from '../settings/setting-definition'
-import { SettingsReader } from '../settings/settings-reader'
-import { StorageSettingDefinition } from '../settings/storage-setting.definition'
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService } from '../observability/index.js'
+import { METRIC_NAMES } from '../observability/metrics.constants.js'
+import type { SettingSnapshot } from '../settings/setting-definition.js'
+import { SettingsReader } from '../settings/settings-reader.js'
+import { StorageSettingDefinition } from '../settings/storage-setting.definition.js'
 
-import { classifyFailure } from './storage-failure'
-import { StorageProbeIo } from './storage-probe.io'
-import { StorageProbeSchedule } from './storage-probe.schedule'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { METRIC_NAMES } from '@/infrastructure/observability/metrics.constants'
+import { classifyFailure } from './storage-failure.js'
+import { StorageProbeIo } from './storage-probe.io.js'
+import { StorageProbeSchedule } from './storage-probe.schedule.js'
 
 export type StorageProbeSnapshot = AdminOverviewStorage
 export type StorageProbeFailure = NonNullable<AdminOverviewStorage['failure']>

@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
-import type { DeliveryContext } from './channel-deliverer.types'
-import type { NotificationChannelDescriptor } from './notification-channel.types'
+import { canonicalJsonHash } from '../../../common/utils/canonical-json.js'
+import { strictJson } from '../../../common/utils/strict-json.js'
 
-import { canonicalJsonHash } from '@/common/utils/canonical-json'
-import { strictJson } from '@/common/utils/strict-json'
+import type { DeliveryContext } from './channel-deliverer.types.js'
+import type { NotificationChannelDescriptor } from './notification-channel.types.js'
 
 const envelopeSchema = z
   .object({

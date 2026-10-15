@@ -18,36 +18,36 @@ import {
   workReasonSchema,
 } from '@amcore/shared'
 
-import { BackgroundControlAuthority } from './background-control-authority'
-import { BackgroundControlBudgets } from './background-control-budgets'
-import { backgroundControlError } from './background-control-error'
-
-import { BadRequestException } from '@/common/exceptions'
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
-import { backgroundControlTransaction } from '@/infrastructure/background-work/control-transaction'
-import type { DurableWorkReader } from '@/infrastructure/background-work/durable-work'
+import { BadRequestException } from '../../common/exceptions/index.js'
+import { ControlConnection } from '../../infrastructure/background-work/control-connection.js'
+import { backgroundControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
+import type { DurableWorkReader } from '../../infrastructure/background-work/durable-work.js'
 import {
   type JobSnapshot,
   providerTargetRevision,
   readJobSnapshot,
-} from '@/infrastructure/background-work/job-snapshot'
-import { parseManagedJob } from '@/infrastructure/background-work/managed-job-profile'
-import { ProviderEvidenceStore } from '@/infrastructure/background-work/provider-evidence.store'
-import { readQueueSnapshot } from '@/infrastructure/background-work/queue-snapshot'
-import { WORK_REGISTRATIONS } from '@/infrastructure/background-work/registration'
+} from '../../infrastructure/background-work/job-snapshot.js'
+import { parseManagedJob } from '../../infrastructure/background-work/managed-job-profile.js'
+import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { readQueueSnapshot } from '../../infrastructure/background-work/queue-snapshot.js'
+import { WORK_REGISTRATIONS } from '../../infrastructure/background-work/registration.js'
 import {
   applyIdempotentCommand,
   applyProviderWindowCommand,
-} from '@/infrastructure/background-work/scripts/idempotent-command'
-import { readJobWindow } from '@/infrastructure/background-work/scripts/job-window'
+} from '../../infrastructure/background-work/scripts/idempotent-command.js'
+import { readJobWindow } from '../../infrastructure/background-work/scripts/job-window.js'
 import type {
   WorkDefinition,
   WorkRegistration,
-} from '@/infrastructure/background-work/work-definition'
-import { currentWorkFailure } from '@/infrastructure/background-work/work-failure'
-import type { EmailProvider } from '@/infrastructure/email/email.types'
-import { QUEUE_REGISTRY } from '@/infrastructure/queue/constants/queue-inventory.constant'
-import { PrismaService } from '@/prisma'
+} from '../../infrastructure/background-work/work-definition.js'
+import { currentWorkFailure } from '../../infrastructure/background-work/work-failure.js'
+import type { EmailProvider } from '../../infrastructure/email/email.types.js'
+import { QUEUE_REGISTRY } from '../../infrastructure/queue/constants/queue-inventory.constant.js'
+import { PrismaService } from '../../prisma/index.js'
+
+import { BackgroundControlAuthority } from './background-control-authority.js'
+import { BackgroundControlBudgets } from './background-control-budgets.js'
+import { backgroundControlError } from './background-control-error.js'
 
 /** Same registration and bounded projection for every native job list/detail. */
 @Injectable()

@@ -2,7 +2,7 @@ import { HttpCode, SetMetadata } from '@nestjs/common'
 import { ApiResponse } from '@nestjs/swagger'
 import { z } from 'zod'
 
-import type { SchemaDto } from './schema-dto'
+import type { SchemaDto } from './schema-dto.js'
 
 export const RESPONSE_SCHEMA = 'amcore:response-schema'
 

@@ -4,12 +4,12 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { SwaggerModule } from '@nestjs/swagger'
 import { Logger } from 'nestjs-pino'
 
-import { configureHttp } from './bootstrap/configure-http'
-import { createHttpAdapter } from './bootstrap/create-http-adapter'
-import { resolveTrustProxy } from './common/utils/trust-proxy'
-import { EnvService } from './env/env.service'
-import { ShutdownService } from './shutdown.service'
-import { API_GLOBAL_PREFIX, buildApiDocument } from './swagger.config'
+import { configureHttp } from './bootstrap/configure-http.js'
+import { createHttpAdapter } from './bootstrap/create-http-adapter.js'
+import { resolveTrustProxy } from './common/utils/trust-proxy.js'
+import { EnvService } from './env/env.service.js'
+import { ShutdownService } from './shutdown.service.js'
+import { API_GLOBAL_PREFIX, buildApiDocument } from './swagger.config.js'
 
 type ProcessRole = 'web' | 'worker' | 'all'
 
@@ -22,12 +22,12 @@ type ProcessRole = 'web' | 'worker' | 'all'
 async function rootModuleFor(role: ProcessRole): Promise<Type<unknown>> {
   switch (role) {
     case 'web':
-      return (await import('./web.module')).WebModule
+      return (await import('./web.module.js')).WebModule
     case 'worker':
-      return (await import('./worker.module')).WorkerModule
+      return (await import('./worker.module.js')).WorkerModule
     case 'all':
     default:
-      return (await import('./app.module')).AppModule
+      return (await import('./app.module.js')).AppModule
   }
 }
 
@@ -37,7 +37,7 @@ async function bootstrap(): Promise<void> {
 
   const root = await rootModuleFor(role)
   const { BULL_BOARD_MOUNT } =
-    await import('./infrastructure/queue/dashboard/bull-board-mount-state')
+    await import('./infrastructure/queue/dashboard/bull-board-mount-state.js')
   const app = await NestFactory.create<NestFastifyApplication>(
     root,
     createHttpAdapter(

@@ -1,10 +1,10 @@
-import { closeAttempt, closeRunInvocations } from './ai-run-attempts'
-import { isBotOwnershipStale, type OwnershipFenceRow } from './ai-run-ownership-fence'
+import { AiRunAttemptOutcome, AiRunStatus, AiRunStepType, Prisma } from '../../../generated/prisma/client.js'
+import type { PrismaService } from '../../../prisma/index.js'
+import type { ObservedTransactionRunner } from '../../../prisma/observed-transaction.js'
+import { CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
 
-import { AiRunAttemptOutcome, AiRunStatus, AiRunStepType, Prisma } from '@/generated/prisma/client'
-import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
-import type { PrismaService } from '@/prisma'
-import type { ObservedTransactionRunner } from '@/prisma/observed-transaction'
+import { closeAttempt, closeRunInvocations } from './ai-run-attempts.js'
+import { isBotOwnershipStale, type OwnershipFenceRow } from './ai-run-ownership-fence.js'
 
 interface Candidate {
   id: string

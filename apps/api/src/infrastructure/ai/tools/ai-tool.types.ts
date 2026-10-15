@@ -3,8 +3,8 @@ import type { ZodType } from 'zod'
 
 import type { AiApprovalPreview, SupportedLocale } from '@amcore/shared'
 
-import type { Prisma } from '@/generated/prisma/client'
-import type { AiToolRiskClass } from '@/generated/prisma/client'
+import type { Prisma } from '../../../generated/prisma/client.js'
+import type { AiToolRiskClass } from '../../../generated/prisma/client.js'
 
 /**
  * Self-hosted tool contract (Track C — ADR-054, Arc E, worker role only). A tool is code-owned: the

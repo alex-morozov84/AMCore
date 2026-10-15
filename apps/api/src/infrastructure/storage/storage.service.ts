@@ -3,10 +3,12 @@ import type { Readable } from 'node:stream'
 
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 
-import { AppException } from '../../common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService, type StorageMetricsOperation } from '../observability/index.js'
 
-import type { StorageDriver } from './storage.constants'
-import { STORAGE_PROVIDER } from './storage.constants'
+import type { StorageDriver } from './storage.constants.js'
+import { STORAGE_PROVIDER } from './storage.constants.js'
 import type {
   CopyObjectInput,
   FileMetadata,
@@ -18,10 +20,7 @@ import type {
   StorageProvider,
   UploadInput,
   UploadResult,
-} from './storage.interface'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService, type StorageMetricsOperation } from '@/infrastructure/observability'
+} from './storage.interface.js'
 
 /**
  * Facade over the active storage driver (selected by `STORAGE_DRIVER`).

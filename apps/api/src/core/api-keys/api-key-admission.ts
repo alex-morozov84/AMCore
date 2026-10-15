@@ -1,6 +1,6 @@
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { ForbiddenException } from '../../common/exceptions'
+import { ForbiddenException } from '../../common/exceptions/index.js'
 
 export interface ApiKeyEvidence {
   readonly keyId: string

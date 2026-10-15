@@ -1,14 +1,14 @@
 import type { AccessConfiguredItem } from '@amcore/shared'
 
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
 
-import type { AccessOperationBudget } from './access-budget'
-import type { ItemSpec } from './access-capabilities'
-import type { Prerequisite, PrerequisiteCheck } from './access-prerequisites'
-import { isUnconditional } from './access-rule-utils'
-import { roleRefs } from './access-sources'
-import { type Classified, KIND_ORDER } from './configured-areas'
-import { denyCovers, type Masking, type Scan } from './configured-scan'
+import type { AccessOperationBudget } from './access-budget.js'
+import type { ItemSpec } from './access-capabilities.js'
+import type { Prerequisite, PrerequisiteCheck } from './access-prerequisites.js'
+import { isUnconditional } from './access-rule-utils.js'
+import { roleRefs } from './access-sources.js'
+import { type Classified, KIND_ORDER } from './configured-areas.js'
+import { denyCovers, type Masking, type Scan } from './configured-scan.js'
 
 type RuleSource = Extract<AccessConfiguredItem['sources'][number], { kind: 'rule' }>
 

@@ -5,12 +5,12 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { AiRunSseReason, AiRunStatusValue } from '@amcore/shared'
 
-import { composeAiRunRealtimeChannel } from './ai-run-realtime.constants'
-import type { AiRunRealtimeEnvelope } from './ai-run-realtime.schema'
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
 
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
+import { composeAiRunRealtimeChannel } from './ai-run-realtime.constants.js'
+import type { AiRunRealtimeEnvelope } from './ai-run-realtime.schema.js'
 
 /**
  * Publishes the disposable AI run-status hint (Track C — ADR-054, Arc C.5; ADR-053 pattern) to the

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { optionalEnvString, optionalEnvUrl } from './helpers'
+import { optionalEnvString, optionalEnvUrl } from './helpers.js'
 
 // OAuth login providers. Each provider is optional, but the composed cross-field
 // refinement enforces "configure one field of a provider → configure them all".

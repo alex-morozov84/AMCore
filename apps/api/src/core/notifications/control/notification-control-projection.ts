@@ -1,4 +1,4 @@
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '../../../generated/prisma/client.js'
 
 /** List reads never load frozen bodies or destination snapshots across the bounded window. */
 export const notificationControlProjection = Prisma.sql`

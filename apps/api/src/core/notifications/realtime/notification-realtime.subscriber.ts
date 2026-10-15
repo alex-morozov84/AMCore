@@ -3,17 +3,17 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { NotificationSseEvent } from '@amcore/shared'
 
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
+
 import {
   composeRealtimeChannel,
   NOTIFICATION_REALTIME_ENVELOPE_MAX_BYTES,
   NOTIFICATION_REALTIME_SHUTDOWN_DEADLINE_MS,
-} from './notification-realtime.constants'
-import { NotificationRealtimeHub } from './notification-realtime.hub'
-import { notificationRealtimeEnvelopeSchema } from './notification-realtime.schema'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
+} from './notification-realtime.constants.js'
+import { NotificationRealtimeHub } from './notification-realtime.hub.js'
+import { notificationRealtimeEnvelopeSchema } from './notification-realtime.schema.js'
 
 /**
  * One dedicated Redis Pub/Sub subscriber per web/all process (ADR-053). RESP2 puts a

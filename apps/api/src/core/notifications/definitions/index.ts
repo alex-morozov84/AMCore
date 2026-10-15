@@ -1,8 +1,8 @@
-import type { NotificationDefinitionRegistration } from '../notification-definition.types'
+import type { NotificationDefinitionRegistration } from '../notification-definition.types.js'
 
-import { accountPasswordChangedDefinition } from './account-password-changed.definition'
-import { accountProfileUpdatedDefinition } from './account-profile-updated.definition'
-import { accountTelegramLinkedDefinition } from './account-telegram-linked.definition'
+import { accountPasswordChangedDefinition } from './account-password-changed.definition.js'
+import { accountProfileUpdatedDefinition } from './account-profile-updated.definition.js'
+import { accountTelegramLinkedDefinition } from './account-telegram-linked.definition.js'
 
 /**
  * The starter notification definitions registered at bootstrap. Forks add their

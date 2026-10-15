@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
+import { REDIS_CLIENT } from '../redis/redis.constants.js'
+import type { AppRedisClient } from '../redis/redis-connection.service.js'
+
 import {
   WEBHOOK_DEGRADE_LOG_INTERVAL_MS,
   WEBHOOK_REDIS_KEY_PREFIX,
   WEBHOOK_REDIS_TIMEOUT_MS,
-} from './webhook.constants'
-
-import { REDIS_CLIENT } from '@/infrastructure/redis/redis.constants'
-import type { AppRedisClient } from '@/infrastructure/redis/redis-connection.service'
+} from './webhook.constants.js'
 
 @Injectable()
 export class WebhookReplayService {

@@ -1,6 +1,6 @@
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
 
-import { coversAnyField } from './access-rule-utils'
+import { coversAnyField } from './access-rule-utils.js'
 
 /** A deny index supports field coverage and attribution without allow-by-deny scans. */
 export class DenyIndex {

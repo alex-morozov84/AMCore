@@ -9,20 +9,19 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
-} from '../../../common/exceptions'
-import { toAiArtifactResponse } from '../runs/ai-run.mapper'
-
-import { AI_ARTIFACT_ALLOWED_MIME_TYPES, detectAiArtifactKind } from './ai-artifact.constants'
-
-import { EnvService } from '@/env/env.service'
+} from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
 import {
   AiArtifactKind,
   AiConversationControl,
   AiConversationState,
-} from '@/generated/prisma/client'
-import { type AiMetricsArtifactKind, MetricsService } from '@/infrastructure/observability'
-import { normalizeObjectKey, StorageService } from '@/infrastructure/storage'
-import { PrismaService } from '@/prisma'
+} from '../../../generated/prisma/client.js'
+import { type AiMetricsArtifactKind, MetricsService } from '../../../infrastructure/observability/index.js'
+import { normalizeObjectKey, StorageService } from '../../../infrastructure/storage/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { toAiArtifactResponse } from '../runs/ai-run.mapper.js'
+
+import { AI_ARTIFACT_ALLOWED_MIME_TYPES, detectAiArtifactKind } from './ai-artifact.constants.js'
 
 /** Minimal shape of an in-memory multipart upload this service validates. */
 export interface UploadableAiArtifactFile {

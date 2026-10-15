@@ -2,14 +2,14 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common'
 
 import type { NotificationSseEvent } from '@amcore/shared'
 
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+
 import {
   NotificationStreamConnection,
   type StreamCloseReason,
   type StreamWritable,
-} from './notification-stream.connection'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
+} from './notification-stream.connection.js'
 
 /** Admission verdict before any SSE headers are flushed. */
 export type AdmissionResult =

@@ -4,8 +4,8 @@ import {
   NotificationCategory,
   NotificationChannel,
   NotificationContentClass,
-} from '../notification.constants'
-import type { NotificationDefinition } from '../notification-definition.types'
+} from '../notification.constants.js'
+import type { NotificationDefinition } from '../notification-definition.types.js'
 
 /**
  * Starter in-app-only informational notification: the user's profile was updated.

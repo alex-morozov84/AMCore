@@ -4,8 +4,8 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { type AppRedisClient, REDIS_CLIENT } from '../../infrastructure/redis'
+import { AppException } from '../../common/exceptions/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../infrastructure/redis/index.js'
 
 const WINDOW_MS = 3600000
 

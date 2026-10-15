@@ -1,7 +1,7 @@
-import type { AiGenerateMessage } from '../gateway/ai-gateway.types'
-import type { AiExecutionDescriptor } from '../registry/ai-execution-descriptor'
+import type { AiGenerateMessage } from '../gateway/ai-gateway.types.js'
+import type { AiExecutionDescriptor } from '../registry/ai-execution-descriptor.js'
 
-import type { GuardrailStepCategory } from './ai-run-dispatch.types'
+import type { GuardrailStepCategory } from './ai-run-dispatch.types.js'
 
 /** Ledger attribution snapshotted from the run's conversation (no FK; content-free). */
 export interface RunAttribution {

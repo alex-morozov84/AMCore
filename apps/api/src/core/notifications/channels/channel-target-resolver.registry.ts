@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 
-import type { NotificationChannel } from '../notification.constants'
+import type { NotificationChannel } from '../notification.constants.js'
 
-import type { ChannelTargetResolver } from './channel-target-resolver.types'
-import { EmailTargetResolver } from './email-target.resolver'
-import { TelegramTargetResolver } from './telegram/telegram-target.resolver'
+import type { ChannelTargetResolver } from './channel-target-resolver.types.js'
+import { EmailTargetResolver } from './email-target.resolver.js'
+import { TelegramTargetResolver } from './telegram/telegram-target.resolver.js'
 
 /**
  * External channel target resolvers active in this build (in-app is excluded — it is

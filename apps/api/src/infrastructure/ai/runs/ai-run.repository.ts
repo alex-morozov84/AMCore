@@ -2,9 +2,19 @@ import { randomUUID } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import type { ProviderRetryHint } from '../gateway/providers/provider-retry-hint'
+import {
+  AiAuthorType,
+  AiMessageRole,
+  AiRunAttemptOutcome,
+  AiRunStatus,
+  AiRunStepType,
+  Prisma,
+} from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
+import type { ProviderRetryHint } from '../gateway/providers/provider-retry-hint.js'
 
-import { AiQueuedRestrictionDiagnosis } from './ai-queued-restriction-diagnosis'
+import { AiQueuedRestrictionDiagnosis } from './ai-queued-restriction-diagnosis.js'
 import {
   AI_RUN_CLAIM_BATCH_LIMIT,
   AI_RUN_GUARDRAIL_REFUSAL_CLASSIFICATION,
@@ -14,30 +24,19 @@ import {
   AI_RUN_REAP_BATCH_LIMIT,
   AiRunErrorCode,
   AiRunTerminalReason,
-} from './ai-run.constants'
-import { closeAttempt, closeRunInvocations } from './ai-run-attempts'
-import { computeNextRunAttemptAt } from './ai-run-backoff'
+} from './ai-run.constants.js'
+import { closeAttempt, closeRunInvocations } from './ai-run-attempts.js'
+import { computeNextRunAttemptAt } from './ai-run-backoff.js'
 import type {
   ClaimedRun,
   GuardrailRefusalInput,
   RunReapResult,
   RunRetryOutcome,
-} from './ai-run-dispatch.types'
-import { aiRunExecutionEligibility } from './ai-run-execution-eligibility'
-import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
-import { sanitizeGuardrailCategories } from './guardrail-step-detail'
-import { persistProviderRestriction, type SettledRestriction } from './provider-retry-restriction'
-
-import {
-  AiAuthorType,
-  AiMessageRole,
-  AiRunAttemptOutcome,
-  AiRunStatus,
-  AiRunStepType,
-  Prisma,
-} from '@/generated/prisma/client'
-import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
-import { PrismaService } from '@/prisma'
+} from './ai-run-dispatch.types.js'
+import { aiRunExecutionEligibility } from './ai-run-execution-eligibility.js'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
+import { sanitizeGuardrailCategories } from './guardrail-step-detail.js'
+import { persistProviderRestriction, type SettledRestriction } from './provider-retry-restriction.js'
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
 interface ClaimedRow {

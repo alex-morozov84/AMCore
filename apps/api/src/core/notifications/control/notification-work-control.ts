@@ -2,7 +2,15 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 
 import type { WorkCommand, WorkReason } from '@amcore/shared'
 
-import { NotificationControlTargets } from '../channels/notification-control-targets'
+import { AppException } from '../../../common/exceptions/index.js'
+import { type NotificationDelivery, Prisma } from '../../../generated/prisma/client.js'
+import type {
+  DurableControlState,
+  DurableOutcome,
+  DurableTransactionContext,
+  DurableWorkControl,
+} from '../../../infrastructure/background-work/index.js'
+import { NotificationControlTargets } from '../channels/notification-control-targets.js'
 
 import {
   deliveryCapability,
@@ -10,16 +18,7 @@ import {
   deliveryState,
   NOTIFICATION_CONTROL_RETENTION_MS,
   notificationWorkDigest,
-} from './notification-control-policy'
-
-import { AppException } from '@/common/exceptions'
-import { type NotificationDelivery, Prisma } from '@/generated/prisma/client'
-import type {
-  DurableControlState,
-  DurableOutcome,
-  DurableTransactionContext,
-  DurableWorkControl,
-} from '@/infrastructure/background-work'
+} from './notification-control-policy.js'
 
 interface BusinessState {
   gate?: { paused: boolean; revision: number }

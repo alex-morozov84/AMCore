@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { RedisLockService } from '@/infrastructure/redis'
+import { RedisLockService } from '../redis/index.js'
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown'

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { optionalEnvString } from './helpers'
+import { optionalEnvString } from './helpers.js'
 
 // AI capability layer (Track C — ADR-054). The provider/model catalog is DB-backed
 // (admin-managed); only the SECRETS live in env. A catalog row's `credentialSlot`

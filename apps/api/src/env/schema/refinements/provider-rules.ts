@@ -1,7 +1,7 @@
-import { TELEGRAM_WEBHOOK_SECRET_PATTERN } from '../../../core/notifications/channels/telegram/telegram.constants'
+import { TELEGRAM_WEBHOOK_SECRET_PATTERN } from '../../../core/notifications/channels/telegram/telegram.constants.js'
 
-import type { EnvResolved } from './derive-defaults'
-import type { RefinementCtx } from './refinement-ctx'
+import type { EnvResolved } from './derive-defaults.js'
+import type { RefinementCtx } from './refinement-ctx.js'
 
 // When any key of a provider group is set, all of them are required.
 function requireAllIfAny(

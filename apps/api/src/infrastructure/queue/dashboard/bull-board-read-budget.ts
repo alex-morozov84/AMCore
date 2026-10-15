@@ -1,6 +1,6 @@
 import type { AppControllerRoute, BullBoardRequest } from '@bull-board/api/typings/app'
 
-import { CONTROL_LIMITS } from '../../background-work/control-limits'
+import { CONTROL_LIMITS } from '../../background-work/control-limits.js'
 
 const READ_METHODS = new Set(['getJobCounts', 'isPaused', 'getJobs', 'getJob'])
 

@@ -2,8 +2,8 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { createClient } from '@redis/client'
 import { PinoLogger } from 'nestjs-pino'
 
-import { EnvService } from '../../env/env.service'
-import { MetricsService } from '../observability'
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService } from '../observability/index.js'
 
 export type AppRedisClient = ReturnType<typeof createClient>
 

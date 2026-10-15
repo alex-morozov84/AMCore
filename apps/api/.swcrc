@@ -1,17 +1,13 @@
 {
   "$schema": "https://swc.rs/schema.json",
-  "exclude": [
-    "\\.spec\\.ts$",
-    "-spec\\.ts$",
-    "__tests__",
-    "__mocks__"
-  ],
+  "exclude": ["\\.spec\\.ts$", "-spec\\.ts$", "__tests__", "__mocks__"],
   "jsc": {
     "target": "es2022",
     "parser": {
       "syntax": "typescript",
       "decorators": true,
-      "dynamicImport": true
+      "dynamicImport": true,
+      "tsx": true
     },
     "transform": {
       "legacyDecorator": true,
@@ -28,6 +24,7 @@
     }
   },
   "module": {
-    "type": "commonjs"
+    "type": "es6",
+    "resolveFully": true
   }
 }

@@ -1,5 +1,5 @@
-import { BOARD_HIDDEN, boardCopy, type BoardLocale } from './bull-board-copy'
-import { BOARD_DATA_PROJECTIONS } from './bull-board-data-projections'
+import { BOARD_HIDDEN, boardCopy, type BoardLocale } from './bull-board-copy.js'
+import { BOARD_DATA_PROJECTIONS } from './bull-board-data-projections.js'
 
 /**
  * Closed projection of the Bull Board wire envelopes (`GetQueuesResponse`, `GetJobResponse`).

@@ -1,4 +1,4 @@
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '../../../generated/prisma/client.js'
 
 /** Shared until claim commit; pause takes the conflicting exclusive row lock. */
 export async function notificationClaimsAllowed(tx: Prisma.TransactionClient): Promise<boolean> {

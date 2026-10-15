@@ -10,9 +10,9 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
-import { classifyStoredRule, presetKey, type StoredRule } from './role-definition-classifier'
+import { Prisma } from '../../generated/prisma/client.js'
 
-import { Prisma } from '@/generated/prisma/client'
+import { classifyStoredRule, presetKey, type StoredRule } from './role-definition-classifier.js'
 
 export interface RulePreflight {
   ruleCount: number

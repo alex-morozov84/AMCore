@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { appProviders, coreImports, workerImports } from './app-imports'
+import { appProviders, coreImports, workerImports } from './app-imports.js'
 
 /**
  * Root module for `PROCESS_ROLE=worker` (ADR-041): BullMQ processors + cron, plus

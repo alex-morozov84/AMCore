@@ -7,11 +7,11 @@ import {
   MemoryHealthIndicator,
 } from '@nestjs/terminus'
 
-import { PrismaHealthIndicator } from './indicators/prisma.health'
-import { RedisHealthIndicator } from './indicators/redis.health'
+import { EnvService } from '../env/env.service.js'
+import { StorageHealthIndicator } from '../infrastructure/storage/index.js'
 
-import { EnvService } from '@/env/env.service'
-import { StorageHealthIndicator } from '@/infrastructure/storage'
+import { PrismaHealthIndicator } from './indicators/prisma.health.js'
+import { RedisHealthIndicator } from './indicators/redis.health.js'
 
 /**
  * The readiness check set (ADR-031's DB-pool/disk/memory checks), shared by

@@ -7,7 +7,7 @@ import {
   aiSlugSchema,
 } from '@amcore/shared'
 
-import { AiProviderType } from '@/generated/prisma/client'
+import { AiProviderType } from '../../../generated/prisma/client.js'
 
 /**
  * Resolved catalog shapes (Track C — ADR-054, Arc B) — the DB-derived, secret-free projections

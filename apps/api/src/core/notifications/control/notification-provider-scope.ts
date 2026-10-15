@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto'
 
-import type { NotificationChannelDescriptor } from '../channels/notification-channel.types'
-
-import type { EnvService } from '@/env/env.service'
+import type { EnvService } from '../../../env/env.service.js'
+import type { NotificationChannelDescriptor } from '../channels/notification-channel.types.js'
 
 /** Private compatibility witness; credentials and digests never enter public projections. */
 export function notificationProviderScope(

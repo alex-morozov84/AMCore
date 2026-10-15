@@ -7,21 +7,24 @@ import type {
   RoleListResponse,
 } from '@amcore/shared'
 
-import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '../../common/exceptions/index.js'
+import type { Permission, Prisma, Role } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 import {
   type PermissionWriteInput,
   validatePermissionRule,
-} from '../auth/casl/permission-rule-validation'
+} from '../auth/casl/permission-rule-validation.js'
 
-import type { CreateRoleDto, UpdateRoleDto } from './dto'
-import { lockOrganization } from './organization-mutation-lock'
-import { OrganizationsService } from './organizations.service'
-import { assignableRolesWhere } from './role-assignability-policy'
-import { recordRoleDefinition, type RoleAuditFacts } from './role-definition-audit'
-
-import type { Permission, Prisma, Role } from '@/generated/prisma/client'
+import type { CreateRoleDto, UpdateRoleDto } from './dto/index.js'
+import { lockOrganization } from './organization-mutation-lock.js'
+import { OrganizationsService } from './organizations.service.js'
+import { assignableRolesWhere } from './role-assignability-policy.js'
+import { recordRoleDefinition, type RoleAuditFacts } from './role-definition-audit.js'
 
 export type RoleWithPermissions = Role & { permissions: { permission: Permission }[] }
 

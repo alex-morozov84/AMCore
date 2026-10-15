@@ -4,27 +4,27 @@ import { z } from 'zod'
 
 import type { WorkReason, WorkReconciliation } from '@amcore/shared'
 
-import { compactProviderEvidenceBytes } from './compact-provider-evidence'
-import { CONTROL_LIMITS } from './control-limits'
-import { backgroundControlTransaction, type ControlTransaction } from './control-transaction'
+import type { BackgroundEffectEvidence } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+
+import { compactProviderEvidenceBytes } from './compact-provider-evidence.js'
+import { CONTROL_LIMITS } from './control-limits.js'
+import { backgroundControlTransaction, type ControlTransaction } from './control-transaction.js'
 import {
   changeUnresolvedEvidence,
   compactEvidenceAccounting,
   lockEvidenceBudgets,
   removeEvidenceRow,
   reserveEvidenceRow,
-} from './provider-evidence-accounting'
+} from './provider-evidence-accounting.js'
 import {
   constrainedRetryFloor,
   floorEligible,
   HORIZON_CHECK_OVERHEAD_MS,
   PROVIDER_WINDOW_CLOCK,
   type RetryAfterConstraint,
-} from './provider-window-clock'
-import { WorkPolicyError } from './work-policy-error'
-
-import type { BackgroundEffectEvidence } from '@/generated/prisma/client'
-import { PrismaService } from '@/prisma'
+} from './provider-window-clock.js'
+import { WorkPolicyError } from './work-policy-error.js'
 
 const identitySchema = z.strictObject({
   workId: z

@@ -6,8 +6,8 @@ import { DelayedError, UnrecoverableError } from 'bullmq'
 
 import { workReasonSchema } from '@amcore/shared'
 
-import type { WorkDefinition, WorkHandler } from './work-definition'
-import { WorkExecutionService } from './work-execution.service'
+import type { WorkDefinition, WorkHandler } from './work-definition.js'
+import { WorkExecutionService } from './work-execution.service.js'
 
 /** One generated host per definition; business modules export handlers, never raw processors. */
 export function managedProcessor(definition: WorkDefinition): Type<WorkerHost> {

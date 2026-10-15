@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import { markAsElement } from './element-marker'
+import { markAsElement } from './element-marker.js'
 
 export type PreviewProps = Readonly<
   React.ComponentPropsWithoutRef<'div'> & {

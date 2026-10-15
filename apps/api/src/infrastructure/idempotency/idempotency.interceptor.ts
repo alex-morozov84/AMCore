@@ -9,25 +9,25 @@ import type { Request } from 'express'
 import { PinoLogger } from 'nestjs-pino'
 import { from, type Observable, of, switchMap } from 'rxjs'
 
-import { IDEMPOTENCY_METADATA_KEY } from './idempotency.constants'
+import { EnvService } from '../../env/env.service.js'
+
+import { IDEMPOTENCY_METADATA_KEY } from './idempotency.constants.js'
 import {
   idempotencyConflict,
   idempotencyKeyReuse,
   idempotencyUnavailable,
   invalidIdempotencyKey,
-} from './idempotency.errors'
-import type { IdempotencyOptions } from './idempotency.types'
-import { createIdempotencyFingerprint } from './idempotency-fingerprint'
-import { parseIdempotencyKey } from './idempotency-header'
+} from './idempotency.errors.js'
+import type { IdempotencyOptions } from './idempotency.types.js'
+import { createIdempotencyFingerprint } from './idempotency-fingerprint.js'
+import { parseIdempotencyKey } from './idempotency-header.js'
 import {
   type IdempotencyResponse,
   prepareReplayResponse,
   responseRecord,
   wrapSend,
-} from './idempotency-response'
-import { IdempotencyStoreService } from './idempotency-store.service'
-
-import { EnvService } from '@/env/env.service'
+} from './idempotency-response.js'
+import { IdempotencyStoreService } from './idempotency-store.service.js'
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {

@@ -8,21 +8,21 @@ import {
   AuthType,
 } from '@amcore/shared'
 
-import { BadRequestException } from '../../../common/exceptions'
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
+import { BadRequestException } from '../../../common/exceptions/index.js'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import {
   AiRunCancelResponseDto,
   AiRunListQueryDto,
   AiRunPageDto,
   AiRunResponseDto,
   CreateAiRunDto,
-} from '../dto/ai.dto'
+} from '../dto/ai.dto.js'
 
-import { AiRunService } from './ai-run.service'
-import { InvalidAiRunCursorError } from './ai-run-cursor'
-import { AiRunProducerService } from './ai-run-producer.service'
+import { AiRunService } from './ai-run.service.js'
+import { InvalidAiRunCursorError } from './ai-run-cursor.js'
+import { AiRunProducerService } from './ai-run-producer.service.js'
 
 /**
  * AI durable-run surface (Track C — ADR-054, Arc C), bearer-authenticated and owner-scoped (via the

@@ -1,7 +1,7 @@
 import type { StandardSchemaConverter } from '@nestjs/swagger'
 import { z } from 'zod'
 
-import { schemaNames } from './schema-dto'
+import { schemaNames } from './schema-dto.js'
 
 /** Stable DTO component names preserve existing input/output OpenAPI references. */
 export const schemaOpenApiConverter: StandardSchemaConverter = (candidate, { schemaType }) => {

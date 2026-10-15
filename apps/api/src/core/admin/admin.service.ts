@@ -17,13 +17,12 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions'
-import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
-import { CleanupService } from '../../infrastructure/schedule/cleanup.service'
-import { acquireXactLock, PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
-
-import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
+import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
+import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service.js'
+import { CleanupService } from '../../infrastructure/schedule/cleanup.service.js'
+import { acquireXactLock, PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).

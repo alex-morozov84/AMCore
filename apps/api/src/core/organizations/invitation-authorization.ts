@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common'
 
-import { ForbiddenException, UnauthorizedException } from '../../common/exceptions'
-import { hasFullTeamAccess, normalizeOwnerPermissions } from '../auth/casl/permission-normalization'
-import { memberPermissionSnapshot } from '../auth/member-permission-snapshot'
+import { ForbiddenException, UnauthorizedException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import {
+  hasFullTeamAccess,
+  normalizeOwnerPermissions,
+} from '../auth/casl/permission-normalization.js'
+import { memberPermissionSnapshot } from '../auth/member-permission-snapshot.js'
 
-import { assertInvitationActor, type InvitationActor } from './invitation-actor'
-import { type InvitationUser, lockInvitationUser } from './invitation-locks'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { assertInvitationActor, type InvitationActor } from './invitation-actor.js'
+import { type InvitationUser, lockInvitationUser } from './invitation-locks.js'
 
 @Injectable()
 export class InvitationAuthorization {

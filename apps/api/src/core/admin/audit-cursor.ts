@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } f
 
 import type { AdminAuditQuery } from '@amcore/shared'
 
-import { BadRequestException } from '../../common/exceptions'
+import { BadRequestException } from '../../common/exceptions/index.js'
 
 const PURPOSE = 'amcore:admin-audit-cursor:v1'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/

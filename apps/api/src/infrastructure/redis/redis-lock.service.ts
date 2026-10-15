@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 
-import { REDIS_CLIENT } from './redis.constants'
-import type { AppRedisClient } from './redis-connection.service'
+import { REDIS_CLIENT } from './redis.constants.js'
+import type { AppRedisClient } from './redis-connection.service.js'
 
 const RELEASE_LOCK_SCRIPT = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then

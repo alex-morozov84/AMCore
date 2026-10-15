@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { ProviderRetryHint } from '../gateway/providers/provider-retry-hint'
+import type { Prisma } from '../../../generated/prisma/client.js'
+import type { ProviderRetryHint } from '../gateway/providers/provider-retry-hint.js'
 
-import { AiRunTerminalReason } from './ai-run.constants'
-import { AiRunRepository } from './ai-run.repository'
+import { AiRunTerminalReason } from './ai-run.constants.js'
+import { AiRunRepository } from './ai-run.repository.js'
 import type {
   ClaimedRun,
   GuardrailRefusalInput,
   RunRetryOutcome,
   StopCause,
-} from './ai-run-dispatch.types'
-import { AiRunGuard, type GuardOutcome, RunLeaseLostError } from './ai-run-guard.service'
-import { persistProviderRestriction } from './provider-retry-restriction'
-
-import type { Prisma } from '@/generated/prisma/client'
+} from './ai-run-dispatch.types.js'
+import { AiRunGuard, type GuardOutcome, RunLeaseLostError } from './ai-run-guard.service.js'
+import { persistProviderRestriction } from './provider-retry-restriction.js'
 
 /** Whether a guarded transition committed. `lease_lost`/`cutoff` mean nothing was written. */
 export type TransitionResult = 'applied' | 'lease_lost' | 'cutoff'

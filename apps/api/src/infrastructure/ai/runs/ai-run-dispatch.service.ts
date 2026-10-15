@@ -1,19 +1,19 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AI_RUN_MAX_DRAIN_CYCLES, AI_RUN_SHUTDOWN_GRACE_MS } from './ai-run.constants'
-import { AiRunRepository } from './ai-run.repository'
-import { AiRunExecutorService } from './ai-run-executor.service'
-import { AI_RUN_CAPACITY_GATE, AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
-
-import { WorkReadiness } from '@/infrastructure/background-work/work-readiness'
+import { PrismaService } from '../../../prisma/index.js'
+import { WorkReadiness } from '../../background-work/work-readiness.js'
 import {
   AttemptRuntime,
   type CapacityGate,
   CUTOFF,
   type ShutdownLatch,
-} from '@/infrastructure/worker-lifecycle'
-import { PrismaService } from '@/prisma'
+} from '../../worker-lifecycle/index.js'
+
+import { AI_RUN_MAX_DRAIN_CYCLES, AI_RUN_SHUTDOWN_GRACE_MS } from './ai-run.constants.js'
+import { AiRunRepository } from './ai-run.repository.js'
+import { AiRunExecutorService } from './ai-run-executor.service.js'
+import { AI_RUN_CAPACITY_GATE, AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
 
 /**
  * Drains due AI runs (Track C — ADR-054, ADR-052 pattern, worker role only). Invoked by both the

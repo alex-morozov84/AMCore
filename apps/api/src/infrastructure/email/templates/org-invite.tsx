@@ -2,7 +2,7 @@ import { createIntl } from '@formatjs/intl'
 
 import { DEFAULT_LOCALE } from '@amcore/shared'
 
-import { emailMessages, type Locale } from '../messages'
+import { emailMessages, type Locale } from '../messages.js'
 import {
   Body,
   Button,
@@ -14,7 +14,7 @@ import {
   Preview,
   Section,
   Text,
-} from '../react-email'
+} from '../react-email/index.js'
 
 export interface OrgInviteEmailProps {
   orgName: string

@@ -2,9 +2,9 @@ import type { Configuration } from 'openid-client'
 
 import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
 
-import type { OAuthClientService } from '../oauth-client.service'
+import type { OAuthClientService } from '../oauth-client.service.js'
 
-import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface'
+import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface.js'
 
 /**
  * Google OAuth provider via OIDC discovery.

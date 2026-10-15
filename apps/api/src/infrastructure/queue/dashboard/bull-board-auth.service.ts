@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common'
 
 import { SystemRole } from '@amcore/shared'
 
-import { hashRefreshToken } from '@/core/auth/utils/refresh-token-hash'
-import { PrismaService } from '@/prisma'
+import { hashRefreshToken } from '../../../core/auth/utils/refresh-token-hash.js'
+import { PrismaService } from '../../../prisma/index.js'
 
 /**
  * Outcome of a Bull Board access check. Three states so the middleware can

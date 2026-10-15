@@ -1,13 +1,13 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common'
 import { z } from 'zod'
 
-import { AI_TOOLS, type AiTool, type AiToolRegistration } from './ai-tool.types'
-import { AI_TOOL_REGISTRATIONS } from './ai-tool-composition'
-import { AiToolContractRegistry } from './ai-tool-contract.registry'
-import { AiToolContractsModule } from './ai-tool-contracts.module'
-import { AiToolRegistry } from './ai-tool-registry.service'
+import { canonicalJsonHash } from '../../../common/utils/canonical-json.js'
 
-import { canonicalJsonHash } from '@/common/utils/canonical-json'
+import { AI_TOOLS, type AiTool, type AiToolRegistration } from './ai-tool.types.js'
+import { AI_TOOL_REGISTRATIONS } from './ai-tool-composition.js'
+import { AiToolContractRegistry } from './ai-tool-contract.registry.js'
+import { AiToolContractsModule } from './ai-tool-contracts.module.js'
+import { AiToolRegistry } from './ai-tool-registry.service.js'
 
 @Module({})
 export class AiToolsWorkerModule {

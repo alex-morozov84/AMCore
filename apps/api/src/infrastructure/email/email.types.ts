@@ -4,8 +4,8 @@
  * Defines contracts for email providers and templates
  */
 
-import type { Locale } from './messages'
-import type { QueuedEmailProvider } from './queued-email-provider'
+import type { Locale } from './messages.js'
+import type { QueuedEmailProvider } from './queued-email-provider.js'
 
 /**
  * Email send parameters
@@ -201,4 +201,4 @@ export const SECRET_EMAIL_TEMPLATES: ReadonlySet<EmailTemplate> = new Set([
  * compile-time type cannot drift (EQS-03/EQS-07). Restricted to
  * `QueueableEmailTemplate` payloads.
  */
-export type { SendEmailJobData } from './email.schema'
+export type { SendEmailJobData } from './email.schema.js'

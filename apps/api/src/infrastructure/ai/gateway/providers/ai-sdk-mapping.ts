@@ -11,8 +11,9 @@ import {
   TypeValidationError,
 } from 'ai'
 
-import { normalizeAiUsage } from '../../usage/ai-usage-v2'
-import { AiGatewayException } from '../ai-gateway.error'
+import type { AiProviderType } from '../../../../generated/prisma/client.js'
+import { normalizeAiUsage } from '../../usage/ai-usage-v2.js'
+import { AiGatewayException } from '../ai-gateway.error.js'
 import type {
   AiAdapterCall,
   AiFinishReason,
@@ -22,11 +23,9 @@ import type {
   AiToolCall,
   AiUsage,
   AiUserContentPart,
-} from '../ai-gateway.types'
+} from '../ai-gateway.types.js'
 
-import { attachRetryHint, parseProviderRetryHint } from './provider-retry-hint'
-
-import type { AiProviderType } from '@/generated/prisma/client'
+import { attachRetryHint, parseProviderRetryHint } from './provider-retry-hint.js'
 
 /**
  * Mapping helpers between the Vercel AI SDK and AMCore's own gateway contracts (Track C —

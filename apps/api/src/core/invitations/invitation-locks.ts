@@ -4,9 +4,8 @@ import { HttpStatus } from '@nestjs/common'
 
 import { InviteErrorCode } from '@amcore/shared'
 
-import { AppException, NotFoundException } from '../../common/exceptions'
-
-import type { OrgInvite, Prisma, SystemRole } from '@/generated/prisma/client'
+import { AppException, NotFoundException } from '../../common/exceptions/index.js'
+import type { OrgInvite, Prisma, SystemRole } from '../../generated/prisma/client.js'
 
 export type InvitationUser = {
   id: string

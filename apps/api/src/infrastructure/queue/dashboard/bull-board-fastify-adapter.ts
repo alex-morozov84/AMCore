@@ -3,17 +3,17 @@ import { FastifyAdapter } from '@bull-board/fastify'
 import type {} from '@fastify/view'
 import type { Request, RequestHandler, Response } from 'express'
 
-import type { BoardRequestLocals } from './bull-board-boundary.middleware'
-import { boardCopy, boardLanguage } from './bull-board-copy'
+import type { BoardRequestLocals } from './bull-board-boundary.middleware.js'
+import { boardCopy, boardLanguage } from './bull-board-copy.js'
 import {
   BOARD_DISPLAY_CSS,
   FLOW_CSS,
   INFO_ASSET,
   readBoardDisplayAssets,
   withBoardDisplayStyle,
-} from './bull-board-display-assets'
-import { clientErrorStatus, safeErrorResult, withFinalBoundary } from './bull-board-errors'
-import { withBoardReadBudget } from './bull-board-read-budget'
+} from './bull-board-display-assets.js'
+import { clientErrorStatus, safeErrorResult, withFinalBoundary } from './bull-board-errors.js'
+import { withBoardReadBudget } from './bull-board-read-budget.js'
 
 /** Fastify board seam: the plugin applies the closed boundary on every child route. */
 export class QueueBoardFastifyAdapter extends FastifyAdapter {

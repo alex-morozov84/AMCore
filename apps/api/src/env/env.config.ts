@@ -1,6 +1,6 @@
 import type { ConfigModuleOptions } from '@nestjs/config'
 
-import { validate } from '../env'
+import { validate } from '../env.js'
 
 export const envConfigOptions: ConfigModuleOptions = {
   isGlobal: true,

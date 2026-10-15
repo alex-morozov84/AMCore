@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
 
-import type { LockedControlBudgets } from './background-control-budgets'
-import { backgroundControlError } from './background-control-error'
+import type { BackgroundBudget } from '../../generated/prisma/client.js'
+import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
+import type { ControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
 
-import type { BackgroundBudget } from '@/generated/prisma/client'
-import { CONTROL_LIMITS } from '@/infrastructure/background-work/control-limits'
-import type { ControlTransaction } from '@/infrastructure/background-work/control-transaction'
+import type { LockedControlBudgets } from './background-control-budgets.js'
+import { backgroundControlError } from './background-control-error.js'
 
 /** Active targets reserve possible-unknown capacity before any dispatch, never by eviction. */
 @Injectable()

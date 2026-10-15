@@ -1,5 +1,5 @@
-import { InvalidObjectKeyError, normalizeObjectKey } from './object-key'
-import { isPublicKey, PUBLIC_KEY_PREFIX } from './storage-namespace'
+import { InvalidObjectKeyError, normalizeObjectKey } from './object-key.js'
+import { isPublicKey, PUBLIC_KEY_PREFIX } from './storage-namespace.js'
 
 /** How a public address is formed: under a bucket root, or as the API public route's query. */
 export type PublicUrlForm = 'bucket-root' | 'route'

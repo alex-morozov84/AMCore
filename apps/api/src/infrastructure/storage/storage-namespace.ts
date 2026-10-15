@@ -1,6 +1,6 @@
-import { InvalidObjectKeyError, normalizeObjectKey } from './object-key'
-import { DEFAULT_VISIBILITY } from './storage.constants'
-import type { Visibility } from './storage.interface'
+import { InvalidObjectKeyError, normalizeObjectKey } from './object-key.js'
+import { DEFAULT_VISIBILITY } from './storage.constants.js'
+import type { Visibility } from './storage.interface.js'
 
 /**
  * Reserved first key segment of every publicly readable object. The key IS the

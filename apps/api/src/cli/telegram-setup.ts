@@ -1,3 +1,7 @@
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
 /* oxlint-disable no-console -- a deploy CLI reports progress to stdout (mirrors prisma/seed.ts) */
 /**
  * Deploy-time Telegram `setWebhook` (Arc D / D.3). Compiled into the production artifact
@@ -18,9 +22,9 @@ import { z } from 'zod'
 import {
   DEFAULT_TELEGRAM_API_BASE_URL,
   TELEGRAM_WEBHOOK_SECRET_PATTERN,
-} from '../core/notifications/channels/telegram/telegram.constants'
-import { TelegramBotApiClient } from '../core/notifications/channels/telegram/telegram-bot-api.client'
-import type { EnvService } from '../env/env.service'
+} from '../core/notifications/channels/telegram/telegram.constants.js'
+import { TelegramBotApiClient } from '../core/notifications/channels/telegram/telegram-bot-api.client.js'
+import type { EnvService } from '../env/env.service.js'
 
 // Focused, validated config — the same normalization/grammar the application env enforces.
 const setupConfigSchema = z.object({
@@ -70,6 +74,9 @@ export async function runTelegramSetup(rawEnv: NodeJS.ProcessEnv): Promise<boole
 }
 
 // Run only when invoked directly (not when imported by a test).
-if (require.main === module) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
+) {
   void runTelegramSetup(process.env).then((ok) => process.exit(ok ? 0 : 1))
 }

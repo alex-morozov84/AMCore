@@ -3,17 +3,17 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { AiRunSseEvent } from '@amcore/shared'
 
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
+
 import {
   AI_RUN_REALTIME_ENVELOPE_MAX_BYTES,
   AI_RUN_REALTIME_SHUTDOWN_DEADLINE_MS,
   composeAiRunRealtimeChannel,
-} from './ai-run-realtime.constants'
-import { AiRunRealtimeHub } from './ai-run-realtime.hub'
-import { aiRunRealtimeEnvelopeSchema } from './ai-run-realtime.schema'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
-import { type AppRedisClient, REDIS_CLIENT } from '@/infrastructure/redis'
+} from './ai-run-realtime.constants.js'
+import { AiRunRealtimeHub } from './ai-run-realtime.hub.js'
+import { aiRunRealtimeEnvelopeSchema } from './ai-run-realtime.schema.js'
 
 /**
  * One dedicated Redis Pub/Sub subscriber per web/all process (Track C — ADR-054, Arc C.5; ADR-053

@@ -1,4 +1,4 @@
-import { MODEL_FIELDS, type ModelSubject } from './permission-model-fields'
+import { MODEL_FIELDS, type ModelSubject } from './permission-model-fields.js'
 
 const DATE_MAX = 8_640_000_000_000_000
 

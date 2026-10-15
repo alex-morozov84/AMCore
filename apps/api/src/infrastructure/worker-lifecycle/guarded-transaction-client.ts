@@ -1,4 +1,4 @@
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 /**
  * Thrown by a guarded transaction client when a query is attempted after the shutdown latch

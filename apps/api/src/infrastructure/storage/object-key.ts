@@ -10,7 +10,7 @@
  * (`userId` / random id) plus a detected extension, then normalize.
  */
 
-import { MAX_OBJECT_KEY_LENGTH } from './storage.constants'
+import { MAX_OBJECT_KEY_LENGTH } from './storage.constants.js'
 
 /** Thrown when a key cannot be safely normalized. */
 export class InvalidObjectKeyError extends Error {

@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto'
 
-import { DEFAULT_GUARD_INSTRUCTION } from './default-instruction'
+import { DEFAULT_GUARD_INSTRUCTION } from './default-instruction.js'
 import {
   GUARDRAIL_BOUNDARY_TAG_PREFIX,
   GUARDRAIL_DEFAULT_MAX_INPUT_CHARS,
   GUARDRAIL_NONCE_BYTES,
-} from './guardrail.constants'
+} from './guardrail.constants.js'
 
 /** What the builder is given: the untrusted user text plus optional trusted/policy overrides. */
 export interface TrustBoundaryInput {

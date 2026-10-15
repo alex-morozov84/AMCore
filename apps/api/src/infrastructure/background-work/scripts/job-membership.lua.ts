@@ -1,4 +1,4 @@
-import { JOB_READ_GUARD_LUA } from './job-read.lua'
+import { JOB_READ_GUARD_LUA } from './job-read.lua.js'
 
 /** Full membership proof, never a prefix-negative claim. Shared by snapshots and mutation predicates. */
 export const JOB_MEMBERSHIP_GUARD_LUA =

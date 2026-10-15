@@ -4,12 +4,12 @@ import { DiscoveryService, ModuleRef } from '@nestjs/core'
 import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
 
-import { validateWorkRegistrations, WORK_REGISTRATIONS } from './registration'
-import { verifyInstalledScriptProvenance } from './script-provenance'
-import { initializeManagedQueue } from './scripts/initialize-queue'
-import type { WorkHandler, WorkRegistration } from './work-definition'
-import { PROVIDER_WINDOW_EXECUTION } from './work-execution.service'
-import { WorkReadiness } from './work-readiness'
+import { validateWorkRegistrations, WORK_REGISTRATIONS } from './registration.js'
+import { verifyInstalledScriptProvenance } from './script-provenance.js'
+import { initializeManagedQueue } from './scripts/initialize-queue.js'
+import type { WorkHandler, WorkRegistration } from './work-definition.js'
+import { PROVIDER_WINDOW_EXECUTION } from './work-execution.service.js'
+import { WorkReadiness } from './work-readiness.js'
 
 export const MANAGED_WORKERS = Symbol('MANAGED_WORKERS')
 export interface ManagedWorkerBinding {

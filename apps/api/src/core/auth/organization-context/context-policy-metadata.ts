@@ -6,7 +6,7 @@ import {
   REQUEST_CONTEXT_POLICY,
   REQUEST_CONTEXT_POLICY_COUNT,
   type RequestContextPolicyDefinition,
-} from './request-context-policy'
+} from './request-context-policy.js'
 
 function routePaths(target: Function): string[] {
   const path: string | string[] | undefined = Reflect.getMetadata(PATH_METADATA, target)

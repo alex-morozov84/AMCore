@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 import { SUPPORTED_LOCALES } from '@amcore/shared'
 
-import { QUEUEABLE_EMAIL_TEMPLATES } from '../../email/email.types'
-import { QueueName } from '../constants/queues.constant'
+import { QUEUEABLE_EMAIL_TEMPLATES } from '../../email/email.types.js'
+import { QueueName } from '../constants/queues.constant.js'
 
 /**
  * What the board may show of a job's `data`, per queue. A projection receives the raw payload and

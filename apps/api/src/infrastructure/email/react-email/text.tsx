@@ -1,7 +1,7 @@
 import * as React from 'react'
 
-import { markAsElement } from './element-marker'
-import { computeMargins } from './utils/compute-margins'
+import { markAsElement } from './element-marker.js'
+import { computeMargins } from './utils/compute-margins.js'
 
 export type TextProps = Readonly<React.ComponentPropsWithoutRef<'p'>>
 

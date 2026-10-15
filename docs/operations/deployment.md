@@ -1139,3 +1139,10 @@ Historical attempted deliveries become legacy-unverified. Do not clear their
 uncertainty to enable retries. Rollback requires restoring the verified backup
 with a compatible process set; prefer forward repair. See
 [notification delivery control](../notifications/control.md#upgrade).
+
+## API module boundary
+
+The API emits ESM. Preserve its `package.json` with `type: module` alongside
+`dist`, runtime dependencies and the current shared package. The standard image
+build runs native type checking before emission. Do not deploy output from a
+failed build. See [API build and ESM runtime](../backend/api-build.md).

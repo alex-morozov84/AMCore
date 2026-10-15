@@ -13,8 +13,8 @@
 
 import { Readable } from 'node:stream'
 
-import { InvalidObjectKeyError } from './object-key'
-import type { StorageProvider } from './storage.interface'
+import { InvalidObjectKeyError } from './object-key.js'
+import type { StorageProvider } from './storage.interface.js'
 
 export interface StorageContractOptions {
   signedUrls: boolean

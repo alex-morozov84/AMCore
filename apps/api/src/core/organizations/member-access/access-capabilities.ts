@@ -5,9 +5,9 @@ import {
   type CapabilityId,
 } from '@amcore/shared'
 
-import { CAPABILITY_ADAPTERS, type CapabilityAdapter } from '../capability-registry.service'
+import { CAPABILITY_ADAPTERS, type CapabilityAdapter } from '../capability-registry.service.js'
 
-import { AccessUnavailableError } from './access-budget'
+import { AccessUnavailableError } from './access-budget.js'
 
 /**
  * What the explanation needs to know about one registered capability. It is read from the adapter a

@@ -9,13 +9,13 @@ import {
 
 import { AuthType } from '@amcore/shared'
 
-import { PrismaHealthIndicator } from './indicators/prisma.health'
-import { RedisHealthIndicator } from './indicators/redis.health'
-import { ReadinessCheckService } from './readiness-check.service'
+import { Auth } from '../core/auth/decorators/auth.decorator.js'
+import { EnvService } from '../env/env.service.js'
+import { SkipRateLimit } from '../infrastructure/throttling/index.js'
 
-import { Auth } from '@/core/auth/decorators/auth.decorator'
-import { EnvService } from '@/env/env.service'
-import { SkipRateLimit } from '@/infrastructure/throttling'
+import { PrismaHealthIndicator } from './indicators/prisma.health.js'
+import { RedisHealthIndicator } from './indicators/redis.health.js'
+import { ReadinessCheckService } from './readiness-check.service.js'
 
 @ApiTags('health')
 @Controller('health')

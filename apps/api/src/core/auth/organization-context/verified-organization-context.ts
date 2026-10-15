@@ -1,6 +1,6 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common'
 
-import type { PrivilegedAdmission } from '../privileged-admission.service'
+import type { PrivilegedAdmission } from '../privileged-admission.service.js'
 
 const verified = new WeakMap<object, PrivilegedAdmission>()
 

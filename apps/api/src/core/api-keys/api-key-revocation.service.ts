@@ -2,11 +2,10 @@ import { Injectable } from '@nestjs/common'
 
 import type { AdminApiKeyRevokeResponse } from '@amcore/shared'
 
-import { NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
-
-import { AuditActorType, AuditTargetType, Prisma } from '@/generated/prisma/client'
+import { NotFoundException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
 interface LockedKey {
   id: string

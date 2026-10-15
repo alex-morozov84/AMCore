@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common'
 
 import { storageProbeIntervalSchema } from '@amcore/shared'
 
-import type { SettingDefinition } from './setting-definition'
+import { EnvService } from '../../env/env.service.js'
 
-import { EnvService } from '@/env/env.service'
+import type { SettingDefinition } from './setting-definition.js'
 
 @Injectable()
 export class StorageSettingDefinition implements SettingDefinition<number> {

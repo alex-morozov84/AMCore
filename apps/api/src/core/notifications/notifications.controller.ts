@@ -8,19 +8,19 @@ import {
   type UnreadCountResponse,
 } from '@amcore/shared'
 
-import { BadRequestException } from '../../common/exceptions'
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { BadRequestException } from '../../common/exceptions/index.js'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 
 import {
   MarkAllReadResponseDto,
   NotificationFeedQueryDto,
   NotificationFeedResponseDto,
   UnreadCountResponseDto,
-} from './dto/notification.dto'
-import { NotificationFeedService } from './notification-feed.service'
-import { InvalidFeedCursorError } from './notification-feed-cursor'
+} from './dto/notification.dto.js'
+import { NotificationFeedService } from './notification-feed.service.js'
+import { InvalidFeedCursorError } from './notification-feed-cursor.js'
 
 /**
  * In-app notification feed (Arc A.6), bearer-authenticated and scoped to the caller.

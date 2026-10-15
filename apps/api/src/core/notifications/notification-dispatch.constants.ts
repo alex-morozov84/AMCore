@@ -1,5 +1,5 @@
-import type { JobOptions } from '@/infrastructure/queue/interfaces/job-options.interface'
-import { DEFAULT_JOB_OPTIONS } from '@/infrastructure/queue/interfaces/job-options.interface'
+import type { JobOptions } from '../../infrastructure/queue/interfaces/job-options.interface.js'
+import { DEFAULT_JOB_OPTIONS } from '../../infrastructure/queue/interfaces/job-options.interface.js'
 
 /**
  * Durable dispatch constants (ADR-052; owner-confirmed 2026-06-18). Postgres owns the

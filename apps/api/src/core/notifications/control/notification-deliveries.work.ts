@@ -1,6 +1,6 @@
-import { notificationWorkFailures } from './notification-work-failures'
+import { defineDurableWork } from '../../../infrastructure/background-work/index.js'
 
-import { defineDurableWork } from '@/infrastructure/background-work'
+import { notificationWorkFailures } from './notification-work-failures.js'
 
 export const notificationDeliveriesWork = defineDurableWork({
   id: 'notification-deliveries',

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { z } from 'zod'
 
-import { boardCopy } from './bull-board-copy'
+import { boardCopy } from './bull-board-copy.js'
 
 const translationsSchema = z
   .object({

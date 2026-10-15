@@ -7,14 +7,14 @@ import type { FastifyAdapter } from '@nestjs/platform-fastify'
 
 import { MEMBER_REQUEST_BYTES, ROLE_REQUEST_BYTES, WORK_COMMAND_INPUT_BYTES } from '@amcore/shared'
 
-import { decodedBodyLimit } from './decoded-body-limit'
-import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary'
-import { isMemberRoleJsonRequest } from './member-role-body-parser'
-import { decodeBody, parseNativeForm } from './native-body-values'
-import { parserContentType } from './parser-content-type'
-import { isBackgroundControlPath, REQUEST_BODY_LIMIT_BYTES } from './request-body-policy'
-import { isRoleDefinitionRequest } from './role-definition-body-parser'
-import { unmatchedBodyLimit } from './unmatched-body-limit'
+import { decodedBodyLimit } from './decoded-body-limit.js'
+import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary.js'
+import { isMemberRoleJsonRequest } from './member-role-body-parser.js'
+import { decodeBody, parseNativeForm } from './native-body-values.js'
+import { parserContentType } from './parser-content-type.js'
+import { isBackgroundControlPath, REQUEST_BODY_LIMIT_BYTES } from './request-body-policy.js'
+import { isRoleDefinitionRequest } from './role-definition-body-parser.js'
+import { unmatchedBodyLimit } from './unmatched-body-limit.js'
 
 type BudgetRequest = { url: string; method: string; headers: Record<string, unknown> }
 

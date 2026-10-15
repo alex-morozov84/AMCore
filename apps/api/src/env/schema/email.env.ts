@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { optionalEnvString } from './helpers'
+import { optionalEnvString } from './helpers.js'
 
 // Email delivery + link/token lifetimes. The composed refinement requires
 // RESEND_API_KEY when EMAIL_PROVIDER=resend.

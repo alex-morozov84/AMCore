@@ -1,8 +1,7 @@
-import { NotificationErrorCode } from '../notification-dispatch.constants'
+import { NotificationAttemptOutcome, Prisma } from '../../../generated/prisma/client.js'
+import { NotificationErrorCode } from '../notification-dispatch.constants.js'
 
-import type { ClaimedDelivery } from './notification-dispatch.types'
-
-import { NotificationAttemptOutcome, Prisma } from '@/generated/prisma/client'
+import type { ClaimedDelivery } from './notification-dispatch.types.js'
 
 /** Which still-active deliveries of one durable target to cancel. */
 export interface CancelActiveTarget {

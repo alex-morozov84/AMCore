@@ -19,7 +19,7 @@ import {
   verifyEmailSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 // Request DTOs
 export class RegisterDto extends createSchemaDto(registerSchema) {}

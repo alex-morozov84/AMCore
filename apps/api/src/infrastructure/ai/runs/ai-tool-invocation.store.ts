@@ -1,20 +1,19 @@
-import type { AiTool, AiToolIntent } from '../tools/ai-tool.types'
-import { readToolIntent } from '../tools/ai-tool-intent'
-import { toolIntentData } from '../tools/ai-tool-intent'
-
-import { AiRunTerminalReason } from './ai-run.constants'
-import type { AiRunRepository } from './ai-run.repository'
-import type { ClaimedRun } from './ai-run-dispatch.types'
-import { RunLeaseLostError } from './ai-run-guard.service'
-
-import { canonicalJsonHash } from '@/common/utils/canonical-json'
-import { strictJson } from '@/common/utils/strict-json'
+import { canonicalJsonHash } from '../../../common/utils/canonical-json.js'
+import { strictJson } from '../../../common/utils/strict-json.js'
 import {
   AiRunStepType,
   AiToolInvocationStatus,
   type AiToolRiskClass,
   Prisma,
-} from '@/generated/prisma/client'
+} from '../../../generated/prisma/client.js'
+import type { AiTool, AiToolIntent } from '../tools/ai-tool.types.js'
+import { readToolIntent } from '../tools/ai-tool-intent.js'
+import { toolIntentData } from '../tools/ai-tool-intent.js'
+
+import { AiRunTerminalReason } from './ai-run.constants.js'
+import type { AiRunRepository } from './ai-run.repository.js'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
+import { RunLeaseLostError } from './ai-run-guard.service.js'
 
 /**
  * Durable tool-action bookkeeping (Track C — ADR-054, E12 minimal contract). Every function takes the

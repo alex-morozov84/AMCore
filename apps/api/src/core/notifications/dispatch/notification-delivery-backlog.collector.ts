@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
-import { NotificationDeliveryStatus } from '@/generated/prisma/client'
-import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
-import { PrismaService } from '@/prisma'
+import { NotificationDeliveryStatus } from '../../../generated/prisma/client.js'
+import { METRIC_NAMES, MetricsService } from '../../../infrastructure/observability/index.js'
+import { PrismaService } from '../../../prisma/index.js'
 
 /**
  * Non-terminal `NotificationDelivery` statuses — the real backlog behind the

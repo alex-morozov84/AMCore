@@ -1,18 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { approvedToolCallId } from '../tools/ai-tool.constants'
-import { AiToolRegistry } from '../tools/ai-tool-registry.service'
+import { AiToolInvocationStatus } from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
+import { approvedToolCallId } from '../tools/ai-tool.constants.js'
+import { AiToolRegistry } from '../tools/ai-tool-registry.service.js'
 
-import { AiRunTerminalReason } from './ai-run.constants'
-import { findUnresolvedAction } from './ai-run-loop-reconstruct'
-import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
-import { AiRunTransitions } from './ai-run-transitions.service'
-import { AiToolActionService, type ToolRunContext } from './ai-tool-action.service'
-import { type InvocationRow, isReadOnly } from './ai-tool-invocation.store'
-
-import { AiToolInvocationStatus } from '@/generated/prisma/client'
-import { CUTOFF, type ShutdownLatch } from '@/infrastructure/worker-lifecycle'
-import { PrismaService } from '@/prisma'
+import { AiRunTerminalReason } from './ai-run.constants.js'
+import { findUnresolvedAction } from './ai-run-loop-reconstruct.js'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
+import { AiRunTransitions } from './ai-run-transitions.service.js'
+import { AiToolActionService, type ToolRunContext } from './ai-tool-action.service.js'
+import { type InvocationRow, isReadOnly } from './ai-tool-invocation.store.js'
 
 /**
  * Resolves a run's unfinished tool action at the start of every epoch — BEFORE the model is asked again

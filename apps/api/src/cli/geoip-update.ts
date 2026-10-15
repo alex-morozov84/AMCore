@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 
-import { coreImports } from '../app-imports'
-import { EnvService } from '../env/env.service'
-import { GeoipModule } from '../infrastructure/geoip/geoip.module'
-import { GeoIpService } from '../infrastructure/geoip/geoip.service'
-import { currentEdition } from '../infrastructure/geoip/geoip-download'
-import { GeoIpUpdateService } from '../infrastructure/geoip/geoip-update.service'
-import { SingletonCronRunner } from '../infrastructure/schedule/singleton-cron.runner'
+import { coreImports } from '../app-imports.js'
+import { EnvService } from '../env/env.service.js'
+import { GeoipModule } from '../infrastructure/geoip/geoip.module.js'
+import { GeoIpService } from '../infrastructure/geoip/geoip.service.js'
+import { currentEdition } from '../infrastructure/geoip/geoip-download.js'
+import { GeoIpUpdateService } from '../infrastructure/geoip/geoip-update.service.js'
+import { SingletonCronRunner } from '../infrastructure/schedule/singleton-cron.runner.js'
 
 /** No scheduler/bootstrap/queue consumers; one guarded operator update. */
 @Module({

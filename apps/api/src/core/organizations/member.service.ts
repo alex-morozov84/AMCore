@@ -7,17 +7,16 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
-} from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+} from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 
-import { recordMemberRoles } from './member-role-audit'
-import { lockOrganizationMembers } from './organization-mutation-lock'
-import { OrganizationsService } from './organizations.service'
-import { RoleAssignabilityService } from './role-assignability.service'
-import { getSystemRoleId } from './system-role'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { recordMemberRoles } from './member-role-audit.js'
+import { lockOrganizationMembers } from './organization-mutation-lock.js'
+import { OrganizationsService } from './organizations.service.js'
+import { RoleAssignabilityService } from './role-assignability.service.js'
+import { getSystemRoleId } from './system-role.js'
 
 type PrismaTx = Prisma.TransactionClient
 
