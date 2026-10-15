@@ -86,15 +86,11 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async download(key: string): Promise<Buffer> {
-    const full = this.objectPath(key)
-    await this.statFileOrThrow(full, key)
-    return readFile(full)
+    return readFile(await this.existingObjectPath(key))
   }
 
   async downloadStream(key: string): Promise<Readable> {
-    const full = this.objectPath(key)
-    await this.statFileOrThrow(full, key)
-    return createReadStream(full)
+    return createReadStream(await this.existingObjectPath(key))
   }
 
   async getMetadata(key: string): Promise<FileMetadata> {
@@ -186,6 +182,18 @@ export class LocalStorageProvider implements StorageProvider {
     if (sourceKey === destKey) return
     await this.copy(input)
     await this.delete(input.source)
+  }
+
+  /**
+   * The absolute path of an existing object, resolved and checked against the objects root
+   * right here, so the path that is read is the path that was verified.
+   */
+  private async existingObjectPath(key: string): Promise<string> {
+    const root = path.resolve(this.config.root, OBJECTS_DIR) + path.sep
+    const file = path.resolve(root, normalizeObjectKey(key))
+    if (!file.startsWith(root)) throw new InvalidObjectKeyError('path outside object storage')
+    await this.statFileOrThrow(file, key)
+    return file
   }
 
   private objectPath(key: string): string {

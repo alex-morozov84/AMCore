@@ -46,7 +46,7 @@ export class MemoryStorageProvider implements StorageProvider {
   async upload(input: UploadInput): Promise<UploadResult> {
     const key = normalizeObjectKey(input.key)
     const body = await bufferFromBody(input.body)
-    const etag = createHash('md5').update(body).digest('hex')
+    const etag = createHash('sha256').update(body).digest('hex')
     const metadata: FileMetadata = {
       contentType: input.contentType,
       contentLength: body.length,
