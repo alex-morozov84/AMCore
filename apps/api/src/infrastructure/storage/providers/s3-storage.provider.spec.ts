@@ -50,6 +50,7 @@ describe('S3StorageProvider', () => {
       () => makeProvider({ publicBucket: 'public-bucket', publicDelivery: 'acl' }),
       {
         signedUrls: true,
+        separateNamespaces: true,
         publicUrls: true,
       }
     )

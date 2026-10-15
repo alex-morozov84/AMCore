@@ -331,7 +331,9 @@ Storage failure does not change API readiness by default. The separate existing
 it does not trigger a synthetic write per health request. That passive check can
 return 403 for a missing S3 key without ListBucket. Configure its key to an existing
 readable object or grant appropriate scoped listing access; don't interpret 403 as
-"S3 is down". Compose forwards both monitoring and readiness settings.
+"S3 is down". The unauthenticated readiness response reports only a failure class
+(`access_denied` or `io_error`); the provider message goes to the log as
+`storage_health_failed`. Compose forwards both monitoring and readiness settings.
 
 `amcore_storage_probe_state{driver,state}` and the tested five-minute alert expose
 cached failures without user traffic. The five-minute alert hold starts when

@@ -1,4 +1,5 @@
 import { HealthIndicatorService } from '@nestjs/terminus'
+import type { PinoLogger } from 'nestjs-pino'
 
 import { StorageHealthIndicator } from './storage.health'
 import type { StorageService } from './storage.service'
@@ -13,6 +14,7 @@ describe('StorageHealthIndicator', () => {
   let down: jest.Mock
   let healthIndicatorService: jest.Mocked<HealthIndicatorService>
   let env: { get: jest.Mock }
+  let logger: { warn: jest.Mock }
   let indicator: StorageHealthIndicator
 
   beforeEach(() => {
@@ -22,11 +24,15 @@ describe('StorageHealthIndicator', () => {
     healthIndicatorService = {
       check: jest.fn().mockReturnValue({ up, down }),
     } as unknown as jest.Mocked<HealthIndicatorService>
-    env = { get: jest.fn().mockReturnValue(PROBE_KEY) }
+    env = {
+      get: jest.fn((key: string) => (key === 'STORAGE_DRIVER' ? 's3' : PROBE_KEY)),
+    }
+    logger = { warn: jest.fn() }
     indicator = new StorageHealthIndicator(
       storage as unknown as StorageService,
       healthIndicatorService,
-      env as unknown as EnvService
+      env as unknown as EnvService,
+      logger as unknown as PinoLogger
     )
   })
 
@@ -42,12 +48,29 @@ describe('StorageHealthIndicator', () => {
     expect(down).not.toHaveBeenCalled()
   })
 
-  it('reports down with the error message when the probe throws', async () => {
-    storage.exists.mockRejectedValue(new Error('endpoint unreachable'))
+  it('reports only a failure class when the probe throws, never the provider text', async () => {
+    const secretText = 'getaddrinfo ENOTFOUND bucket.internal.example.com request id 4F2A'
+    storage.exists.mockRejectedValue(new Error(secretText))
 
     const result = await indicator.isHealthy('storage')
 
     expect(result).toEqual({ storage: { status: 'down' } })
-    expect(down).toHaveBeenCalledWith({ message: 'endpoint unreachable' })
+    expect(down).toHaveBeenCalledWith({ failure: 'io_error' })
+    expect(JSON.stringify(down.mock.calls)).not.toContain('internal.example.com')
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'storage_health_failed', driver: 's3', failure: 'io_error' })
+    )
+  })
+
+  it.each([
+    [{ name: 'AccessDenied', message: 'Access Denied for bucket x' }],
+    [{ $metadata: { httpStatusCode: 403 }, message: 'Forbidden' }],
+    [{ code: 'EACCES', message: "EACCES: permission denied, open '/app/uploads/x'" }],
+  ])('classifies an access failure as access_denied without its message (%#)', async (error) => {
+    storage.exists.mockRejectedValue(Object.assign(new Error(error.message), error))
+
+    await indicator.isHealthy('storage')
+
+    expect(down).toHaveBeenCalledWith({ failure: 'access_denied' })
   })
 })

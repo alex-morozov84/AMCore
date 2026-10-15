@@ -111,6 +111,11 @@ Result:
 Prefix values may be empty or end in `/`. Object keys still go through the
 stricter key guard on read/write operations.
 
+An empty prefix (or a leading part of `public/`, such as `pu`) spans the public and
+the private namespace. With **one** bucket it lists both. With **separate** public
+and private buckets (`STORAGE_PUBLIC_BUCKET`) it is ambiguous and the S3 driver
+throws `InvalidObjectKeyError`; list `public/…` and the private prefix separately.
+
 ## URLs
 
 ```ts

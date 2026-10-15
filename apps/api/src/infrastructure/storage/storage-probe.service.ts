@@ -9,6 +9,7 @@ import type { SettingSnapshot } from '../settings/setting-definition'
 import { SettingsReader } from '../settings/settings-reader'
 import { StorageSettingDefinition } from '../settings/storage-setting.definition'
 
+import { classifyFailure } from './storage-failure'
 import { StorageProbeIo } from './storage-probe.io'
 import { StorageProbeSchedule } from './storage-probe.schedule'
 
@@ -202,14 +203,4 @@ export class StorageProbeService implements OnModuleInit, OnModuleDestroy {
   private intervalMs(): number {
     return this.applied.value * 1000
   }
-}
-
-function classifyFailure(error: unknown): StorageProbeFailure {
-  const e = error as { code?: string; name?: string; $metadata?: { httpStatusCode?: number } }
-  return e?.code === 'EACCES' ||
-    e?.code === 'EPERM' ||
-    e?.name === 'AccessDenied' ||
-    e?.$metadata?.httpStatusCode === 403
-    ? 'access_denied'
-    : 'io_error'
 }

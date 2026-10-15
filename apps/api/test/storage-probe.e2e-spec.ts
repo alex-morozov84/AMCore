@@ -9,12 +9,11 @@ import { StorageProbeIo } from '../src/infrastructure/storage/storage-probe.io'
 import { StorageProbeService } from '../src/infrastructure/storage/storage-probe.service'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { SEAWEEDFS_IMAGE } from './support/s3-backends'
 
 import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.fixture'
 
-// Test-only S3-compatible implementation, not an application runtime dependency.
-const IMAGE =
-  'chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d'
+// Test-only S3-compatible implementation (shared pin in support/s3-backends.ts).
 const bucket = 't023-canary'
 const secret = 'test-secret-not-real'
 const identities = [
@@ -46,7 +45,7 @@ describe('active probe against isolated S3-compatible storage', () => {
   let endpoint: string
   const ios: StorageProbeIo[] = []
   beforeAll(async () => {
-    container = await new GenericContainer(IMAGE)
+    container = await new GenericContainer(SEAWEEDFS_IMAGE)
       .withLabels(e2eContainerLabels())
       .withCommand([
         'server',

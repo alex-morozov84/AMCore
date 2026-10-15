@@ -19,18 +19,25 @@ import type { StorageProvider } from './storage.interface'
 export interface StorageContractOptions {
   signedUrls: boolean
   publicUrls: boolean
+  /**
+   * Public and private keys live in different stores (two S3 buckets), so a list prefix
+   * that spans both namespaces (`''`) is ambiguous and refused. When false, an empty
+   * prefix lists every key.
+   */
+  separateNamespaces?: boolean
 }
 
 export function runStorageProviderContract(
   name: string,
-  createProvider: () => StorageProvider,
+  /** A fresh, empty provider per test; a wire backend may create its buckets asynchronously. */
+  createProvider: () => StorageProvider | Promise<StorageProvider>,
   options: StorageContractOptions
 ): void {
   describe(`StorageProvider contract: ${name}`, () => {
     let provider: StorageProvider
 
-    beforeEach(() => {
-      provider = createProvider()
+    beforeEach(async () => {
+      provider = await createProvider()
     })
 
     describe('upload + download', () => {
@@ -170,6 +177,31 @@ export function runStorageProviderContract(
         const { files } = await provider.list({ prefix: 'list/a.txt' })
         expect(files[0]?.size).toBe(1)
       })
+
+      it('lists one namespace with a prefix inside it', async () => {
+        await provider.upload({ key: 'public/list/p.txt', body: Buffer.from('p') })
+        const publicOnly = await provider.list({ prefix: 'public/list/' })
+        expect(publicOnly.files.map((f) => f.key)).toEqual(['public/list/p.txt'])
+        const privateOnly = await provider.list({ prefix: 'list/' })
+        expect(privateOnly.files.map((f) => f.key).sort()).toEqual(['list/a.txt', 'list/b.txt'])
+      })
+
+      if (options.separateNamespaces) {
+        it('refuses an empty prefix because it spans both stores', async () => {
+          await expect(provider.list({ prefix: '' })).rejects.toBeInstanceOf(InvalidObjectKeyError)
+        })
+      } else {
+        it('lists every key, public and private, with an empty prefix', async () => {
+          await provider.upload({ key: 'public/list/p.txt', body: Buffer.from('p') })
+          const { files } = await provider.list({ prefix: '' })
+          expect(files.map((f) => f.key).sort()).toEqual([
+            'list/a.txt',
+            'list/b.txt',
+            'other/c.txt',
+            'public/list/p.txt',
+          ])
+        })
+      }
 
       it('paginates with maxKeys + continuationToken', async () => {
         const first = await provider.list({ prefix: 'list/', maxKeys: 1 })
