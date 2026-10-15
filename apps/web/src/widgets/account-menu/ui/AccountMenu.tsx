@@ -34,7 +34,8 @@ export function AccountMenu() {
   const trigger = useRef<HTMLButtonElement>(null)
   const user = data?.user
 
-  // Same footprint as the loaded trigger, so the header does not jump when the user arrives.
+  // Same footprint as the loaded trigger (the name slot has one fixed width in both), so nothing
+  // in the header, the language switcher included, moves when the user arrives.
   if (isPending) return <AccountMenuSkeleton />
   if (!user) return null
   const label = user.name || user.email
@@ -48,7 +49,7 @@ export function AccountMenu() {
           aria-label={t('menuLabel')}
         >
           <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
-          <span className="hidden max-w-40 truncate text-sm sm:inline">{label}</span>
+          <span className="hidden w-36 truncate text-left text-sm sm:inline-block">{label}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
           <DropdownMenuGroup>
@@ -77,7 +78,7 @@ function AccountMenuSkeleton() {
   return (
     <div aria-hidden="true" className="flex items-center gap-2 px-2 py-1">
       <Skeleton className="size-8 rounded-full" />
-      <Skeleton className="hidden h-4 w-24 sm:block" />
+      <Skeleton className="hidden h-4 w-36 sm:block" />
     </div>
   )
 }
