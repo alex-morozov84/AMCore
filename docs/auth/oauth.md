@@ -441,9 +441,10 @@ The raw OAuth tokens (provider access token, refresh token) are stored in `OAuth
 ### Profile pictures
 
 AMCore never stores or serves a provider picture URL. The API copies the provider picture once
-into its own public storage (see [media](../media/README.md)), and only at the moment the account
-is created or this provider is linked for the first time, when the user has no avatar and the
-provider returned `avatarSourceUrl`. The copy runs after the sign-in response is decided, so it adds
+into its own public storage (see [media](../media/README.md)), and only when a sign-in creates the
+account or links this provider to an existing account by email. Linking a provider on purpose from
+account settings does not copy. The user must have no avatar and the provider must return
+`avatarSourceUrl`. The copy runs after the sign-in response is decided, so it adds
 no sign-in latency. It is not retried: a failed copy leaves the user without an avatar, and the user
 can upload one. A repeat sign-in never copies again, so an avatar the user removed stays removed,
 and the copy never replaces an avatar the user uploaded.

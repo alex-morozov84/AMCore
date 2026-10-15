@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `avatarUrl`, now computed from the key on every response, so a new
   `STORAGE_PUBLIC_BASE_URL` takes effect without rewriting data. `OAuthUserProfile.avatarUrl`
   is renamed `avatarSourceUrl`. OAuth profile pictures are copied once into own storage after
-  account creation or first provider link (only when the user has no avatar, https allow-listed hosts, no redirects, size and
+  account creation or an email link at sign-in (only when the user has no avatar, https allow-listed hosts, no redirects, size and
   time limits) and the provider URL is never stored or sent to a browser.
 
 - **Breaking:** storage public files use a reserved key namespace and an explicit
