@@ -22,9 +22,10 @@ vi.mock('@/shared/api', () => ({
 
 function renderEditor(avatarUrl: string | null = null) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  queryClient.setQueryData(userKeys.me(), {
-    user: { id: 'u1', email: 'a@example.test', name: 'Ada Lovelace', avatarUrl },
-  })
+  const user = { id: 'u1', email: 'a@example.test', name: 'Ada Lovelace', avatarUrl }
+  queryClient.setQueryData(userKeys.me(), { user })
+  // A re-read (after an unknown outcome) returns the same signed-in user.
+  vi.mocked(authApi.getMe).mockResolvedValue({ user } as never)
   render(
     <QueryClientProvider client={queryClient}>
       <AvatarEditor />

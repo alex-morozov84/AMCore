@@ -18,6 +18,8 @@ const png = (size = 10, type = 'image/png') => new File([new Uint8Array(size)], 
 function setup(userId = 'u1', avatarUrl: string | null = null) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   queryClient.setQueryData(userKeys.me(), { user: { id: userId, avatarUrl } })
+  // A re-read (after an unknown outcome) returns the same signed-in user.
+  vi.mocked(authApi.getMe).mockResolvedValue({ user: { id: userId, avatarUrl } } as never)
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
@@ -105,6 +107,51 @@ describe('useAvatarEditor', () => {
       await result.current.upload(png())
     })
     expect(result.current.outcome).toMatchObject({ kind: 'unknown' })
+  })
+
+  it('rereads the current user once after an unknown outcome', async () => {
+    vi.mocked(authApi.uploadAvatar).mockRejectedValue(new ApiNetworkError(new Error('x')))
+    const { result } = setup('u1', 'https://f/old.webp')
+    await act(async () => {
+      await result.current.upload(png())
+    })
+    await waitFor(() => expect(authApi.getMe).toHaveBeenCalledTimes(1))
+    expect(result.current.outcome).toMatchObject({ kind: 'unknown' })
+  })
+
+  it.each([
+    ['rejected', new ApiRequestError(413, undefined)],
+    ['busy', new ApiRequestError(503, undefined)],
+  ])('does not reread the user after a %s outcome', async (_name, error) => {
+    vi.mocked(authApi.uploadAvatar).mockRejectedValue(error)
+    const { result } = setup()
+    await act(async () => {
+      await result.current.upload(png())
+    })
+    expect(authApi.getMe).not.toHaveBeenCalled()
+  })
+
+  it('does not reread the user after a retired outcome', async () => {
+    let fail: (reason: unknown) => void = () => undefined
+    vi.mocked(authApi.uploadAvatar).mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject
+      })
+    )
+    const { result, queryClient } = setup('u1')
+    let pending: Promise<unknown> = Promise.resolve()
+    await act(async () => {
+      pending = result.current.upload(png())
+    })
+    act(() => {
+      queryClient.setQueryData(userKeys.me(), { user: { id: 'u2', avatarUrl: null } })
+    })
+    await waitFor(() => expect(result.current.user?.id).toBe('u2'))
+    await act(async () => {
+      fail(new ApiNetworkError(new Error('x')))
+      await pending
+    })
+    expect(authApi.getMe).not.toHaveBeenCalled()
   })
 
   it('answers busy to a second action while one is pending', async () => {

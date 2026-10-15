@@ -107,6 +107,10 @@ export function useAvatarEditor() {
         inFlight.current = false
       }
       if (currentId.current !== userId) return { kind: 'retired' } as AvatarOutcome
+      // The request may or may not have reached the server: read the user again so the shown
+      // avatar is the real one. Never for rejected or busy (nothing changed) or retired.
+      if (outcome.kind === 'unknown')
+        void queryClient.invalidateQueries({ queryKey: userKeys.me() })
       if (outcome.kind === 'committed') {
         mergeAvatarUrl(
           (updater) => queryClient.setQueryData(userKeys.me(), updater),
