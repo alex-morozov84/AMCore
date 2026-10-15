@@ -40,7 +40,7 @@ only `public/` inside one bucket.
 | [VK Cloud](vk-cloud.md)                                     | Whole bucket (ACL)           | Yes                                   | No            | Provider-documented                    |
 | [Cloud.ru](cloud-ru.md)                                     | Whole bucket                 | Bucket level                          | Yes           | Provider-documented                    |
 | [Timeweb Cloud](timeweb.md)                                 | Whole bucket                 | Bucket level                          | Yes           | Provider-documented                    |
-| [MWS](mws.md)                                               | Policy                       | Deprecated                            | Yes           | Provider-documented                    |
+| [MWS](mws.md)                                               | Whole bucket (policy)        | Deprecated                            | Yes           | Provider-documented                    |
 | [Beget](beget.md)                                           | Whole bucket                 | —                                     | Yes           | Provider-documented                    |
 | [Self-hosted: SeaweedFS, Garage and others](self-hosted.md) | Varies                       | Varies (ignored by SeaweedFS, Garage) | Varies        | SeaweedFS and Garage verified emulator |
 
