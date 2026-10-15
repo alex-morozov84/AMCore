@@ -8,6 +8,8 @@ export async function register(): Promise<void> {
     validateAdminConsoleStartupOrExit()
     const { invitationLocalOrigin } = await import('@/shared/api/bff/invitation-cookie')
     invitationLocalOrigin()
+    const { assertPublicFilesOrigin } = await import('@/shared/lib/csp/public-files-origin')
+    assertPublicFilesOrigin()
   }
 }
 

@@ -58,7 +58,7 @@ The browser still has to be allowed to load the image. Set `WEB_PUBLIC_FILES_ORI
 service to the origin of `STORAGE_PUBLIC_BASE_URL` (a CDN or public bucket host, or the API origin
 when the API serves public files). It is added to the CSP `img-src` directive and nowhere else.
 Only an exact `https` origin, or a loopback `http` origin for local development, is accepted;
-anything else is ignored and leaves images limited to the web origin. See
+anything else stops the web app at start-up with an error that names the variable. An empty value leaves images limited to the web origin. See
 [browser security and CSP](../frontend/browser-security-and-csp.md).
 
 - Use the backend-provided URL directly; do not have the backend know Next.js

@@ -25,3 +25,18 @@ export function parsePublicFilesOrigin(raw: string | undefined): string | null {
 export function getPublicFilesOrigin(): string | null {
   return parsePublicFilesOrigin(process.env.WEB_PUBLIC_FILES_ORIGIN)
 }
+
+/**
+ * Start-up check: a set but unusable value is a configuration error, not a quiet fallback, so an
+ * operator who writes `http://cdn.example.com` learns at boot instead of finding broken avatars.
+ * The proxy keeps the lenient `getPublicFilesOrigin`, which can only ever narrow the policy.
+ */
+export function assertPublicFilesOrigin(
+  env: Record<string, string | undefined> = process.env
+): void {
+  const raw = env.WEB_PUBLIC_FILES_ORIGIN?.trim()
+  if (raw && parsePublicFilesOrigin(raw) === null)
+    throw new Error(
+      'WEB_PUBLIC_FILES_ORIGIN must be an https origin (or a loopback http origin) without credentials or wildcards'
+    )
+}

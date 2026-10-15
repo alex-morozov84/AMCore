@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parsePublicFilesOrigin } from './public-files-origin'
+import { assertPublicFilesOrigin, parsePublicFilesOrigin } from './public-files-origin'
 
 describe('parsePublicFilesOrigin', () => {
   it.each([
@@ -27,4 +27,22 @@ describe('parsePublicFilesOrigin', () => {
   ])('refuses %p, so the policy is never widened', (raw) => {
     expect(parsePublicFilesOrigin(raw)).toBeNull()
   })
+})
+
+describe('assertPublicFilesOrigin', () => {
+  it.each([undefined, '', '  ', 'https://cdn.example.com', 'http://localhost:5002/api'])(
+    'accepts %p',
+    (value) => {
+      expect(() => assertPublicFilesOrigin({ WEB_PUBLIC_FILES_ORIGIN: value })).not.toThrow()
+    }
+  )
+
+  it.each(['http://cdn.example.com', 'https://*.example.com', 'cdn.example.com', '*'])(
+    'refuses %p at start-up and names the variable',
+    (value) => {
+      expect(() => assertPublicFilesOrigin({ WEB_PUBLIC_FILES_ORIGIN: value })).toThrow(
+        /WEB_PUBLIC_FILES_ORIGIN/
+      )
+    }
+  )
 })

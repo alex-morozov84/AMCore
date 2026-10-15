@@ -169,7 +169,8 @@ usually not the web origin. Set `WEB_PUBLIC_FILES_ORIGIN` on the web service to 
 proxy adds it to `img-src` only (`parsePublicFilesOrigin`, covered by `public-files-origin.test.ts`
 and `build-csp.test.ts`). The value is reduced to one exact origin: `https`, or `http` on
 `localhost`/`127.0.0.1` for local stands. A wildcard, a credential, a plain-`http` public host or a
-malformed value is ignored, so a typo can never widen the policy. `connect-src`, `script-src` and
+malformed value is refused at start-up (the web app does not boot and names the variable), and the
+proxy never widens the policy for a bad value. `connect-src`, `script-src` and
 the other directives are unchanged. Images are rendered with `next/image` `unoptimized`, so the
 Next.js server never fetches them and no `images.remotePatterns` list exists.
 
