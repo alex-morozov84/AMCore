@@ -19,7 +19,8 @@ const STRUCTURE_AFTER = `> flags. \`init:project\` records project choices: stru
 > configuration (\`ADMIN_CONSOLE_HOSTNAME\`), not a slug. Still set by hand: where the
 `
 const TOOLING_BEFORE = `Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
-Type checking runs separately; SWC only transforms code.
+API build requires type checking before SWC emission; unit tests do not check types.
+See [API build and ESM runtime](docs/backend/api-build.md) for module boundaries and commands.
 Vitest runs \`packages/shared\`'s own schema/lib contract tests, React Email
 template rendering, and frontend unit/integration tests. Storybook covers
 isolated component-state/interaction/a11y checks. Playwright runs frontend
@@ -30,7 +31,8 @@ for where a shared schema's own test belongs, and
 taxonomy and command choices.
 `
 const TOOLING_AFTER = `Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
-Type checking runs separately; SWC only transforms code.
+API build requires type checking before SWC emission; unit tests do not check types.
+See [API build and ESM runtime](docs/backend/api-build.md) for module boundaries and commands.
 Vitest runs \`packages/shared\`'s own schema/lib contract tests, React Email
 template rendering, and frontend unit/integration tests. Playwright runs frontend
 browser flows, with \`@axe-core/playwright\` for automated accessibility scans.
