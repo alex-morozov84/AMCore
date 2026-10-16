@@ -1,5 +1,10 @@
 # File storage
 
+Use [Troubleshooting](../../storage/troubleshooting.md) for symptom-by-symptom fixes and
+[Testing](../../storage/testing.md#check-a-real-provider-with-storagecheck) to run
+`storage:check` against your provider. Provider pages are in the
+[provider matrix](../../storage/providers/README.md).
+
 ## File diagnostic
 
 `AMCoreStorageProbeFailed` fires after a failed, stale or unmeasured cached
