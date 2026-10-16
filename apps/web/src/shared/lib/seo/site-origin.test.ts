@@ -60,14 +60,22 @@ describe('assertSeoConfig', () => {
     WEB_TRUSTED_ORIGINS: 'https://example.com',
   }
 
-  it('accepts a complete enabled configuration, with trusted origins in any form', () => {
+  it('accepts a complete enabled configuration, with spaces around the trusted origins', () => {
     expect(() => assertSeoConfig(enabled)).not.toThrow()
     expect(() =>
       assertSeoConfig({
         ...enabled,
-        WEB_TRUSTED_ORIGINS: 'http://localhost:3002, https://example.com/ ',
+        WEB_TRUSTED_ORIGINS: 'http://localhost:3002, https://example.com ',
       })
     ).not.toThrow()
+  })
+
+  it('reads WEB_TRUSTED_ORIGINS as the BFF origin guard does: a trailing slash is not trusted', () => {
+    // The origin guard compares exact origins, so `https://example.com/` would refuse the site's
+    // own browser requests; the start-up check must fail on it instead of passing.
+    expect(() =>
+      assertSeoConfig({ ...enabled, WEB_TRUSTED_ORIGINS: 'https://example.com/' })
+    ).toThrow(/WEB_TRUSTED_ORIGINS/)
   })
 
   it.each([undefined, '', 'disabled'])('never stops start-up when indexing is %p', (mode) => {

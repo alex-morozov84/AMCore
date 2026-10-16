@@ -39,10 +39,13 @@ export function isIndexingEnabled(env: SeoEnvironment = process.env): boolean {
   return env.WEB_SEO_INDEXING?.trim() === 'enabled'
 }
 
+// Parsed exactly as the BFF origin guard parses it (`shared/api/bff/origin-guard.ts`): split, trim,
+// nothing else. A looser parse (e.g. stripping a trailing slash) would pass this check while the
+// guard still refuses the site's own browser requests.
 function trustedOrigins(env: SeoEnvironment): string[] {
   return (env.WEB_TRUSTED_ORIGINS ?? '')
     .split(',')
-    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .map((origin) => origin.trim())
     .filter(Boolean)
 }
 

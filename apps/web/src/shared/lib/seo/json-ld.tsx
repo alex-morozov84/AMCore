@@ -3,7 +3,7 @@
  *
  * `JSON.stringify` does not make a string safe inside a `<script>` tag: a value containing
  * `</script>` would end the tag and inject markup. Every `<` is therefore written as the escape
- * `<`, which JSON parsers read back as `<` (the approach of the Next.js JSON-LD guide). The
+ * `\u003c`, which JSON parsers read back as `<` (the approach of the Next.js JSON-LD guide). The
  * script has type `application/ld+json`, a data block the strict CSP does not execute or block
  * (verified in the enforced mode), so it needs no nonce. React would HTML-escape a text child of
  * `<script>` and corrupt the JSON, hence `dangerouslySetInnerHTML` on already-escaped text.
