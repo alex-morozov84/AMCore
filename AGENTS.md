@@ -145,8 +145,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **Docs impact check is required.** Before editing, identify which public docs
   the task can affect. When behavior, API contracts, extension points, security
   invariants, operations, commands, or contributor workflow change, update the
-  relevant `docs/`, `README.md`, `CONTRIBUTING.md`, and `AGENTS.md` in the same
-  PR. If no docs change is needed, state why in the final response. Record
+  relevant `docs/` and `CONTRIBUTING.md` in the same PR, and answer every line of
+  the "Where this change must be visible" block of the PR template (README, doc
+  maps, changelog, this file, OpenAPI). If no docs change is needed, state why in
+  the final response. Record
   significant or architectural choices in an ADR. Add notable user-facing
   changes under `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or
   change release tags. See `CONTRIBUTING.md` → _Changelog & releases_ for the
