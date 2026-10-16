@@ -1,10 +1,14 @@
 import type { MetadataRoute } from 'next'
-import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+
+import { type PageQuery, pageUrl } from './page-url'
 
 /** One public page of the product, as listed in `_app/seo/public-pages.ts`. */
 export interface PublicPage {
   /** Path without the locale prefix: `/pricing`, or `''` for the home page. No query or hash. */
   path: string
+  /** The page's own query, such as `{ page: '2' }` for a listing; see `PageMetadataInput.query`. */
+  query?: PageQuery
   lastModified?: Date | string
   changeFrequency?: NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>
   priority?: number
@@ -41,14 +45,14 @@ export function buildSitemap(origin: string, pages: readonly PublicPage[]): Meta
             ...Object.fromEntries(
               SUPPORTED_LOCALES.map((locale) => [
                 locale,
-                localizedFrontendUrl(origin, locale, page.path),
+                pageUrl(origin, locale, page.path, page.query),
               ])
             ),
-            'x-default': localizedFrontendUrl(origin, DEFAULT_LOCALE, page.path),
+            'x-default': pageUrl(origin, DEFAULT_LOCALE, page.path, page.query),
           }
         : undefined
     return SUPPORTED_LOCALES.map((locale) => ({
-      url: localizedFrontendUrl(origin, locale, page.path),
+      url: pageUrl(origin, locale, page.path, page.query),
       ...(page.lastModified !== undefined && { lastModified: page.lastModified }),
       ...(page.changeFrequency && { changeFrequency: page.changeFrequency }),
       ...(page.priority !== undefined && { priority: page.priority }),

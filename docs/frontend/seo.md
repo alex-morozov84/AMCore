@@ -125,7 +125,9 @@ check that they match.
    }
    ```
 
-   `path` has no locale prefix and no query. Pass the page's own title (`Pricing`): the root layout
+   `path` has no locale prefix and no query. A page whose own query must be part of its canonical
+   (the page number of a listing) passes it separately as `query: { page: '2' }`; see
+   [the online store example](#example-an-online-store). Pass the page's own title (`Pricing`): the root layout
    appends ` | <site name>` through its title template, so do not add the site name yourself. The
    helper builds the absolute, locale-prefixed canonical URL, the language variants with
    `x-default`, Open Graph and Twitter data, and opens the page only when indexing is effective.
@@ -217,6 +219,38 @@ A private page needs nothing for search engines: the whole app is closed by defa
    Without a session the page must redirect to the login page:
    `curl -sI https://shop.example.com/en/settings/billing | grep -iE '^HTTP|^location'` shows a
    redirect status and a `location` ending in `/en/login`.
+
+## Example: an online store
+
+Which pages of a shop are public, and what to do for each. The central rule is the same everywhere:
+the canonical URL of a page contains only the query you pass as `query`; every other parameter in a
+visitor's URL (filters, sort order, tracking) is left out, so all those variants fold into the listed page.
+
+| Page                                                 | Public?                     | What to do                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Catalog or category listing                          | yes                         | `buildPageMetadata` with `path: '/catalog'`, listed in `getPublicPages()`. Fetch the products on the server: text loaded in the browser after the page opens is not in the HTML a crawler receives.                                                                       |
+| Listing page 2, 3, …                                 | yes, they are listing pages | Pass `query: { page: '2' }` so the page has its own canonical. Page 1 passes nothing (never `?page=1`). Do not use page 1 as the canonical of later pages (Google advises against it), and do not `noindex` them: Google reserves `noindex` for filter and sort variants. |
+| Filtered or sorted listing (`?color=red&sort=price`) | as the base listing         | Pass no filter parameters. The canonical folds the variant into the base listing. If one combination has its own search demand (for example red shoes), make it a real path such as `/catalog/red-shoes` and list it like any page.                                       |
+| Product page                                         | yes                         | `generateMetadata` reads the title, description and image from your data and calls `buildPageMetadata`; the page adds `JsonLd` with a `Product`. `getPublicPages()` reads every product from the database, so the sitemap follows the catalog.                            |
+| Site search results                                  | no                          | Private by default; never list them.                                                                                                                                                                                                                                      |
+| Cart, checkout, account, orders                      | no                          | Private by default. Protect each page itself (`requireSession()` or your own cart check); never call `buildPageMetadata` there.                                                                                                                                           |
+| A product that is out of stock or removed            | your decision               | Out of stock: keep the page and say so in the structured data. Removed: answer 404 or 410 and stop listing it.                                                                                                                                                            |
+
+```ts
+// listing page n of the catalog
+return buildPageMetadata({
+  locale,
+  path: '/catalog',
+  ...(page > 1 && { query: { page: String(page) } }),
+  title: t('catalogTitle'),
+})
+```
+
+Limits to know. One sitemap file may hold 50,000 URLs and the builder here writes a single file, and each
+product appears once per locale: a very large catalog needs a sitemap index, which is not provided.
+Product feeds for shopping services and page-speed work are outside this guide. The listing pagination
+advice follows Google's
+[pagination guide](https://developers.google.com/search/docs/specialty/ecommerce/pagination-and-incremental-page-loading).
 
 ## Open production and keep everything else closed
 
@@ -317,6 +351,9 @@ the tags were streamed into the page body, where Google does not accept them.
   override, a partial object such as `{ nocache: true }`, a spread of an object of your own that
   contains `robots`, `other.robots`. The guard test rejects the `robots` key itself. Spreading
   `noindexMetadata` is fine: that is the sanctioned object.
+- **Filters and sort order in the canonical.** The canonical contains only the `query` you pass, so
+  filter and sort parameters never enter it; passing the whole query string would create one
+  canonical per filter combination. Pass only what identifies the page, such as the page number.
 - **`Disallow` hides `noindex`.** To remove a page from the index keep it crawlable and serve
   `noindex`.
 - **Aliases and previews.** `www`, the apex, a raw IP and preview hosts are different hosts. Only

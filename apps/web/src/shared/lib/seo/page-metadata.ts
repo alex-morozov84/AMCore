@@ -1,12 +1,8 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import {
-  DEFAULT_LOCALE,
-  localizedFrontendUrl,
-  SUPPORTED_LOCALES,
-  type SupportedLocale,
-} from '@amcore/shared'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
 
+import { type PageQuery, pageUrl } from './page-url'
 import { getSiteOrigin, isIndexingEnabled } from './site-origin'
 
 /**
@@ -41,6 +37,12 @@ export interface PageMetadataInput {
   locale: SupportedLocale
   /** Path without the locale prefix: `/pricing`, or `''` for the home page. No query or hash. */
   path: string
+  /**
+   * The page's own query, only when it must have its own canonical URL: the page number of a
+   * listing, `{ page: '2' }` (page 1 passes nothing). Filters, sort order and tracking parameters
+   * are NOT passed: they stay out of the canonical, so those variants fold into the listed page.
+   */
+  query?: PageQuery
   title: string
   description?: string
   /** Absolute URL, or a path resolved against the site origin. */
@@ -51,8 +53,8 @@ export interface PageMetadataInput {
 type UrlFor = (target: SupportedLocale) => string
 
 /** The absolute URL of this page in each locale, or `null` when there is no usable site origin. */
-function urlBuilder(origin: string | null, path: string): UrlFor | null {
-  return origin ? (target) => localizedFrontendUrl(origin, target, path) : null
+function urlBuilder(origin: string | null, path: string, query?: PageQuery): UrlFor | null {
+  return origin ? (target) => pageUrl(origin, target, path, query) : null
 }
 
 /** Canonical plus every language variant and `x-default`; a single-locale fork gets no variants. */
@@ -83,10 +85,10 @@ function otherOpenGraphLocales(locale: SupportedLocale): string[] {
  * Without a usable origin no absolute URL (canonical, alternates, `og:url`, images) is emitted.
  */
 export async function buildPageMetadata(input: PageMetadataInput): Promise<Metadata> {
-  const { locale, path, title, description, image, type = 'website' } = input
+  const { locale, path, query, title, description, image, type = 'website' } = input
   const origin = getSiteOrigin()
   const open = isIndexingEnabled() && origin !== null
-  const urlFor = urlBuilder(origin, path)
+  const urlFor = urlBuilder(origin, path, query)
   const canonical = urlFor?.(locale)
   const alternates = alternatesFor(locale, urlFor)
   const ogLocale = OPEN_GRAPH_LOCALES[locale]
