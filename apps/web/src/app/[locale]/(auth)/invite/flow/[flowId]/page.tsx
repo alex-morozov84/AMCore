@@ -2,9 +2,10 @@ import { setRequestLocale } from 'next-intl/server'
 
 import { InvitationRecipientMount } from '@/_app/invitation-flow/index.server'
 import { resolveLocaleParam } from '@/i18n/params'
+import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { robots: { index: false, follow: false } }
+export const metadata = noindexMetadata
 
 export default async function Invitation({
   params,

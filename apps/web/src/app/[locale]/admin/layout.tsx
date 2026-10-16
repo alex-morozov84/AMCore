@@ -3,8 +3,12 @@ import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
 
 import { hasCanonicalConsoleHost } from '@/shared/lib/console-host-guard'
+import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
 
 export const dynamic = 'force-dynamic'
+// The Console must stay closed to search engines even if the root default ever changes. The
+// matching static `X-Robots-Tag` header is in `next.config.ts` (docs/frontend/seo.md).
+export const metadata = noindexMetadata
 
 /**
  * Console-only "Control Room" typography. The fonts themselves load here,

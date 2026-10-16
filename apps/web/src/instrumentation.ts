@@ -10,6 +10,8 @@ export async function register(): Promise<void> {
     invitationLocalOrigin()
     const { assertPublicFilesOrigin } = await import('@/shared/lib/csp/public-files-origin')
     assertPublicFilesOrigin()
+    const { assertSeoConfig } = await import('@/shared/lib/seo/site-origin')
+    assertSeoConfig()
   }
 }
 

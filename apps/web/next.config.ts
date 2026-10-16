@@ -6,8 +6,12 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
+import { ADMIN_CONSOLE_CONFIG } from './src/shared/lib/admin-console.generated'
+import { HTML_LIMITED_BOTS } from './src/shared/lib/seo/html-limited-bots'
+
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 const deploymentVersion = process.env.NEXT_DEPLOYMENT_ID || randomUUID()
+const noindexHeaders = [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]
 const invitationPrivacyHeaders = [
   { key: 'Referrer-Policy', value: 'no-referrer' },
   { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
@@ -33,6 +37,9 @@ const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_DEPLOYMENT_VERSION: deploymentVersion },
   // Standalone output for Docker
   output: 'standalone',
+  // Googlebot gets page metadata (canonical, hreflang, robots) in <head>, not streamed into <body>,
+  // however slowly it resolves. See shared/lib/seo/html-limited-bots.ts and docs/frontend/seo.md.
+  htmlLimitedBots: HTML_LIMITED_BOTS,
 
   // Monorepo root for standalone file tracing — without it Next traces from
   // apps/web and omits the workspace `@amcore/shared` package and the hoisted
@@ -157,6 +164,23 @@ const nextConfig: NextConfig = {
         '/api/invitation-operations/:path*',
         '/api/invitation-verification-return/:path*',
       ].map((source) => ({ source, headers: invitationPrivacyHeaders })),
+      // Static noindex for surfaces that must never be indexed, whatever the environment. These are
+      // build-time, path-based entries; the environment/host rule is the proxy's (shared/lib/seo).
+      // `/api/*` never passes the proxy. The Console login is reachable without authentication, and
+      // a header, unlike a meta tag, does not depend on where Next places page metadata. The Console
+      // slug comes from the generated config, so a disabled Console adds nothing.
+      { source: '/api/:path*', headers: noindexHeaders },
+      ...(ADMIN_CONSOLE_CONFIG.enabled
+        ? [
+            {
+              source:
+                SUPPORTED_LOCALES.length > 1
+                  ? `/:locale/${ADMIN_CONSOLE_CONFIG.slug}/:path*`
+                  : `/${ADMIN_CONSOLE_CONFIG.slug}/:path*`,
+              headers: noindexHeaders,
+            },
+          ]
+        : []),
       {
         source: '/sw.js',
         headers: [
