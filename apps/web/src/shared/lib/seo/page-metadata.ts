@@ -48,6 +48,33 @@ export interface PageMetadataInput {
   type?: 'website' | 'article'
 }
 
+type UrlFor = (target: SupportedLocale) => string
+
+/** The absolute URL of this page in each locale, or `null` when there is no usable site origin. */
+function urlBuilder(origin: string | null, path: string): UrlFor | null {
+  return origin ? (target) => localizedFrontendUrl(origin, target, path) : null
+}
+
+/** Canonical plus every language variant and `x-default`; a single-locale fork gets no variants. */
+function alternatesFor(locale: SupportedLocale, urlFor: UrlFor | null): Metadata['alternates'] {
+  if (!urlFor) return undefined
+  const canonical = urlFor(locale)
+  if (SUPPORTED_LOCALES.length < 2) return { canonical }
+  return {
+    canonical,
+    languages: {
+      ...Object.fromEntries(SUPPORTED_LOCALES.map((other) => [other, urlFor(other)])),
+      'x-default': urlFor(DEFAULT_LOCALE),
+    },
+  }
+}
+
+function otherOpenGraphLocales(locale: SupportedLocale): string[] {
+  return SUPPORTED_LOCALES.filter((other) => other !== locale)
+    .map((other) => OPEN_GRAPH_LOCALES[other])
+    .filter((value): value is string => Boolean(value))
+}
+
 /**
  * Complete metadata for a public page. Every object that Next replaces on merge (`robots`,
  * `openGraph`, `twitter`, `alternates`) is returned whole. The page is open to search engines only
@@ -59,39 +86,27 @@ export async function buildPageMetadata(input: PageMetadataInput): Promise<Metad
   const { locale, path, title, description, image, type = 'website' } = input
   const origin = getSiteOrigin()
   const open = isIndexingEnabled() && origin !== null
-  const t = await getTranslations({ locale, namespace: 'meta' })
-  const urlFor = (target: SupportedLocale) =>
-    origin ? localizedFrontendUrl(origin, target, path) : undefined
-  const canonical = urlFor(locale)
+  const urlFor = urlBuilder(origin, path)
+  const canonical = urlFor?.(locale)
+  const alternates = alternatesFor(locale, urlFor)
   const ogLocale = OPEN_GRAPH_LOCALES[locale]
-  const alternateLocales = SUPPORTED_LOCALES.filter((other) => other !== locale)
-    .map((other) => OPEN_GRAPH_LOCALES[other])
-    .filter((value): value is string => Boolean(value))
+  const alternateLocale = otherOpenGraphLocales(locale)
   const imageUrl = origin && image ? new URL(image, origin).toString() : undefined
+  const siteName = (await getTranslations({ locale, namespace: 'meta' }))('title')
 
   return {
     title,
     description,
     robots: { index: open, follow: open },
-    ...(canonical && {
-      alternates: {
-        canonical,
-        ...(SUPPORTED_LOCALES.length > 1 && {
-          languages: {
-            ...Object.fromEntries(SUPPORTED_LOCALES.map((other) => [other, urlFor(other)])),
-            'x-default': urlFor(DEFAULT_LOCALE),
-          },
-        }),
-      },
-    }),
+    ...(alternates && { alternates }),
     openGraph: {
       type,
       title,
       description,
-      siteName: t('title'),
+      siteName,
       ...(canonical && { url: canonical }),
       ...(ogLocale && { locale: ogLocale }),
-      ...(alternateLocales.length > 0 && { alternateLocale: alternateLocales }),
+      ...(alternateLocale.length > 0 && { alternateLocale }),
       ...(imageUrl && { images: [{ url: imageUrl }] }),
     },
     twitter: {
