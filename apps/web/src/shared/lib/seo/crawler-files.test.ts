@@ -1,3 +1,4 @@
+import { resolveSitemap } from 'next/dist/build/webpack/loaders/metadata/resolve-route-data'
 import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
@@ -64,17 +65,27 @@ describe('buildSitemap', () => {
       { path: '/catalog', query: { page: '2', brand: 'acme' } },
     ])
     const query = { brand: 'acme', page: '2' }
+    // Entries carry XML-escaped text: Next writes them into the sitemap verbatim.
+    const xml = (path: string, locale: string) => url(path, locale, query).replace(/&/g, '&amp;')
     expect(entries.map((entry) => entry.url)).toEqual(
-      SUPPORTED_LOCALES.map((locale) => url('/catalog', locale, query))
+      SUPPORTED_LOCALES.map((locale) => xml('/catalog', locale))
     )
-    expect(entries[0]?.url).toMatch(/\?brand=acme&page=2$/)
+    expect(entries[0]?.url).toMatch(/\?brand=acme&amp;page=2$/)
     if (MULTI)
       expect(entries[0]?.alternates?.languages).toEqual({
-        ...Object.fromEntries(
-          SUPPORTED_LOCALES.map((locale) => [locale, url('/catalog', locale, query)])
-        ),
-        'x-default': url('/catalog', DEFAULT_LOCALE, query),
+        ...Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, xml('/catalog', locale)])),
+        'x-default': xml('/catalog', DEFAULT_LOCALE),
       })
+  })
+
+  it("produces well-formed XML through Next's own sitemap serializer", () => {
+    const body = resolveSitemap(
+      buildSitemap(origin, [{ path: '/catalog', query: { page: '2', brand: 'a&b' } }])
+    )
+    // Every `&` in the XML starts an entity; no double escaping if Next ever escapes itself.
+    expect(body).not.toMatch(/&(?!amp;|lt;|gt;|quot;|apos;)/)
+    expect(body).not.toContain('&amp;amp;')
+    expect(body).toContain('?brand=a%26b&amp;page=2</loc>')
   })
 
   it('is empty for an empty registry', () => {

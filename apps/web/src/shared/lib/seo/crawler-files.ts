@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
 
 import { type PageQuery, pageUrl } from './page-url'
 
@@ -33,26 +33,38 @@ export function buildRobots(input: {
 }
 
 /**
+ * Next writes sitemap URLs into the XML verbatim (`<loc>${url}</loc>`, `href="${url}"`), without
+ * escaping. A page query with two keys joins them with `&`, which is not valid XML text, so the
+ * whole sitemap would fail to parse. `crawler-files.test.ts` runs Next's own serializer on the
+ * result, so a Next release that starts escaping (double `&amp;amp;`) fails there.
+ */
+function xmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+/**
  * Sitemap entries: every public page once per locale, each listing all locale variants and
  * `x-default` (Google reads sitemap alternates; Yandex does not, so pages also publish hreflang
  * in their `<head>` through `buildPageMetadata`). A single-locale fork gets no alternates.
  */
 export function buildSitemap(origin: string, pages: readonly PublicPage[]): MetadataRoute.Sitemap {
   return pages.flatMap((page) => {
+    const urlFor = (locale: SupportedLocale) =>
+      xmlText(pageUrl(origin, locale, page.path, page.query))
     const languages =
       SUPPORTED_LOCALES.length > 1
         ? {
-            ...Object.fromEntries(
-              SUPPORTED_LOCALES.map((locale) => [
-                locale,
-                pageUrl(origin, locale, page.path, page.query),
-              ])
-            ),
-            'x-default': pageUrl(origin, DEFAULT_LOCALE, page.path, page.query),
+            ...Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, urlFor(locale)])),
+            'x-default': urlFor(DEFAULT_LOCALE),
           }
         : undefined
     return SUPPORTED_LOCALES.map((locale) => ({
-      url: pageUrl(origin, locale, page.path, page.query),
+      url: urlFor(locale),
       ...(page.lastModified !== undefined && { lastModified: page.lastModified }),
       ...(page.changeFrequency && { changeFrequency: page.changeFrequency }),
       ...(page.priority !== undefined && { priority: page.priority }),
