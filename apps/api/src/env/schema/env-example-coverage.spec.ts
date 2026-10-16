@@ -55,6 +55,10 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'WEB_INVITATION_LOCAL_HTTP_ORIGIN',
   // apps/web-only: the origin public files (avatars) load from, added to the browser CSP img-src.
   'WEB_PUBLIC_FILES_ORIGIN',
+  // apps/web-only: search-engine indexing switch and the public site origin (docs/frontend/seo.md),
+  // read directly via `process.env` in apps/web at request time.
+  'WEB_SEO_INDEXING',
+  'WEB_SITE_ORIGIN',
   // apps/web-only (ADR-072): which inbound header apps/web trusts as the
   // real visitor IP before relaying it to apps/api — same reasoning as
   // WEB_TRUSTED_ORIGINS above.

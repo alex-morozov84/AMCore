@@ -42,4 +42,9 @@ export const routing = defineRouting({
   locales: SUPPORTED_LOCALES,
   defaultLocale: DEFAULT_LOCALE,
   localePrefix: 'always',
+  // next-intl's default sends hreflang as a `Link` header built from the request's own
+  // `x-forwarded-host`/`host`, on every response (private and 404 pages included). Language
+  // variants are published instead by `buildPageMetadata` and the sitemap from the fixed
+  // `WEB_SITE_ORIGIN` (docs/frontend/seo.md). Do not re-enable it without removing that source.
+  alternateLinks: false,
 })

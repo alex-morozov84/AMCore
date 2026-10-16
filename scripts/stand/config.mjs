@@ -30,6 +30,11 @@ export async function configuration(m) {
   // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_START
   closedCreationProfiles.push('organization-establishment')
   // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_END
+  // Optional SEO scenarios (docs/frontend/seo.md): set these in the shell that runs the stand
+  // command to start the web service open to search engines. Empty means the default closed site.
+  // The site origin must be https and trusted, so it is added to the trusted origins below.
+  const siteOrigin = process.env.AMCORE_STAND_WEB_SITE_ORIGIN ?? ''
+  const seoIndexing = process.env.AMCORE_STAND_WEB_SEO_INDEXING ?? ''
   const app = {
     NODE_ENV: 'development',
     API_PORT: '5002',
@@ -69,7 +74,9 @@ export async function configuration(m) {
       NODE_ENV: 'production',
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
-      WEB_TRUSTED_ORIGINS: m.origins.product,
+      WEB_TRUSTED_ORIGINS: [m.origins.product, siteOrigin].filter(Boolean).join(','),
+      WEB_SITE_ORIGIN: siteOrigin,
+      WEB_SEO_INDEXING: seoIndexing,
       // The stand's API serves public files, so its origin may load images.
       WEB_PUBLIC_FILES_ORIGIN: m.origins.api ?? '',
       WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:')
