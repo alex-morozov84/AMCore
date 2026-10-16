@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 // AMCORE_CONSOLE_HOST_IMPORTS_END
 import { directory, save } from './state.mjs'
+import { prepareOrganizationSetupSource } from './organization-setup-fixture.mjs'
 import { snapshot } from './snapshot.mjs'
 
 export async function refresh(m) {
@@ -22,6 +23,7 @@ export async function refresh(m) {
   m.snapshot = destination
   if (hash !== m.sourceHash) delete m.images
   m.sourceHash = hash
+  await prepareOrganizationSetupSource(m)
   // AMCORE_CONSOLE_HOST_SNAPSHOT_START
   if (m.topology === 'host') {
     const file = join(destination, 'apps/web/src/shared/lib/admin-console.generated.ts')

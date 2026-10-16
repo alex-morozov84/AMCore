@@ -27,6 +27,7 @@ function useReadyHeading(state: OrganizationContextState, selected: boolean) {
 /** Page-owned navigation, bounded recovery and heading focus; no authority requests. */
 export function useAccessNavigation({
   state,
+  blocksAutoOpen = false,
   data,
   input,
   explicitList,
@@ -38,6 +39,7 @@ export function useAccessNavigation({
   state: OrganizationContextState
   data: OrganizationContextData | undefined
   input: OrganizationContextInput
+  blocksAutoOpen?: boolean
   explicitList: boolean
   refresh: () => void
   onReplace: (href: string) => void
@@ -51,7 +53,7 @@ export function useAccessNavigation({
   const list = data && 'total' in data.data ? data.data : undefined
   const context = data && 'organization' in data.data ? data.data : undefined
   const inconsistent = list ? organizationListNeedsRecovery(list) : false
-  const autoOpen = !explicitList && list?.total === 1 && !inconsistent
+  const autoOpen = !blocksAutoOpen && !explicitList && list?.total === 1 && !inconsistent
 
   useEffect(() => {
     if (autoOpen && list) {

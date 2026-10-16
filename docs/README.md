@@ -26,6 +26,8 @@ find for something, that page is under-documented; please open an issue.
 
 ## Find the right guide
 
+[Create a company or prepare its first administrator](product-admin/organization-establishment.md) — policies, Console/CLI/API setup and recovery.
+
 | I want to…                                                                               | Go to                                                                                                                                   |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Store or extend typed ordinary runtime settings                                          | [`backend/settings.md`](backend/settings.md)                                                                                            |

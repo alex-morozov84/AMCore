@@ -138,6 +138,12 @@ solo. Without an org context, a caller can only read and update their own
 profile. Create an org when several people need to collaborate with different
 levels of access. A user can belong to multiple orgs, each with its own roles.
 
+Organization `ADMIN` comes from explicit creation, trusted initial setup or an
+existing authorized role/invitation workflow. Signup alone grants no membership.
+[Establishment](../product-admin/organization-establishment.md) documents creation
+policy, verified first-ADMIN setup and safe repeat behavior. These do not promote
+system roles or alter the separate platform bootstrap above.
+
 ### Selecting organization context
 
 Covered organization handlers accept a personal JWT and verify their explicitly

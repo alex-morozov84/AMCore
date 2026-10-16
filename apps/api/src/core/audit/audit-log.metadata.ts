@@ -231,6 +231,17 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'api_key.revoked': { reason: true },
   'auth.step_up_failed': { reason: true },
   'auth.step_up_succeeded': { sessionId: true },
+  'org.created': {
+    source: boundedString(17, /^(self-service|bootstrap-cli|bootstrap-console)$/),
+    userId: aiId,
+    memberId: aiId,
+    adminRoleId: aiId,
+    adminGrantId: aiId,
+  },
+  'org.setup_account_prepared': {
+    source: boundedString(17, /^(bootstrap-cli|bootstrap-console)$/),
+    userId: aiId,
+  },
   'org.invite_accepted': {
     actorCredentialType: true,
     branch: true,

@@ -12,6 +12,16 @@ const [action = 'help', ...args] = process.argv.slice(2)
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const lane = value('--lane', 'real-stack')
 const group = value('--ci-group')
+const fixture = value('--fixture')
+if (
+  args.includes('--fixture') &&
+  (!['organization-setup', 'organization-shop'].includes(fixture) ||
+    action !== 'e2e' ||
+    lane === 'mocked')
+)
+  throw new Error('Only organization fixtures on fresh Docker E2E are supported')
+if (fixture && group)
+  throw new Error('A closed-signup fixture cannot run registration-dependent CI groups')
 if (group && (lane !== 'real-stack' || !['standard', 'disruptive'].includes(group)))
   throw new Error('Invalid E2E CI group')
 const lanes = ['mocked', 'real-stack']
@@ -93,6 +103,7 @@ async function execute() {
       if (e.code !== 'ENOENT') throw e
     })
     if (existing) {
+      if (fixture) throw new Error('Organization setup fixture requires a fresh stand ID')
       if (Boolean(existing.mocked) !== (lane === 'mocked'))
         throw new Error('Cannot switch a recorded stand between mocked and Docker lanes')
       if (action === 'e2e' && existing.purpose !== 'e2e')
@@ -112,7 +123,7 @@ async function execute() {
         action === 'e2e' ? 'e2e' : 'preview',
         topology,
         action === 'e2e' && lane === 'mocked',
-        action === 'preview' ? value('--profile', 'default') : undefined
+        action === 'preview' ? value('--profile', 'default') : fixture
       )
     if (lane !== 'mocked') await boot(m, !existing)
     if (interrupted) throw new Error('Interrupted startup')

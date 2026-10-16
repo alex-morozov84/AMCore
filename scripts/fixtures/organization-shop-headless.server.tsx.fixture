@@ -1,0 +1,33 @@
+import { headers } from 'next/headers'
+import { notFound } from 'next/navigation'
+
+import { ShopTeam } from '@/_pages/shop-team'
+import { readOrganizationBootstrap, readOrganizationContext } from '@/entities/organization-context/index.server'
+import { ContextRequestError } from '@/shared/api/bff/context-errors'
+import { redirectToLogin } from '@/shared/api/bff/dal'
+import { SessionNotFoundError } from '@/shared/api/bff/errors'
+
+import 'server-only'
+
+// Replace with the immutable organization ID recorded during your trusted setup.
+// This value belongs to server configuration, never a URL, first membership or buyer input.
+const SHOP_ORGANIZATION_ID = 'shop-staff-fixture'
+
+async function admitShop() {
+  try {
+    const source = await headers()
+    const admission = await readOrganizationBootstrap(source)
+    const context = await readOrganizationContext(SHOP_ORGANIZATION_ID, { headers: source, expectedSession: admission.binding })
+    if (!context.data.canManageTeamAccess) notFound()
+    return admission
+  } catch (error) {
+    if (error instanceof SessionNotFoundError || (error instanceof ContextRequestError && error.status === 401)) return redirectToLogin()
+    if (error instanceof ContextRequestError && [403, 404].includes(error.status)) notFound()
+    throw error
+  }
+}
+
+export async function ShopTeamMount() {
+  const admission = await admitShop()
+  return <ShopTeam admission={admission} id={SHOP_ORGANIZATION_ID} />
+}

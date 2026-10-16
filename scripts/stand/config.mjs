@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { parse, stringify } from 'yaml'
 import { compose } from './docker.mjs'
+import { setupMailCollectorService } from './setup-mail-collector.mjs'
+import { assertOrganizationSetupFixture } from './organization-setup-fixture.mjs'
 import { directory } from './state.mjs'
 
 export const label = 'org.amcore.stand'
@@ -22,7 +24,12 @@ const overridden = (value) =>
   `!override\n      ${stringify(value).trimEnd().replaceAll('\n', '\n      ')}`
 
 export async function configuration(m) {
+  assertOrganizationSetupFixture(m)
   const db = `postgresql://amcore:${m.dbPassword}@postgres:5432/amcore`
+  const closedCreationProfiles = ['organization-setup', 'organization-shop']
+  // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_START
+  closedCreationProfiles.push('organization-establishment')
+  // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_END
   const app = {
     NODE_ENV: 'development',
     API_PORT: '5002',
@@ -34,6 +41,13 @@ export async function configuration(m) {
     // The browser-facing API origin of this stand, so a public avatar URL resolves.
     ...(m.origins.api && { STORAGE_PUBLIC_BASE_URL: `${m.origins.api}/api/v1/storage/public` }),
     EMAIL_PROVIDER: 'mock',
+    AUTH_PUBLIC_SIGNUP_ENABLED: m.fixtureProfile === 'organization-setup' ? 'false' : 'true',
+    ORG_SELF_SERVICE_CREATION_ENABLED: closedCreationProfiles.includes(m.fixtureProfile)
+      ? 'false'
+      : 'true',
+    ...(m.fixtureProfile === 'organization-setup'
+      ? { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
+      : {}),
     FRONTEND_URL: m.origins.product,
     CORS_ORIGIN: Object.values(m.origins).join(','),
     TRUST_PROXY: m.topology === 'host' ? '1' : 'false',
@@ -76,6 +90,8 @@ export async function configuration(m) {
     environments['notification-provider'] = {}
   }
   // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_END
+  if (m.fixtureProfile === 'organization-setup')
+    environments['mail-capture'] = { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
   // AMCORE_CONSOLE_CADDY_ENV_START
   if (m.topology === 'host')
     environments.caddy = {
@@ -106,6 +122,12 @@ export async function configuration(m) {
         .slice(1)
         .join('\n')
     // AMCORE_CONSOLE_NOTIFICATION_SERVICE_END
+    if (service === 'mail-capture')
+      yaml += stringify({ services: { [service]: setupMailCollectorService(m) } })
+        .replace(/^services:\n/, '')
+        .split('\n')
+        .slice(1)
+        .join('\n')
     if (ports[service]) yaml += `    ports: ${overridden(ports[service])}\n`
   }
   const base = parse(await readFile(join(m.snapshot, 'docker-compose.yml'), 'utf8'))
@@ -139,6 +161,37 @@ export async function configuration(m) {
 }
 
 export function validateModel(m) {
+  assertOrganizationSetupFixture(m)
+  const collector = m.model.services['mail-capture']
+  if (m.fixtureProfile === 'organization-setup') {
+    if (
+      !collector ||
+      collector.image !== `${m.project}-api:latest` ||
+      collector.ports?.length ||
+      collector.volumes?.length ||
+      collector.environment?.AMCORE_SETUP_MAIL_CAPTURE_KEY !== m.mailCaptureKey
+    )
+      throw new Error('Unsafe setup mail collector')
+    for (const name of ['api', 'worker']) {
+      const environment = m.model.services[name].environment
+      if (
+        environment.AUTH_PUBLIC_SIGNUP_ENABLED !== 'false' ||
+        environment.ORG_SELF_SERVICE_CREATION_ENABLED !== 'false' ||
+        environment.AMCORE_SETUP_MAIL_CAPTURE_KEY !== m.mailCaptureKey
+      )
+        throw new Error('Setup fixture policy changed')
+    }
+  } else if (collector) throw new Error('Unexpected setup mail collector')
+  if (m.fixtureProfile === 'organization-shop') {
+    for (const name of ['api', 'worker']) {
+      const environment = m.model.services[name].environment
+      if (
+        environment.AUTH_PUBLIC_SIGNUP_ENABLED !== 'true' ||
+        environment.ORG_SELF_SERVICE_CREATION_ENABLED !== 'false'
+      )
+        throw new Error('Shop fixture policy changed')
+    }
+  }
   if (!/^[0-9a-f]{48}$/.test(m.dbPassword) || !/^[0-9a-f]{64}$/.test(m.jwtSecret))
     throw new Error('Invalid local credential encoding')
   const ports = Object.values(m.ports)

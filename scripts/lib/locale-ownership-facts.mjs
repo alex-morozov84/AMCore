@@ -102,6 +102,12 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one('apps/web/src/features/console-organization-setup/ui/organization-setup.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/organization-create/ui/organization-create.stories.tsx', {
+      disposition: 'rewrite',
+    }),
     ...e2eVerification,
     ...localeOnlyVerification,
     one('apps/web/src/features/auth-login/ui/LoginForm.stories.tsx', { disposition: 'rewrite' }),

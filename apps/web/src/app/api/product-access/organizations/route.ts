@@ -1,6 +1,7 @@
+import { organizationCreationHandlers } from '@/_app/organization-access/index.server'
 import { readOrganizationList } from '@/entities/organization-context/index.server'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
-import { contextMethodNotAllowed, contextRoute } from '@/shared/api/bff/context-route'
+import { contextRoute } from '@/shared/api/bff/context-route'
 import { CONTEXT_SESSION_HEADER } from '@/shared/api/bff/context-session'
 
 export function GET(request: Request): Promise<Response> {
@@ -21,9 +22,10 @@ export function GET(request: Request): Promise<Response> {
   })
 }
 
-export const HEAD = contextMethodNotAllowed
-export const OPTIONS = contextMethodNotAllowed
-export const POST = contextMethodNotAllowed
-export const PUT = contextMethodNotAllowed
-export const PATCH = contextMethodNotAllowed
-export const DELETE = contextMethodNotAllowed
+const denied = () => new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+export const HEAD = denied
+export const OPTIONS = denied
+export const POST = organizationCreationHandlers.create
+export const PUT = denied
+export const PATCH = denied
+export const DELETE = denied

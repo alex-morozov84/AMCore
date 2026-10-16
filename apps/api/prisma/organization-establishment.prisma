@@ -1,0 +1,33 @@
+// Permanent minimal completion facts deliberately have no cascading relations.
+// Account/organization deletion must never turn an old command into a new grant.
+model OrganizationCreationResult {
+  actorId            String
+  operationId        String   @db.Uuid
+  protocolVersion    Int      @default(1)
+  canonicalInputHash  String   @db.VarChar(64)
+  organizationId     String
+  memberId           String
+  adminRoleId        String
+  adminGrantId       String
+  completedAt        DateTime @default(now())
+
+  @@id([actorId, operationId])
+  @@map("organization_creation_results")
+  @@schema("core")
+}
+
+model OrganizationBootstrapResult {
+  key                String   @id
+  protocolVersion    Int      @default(1)
+  canonicalInputHash  String   @db.VarChar(64)
+  organizationId     String
+  userId             String
+  memberId           String
+  adminRoleId        String
+  adminGrantId       String
+  completedAt        DateTime @default(now())
+
+  // The migration also CHECKs key = 'initial-organization'.
+  @@map("organization_bootstrap_results")
+  @@schema("core")
+}

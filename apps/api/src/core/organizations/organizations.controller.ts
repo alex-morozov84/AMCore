@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -13,10 +14,12 @@ import {
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiQuery,
+  ApiResponse,
   ApiSecurity,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -106,13 +109,33 @@ export class OrganizationsController {
   @Post()
   @Auth(AuthType.Bearer)
   @ApiOperation({ summary: 'Create a new organization — caller becomes ADMIN' })
+  @ApiHeader({
+    name: 'X-Organization-Creation-Id',
+    required: false,
+    description: 'UUIDv4 operation identity. Preserve it and the original input for safe retry.',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid body or operation header' })
+  @ApiResponse({ status: 403, description: 'ORGANIZATION_CREATION_DISABLED' })
+  @ApiResponse({
+    status: 409,
+    description: 'CONFLICT, intent mismatch, changed result or known aborted conflict',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'SYSTEM_NOT_INITIALIZED: canonical ADMIN template unavailable',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'ORGANIZATION_CREATION_UNCONFIRMED: preserve the operation identity',
+  })
   @SchemaResponse({ type: OrgResponseDto, status: 201, description: 'Organization created' })
   @RequestContextPolicy({ kind: 'personal' })
   create(
     @Body({ schema: CreateOrganizationDto.schema }) dto: CreateOrganizationDto,
-    @CurrentUser('sub') userId: string
+    @CurrentUser('sub') userId: string,
+    @Headers('x-organization-creation-id') operationId?: string
   ): Promise<OrgResponse> {
-    return this.orgsService.create(userId, dto)
+    return this.orgsService.create(userId, dto, operationId)
   }
 
   /**

@@ -26,6 +26,7 @@ import { BackgroundWorkController } from './background-work.controller.js'
 import { BackgroundWorkService } from './background-work.service.js'
 import { BackgroundWorkCatalogue } from './background-work-catalogue.js'
 import { BackgroundWorkReader } from './background-work-reader.js'
+import { OrganizationEstablishmentController } from './organization-establishment.controller.js'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard.js'
 
 // Imports CleanupModule (not ScheduleModule): AdminController's manual
@@ -48,6 +49,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
   ],
   controllers: [
     AdminController,
+    OrganizationEstablishmentController,
     AdminApiKeysController,
     AdminStorageSettingController,
     AdminQueuesController,

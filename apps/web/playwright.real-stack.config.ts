@@ -1,12 +1,18 @@
 import { defineConfig, devices } from '@playwright/test'
 
-import { outputPaths, testOptions } from './e2e/support/managed-target.mjs'
+import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-target.mjs'
 
 // The managed runner provisions a fresh local Docker stack and owns its cleanup.
 // Playwright never reuses an unrelated development server.
 export default defineConfig({
   ...outputPaths(),
-  testDir: './e2e/real-stack',
+  testDir:
+    activeTarget().fixtureProfile === 'organization-setup'
+      ? './e2e/organization-setup'
+      : './e2e/real-stack',
+  ...(activeTarget().fixtureProfile === 'organization-setup'
+    ? { testMatch: '**/organization-initial-setup.spec.ts' }
+    : {}),
   fullyParallel: false,
   // Fixture writes include live ownership/marker checks; browser assertions keep their own limits.
   timeout: 120_000,

@@ -6,6 +6,7 @@ import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redi
 
 import { e2eContainerLabels } from './e2e-owned-containers'
 import { esmOperatorContracts } from './support/esm-operator-contracts'
+import { organizationSetupOperatorContracts } from './support/esm-organization-setup-contracts'
 import { esmProcess, freeEsmPort, waitEsmHealth } from './support/esm-process'
 
 let postgres: StartedPostgreSqlContainer | undefined
@@ -83,3 +84,5 @@ it.each(['web', 'worker', 'all'])(
 )
 
 esmOperatorContracts(() => env)
+
+organizationSetupOperatorContracts(() => env)

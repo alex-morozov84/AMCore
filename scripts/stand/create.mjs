@@ -8,6 +8,10 @@ import { root, directory, save } from './state.mjs'
 import { snapshot } from './snapshot.mjs'
 import { allocate } from './ports.mjs'
 import { engine } from './docker.mjs'
+import {
+  assertOrganizationSetupFixture,
+  prepareOrganizationSetupSource,
+} from './organization-setup-fixture.mjs'
 
 export async function create(id, purpose, topology, mocked = false, fixtureProfile) {
   const choices = await projectChoices(root)
@@ -42,6 +46,9 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     ...choices,
     fixtureVersion: 2,
     fixtureProfile,
+    ...(fixtureProfile === 'organization-setup'
+      ? { mailCaptureKey: randomBytes(32).toString('hex') }
+      : {}),
     mocked,
     id,
     uuid,
@@ -60,8 +67,10 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     state: 'allocated',
     resources: {},
   }
+  assertOrganizationSetupFixture(m)
   await save(m)
   m.sourceHash = await snapshot(root, m.snapshot)
+  await prepareOrganizationSetupSource(m)
   // AMCORE_CONSOLE_HOST_SNAPSHOT_START
   if (topology === 'host') {
     const path = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')

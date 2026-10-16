@@ -10,6 +10,10 @@ export async function previewLabels(m) {
       email: messages.auth.email,
       password: messages.auth.password,
       submit: messages.auth.login,
+      creationTitle: messages.organizationCreation.title,
+      create: messages.organizationCreation.create,
+      organizationName: messages.organizationCreation.name,
+      cancelCreation: messages.organizationCreation.cancel,
     },
   }
   // AMCORE_CONSOLE_PREVIEW_LABELS_START
@@ -18,6 +22,9 @@ export async function previewLabels(m) {
       email: messages.console.loginEmail,
       password: messages.console.loginPassword,
       submit: messages.console.signIn,
+      setupTitle: messages.console.organizationSetup.title,
+      setupFirstStep: messages.console.organizationSetup.headings.administrator,
+      setupStates: Object.values(messages.console.organizationSetup.states),
     }
   // AMCORE_CONSOLE_PREVIEW_LABELS_END
   return labels

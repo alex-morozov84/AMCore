@@ -33,8 +33,15 @@ export function outputPaths() {
   const dir = `${m.worktree}/.amcore/stands/${m.id}`
   return {
     outputDir: `${dir}/test-results`,
-    reporter: [['list'], ['html', { open: 'never', outputFolder: `${dir}/report` }]],
+    reporter: standReporters(m, dir),
   }
+}
+export function standReporters(m, dir) {
+  // HTML/blob reports record built-in page.goto step URLs even when trace/video are off.
+  // The rendered-mail fixture visits one-use secrets; keep only step-free console results.
+  return m.fixtureProfile === 'organization-setup'
+    ? [['list', { printSteps: false }]]
+    : [['list'], ['html', { open: 'never', outputFolder: `${dir}/report` }]]
 }
 export function guardedExec(service, ...args) {
   const m = activeTarget()

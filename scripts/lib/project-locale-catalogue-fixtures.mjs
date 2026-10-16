@@ -66,6 +66,18 @@ function catalogueObject(model, locale, ctx) {
 }
 
 export function singleCatalogueFixture(model, { locale, variant }, ctx) {
+  if (variant === 'catalogue-pair') {
+    for (const source of ['en', 'ru']) {
+      const [catalogue, ...extra] = jsonImports(model, source)
+      if (!catalogue || extra.length) throw new Error('catalogue pair is missing or ambiguous')
+      model.replaceNode(
+        catalogue.moduleSpecifier,
+        `'${catalogue.moduleSpecifier.text.replace(`/${source}.json`, `/${locale}.json`)}'`,
+        ctx
+      )
+    }
+    return
+  }
   if (variant === 'invitation') {
     const [catalogue, ...extra] = jsonImports(model, 'en')
     if (!catalogue || extra.length)
@@ -122,6 +134,12 @@ export const fixtureParams = (params) =>
   typeof params === 'object' &&
   Object.keys(params).length === 2 &&
   ['en', 'ru'].includes(params.locale) &&
-  ['errors', 'sessions', 'oauth', 'section', 'storage-setting', 'invitation'].includes(
-    params.variant
-  )
+  [
+    'errors',
+    'sessions',
+    'oauth',
+    'section',
+    'storage-setting',
+    'invitation',
+    'catalogue-pair',
+  ].includes(params.variant)

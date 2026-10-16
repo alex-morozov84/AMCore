@@ -2,8 +2,8 @@ import { HttpStatus } from '@nestjs/common'
 
 import { AuthErrorCode, type RequestPrincipal } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions/index.js'
-import { PrismaService } from '../../prisma/index.js'
+import { AppException } from '../../common/exceptions/domain/app.exception.js'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 /** The 403 STEP_UP_REQUIRED an unfresh privileged action raises (client → `POST /auth/step-up`). */
 function stepUpRequired(): AppException {
@@ -24,7 +24,7 @@ function stepUpRequired(): AppException {
  * pays nothing; 403 (not 401) so a generic 401→refresh client can't loop — it branches on the code.
  */
 export async function assertSessionFresh(
-  prisma: PrismaService,
+  prisma: Pick<Prisma.TransactionClient, 'session'>,
   windowSec: number,
   principal: RequestPrincipal | undefined
 ): Promise<void> {

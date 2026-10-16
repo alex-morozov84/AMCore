@@ -4,8 +4,28 @@
 
 Use **Organizations** to inspect the system's organization inventory. Each row
 shows its name, slug, and creation and update times. Open a row's name for its
-full page. These pages cannot create, edit, or delete an organization or change
-its members' roles.
+full page. The **First organization** panel can create the first organization
+and assign a verified recipient `ADMIN` only on an eligible empty installation.
+It shares the command's rules and permanently closes after completion.
+The inventory/detail pages do not edit/delete organizations or change member roles.
+
+See [initial setup](../product-admin/organization-establishment.md#use-console-after-trusted-platform-access)
+for prerequisites, account preparation, email proof, confirmation and recovery.
+The operator must already have trusted platform access and receives no automatic
+company membership. Additional-organization provisioning is a separate workflow.
+
+From the Console home page, select **Organizations** in the left navigation.
+The setup panel appears above the search field. Follow **Administrator → Organization → Confirmation**.
+Enter the employee's email and select **Continue**. An existing confirmed account can continue immediately;
+the page explains when the employee must confirm their email first. **Back** preserves entered details.
+The final action is **Create organization**. The result explains who has access and provides **Open organization**.
+If the selected account was deleted before completion, choose **Change recipient**
+and select another administrator. Organization details remain saved. Confirm the
+new account's mailbox before continuing. An unknown creation result must be checked
+first; completed setup never replaces its original administrator through this panel.
+If the page says an organization already exists, initial setup is unavailable.
+Use the inventory below to inspect that organization; this state does not ask
+the operator to repair deployment prerequisites or stop application writes.
 
 ## Find an organization
 
