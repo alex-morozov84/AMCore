@@ -44,6 +44,13 @@ baseURL/project/environment does not authorize an external target.
 The web package's `test:e2e` and `test:e2e:real-stack` commands delegate to
 these managed lanes.
 
+A stand starts the web service closed to search engines. To try the open state, set
+`AMCORE_STAND_WEB_SITE_ORIGIN` (an `https` origin, for example `https://shop.example.test`; the stand
+adds it to the trusted origins) and `AMCORE_STAND_WEB_SEO_INDEXING=enabled` in the shell that runs
+`pnpm stand up`, then request the stand with `-H 'Host: shop.example.test'`. A running stand refuses a
+changed environment, so run `pnpm stand down` before the next `up` with other values. See
+[Search-engine indexing](../frontend/seo.md#try-the-open-state-locally).
+
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_START -->
 
 `test:e2e:console-real-stack` delegates to the HTTPS host lane;

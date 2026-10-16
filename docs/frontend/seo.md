@@ -55,6 +55,11 @@ staging and open in production; promote the same image (see
 | `WEB_SEO_INDEXING` | `enabled` or `disabled`. Empty or unset means `disabled`. Any other value stops the web service at start-up.                                                              |
 | `WEB_SITE_ORIGIN`  | The public origin, for example `https://shop.example.com`: no path, no trailing slash. Used for canonical links, hreflang, Open Graph URLs, the sitemap and `robots.txt`. |
 
+Set them wherever your deployment sets the environment of the web service (Compose `.env`, your
+orchestrator or CI environment; see [deployment](../operations/deployment.md)).
+`WEB_TRUSTED_ORIGINS` is a comma-separated list of exact origins (`https://shop.example.com`, no
+trailing slash), the same list the browser CSRF guard uses.
+
 With `enabled`, the web service checks at start-up that `WEB_SITE_ORIGIN` is set, canonical and
 `https`, and also listed in `WEB_TRUSTED_ORIGINS`; otherwise it stops with a message naming the
 variable. With `disabled` it never stops. Keep the API's `FRONTEND_URL` equal to
@@ -74,24 +79,29 @@ check that they match.
 
 1. **Decide the page is public.** Anyone, including a crawler, may read it. A page that shows
    account data is not public.
-2. **Place it outside the private groups.** Do not put it in `(auth)`, `(dashboard)`,
-   `(organization-access)` or `admin`. The home page `/en` is the dashboard in this starter; a
-   product with a public landing page restructures that route itself.
-3. **Build its metadata with the helper.** Never write a `robots` key yourself.
+2. **Create it in a route group of its own, outside the private ones.** Never put it in `(auth)`,
+   `(dashboard)`, `(organization-access)` or `admin` (see [Make a page private](#make-a-page-private)
+   for what they are). `(site)` below is only an example name: create the folder
+   `src/app/[locale]/(site)/`. It needs no `layout.tsx` of its own. The page inherits the root
+   `[locale]` layout (fonts, theme, providers, the CSP nonce) and gets no app shell and no sign-in
+   check. The home page `/en` is the signed-in dashboard in this starter; a product with a public
+   landing page restructures that route first.
+3. **Write the route and build its metadata with the helper.** The route file stays thin; compose
+   the page in `src/_pages/pricing` like any other page (see the
+   [architecture guide](./architecture-and-conventions.md)). Never write a `robots` key yourself.
 
    ```tsx
-   // app/[locale]/(site)/pricing/page.tsx
+   // src/app/[locale]/(site)/pricing/page.tsx
    import type { Metadata } from 'next'
-   import { getTranslations } from 'next-intl/server'
+   import { getTranslations, setRequestLocale } from 'next-intl/server'
 
+   import { PricingPage } from '@/_pages/pricing'
    import { resolveLocaleParam } from '@/i18n/params'
    import { buildPageMetadata } from '@/shared/lib/seo/page-metadata'
 
-   export async function generateMetadata({
-     params,
-   }: {
-     params: Promise<{ locale: string }>
-   }): Promise<Metadata> {
+   type Props = { params: Promise<{ locale: string }> }
+
+   export async function generateMetadata({ params }: Props): Promise<Metadata> {
      const locale = await resolveLocaleParam(params)
      const t = await getTranslations({ locale, namespace: 'pricing' })
      return buildPageMetadata({
@@ -101,47 +111,110 @@ check that they match.
        description: t('description'),
      })
    }
+
+   export default async function Pricing({ params }: Props) {
+     setRequestLocale(await resolveLocaleParam(params))
+     return <PricingPage />
+   }
    ```
 
-   `path` has no locale prefix and no query. The helper builds the absolute, locale-prefixed
-   canonical URL, the language variants with `x-default`, Open Graph and Twitter data, and opens
-   the page only when indexing is effective. Add the `pricing.*` message keys to every catalogue.
+   `path` has no locale prefix and no query. Pass the page's own title (`Pricing`): the root layout
+   appends ` | <site name>` through its title template, so do not add the site name yourself. The
+   helper builds the absolute, locale-prefixed canonical URL, the language variants with
+   `x-default`, Open Graph and Twitter data, and opens the page only when indexing is effective.
+   Add the `pricing.*` message keys to every catalogue. In a fork scaffolded with one locale the
+   route has no `[locale]` folder and no `params`: pass `DEFAULT_LOCALE` from `@amcore/shared` as
+   `locale`; URLs have no prefix and no language variants are published.
 
 4. **List the page** in `src/_app/seo/public-pages.ts`, which ships returning an empty list:
 
    ```ts
    export async function getPublicPages() {
-     return [{ path: '/pricing' }, { path: '', changeFrequency: 'weekly' as const }]
+     return [{ path: '/pricing' }, { path: '/about', changeFrequency: 'monthly' as const }]
    }
    ```
 
    The function is `async`, so a product can read its pages from a database. The sitemap is built
-   only from this list. **Convention:** a listed page must also use the helper. A listed page that
-   forgot it stays `noindex` (safe) but appears in the sitemap, which Search Console reports as a
-   warning. A page that uses the helper but is not listed is indexable and missing from the
-   sitemap.
+   only from this list. Do not list the home page (`path: ''`) while `/en` is still the signed-in
+   dashboard: that would put a private, `noindex` page in the sitemap. **Convention:** a listed
+   page must also use the helper. A listed page that forgot it stays `noindex` (safe) but appears in
+   the sitemap, which Search Console reports as a warning. A page that uses the helper but is not
+   listed is indexable and missing from the sitemap.
 
-5. **Optional structured data.**
+5. **Optional structured data**, inside the page component:
 
    ```tsx
    import { JsonLd } from '@/shared/lib/seo/json-ld'
 
-   ;<JsonLd data={{ '@context': 'https://schema.org', '@type': 'Product', name: product.name }} />
+   export function PricingPage() {
+     return (
+       <main>
+         <JsonLd
+           data={{ '@context': 'https://schema.org', '@type': 'Product', name: 'Pro plan' }}
+         />
+         {/* page content */}
+       </main>
+     )
+   }
    ```
 
    The component escapes every `<` so a value cannot close the script tag. Check the result with
    Google's Rich Results Test.
+
+6. **Test it if you want a browser test.** `e2e/mocked/seo-headers.spec.ts` covers the closed
+   defaults. A product adds its own test for its public pages.
+
+## Make a page private
+
+A private page needs nothing for search engines: the whole app is closed by default.
+
+1. **Choose the group by purpose.** `(dashboard)` is the signed-in application shell (sidebar,
+   account menu). `(organization-access)` holds organization pages. `(auth)` holds the forms for
+   signed-out visitors (login, registration, password reset, invitations): it is **not** the group
+   for "pages behind login". `admin` is the Operations Console.
+2. **Noindex is not access control.** A group does not protect a page: its layout is only a shell.
+   Every page that shows account data must check the session itself with `requireSession()` from
+   `@/shared/api/bff/dal`, as the existing `(dashboard)` pages do. Search-engine rules hide a page
+   from search results; they do not stop anyone who has the URL.
+3. **Metadata.** Give the page a `title` (and `description`) as usual and set nothing else about
+   robots: it inherits the root `noindex`. Do not call `buildPageMetadata`, which opens a page when
+   indexing is enabled. To be explicit, use `export const metadata = noindexMetadata` from
+   `@/shared/lib/seo/page-metadata` instead of your own `robots` value. Setting `openGraph`,
+   `twitter` or `alternates` on a private page changes nothing for indexing.
+4. **Check it.** On a closed site `curl -sI` shows `X-Robots-Tag: noindex, nofollow`; on the open
+   site host check the `<meta name="robots">` tag with the body command in [Verify](#verify).
 
 ## Open production and keep everything else closed
 
 1. On the production web service, set `WEB_SEO_INDEXING=enabled` and
    `WEB_SITE_ORIGIN=https://<your public host>`, and make sure `WEB_TRUSTED_ORIGINS` contains the
    same origin.
-2. Leave both unset on every other environment.
+2. Leave both unset on every other environment. A deployment is open only when it has both
+   variables set to its own host; opening is always an explicit act there. Do not copy production's
+   variables to staging: staging would then open. Search-engine rules are not access control, so
+   also keep staging behind basic authentication or an IP allowlist.
 3. Make the reverse proxy pass the public `Host` header unchanged (the bundled Caddy profile does).
    If a proxy rewrites it, the site stays closed (the safe direction); the verification block
    below shows it.
 4. Verify with the block below, then register the site in Search Console and Yandex Webmaster.
+
+### Try the open state locally
+
+Open mode needs an `https` origin and a matching `Host` header, so a plain `localhost` run stays
+closed. The managed stand can start the web service open (it adds the origin to the trusted origins
+for you; run `pnpm stand down` first if a stand is already running, because a running stand refuses a
+changed environment):
+
+```bash
+AMCORE_STAND_WEB_SITE_ORIGIN=https://shop.example.test \
+AMCORE_STAND_WEB_SEO_INDEXING=enabled pnpm stand up
+pnpm stand status                      # prints the stand's product URL, used as $STAND below
+curl -sI -H 'Host: shop.example.test' $STAND/en/pricing | grep -i x-robots-tag    # nothing: open
+curl -sI -H 'Host: other.example.test' $STAND/en/pricing | grep -i x-robots-tag   # noindex, nofollow
+```
+
+Without the stand, set both variables and `WEB_TRUSTED_ORIGINS` yourself on a production build and
+use the same `-H 'Host: …'` trick. See [local stands](../operations/local-stands.md).
 
 ## Verify
 
@@ -221,6 +294,31 @@ generation and no CDN caching of these pages. Skipping the CSP header for a publ
 the CSP guide describes, relaxes the policy only; the page stays dynamic because the root layout
 still reads the request headers. For a large or high-traffic public site, run it as a separate
 Next app or on a separate domain.
+
+### If your public pages must be static
+
+You have two options. Neither is a switch in this starter.
+
+1. **Stay in this app.** Every page is rendered per request and answered with
+   `Cache-Control: private, no-cache, no-store`, so a CDN will not cache it. Indexing is unaffected.
+   This is enough for a modest public surface; spend the effort on the capacity of the web service.
+2. **Move the public site out.** Run it as a second Next app, or on its own domain, behind the same
+   reverse proxy: public hosts or paths go to it, the signed-in application goes to this app. Next
+   describes the pattern as [multi-zones](https://nextjs.org/docs/app/guides/multi-zones). Then:
+   - the public app has its own proxy and its own security-header choices, so it can serve static or
+     cached pages with a policy suited to static content (the
+     [CSP guide](./browser-security-and-csp.md) lists the trade-offs);
+   - it owns its `robots.txt`, `sitemap.xml`, canonical links and hreflang. Set
+     `WEB_SEO_INDEXING` and `WEB_SITE_ORIGIN` on **it**, in the way its own code reads them; this app
+     stays closed;
+   - the helpers in this guide live in this app (`shared/lib/seo`) and are not a shared package, so
+     the public app copies them or you extract them first. The rules still apply to it: complete
+     metadata objects, Googlebot's metadata in `<head>`, hreflang in the page head, no `Disallow` for
+     private paths.
+
+Only the first half was measured here: a public page with a relaxed policy stays dynamic under this
+app's root layout. The separate-app route is described, not exercised, so test it on your
+deployment (for example with the Verify block) before relying on it.
 
 ## Search Console and Yandex Webmaster
 
