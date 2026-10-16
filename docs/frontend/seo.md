@@ -147,8 +147,10 @@ check that they match.
    }
    ```
 
-   The function is `async`, so a product can read its pages from a database. The sitemap is built
-   only from this list. Do not list the home page (`path: ''`) while `/en` is still the signed-in
+   The function is `async`, so a product can read its pages from a database. Do not list a catalog
+   page by page: build the list inside the function (see
+   [the online store example](#example-an-online-store)); the pages 2, 3, … of a listing need not
+   be listed at all. The sitemap is built only from this list. Do not list the home page (`path: ''`) while `/en` is still the signed-in
    dashboard: that would put a private, `noindex` page in the sitemap. **Convention:** a listed
    page must also use the helper. A listed page that forgot it stays `noindex` (safe) but appears in
    the sitemap, which Search Console reports as a warning. A page that uses the helper but is not
@@ -233,8 +235,8 @@ visitor's URL (filters, sort order, tracking) is left out, so all those variants
 | Filtered or sorted listing (`?color=red&sort=price`) | as the base listing         | Pass no filter parameters. The canonical folds the variant into the base listing (a canonical is a hint, not a command). Google's pagination guide also allows `noindex` for unwanted filter and sort URLs; choose one signal, not both: to close the variant instead, return `{ ...noindexMetadata, title }` without `buildPageMetadata` when filters are present. If one combination has its own search demand (for example red shoes), make it a real path such as `/catalog/red-shoes` and list it like any page. |
 | Product page                                         | yes                         | `generateMetadata` reads the title, description and image from your data and calls `buildPageMetadata`; the page adds `JsonLd` with a `Product`. `getPublicPages()` reads every product from the database, so the sitemap follows the catalog.                                                                                                                                                                                                                                                                        |
 | Site search results                                  | no                          | Private by default; never list them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Cart, checkout, account, orders                      | no                          | Private by default. Protect each page itself (`requireSession()` or your own cart check); never call `buildPageMetadata` there.                                                                                                                                                                                                                                                                                                                                                                                       |
-| A product that is out of stock or removed            | your decision               | Out of stock: keep the page and say so in the structured data. Removed: answer 404 or 410 and stop listing it.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Cart, checkout, account, orders                      | no                          | Private by default. Put them in a group of your own, for example `(shop)`: the group does not decide indexing, and a page that never calls `buildPageMetadata` stays `noindex`. A guest cart needs no sign-in; protect account and order pages with `requireSession()`, and the cart with your own cart session.                                                                                                                                                                                                      |
+| A product that is out of stock or removed            | your decision               | Out of stock: keep the page and say so in the structured data. Removed: answer 404 (`notFound()`) and stop listing it; this starter provides no 410 helper.                                                                                                                                                                                                                                                                                                                                                           |
 
 ```ts
 // listing page n of the catalog
@@ -245,6 +247,57 @@ return buildPageMetadata({
   title: t('catalogTitle'),
 })
 ```
+
+Details the table leaves out:
+
+- **A filtered page 2** (`?page=2&color=red`) gets the canonical `?page=2`: the filter is dropped and the
+  variant folds into page 2 of the base listing. To keep filtered variants out of the index instead, return
+  `{ ...noindexMetadata, title }` for requests that carry a filter (no canonical: one signal, not both).
+- **`?page=1`** renders page 1 and, because page 1 passes no `query`, its canonical is the base URL, so it
+  folds into it. Redirecting `?page=1` to the base URL is optional tidiness.
+- **The allowed page range** is that of the listing the visitor sees: with a filter applied, the last page is
+  the last page of the filtered result.
+- **A removed product** answers 404 through `notFound()`; the starter provides no 410 response.
+- **Stock in structured data:**
+
+  ```tsx
+  <JsonLd
+    data={{
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      offers: {
+        '@type': 'Offer',
+        price: product.price,
+        priceCurrency: 'USD',
+        availability: product.inStock
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+      },
+    }}
+  />
+  ```
+
+### Registering the shop's pages
+
+Do not write the list by hand. `getPublicPages()` is a function, so the products come from your database,
+and a new product appears in the sitemap without a code change:
+
+```ts
+// src/_app/seo/public-pages.ts
+export async function getPublicPages() {
+  const products = await listProducts() // your own data access, not part of the starter
+  return [
+    { path: '/catalog' },
+    ...products.map((product) => ({ path: `/products/${product.slug}` })),
+  ]
+}
+```
+
+Pages 2, 3, … of the catalog do not have to be in the sitemap: crawlers reach them through the
+"next page" links, and each still gets its own canonical from the route code above (a page missing from
+the list is only missing from the sitemap). To list them anyway, add them in the same function, for
+`n` from 2 to the last page: `{ path: '/catalog', query: { page: String(n) } }`.
 
 Limits to know. One sitemap file may hold 50,000 URLs and the builder here writes a single file, and each
 product appears once per locale: a very large catalog needs a sitemap index, which is not provided.
@@ -306,6 +359,8 @@ curl -sI https://shop.example.com/api/auth/sessions | grep -iE '^HTTP|x-robots-t
 # 3. Crawler files.
 curl -s https://shop.example.com/robots.txt
 curl -sI https://shop.example.com/sitemap.xml | head -1                    # 200, or 404 with no listed pages
+curl -s https://shop.example.com/sitemap.xml | grep -c '<loc>'             # how many URLs are listed
+curl -s https://shop.example.com/sitemap.xml | grep -c '/products/old-slug' # a removed product: 0
 
 # 4. The Operations Console (path topology; `admin` is the default slug, see the Console guide).
 curl -s -A 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' \
