@@ -1,0 +1,55 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { expect, test } from '@playwright/test'
+
+import { expectNoAxeViolations } from '../shared/axe'
+import { activeTarget, guardedSql } from '../support/managed-target.mjs'
+
+import { directApi } from './credential-containment.helpers'
+import { TEST_PASSWORD, uniqueEmail } from './helpers'
+
+test('fixed internal shop hides company navigation; staff manage roles while buyers and removed staff fail server admission', async ({ page, context }) => {
+  const target = activeTarget()
+  // Frontend Console removal must retain the guarded backend route.
+  const setupApi = await fetch(`http://127.0.0.1:${target.ports.api}/api/v1/admin/organization-establishment/status`)
+  expect(setupApi.status).toBe(401)
+  const email = uniqueEmail('shop-staff')
+  const buyerEmail = uniqueEmail('shop-buyer')
+  const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
+  expect(register.status()).toBe(201)
+  const actor = (await register.json()).user
+  const bootstrap = await context.request.get('/api/product-access/bootstrap')
+  const { binding } = await bootstrap.json()
+  const deniedCreation = await context.request.post('/api/product-access/organizations', {
+    headers: { origin: target.origins.product, 'X-AMCore-Context-Session': binding },
+    data: { name: 'Buyer company', operationId: crypto.randomUUID() },
+  })
+  expect(deniedCreation.status()).toBe(403)
+  expect(guardedSql('SELECT count(*) FROM core.organizations;').trim()).toBe('0')
+  await directApi('auth/register', { email: buyerEmail, password: TEST_PASSWORD })
+  guardedSql(`INSERT INTO core.organizations (id,name,slug,"updatedAt") VALUES ('shop-staff-fixture','Hidden internal shop','hidden-internal-shop',NOW());
+    INSERT INTO core.org_members (id,"userId","organizationId") VALUES ('shop-owner-membership', :'id', 'shop-staff-fixture');
+    INSERT INTO core.member_roles (id,"memberId","roleId") SELECT 'shop-owner-admin', 'shop-owner-membership', id FROM core.roles WHERE name = 'ADMIN' AND "organizationId" IS NULL;`, { id: actor.id })
+  const path = new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'shop-team')).pathname
+  const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')).organizationMembers
+  await page.goto(path)
+  await expect(page.getByTestId('shop-team')).toBeVisible()
+  await expect(page.getByText('Hidden internal shop', { exact: true })).toHaveCount(0)
+  expect(await page.getByRole('link').count()).toBe(0)
+  await page.getByRole('button', { name: email, exact: true }).click()
+  await page.getByRole('checkbox', { name: 'MEMBER', exact: true }).check()
+  await page.getByRole('checkbox', { name: t.selfWarning }).check()
+  await page.getByRole('button', { name: t.save, exact: true }).click()
+  await expect(page.getByText(t.saved, { exact: true })).toBeVisible()
+  await expectNoAxeViolations(page)
+  const loginBuyer = await context.request.post('/api/auth/login', { headers: { origin: target.origins.product }, data: { email: buyerEmail, password: TEST_PASSWORD } })
+  expect(loginBuyer.status()).toBe(200)
+  expect((await page.goto(path))?.status()).toBe(404)
+  await expect(page.getByTestId('shop-team')).toHaveCount(0)
+  await context.request.post('/api/auth/login', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
+  guardedSql('DELETE FROM core.org_members WHERE id = \'shop-owner-membership\';')
+  expect((await page.goto(path))?.status()).toBe(404)
+  await expect(page.getByTestId('shop-team')).toHaveCount(0)
+})

@@ -587,6 +587,32 @@ upserts. Review both effects before using it on an installation: exact current
 authorization templates are unchanged, but AI catalogue defaults are reapplied.
 It is not a routine production migration or a repair command.
 
+## Initial organization and administrator
+
+Migration `20261015150000_organization_establishment` adds two minimal permanent result
+tables without backfilling memberships or granting roles. Existing installations are
+not adopted as initial setup. Runtime DML/default privileges must cover the new tables.
+Application rollback leaves these additive tables and completion facts intact.
+
+After explicit guarded seed, choose the independent signup and creation policies.
+A fixed company sets `ORG_SELF_SERVICE_CREATION_ENABLED=false` consistently on every
+API replica. In reference Compose, set it in the project `.env` or the file selected
+with `--env-file`; the common backend environment forwards it to `api` and `worker`.
+An omitted setting defaults to `true`. A one-off setup command using the `api`
+service inherits the same policy; it does not reconfigure existing API replicas.
+Roll out that policy consistently before admitting traffic or running initial setup.
+Prepare an ordinary account, complete normal mailbox proof, then assign
+its verified ID as organization `ADMIN`. Run `organization-setup.js` from the runner;
+migrations and seed use the CLI-capable migrator. First platform `SUPER_ADMIN` trust
+is separate. The [establishment runbook](../product-admin/organization-establishment.md)
+gives exact image commands, prerequisites, status/exit codes and failure recovery.
+
+Setup serializes its initial checks with ordinary organization writers. A Console
+operator does not stop writes. This short transaction is not a permanent singleton
+policy: a stale creation-enabled replica can create another company after commit.
+Keep minimal completion records across deletion, cleanup, backups and application
+rollback. Never delete them as an ordinary retry procedure.
+
 ## Process roles: web / worker
 
 The same image runs as different roles via `PROCESS_ROLE`:

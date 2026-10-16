@@ -84,6 +84,7 @@ x-app-env: &app-env
   WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
   # Dev-only secret; production requires a real value >= 32 chars (ADR-029/040).
   AUTH_PUBLIC_SIGNUP_ENABLED: ${AUTH_PUBLIC_SIGNUP_ENABLED:-true}
+  ORG_SELF_SERVICE_CREATION_ENABLED: ${ORG_SELF_SERVICE_CREATION_ENABLED:-true}
   JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-min-32-characters-change-me}
   # Storage: local by default; set STORAGE_DRIVER=s3 + the vars below for real S3.
   STORAGE_DRIVER: ${STORAGE_DRIVER:-local}

@@ -36,7 +36,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Only validated server-owned retry hints become transport headers.
     const retryAfter = details?.retryAfterSeconds
     if (
-      statusCode === 429 &&
+      (statusCode === 429 || (statusCode === 503 && errorCode === 'SETUP_BUSY')) &&
       typeof retryAfter === 'number' &&
       Number.isFinite(retryAfter) &&
       retryAfter > 0 &&

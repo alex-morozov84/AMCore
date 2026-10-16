@@ -1,3 +1,5 @@
+import { databaseSslMode } from '../database.env'
+
 import type { EnvResolved } from './derive-defaults'
 import type { RefinementCtx } from './refinement-ctx'
 
@@ -109,7 +111,7 @@ function databaseRule(env: EnvResolved, ctx: RefinementCtx): void {
 
   let sslmode: string | null = null
   try {
-    sslmode = new URL(env.DATABASE_URL).searchParams.get('sslmode')?.toLowerCase() ?? null
+    sslmode = databaseSslMode(env.DATABASE_URL)
   } catch {
     ctx.addIssue({
       code: 'custom',

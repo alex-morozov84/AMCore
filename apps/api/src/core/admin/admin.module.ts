@@ -24,6 +24,7 @@ import { BackgroundWorkController } from './background-work.controller'
 import { BackgroundWorkService } from './background-work.service'
 import { BackgroundWorkCatalogue } from './background-work-catalogue'
 import { BackgroundWorkReader } from './background-work-reader'
+import { OrganizationEstablishmentController } from './organization-establishment.controller'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard'
 
 import { HealthModule } from '@/health'
@@ -49,6 +50,7 @@ import { QueueModule } from '@/infrastructure/queue'
   ],
   controllers: [
     AdminController,
+    OrganizationEstablishmentController,
     AdminApiKeysController,
     AdminStorageSettingController,
     AdminQueuesController,

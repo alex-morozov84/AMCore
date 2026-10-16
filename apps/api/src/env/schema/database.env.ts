@@ -14,3 +14,8 @@ export const databaseEnv = z.object({
   // Env-derived default resolved in the composed transform (production → 500, else 100).
   SLOW_QUERY_THRESHOLD_MS: z.coerce.number().int().min(0).optional(),
 })
+
+/** Shared API/operator interpretation of the existing production TLS requirement. */
+export function databaseSslMode(value: string): string | null {
+  return new URL(value).searchParams.get('sslmode')?.toLowerCase() ?? null
+}

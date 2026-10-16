@@ -23,6 +23,8 @@ export async function assertManagedStandProjection(root, scenario) {
     })
   )
   assert.equal(matrix.lane.includes('host'), enabled)
+  assert.equal(matrix.lane.includes('setup-console'), enabled)
+  assert.ok(matrix.lane.includes('setup-cli'))
   assert.ok(matrix.lane.includes('path-standard'))
   assert.ok(matrix.lane.includes('safety'))
   assert.ok(matrix.lane.includes('mocked'))
@@ -69,12 +71,23 @@ export async function assertManagedStandProjection(root, scenario) {
     baseLocale: locale,
     consoleEnabled: enabled,
   })
-  assert.deepEqual(
-    labels.product,
-    locale === 'ru'
+  assert.deepEqual(labels.product, {
+    ...(locale === 'ru'
       ? { email: 'Email', password: 'Пароль', submit: 'Войти' }
-      : { email: 'Email', password: 'Password', submit: 'Sign in' }
-  )
+      : { email: 'Email', password: 'Password', submit: 'Sign in' }),
+    ...Object.fromEntries(
+      [
+        ['creationTitle', 'title'],
+        ['create', 'create'],
+        ['organizationName', 'name'],
+        ['cancelCreation', 'cancel'],
+      ].map(([label, key]) => [
+        label,
+        JSON.parse(readFileSync(join(root, `apps/web/messages/${locale}.json`), 'utf8'))
+          .organizationCreation[key],
+      ])
+    ),
+  })
   assert.equal(Boolean(labels.console), enabled)
   if (enabled) assert.equal(labels.console.submit, locale === 'ru' ? 'Войти' : 'Sign in')
 }

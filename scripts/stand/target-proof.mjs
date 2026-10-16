@@ -4,6 +4,8 @@ const fields = [
   'uuid',
   'attempt',
   'purpose',
+  'fixtureProfile',
+  'mailCaptureKey',
   'topology',
   'worktree',
   'snapshot',

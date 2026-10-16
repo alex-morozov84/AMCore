@@ -1,5 +1,3 @@
-import { randomBytes } from 'node:crypto'
-
 import { Injectable } from '@nestjs/common'
 
 import {
@@ -25,7 +23,7 @@ import {
   assertOrganizationResponse,
   lockOrganization,
 } from './organization-authorization'
-import { getSystemRoleId } from './system-role'
+import { OrganizationCreationService } from './organization-creation.service'
 
 import type { Organization, Prisma } from '@/generated/prisma/client'
 
@@ -36,25 +34,12 @@ export class OrganizationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aclVersionService: OrgAclVersionService,
-    private readonly capabilities: CapabilityRegistry
+    private readonly capabilities: CapabilityRegistry,
+    private readonly creation: OrganizationCreationService
   ) {}
 
-  async create(userId: string, dto: CreateOrganizationDto): Promise<OrgResponse> {
-    const slug = dto.slug ?? (await this.generateSlug(dto.name))
-
-    if (dto.slug) {
-      const existing = await this.prisma.organization.findUnique({ where: { slug } })
-      if (existing) throw new ConflictException(`Slug '${slug}' is already taken`)
-    }
-
-    const adminRoleId = await getSystemRoleId(this.prisma, 'ADMIN')
-
-    return this.prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({ data: { name: dto.name, slug } })
-      const member = await tx.orgMember.create({ data: { userId, organizationId: org.id } })
-      await tx.memberRole.create({ data: { memberId: member.id, roleId: adminRoleId } })
-      return this.toOrgResponse(org)
-    })
+  create(userId: string, dto: CreateOrganizationDto, operationId?: string): Promise<OrgResponse> {
+    return this.creation.create(userId, dto, operationId)
   }
 
   async findAllForUser(
@@ -254,22 +239,5 @@ export class OrganizationsService {
     if (principal.organizationId !== orgId) {
       throw new ForbiddenException('Organization context does not match the operation target')
     }
-  }
-
-  private async generateSlug(name: string): Promise<string> {
-    const base = name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-
-    const existing = await this.prisma.organization.findUnique({ where: { slug: base } })
-    if (!existing) return base
-
-    const suffix = randomBytes(3).toString('hex')
-    return `${base}-${suffix}`
   }
 }

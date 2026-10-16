@@ -51,6 +51,8 @@ export async function start(m) {
   if (m.fixtureProfile === 'notification-work')
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'notification-provider'])
   // AMCORE_CONSOLE_NOTIFICATION_START_END
+  if (m.fixtureProfile === 'organization-setup')
+    await compose(m, ['up', '-d', '--wait', '--no-deps', 'mail-capture'])
   await compose(m, [
     'up',
     '-d',

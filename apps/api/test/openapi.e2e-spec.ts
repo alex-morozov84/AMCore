@@ -82,6 +82,12 @@ const EXPECTED: Record<string, Expected> = {
   'get /organizations/{orgId}/invite-operations/{operationId}': { status: '200', kind: 'json' },
   // auth-invites
   'post /auth/invites/accept': { status: '200', kind: 'json' },
+  'get /organizations/creation-policy': { status: '200', kind: 'json' },
+  'get /organizations/creation-results/{operationId}': { status: '200', kind: 'json' },
+  'get /admin/organization-establishment/status': { status: '200', kind: 'json' },
+  'post /admin/organization-establishment/accounts/prepare': { status: '200', kind: 'json' },
+  'get /admin/organization-establishment/accounts/{userId}/status': { status: '200', kind: 'json' },
+  'post /admin/organization-establishment/bootstrap': { status: '200', kind: 'json' },
   // admin
   'get /admin/api-keys': { status: '200', kind: 'json' },
   'delete /admin/api-keys/{id}': { status: '200', kind: 'json' },
@@ -314,7 +320,12 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operations.filter(({ operation }) => !operation.responses?.['401'])).toEqual([])
     expect(
       operations.filter(
-        ({ path, operation }) => path !== '/organizations' && !operation.responses?.['403']
+        ({ path, operation }) =>
+          ![
+            '/organizations',
+            '/organizations/creation-policy',
+            '/organizations/creation-results/{operationId}',
+          ].includes(path) && !operation.responses?.['403']
       )
     ).toEqual([])
     const operation = document.paths['/organizations/{orgId}/roles/{roleId}/permissions']?.post

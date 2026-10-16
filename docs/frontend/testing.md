@@ -81,6 +81,16 @@ within a stand. Unique emails do not isolate those mechanisms.
 Run one lane with `node scripts/e2e-ci.mjs path-standard` (also `safety`, `mocked`,
 `path-disruptive` and `host` when applicable). New ordinary specs automatically join
 `path-standard`; runtime-settings/background-work specs join `path-disruptive`.
+The separate `setup-cli` lane proves closed-registration installation with the
+compiled command and an actual captured recovery email. It always applies.
+<!-- AMCORE_CONSOLE_ESTABLISHMENT_TESTING_START -->
+
+`setup-console` adds the same initial lifecycle through the retained HTTPS Console.
+<!-- AMCORE_CONSOLE_ESTABLISHMENT_TESTING_END -->
+
+Both use fresh `organization-setup` fixtures. Ordinary registration-dependent tests
+remain in their original stands. See [initial installation proof](../operations/local-stands.md#initial-organization-installation-proof)
+for scoped commands and the internal-only mailbox boundaries.
 Before grouped execution, the runner collects Playwright's full and selected
 inventories, rejects missing/duplicate tests and writes `inventory.json` under
 that stand. Full original `pnpm stand e2e --lane real-stack` remains available.

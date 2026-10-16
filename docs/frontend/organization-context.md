@@ -3,12 +3,13 @@
 In multi-locale builds, the product sidebar's Organizations entry opens
 `/[locale]/organizations`. A single-locale fork uses `/organizations` and
 `/organizations/[id]` after the standard project initializer moves the routes.
-An empty successful list explains how to request an invitation; it does not
-create an organization or accept invitations. One membership opens its overview
-automatically. The overview's All organizations link uses `?view=list` to avoid
+An empty successful list offers explicit organization creation when deployment policy
+allows it; otherwise it explains invitation access. Registration never creates a
+membership. One membership opens its overview automatically only after creation
+recovery and storage hydration have been classified. The overview's All organizations link uses `?view=list` to avoid
 a single-organization redirect loop. Multiple memberships use cards and URL
 pagination, 20 per page. The organization selector has no search, table or
-organization CRUD UI; the separate members page supplies member search and roles.
+organization edit/delete UI; the separate members page supplies member search and roles.
 
 `/[locale]/organizations/[id]` confirms the company and signed-in account. Its
 read-only “Your access” / “Ваш доступ” card shows the verified
@@ -21,6 +22,16 @@ work. The [members page](../product-admin/organization-members.md) adds role ass
 journey. The [Roles tab](../product-admin/role-definitions.md#ready-role-screens) edits custom roles through the
 [role definitions API](../product-admin/role-definitions.md); product-specific screens remain downstream-owned. A missing/removed target stays unavailable at that URL; it never
 silently adopts another organization. Capability text never grants authority.
+
+## Organization creation
+
+The list composes `useOrganizationCreation` with the editable `organization-create`
+feature. The headless entity owns policy, frozen UUIDv4 attempts, safe result reads,
+same-operation retries and per-tab storage. The page owns navigation after a fresh
+selected-context check. Unknown or changed results remain visible ahead of single-
+membership auto-open. A failed access check after confirmed commit never reports rollback.
+See [establishment](../product-admin/organization-establishment.md) for API, recovery,
+retention and fixed-shop integration. The hook imports no ready feature or Console.
 
 ## Ordered data and identity lifecycle
 

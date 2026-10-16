@@ -114,3 +114,5 @@ Already running? Reach for whichever concern below applies.
 
 Endpoint shapes live in the Swagger/OpenAPI document at `/docs`; these runbooks
 cover operation, not request/response schemas.
+
+[First organization and administrator](../product-admin/organization-establishment.md) — deployment prerequisites, production commands and recovery.

@@ -7,7 +7,9 @@ import { RefreshCw } from 'lucide-react'
 import {
   type OrganizationContextInput,
   useOrganizationContext,
+  useOrganizationCreation,
 } from '@/entities/organization-context'
+import { OrganizationCreate } from '@/features/organization-create'
 import { OrganizationSelect } from '@/features/organization-select'
 import { Alert, AlertDescription } from '@/shared/ui/alert'
 import { BackLink } from '@/shared/ui/back-link'
@@ -43,7 +45,14 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
   const t = useTranslations('organizationAccess')
   const { admission, input } = props
   const { state, data, refresh, initialPending } = useOrganizationContext(admission.binding, input)
-  const navigation = useAccessNavigation({ ...props, state, data, refresh })
+  const creation = useOrganizationCreation(admission, input.kind === 'list')
+  const navigation = useAccessNavigation({
+    ...props,
+    state,
+    data,
+    refresh,
+    blocksAutoOpen: creation.blocksAutoOpen,
+  })
   const { heading, selected, list, context, inconsistent, autoOpen } = navigation
   const pending = state.status === 'pending' || autoOpen
   const title = selected
@@ -114,12 +123,18 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
             <AlertDescription>{t('inconsistent')}</AlertDescription>
           </Alert>
         ) : list ? (
-          <OrganizationSelect
-            list={list}
-            contextHref={props.contextHref}
-            pageHref={props.pageHref}
-            dashboardHref={props.dashboardHref}
-          />
+          <div className="space-y-4">
+            <OrganizationCreate
+              flow={creation}
+              onOpen={(id) => props.onReplace(props.contextHref(id))}
+            />
+            <OrganizationSelect
+              list={list}
+              contextHref={props.contextHref}
+              pageHref={props.pageHref}
+              dashboardHref={props.dashboardHref}
+            />
+          </div>
         ) : context ? (
           <div className="space-y-4">
             <OrganizationContextSummary context={context} email={admission.actor.email} />

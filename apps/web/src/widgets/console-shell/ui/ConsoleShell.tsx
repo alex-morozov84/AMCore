@@ -78,7 +78,7 @@ export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShel
                 <ConsoleBreadcrumb />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               <ConsoleTimeZoneSwitcher />
               <ConsoleLocaleSwitcher />
               <ConsoleUserBadge user={user} />

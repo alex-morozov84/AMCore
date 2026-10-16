@@ -41,6 +41,59 @@ Scoped tests use `pnpm stand e2e --lane real-stack -- credential-containment.spe
 Low-level Playwright configs require an active supervisor lease; overriding
 baseURL/project/environment does not authorize an external target.
 
+### Initial organization installation proof
+
+Use a fresh closed-registration fixture for the first account and organization:
+
+```sh
+pnpm stand e2e --lane real-stack --fixture organization-setup -- organization-initial-setup.spec.ts
+```
+
+This fixture disables public signup and self-service organization creation.
+It runs the compiled setup command in the owned API runtime image.
+The existing password-recovery flow generates and consumes the actual rendered email link.
+A test-only replacement for the mock transport sends fake-recipient mail to an internal collector container.
+The collector has no published port or volume. It retains at most1MiB in memory for five minutes.
+The admitted helper consumes each message once through the pinned owned container.
+Tokens never enter test attachments, trace, screenshots, logs or command arguments.
+This fixture uses only the list reporter with API-step printing disabled.
+HTML/blob reports retain navigation URLs even without traces, so they are not enabled here.
+The production email provider and environment contract contain no capture feature.
+Each run owns its database, images and cleanup. It cannot reuse an owner preview.
+
+The fixed-shop example uses `--fixture organization-shop` on a fresh Docker E2E
+instead: buyer signup stays enabled and self-service organization creation is disabled.
+It has no mail collector or initial-account mutation helper access.
+
+<!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_START -->
+
+Test the same lifecycle through the HTTPS Console with:
+
+```sh
+pnpm stand e2e --lane console-real-stack --fixture organization-setup -- console-organization-setup.spec.ts
+```
+
+For manual initial-setup acceptance, prepare a separate fresh preview:
+
+```sh
+pnpm stand preview --id initial-organization --profile organization-establishment
+```
+
+This preview keeps demo registration available and disables self-service organization creation.
+It prepares the usual two demo accounts and marks only the recorded demo USER mailbox as confirmed.
+This is demo data, not proof of production email delivery. The isolated test above supplies that proof.
+In Console, open **Organizations → First organization**, enter `demo.user@preview.amcore.test`, and select **Continue**.
+The next step explains that this demo account has already confirmed its email. Enter the organization details,
+continue to confirmation, then select **Create organization**. The operator receives no organization membership automatically.
+Refreshing this preview preserves the completed setup and does not restore removed access.
+Use the ordinary default preview on a separate ID to inspect self-service creation.
+
+<!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_END -->
+
+For self-service creation acceptance, use
+`pnpm stand preview --id organization-creation --profile organization-creation`.
+This opens and cancels the new form without creating an organization for the reviewer.
+
 The web package's `test:e2e` and `test:e2e:real-stack` commands delegate to
 these managed lanes.
 

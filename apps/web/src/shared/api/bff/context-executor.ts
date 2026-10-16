@@ -1,6 +1,7 @@
 import {
   invitationOperationIdSchema,
   isOrganizationContextId,
+  organizationCreationIdSchema,
   serializedJsonBytes,
 } from '@amcore/shared'
 import type { ZodType } from 'zod'
@@ -30,6 +31,7 @@ interface ContextOperationBase {
   readonly responseBytes?: number
   readonly requestBytes?: number
   readonly invitationOperationId?: string
+  readonly organizationCreationId?: string
   readonly timeoutMs?: 10000 | 15000
 }
 export type ContextOperation<T> = ContextOperationBase &
@@ -77,6 +79,11 @@ export async function executeContextOperation<T>(
   )
     throw new ContextRequestError(400, 'BAD_REQUEST')
   validateExpectedContextSession(input.expectedSession)
+  if (
+    operation.organizationCreationId !== undefined &&
+    !organizationCreationIdSchema.safeParse(operation.organizationCreationId).success
+  )
+    throw new ContextRequestError(400, 'BAD_REQUEST')
   return withinContextDeadline(
     input.signal,
     async (signal) => {
@@ -98,6 +105,8 @@ export async function executeContextOperation<T>(
       if (operation.body !== undefined) headers.set('content-type', 'application/json')
       if (operation.invitationOperationId)
         headers.set('x-invitation-operation-id', operation.invitationOperationId)
+      if (operation.organizationCreationId)
+        headers.set('x-organization-creation-id', operation.organizationCreationId)
       const response = await (deps.fetch ?? fetch)(url, {
         method: operation.method,
         headers,

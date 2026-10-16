@@ -1,7 +1,7 @@
 # Product administration foundation
 
 AMCore supplies an Organizations selector and read-only organization overview for
-signed-in members, plus a [members and role-assignment page](organization-members.md)
+signed-in members, explicit self-service organization creation when enabled, plus a [members and role-assignment page](organization-members.md)
 and [invitation management](invitations.md) for members with full TeamAccess.
 
 This product surface is independent of the [Operations Console](../operations-console/README.md), which is restricted to
@@ -23,6 +23,11 @@ recipients use a separate sign-in, verification and explicit-consent journey.
 See the [invitation API](../auth/invites.md) for contracts and upgrade requirements. See the
 [capability catalogue and access hints](../auth/capability-catalogue.md) for the
 separate discovery, actor and record contracts.
+
+[Organization establishment](organization-establishment.md) covers independent signup/creation
+policies, trusted first-ADMIN setup, the production command, Console controls and
+recovery. Registration alone never creates staff membership. Unresolved creation
+recovery takes priority over automatic opening of a single membership.
 
 ## Connect the ready pages
 

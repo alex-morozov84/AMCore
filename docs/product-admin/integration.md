@@ -292,3 +292,46 @@ This small fixture demonstrates composition, not a complete replacement manager.
 For your product, add your own search/paging, complete-set draft review and
 confirmation UI while retaining the headless operation's identity, generation
 and recovery semantics. See [invitation reuse](invitations.md#reuse-with-your-own-design).
+
+## Fixed internal organization for a shop
+
+Use a server-owned immutable organization ID returned by trusted initial setup.
+The product can keep buyer registration enabled and self-service company creation
+disabled. Buyers remain personal accounts without staff membership.
+
+A custom server mount reads safe admission through `readOrganizationBootstrap`,
+then calls `readOrganizationContext(configuredId, {headers,expectedSession})`.
+Require current membership and `canManageTeamAccess` before rendering team tools.
+Redirect missing sessions through `redirectToLogin`; conceal denied/missing targets
+with `notFound`; let infrastructure errors reach the error boundary.
+Never infer the target from the first membership or accept it from buyer input.
+
+Compose the public member/role hooks in a custom page without the organization
+frame, selector, company heading or all-organizations links. The API still checks
+current membership and authority for every team operation. Hiding company UI does
+not remove the organization model or grant employee access to customers.
+
+The executable example creates a separate sanitized source fixture:
+
+```sh
+node scripts/fixtures/organization-shop-headless.mjs
+# Optional combined projection: single Russian locale, no Console/Storybook/progress.
+node scripts/fixtures/organization-shop-headless.mjs --projected
+```
+
+The projected example mounts `/shop-team` without a locale prefix; the default
+example mounts it under each supported locale. It keeps the generic backend
+organization API and compiled setup command when the frontend Console is removed.
+Its `organization-shop` test fixture enables buyer registration and disables
+self-service organization creation; it proves that a signed-in buyer cannot create a company.
+The shop browser fixture checks backend authentication, staff role editing,
+and server denial for buyers and removed staff. The dedicated initial-setup
+fixture proves the compiled command and actual mailbox confirmation without Console.
+
+The helper prints the exact install and managed E2E commands. Its server-only
+`SHOP_ORGANIZATION_ID` is a deliberately fixed test identity. In your product,
+replace it with the ID recorded during your installation. Its tests show an ADMIN
+using the headless member editor, a buyer denied by the server, and removed staff
+losing access with their existing login. No turnkey shop or new initializer mode
+is supplied. See [establishment](organization-establishment.md) for initial setup
+prerequisites, account proof, retention and recovery.

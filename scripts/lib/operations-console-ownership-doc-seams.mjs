@@ -16,6 +16,24 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
   entry(
+    'console.establishment-guide',
+    'docs/product-admin/organization-establishment.md',
+    block(
+      '<!-- AMCORE_CONSOLE_ESTABLISHMENT_START -->',
+      '<!-- AMCORE_CONSOLE_ESTABLISHMENT_END -->'
+    ),
+    ['../operations-console/']
+  ),
+  entry(
+    'console.establishment-stand-guide',
+    'docs/operations/local-stands.md',
+    block(
+      '<!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_START -->',
+      '<!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_END -->'
+    ),
+    ['console-real-stack']
+  ),
+  entry(
     'console.queue-guide',
     'apps/api/src/infrastructure/queue/README.md',
     block('<!-- AMCORE_CONSOLE_QUEUE_GUIDE_START -->', '<!-- AMCORE_CONSOLE_QUEUE_GUIDE_END -->'),

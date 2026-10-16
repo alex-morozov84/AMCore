@@ -6,6 +6,10 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 
 ---
 
+[Organization establishment](../product-admin/organization-establishment.md) separates
+personal signup, explicit company creation, trusted first organization ADMIN and
+first platform SUPER_ADMIN access.
+
 ## What's included
 
 | Topic                                                 | What it covers                                                                     |

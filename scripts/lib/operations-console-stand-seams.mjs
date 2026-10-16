@@ -16,6 +16,10 @@ const entry = (path, key) => ({
 })
 
 export const operationsConsoleStandSeams = [
+  entry('scripts/stand/config.mjs', 'ESTABLISHMENT_POLICY'),
+  entry('scripts/stand/setup-command.mjs', 'ESTABLISHMENT_DIAGNOSTICS'),
+  entry('scripts/stand/preview.mjs', 'ESTABLISHMENT_PROFILE'),
+  entry('scripts/stand/preview.mjs', 'ESTABLISHMENT_FIXTURE'),
   entry('scripts/stand/config.mjs', 'NOTIFICATION_ENV'),
   entry('scripts/stand/config.mjs', 'NOTIFICATION_PROVIDER'),
   entry('scripts/stand/config.mjs', 'NOTIFICATION_SERVICE'),
