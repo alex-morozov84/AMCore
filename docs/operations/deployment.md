@@ -129,6 +129,26 @@ cannot authorize public HTTP hosts. Both settings are forwarded to the web servi
 See [cookie policy](../frontend/browser-security-and-csp.md#invitation-browser-proof)
 and [invitation scenarios](../product-admin/invitations.md).
 
+### Search-engine indexing
+
+The web app is closed to search engines unless you open it: every response carries
+`X-Robots-Tag: noindex, nofollow`. Open only the production deployment of a product with public
+pages by setting these on its web service, and leave them unset everywhere else:
+
+```bash
+WEB_SEO_INDEXING=enabled
+WEB_SITE_ORIGIN=https://shop.example.com     # also listed in WEB_TRUSTED_ORIGINS
+```
+
+Both are read at run time, so the image you promote from staging to production (the same
+immutable digest) is closed on staging and open in production without a rebuild. With `enabled`,
+`WEB_SITE_ORIGIN` must be a canonical `https` origin that is also in `WEB_TRUSTED_ORIGINS`, or the
+web service stops at start-up. Only requests whose `Host` equals that origin's host are open;
+aliases, preview hosts, raw IPs and the Console host stay closed. Make your reverse proxy pass the
+public `Host` unchanged (the bundled Caddy profile does) and keep the API's `FRONTEND_URL` equal to
+`WEB_SITE_ORIGIN`. How to make pages public and how to verify the result:
+[Search-engine indexing](../frontend/seo.md).
+
 ### Upgrades (new migrations in a release)
 
 The `migrate` service is one-shot; `docker compose up` does not re-run a container

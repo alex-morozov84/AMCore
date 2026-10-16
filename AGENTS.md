@@ -319,6 +319,17 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   are supported for local component CSS under the same rule, with camelCase
   class names; `app/globals.css` is exempt because that is where tokens are
   declared.
+- **Frontend indexing — closed by default; decide public or private before adding a
+  page.** A private page needs nothing: the whole app, `/api/*` and the Console are
+  `noindex`. A public page builds its metadata only with `buildPageMetadata()` from
+  `@/shared/lib/seo/page-metadata` and is listed in `src/_app/seo/public-pages.ts`
+  (the list the sitemap is built from). **Never write a `robots` metadata key**
+  anywhere else: metadata merges shallowly, so it can silently reopen indexing, and
+  a static test fails on it. Keep the indexing hook in `proxy.ts`, the routing
+  option `alternateLinks: false` and `htmlLimitedBots` as they are unless you have
+  read `docs/frontend/seo.md`. In the root `generateMetadata` do not use `locale` or
+  `params` beyond the existing `getTranslations` call (the single-locale scaffold
+  transform deletes them).
 - **Frontend i18n — English base, Russian second, both live.** Routes sit under
   `[locale]` with an explicit prefix (`/en/...`, `/ru/...`). Four rules an agent
   will otherwise break:

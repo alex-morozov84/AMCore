@@ -324,6 +324,11 @@ services:
       # STORAGE_PUBLIC_BASE_URL (the default matches the local driver served by the api service).
       # A set but unusable value stops the web service at start-up.
       WEB_PUBLIC_FILES_ORIGIN: ${WEB_PUBLIC_FILES_ORIGIN:-http://localhost:5002}
+      # Search-engine indexing is closed unless both are set (docs/frontend/seo.md). Read at run
+      # time: the same image is closed on staging and open in production. Enabled requires an
+      # https WEB_SITE_ORIGIN that is also in WEB_TRUSTED_ORIGINS, or the web service stops.
+      WEB_SEO_INDEXING: ${WEB_SEO_INDEXING:-}
+      WEB_SITE_ORIGIN: ${WEB_SITE_ORIGIN:-}
       # Trusted inbound client-IP header (ADR-072) — disabled by default
       # (empty), matching apps/web's own safe default. Only set this when an
       # edge proxy/LB sits directly in front of THIS web container and

@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cooperative cancellation, one linked text-only retry for proven transient
   failures, and 30-day cleanup of never-started cancelled or expired runs.
   Archived identities preserve owner replay and transcript lineage.
+- The web app is closed to search engines by default and ships what a product with public pages
+  needs to open them. **Behaviour change:** every proxied page response now carries
+  `X-Robots-Tag: noindex, nofollow` unless `WEB_SEO_INDEXING=enabled` and `WEB_SITE_ORIGIN` is set
+  and the request `Host` equals that origin; `/api/*` and the Console carry the header always, and
+  pages are `noindex` by default. New: `buildPageMetadata` (canonical, hreflang, Open Graph,
+  Twitter), the public-page list that feeds `sitemap.xml`, `robots.txt`, a JSON-LD component and
+  the guide `docs/frontend/seo.md`. next-intl's hreflang `Link` header is replaced by page
+  metadata and sitemap alternates, and Googlebot now receives page metadata in `<head>`. The two
+  variables are read at run time, so one image is closed on staging and open in production.
 
 ### Changed
 
