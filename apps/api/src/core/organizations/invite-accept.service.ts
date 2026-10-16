@@ -10,16 +10,17 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
+import { AppException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
 import {
   type InvitationCredential,
   invitationCredentialHint,
   invitationSecretHash,
-} from '../invitations/invitation-credential'
-import { InvitationLiveSessionService } from '../invitations/invitation-live-session.service'
-import { currentInvitationIntent } from '../invitations/invitation-role-intent'
+} from '../invitations/invitation-credential.js'
+import { InvitationLiveSessionService } from '../invitations/invitation-live-session.service.js'
+import { currentInvitationIntent } from '../invitations/invitation-role-intent.js'
 
 import {
   invalidInvitation,
@@ -27,7 +28,7 @@ import {
   lockInvitation,
   lockInvitationOrg,
   lockInvitationUser,
-} from './invitation-locks'
+} from './invitation-locks.js'
 import {
   completeInvitationOperation,
   INVITATION_RETENTION_MS,
@@ -35,13 +36,11 @@ import {
   lockInvitationOperation,
   parseInvitationOperationId,
   replayInvitationOperation,
-} from './invitation-operation'
-import { invitationPostCommit } from './invitation-post-commit'
-import { invitationTransaction } from './invitation-transaction'
-import { InviteAcceptLimiterService } from './invite-accept-limiter.service'
-import { OrganizationsService } from './organizations.service'
-
-import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
+} from './invitation-operation.js'
+import { invitationPostCommit } from './invitation-post-commit.js'
+import { invitationTransaction } from './invitation-transaction.js'
+import { InviteAcceptLimiterService } from './invite-accept-limiter.service.js'
+import { OrganizationsService } from './organizations.service.js'
 
 @Injectable()
 export class InviteAcceptService {

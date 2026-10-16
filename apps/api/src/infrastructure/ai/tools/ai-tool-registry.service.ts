@@ -5,8 +5,8 @@ import {
   AI_TOOL_ID_PATTERN,
   AI_TOOL_REGISTRY_MAX_SIZE,
   toolRequiresApproval,
-} from './ai-tool.constants'
-import { AI_TOOLS, type AiTool, type AiToolDescriptor } from './ai-tool.types'
+} from './ai-tool.constants.js'
+import { AI_TOOLS, type AiTool, type AiToolDescriptor } from './ai-tool.types.js'
 
 /**
  * Code-owned tool registry (Track C — ADR-054, Arc E, worker role only). It validates the registered

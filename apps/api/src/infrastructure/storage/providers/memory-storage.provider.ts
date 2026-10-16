@@ -3,7 +3,7 @@ import { Readable } from 'node:stream'
 
 import { Injectable } from '@nestjs/common'
 
-import { normalizeObjectKey } from '../object-key'
+import { normalizeObjectKey } from '../object-key.js'
 import {
   type CopyObjectInput,
   type FileInfo,
@@ -17,10 +17,10 @@ import {
   type StorageProvider,
   type UploadInput,
   type UploadResult,
-} from '../storage.interface'
-import { assertSameNamespace, resolveUploadVisibility } from '../storage-namespace'
+} from '../storage.interface.js'
+import { assertSameNamespace, resolveUploadVisibility } from '../storage-namespace.js'
 
-import { bufferFromBody } from './body.util'
+import { bufferFromBody } from './body.util.js'
 
 interface StoredObject {
   body: Buffer

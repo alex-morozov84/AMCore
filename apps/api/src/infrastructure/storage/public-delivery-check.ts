@@ -1,7 +1,7 @@
-import type { StorageProvider } from './storage.interface'
-import type { AnonymousRead } from './storage-anonymous-read'
-import { PUBLIC_KEY_PREFIX } from './storage-namespace'
-import { buildDiagnosticUrl, type PublicUrlForm } from './storage-public-url'
+import type { StorageProvider } from './storage.interface.js'
+import type { AnonymousRead } from './storage-anonymous-read.js'
+import { PUBLIC_KEY_PREFIX } from './storage-namespace.js'
+import { buildDiagnosticUrl, type PublicUrlForm } from './storage-public-url.js'
 
 /** Fixed bytes. The two canaries differ, so one can never be mistaken for the other. */
 export const PUBLIC_CANARY_BYTES = Buffer.from('amcore-public-canary-v1')

@@ -1,7 +1,7 @@
 import type { Redis } from 'ioredis'
 import { z } from 'zod'
 
-import { QUEUE_CONTROL_LUA } from './queue-control.lua'
+import { QUEUE_CONTROL_LUA } from './queue-control.lua.js'
 
 export interface QueueControlCommand {
   readonly prefix: string

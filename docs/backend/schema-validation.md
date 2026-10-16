@@ -89,9 +89,9 @@ return-type fixture checks a valid return and the specific compilation diagnosti
 for an invalid return. The OpenAPI E2E suite checks the public route inventory,
 success bodies, security, multipart requests and component references.
 
-NestJS 12 ships ESM packages. AMCore retains its CommonJS API on the declared
-Node floor, which supports synchronous `require(esm)`. Jest remains the existing
-runner; a runner migration is independent work. Framework upgrades also need
+NestJS 12 and the API use ESM on the declared Node floor.
+See [API build and ESM runtime](api-build.md). Jest remains the existing
+runner; unit transformation deliberately retains CommonJS. Framework upgrades also need
 role boot, worker admission and shutdown checks because lifecycle ordering changes.
 
 SWC emits legacy decorator metadata for API unit and E2E tests. Type checking

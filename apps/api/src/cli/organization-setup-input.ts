@@ -9,9 +9,9 @@ import {
   organizationPrepareAccountSchema,
 } from '@amcore/shared'
 
-import { databaseEnv, databaseSslMode } from '../env/schema/database.env'
-import { organizationsEnv } from '../env/schema/organizations.env'
-import { runtimeEnv } from '../env/schema/runtime.env'
+import { databaseEnv, databaseSslMode } from '../env/schema/database.env.js'
+import { organizationsEnv } from '../env/schema/organizations.env.js'
+import { runtimeEnv } from '../env/schema/runtime.env.js'
 
 type SetupCommand =
   | { command: 'status' }

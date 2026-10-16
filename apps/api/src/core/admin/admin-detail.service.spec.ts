@@ -35,7 +35,9 @@ describe('AdminDetailService', () => {
     const prisma = {
       $transaction: jest.fn((run: (client: typeof tx) => unknown) => run(tx)),
     } as unknown as PrismaService
-    const result = await new AdminDetailService(prisma).user(id, {
+    const result = await new AdminDetailService(prisma, {
+      getPublicUrl: (key: string) => `https://files.test/${key}`,
+    } as never).user(id, {
       page: 2,
       limit: 10,
       search: undefined,
@@ -82,7 +84,9 @@ describe('AdminDetailService', () => {
     const prisma = {
       $transaction: jest.fn((run: (client: typeof tx) => unknown) => run(tx)),
     } as unknown as PrismaService
-    const result = await new AdminDetailService(prisma).user(id, {
+    const result = await new AdminDetailService(prisma, {
+      getPublicUrl: (key: string) => `https://files.test/${key}`,
+    } as never).user(id, {
       page: 1,
       limit: 10,
       search: 'North%',
@@ -111,7 +115,9 @@ describe('AdminDetailService', () => {
     const prisma = {
       $transaction: jest.fn((run: (client: typeof tx) => unknown) => run(tx)),
     } as unknown as PrismaService
-    const result = await new AdminDetailService(prisma).organization(id, {
+    const result = await new AdminDetailService(prisma, {
+      getPublicUrl: (key: string) => `https://files.test/${key}`,
+    } as never).organization(id, {
       page: 1,
       limit: 20,
       search: '100%',
@@ -137,7 +143,9 @@ describe('AdminDetailService', () => {
       $transaction: jest.fn((run: (client: typeof tx) => unknown) => run(tx)),
     } as unknown as PrismaService
     await expect(
-      new AdminDetailService(prisma).user(id, {
+      new AdminDetailService(prisma, {
+        getPublicUrl: (key: string) => `https://files.test/${key}`,
+      } as never).user(id, {
         page: 1,
         limit: 20,
         search: undefined,

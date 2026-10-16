@@ -1,14 +1,14 @@
 import type { OrganizationSetupStatus } from '@amcore/shared'
 
-import { canonicalAdmin } from './canonical-admin'
-import { establishmentError } from './establishment-error'
+import type { Prisma } from '../../generated/prisma/client.js'
+
+import { canonicalAdmin } from './canonical-admin.js'
+import { establishmentError } from './establishment-error.js'
 import {
   INITIAL_ORGANIZATION_KEY,
   readEstablishmentResult,
   setupCompletion,
-} from './establishment-result'
-
-import type { Prisma } from '@/generated/prisma/client'
+} from './establishment-result.js'
 
 /** Read classifier uses one joined completion snapshot and never locks existing parents. */
 export async function readSetupState(

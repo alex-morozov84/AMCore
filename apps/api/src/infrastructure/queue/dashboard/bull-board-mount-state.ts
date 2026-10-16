@@ -1,4 +1,4 @@
-import { isBullBoardEnabled } from './bull-board-mount-gate'
+import { isBullBoardEnabled } from './bull-board-mount-gate.js'
 
 /** Why the Board is (not) mounted: a closed set, never derived from a later env read or an HTTP 404. */
 export type BullBoardMountReason = 'mounted' | 'disabled_in_production' | 'worker_role'

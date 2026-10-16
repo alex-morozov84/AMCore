@@ -17,8 +17,8 @@ import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Injectable } from '@nestjs/common'
 
-import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key'
-import { S3_DELETE_OBJECTS_MAX_KEYS } from '../storage.constants'
+import { InvalidObjectKeyError, normalizeObjectKey } from '../object-key.js'
+import { S3_DELETE_OBJECTS_MAX_KEYS } from '../storage.constants.js'
 import {
   type CopyObjectInput,
   type FileMetadata,
@@ -33,7 +33,7 @@ import {
   type StorageProvider,
   type UploadInput,
   type UploadResult,
-} from '../storage.interface'
+} from '../storage.interface.js'
 import {
   assertSameNamespace,
   classifyListPrefix,
@@ -41,11 +41,11 @@ import {
   PUBLIC_KEY_PREFIX,
   resolveUploadVisibility,
   visibilityOf,
-} from '../storage-namespace'
-import { buildBucketRootUrl, buildPublicRouteUrl } from '../storage-public-url'
+} from '../storage-namespace.js'
+import { buildBucketRootUrl, buildPublicRouteUrl } from '../storage-public-url.js'
 
-import { bufferFromBody } from './body.util'
-import { createS3Client, type S3ClientSettings } from './s3-client.factory'
+import { bufferFromBody } from './body.util.js'
+import { createS3Client, type S3ClientSettings } from './s3-client.factory.js'
 
 /** How a public key becomes readable. `api` is served by the public route, not by this driver. */
 export type S3PublicDelivery = 'external' | 'acl' | 'api'

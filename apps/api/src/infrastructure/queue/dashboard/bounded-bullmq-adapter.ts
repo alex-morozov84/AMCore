@@ -5,11 +5,11 @@ import { z } from 'zod'
 
 import { workJobIdSchema, workListQuerySchema } from '@amcore/shared'
 
-import { readBoundedJobPage } from '../../background-work/bounded-job-reader'
-import { decodeBoundedJob } from '../../background-work/bounded-job-reader'
-import { ControlConnection } from '../../background-work/control-connection'
-import { JOB_READ_GUARD_LUA } from '../../background-work/scripts/job-read.lua'
-import { readJobWindow } from '../../background-work/scripts/job-window'
+import { readBoundedJobPage } from '../../background-work/bounded-job-reader.js'
+import { decodeBoundedJob } from '../../background-work/bounded-job-reader.js'
+import { ControlConnection } from '../../background-work/control-connection.js'
+import { JOB_READ_GUARD_LUA } from '../../background-work/scripts/job-read.lua.js'
+import { readJobWindow } from '../../background-work/scripts/job-window.js'
 
 const COUNT_STATES = [
   'wait',

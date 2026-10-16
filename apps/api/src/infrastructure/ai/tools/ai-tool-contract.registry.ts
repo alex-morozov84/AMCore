@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { z } from 'zod'
 
+import { canonicalJsonEqual, canonicalJsonHash } from '../../../common/utils/canonical-json.js'
+
 import {
   AI_TOOL_ID_MAX_LENGTH,
   AI_TOOL_ID_PATTERN,
   AI_TOOL_REGISTRY_MAX_SIZE,
-} from './ai-tool.constants'
-import type { AiToolAuthority, AiToolContract, AiToolIntent } from './ai-tool.types'
-
-import { canonicalJsonEqual, canonicalJsonHash } from '@/common/utils/canonical-json'
+} from './ai-tool.constants.js'
+import type { AiToolAuthority, AiToolContract, AiToolIntent } from './ai-tool.types.js'
 
 export interface RegisteredToolContract {
   contract: AiToolContract

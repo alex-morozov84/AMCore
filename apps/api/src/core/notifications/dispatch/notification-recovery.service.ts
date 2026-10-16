@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { NotificationDispatchService } from './notification-dispatch.service'
+import { NotificationDispatchService } from './notification-dispatch.service.js'
 
 /**
  * Worker-only recovery poller (ADR-052). Runs on **every** worker replica — deliberately

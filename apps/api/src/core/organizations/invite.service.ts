@@ -9,13 +9,13 @@ import type {
   RequestPrincipal,
 } from '@amcore/shared'
 
-import type { InvitationCredential } from '../invitations/invitation-credential'
+import type { InvitationCredential } from '../invitations/invitation-credential.js'
 
-import type { InvitationActor } from './invitation-actor'
-import { InvitationCommandService } from './invitation-command.service'
-import { InvitationQueryService } from './invitation-query.service'
-import { InviteAcceptService } from './invite-accept.service'
-import { InviteRevokeService } from './invite-revoke.service'
+import type { InvitationActor } from './invitation-actor.js'
+import { InvitationCommandService } from './invitation-command.service.js'
+import { InvitationQueryService } from './invitation-query.service.js'
+import { InviteAcceptService } from './invite-accept.service.js'
+import { InviteRevokeService } from './invite-revoke.service.js'
 
 /** Public application facade; each lifecycle responsibility has its own service. */
 @Injectable()

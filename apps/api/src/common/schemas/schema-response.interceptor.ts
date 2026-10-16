@@ -9,9 +9,9 @@ import { Reflector } from '@nestjs/core'
 import { mergeMap } from 'rxjs'
 import type { z } from 'zod'
 
-import { AppException } from '../exceptions/domain/app.exception'
+import { AppException } from '../exceptions/domain/app.exception.js'
 
-import { RESPONSE_SCHEMA } from './schema-response'
+import { RESPONSE_SCHEMA } from './schema-response.js'
 
 /** Validate the entire response, including arrays, primitives and null. */
 @Injectable()

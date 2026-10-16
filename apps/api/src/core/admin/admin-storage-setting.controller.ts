@@ -8,20 +8,19 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
-import { SystemRoles } from '../auth/decorators/system-roles.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator.js'
+import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 
-import { AdminStorageSettingService } from './admin-storage-setting.service'
+import { AdminStorageSettingService } from './admin-storage-setting.service.js'
 import {
   StorageProbeSettingResponseDto,
   StorageProbeSettingUpdateDto,
-} from './dto/storage-probe-setting.dto'
-import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard'
-
-import { RATE_LIMIT_POLICIES, RateLimit } from '@/infrastructure/throttling'
+} from './dto/storage-probe-setting.dto.js'
+import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard.js'
 
 @ApiTags('admin')
 @ApiBearerAuth()

@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
 
-import { AppException } from '../common/exceptions'
+import { AppException } from '../common/exceptions/index.js'
 
 /** Classify for budgets only: never rewrite routing or dynamic identifiers. */
 function invitationBudgetPath(url: string): string {

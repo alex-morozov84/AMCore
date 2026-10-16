@@ -197,6 +197,11 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 
 ## Code conventions
 
+- **API runtime uses ESM.** Use explicit `.js` relative imports and `/index.js`
+  barrel entries in API runtime modules. Keep the maintained Nest CLI + SWC
+  development path and required native checks. See `docs/backend/api-build.md`
+  for build order, operator commands and manual restart boundaries.
+
 - **Validation: Zod everywhere, never `class-validator`.** Schemas live in
   `packages/shared` and are **language-agnostic — never add a literal `message`**.
   A schema-level message outranks the frontend's per-parse error map (Zod

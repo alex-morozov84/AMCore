@@ -420,6 +420,8 @@ export {
   adminOverviewFilesystemSchema,
   adminOverviewMemorySchema,
   adminOverviewPoolSchema,
+  type AdminOverviewPublicDelivery,
+  adminOverviewPublicDeliverySchema,
   type AdminOverviewResources,
   adminOverviewResourcesSchema,
   type AdminOverviewResponse,

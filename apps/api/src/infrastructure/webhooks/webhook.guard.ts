@@ -3,13 +3,13 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import type { Request } from 'express'
 
-import { VERIFY_WEBHOOK_METADATA_KEY } from './webhook.constants'
-import type { WebhookProvider } from './webhook.types'
-import { createWebhookException } from './webhook-errors'
-import { WebhookProviderService } from './webhook-provider.service'
-import { WebhookReplayService } from './webhook-replay.service'
+import { EnvService } from '../../env/env.service.js'
 
-import { EnvService } from '@/env/env.service'
+import { VERIFY_WEBHOOK_METADATA_KEY } from './webhook.constants.js'
+import type { WebhookProvider } from './webhook.types.js'
+import { createWebhookException } from './webhook-errors.js'
+import { WebhookProviderService } from './webhook-provider.service.js'
+import { WebhookReplayService } from './webhook-replay.service.js'
 
 @Injectable()
 export class WebhookGuard implements CanActivate {

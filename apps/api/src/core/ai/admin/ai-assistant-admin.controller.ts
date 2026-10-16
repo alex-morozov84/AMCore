@@ -9,14 +9,14 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
-import { RequireFreshAuth } from '../../auth/decorators/require-fresh-auth.decorator'
-import { SystemRoles } from '../../auth/decorators/system-roles.decorator'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling/index.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
+import { RequireFreshAuth } from '../../auth/decorators/require-fresh-auth.decorator.js'
+import { SystemRoles } from '../../auth/decorators/system-roles.decorator.js'
 
-import { AiAssistantAdminService } from './ai-assistant-admin.service'
+import { AiAssistantAdminService } from './ai-assistant-admin.service.js'
 import {
   AiAssistantListQueryDto,
   AiAssistantListResponseDto,
@@ -24,7 +24,7 @@ import {
   CreateAiAssistantDto,
   PublishAiAssistantVersionDto,
   UpdateAiAssistantDto,
-} from './dto/ai-assistant-admin.dto'
+} from './dto/ai-assistant-admin.dto.js'
 
 /**
  * Assistant-registry admin surface (Track C — ADR-054, Arc F.1) — web role, **SUPER_ADMIN only**.

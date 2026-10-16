@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 
-import type { SettingDefinition } from './setting-definition'
+import type { SettingDefinition } from './setting-definition.js'
 
 export function testDefinition<T>(
   key: string,

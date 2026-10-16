@@ -1,5 +1,5 @@
-import type { AiGenerateMessage } from '../gateway/ai-gateway.types'
-import { wrapUntrusted } from '../guardrails/trust-boundary.builder'
+import type { AiGenerateMessage } from '../gateway/ai-gateway.types.js'
+import { wrapUntrusted } from '../guardrails/trust-boundary.builder.js'
 
 /**
  * One completed tool round reconstructed from a SUCCEEDED `AiToolInvocation` and its ordering

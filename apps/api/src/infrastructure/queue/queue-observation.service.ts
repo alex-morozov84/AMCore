@@ -3,9 +3,9 @@ import type { Queue } from 'bullmq'
 
 import type { AdminQueue, AdminQueueAge, AdminQueueCounts } from '@amcore/shared'
 
-import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant'
-import { QueueService } from './queue.service'
-import { isOnBoard } from './queue-inventory'
+import { QUEUE_INVENTORY, type QueueDescriptor } from './constants/queue-inventory.constant.js'
+import { QueueService } from './queue.service.js'
+import { isOnBoard } from './queue-inventory.js'
 
 /** Absolute budget of one collection unit; callers never wait longer. */
 export const QUEUE_OBSERVATION_DEADLINE_MS = 1000

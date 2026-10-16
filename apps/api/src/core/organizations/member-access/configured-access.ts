@@ -6,17 +6,17 @@ import {
   configuredInvariants,
 } from '@amcore/shared'
 
-import type { AbilityPermission } from '../../auth/casl/permission-normalization'
+import type { AbilityPermission } from '../../auth/casl/permission-normalization.js'
 
-import { type AccessOperationBudget, AccessUnavailableError } from './access-budget'
-import type { ItemSpec } from './access-capabilities'
-import type { StoredPolicyRule } from './access-facts'
-import { type Prerequisite, prerequisiteCheck } from './access-prerequisites'
-import { conditionKeys } from './access-rule-utils'
-import { roleRefs } from './access-sources'
-import { areaLimits, buildAreas, classifier, denyLimits } from './configured-areas'
-import { type Masking, maskRules, type Scan, scanRules } from './configured-scan'
-import { collectSources } from './configured-sources'
+import { type AccessOperationBudget, AccessUnavailableError } from './access-budget.js'
+import type { ItemSpec } from './access-capabilities.js'
+import type { StoredPolicyRule } from './access-facts.js'
+import { type Prerequisite, prerequisiteCheck } from './access-prerequisites.js'
+import { conditionKeys } from './access-rule-utils.js'
+import { roleRefs } from './access-sources.js'
+import { areaLimits, buildAreas, classifier, denyLimits } from './configured-areas.js'
+import { type Masking, maskRules, type Scan, scanRules } from './configured-scan.js'
+import { collectSources } from './configured-sources.js'
 
 export interface ConfiguredContext {
   /** The whole policy after validation, interpolation and ordering. */

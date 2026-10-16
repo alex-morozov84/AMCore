@@ -12,12 +12,11 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
-import { AppException, ForbiddenException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { AppException, ForbiddenException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { assignableRolesWhere } from './role-assignability-policy'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { assignableRolesWhere } from './role-assignability-policy.js'
 
 const summary = { id: true, name: true, description: true, isSystem: true } as const
 const user = { id: true, name: true, email: true } as const

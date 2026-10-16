@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule'
 
-import { CleanupModule } from './cleanup.module'
+import { GeoipUpdaterModule } from '../geoip/geoip-updater.module.js'
 
-import { GeoipUpdaterModule } from '@/infrastructure/geoip/geoip-updater.module'
+import { CleanupModule } from './cleanup.module.js'
 
 /**
  * Scheduler (ADR-041). Adds `@nestjs/schedule`'s `forRoot()` — the explorer that

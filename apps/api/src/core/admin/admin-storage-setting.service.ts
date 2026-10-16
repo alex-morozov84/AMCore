@@ -6,11 +6,11 @@ import type {
   StorageProbeSettingUpdate,
 } from '@amcore/shared'
 
-import { decodeSetting } from '@/infrastructure/settings/setting-codec'
-import { SettingRepository } from '@/infrastructure/settings/setting-repository'
-import { SettingWriter } from '@/infrastructure/settings/setting-writer'
-import { StorageSettingDefinition } from '@/infrastructure/settings/storage-setting.definition'
-import { StorageProbeService } from '@/infrastructure/storage/storage-probe.service'
+import { decodeSetting } from '../../infrastructure/settings/setting-codec.js'
+import { SettingRepository } from '../../infrastructure/settings/setting-repository.js'
+import { SettingWriter } from '../../infrastructure/settings/setting-writer.js'
+import { StorageSettingDefinition } from '../../infrastructure/settings/storage-setting.definition.js'
+import { StorageProbeService } from '../../infrastructure/storage/storage-probe.service.js'
 
 @Injectable()
 export class AdminStorageSettingService {

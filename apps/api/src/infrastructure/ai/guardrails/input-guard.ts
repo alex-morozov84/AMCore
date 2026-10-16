@@ -1,6 +1,6 @@
-import { GUARDRAIL_BOUNDARY_TAG_PREFIX, GUARDRAIL_INPUT_CATEGORY } from './guardrail.constants'
-import type { GuardInputCategory, GuardResult } from './guardrail.types'
-import { CategoryTally } from './guardrail-result'
+import { GUARDRAIL_BOUNDARY_TAG_PREFIX, GUARDRAIL_INPUT_CATEGORY } from './guardrail.constants.js'
+import type { GuardInputCategory, GuardResult } from './guardrail.types.js'
+import { CategoryTally } from './guardrail-result.js'
 
 /**
  * Deterministic, low-false-positive **input guard** (Track C — ADR-054 / ADR-055, Arc D). Pure and

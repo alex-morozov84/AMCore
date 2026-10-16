@@ -1,12 +1,12 @@
 import { Global, Module } from '@nestjs/common'
 
-import { EnvModule } from '../../env/env.module'
+import { EnvModule } from '../../env/env.module.js'
 
-import { REDIS_CLIENT } from './redis.constants'
-import { RedisConnectionService } from './redis-connection.service'
-import { RedisLockService } from './redis-lock.service'
-import { RedisMutexService } from './redis-mutex.service'
-import { RedisPingMetricsCollector } from './redis-ping-metrics.collector'
+import { REDIS_CLIENT } from './redis.constants.js'
+import { RedisConnectionService } from './redis-connection.service.js'
+import { RedisLockService } from './redis-lock.service.js'
+import { RedisMutexService } from './redis-mutex.service.js'
+import { RedisPingMetricsCollector } from './redis-ping-metrics.collector.js'
 
 @Global()
 @Module({

@@ -2,11 +2,10 @@ import { timingSafeEqual } from 'node:crypto'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
 
-import { invitationSecretHash } from './invitation-credential'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { invitationSecretHash } from './invitation-credential.js'
 
 export interface InvitationHandoffProof {
   attemptId: string

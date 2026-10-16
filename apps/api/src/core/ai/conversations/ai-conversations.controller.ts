@@ -3,12 +3,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 
 import { type AiConversationResponse, AuthType } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
-import { AiConversationResponseDto, CreateAiConversationDto } from '../dto/ai.dto'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
+import { AiConversationResponseDto, CreateAiConversationDto } from '../dto/ai.dto.js'
 
-import { AiConversationService } from './ai-conversation.service'
+import { AiConversationService } from './ai-conversation.service.js'
 
 /**
  * AI conversation surface (Track C — ADR-054, Arc C), bearer-authenticated and owner-scoped. Web

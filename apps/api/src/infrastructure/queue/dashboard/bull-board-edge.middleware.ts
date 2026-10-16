@@ -1,7 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express'
 
-import { applyBoardHeaders } from './bull-board-boundary.middleware'
-import { safeErrorResult } from './bull-board-errors'
+import { applyBoardHeaders } from './bull-board-boundary.middleware.js'
+import { safeErrorResult } from './bull-board-errors.js'
 
 /** CORS answers the board never gives: it is same-origin only (`Cross-Origin-Resource-Policy`). */
 const CORS_HEADERS = [

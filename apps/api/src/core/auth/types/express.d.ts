@@ -1,7 +1,7 @@
 import type { RequestPrincipal } from '@amcore/shared'
 
-import type { AppAbility } from '../casl/ability.factory'
-import type { PrivilegedAdmission } from '../privileged-admission.service'
+import type { AppAbility } from '../casl/ability.factory.js'
+import type { PrivilegedAdmission } from '../privileged-admission.service.js'
 
 /**
  * Extend Express Request type to include auth-related properties

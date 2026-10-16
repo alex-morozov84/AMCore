@@ -30,7 +30,7 @@ describe('UserCacheService', () => {
     emailVerified: true,
     passwordHash: 'hashedPassword',
     name: 'Test User',
-    avatarUrl: null,
+    avatarKey: null,
     avatarGeneration: 0,
     phone: null,
     locale: 'ru',

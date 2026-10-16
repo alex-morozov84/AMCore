@@ -1,17 +1,16 @@
 import { Action, Subject } from '@amcore/shared'
 
-import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults'
-import { CapabilityRegistry } from '../capability-registry.service'
+import type { Organization } from '../../../generated/prisma/client.js'
+import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults.js'
+import { CapabilityRegistry } from '../capability-registry.service.js'
 
 import {
   type AccessCapability,
   defaultCapabilities,
   type PresetTemplate,
-} from './access-capabilities'
-import { type AccessInput } from './access-evaluator'
-import type { StoredPolicyRule } from './access-facts'
-
-import type { Organization } from '@/generated/prisma/client'
+} from './access-capabilities.js'
+import { type AccessInput } from './access-evaluator.js'
+import type { StoredPolicyRule } from './access-facts.js'
 
 export const ORG_ID = 'org-1'
 export const USER_ID = 'user-1'

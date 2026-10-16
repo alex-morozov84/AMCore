@@ -2,17 +2,18 @@ import { HttpStatus } from '@nestjs/common'
 
 import { Action, PermissionErrorCode, Subject, SystemRole } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
+import { AppException } from '../../../common/exceptions/index.js'
 
-import { isEpochMilliseconds, normalizeDateConditions } from './normalize-date-conditions'
+import { isEpochMilliseconds, normalizeDateConditions } from './normalize-date-conditions.js'
 import {
+  isDerivedField,
   isModelSubject,
   MODEL_FIELDS,
   MODEL_SUBJECTS,
   type ModelSubject,
   type ScalarKind,
-} from './permission-model-fields'
-import { prismaQuery } from './prisma-ability'
+} from './permission-model-fields.js'
+import { prismaQuery } from './prisma-ability.js'
 
 type Code = `${PermissionErrorCode}`
 export interface PermissionWriteInput {
@@ -153,7 +154,7 @@ function condition(
         return [key, logicalChild(value, subject, depth, budget)]
       }
       const kind = MODEL_FIELDS[subject][key]
-      if (!kind) fail('PERMISSION_RULE_UNSUPPORTED')
+      if (!kind || isDerivedField(subject, key)) fail('PERMISSION_RULE_UNSUPPORTED')
       return [key, predicate(value, kind!, subject, key)]
     })
   )

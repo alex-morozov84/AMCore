@@ -249,6 +249,10 @@ Call `save({expectedMemberId, expectedAclVersion, roleIds})`; inspect `committed
 `rejected`, `unknown`, `busy` and `retired` outcomes. A committed result includes
 follow-up status. Never turn a failed follow-up into a claimed write rollback.
 
+The account menu and avatar editor have the same kind of fixture:
+`scripts/fixtures/account-avatar-headless.mjs` (see the
+[account menu guide](account-menu-and-profile.md#executed-custom-ui-example)).
+
 The executable `scripts/fixtures/organization-members-headless.mjs` creates a
 separate disposable consumer with a list and inline editor instead of the ready
 table/dialog. `--projected` also selects single-Russian routing, Console disabled

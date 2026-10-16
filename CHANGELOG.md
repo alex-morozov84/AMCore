@@ -30,9 +30,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Storage documentation now has one page per S3-compatible provider with an honest status, a
+  testing guide for `storage:check`, troubleshooting, security and migration guides. Yandex
+  Object Storage was verified on a real account on 2026-10-15 (`external` and `acl` modes, CORS,
+  exposure detection). Publishing a prefix on Yandex needs the bucket public-read flag **and** a
+  policy; the earlier example that showed only the policy was wrong and is replaced. A bucket policy
+  on Yandex also denies the application account and the web console unless the policy allows them.
+
+- Upgrade backend AI provider integration to AI SDK 7 public structured output.
+  **Breaking for provider extensions:** successful structured results cannot be entirely
+  `null` or `undefined`; these produce non-retryable `output_validation_failed`.
+  Nullable/optional fields remain supported. Available usage receipts remain accountable.
+- Pin the Anthropic endpoint through its public provider setting, ignoring ambient endpoint
+  configuration. Strengthen auth E2E mocks with actual handler-hit and unexpected-traffic checks.
+
+- API production output now uses ESM through maintained Nest CLI + SWC.
+  API build checks types before emission; operator commands and Jest retain
+  their supported execution boundaries. See [API build guidance](docs/backend/api-build.md).
+
 - Run unit/Redis and extension checks in isolated parallel CI groups. Keep `Test`
   as a strict aggregate and retain focused API repetitions pending equivalence proof.
   Document how contributors add tests to their CI groups.
+
+- **Breaking:** the database stores the avatar object key, not a URL. `User.avatarUrl` is
+  replaced by `User.avatarKey` (migration `20261015120000_user_avatar_key`, no data
+  migration: existing users re-upload their avatar). API responses still return
+  `avatarUrl`, now computed from the key on every response, so a new
+  `STORAGE_PUBLIC_BASE_URL` takes effect without rewriting data. `OAuthUserProfile.avatarUrl`
+  is renamed `avatarSourceUrl`. OAuth profile pictures are copied once into own storage after
+  account creation or an email link at sign-in (only when the user has no avatar, https allow-listed hosts, no redirects, size and
+  time limits) and the provider URL is never stored or sent to a browser.
 
 - **Breaking:** storage public files use a reserved key namespace and an explicit
   delivery mode. Keys under `public/` are public and every other key is private; the
@@ -46,6 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `STORAGE_PUBLIC_BASE_URL` (URL of the public bucket root, required for `s3`),
   `STORAGE_PRESIGN_ENDPOINT` (a bare S3 API origin used only to sign),
   `STORAGE_PUBLIC_DELIVERY` and `STORAGE_PUBLIC_BUCKET`. See `docs/storage/public-files.md`.
+
+- Add an account menu to the product shell header: avatar and name (email when there is no
+  name), **Profile** (a dialog with read-only name and email and photo upload, replace and
+  confirmed removal) and **Log out**. The reusable operation is the headless `useAvatarEditor`
+  in `entities/user` (outcomes `committed`, `rejected`, `busy`, `unknown`, `retired`; a result
+  after the signed-in user changed is dropped). `AppShell` gets a `headerEnd` slot and no longer
+  imports the logout button or shows the email in its footer, so a downstream that removes the
+  account menu must provide its own logout control. See `docs/product-admin/account-menu-and-profile.md`.
+
+- Show avatars from another origin in the web starter: `WEB_PUBLIC_FILES_ORIGIN` (the origin of
+  `STORAGE_PUBLIC_BASE_URL`) is added to the CSP `img-src` and nowhere else, only as one exact
+  `https` (or loopback `http`) origin; avatars render with `next/image` `unoptimized`, so no
+  `images.remotePatterns` list is needed.
 
 - Add the `api` public delivery mode (`STORAGE_PUBLIC_DELIVERY=api`). The unauthenticated
   `GET /api/v1/storage/public?key=` route now also serves `public/` objects of the `s3`
@@ -92,6 +132,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Upgrade Prisma CLI, client and PostgreSQL adapter to 7.10.1, which selects
+  patched deepmerge-ts 8.0.2 for configuration loading. Upgrade OSV-Scanner to
+  2.7.0 with a verified binary checksum; retain weekly recursive SARIF reporting
+  and failure on scanner errors. Other dependency advisories remain open.
+- Remove obsolete Swagger/js-yaml, Prisma/mysql2 and MCP/Hono dependency
+  overrides. Use parent-selected js-yaml 5.4.2 and mysql2 3.24.4; retain
+  supported Hono node-server 1.19.17 through the ordinary lockfile.
+
 - Restore native JSON prototype/constructor protection and preserve supported request encodings.
   Recognized body-parser failures use 400/413/415 instead of 500; keep true internal failures unchanged.
 
@@ -105,6 +153,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage uses three shards and attempt-specific artifacts. The tracked main ruleset requires its stable aggregate check; live protection needs separate owner-authorized activation.
 
 ### Features
+
+- Operations Console Overview shows the public files check next to the private files
+  check: delivery mode, bucket layout and public base URL, a result per state, and a
+  destructive banner when private files are reachable anonymously. The Overview API
+  response gains `publicDelivery` (no bucket names, endpoints or credentials).
 
 - Notification deliveries use common work control with durable pause, one safe
   lifetime retry grant, pending cancellation, protected cleanup, channel filters

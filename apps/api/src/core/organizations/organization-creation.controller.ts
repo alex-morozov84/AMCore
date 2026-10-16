@@ -3,19 +3,19 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 
 import { AuthType, ORGANIZATION_CONTEXT_FAMILY } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
+} from '../auth/organization-context/request-context-policy.js'
 
 import {
   OrganizationCreationPolicyDto,
   OrganizationCreationResultDto,
-} from './dto/organization-establishment.dto'
-import { OrganizationCreationService } from './organization-creation.service'
+} from './dto/organization-establishment.dto.js'
+import { OrganizationCreationService } from './organization-creation.service.js'
 
 @ApiTags('organizations')
 @ApiBearerAuth()

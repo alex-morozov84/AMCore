@@ -1,6 +1,6 @@
-import { AI_RUN_MAX_EPOCHS } from './ai-run.constants'
+import { Prisma } from '../../../generated/prisma/client.js'
 
-import { Prisma } from '@/generated/prisma/client'
+import { AI_RUN_MAX_EPOCHS } from './ai-run.constants.js'
 
 /** One durable execution predicate shared by claim and due metrics; diagnosis is a separate sweep. */
 export function aiRunExecutionEligibility(at: Prisma.Sql): Prisma.Sql {

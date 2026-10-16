@@ -3,9 +3,9 @@ import { Reflector } from '@nestjs/core'
 
 import { type RequestPrincipal } from '@amcore/shared'
 
-import { EnvService } from '../../../env/env.service'
-import { PrismaService } from '../../../prisma'
-import { assertSessionFresh } from '../session-freshness'
+import { EnvService } from '../../../env/env.service.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { assertSessionFresh } from '../session-freshness.js'
 
 /**
  * Metadata key set by `@RequireFreshAuth`. Value semantics:

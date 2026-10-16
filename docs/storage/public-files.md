@@ -28,10 +28,10 @@ bucket "public"    public/avatars/<user>/v-1-x/avatar-256.webp   (generated copy
 
 ## Choose the layout
 
-| Layout                                   | When to use it                                                                  |
-| ---------------------------------------- | ------------------------------------------------------------------------------- |
-| **Two buckets** (recommended)            | Works on every provider, because publicity is a property of a whole bucket.     |
-| One bucket, publish the `public/` prefix | Only where the provider's bucket policy can target a prefix (AWS, Yandex, ...). |
+| Layout                                   | When to use it                                                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Two buckets** (recommended)            | Works on every provider, because publicity is a property of a whole bucket.                                 |
+| One bucket, publish the `public/` prefix | Only where the provider can publish a prefix: AWS (policy), Yandex (flag **and** policy, see its page), ... |
 
 With two buckets set `STORAGE_PUBLIC_BUCKET` to the public one. The public bucket
 then holds only `public/...` keys, and a CDN or custom domain can point at it
@@ -58,8 +58,8 @@ ACLs, so they need this mode or `api`.
 
 The application sends `public-read` with each `public/` upload and with copies of
 `public/` keys. Use it only if your provider enforces per-object ACLs and you want
-that mechanism (Yandex Object Storage, DigitalOcean Spaces and VK Cloud document
-it). Two risks make it a deliberate choice:
+that mechanism (Yandex Object Storage, verified on a plain bucket; DigitalOcean Spaces and
+VK Cloud document it). Two risks make it a deliberate choice:
 
 - AWS default buckets answer `AccessControlListNotSupported`; R2 reports
   `NotImplemented`; B2 accepts only bucket-level ACLs.
@@ -104,7 +104,8 @@ The local driver always serves public files through this route and ignores
 ## Publish the location
 
 Replace every `<...>`. These are structural examples taken from the providers'
-documentation and were not run by the maintainers.
+documentation and were not run by the maintainers, except Yandex, which was run on
+2026-10-15. Every provider has a [page](providers/README.md) with its status.
 
 ### AWS S3
 
@@ -137,10 +138,10 @@ private files.
 
 ### Yandex Object Storage
 
-A bucket policy with the same statement shape publishes the prefix (the policy
-uses the `arn:aws:s3:::<bucket>/public/*` resource form). Alternatively make a
-dedicated public bucket. Set `STORAGE_PUBLIC_BASE_URL` to
-`https://<bucket>.storage.yandexcloud.net` or your CDN.
+Verified on 2026-10-15. Publishing a prefix on Yandex needs the bucket's public read flag **and** a
+bucket policy; the policy alone publishes nothing. The policy also changes the bucket to "closed
+unless allowed", so it must name the application account and the console. The full recipe, the
+measurements and the traps are on the [Yandex page](providers/yandex.md).
 
 ### Providers that publish a whole bucket
 
@@ -204,7 +205,9 @@ node dist/cli/storage-check.js       # from the production image
 or website endpoint that you bound to the **private** bucket outside AMCore is not
 covered by the requests above; never bind one. After a change, upload an avatar, copy
 its `avatarUrl` and open it in a private browser window (no cookies): it must show the
-image.
+image. In the web app the avatar must also render: if it does not, check that
+`WEB_PUBLIC_FILES_ORIGIN` equals the origin of `STORAGE_PUBLIC_BASE_URL` (a blocked image
+shows up as a CSP `img-src` report).
 
 ## Failure reference
 

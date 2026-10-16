@@ -45,12 +45,19 @@ the CLI-capable migrator image as a one-shot step before the slim app image
 rollout. See
 [`docs/operations/deployment.md`](../../docs/operations/deployment.md).
 
+## Build and module format
+
+The API runs as ESM through the maintained Nest CLI + SWC integration.
+See [API build and ESM runtime](../../docs/backend/api-build.md) for build order,
+imports, operator commands, development diagnostics and recovery.
+
 ## Test compiler and type checking
 
 API unit tests use Jest with SWC CommonJS transformation. API E2E uses Jest
 with SWC ESM transformation in a fresh supervised process per suite.
 `jest-swc.config.cjs` shares decorator metadata, target and source-map settings.
-Run `pnpm --filter api typecheck` separately. It selects the pinned TypeScript 7
+The API build runs typecheck first. For independent checks, run
+`pnpm --filter api typecheck`. It selects the pinned TypeScript 7
 CLI explicitly; SWC still emits JavaScript. Nest build retains its existing
 compiler API and secondary checker. Avoid bare `tsc`: the two installed CLI
 packages export that name. Native incremental state stays in

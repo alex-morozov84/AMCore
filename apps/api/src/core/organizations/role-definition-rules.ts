@@ -1,10 +1,9 @@
 import type { AssignPermissionInput, RoleDefinitionPreset } from '@amcore/shared'
 
-import { validatePermissionRule } from '../auth/casl/permission-rule-validation'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { validatePermissionRule } from '../auth/casl/permission-rule-validation.js'
 
-import { classifyStoredRule, presetKey, type StoredRule } from './role-definition-classifier'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { classifyStoredRule, presetKey, type StoredRule } from './role-definition-classifier.js'
 
 type Tx = Prisma.TransactionClient
 

@@ -34,6 +34,7 @@ find for something, that page is under-documented; please open an issue.
 | Validate API requests and filter typed responses                                         | [`backend/schema-validation.md`](backend/schema-validation.md)                                                                          |
 | Extend or operate the API HTTP runtime                                                   | [`backend/http-runtime.md`](backend/http-runtime.md) — Fastify plugins, upgrade checks and rollback.                                    |
 | Understand request parsing, decoded limits and transport errors                          | [`backend/request-body-contract.md`](backend/request-body-contract.md)                                                                  |
+| Build, develop or extend the ESM API                                                     | [`backend/api-build.md`](backend/api-build.md)                                                                                          |
 | Build or verify shared package distribution                                              | [`backend/shared-package-build.md`](backend/shared-package-build.md)                                                                    |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                                    |
 | Register background work, an idempotent handler or a database-owned control adapter      | [`backend/background-work.md`](backend/background-work.md)                                                                              |
@@ -67,6 +68,8 @@ find for something, that page is under-documented; please open an issue.
 | Control notification deliveries and preserve provider evidence                           | [`notifications/control.md`](notifications/control.md)                                                                                  |
 | Add an AI provider / tool / assistant / artifact                                         | [`ai/`](ai/README.md)                                                                                                                   |
 | Add a storage- or media-backed feature                                                   | [`storage/`](storage/README.md), [`media/`](media/README.md)                                                                            |
+| Set up a storage provider (Yandex, AWS, R2, ...) or check it works                       | [`storage/providers/`](storage/providers/README.md), [`storage/testing.md`](storage/testing.md)                                         |
+| Fix a storage problem (403 on a public file, CORS, presigned URLs)                       | [`storage/troubleshooting.md`](storage/troubleshooting.md)                                                                              |
 | Deploy, run, or operate the system                                                       | [`operations/`](operations/README.md)                                                                                                   |
 | Set up TLS / a reverse proxy                                                             | [`operations/deployment.md`](operations/deployment.md#tls--reverse-proxy)                                                               |
 | Run the Prometheus/Grafana/Alertmanager monitoring harness, or respond to an alert       | [`operations/observability.md`](operations/observability.md), [`operations/runbooks/`](operations/runbooks/)                            |
@@ -145,7 +148,8 @@ provide an operator interface for admin session management.
 - **[Product administration foundation](product-admin/README.md)** — the
   organization selector and read-only overview, one-placement integration and
   headless extension path, members/roles, the [role definitions API and ready Roles tab](product-admin/role-definitions.md), the
-  [member access explanation](product-admin/member-access.md)
+  [member access explanation](product-admin/member-access.md), the
+  [account menu, profile and avatar](product-admin/account-menu-and-profile.md)
   and [invitations](product-admin/invitations.md);
   product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional

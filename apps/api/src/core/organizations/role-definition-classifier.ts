@@ -1,6 +1,6 @@
 import { Action, type CapabilityId, type RoleDefinitionPreset, Subject } from '@amcore/shared'
 
-import { CAPABILITY_ADAPTERS } from './capability-registry.service'
+import { CAPABILITY_ADAPTERS } from './capability-registry.service.js'
 
 /** A stored rule as the classifier sees it; conditions stay the uninterpolated template. */
 export interface StoredRule {

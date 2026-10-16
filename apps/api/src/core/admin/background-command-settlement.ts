@@ -5,23 +5,25 @@ import { v7 as uuidv7 } from 'uuid'
 
 import type { RequestPrincipal, WorkReason, WorkReconciliation } from '@amcore/shared'
 
-import { AuditLogService } from '../audit/audit-log.service'
-
-import { BackgroundControlAuthority } from './background-control-authority'
-import { BackgroundControlBudgets, type LockedControlBudgets } from './background-control-budgets'
-import { backgroundControlError } from './background-control-error'
-import { BackgroundControlReservations } from './background-control-reservations'
-
 import {
   AuditActorType,
   AuditCategory,
   AuditTargetType,
   type BackgroundCommand,
   type BackgroundCommandTarget,
-} from '@/generated/prisma/client'
-import { CONTROL_LIMITS } from '@/infrastructure/background-work/control-limits'
-import type { ControlTransaction } from '@/infrastructure/background-work/control-transaction'
-import { ProviderEvidenceStore } from '@/infrastructure/background-work/provider-evidence.store'
+} from '../../generated/prisma/client.js'
+import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
+import type { ControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
+import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { AuditLogService } from '../audit/audit-log.service.js'
+
+import { BackgroundControlAuthority } from './background-control-authority.js'
+import {
+  BackgroundControlBudgets,
+  type LockedControlBudgets,
+} from './background-control-budgets.js'
+import { backgroundControlError } from './background-control-error.js'
+import { BackgroundControlReservations } from './background-control-reservations.js'
 
 export type CommandOutcome =
   | { readonly state: 'applied' }

@@ -13,12 +13,14 @@ operations a starter needs without tying application code to one cloud.
 
 ## S3-Compatible Driver
 
-The S3 driver speaks the S3 API, so it targets any S3-compatible provider. The
-[configuration guide](configuration.md#provider-examples) lists variables for AWS S3,
-Cloudflare R2, Backblaze B2, DigitalOcean Spaces, Yandex Object Storage, Selectel,
-VK Cloud and Cloud.ru. Those blocks come from provider documentation; the
-maintainers have not run AMCore against the real services yet, so treat each as
-"provider-documented" until your own check passes.
+The S3 driver speaks the S3 API, so it targets any S3-compatible provider. Each
+provider has a page with its settings, how to publish `public/`, and its status:
+see the [provider matrix](providers/README.md). Yandex Object Storage was verified
+on 2026-10-15. Every other cloud provider is provider-documented only: the
+maintainers have not run AMCore against it, so run
+[`storage:check`](testing.md#check-a-real-provider-with-storagecheck) on your own
+account. The [configuration guide](configuration.md#provider-examples) keeps the
+variable blocks.
 
 Notable behavior:
 
@@ -90,15 +92,14 @@ separately:
 - public URLs may change when a CDN or bucket hostname changes.
 
 For private files, store only the key. Generate signed/app-mediated access at
-read time. For public avatars, AMCore currently stores `User.avatarUrl`, built
-from `STORAGE_PUBLIC_BASE_URL` when the avatar is uploaded. Public avatar objects
+read time. For public avatars, AMCore stores `User.avatarKey` and computes `avatarUrl` from
+`STORAGE_PUBLIC_BASE_URL` on every response. Public avatar objects
 use versioned keys under `public/avatars/{userId}/v-{version}/`, so a published
 URL is immutable and can be cached safely.
 
 To move to another provider or CDN, copy all objects with their keys unchanged
-(`public/...` keeps its prefix), then set the new `STORAGE_PUBLIC_BASE_URL`. A
-stored `avatarUrl` keeps the old host until the avatar is uploaded again, so
-rewrite the stored URLs with the new base or ask users to re-upload.
+(`public/...` keeps its prefix), then set the new `STORAGE_PUBLIC_BASE_URL`. Responses
+use the new host at once: no stored URL needs rewriting.
 
 ## Media Processing
 

@@ -5,7 +5,7 @@
  * into the early `env.ts` validation path.
  */
 
-import type { Visibility } from './storage.interface'
+import type { Visibility } from './storage.interface.js'
 
 /**
  * Injection token for the active `StorageProvider`. The dynamic

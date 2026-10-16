@@ -5,7 +5,7 @@ import {
   switchOrgResponseSchema,
 } from '@amcore/shared'
 
-import { createSchemaDto } from '../../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 
 /**
  * Single-resource response DTOs for the organizations surface (Arc C).

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
 
-import { AiCredentialResolver } from './gateway/credential-resolver'
-import { AiModelRegistry } from './registry/ai-model-registry.service'
+import { PrismaModule } from '../../prisma/index.js'
 
-import { PrismaModule } from '@/prisma'
+import { AiCredentialResolver } from './gateway/credential-resolver.js'
+import { AiModelRegistry } from './registry/ai-model-registry.service.js'
 
 /**
  * AI catalog module (Track C — ADR-054, Arc C split). The **web-safe** half of the former

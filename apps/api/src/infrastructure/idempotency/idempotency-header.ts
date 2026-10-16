@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 
-import { IDEMPOTENCY_HEADER } from './idempotency.constants'
+import { IDEMPOTENCY_HEADER } from './idempotency.constants.js'
 
 const IDEMPOTENCY_KEY_REGEX = /^[A-Za-z0-9:_-]{1,255}$/
 

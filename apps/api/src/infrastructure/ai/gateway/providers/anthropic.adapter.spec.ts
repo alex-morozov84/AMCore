@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import type { AiAdapterCall } from '../ai-gateway.types'
+import { providerReceipt } from '../provider-receipt'
 
 import { AnthropicAdapter } from './anthropic.adapter'
 
@@ -15,6 +16,8 @@ import { AiProviderType } from '@/generated/prisma/client'
 interface CapturedRequest {
   url: string
   headers: Headers
+  body: unknown
+  redirect: RequestInit['redirect']
 }
 
 function fakeFetch(
@@ -23,7 +26,12 @@ function fakeFetch(
 ): typeof globalThis.fetch & { calls: CapturedRequest[] } {
   const calls: CapturedRequest[] = []
   const fn = (async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({ url: String(input), headers: new Headers(init?.headers) })
+    calls.push({
+      url: String(input),
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      redirect: init?.redirect,
+    })
     return new Response(JSON.stringify(body), {
       status,
       headers: { 'content-type': 'application/json' },
@@ -187,4 +195,111 @@ describe('AnthropicAdapter caller abort', () => {
     ).rejects.toMatchObject({ code: 'aborted' })
     expect(fetchImpl.calls).toHaveLength(0)
   })
+})
+
+describe('Anthropic fixed endpoint and ambient credentials', () => {
+  it.each([undefined, 'https://poisoned.invalid/v1'])(
+    'ignores ambient endpoint %s',
+    async (ambient) => {
+      const old = process.env.ANTHROPIC_BASE_URL
+      try {
+        if (ambient === undefined) delete process.env.ANTHROPIC_BASE_URL
+        else process.env.ANTHROPIC_BASE_URL = ambient
+        const fetchImpl = fakeFetch(MESSAGES_RESPONSE)
+        await new AnthropicAdapter(fetchImpl).generateText(call('https://catalogue.invalid/v1'))
+        expect(fetchImpl.calls).toHaveLength(1)
+        expect(fetchImpl.calls[0]?.url).toBe('https://api.anthropic.com/v1/messages')
+        expect(fetchImpl.calls[0]?.headers.get('x-api-key')).toBe('sk-aB0_-Zz9')
+      } finally {
+        if (old === undefined) delete process.env.ANTHROPIC_BASE_URL
+        else process.env.ANTHROPIC_BASE_URL = old
+      }
+    }
+  )
+
+  it('refuses an absent injected key even when ambient credentials exist', async () => {
+    const oldKey = process.env.ANTHROPIC_API_KEY
+    const oldToken = process.env.ANTHROPIC_AUTH_TOKEN
+    try {
+      process.env.ANTHROPIC_API_KEY = '<ambient-key>'
+      process.env.ANTHROPIC_AUTH_TOKEN = '<ambient-token>'
+      const request = call()
+      request.credential = null
+      const fetchImpl = fakeFetch(MESSAGES_RESPONSE)
+      await expect(new AnthropicAdapter(fetchImpl).generateText(request)).rejects.toMatchObject({
+        code: 'model_not_configured',
+      })
+      expect(fetchImpl.calls).toHaveLength(0)
+    } finally {
+      if (oldKey === undefined) delete process.env.ANTHROPIC_API_KEY
+      else process.env.ANTHROPIC_API_KEY = oldKey
+      if (oldToken === undefined) delete process.env.ANTHROPIC_AUTH_TOKEN
+      else process.env.ANTHROPIC_AUTH_TOKEN = oldToken
+    }
+  })
+})
+
+describe('Anthropic structured transport', () => {
+  it.each(['valid', 'invalid'] as const)(
+    'proves native schema format and %s output accounting',
+    async (mode) => {
+      const fetchImpl = fakeFetch({
+        ...MESSAGES_RESPONSE,
+        content: [{ type: 'text', text: mode === 'valid' ? '{"answer":"ok"}' : '{"answer":42}' }],
+      })
+      const request = call('https://poisoned.invalid/v1')
+      request.system = 'Trusted Anthropic structured instructions'
+      request.model.capabilities.structured_output = true
+      const outcome = await new AnthropicAdapter(fetchImpl)
+        .generateObject(request, z.object({ answer: z.string() }))
+        .then(
+          (value) => ({
+            object: value.object,
+            receipt: value.receipt,
+            usage: value.usage,
+            error: undefined,
+          }),
+          (error: unknown) => ({
+            object: undefined,
+            receipt: providerReceipt(error),
+            usage: providerReceipt(error)?.usage,
+            error,
+          })
+        )
+      const expected =
+        mode === 'valid'
+          ? { object: { answer: 'ok' }, error: undefined }
+          : { object: undefined, error: { code: 'output_validation_failed', retryable: false } }
+      expect(outcome).toMatchObject(expected)
+      expect(outcome.receipt?.usage).toMatchObject({
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        totalDerived: true,
+      })
+      expect(outcome.usage).toMatchObject({ inputTokens: 10, outputTokens: 5, totalTokens: 15 })
+      expect(fetchImpl.calls).toHaveLength(1)
+      expect(fetchImpl.calls[0]).toMatchObject({
+        url: 'https://api.anthropic.com/v1/messages',
+        redirect: 'error',
+      })
+      expect(fetchImpl.calls[0]?.headers.get('x-api-key')).toBe('sk-aB0_-Zz9')
+      expect(fetchImpl.calls[0]?.body).toMatchObject({
+        model: 'claude-opus-4-8',
+        system: [{ type: 'text', text: 'Trusted Anthropic structured instructions' }],
+        output_config: {
+          format: {
+            type: 'json_schema',
+            schema: {
+              type: 'object',
+              properties: { answer: { type: 'string' } },
+              required: ['answer'],
+            },
+          },
+        },
+      })
+      expect(fetchImpl.calls[0]?.body).not.toHaveProperty('tools')
+      expect(fetchImpl.calls[0]?.body).not.toHaveProperty('stream')
+    }
+  )
 })

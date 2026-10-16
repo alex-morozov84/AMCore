@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
-import { PrismaService } from '../../prisma'
-
-import type { NotificationPreference, Prisma } from '@/generated/prisma/client'
+import type { NotificationPreference, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
 /** A Prisma client or an active transaction client. */
 type DbClient = PrismaService | Prisma.TransactionClient

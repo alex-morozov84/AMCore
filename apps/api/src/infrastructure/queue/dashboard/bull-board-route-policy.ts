@@ -1,4 +1,4 @@
-import { BOARD_STATUSES } from './bull-board-projection'
+import { BOARD_STATUSES } from './bull-board-projection.js'
 
 /**
  * Which requests the board mount accepts, decided from the method and the path alone (before any

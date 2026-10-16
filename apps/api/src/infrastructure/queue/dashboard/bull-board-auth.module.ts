@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 
-import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service'
-import { PrivilegedRoleService } from '../../../core/auth/privileged-role.service'
-import { EnvModule } from '../../../env/env.module'
-import { EnvService } from '../../../env/env.service'
+import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service.js'
+import { PrivilegedRoleService } from '../../../core/auth/privileged-role.service.js'
+import { EnvModule } from '../../../env/env.module.js'
+import { EnvService } from '../../../env/env.service.js'
 
-import { BullBoardAuthService } from './bull-board-auth.service'
-import { BullBoardBearerAuthService } from './bull-board-bearer-auth.service'
+import { BullBoardAuthService } from './bull-board-auth.service.js'
+import { BullBoardBearerAuthService } from './bull-board-bearer-auth.service.js'
 
 /**
  * Provides the read-only Bull Board access verifiers to the dynamically created Bull Board module

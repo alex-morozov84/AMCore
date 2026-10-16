@@ -3,23 +3,23 @@ import { z } from 'zod'
 
 import { type WorkCommand, workReasonSchema } from '@amcore/shared'
 
-import type { CommandTargetSnapshot } from './background-command-admission'
-import type { BrokerCommandPort } from './background-command-service'
-import { backgroundControlError } from './background-control-error'
-
-import { AppException } from '@/common/exceptions'
-import { ControlConnection } from '@/infrastructure/background-work/control-connection'
+import { AppException } from '../../common/exceptions/index.js'
+import { ControlConnection } from '../../infrastructure/background-work/control-connection.js'
 import {
   providerTargetRevision,
   readJobSnapshot,
-} from '@/infrastructure/background-work/job-snapshot'
-import { parseManagedJob } from '@/infrastructure/background-work/managed-job-profile'
-import { ProviderEvidenceStore } from '@/infrastructure/background-work/provider-evidence.store'
-import { readQueueSnapshot } from '@/infrastructure/background-work/queue-snapshot'
-import { applyIdempotentCommand } from '@/infrastructure/background-work/scripts/idempotent-command'
-import { applyProviderWindowCommand } from '@/infrastructure/background-work/scripts/idempotent-command'
-import { type WorkDefinition } from '@/infrastructure/background-work/work-definition'
-import { WorkPolicyError } from '@/infrastructure/background-work/work-policy-error'
+} from '../../infrastructure/background-work/job-snapshot.js'
+import { parseManagedJob } from '../../infrastructure/background-work/managed-job-profile.js'
+import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { readQueueSnapshot } from '../../infrastructure/background-work/queue-snapshot.js'
+import { applyIdempotentCommand } from '../../infrastructure/background-work/scripts/idempotent-command.js'
+import { applyProviderWindowCommand } from '../../infrastructure/background-work/scripts/idempotent-command.js'
+import { type WorkDefinition } from '../../infrastructure/background-work/work-definition.js'
+import { WorkPolicyError } from '../../infrastructure/background-work/work-policy-error.js'
+
+import type { CommandTargetSnapshot } from './background-command-admission.js'
+import type { BrokerCommandPort } from './background-command-service.js'
+import { backgroundControlError } from './background-control-error.js'
 
 const witnessSchema = z.object({
   fingerprint: z.string().regex(/^[a-f0-9]{40}$/),

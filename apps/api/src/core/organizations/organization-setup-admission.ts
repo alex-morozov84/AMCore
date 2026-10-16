@@ -1,10 +1,9 @@
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { assertSessionFresh } from '../auth/session-freshness'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { assertSessionFresh } from '../auth/session-freshness.js'
 
-import { establishmentError } from './establishment-error'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { establishmentError } from './establishment-error.js'
 
 export type SetupOperator = { principal: RequestPrincipal; freshWindowSeconds: number }
 

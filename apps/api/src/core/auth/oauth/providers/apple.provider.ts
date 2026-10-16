@@ -2,9 +2,9 @@ import type { Configuration } from 'openid-client'
 
 import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
 
-import type { OAuthClientService } from '../oauth-client.service'
+import type { OAuthClientService } from '../oauth-client.service.js'
 
-import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface'
+import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface.js'
 
 export interface AppleProviderConfig extends OAuthProviderConfig {
   teamId: string
@@ -108,7 +108,7 @@ export class AppleProvider implements OAuthProvider {
       emailVerified: (userInfo.email_verified as boolean) ?? false,
       // Name is only available on first login via form_post body (not in userinfo)
       displayName: null,
-      avatarUrl: null,
+      avatarSourceUrl: null,
     }
   }
 }

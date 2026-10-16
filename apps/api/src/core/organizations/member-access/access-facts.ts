@@ -1,18 +1,17 @@
 import type { RequestPrincipal } from '@amcore/shared'
 
-import type { AppAbility, TeamAccessDecision } from '../../auth/casl/ability.factory'
+import type { Organization } from '../../../generated/prisma/client.js'
+import type { AppAbility, TeamAccessDecision } from '../../auth/casl/ability.factory.js'
 import {
   type AbilityPermission,
   hasFullTeamAccess,
   normalizeOwnerPermissions,
-} from '../../auth/casl/permission-normalization'
-import { createPrismaAbility } from '../../auth/casl/prisma-ability'
-import type { CapabilityRegistry } from '../capability-registry.service'
+} from '../../auth/casl/permission-normalization.js'
+import { createPrismaAbility } from '../../auth/casl/prisma-ability.js'
+import type { CapabilityRegistry } from '../capability-registry.service.js'
 
-import { type AccessOperationBudget, AccessUnavailableError } from './access-budget'
-import type { ItemSpec } from './access-capabilities'
-
-import type { Organization } from '@/generated/prisma/client'
+import { type AccessOperationBudget, AccessUnavailableError } from './access-budget.js'
+import type { ItemSpec } from './access-capabilities.js'
 
 /** A stored rule as loaded; conditions stay the uninterpolated template. */
 export type StoredPolicyRule = AbilityPermission

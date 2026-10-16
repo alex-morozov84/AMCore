@@ -1,9 +1,9 @@
 import type { DynamicModule, InjectionToken, Type } from '@nestjs/common'
 import type { ZodType } from 'zod'
 
-import type { DeliveryContext } from './channel-deliverer.types'
+import type { EnvService } from '../../../env/env.service.js'
 
-import type { EnvService } from '@/env/env.service'
+import type { DeliveryContext } from './channel-deliverer.types.js'
 
 /** One code-owned registration, projected into the selected process role. */
 export interface NotificationChannelDescriptor {

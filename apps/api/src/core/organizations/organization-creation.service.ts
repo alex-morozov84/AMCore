@@ -10,18 +10,18 @@ import {
   type OrgResponse,
 } from '@amcore/shared'
 
-import { EnvService } from '../../env/env.service'
-import { acquireXactLock, PrismaService } from '../../prisma'
+import { EnvService } from '../../env/env.service.js'
+import { acquireXactLock, PrismaService } from '../../prisma/index.js'
 
-import { canonicalAdmin } from './canonical-admin'
+import { canonicalAdmin } from './canonical-admin.js'
 import {
   establishmentError,
   establishmentFailure,
   isOrganizationSlugConflict,
-} from './establishment-error'
-import { readEstablishmentResult, resultOrganization } from './establishment-result'
-import { establishmentTransaction } from './establishment-transaction'
-import { establishmentFingerprint, writeEstablishedOrganization } from './establishment-write'
+} from './establishment-error.js'
+import { readEstablishmentResult, resultOrganization } from './establishment-result.js'
+import { establishmentTransaction } from './establishment-transaction.js'
+import { establishmentFingerprint, writeEstablishedOrganization } from './establishment-write.js'
 
 export function generatedOrganizationSlug(name: string, collision = false): string {
   const base = name

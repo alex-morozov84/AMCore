@@ -1,11 +1,19 @@
-import { activeTarget } from '../support/managed-target.mjs'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-const standTarget = activeTarget()
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
+
+const standTarget = activeTarget()
+// Texts come from the active catalogue, so the spec follows the project's locale choice.
+const t = JSON.parse(
+  readFileSync(join(standTarget.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
+).console
 
 test('role setup refuses an account whose registration has not completed', () => {
   expect(() => setSystemRole(uniqueEmail('console-unregistered'), 'SUPER_ADMIN')).toThrow(
@@ -53,6 +61,12 @@ test('host-mode Overview panel renders real readiness, version and process role,
   await expect(consolePage.getByText('Cache (Redis)')).toBeVisible()
   await expect(consolePage.getByText('API is ready', { exact: true })).toBeVisible()
   await expect(consolePage.getByText('Working', { exact: true })).toBeVisible()
+  // The stand uses the local driver, so the public-files row is off and says why.
+  for (const name of [t.overviewPrivateFilesTitle, t.overviewPublicFilesTitle]) {
+    await expect(consolePage.getByRole('heading', { name, exact: true })).toBeVisible()
+  }
+  await expect(consolePage.getByText(t.overviewPublicOff, { exact: true })).toBeVisible()
+  await expect(consolePage.getByText(t.overviewPublicOffLocal, { exact: true })).toBeVisible()
   await consolePage.getByText('Build details', { exact: true }).click()
   await expect(consolePage.getByText('API version')).toBeVisible()
   await expect(consolePage.getByText('Process role')).not.toBeVisible()

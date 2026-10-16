@@ -484,3 +484,10 @@ resource/process removal is proved. Retaining a stand requires an explicit owner
 decision recorded with its identity, reason and responsible person; retain the
 needed source/recovery location too. Preview remains available during acceptance,
 then the default closeout removes it.
+
+## API compiler changes
+
+Managed stands retain their isolated resource ownership with the ESM API.
+For manual Nest watch sessions, see [API build guidance](../backend/api-build.md)
+for asynchronous diagnostics and explicit restarts after configuration/shared changes.
+A successful E2E preparation receipt does not certify compiled API freshness.

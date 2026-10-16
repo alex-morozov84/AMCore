@@ -3,13 +3,13 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 
 import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { EnvService } from '../../env/env.service'
-import { PrismaService } from '../../prisma'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
-import { SystemRoles } from '../auth/decorators/system-roles.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { EnvService } from '../../env/env.service.js'
+import { PrismaService } from '../../prisma/index.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator.js'
+import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 import {
   OrganizationBootstrapDto,
   OrganizationBootstrapResultDto,
@@ -17,9 +17,9 @@ import {
   OrganizationPreparedAccountDto,
   OrganizationSetupAccountDto,
   OrganizationSetupStatusDto,
-} from '../organizations/dto/organization-establishment.dto'
-import type { SetupOperator } from '../organizations/organization-setup-admission'
-import { OrganizationSetupOperations } from '../organizations/organization-setup-operations'
+} from '../organizations/dto/organization-establishment.dto.js'
+import type { SetupOperator } from '../organizations/organization-setup-admission.js'
+import { OrganizationSetupOperations } from '../organizations/organization-setup-operations.js'
 
 @ApiTags('admin')
 @ApiBearerAuth()

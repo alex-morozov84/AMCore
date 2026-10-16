@@ -1,5 +1,5 @@
-import type { JobOptions } from '@/infrastructure/queue/interfaces/job-options.interface'
-import { DEFAULT_JOB_OPTIONS } from '@/infrastructure/queue/interfaces/job-options.interface'
+import type { JobOptions } from '../../infrastructure/queue/interfaces/job-options.interface.js'
+import { DEFAULT_JOB_OPTIONS } from '../../infrastructure/queue/interfaces/job-options.interface.js'
 
 /**
  * Default attempt budget frozen onto a new `AiRun` (Track C — ADR-054, locked decision). Postgres

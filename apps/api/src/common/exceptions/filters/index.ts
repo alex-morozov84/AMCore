@@ -1,3 +1,3 @@
-export * from './all-exceptions.filter'
-export * from './http-exception.filter'
-export * from './prisma-exception.filter'
+export * from './all-exceptions.filter.js'
+export * from './http-exception.filter.js'
+export * from './prisma-exception.filter.js'

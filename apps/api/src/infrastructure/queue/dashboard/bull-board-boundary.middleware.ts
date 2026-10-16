@@ -2,10 +2,10 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express'
 
 import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
 
-import { boardCopy, type BoardLocale } from './bull-board-copy'
-import { safeErrorResult } from './bull-board-errors'
-import { type BoardEventSink, NOOP_BOARD_EVENTS } from './bull-board-events'
-import { decideBoardRoute } from './bull-board-route-policy'
+import { boardCopy, type BoardLocale } from './bull-board-copy.js'
+import { safeErrorResult } from './bull-board-errors.js'
+import { type BoardEventSink, NOOP_BOARD_EVENTS } from './bull-board-events.js'
+import { decideBoardRoute } from './bull-board-route-policy.js'
 
 /** What an authenticated request leaves for the rest of the chain (set by the admission middleware). */
 export interface BoardRequestLocals {

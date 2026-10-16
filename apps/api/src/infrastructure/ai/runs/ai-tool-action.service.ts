@@ -4,29 +4,35 @@ import { performance } from 'node:perf_hooks'
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { AiTextResult } from '../gateway/ai-gateway.types'
+import { canonicalJsonEqual } from '../../../common/utils/canonical-json.js'
+import { AuditLogService } from '../../../core/audit/index.js'
+import { EnvService } from '../../../env/env.service.js'
+import { AiToolInvocationStatus, AuditActorType, AuditTargetType } from '../../../generated/prisma/client.js'
+import { type AiMetricsToolRiskClass, MetricsService } from '../../observability/index.js'
+import type { AttemptRuntime, ShutdownLatch } from '../../worker-lifecycle/index.js'
+import type { AiTextResult } from '../gateway/ai-gateway.types.js'
 import {
   AI_TOOL_REJECTION_NOTICE,
   AiToolErrorCode,
   type AiToolErrorCodeValue,
   approvedToolCallId,
   toolIdempotencyKey,
-} from '../tools/ai-tool.constants'
-import type { AiTool, AiToolContext, AiToolIntent } from '../tools/ai-tool.types'
-import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry'
-import { AiToolNoEffectError } from '../tools/ai-tool-error'
-import { boundedToolHook } from '../tools/ai-tool-hook'
-import { prepareToolIntent, readToolIntent } from '../tools/ai-tool-intent'
+} from '../tools/ai-tool.constants.js'
+import type { AiTool, AiToolContext, AiToolIntent } from '../tools/ai-tool.types.js'
+import { AiToolContractRegistry } from '../tools/ai-tool-contract.registry.js'
+import { AiToolNoEffectError } from '../tools/ai-tool-error.js'
+import { boundedToolHook } from '../tools/ai-tool-hook.js'
+import { prepareToolIntent, readToolIntent } from '../tools/ai-tool-intent.js'
 
-import { AiRunTerminalReason } from './ai-run.constants'
-import { AiRunRepository } from './ai-run.repository'
-import type { ClaimedRun } from './ai-run-dispatch.types'
-import { AiRunGuard, markIoStarted, RunLeaseLostError } from './ai-run-guard.service'
-import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence'
-import { findUncertainAction } from './ai-run-loop-reconstruct'
-import type { RunPlan } from './ai-run-plan'
-import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown'
-import { AiRunTransitions, applyStop } from './ai-run-transitions.service'
+import { AiRunTerminalReason } from './ai-run.constants.js'
+import { AiRunRepository } from './ai-run.repository.js'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
+import { AiRunGuard, markIoStarted, RunLeaseLostError } from './ai-run-guard.service.js'
+import { providerCallStep, writeRunSteps, writeUsageLedger } from './ai-run-loop-persistence.js'
+import { findUncertainAction } from './ai-run-loop-reconstruct.js'
+import type { RunPlan } from './ai-run-plan.js'
+import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
+import { AiRunTransitions, applyStop } from './ai-run-transitions.service.js'
 import {
   applyRejection,
   createRequested,
@@ -38,14 +44,7 @@ import {
   recordSuccess,
   sameAction,
   startExecution,
-} from './ai-tool-invocation.store'
-
-import { canonicalJsonEqual } from '@/common/utils/canonical-json'
-import { AuditLogService } from '@/core/audit'
-import { EnvService } from '@/env/env.service'
-import { AiToolInvocationStatus, AuditActorType, AuditTargetType } from '@/generated/prisma/client'
-import { type AiMetricsToolRiskClass, MetricsService } from '@/infrastructure/observability'
-import type { AttemptRuntime, ShutdownLatch } from '@/infrastructure/worker-lifecycle'
+} from './ai-tool-invocation.store.js'
 
 /**
  * Defensive cap on the tool output stored in `resultSummary` + fed back to the model. This row is

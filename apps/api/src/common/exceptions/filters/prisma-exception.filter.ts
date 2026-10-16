@@ -5,10 +5,9 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode, InfrastructureErrorCode, ResourceErrorCode } from '@amcore/shared'
 
-import { sanitizeRequestUrl } from '../../config/logging.config'
-import type { ErrorResponse } from '../types'
-
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '../../../generated/prisma/client.js'
+import { sanitizeRequestUrl } from '../../config/logging.config.js'
+import type { ErrorResponse } from '../types.js'
 
 interface PrismaErrorMapping {
   status: HttpStatus

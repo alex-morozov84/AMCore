@@ -5,14 +5,16 @@ import {
   type LanguageModelUsage,
   type ModelMessage,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   type TextPart,
   tool,
   type ToolSet,
   TypeValidationError,
 } from 'ai'
 
-import { normalizeAiUsage } from '../../usage/ai-usage-v2'
-import { AiGatewayException } from '../ai-gateway.error'
+import type { AiProviderType } from '../../../../generated/prisma/client.js'
+import { normalizeAiUsage } from '../../usage/ai-usage-v2.js'
+import { AiGatewayException } from '../ai-gateway.error.js'
 import type {
   AiAdapterCall,
   AiFinishReason,
@@ -22,11 +24,9 @@ import type {
   AiToolCall,
   AiUsage,
   AiUserContentPart,
-} from '../ai-gateway.types'
+} from '../ai-gateway.types.js'
 
-import { attachRetryHint, parseProviderRetryHint } from './provider-retry-hint'
-
-import type { AiProviderType } from '@/generated/prisma/client'
+import { attachRetryHint, parseProviderRetryHint } from './provider-retry-hint.js'
 
 /**
  * Mapping helpers between the Vercel AI SDK and AMCore's own gateway contracts (Track C —
@@ -184,7 +184,11 @@ function isAbortError(error: unknown): boolean {
 export function mapProviderError(error: unknown, providerType: AiProviderType): AiGatewayException {
   if (error instanceof AiGatewayException) return error
   if (isAbortError(error)) return AiGatewayException.providerTimeout(providerType)
-  if (NoObjectGeneratedError.isInstance(error) || TypeValidationError.isInstance(error)) {
+  if (
+    NoObjectGeneratedError.isInstance(error) ||
+    NoOutputGeneratedError.isInstance(error) ||
+    TypeValidationError.isInstance(error)
+  ) {
     return AiGatewayException.outputValidationFailed(providerType)
   }
   if (APICallError.isInstance(error)) {

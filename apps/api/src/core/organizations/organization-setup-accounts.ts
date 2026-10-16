@@ -4,11 +4,10 @@ import {
   type OrganizationPreparedAccount,
 } from '@amcore/shared'
 
-import { EmailIdentityService } from '../auth/email-identity.service'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { EmailIdentityService } from '../auth/email-identity.service.js'
 
-import { admitSetupOperator, type SetupOperator } from './organization-setup-admission'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { admitSetupOperator, type SetupOperator } from './organization-setup-admission.js'
 
 /** Preparation never changes credentials, locale, verification or roles on an existing identity. */
 export async function prepareSetupAccount(

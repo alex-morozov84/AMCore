@@ -7,17 +7,17 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
-} from '../../../common/exceptions'
-import { PrismaService } from '../../../prisma'
-import type { PrivilegedAdmission } from '../privileged-admission.service'
+} from '../../../common/exceptions/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import type { PrivilegedAdmission } from '../privileged-admission.service.js'
 
-import { contextPolicyMetadata } from './context-policy-metadata'
-import { organizationHeader, organizationSelector } from './organization-selector'
-import type { RequestContextPolicyDefinition } from './request-context-policy'
+import { contextPolicyMetadata } from './context-policy-metadata.js'
+import { organizationHeader, organizationSelector } from './organization-selector.js'
+import type { RequestContextPolicyDefinition } from './request-context-policy.js'
 import {
   type VerifiedOrganizationContext,
   verifiedOrganizationContext,
-} from './verified-organization-context'
+} from './verified-organization-context.js'
 
 function legacyMembershipBypass(
   admission: PrivilegedAdmission,

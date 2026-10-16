@@ -1,4 +1,4 @@
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../generated/prisma/client.js'
 
 /** A role can be assigned only within its owning organization or as a system template. */
 export function isRoleAssignable(

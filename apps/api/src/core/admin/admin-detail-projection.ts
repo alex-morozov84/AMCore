@@ -4,14 +4,16 @@ import {
   parseSupportedLocale,
 } from '@amcore/shared'
 
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../generated/prisma/client.js'
+import type { StorageService } from '../../infrastructure/storage/index.js'
+import { avatarUrlOf } from '../auth/avatar-url.js'
 
 export const DETAIL_USER_SELECT = {
   id: true,
   email: true,
   emailVerified: true,
   name: true,
-  avatarUrl: true,
+  avatarKey: true,
   phone: true,
   locale: true,
   timezone: true,
@@ -46,13 +48,16 @@ export const ORGANIZATION_MEMBER_SELECT = {
 type UserRow = Prisma.UserGetPayload<{ select: typeof DETAIL_USER_SELECT }>
 type OrganizationRow = Prisma.OrganizationGetPayload<{ select: typeof DETAIL_ORGANIZATION_SELECT }>
 
-export function projectDetailUser(row: UserRow): AdminUserResponse {
+export function projectDetailUser(
+  row: UserRow,
+  storage: Pick<StorageService, 'getPublicUrl'>
+): AdminUserResponse {
   return {
     id: row.id,
     email: row.email,
     emailVerified: row.emailVerified,
     name: row.name,
-    avatarUrl: row.avatarUrl,
+    avatarUrl: avatarUrlOf(storage, row.avatarKey),
     phone: row.phone,
     locale: parseSupportedLocale(row.locale),
     timezone: row.timezone,

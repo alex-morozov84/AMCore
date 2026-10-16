@@ -1,13 +1,12 @@
 import { z } from 'zod'
 
+import { AiRunStepType, Prisma } from '../../../generated/prisma/client.js'
 import {
   type ProviderRetryHint,
   retryDateAtPgClock,
-} from '../gateway/providers/provider-retry-hint'
+} from '../gateway/providers/provider-retry-hint.js'
 
-import { writeRunSteps } from './ai-run-loop-persistence'
-
-import { AiRunStepType, Prisma } from '@/generated/prisma/client'
+import { writeRunSteps } from './ai-run-loop-persistence.js'
 
 const timestamp = z
   .string()

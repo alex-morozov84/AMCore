@@ -1,4 +1,4 @@
-import type { FileValidationOptions } from './file-validation.pipe'
+import type { FileValidationOptions } from './file-validation.pipe.js'
 
 /**
  * Reusable validation presets. SVG is intentionally absent from every image

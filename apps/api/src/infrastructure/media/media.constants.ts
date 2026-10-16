@@ -1,4 +1,4 @@
-import type { ImageOutputFormat, ImageSourceFormat } from './media.types'
+import type { ImageOutputFormat, ImageSourceFormat } from './media.types.js'
 
 /**
  * DI token for the active `ImageProcessor`. Wired to `SharpImageProcessor` by

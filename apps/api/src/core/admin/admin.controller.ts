@@ -44,35 +44,35 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { SchemaValidationException } from '../../common/schemas/schema-validation'
-import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service'
-import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
-import { SystemRoles } from '../auth/decorators/system-roles.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { SchemaValidationException } from '../../common/schemas/schema-validation.js'
+import type { CleanupResult } from '../../infrastructure/schedule/cleanup.service.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator.js'
+import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 
-import { AdminService } from './admin.service'
-import { AdminAuditService } from './admin-audit.service'
-import { AdminDetailService } from './admin-detail.service'
-import { AdminOverviewService } from './admin-overview.service'
-import { AdminSessionsService } from './admin-sessions.service'
-import { AdminAuditResponseDto } from './dto/admin-audit.dto'
+import { AdminService } from './admin.service.js'
+import { AdminAuditService } from './admin-audit.service.js'
+import { AdminDetailService } from './admin-detail.service.js'
+import { AdminOverviewService } from './admin-overview.service.js'
+import { AdminSessionsService } from './admin-sessions.service.js'
+import { AdminAuditResponseDto } from './dto/admin-audit.dto.js'
 import {
   AdminOrganizationDetailQueryDto,
   AdminOrganizationDetailResponseDto,
   AdminUserDetailQueryDto,
   AdminUserDetailResponseDto,
-} from './dto/admin-detail.dto'
-import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto'
-import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto'
-import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto'
-import { AdminSessionsListResponseDto, AdminSessionsQueryDto } from './dto/admin-session.dto'
-import { AdminUserListQueryDto } from './dto/admin-user-list-query.dto'
-import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto'
-import { CleanupResultDto } from './dto/cleanup-result.dto'
-import { UpdateSystemRoleDto } from './dto/update-system-role.dto'
+} from './dto/admin-detail.dto.js'
+import { AdminOrganizationListQueryDto } from './dto/admin-organization-list-query.dto.js'
+import { AdminOrganizationListResponseDto } from './dto/admin-organization-response.dto.js'
+import { AdminOverviewResponseDto } from './dto/admin-overview-response.dto.js'
+import { AdminSessionsListResponseDto, AdminSessionsQueryDto } from './dto/admin-session.dto.js'
+import { AdminUserListQueryDto } from './dto/admin-user-list-query.dto.js'
+import { AdminUserListResponseDto, AdminUserResponseDto } from './dto/admin-user-response.dto.js'
+import { CleanupResultDto } from './dto/cleanup-result.dto.js'
+import { UpdateSystemRoleDto } from './dto/update-system-role.dto.js'
 
 /**
  * OA-02: admin routes are bearer-only.

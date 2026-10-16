@@ -1,11 +1,10 @@
-import type { AiProviderReceipt } from '../gateway/provider-receipt'
-import { usageLedgerV2 } from '../usage/ai-usage-v2'
+import { AiRunStepType, type Prisma } from '../../../generated/prisma/client.js'
+import type { AiProviderReceipt } from '../gateway/provider-receipt.js'
+import { usageLedgerV2 } from '../usage/ai-usage-v2.js'
 
-import type { ClaimedRun } from './ai-run-dispatch.types'
-import { writeRunSteps } from './ai-run-loop-persistence'
-import type { RunPlan } from './ai-run-plan'
-
-import { AiRunStepType, type Prisma } from '@/generated/prisma/client'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
+import { writeRunSteps } from './ai-run-loop-persistence.js'
+import type { RunPlan } from './ai-run-plan.js'
 
 /** Safe receipt and spend share the terminal guard's transaction, including stop outcomes. */
 export async function writeProviderReceipt(

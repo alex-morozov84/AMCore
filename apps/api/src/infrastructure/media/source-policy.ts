@@ -1,4 +1,4 @@
-import { type ImageInspection, MediaProcessingError, type SourcePolicy } from './media.types'
+import { type ImageInspection, MediaProcessingError, type SourcePolicy } from './media.types.js'
 
 /**
  * Enforce preset-level source acceptance on an already-inspected image.

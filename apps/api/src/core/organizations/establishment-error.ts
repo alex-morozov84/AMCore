@@ -1,4 +1,4 @@
-import { AppException } from '../../common/exceptions/domain/app.exception'
+import { AppException } from '../../common/exceptions/domain/app.exception.js'
 
 export function establishmentError(code: string, status = 409): AppException {
   return new AppException(

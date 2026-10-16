@@ -205,7 +205,8 @@ adopter-owned infrastructure, secrets, environments, and capacity choices.
 | API surface                                                  | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
-Type checking runs separately; SWC only transforms code.
+API build requires type checking before SWC emission; unit tests do not check types.
+See [API build and ESM runtime](docs/backend/api-build.md) for module boundaries and commands.
 Vitest runs `packages/shared`'s own schema/lib contract tests, React Email
 template rendering, and frontend unit/integration tests. Storybook covers
 isolated component-state/interaction/a11y checks. Playwright runs frontend

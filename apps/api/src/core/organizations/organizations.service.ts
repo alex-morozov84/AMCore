@@ -8,24 +8,27 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { ConflictException, ForbiddenException, NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import type { AppAbility } from '../auth/casl/ability.factory'
-import type { TeamAccessDecision } from '../auth/casl/ability.factory'
-import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
-import { OrgAclVersionService } from '../auth/org-acl-version.service'
-import type { VerifiedOrganizationContext } from '../auth/organization-context/verified-organization-context'
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '../../common/exceptions/index.js'
+import type { Organization, Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import type { AppAbility } from '../auth/casl/ability.factory.js'
+import type { TeamAccessDecision } from '../auth/casl/ability.factory.js'
+import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults.js'
+import { OrgAclVersionService } from '../auth/org-acl-version.service.js'
+import type { VerifiedOrganizationContext } from '../auth/organization-context/verified-organization-context.js'
 
-import { CapabilityRegistry } from './capability-registry.service'
-import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto'
+import { CapabilityRegistry } from './capability-registry.service.js'
+import type { CreateOrganizationDto, UpdateOrganizationDto } from './dto/index.js'
 import {
   assertOrganizationAction,
   assertOrganizationResponse,
   lockOrganization,
-} from './organization-authorization'
-import { OrganizationCreationService } from './organization-creation.service'
-
-import type { Organization, Prisma } from '@/generated/prisma/client'
+} from './organization-authorization.js'
+import { OrganizationCreationService } from './organization-creation.service.js'
 
 type PrismaTx = Prisma.TransactionClient
 

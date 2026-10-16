@@ -2,17 +2,17 @@ import type { IncomingHttpHeaders } from 'node:http'
 
 import { Injectable } from '@nestjs/common'
 
-import { GenericHmacWebhookVerifier } from './generic-hmac.webhook-verifier'
-import { StripeStyleWebhookVerifier } from './stripe-style.webhook-verifier'
-import { TelegramSecretTokenVerifier } from './telegram-secret-token.webhook-verifier'
+import { EnvService } from '../../env/env.service.js'
+
+import { GenericHmacWebhookVerifier } from './generic-hmac.webhook-verifier.js'
+import { StripeStyleWebhookVerifier } from './stripe-style.webhook-verifier.js'
+import { TelegramSecretTokenVerifier } from './telegram-secret-token.webhook-verifier.js'
 import type {
   GenericHmacWebhookOptions,
   ResolvedWebhookProvider,
   WebhookProvider,
   WebhookVerificationInput,
-} from './webhook.types'
-
-import { EnvService } from '@/env/env.service'
+} from './webhook.types.js'
 
 const GENERIC_OPTIONS: GenericHmacWebhookOptions = {
   idHeader: 'webhook-id',

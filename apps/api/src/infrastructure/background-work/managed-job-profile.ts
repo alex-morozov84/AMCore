@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 import { workJobIdSchema } from '@amcore/shared'
 
-import { type JobBinding, jobVersions, type WorkDefinition } from './work-definition'
-import { parseWorkPayload } from './work-payload'
+import { type JobBinding, jobVersions, type WorkDefinition } from './work-definition.js'
+import { parseWorkPayload } from './work-payload.js'
 
 export const managedEnvelopeSchema = z.strictObject({
   protocolVersion: z.literal(1),

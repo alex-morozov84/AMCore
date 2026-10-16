@@ -2,22 +2,22 @@ import { Injectable } from '@nestjs/common'
 
 import type { SupportedLocale } from '@amcore/shared'
 
-import type { NotificationChannelRegistry } from './channels/notification-channel.registry'
-import { NOTIFICATION_DEFINITIONS } from './definitions'
-import type { NotificationExternalMode } from './notification.constants'
+import type { NotificationChannelRegistry } from './channels/notification-channel.registry.js'
+import { NOTIFICATION_DEFINITIONS } from './definitions/index.js'
+import type { NotificationExternalMode } from './notification.constants.js'
 import {
   DuplicateNotificationDefinitionError,
   UnknownNotificationTypeError,
-} from './notification.errors'
-import { resolveExternalMode } from './notification-content-policy'
+} from './notification.errors.js'
+import { resolveExternalMode } from './notification-content-policy.js'
 import type {
   CategoryCapability,
   NotificationCapabilities,
   NotificationDefinition,
   NotificationDefinitionRegistration,
   RenderedNotificationContent,
-} from './notification-definition.types'
-import { validateDefinition } from './notification-definition.validation'
+} from './notification-definition.types.js'
+import { validateDefinition } from './notification-definition.validation.js'
 
 /**
  * Registry of code-owned notification definitions (ADR-052). The single lookup

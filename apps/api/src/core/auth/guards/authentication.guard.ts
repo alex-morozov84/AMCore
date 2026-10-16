@@ -9,19 +9,19 @@ import { Reflector } from '@nestjs/core'
 
 import { AuthType } from '@amcore/shared'
 
-import { BadRequestException, UnauthorizedException } from '../../../common/exceptions'
-import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
-import { AbilityFactory } from '../casl/ability.factory'
-import { AUTH_TYPE_KEY } from '../decorators/auth.decorator'
-import { contextPolicyMetadata } from '../organization-context/context-policy-metadata'
-import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
-import { organizationHeader } from '../organization-context/organization-selector'
-import { PrivilegedAdmissionService } from '../privileged-admission.service'
+import { BadRequestException, UnauthorizedException } from '../../../common/exceptions/index.js'
+import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard.js'
+import { AbilityFactory } from '../casl/ability.factory.js'
+import { AUTH_TYPE_KEY } from '../decorators/auth.decorator.js'
+import { contextPolicyMetadata } from '../organization-context/context-policy-metadata.js'
+import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service.js'
+import { organizationHeader } from '../organization-context/organization-selector.js'
+import { PrivilegedAdmissionService } from '../privileged-admission.service.js'
 
-import { JwtAuthGuard } from './jwt-auth.guard'
-import { PoliciesGuard } from './policies.guard'
-import { SystemRolesGuard } from './system-roles.guard'
-import { TeamAccessGuard } from './team-access.guard'
+import { JwtAuthGuard } from './jwt-auth.guard.js'
+import { PoliciesGuard } from './policies.guard.js'
+import { SystemRolesGuard } from './system-roles.guard.js'
+import { TeamAccessGuard } from './team-access.guard.js'
 
 /**
  * AK-11: distinguish decision-class failures from infrastructure failures

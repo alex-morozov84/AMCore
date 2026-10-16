@@ -530,6 +530,35 @@ When bumping one of these tools:
 2. verify the checksum against the upstream release asset;
 3. re-run the relevant local validation before review.
 
+OSV runs only on the weekly schedule. A successful pull-request workflow skips
+that job and does not prove the new binary works. Before changing its pin, verify
+the downloaded binary's checksum and version, then run the existing recursive
+command against root and nested lockfiles. Validate the resulting SARIF report.
+Keep these results separate from tests that simulate scanner exit codes.
+
+OSV exit codes `0` (clean) and `1` (findings) permit SARIF upload. Other exit codes
+fail the job; a missing or malformed report must not become a successful upload.
+Keep the schedule, recursive scan, upload category and report-only findings policy
+when refreshing the binary. An older alert can still apply if its affected
+package version remains installed. Duplicate alerts from different scanners do
+not represent independent vulnerabilities, and a green report-only scan does
+not prove that an image contains no vulnerable packages.
+
+### Transitive dependency exceptions
+
+Prefer the versions supported by each parent package. Before removing an override,
+check the parent's published dependency range, current advisories and the actual
+installed consumer. Use normal pnpm resolution and review the complete lockfile
+change. An override removal does not require updating every compatible dependency
+already retained by the lockfile.
+
+Swagger 12.0.2 selects js-yaml 5.4.2; Prisma 7.10.1 selects mysql2 3.24.4.
+MCP SDK 1.31.0 accepts Hono node-server 1.19.17, retained in the ordinary lockfile.
+These paths no longer need overrides. The web development tool shadcn uses MCP
+stdio, not the Hono HTTP transport. This does not certify unrelated package paths
+or replace source and deployed-image scans. Recheck advisory ranges before a
+future dependency update; a package's minimum supported version can be vulnerable.
+
 ### Dependency freshness report
 
 Dependabot handles patch/minor npm + action bumps and (per repo, see

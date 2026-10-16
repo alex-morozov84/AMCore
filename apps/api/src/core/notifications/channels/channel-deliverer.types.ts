@@ -1,7 +1,6 @@
-import type { ClaimedDelivery } from '../dispatch/notification-dispatch.types'
-import type { NotificationChannel } from '../notification.constants'
-
-import type { Notification, Prisma } from '@/generated/prisma/client'
+import type { Notification, Prisma } from '../../../generated/prisma/client.js'
+import type { ClaimedDelivery } from '../dispatch/notification-dispatch.types.js'
+import type { NotificationChannel } from '../notification.constants.js'
 
 /** Everything a deliverer needs for one attempt: the claimed delivery + its notification. */
 export interface DeliveryContext {

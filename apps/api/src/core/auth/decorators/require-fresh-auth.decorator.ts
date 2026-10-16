@@ -1,6 +1,6 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common'
 
-import { FreshAuthGuard, REQUIRE_FRESH_AUTH_KEY } from '../guards/fresh-auth.guard'
+import { FreshAuthGuard, REQUIRE_FRESH_AUTH_KEY } from '../guards/fresh-auth.guard.js'
 
 /**
  * @RequireFreshAuth() — require a recently re-authenticated session (OB-06b /

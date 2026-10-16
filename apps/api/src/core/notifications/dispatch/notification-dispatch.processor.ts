@@ -2,13 +2,12 @@ import { Injectable } from '@nestjs/common'
 import type { Job } from 'bullmq'
 import { PinoLogger } from 'nestjs-pino'
 
-import { dispatchDueJobSchema } from '../notification-dispatch.schema'
+import type { WorkHandler } from '../../../infrastructure/background-work/work-definition.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+import { JobName, QueueName } from '../../../infrastructure/queue/constants/queues.constant.js'
+import { dispatchDueJobSchema } from '../notification-dispatch.schema.js'
 
-import { NotificationDispatchService } from './notification-dispatch.service'
-
-import type { WorkHandler } from '@/infrastructure/background-work/work-definition'
-import { MetricsService } from '@/infrastructure/observability'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
+import { NotificationDispatchService } from './notification-dispatch.service.js'
 
 /**
  * BullMQ consumer for `QueueName.NOTIFICATIONS` (ADR-052). A `DISPATCH_DUE` job is a

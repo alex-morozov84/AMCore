@@ -1,16 +1,15 @@
 import { Module } from '@nestjs/common'
 
-import { AiRunService } from '../runs/ai-run.service'
+import { AiCatalogModule } from '../../../infrastructure/ai/ai-catalog.module.js'
+import { PrismaModule } from '../../../prisma/index.js'
+import { AuditModule } from '../../audit/index.js'
+import { AiRunService } from '../runs/ai-run.service.js'
 
-import { aiRunExecutionsWork } from './ai-run-executions.work'
-import { AiWorkCleanup } from './ai-work-cleanup'
-import { AiWorkControl } from './ai-work-control'
-import { AiWorkReader } from './ai-work-reader'
-import { AiWorkRetry } from './ai-work-retry'
-
-import { AuditModule } from '@/core/audit'
-import { AiCatalogModule } from '@/infrastructure/ai/ai-catalog.module'
-import { PrismaModule } from '@/prisma'
+import { aiRunExecutionsWork } from './ai-run-executions.work.js'
+import { AiWorkCleanup } from './ai-work-cleanup.js'
+import { AiWorkControl } from './ai-work-control.js'
+import { AiWorkReader } from './ai-work-reader.js'
+import { AiWorkRetry } from './ai-work-retry.js'
 
 /** Backend durable authority survives every optional Console frontend topology. */
 @Module({

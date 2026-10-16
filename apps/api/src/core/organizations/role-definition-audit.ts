@@ -1,8 +1,7 @@
 import type { AuditAction, RequestPrincipal } from '@amcore/shared'
 
-import type { AuditLogService } from '../audit'
-
-import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
+import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
+import type { AuditLogService } from '../audit/index.js'
 
 export interface RoleAuditFacts {
   roleId: string

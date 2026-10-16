@@ -10,7 +10,7 @@ import type { StorageService } from '@/infrastructure/storage'
 
 const derivative = (name: string, url: string) => ({
   name,
-  key: `avatars/u1/${name}.webp`,
+  key: `public/avatars/u1/v-1-x/${name}.webp`,
   url,
   width: 256,
   height: 256,
@@ -29,7 +29,7 @@ const PROCESS_RESULT: ProcessImageResult = {
 
 describe('AvatarService', () => {
   let service: AvatarService
-  let storage: jest.Mocked<Pick<StorageService, 'upload' | 'list' | 'deleteMany'>>
+  let storage: jest.Mocked<Pick<StorageService, 'upload' | 'list' | 'deleteMany' | 'getPublicUrl'>>
   let prisma: { user: { findUnique: jest.Mock; updateMany: jest.Mock } }
   let userCache: jest.Mocked<Pick<UserCacheService, 'invalidateUser'>>
   let media: jest.Mocked<Pick<MediaService, 'processImageNow'>>
@@ -41,6 +41,7 @@ describe('AvatarService', () => {
       upload: jest.fn().mockResolvedValue({ key: 'k', size: 1 }),
       list: jest.fn().mockResolvedValue({ files: [], isTruncated: false }),
       deleteMany: jest.fn().mockResolvedValue(undefined),
+      getPublicUrl: jest.fn((key: string) => `https://cdn/${key}`),
     }
     prisma = {
       user: {
@@ -64,6 +65,35 @@ describe('AvatarService', () => {
     )
   })
 
+  describe('setAvatarIfAbsent', () => {
+    const file = { buffer: Buffer.from('img'), mimetype: 'image/png' }
+
+    it('returns null and writes nothing when the user already has an avatar', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        avatarKey: 'public/avatars/u1/v-1-a/avatar-256.webp',
+        avatarGeneration: 1,
+      })
+      await expect(service.setAvatarIfAbsent('u1', file)).resolves.toBeNull()
+      expect(storage.upload).not.toHaveBeenCalled()
+      expect(prisma.user.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('publishes through the same generation fence when the avatar is empty', async () => {
+      prisma.user.findUnique.mockResolvedValue({ avatarKey: null, avatarGeneration: 0 })
+      await expect(service.setAvatarIfAbsent('u1', file)).resolves.toMatch(/^https:\/\/cdn\//)
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: 'u1', avatarGeneration: { lt: 1 } },
+        data: expect.objectContaining({ avatarGeneration: 1 }) as unknown as object,
+      })
+    })
+
+    it('loses to a concurrent upload instead of replacing it (fence miss → 503)', async () => {
+      prisma.user.findUnique.mockResolvedValue({ avatarKey: null, avatarGeneration: 0 })
+      prisma.user.updateMany.mockResolvedValue({ count: 0 })
+      await expect(service.setAvatarIfAbsent('u1', file)).rejects.toMatchObject({ status: 503 })
+    })
+  })
+
   it('stores a private versioned original and CAS-publishes the primary URL', async () => {
     const result = await service.setAvatar('u1', {
       buffer: Buffer.from('img'),
@@ -79,10 +109,10 @@ describe('AvatarService', () => {
     // Conditional publish: generation 1, only while the stored generation is older.
     expect(prisma.user.updateMany).toHaveBeenCalledWith({
       where: { id: 'u1', avatarGeneration: { lt: 1 } },
-      data: { avatarUrl: 'https://cdn/avatar-256.webp', avatarGeneration: 1 },
+      data: { avatarKey: 'public/avatars/u1/v-1-x/avatar-256.webp', avatarGeneration: 1 },
     })
     expect(userCache.invalidateUser).toHaveBeenCalledWith('u1')
-    expect(result).toBe('https://cdn/avatar-256.webp')
+    expect(result).toBe('https://cdn/public/avatars/u1/v-1-x/avatar-256.webp')
   })
 
   it('sweeps strictly-older generations and the legacy object, keeping its own', async () => {
@@ -115,7 +145,7 @@ describe('AvatarService', () => {
       mimetype: 'image/png',
     })
 
-    expect(result).toBe('https://cdn/avatar-256.webp')
+    expect(result).toBe('https://cdn/public/avatars/u1/v-1-x/avatar-256.webp')
     expect(prisma.user.updateMany).toHaveBeenCalled()
     expect(userCache.invalidateUser).toHaveBeenCalledWith('u1')
   })
@@ -148,7 +178,7 @@ describe('AvatarService', () => {
 
   it('runs every mutation under the per-user avatar lock', async () => {
     await service.setAvatar('u1', { buffer: Buffer.from('img'), mimetype: 'image/png' })
-    prisma.user.findUnique.mockResolvedValue({ avatarUrl: null, avatarGeneration: 0 })
+    prisma.user.findUnique.mockResolvedValue({ avatarKey: null, avatarGeneration: 0 })
     await service.removeAvatar('u1')
 
     expect(mutex.runExclusive).toHaveBeenCalledTimes(2)
@@ -187,7 +217,7 @@ describe('AvatarService', () => {
       // Stale remover read generation 0 → bounds its sweep to generations < 1,
       // while a concurrent upload already published generation 2.
       prisma.user.findUnique.mockResolvedValue({
-        avatarUrl: 'https://cdn/avatars/u1/v-0-old/avatar-256.webp',
+        avatarKey: 'public/avatars/u1/v-0-old/avatar-256.webp',
         avatarGeneration: 0,
       })
       prisma.user.updateMany.mockResolvedValue({ count: 0 }) // newer generation won the CAS
@@ -209,7 +239,7 @@ describe('AvatarService', () => {
 
   it('removes all avatar objects and clears the row via CAS', async () => {
     prisma.user.findUnique.mockResolvedValue({
-      avatarUrl: 'https://cdn/avatars/u1/v-0-a/avatar-256.webp',
+      avatarKey: 'public/avatars/u1/v-0-a/avatar-256.webp',
       avatarGeneration: 0,
     })
     // Private originals live under avatars/…, public derivatives under public/avatars/….
@@ -233,14 +263,14 @@ describe('AvatarService', () => {
     ])
     expect(prisma.user.updateMany).toHaveBeenCalledWith({
       where: { id: 'u1', avatarGeneration: { lt: 1 } },
-      data: { avatarUrl: null, avatarGeneration: 1 },
+      data: { avatarKey: null, avatarGeneration: 1 },
     })
     expect(userCache.invalidateUser).toHaveBeenCalledWith('u1')
   })
 
   it('fails closed: does not clear the row when storage cleanup fails', async () => {
     prisma.user.findUnique.mockResolvedValue({
-      avatarUrl: 'https://cdn/avatar-256.webp',
+      avatarKey: 'public/avatars/u1/v-0-a/avatar-256.webp',
       avatarGeneration: 0,
     })
     storage.deleteMany.mockRejectedValue(new Error('storage down'))
@@ -250,7 +280,7 @@ describe('AvatarService', () => {
   })
 
   it('is idempotent when the user has no avatar URL', async () => {
-    prisma.user.findUnique.mockResolvedValue({ avatarUrl: null, avatarGeneration: 0 })
+    prisma.user.findUnique.mockResolvedValue({ avatarKey: null, avatarGeneration: 0 })
 
     await service.removeAvatar('u1')
 

@@ -26,15 +26,15 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 
-import { ApiKeysService, type CreateApiKeyResult } from './api-keys.service'
-import { ApiKeyListResponseDto } from './dto/api-key-list-response.dto'
-import { ApiKeyQueryDto } from './dto/api-key-query.dto'
-import { CreateApiKeyDto } from './dto/create-api-key.dto'
-import { CreateApiKeyResponseDto } from './dto/create-api-key-response.dto'
+import { ApiKeysService, type CreateApiKeyResult } from './api-keys.service.js'
+import { ApiKeyListResponseDto } from './dto/api-key-list-response.dto.js'
+import { ApiKeyQueryDto } from './dto/api-key-query.dto.js'
+import { CreateApiKeyDto } from './dto/create-api-key.dto.js'
+import { CreateApiKeyResponseDto } from './dto/create-api-key-response.dto.js'
 
 /**
  * Credential management routes are bearer-only.

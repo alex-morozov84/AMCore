@@ -1,9 +1,9 @@
 import type { Response } from 'express'
 import type { FastifyReply } from 'fastify'
 
-import { captureFastifyResponse } from './fastify-idempotency-response'
-import { IDEMPOTENCY_REPLAY_HEADER } from './idempotency.constants'
-import type { CompletedIdempotencyRecord } from './idempotency.types'
+import { captureFastifyResponse } from './fastify-idempotency-response.js'
+import { IDEMPOTENCY_REPLAY_HEADER } from './idempotency.constants.js'
+import type { CompletedIdempotencyRecord } from './idempotency.types.js'
 
 export type IdempotencyResponse = Response | FastifyReply
 

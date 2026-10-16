@@ -9,21 +9,22 @@ import {
   type ReissueInviteInput,
 } from '@amcore/shared'
 
-import { ForbiddenException, NotFoundException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
-import { AuditLogService } from '../audit'
-import { EmailIdentityService } from '../auth/email-identity.service'
+import { ForbiddenException, NotFoundException } from '../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
+import { AuditLogService } from '../audit/index.js'
+import { EmailIdentityService } from '../auth/email-identity.service.js'
 import {
   currentInvitationIntent,
   invitationDefaultRole,
   invitationRoleCreate,
   lockInvitationRoles,
-} from '../invitations/invitation-role-intent'
+} from '../invitations/invitation-role-intent.js'
 
-import { assertInvitationActor, type InvitationActor } from './invitation-actor'
-import { InvitationAuthorization } from './invitation-authorization'
-import { InvitationEmailService, type InvitationMailSnapshot } from './invitation-email.service'
-import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks'
+import { assertInvitationActor, type InvitationActor } from './invitation-actor.js'
+import { InvitationAuthorization } from './invitation-authorization.js'
+import { InvitationEmailService, type InvitationMailSnapshot } from './invitation-email.service.js'
+import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks.js'
 import {
   completeInvitationOperation,
   INVITATION_RETENTION_MS,
@@ -31,12 +32,10 @@ import {
   invitationFingerprint,
   lockInvitationOperation,
   replayInvitationOperation,
-} from './invitation-operation'
-import { invitationPostCommit } from './invitation-post-commit'
-import { invitationTransaction } from './invitation-transaction'
-import { InviteRateLimiterService } from './invite-rate-limiter.service'
-
-import { AuditActorType, AuditTargetType, type Prisma } from '@/generated/prisma/client'
+} from './invitation-operation.js'
+import { invitationPostCommit } from './invitation-post-commit.js'
+import { invitationTransaction } from './invitation-transaction.js'
+import { InviteRateLimiterService } from './invite-rate-limiter.service.js'
 
 const ack: InviteResponse = { status: 'invited' }
 type Mail = Omit<InvitationMailSnapshot, 'orgName' | 'inviterName' | 'inviterEmail'> & {

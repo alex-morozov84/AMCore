@@ -1,4 +1,4 @@
-import type { ShutdownLatch } from './shutdown-latch'
+import type { ShutdownLatch } from './shutdown-latch.js'
 
 /**
  * Process-wide capacity gate for one durable worker subsystem (synchronous, no I/O). Every dispatch

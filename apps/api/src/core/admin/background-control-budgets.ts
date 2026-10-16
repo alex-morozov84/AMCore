@@ -2,16 +2,22 @@ import { Inject, Injectable, Optional } from '@nestjs/common'
 
 import type { WorkOperation } from '@amcore/shared'
 
-import { backgroundControlError } from './background-control-error'
+import type { BackgroundBudget, Prisma } from '../../generated/prisma/client.js'
+import {
+  admitControlBudget,
+  type GcraRate,
+} from '../../infrastructure/background-work/control-budget.js'
+import { lockControlBudget } from '../../infrastructure/background-work/control-budget-store.js'
+import {
+  CONTROL_LIMITS,
+  CONTROL_RATES,
+} from '../../infrastructure/background-work/control-limits.js'
+import type { ControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
+import { WORK_REGISTRATIONS } from '../../infrastructure/background-work/registration.js'
+import type { WorkRegistration } from '../../infrastructure/background-work/work-definition.js'
+import { WorkPolicyError } from '../../infrastructure/background-work/work-policy-error.js'
 
-import type { BackgroundBudget, Prisma } from '@/generated/prisma/client'
-import { admitControlBudget, type GcraRate } from '@/infrastructure/background-work/control-budget'
-import { lockControlBudget } from '@/infrastructure/background-work/control-budget-store'
-import { CONTROL_LIMITS, CONTROL_RATES } from '@/infrastructure/background-work/control-limits'
-import type { ControlTransaction } from '@/infrastructure/background-work/control-transaction'
-import { WORK_REGISTRATIONS } from '@/infrastructure/background-work/registration'
-import type { WorkRegistration } from '@/infrastructure/background-work/work-definition'
-import { WorkPolicyError } from '@/infrastructure/background-work/work-policy-error'
+import { backgroundControlError } from './background-control-error.js'
 
 export interface LockedControlBudgets {
   readonly global: BackgroundBudget

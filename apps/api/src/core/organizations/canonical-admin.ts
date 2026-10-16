@@ -1,7 +1,7 @@
-import { establishmentError } from './establishment-error'
-import { hasCanonicalTemplate } from './system-template-validation'
+import type { Prisma } from '../../generated/prisma/client.js'
 
-import type { Prisma } from '@/generated/prisma/client'
+import { establishmentError } from './establishment-error.js'
+import { hasCanonicalTemplate } from './system-template-validation.js'
 
 export async function canonicalAdmin(db: Pick<Prisma.TransactionClient, 'role'>): Promise<string> {
   const roles = await db.role.findMany({

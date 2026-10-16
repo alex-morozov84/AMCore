@@ -1,10 +1,10 @@
 import { Action, type RequestPrincipal, Subject } from '@amcore/shared'
 
-import { interpolateConditions } from './interpolate-conditions'
-import { normalizeDateConditions } from './normalize-date-conditions'
-import { isModelSubject } from './permission-model-fields'
-import { type PermissionWriteInput, validatePermissionRule } from './permission-rule-validation'
-import { prismaQuery } from './prisma-ability'
+import { interpolateConditions } from './interpolate-conditions.js'
+import { normalizeDateConditions } from './normalize-date-conditions.js'
+import { isModelSubject } from './permission-model-fields.js'
+import { type PermissionWriteInput, validatePermissionRule } from './permission-rule-validation.js'
+import { prismaQuery } from './prisma-ability.js'
 
 export interface AbilityPermission {
   id: string

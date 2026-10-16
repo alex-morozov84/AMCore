@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { optionalEnvString, optionalEnvUrl } from './helpers'
+import { optionalEnvString, optionalEnvUrl } from './helpers.js'
 
 // Cloud-agnostic file storage. The driver default is
 // environment-derived (production → s3, test → memory, otherwise local) in the

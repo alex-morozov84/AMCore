@@ -1,9 +1,9 @@
-import type { Env } from '../../env'
+import type { Env } from '../../env.js'
 
-import { LocalStorageProvider } from './providers/local-storage.provider'
-import { MemoryStorageProvider } from './providers/memory-storage.provider'
-import { S3StorageProvider } from './providers/s3-storage.provider'
-import type { StorageProvider } from './storage.interface'
+import { LocalStorageProvider } from './providers/local-storage.provider.js'
+import { MemoryStorageProvider } from './providers/memory-storage.provider.js'
+import { S3StorageProvider } from './providers/s3-storage.provider.js'
+import type { StorageProvider } from './storage.interface.js'
 
 /** Anything that reads validated configuration: the Nest `EnvService` or a plain object. */
 export interface StorageConfigSource {

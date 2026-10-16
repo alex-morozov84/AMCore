@@ -45,16 +45,19 @@ import {
   type SessionsListResponse,
 } from '@amcore/shared'
 
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto'
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip'
-import { EnvService } from '../../env/env.service'
-import { invitationHandoffProof } from '../invitations/invitation-auth-handoff'
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip.js'
+import { EnvService } from '../../env/env.service.js'
+import type { User } from '../../generated/prisma/client.js'
+import { AVATAR_VALIDATION, FileValidationPipe } from '../../infrastructure/storage/index.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
+import { invitationHandoffProof } from '../invitations/invitation-auth-handoff.js'
 
-import { AuthService } from './auth.service'
-import { AvatarService, type AvatarUploadFile } from './avatar.service'
-import { Auth } from './decorators/auth.decorator'
-import { CurrentUser } from './decorators/current-user.decorator'
+import { AuthService } from './auth.service.js'
+import { AvatarService, type AvatarUploadFile } from './avatar.service.js'
+import { Auth } from './decorators/auth.decorator.js'
+import { CurrentUser } from './decorators/current-user.decorator.js'
 import {
   AuthResponseDto,
   AvatarResponseDto,
@@ -70,16 +73,12 @@ import {
   StepUpDto,
   UpdateProfileDto,
   VerifyEmailDto,
-} from './dto'
-import { SessionsListResponseDto } from './dto/sessions-list-response.dto'
-import { OriginCheckGuard, RefreshTokenGuard } from './guards'
-import { negotiateLocale } from './locale-negotiation'
-import { SessionService } from './session.service'
-import { TokenService } from './token.service'
-
-import type { User } from '@/generated/prisma/client'
-import { AVATAR_VALIDATION, FileValidationPipe } from '@/infrastructure/storage'
-import { RATE_LIMIT_POLICIES, RateLimit } from '@/infrastructure/throttling'
+} from './dto/index.js'
+import { SessionsListResponseDto } from './dto/sessions-list-response.dto.js'
+import { OriginCheckGuard, RefreshTokenGuard } from './guards/index.js'
+import { negotiateLocale } from './locale-negotiation.js'
+import { SessionService } from './session.service.js'
+import { TokenService } from './token.service.js'
 
 // Multipart hard stop for the avatar upload. Set above AVATAR_VALIDATION.maxSize
 // (2 MB) so the FileValidationPipe produces the clean 413 for files between the

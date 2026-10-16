@@ -10,30 +10,32 @@ import type {
 } from '@amcore/shared'
 import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
 
-import { AppException } from '../../../common/exceptions'
-import { EnvService } from '../../../env/env.service'
-import { PrismaService } from '../../../prisma'
+import { AppException } from '../../../common/exceptions/index.js'
+import { EnvService } from '../../../env/env.service.js'
+import type { OAuthProvider, Prisma, User } from '../../../generated/prisma/client.js'
+import { StorageService } from '../../../infrastructure/storage/index.js'
+import { PrismaService } from '../../../prisma/index.js'
 import {
   type InvitationHandoffProof,
   lockInvitationAuthAttempt,
-} from '../../invitations/invitation-auth-handoff'
-import { InvitationContinuationService } from '../../invitations/invitation-continuation.service'
+} from '../../invitations/invitation-auth-handoff.js'
+import { InvitationContinuationService } from '../../invitations/invitation-continuation.service.js'
 import {
   invalidInvitation,
   invitationClock,
   lockInvitationSignupEmail,
   lockInvitationUser,
-} from '../../invitations/invitation-locks'
-import { EmailIdentityService } from '../email-identity.service'
-import { SessionService } from '../session.service'
-import type { AccessTokenPayload } from '../token.service'
-import { UserCacheService } from '../user-cache.service'
+} from '../../invitations/invitation-locks.js'
+import { avatarUrlOf } from '../avatar-url.js'
+import { EmailIdentityService } from '../email-identity.service.js'
+import { SessionService } from '../session.service.js'
+import type { AccessTokenPayload } from '../token.service.js'
+import { UserCacheService } from '../user-cache.service.js'
 
-import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce'
-import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service'
-import { OAuthProviderFactory } from './providers/oauth-provider.factory'
-
-import type { OAuthProvider, Prisma, User } from '@/generated/prisma/client'
+import { OAuthAvatarRehostService } from './oauth-avatar-rehost.service.js'
+import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce.js'
+import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service.js'
+import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
 interface LoginCallbackResult {
   mode: 'login'
@@ -67,7 +69,9 @@ export class OAuthService {
     private readonly emailIdentity: EmailIdentityService,
     private readonly logger: PinoLogger,
     private readonly env: EnvService,
-    private readonly invitationAuthority: InvitationContinuationService
+    private readonly invitationAuthority: InvitationContinuationService,
+    private readonly storage: StorageService,
+    private readonly avatarRehost: OAuthAvatarRehostService
   ) {
     this.logger.setContext(OAuthService.name)
   }
@@ -189,7 +193,7 @@ export class OAuthService {
       )
     }
 
-    const { user, session, refreshToken } = await this.prisma.$transaction(
+    const { user, accountCreated, session, refreshToken } = await this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
         const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
@@ -219,7 +223,7 @@ export class OAuthService {
           )
           if (invite.emailCanonical !== emailCanonical) throw invalidInvitation()
         }
-        const user = await this.findOrCreateUser(
+        const { user, accountCreated } = await this.findOrCreateUser(
           tx,
           profile,
           providerName,
@@ -250,7 +254,7 @@ export class OAuthService {
           new Date(stateData.invitation.expiresAt) <= (await invitationClock(tx))
         )
           throw invalidInvitation()
-        return { user, ...issuance }
+        return { user, accountCreated, ...issuance }
       },
       { maxWait: 2000, timeout: 4000 }
     )
@@ -262,6 +266,10 @@ export class OAuthService {
     }
 
     this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
+    // Copied once, when this sign-in created the account or linked this provider for the first time.
+    // A repeat sign-in never copies again, so an avatar the user removed stays removed.
+    if (accountCreated && !user.avatarKey && profile.avatarSourceUrl)
+      this.avatarRehost.schedule(user.id, profile.avatarSourceUrl)
 
     return {
       mode: 'login',
@@ -334,7 +342,7 @@ export class OAuthService {
     locale?: SupportedLocale,
     invited = false,
     expectedUserId?: string
-  ): Promise<User> {
+  ): Promise<{ user: User; accountCreated: boolean }> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
     const existing = await tx.oAuthAccount.findUnique({
@@ -352,7 +360,7 @@ export class OAuthService {
         where: { id: existing.userId },
         data: { lastLoginAt: new Date() },
       })
-      return existing.user
+      return { user: existing.user, accountCreated: false }
     }
 
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
@@ -366,12 +374,15 @@ export class OAuthService {
         )
       // Existing account linked by email — keep its stored locale (D2: never
       // overwrite an established preference with a browser hint).
-      return this.linkAndReturnUser(tx, userByEmail, profile, provider)
+      return {
+        user: await this.linkAndReturnUser(tx, userByEmail, profile, provider),
+        accountCreated: true,
+      }
     }
 
     if (!invited && !this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
       throw new AppException('Public signup is disabled', 403, AuthErrorCode.PUBLIC_SIGNUP_DISABLED)
-    return this.createOAuthUser(tx, profile, provider, locale)
+    return { user: await this.createOAuthUser(tx, profile, provider, locale), accountCreated: true }
   }
 
   private async linkAndReturnUser(
@@ -410,7 +421,6 @@ export class OAuthService {
         emailCanonical,
         emailVerified: profile.emailVerified,
         name: profile.displayName,
-        avatarUrl: profile.avatarUrl,
         // Seed from the negotiated locale (D2); omit to take the DB default.
         ...(locale ? { locale } : {}),
         lastLoginAt: new Date(),
@@ -425,7 +435,7 @@ export class OAuthService {
       email: user.email,
       emailVerified: user.emailVerified,
       name: user.name,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: avatarUrlOf(this.storage, user.avatarKey),
       phone: user.phone,
       locale: parseSupportedLocale(user.locale),
       timezone: user.timezone,

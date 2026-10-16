@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common'
 
-import { AppException } from '@/common/exceptions'
+import { AppException } from '../../common/exceptions/index.js'
 
 export function invalidIdempotencyKey(): AppException {
   return new AppException(

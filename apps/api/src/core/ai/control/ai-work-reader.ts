@@ -12,17 +12,17 @@ import {
   workSummarySchema,
 } from '@amcore/shared'
 
-import { aiRunExecutionsWork } from './ai-run-executions.work'
-import { AiWorkCleanup } from './ai-work-cleanup'
-import { aiRunBasicCapability, aiRunRevision, aiRunWorkState, aiWorkDigest } from './ai-work-policy'
-import { AiWorkRetry } from './ai-work-retry'
+import { BadRequestException } from '../../../common/exceptions/index.js'
+import { type AiRun, Prisma } from '../../../generated/prisma/client.js'
+import { aiExecutionDescriptorSchema } from '../../../infrastructure/ai/registry/ai-execution-descriptor.js'
+import { aiRunExecutionEligibility } from '../../../infrastructure/ai/runs/ai-run-execution-eligibility.js'
+import { resolveWorkFailure } from '../../../infrastructure/background-work/work-failure.js'
+import { PrismaService } from '../../../prisma/index.js'
 
-import { BadRequestException } from '@/common/exceptions'
-import { type AiRun, Prisma } from '@/generated/prisma/client'
-import { aiExecutionDescriptorSchema } from '@/infrastructure/ai/registry/ai-execution-descriptor'
-import { aiRunExecutionEligibility } from '@/infrastructure/ai/runs/ai-run-execution-eligibility'
-import { resolveWorkFailure } from '@/infrastructure/background-work/work-failure'
-import { PrismaService } from '@/prisma'
+import { aiRunExecutionsWork } from './ai-run-executions.work.js'
+import { AiWorkCleanup } from './ai-work-cleanup.js'
+import { aiRunBasicCapability, aiRunRevision, aiRunWorkState, aiWorkDigest } from './ai-work-policy.js'
+import { AiWorkRetry } from './ai-work-retry.js'
 
 const buckets: Record<string, string[]> = {
   waiting: ['QUEUED', 'WAITING_APPROVAL', 'WAITING_HUMAN'],

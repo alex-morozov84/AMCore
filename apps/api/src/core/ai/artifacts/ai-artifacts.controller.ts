@@ -29,18 +29,18 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../../common/schemas/schema-response'
-import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling'
-import { Auth } from '../../auth/decorators/auth.decorator'
-import { CurrentUser } from '../../auth/decorators/current-user.decorator'
-import { AiArtifactResponseDto } from '../dto/ai.dto'
+import { SchemaResponse } from '../../../common/schemas/schema-response.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling/index.js'
+import { Auth } from '../../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
+import { AiArtifactResponseDto } from '../dto/ai.dto.js'
 
-import { AI_ARTIFACT_UPLOAD_HARD_LIMIT_BYTES } from './ai-artifact.constants'
-import { AiArtifactDownloadService } from './ai-artifact-download.service'
+import { AI_ARTIFACT_UPLOAD_HARD_LIMIT_BYTES } from './ai-artifact.constants.js'
+import { AiArtifactDownloadService } from './ai-artifact-download.service.js'
 import {
   AiArtifactUploadService,
   type UploadableAiArtifactFile,
-} from './ai-artifact-upload.service'
+} from './ai-artifact-upload.service.js'
 
 /**
  * AI artifact upload + download (Track C — ADR-054, Arc G), bearer-authenticated. Web role only —

@@ -2,11 +2,10 @@ import { subject } from '@casl/ability'
 
 import { Action, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { ForbiddenException, NotFoundException } from '../../common/exceptions'
-import type { AppAbility } from '../auth/casl/ability.factory'
-import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults'
-
-import type { Organization, Prisma } from '@/generated/prisma/client'
+import { ForbiddenException, NotFoundException } from '../../common/exceptions/index.js'
+import type { Organization, Prisma } from '../../generated/prisma/client.js'
+import type { AppAbility } from '../auth/casl/ability.factory.js'
+import { ORG_READ_FIELDS } from '../auth/casl/org-role-defaults.js'
 
 export function assertOrganizationAction(
   ability: AppAbility,

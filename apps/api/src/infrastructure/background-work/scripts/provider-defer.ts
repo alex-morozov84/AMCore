@@ -2,9 +2,9 @@ import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
 import { z } from 'zod'
 
-import { jobPredicateKeys } from '../job-snapshot'
+import { jobPredicateKeys } from '../job-snapshot.js'
 
-import { PROVIDER_DEFER_LUA } from './provider-defer.lua'
+import { PROVIDER_DEFER_LUA } from './provider-defer.lua.js'
 
 const schema = z.strictObject({
   id: z

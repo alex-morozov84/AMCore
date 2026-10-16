@@ -1,4 +1,4 @@
-import { AiToolRiskClass } from '@/generated/prisma/client'
+import { AiToolRiskClass } from '../../../generated/prisma/client.js'
 
 /**
  * Self-hosted tool registry constants + code-owned policy (Track C — ADR-054, Arc E). Starter

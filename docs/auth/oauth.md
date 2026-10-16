@@ -381,7 +381,7 @@ export class DiscordProvider implements OAuthProvider {
       email: '...', // or null if the provider returns none (see login vs link-only)
       emailVerified: true,
       displayName: '...',
-      avatarUrl: null,
+      avatarSourceUrl: null,
     }
   }
 }
@@ -431,12 +431,35 @@ All providers are normalized to the same profile shape before the user record is
   email: string | null // null for Telegram
   emailVerified: boolean
   displayName: string | null
-  avatarUrl: string | null
+  avatarSourceUrl: string | null // provider-hosted picture; copied once into our storage, never stored
   phone: string | null // Telegram only
 }
 ```
 
 The raw OAuth tokens (provider access token, refresh token) are stored in `OAuthAccount` and can be used later for provider-specific API calls (e.g., Google Calendar, GitHub repos).
+
+### Profile pictures
+
+AMCore never stores or serves a provider picture URL. The API copies the provider picture once
+into its own public storage (see [media](../media/README.md)), and only when a sign-in creates the
+account or links this provider to an existing account by email. Linking a provider on purpose from
+account settings does not copy. The user must have no avatar and the provider must return
+`avatarSourceUrl`. The copy runs after the sign-in response is decided, so it adds
+no sign-in latency. It is not retried: a failed copy leaves the user without an avatar, and the user
+can upload one. A repeat sign-in never copies again, so an avatar the user removed stays removed,
+and the copy never replaces an avatar the user uploaded.
+
+The download is a server-side request to a URL that a third party supplied, so it is restricted:
+
+- `https` only, on an explicit host allow-list (`*.googleusercontent.com`,
+  `avatars.githubusercontent.com`), no credentials or custom port. Add a host in
+  `oauth-avatar-source.ts` when a new provider returns a picture URL.
+- No redirect is followed, the wait is limited to 5 seconds, and the body is read only up to the
+  avatar upload size limit.
+- Only JPEG, PNG and WebP are accepted. The media pipeline then checks the image content itself.
+
+Each attempt logs one `oauth avatar rehost` line with the result (`stored`, `skipped`, `failed`) and
+a failure class, never the URL.
 
 ---
 

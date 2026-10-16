@@ -65,12 +65,36 @@ to see a later result. A storage failure can coexist with a ready API.
 403 indicates an access failure, not proof that S3 is down.
 
 This checks current operations, not backup integrity, persistence after container
-recreation, public URL delivery or total S3 capacity. Worker/other-instance checks
+recreation or total S3 capacity. Public delivery has its own row below. Worker/other-instance checks
 are available through monitoring, not this instance's screen. A tested alert can
 report a persistent failure; a downstream must configure a notification receiver
 once. Leaving this page open does not itself send notifications. See
 [storage configuration](../storage/configuration.md#active-file-monitoring-and-readiness)
 and [runbook](../operations/runbooks/storage.md).
+
+### Private files and public files
+
+The card has two rows. **Private files** is the write/read/delete check above.
+**Public files** shows the result of the separate [public delivery check](../storage/public-files.md)
+that the answering API instance runs against the S3 driver, by default once an
+hour (`STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS`). It sends read-only requests.
+Above the rows, a line states the delivery mode (`external`, `acl` or `api`), the
+bucket layout (one or two buckets) and the public base URL. It never shows bucket
+names, the S3 endpoint or credentials. The public base URL is shown as configured, so it can contain the provider host or bucket name.
+
+| Public files shows          | Meaning                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Served**                  | The public test file was read anonymously and the private test file was refused.                                                                 |
+| **Not served**              | The public address did not serve the test file. A hint names the likely cause for the delivery mode in use.                                      |
+| **Private files exposed**   | An anonymous request read a private test file. See the banner below.                                                                             |
+| **Not checked yet / stale** | No result yet, or the last result is older than three intervals.                                                                                 |
+| **Off**                     | The instance does not run the check. The row says why: local or memory driver, the check is disabled, or this process only runs background jobs. |
+
+When private files are exposed, a destructive banner appears at the top of the
+card. Treat it as a data-exposure incident and follow the **Private exposure**
+section of the [file storage runbook](../operations/runbooks/storage.md). Like
+the private row, this row shows the answering API instance only. Other replicas
+are covered by the public-check metrics and alerts.
 
 ### Change the probe interval
 

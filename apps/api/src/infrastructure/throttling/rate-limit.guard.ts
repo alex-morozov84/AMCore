@@ -4,19 +4,19 @@ import { type CanActivate, type ExecutionContext, HttpStatus, Injectable } from 
 import { HttpAdapterHost, Reflector } from '@nestjs/core'
 import type { Request, Response } from 'express'
 
-import { AppException } from '../../common/exceptions'
-import { EnvService } from '../../env/env.service'
-import { MetricsService } from '../observability'
+import { AppException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
+import { MetricsService } from '../observability/index.js'
 
-import { resolveTracker } from './client-tracker'
-import { GcraRedisLimiter } from './gcra-redis-limiter.service'
-import { RATE_LIMIT_POLICY_KEY, RATE_LIMIT_SKIP_KEY } from './rate-limit.decorator'
+import { resolveTracker } from './client-tracker.js'
+import { GcraRedisLimiter } from './gcra-redis-limiter.service.js'
+import { RATE_LIMIT_POLICY_KEY, RATE_LIMIT_SKIP_KEY } from './rate-limit.decorator.js'
 import {
   classifyPolicy,
   RATE_LIMIT_POLICIES,
   type RateLimitPolicy,
   resolveBurst,
-} from './rate-limit-policies'
+} from './rate-limit-policies.js'
 
 /**
  * The only global rate-limit guard (Option O, ADR-073 — replaces

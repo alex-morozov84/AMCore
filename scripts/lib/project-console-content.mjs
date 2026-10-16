@@ -24,13 +24,26 @@ const FONT_TOKENS = `
 const absent = (location) => ({ location, value: 'absent' })
 const noParams = (params) => params && Object.keys(params).length === 0
 
+/**
+ * Drop only the Console start-up statements from `register` (the dynamic import of the Console
+ * validator and its call). Everything else in `register` is shared behaviour and stays, so a line
+ * added there later survives in a fork without the Console.
+ */
 function removeStartup(model, _params, ctx) {
-  const node = findUniqueNode(
-    model,
-    (candidate) => ts.isFunctionDeclaration(candidate) && candidate.name?.text === 'register',
-    { ...ctx, describe: 'register function' }
-  )
-  model.removeNode(node, ctx)
+  const IDENTIFIER = 'validateAdminConsoleStartupOrExit'
+  const statements = [
+    [
+      (candidate) => ts.isVariableStatement(candidate) && candidate.getText().includes(IDENTIFIER),
+      'Console start-up import',
+    ],
+    [
+      (candidate) =>
+        ts.isExpressionStatement(candidate) && candidate.getText().trim() === `${IDENTIFIER}()`,
+      'Console start-up call',
+    ],
+  ]
+  for (const [predicate, describe] of statements)
+    model.removeNode(findUniqueNode(model, predicate, { ...ctx, describe }), ctx)
 }
 
 function rewriteLogin(model, _params, ctx) {

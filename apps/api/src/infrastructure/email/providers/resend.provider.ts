@@ -4,11 +4,10 @@ import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { Resend } from 'resend'
 
-import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types'
-import type { QueuedEmailOutcome, QueuedEmailProvider } from '../queued-email-provider'
-import { parseRetryAfterConstraint, parseRetryAfterMs } from '../retry-after'
-
-import { EnvService } from '@/env/env.service'
+import { EnvService } from '../../../env/env.service.js'
+import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types.js'
+import type { QueuedEmailOutcome, QueuedEmailProvider } from '../queued-email-provider.js'
+import { parseRetryAfterConstraint, parseRetryAfterMs } from '../retry-after.js'
 
 /**
  * Resend error codes that will NOT heal on an immediate in-process retry

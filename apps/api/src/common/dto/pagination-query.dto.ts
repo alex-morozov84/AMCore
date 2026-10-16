@@ -1,6 +1,6 @@
 import { paginationQuerySchema } from '@amcore/shared'
 
-import { createSchemaDto } from '../schemas/schema-dto'
+import { createSchemaDto } from '../schemas/schema-dto.js'
 
 /**
  * Reusable pagination DTO (OA-08).

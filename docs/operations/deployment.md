@@ -96,6 +96,7 @@ COMPOSE_REDIS_URL=rediss://…
 STORAGE_DRIVER=s3
 STORAGE_BUCKET=…  STORAGE_ACCESS_KEY_ID=…  STORAGE_SECRET_ACCESS_KEY=…  # + region/endpoint
 STORAGE_PUBLIC_BASE_URL=https://cdn.example.com   # root of the public bucket (see public files)
+WEB_PUBLIC_FILES_ORIGIN=https://cdn.example.com   # same origin: lets the web app load avatars (CSP img-src)
 # MIGRATION_DATABASE_URL=…              # only if COMPOSE_DATABASE_URL points at a pooler
 ```
 
@@ -542,9 +543,11 @@ Set the following values in `.env` when using the reference Compose stack:
 STORAGE_DRIVER=local
 STORAGE_LOCAL_ROOT=/app/uploads
 STORAGE_PUBLIC_BASE_URL=https://api.example.com/api/v1/storage/public
+WEB_PUBLIC_FILES_ORIGIN=https://api.example.com
 ```
 
-Use your actual public API origin. If changing `STORAGE_LOCAL_ROOT`, change both
+Use your actual public API origin; `WEB_PUBLIC_FILES_ORIGIN` must be the origin of
+`STORAGE_PUBLIC_BASE_URL`, otherwise the web app cannot show avatars. If changing `STORAGE_LOCAL_ROOT`, change both
 services' mounts as well. Keep the volume during upgrades, back up and restore
 objects/meta/public together, and
 verify files after container recreation. A successful live probe alone does not
@@ -1184,3 +1187,10 @@ Historical attempted deliveries become legacy-unverified. Do not clear their
 uncertainty to enable retries. Rollback requires restoring the verified backup
 with a compatible process set; prefer forward repair. See
 [notification delivery control](../notifications/control.md#upgrade).
+
+## API module boundary
+
+The API emits ESM. Preserve its `package.json` with `type: module` alongside
+`dist`, runtime dependencies and the current shared package. The standard image
+build runs native type checking before emission. Do not deploy output from a
+failed build. See [API build and ESM runtime](../backend/api-build.md).

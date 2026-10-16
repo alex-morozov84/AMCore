@@ -3,12 +3,12 @@ import type { Request } from 'express'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { invitationJsonLimit } from '../../bootstrap/invitation-request-boundary'
-import { AppException } from '../../common/exceptions'
-import { GcraRedisLimiter } from '../../infrastructure/throttling/gcra-redis-limiter.service'
+import { invitationJsonLimit } from '../../bootstrap/invitation-request-boundary.js'
+import { AppException } from '../../common/exceptions/index.js'
+import { GcraRedisLimiter } from '../../infrastructure/throttling/gcra-redis-limiter.service.js'
 
-import { InvitationContinuationService } from './invitation-continuation.service'
-import { invitationSecretHash } from './invitation-credential'
+import { InvitationContinuationService } from './invitation-continuation.service.js'
+import { invitationSecretHash } from './invitation-credential.js'
 
 /** Additional scoped ceilings atop global IP admission; raw secrets never become limiter keys. */
 @Injectable()

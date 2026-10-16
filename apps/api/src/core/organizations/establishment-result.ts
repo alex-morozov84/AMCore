@@ -1,6 +1,6 @@
 import type { OrganizationSetupIds, OrganizationSetupStatus, OrgResponse } from '@amcore/shared'
 
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '../../generated/prisma/client.js'
 
 export const INITIAL_ORGANIZATION_KEY = 'initial-organization'
 

@@ -4,8 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './dropdown-menu'
 
@@ -63,5 +68,30 @@ describe('DropdownMenu', () => {
     await user.click(screen.getByText('Open'))
 
     expect(await screen.findByText('Revoke')).toHaveAttribute('data-variant', 'destructive')
+  })
+
+  it('shows the pointer cursor on every kind of clickable item', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem>Plain</DropdownMenuItem>
+          <DropdownMenuCheckboxItem checked>Check</DropdownMenuCheckboxItem>
+          <DropdownMenuRadioGroup value="a">
+            <DropdownMenuRadioItem value="a">Radio</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>Sub</DropdownMenuSubTrigger>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+
+    await user.click(screen.getByText('Open'))
+
+    for (const name of ['Plain', 'Check', 'Radio', 'Sub'])
+      expect(await screen.findByText(name)).toHaveClass('cursor-pointer')
   })
 })

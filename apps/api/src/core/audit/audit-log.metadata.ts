@@ -1,6 +1,6 @@
-import type { AuditAction } from './audit-log.actions'
+import type { Prisma } from '../../generated/prisma/client.js'
 
-import type { Prisma } from '@/generated/prisma/client'
+import type { AuditAction } from './audit-log.actions.js'
 
 interface MetadataSpec {
   [key: string]: MetadataRule

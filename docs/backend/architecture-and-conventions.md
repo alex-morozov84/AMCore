@@ -541,6 +541,7 @@ that a database operation ended; process supervision owns ultimate cleanup.
 
 API unit and E2E suites use `@swc/jest`. Shared settings preserve Nest legacy
 decorators, constructor metadata and source maps. Unit output is CommonJS;
-E2E output is ESM. Production build configuration is independent.
+E2E output is ESM. The production API also emits ESM through Nest CLI + SWC.
+See [API build and ESM runtime](api-build.md) for imports, build order and restarts.
 SWC does not check types: run `pnpm --filter api typecheck` for source and tests.
 Email template integration tests retain Vitest and happy-dom.

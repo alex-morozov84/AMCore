@@ -3,8 +3,8 @@ import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 
 import { HttpException } from '@nestjs/common'
 
-import { decodedBodyLimit } from './decoded-body-limit'
-import { REQUEST_BODY_LIMIT_BYTES } from './request-body-policy'
+import { decodedBodyLimit } from './decoded-body-limit.js'
+import { REQUEST_BODY_LIMIT_BYTES } from './request-body-policy.js'
 
 /** The native compression plugin adds route hooks; unmatched requests need their own decoded cap. */
 export function unmatchedBodyLimit(payload: Readable, encoding?: string): Transform {

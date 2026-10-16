@@ -4,10 +4,10 @@ import { z } from 'zod'
 
 import { workJobIdSchema, type WorkReason, workReasonSchema } from '@amcore/shared'
 
-import { jobPredicateKeys } from '../job-snapshot'
-import { managedJobKey } from '../managed-job-key'
+import { jobPredicateKeys } from '../job-snapshot.js'
+import { managedJobKey } from '../managed-job-key.js'
 
-import { IDEMPOTENT_COMMAND_LUA, PROVIDER_COMMAND_LUA } from './idempotent-command.lua'
+import { IDEMPOTENT_COMMAND_LUA, PROVIDER_COMMAND_LUA } from './idempotent-command.lua.js'
 
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const requestSchema = z

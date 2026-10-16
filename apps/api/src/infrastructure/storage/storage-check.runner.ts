@@ -4,10 +4,10 @@ import {
   checkPublicDelivery,
   ensureCanaries,
   type PublicDeliveryDeps,
-} from './public-delivery-check'
-import type { StorageProvider } from './storage.interface'
-import type { AnonymousRead } from './storage-anonymous-read'
-import type { PublicUrlForm } from './storage-public-url'
+} from './public-delivery-check.js'
+import type { StorageProvider } from './storage.interface.js'
+import type { AnonymousRead } from './storage-anonymous-read.js'
+import type { PublicUrlForm } from './storage-public-url.js'
 
 export interface CheckStep {
   name: string

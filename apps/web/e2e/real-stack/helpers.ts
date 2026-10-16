@@ -46,3 +46,9 @@ export async function loginViaUi(page: Page, email: string): Promise<void> {
   await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
 }
+
+/** Sign out through the product shell's account menu (header), the only logout control there. */
+export async function signOutViaUi(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /account menu/i }).click()
+  await page.getByRole('menuitem', { name: /sign out/i }).click()
+}

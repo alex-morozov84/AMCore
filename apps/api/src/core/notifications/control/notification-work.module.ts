@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common'
 
-import { NotificationsModule } from '../notifications.module'
+import { PrismaModule } from '../../../prisma/index.js'
+import { NotificationsModule } from '../notifications.module.js'
 
-import { notificationDeliveriesWork } from './notification-deliveries.work'
-import { NotificationWorkControl } from './notification-work-control'
-import { NotificationWorkReader } from './notification-work-reader'
-
-import { PrismaModule } from '@/prisma'
+import { notificationDeliveriesWork } from './notification-deliveries.work.js'
+import { NotificationWorkControl } from './notification-work-control.js'
+import { NotificationWorkReader } from './notification-work-reader.js'
 
 @Module({
   imports: [PrismaModule, NotificationsModule],

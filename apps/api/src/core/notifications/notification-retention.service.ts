@@ -2,12 +2,11 @@ import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
-import { PrismaService } from '../../prisma'
+import { Prisma } from '../../generated/prisma/client.js'
+import { SingletonCronRunner } from '../../infrastructure/schedule/singleton-cron.runner.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { lockRetentionChildren, protectsNotification } from './notification-retention-locks'
-
-import { Prisma } from '@/generated/prisma/client'
-import { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
+import { lockRetentionChildren, protectsNotification } from './notification-retention-locks.js'
 
 /**
  * Retention windows (ADR-052 §10). Hardcoded starter constants tuned by code change,

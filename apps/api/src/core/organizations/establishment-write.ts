@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto'
 
 import type { CreateOrganizationInput, OrganizationSetupIds } from '@amcore/shared'
 
-import { templateSignature } from './system-template-validation'
+import type { Organization, Prisma } from '../../generated/prisma/client.js'
 
-import type { Organization, Prisma } from '@/generated/prisma/client'
+import { templateSignature } from './system-template-validation.js'
 
 export function establishmentFingerprint(input: unknown): string {
   return createHash('sha256')

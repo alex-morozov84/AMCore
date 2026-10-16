@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { appProviders, coreImports, webImports } from './app-imports'
+import { appProviders, coreImports, webImports } from './app-imports.js'
 
 /**
  * Root module for `PROCESS_ROLE=web` (ADR-041): HTTP API + queue producers, but

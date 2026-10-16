@@ -2,15 +2,15 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../../../common/exceptions'
-import { EnvService } from '../../../../env/env.service'
-import { OAuthClientService } from '../oauth-client.service'
+import { AppException } from '../../../../common/exceptions/index.js'
+import { EnvService } from '../../../../env/env.service.js'
+import { OAuthClientService } from '../oauth-client.service.js'
 
-import { AppleProvider } from './apple.provider'
-import { GitHubProvider } from './github.provider'
-import { GoogleProvider } from './google.provider'
-import type { OAuthProvider } from './oauth-provider.interface'
-import { TelegramProvider } from './telegram.provider'
+import { AppleProvider } from './apple.provider.js'
+import { GitHubProvider } from './github.provider.js'
+import { GoogleProvider } from './google.provider.js'
+import type { OAuthProvider } from './oauth-provider.interface.js'
+import { TelegramProvider } from './telegram.provider.js'
 
 @Injectable()
 export class OAuthProviderFactory {

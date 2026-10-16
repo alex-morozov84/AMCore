@@ -1,7 +1,7 @@
-import { type DispatchDueJob, dispatchDueJobSchema } from './notification-dispatch.schema'
+import { defineWork } from '../../infrastructure/background-work/work-definition.js'
+import { JobName, QueueName } from '../../infrastructure/queue/constants/queues.constant.js'
 
-import { defineWork } from '@/infrastructure/background-work/work-definition'
-import { JobName, QueueName } from '@/infrastructure/queue/constants/queues.constant'
+import { type DispatchDueJob, dispatchDueJobSchema } from './notification-dispatch.schema.js'
 
 export const notificationsWork = defineWork({
   id: 'notifications',

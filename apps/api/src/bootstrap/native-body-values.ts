@@ -4,9 +4,9 @@ import { HttpException } from '@nestjs/common'
 import iconv from 'iconv-lite'
 import qs from 'qs'
 
-import { PayloadTooLargeException } from '../common/exceptions/domain'
+import { PayloadTooLargeException } from '../common/exceptions/domain/index.js'
 
-import { parserContentType } from './parser-content-type'
+import { parserContentType } from './parser-content-type.js'
 
 export function decodeBody(
   body: Buffer,

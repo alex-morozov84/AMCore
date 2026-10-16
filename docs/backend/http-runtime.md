@@ -94,7 +94,7 @@ Nest/Fastify/plugin updates. Include parser security/encodings/limits, cookies,
 proxy identity, errors, uploads/downloads, SSE cancellation, idempotency, metrics
 and board method/header/disabled boundaries as applicable. Pinned board asset
 hashes must be revalidated against a deliberate UI upgrade. Run typecheck and
-build separately; SWC does not check types. Each API build cleans `dist` first
+build; the API build requires a successful typecheck before SWC emission. Each API build cleans `dist` first
 to remove deleted or renamed modules. Full API E2E, generated starter
 install/build/test and platform image/deploy checks remain separate CI gates.
 

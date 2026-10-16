@@ -5,11 +5,11 @@ import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
-import { REQUEST_BODY_LIMIT_BYTES } from '../../../bootstrap/request-body-policy'
-import { sanitizeRequestUrl } from '../../config/logging.config'
-import { sanitizeHeaders } from '../../utils'
-import { PayloadTooLargeException } from '../domain'
-import type { ErrorResponse } from '../types'
+import { REQUEST_BODY_LIMIT_BYTES } from '../../../bootstrap/request-body-policy.js'
+import { sanitizeRequestUrl } from '../../config/logging.config.js'
+import { sanitizeHeaders } from '../../utils/index.js'
+import { PayloadTooLargeException } from '../domain/index.js'
+import type { ErrorResponse } from '../types.js'
 
 /**
  * Catch-all exception filter (last resort)

@@ -6,6 +6,7 @@ import type { ResolvedAiModel } from '../registry/ai-registry.types'
 import type { AiAdapterCall, AiProviderAdapter } from './ai-gateway.types'
 import type { AiCredentialResolver } from './credential-resolver'
 import { ModelGateway } from './model-gateway.service'
+import { observeProviderReceipt, providerReceipt } from './provider-receipt'
 import { MockAiAdapter } from './providers/mock.adapter'
 
 import type { EnvService } from '@/env/env.service'
@@ -351,5 +352,45 @@ describe('ModelGateway.generateObject', () => {
       schema
     )
     expect(result.object).toEqual({ ok: true })
+  })
+})
+
+describe('ModelGateway rejects a nullish result from an extension', () => {
+  it.each([null, undefined])('retains receipt and accounts once for %s', async (object) => {
+    // Intentionally adversarial runtime mock, not a proof of the generic success type.
+    const generateObject = jest.fn()
+    const adapter: AiProviderAdapter = {
+      supportedTypes: [AiProviderType.MOCK],
+      generateText: jest.fn(),
+      generateObject,
+    }
+    generateObject.mockImplementation(async (call: AiAdapterCall) => ({
+      object,
+      usage: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      receipt: observeProviderReceipt(
+        call,
+        { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+        'stop',
+        performance.now()
+      ),
+      modelSlug: 'mock-default',
+      providerType: AiProviderType.MOCK,
+    }))
+    const gateway = makeGateway(
+      {
+        resolveDefaultModel: jest.fn(async () =>
+          model({ capabilities: { text: true, structured_output: true } })
+        ),
+        hasCredential: () => true,
+      },
+      [adapter]
+    )
+    const error = await gateway
+      .generateObject({ messages: [] }, z.unknown())
+      .catch((e: unknown) => e)
+    expect(error).toMatchObject({ code: 'output_validation_failed', retryable: false })
+    expect(providerReceipt(error)?.usage.totalTokens).toBe(12)
+    expect(usageLedger.record).toHaveBeenCalledTimes(1)
+    expect(generateObject).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,6 +1,6 @@
 import type { AiApprovalResponse } from '@amcore/shared'
 
-import type { AiApproval, AiToolInvocation } from '@/generated/prisma/client'
+import type { AiApproval, AiToolInvocation } from '../../../generated/prisma/client.js'
 
 /** Private approval projection with its single gated invocation. */
 export type AiApprovalWithTool = AiApproval & {

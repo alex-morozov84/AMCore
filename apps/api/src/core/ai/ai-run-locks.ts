@@ -1,4 +1,4 @@
-import { Prisma } from '@/generated/prisma/client'
+import { Prisma } from '../../generated/prisma/client.js'
 
 /**
  * The global lock order of the AI run state machine (Track C — ADR-054): **conversation → run →

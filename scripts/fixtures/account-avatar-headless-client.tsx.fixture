@@ -1,0 +1,30 @@
+'use client'
+
+import { useAvatarEditor, UserAvatar } from '@/entities/user'
+
+// Different presentation: inline photo controls, no menu, no dialog, no ready account block.
+export function CustomAccount() {
+  const editor = useAvatarEditor()
+  if (!editor.user) return null
+  return (
+    <section className="flex items-center gap-3" data-testid="custom-headless-account">
+      <UserAvatar name={editor.user.name} avatarUrl={editor.avatarUrl} size="md" />
+      <span data-testid="custom-account-email">{editor.user.email}</span>
+      <input
+        type="file"
+        aria-label="Custom photo"
+        accept="image/png"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void editor.upload(file)
+        }}
+      />
+      <button type="button" disabled={editor.isPending || !editor.avatarUrl} onClick={() => void editor.remove()}>
+        Delete photo
+      </button>
+      <span role="status" data-testid="custom-account-outcome">
+        {editor.outcome?.kind ?? editor.status}
+      </span>
+    </section>
+  )
+}

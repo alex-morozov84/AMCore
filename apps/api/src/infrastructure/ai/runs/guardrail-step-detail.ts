@@ -1,5 +1,5 @@
-import { AI_RUN_GUARDRAIL_CATEGORY_CODE, AI_RUN_GUARDRAIL_MAX_CATEGORIES } from './ai-run.constants'
-import type { GuardrailStepCategory } from './ai-run-dispatch.types'
+import { AI_RUN_GUARDRAIL_CATEGORY_CODE, AI_RUN_GUARDRAIL_MAX_CATEGORIES } from './ai-run.constants.js'
+import type { GuardrailStepCategory } from './ai-run-dispatch.types.js'
 
 /**
  * Defensively normalize guardrail categories before they are persisted into `AiRunStep.detail`

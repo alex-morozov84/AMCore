@@ -17,22 +17,22 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { SchemaValidationException } from '../../common/schemas/schema-validation'
-import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling'
-import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
-import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator'
-import { SystemRoles } from '../auth/decorators/system-roles.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { SchemaValidationException } from '../../common/schemas/schema-validation.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
+import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
+import { RequireFreshAuth } from '../auth/decorators/require-fresh-auth.decorator.js'
+import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 
-import { AdminApiKeysService } from './admin-api-keys.service'
+import { AdminApiKeysService } from './admin-api-keys.service.js'
 import {
   AdminApiKeyListDto,
   AdminApiKeyQueryDto,
   AdminApiKeyRevokeDto,
   AdminApiKeyRevokeResultDto,
-} from './dto/admin-api-key.dto'
+} from './dto/admin-api-key.dto.js'
 
 @ApiTags('admin')
 @ApiBearerAuth()

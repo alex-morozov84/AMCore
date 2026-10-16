@@ -1,7 +1,7 @@
-import type { ClaimedRun } from './ai-run-dispatch.types'
-import { type AiRunGuard, markIoStarted } from './ai-run-guard.service'
-import type { RunPlan } from './ai-run-plan'
-import type { AiRunTransitions } from './ai-run-transitions.service'
+import type { ClaimedRun } from './ai-run-dispatch.types.js'
+import { type AiRunGuard, markIoStarted } from './ai-run-guard.service.js'
+import type { RunPlan } from './ai-run-plan.js'
+import type { AiRunTransitions } from './ai-run-transitions.service.js'
 
 /** Already handled gate denial, distinct from provider failure/retry. */
 export class FinalAdmissionDenied extends Error {}

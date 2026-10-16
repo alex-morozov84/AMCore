@@ -3,13 +3,12 @@ import type { Response } from 'express'
 
 import type { RequestPrincipal } from '@amcore/shared'
 
-import { NotFoundException } from '../../../common/exceptions'
-import { AiConversationAccessAuthorizer } from '../conversations/ai-conversation-access.authorizer'
-
-import { AuditLogService } from '@/core/audit'
-import { AuditActorType, AuditTargetType } from '@/generated/prisma/client'
-import { StorageDownloadService } from '@/infrastructure/storage'
-import { PrismaService } from '@/prisma'
+import { NotFoundException } from '../../../common/exceptions/index.js'
+import { AuditActorType, AuditTargetType } from '../../../generated/prisma/client.js'
+import { StorageDownloadService } from '../../../infrastructure/storage/index.js'
+import { PrismaService } from '../../../prisma/index.js'
+import { AuditLogService } from '../../audit/index.js'
+import { AiConversationAccessAuthorizer } from '../conversations/ai-conversation-access.authorizer.js'
 
 /**
  * Authorized artifact download (Track C — ADR-054, Arc G, web role). An artifact is conversation

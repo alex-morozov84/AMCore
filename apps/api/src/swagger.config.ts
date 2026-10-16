@@ -1,9 +1,9 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
-import { addParserResponses } from './bootstrap/parser-openapi'
-import { schemaOpenApiConverter } from './common/schemas/schema-openapi'
-import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mount-state'
+import { addParserResponses } from './bootstrap/parser-openapi.js'
+import { schemaOpenApiConverter } from './common/schemas/schema-openapi.js'
+import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mount-state.js'
 
 /** The one global prefix of the API (`main.ts` applies it; the OpenAPI paths carry it). */
 export const API_GLOBAL_PREFIX = 'api/v1'

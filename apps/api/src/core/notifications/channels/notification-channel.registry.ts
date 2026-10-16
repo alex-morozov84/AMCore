@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
-import type { NotificationChannelDescriptor } from './notification-channel.types'
+import type { EnvService } from '../../../env/env.service.js'
 
-import type { EnvService } from '@/env/env.service'
+import type { NotificationChannelDescriptor } from './notification-channel.types.js'
 
 export const NOTIFICATION_CHANNEL_DESCRIPTORS = Symbol('NOTIFICATION_CHANNEL_DESCRIPTORS')
 

@@ -52,6 +52,7 @@ const mockProfile = {
 describe('OAuthService', () => {
   let env: { get: jest.Mock }
   let invitationAuthority: { lockValid: jest.Mock; lockOAuthIntent: jest.Mock }
+  let avatarRehost: { schedule: jest.Mock }
   let service: OAuthService
   let prisma: jest.Mocked<any>
   let sessionService: jest.Mocked<any>
@@ -129,6 +130,7 @@ describe('OAuthService', () => {
 
     env = { get: jest.fn(() => true) }
     invitationAuthority = { lockValid: jest.fn(), lockOAuthIntent: jest.fn() }
+    avatarRehost = { schedule: jest.fn() }
     service = new OAuthService(
       prisma,
       sessionService,
@@ -138,7 +140,9 @@ describe('OAuthService', () => {
       new EmailIdentityService(),
       mockLogger,
       env as never,
-      invitationAuthority as never
+      invitationAuthority as never,
+      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never,
+      avatarRehost as never
     )
   })
 
@@ -269,6 +273,59 @@ describe('OAuthService', () => {
         errorCode: AuthErrorCode.OAUTH_STATE_INVALID,
       })
       expect(mockProvider.exchangeCode).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('profile picture copy', () => {
+    const source = 'https://avatars.githubusercontent.com/u/1'
+    const withPicture = (): void =>
+      mockProvider.getUserProfile.mockResolvedValue({ ...mockProfile, avatarSourceUrl: source })
+    const signIn = (): Promise<unknown> =>
+      service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+
+    it('copies the picture when this sign-in creates the user', async () => {
+      withPicture()
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(null)
+      prisma.user.create.mockResolvedValue(mockUser({ id: 'new-user' }))
+      await signIn()
+      expect(avatarRehost.schedule).toHaveBeenCalledWith('new-user', source)
+    })
+
+    it('copies the picture the first time a provider is linked to a user without avatar', async () => {
+      withPicture()
+      const user = mockUser()
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(user)
+      prisma.user.findUniqueOrThrow.mockResolvedValue(user)
+      await signIn()
+      expect(avatarRehost.schedule).toHaveBeenCalledWith(user.id, source)
+    })
+
+    it('does not replace an avatar the linked user already has', async () => {
+      withPicture()
+      const user = mockUser({ avatarKey: 'public/avatars/user-1/v-1-a/avatar-256.webp' })
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(user)
+      prisma.user.findUniqueOrThrow.mockResolvedValue(user)
+      await signIn()
+      expect(avatarRehost.schedule).not.toHaveBeenCalled()
+    })
+
+    it('never copies on a repeat sign-in, so a removed avatar stays removed', async () => {
+      withPicture()
+      const user = mockUser({ avatarKey: null })
+      prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: user.id, user })
+      await signIn()
+      expect(avatarRehost.schedule).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when the provider returns no picture', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(null)
+      prisma.user.create.mockResolvedValue(mockUser())
+      await signIn()
+      expect(avatarRehost.schedule).not.toHaveBeenCalled()
     })
   })
 

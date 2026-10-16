@@ -1,13 +1,13 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common'
 
-import { TelegramController } from './telegram.controller'
-import { TelegramLinkService } from './telegram-link.service'
-import { TelegramWebhookController } from './telegram-webhook.controller'
-import { TelegramWebhookService } from './telegram-webhook.service'
+import { WebhooksModule } from '../../../../infrastructure/webhooks/index.js'
+import { PrismaModule } from '../../../../prisma/index.js'
+import { AuditModule } from '../../../audit/audit.module.js'
 
-import { AuditModule } from '@/core/audit/audit.module'
-import { WebhooksModule } from '@/infrastructure/webhooks'
-import { PrismaModule } from '@/prisma'
+import { TelegramController } from './telegram.controller.js'
+import { TelegramLinkService } from './telegram-link.service.js'
+import { TelegramWebhookController } from './telegram-webhook.controller.js'
+import { TelegramWebhookService } from './telegram-webhook.service.js'
 
 @Module({})
 export class TelegramNotificationWebModule {

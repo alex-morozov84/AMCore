@@ -2,14 +2,14 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common'
 
 import type { AiRunSseEvent } from '@amcore/shared'
 
+import { EnvService } from '../../../env/env.service.js'
+import { MetricsService } from '../../../infrastructure/observability/index.js'
+
 import {
   AiRunStreamConnection,
   type StreamCloseReason,
   type StreamWritable,
-} from './ai-run-stream.connection'
-
-import { EnvService } from '@/env/env.service'
-import { MetricsService } from '@/infrastructure/observability'
+} from './ai-run-stream.connection.js'
 
 /** Admission verdict before any SSE headers are flushed. */
 export type AdmissionResult =

@@ -69,6 +69,25 @@ test('rewrites structural startup and single-locale login contributions', () => 
   const startup = materialize('apps/web/src/instrumentation.ts', 'console.startup-hook')
   assert.equal(startup.includes('validateAdminConsoleStartupOrExit'), false)
   assert.ok(startup.includes('onRequestError'))
+  // Only the two Console statements may go: every other line of the real `register` body is
+  // shared behaviour and must survive, so a line added there later fails here, not only in CI.
+  const source = readFileSync(path.join(root, 'apps/web/src/instrumentation.ts'), 'utf8')
+  const start = source.indexOf('export async function register')
+  const original = source.slice(start, source.indexOf('\n}\n', start) + 2)
+  const outputRegister = startup.slice(
+    startup.indexOf('export async function register'),
+    startup.indexOf('\n}\n', startup.indexOf('export async function register')) + 2
+  )
+  const lines = (text) =>
+    text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+  const shared = lines(original).filter(
+    (line) => !line.includes('validateAdminConsoleStartupOrExit')
+  )
+  assert.ok(shared.length >= 5, 'register body was found')
+  assert.deepEqual(lines(outputRegister), shared)
 
   const login = materialize(
     'apps/web/src/app/[locale]/admin/(auth)/login/page.tsx',

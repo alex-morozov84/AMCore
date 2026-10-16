@@ -3,12 +3,18 @@ import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import type { ZodType } from 'zod'
 
-import { endpointBinding, freezeAiModel } from '../registry/ai-execution-descriptor'
-import { AiModelRegistry } from '../registry/ai-model-registry.service'
-import type { ResolvedAiModel } from '../registry/ai-registry.types'
-import { AiUsageLedgerService } from '../usage/ai-usage-ledger.service'
+import { EnvService } from '../../../env/env.service.js'
+import {
+  type AiMetricsOperation,
+  type AiMetricsProvider,
+  MetricsService,
+} from '../../observability/index.js'
+import { endpointBinding, freezeAiModel } from '../registry/ai-execution-descriptor.js'
+import { AiModelRegistry } from '../registry/ai-model-registry.service.js'
+import type { ResolvedAiModel } from '../registry/ai-registry.types.js'
+import { AiUsageLedgerService } from '../usage/ai-usage-ledger.service.js'
 
-import { AiGatewayException } from './ai-gateway.error'
+import { AiGatewayException } from './ai-gateway.error.js'
 import {
   AI_PROVIDER_ADAPTERS,
   type AiAdapterCall,
@@ -17,17 +23,10 @@ import {
   type AiProviderAdapter,
   type AiTextResult,
   type AiUsage,
-} from './ai-gateway.types'
-import { AiCredentialResolver } from './credential-resolver'
-import { findUnsupportedMultimodalCapability } from './multimodal-capability'
-import { providerReceipt } from './provider-receipt'
-
-import { EnvService } from '@/env/env.service'
-import {
-  type AiMetricsOperation,
-  type AiMetricsProvider,
-  MetricsService,
-} from '@/infrastructure/observability'
+} from './ai-gateway.types.js'
+import { AiCredentialResolver } from './credential-resolver.js'
+import { findUnsupportedMultimodalCapability } from './multimodal-capability.js'
+import { attachProviderReceipt, providerReceipt } from './provider-receipt.js'
 
 /** Low-cardinality metric label: the lowercase wire form of the catalog provider type. */
 function providerLabel(model: ResolvedAiModel): AiMetricsProvider {
@@ -87,7 +86,7 @@ export class ModelGateway {
   async generateObject<T>(
     request: AiGenerateRequest,
     schema: ZodType<T>
-  ): Promise<AiObjectResult<T>> {
+  ): Promise<AiObjectResult<Exclude<T, null | undefined>>> {
     const { model, adapter } = await this.prepare(request)
     if (request.abortSignal?.aborted === true) throw AiGatewayException.aborted(model.provider.type)
     if (model.capabilities.structured_output !== true || adapter.generateObject === undefined) {
@@ -97,6 +96,12 @@ export class ModelGateway {
     const call = this.adapterCall(model, request)
     try {
       const result = await adapter.generateObject(call, schema)
+      if (result.object === null || result.object === undefined) {
+        throw attachProviderReceipt(
+          AiGatewayException.outputValidationFailed(model.provider.type),
+          result.receipt
+        )
+      }
       await this.settle(model, 'object', result.usage, request)
       return result
     } catch (error) {

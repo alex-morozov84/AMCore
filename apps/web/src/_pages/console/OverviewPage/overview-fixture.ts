@@ -25,6 +25,16 @@ export const overviewFixture: AdminOverviewResponse = {
     intervalSeconds: 60,
     staleAfterSeconds: 180,
   },
+  publicDelivery: {
+    state: 'off',
+    offReason: 'local_driver',
+    delivery: 'external',
+    layout: 'one',
+    publicBaseUrl: null,
+    checkedAt: null,
+    stage: null,
+    failure: null,
+  },
   storageHealthEnabled: false,
   api: {
     version: '1.0.0',

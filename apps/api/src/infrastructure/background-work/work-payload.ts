@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { canonicalJsonEqual } from '@/common/utils/canonical-json'
+import { canonicalJsonEqual } from '../../common/utils/canonical-json.js'
 
 /** Bounded wire representation only; normalized business values are never serialized here. */
 export function wireJson(value: unknown): string {

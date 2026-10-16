@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 
-import type { PhysicalTransaction } from './observed-pg-adapter'
+import type { PhysicalTransaction } from './observed-pg-adapter.js'
 
 /** Shared pool capability, no second pool: uncertain cleanup must not return a healthy-looking socket. */
 export function observedPgPool(

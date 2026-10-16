@@ -1,14 +1,18 @@
 /* oxlint-disable no-console -- bounded JSON output is the operator command contract */
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
-import { OrganizationSetupOperations } from '../core/organizations/organization-setup-operations'
-import { PrismaClient } from '../generated/prisma/client'
+import { OrganizationSetupOperations } from '../core/organizations/organization-setup-operations.js'
+import { PrismaClient } from '../generated/prisma/client.js'
 
 import {
   organizationSetupEnvironment,
   parseOrganizationSetupArgs,
-} from './organization-setup-input'
+} from './organization-setup-input.js'
 
 export async function runOrganizationSetup(
   args: string[],
@@ -76,7 +80,10 @@ export async function runOrganizationSetup(
 }
 
 // Run only when invoked directly.
-if (require.main === module) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
+) {
   const deadline = setTimeout(() => {
     console.log(
       JSON.stringify({

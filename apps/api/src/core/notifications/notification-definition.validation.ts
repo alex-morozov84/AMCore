@@ -2,10 +2,10 @@ import {
   NotificationCategory,
   NotificationChannel,
   NotificationContentClass,
-} from './notification.constants'
-import { InvalidNotificationDefinitionError } from './notification.errors'
-import { resolveExternalMode } from './notification-content-policy'
-import type { NotificationDefinition } from './notification-definition.types'
+} from './notification.constants.js'
+import { InvalidNotificationDefinitionError } from './notification.errors.js'
+import { resolveExternalMode } from './notification-content-policy.js'
+import type { NotificationDefinition } from './notification-definition.types.js'
 
 const TYPE_GRAMMAR = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/
 const KNOWN_CHANNELS = new Set<string>(Object.values(NotificationChannel))

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import type { JobType } from 'bullmq'
 
-import { QueueService } from './queue.service'
-import { enabledQueueNames } from './queue-inventory'
+import { METRIC_NAMES, MetricsService } from '../observability/index.js'
 
-import { METRIC_NAMES, MetricsService } from '@/infrastructure/observability'
+import { QueueService } from './queue.service.js'
+import { enabledQueueNames } from './queue-inventory.js'
 
 const QUEUE_DEPTH_STATES = [
   ['waiting', 'waiting'],

@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common'
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus'
 import { PinoLogger } from 'nestjs-pino'
 
-import { StorageService } from './storage.service'
-import { classifyFailure, type StorageFailureClass } from './storage-failure'
+import { EnvService } from '../../env/env.service.js'
 
-import { EnvService } from '@/env/env.service'
+import { StorageService } from './storage.service.js'
+import { classifyFailure, type StorageFailureClass } from './storage-failure.js'
 
 /**
  * Opt-in storage readiness indicator (registered only when

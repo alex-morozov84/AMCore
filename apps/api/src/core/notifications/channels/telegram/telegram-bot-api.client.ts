@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { z } from 'zod'
 
+import { EnvService } from '../../../../env/env.service.js'
+
 import {
   DEFAULT_TELEGRAM_API_BASE_URL,
   TELEGRAM_MAX_RESPONSE_BYTES,
   TELEGRAM_REQUEST_TIMEOUT_MS,
   TelegramDeliveryError,
-} from './telegram.constants'
-
-import { EnvService } from '@/env/env.service'
+} from './telegram.constants.js'
 
 /** One outbound text message. Plain text only — no `parse_mode` (no escaping/injection surface). */
 export interface TelegramSendMessageInput {

@@ -2,33 +2,32 @@ import { randomUUID } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
 
-import { PrismaService } from '../../../prisma'
+import {
+  NotificationAttemptOutcome,
+  NotificationDeliveryStatus,
+  Prisma,
+} from '../../../generated/prisma/client.js'
+import { PrismaService } from '../../../prisma/index.js'
 import {
   NOTIFICATION_CLAIM_BATCH_LIMIT,
   NOTIFICATION_LEASE_TTL_MS,
   NOTIFICATION_REAP_BATCH_LIMIT,
   NotificationErrorCode,
   NotificationTerminalReason,
-} from '../notification-dispatch.constants'
+} from '../notification-dispatch.constants.js'
 
 import {
   applyRetryAfterFloor,
   computeNextAttemptAt,
   resolveRetryFloor,
-} from './notification-backoff'
-import { notificationClaimsAllowed } from './notification-claim-authority'
-import type { ClaimedDelivery, FinalizeResult, ReapResult } from './notification-dispatch.types'
+} from './notification-backoff.js'
+import { notificationClaimsAllowed } from './notification-claim-authority.js'
+import type { ClaimedDelivery, FinalizeResult, ReapResult } from './notification-dispatch.types.js'
 import {
   type NotificationEffectCertainty,
   settleNotificationEffect,
-} from './notification-effect-evidence'
-import { CUTOFF, type Cutoff, NotificationShutdownLatch } from './notification-shutdown.latch'
-
-import {
-  NotificationAttemptOutcome,
-  NotificationDeliveryStatus,
-  Prisma,
-} from '@/generated/prisma/client'
+} from './notification-effect-evidence.js'
+import { CUTOFF, type Cutoff, NotificationShutdownLatch } from './notification-shutdown.latch.js'
 
 /** Shape returned by the raw claim `UPDATE ... RETURNING`. */
 interface ClaimedRow {

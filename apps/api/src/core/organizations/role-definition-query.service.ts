@@ -16,13 +16,17 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
-import { AppException, ForbiddenException } from '../../common/exceptions'
-import { PrismaService } from '../../prisma'
+import { AppException, ForbiddenException } from '../../common/exceptions/index.js'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { PrismaService } from '../../prisma/index.js'
 
-import { assignableRolesWhere } from './role-assignability-policy'
-import { buildRoleDetail, isOversized, rulePreflight, splitRules } from './role-definition-detail'
-
-import type { Prisma } from '@/generated/prisma/client'
+import { assignableRolesWhere } from './role-assignability-policy.js'
+import {
+  buildRoleDetail,
+  isOversized,
+  rulePreflight,
+  splitRules,
+} from './role-definition-detail.js'
 
 const roleMetaSelect = {
   id: true,

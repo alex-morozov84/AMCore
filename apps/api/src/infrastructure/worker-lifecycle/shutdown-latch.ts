@@ -1,8 +1,8 @@
 import type { PinoLogger } from 'nestjs-pino'
 
-import { guardTransactionClient, ShutdownCutoffError } from './guarded-transaction-client'
+import type { Prisma } from '../../generated/prisma/client.js'
 
-import type { Prisma } from '@/generated/prisma/client'
+import { guardTransactionClient, ShutdownCutoffError } from './guarded-transaction-client.js'
 
 /** Returned instead of a result once the latch is sealed; callers stop, never continue. */
 export const CUTOFF = Symbol('worker.shutdown.cutoff')

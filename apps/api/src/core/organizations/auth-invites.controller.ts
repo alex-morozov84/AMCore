@@ -27,25 +27,25 @@ import type { Request } from 'express'
 
 import { type AcceptInviteInput, AuthType, type RequestPrincipal } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { getClientIp } from '../../common/utils/anonymize-ip'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { getClientIp } from '../../common/utils/anonymize-ip.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
-} from '../auth/organization-context/request-context-policy'
-import { InvitationContinuationService } from '../invitations/invitation-continuation.service'
-import { InvitationRequestGuard } from '../invitations/invitation-request.guard'
+} from '../auth/organization-context/request-context-policy.js'
+import { InvitationContinuationService } from '../invitations/invitation-continuation.service.js'
+import { InvitationRequestGuard } from '../invitations/invitation-request.guard.js'
 
-import { AcceptInviteDto, AcceptInviteResponseDto } from './dto'
+import { AcceptInviteDto, AcceptInviteResponseDto } from './dto/index.js'
 import {
   InvitationAdmissionDto,
   InvitationInspectDto,
   InvitationOperationDto,
-} from './dto/invitation-recipient.dto'
-import { parseInvitationOperationId } from './invitation-operation'
-import { InviteAcceptService } from './invite-accept.service'
+} from './dto/invitation-recipient.dto.js'
+import { parseInvitationOperationId } from './invitation-operation.js'
+import { InviteAcceptService } from './invite-accept.service.js'
 
 @ApiTags('auth')
 @ApiBearerAuth()

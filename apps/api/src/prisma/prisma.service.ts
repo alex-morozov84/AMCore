@@ -4,13 +4,12 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PinoLogger } from 'nestjs-pino'
 import { Pool } from 'pg'
 
-import type { Env } from '../env'
-import { EnvService } from '../env/env.service'
-import { MetricsService } from '../infrastructure/observability'
+import type { Env } from '../env.js'
+import { EnvService } from '../env/env.service.js'
+import { PrismaClient } from '../generated/prisma/client.js'
+import { MetricsService } from '../infrastructure/observability/index.js'
 
-import { ObservedTransactionRunner } from './observed-transaction'
-
-import { PrismaClient } from '@/generated/prisma/client'
+import { ObservedTransactionRunner } from './observed-transaction.js'
 
 type SlowQueryEvent = {
   query: string

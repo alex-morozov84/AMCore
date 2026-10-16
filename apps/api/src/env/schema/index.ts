@@ -1,7 +1,11 @@
 import { z } from 'zod'
 
-import { envBaseSchema } from './base'
-import { crossFieldRules, deriveConditionalDefaults, injectWebhookSecrets } from './refinements'
+import { envBaseSchema } from './base.js'
+import {
+  crossFieldRules,
+  deriveConditionalDefaults,
+  injectWebhookSecrets,
+} from './refinements/index.js'
 
 // Full validation pipeline: inject dynamic webhook secrets → validate the flat
 // domain-composed object → derive cross-field defaults → apply cross-field rules.
@@ -19,6 +23,6 @@ export function validate(config: Record<string, unknown>): Env {
 }
 
 // Re-exported for the `.env.example` coverage guard (introspects `.shape`).
-export type { EnvInput } from './base'
-export { envBaseSchema } from './base'
-export { envSections } from './base'
+export type { EnvInput } from './base.js'
+export { envBaseSchema } from './base.js'
+export { envSections } from './base.js'

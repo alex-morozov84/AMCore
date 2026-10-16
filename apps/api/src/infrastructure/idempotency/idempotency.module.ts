@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 
-import { IdempotencyInterceptor } from './idempotency.interceptor'
-import { IdempotencyStoreService } from './idempotency-store.service'
+import { IdempotencyInterceptor } from './idempotency.interceptor.js'
+import { IdempotencyStoreService } from './idempotency-store.service.js'
 
 @Module({
   providers: [IdempotencyStoreService, IdempotencyInterceptor],

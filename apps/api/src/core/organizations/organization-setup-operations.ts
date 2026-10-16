@@ -7,27 +7,31 @@ import type {
   OrganizationSetupStatus,
 } from '@amcore/shared'
 
-import { canonicalAdmin } from './canonical-admin'
+import { canonicalAdmin } from './canonical-admin.js'
 import {
   establishmentError,
   establishmentFailure,
   isCanonicalEmailConflict,
   isOrganizationSlugConflict,
-} from './establishment-error'
+} from './establishment-error.js'
 import {
   INITIAL_ORGANIZATION_KEY,
   readEstablishmentResult,
   resultIds,
-} from './establishment-result'
+} from './establishment-result.js'
 import {
   type EstablishmentDatabase,
   establishmentTransaction,
   lockInitialSetup,
-} from './establishment-transaction'
-import { establishmentFingerprint, writeEstablishedOrganization } from './establishment-write'
-import { prepareSetupAccount } from './organization-setup-accounts'
-import { admitSetupOperator, type SetupOperator } from './organization-setup-admission'
-import { assertSetupEligible, mutationSetupState, readSetupState } from './organization-setup-state'
+} from './establishment-transaction.js'
+import { establishmentFingerprint, writeEstablishedOrganization } from './establishment-write.js'
+import { prepareSetupAccount } from './organization-setup-accounts.js'
+import { admitSetupOperator, type SetupOperator } from './organization-setup-admission.js'
+import {
+  assertSetupEligible,
+  mutationSetupState,
+  readSetupState,
+} from './organization-setup-state.js'
 
 /** Shared initial-only operations. No HTTP, shell, listeners, queues or full application bootstrap. */
 export class OrganizationSetupOperations {

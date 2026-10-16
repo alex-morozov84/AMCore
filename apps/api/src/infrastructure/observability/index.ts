@@ -1,4 +1,4 @@
-export { METRIC_NAMES } from './metrics.constants'
+export { METRIC_NAMES } from './metrics.constants.js'
 export type {
   AiMetricsApprovalKind,
   AiMetricsApprovalState,
@@ -22,6 +22,6 @@ export type {
   RateLimitMetricsOutcome,
   RateLimitMetricsPolicy,
   StorageMetricsOperation,
-} from './metrics.service'
-export { MetricsService } from './metrics.service'
-export { ObservabilityModule } from './observability.module'
+} from './metrics.service.js'
+export { MetricsService } from './metrics.service.js'
+export { ObservabilityModule } from './observability.module.js'

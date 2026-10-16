@@ -1,30 +1,29 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AiGatewayException } from '../gateway/ai-gateway.error'
-import type { AiTextResult } from '../gateway/ai-gateway.types'
-import { type AiProviderReceipt, providerReceipt } from '../gateway/provider-receipt'
-import { retryHint } from '../gateway/providers/provider-retry-hint'
+import { AiRunStepType, Prisma } from '../../../generated/prisma/client.js'
+import { MetricsService } from '../../observability/index.js'
+import { AiGatewayException } from '../gateway/ai-gateway.error.js'
+import type { AiTextResult } from '../gateway/ai-gateway.types.js'
+import { type AiProviderReceipt, providerReceipt } from '../gateway/provider-receipt.js'
+import { retryHint } from '../gateway/providers/provider-retry-hint.js'
 
-import { writeProviderReceipt } from './ai-provider-receipt-persistence'
-import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants'
-import { AiRunRepository } from './ai-run.repository'
-import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types'
-import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service'
+import { writeProviderReceipt } from './ai-provider-receipt-persistence.js'
+import { AiRunErrorCode, AiRunTerminalReason } from './ai-run.constants.js'
+import { AiRunRepository } from './ai-run.repository.js'
+import type { ClaimedRun, GuardrailStepCategory } from './ai-run-dispatch.types.js'
+import { AiRunGuard, RunLeaseLostError } from './ai-run-guard.service.js'
 import {
   providerCallStep,
   type RunStepSpec,
   writeAssistantTurn,
   writeRunSteps,
   writeUsageLedger,
-} from './ai-run-loop-persistence'
-import type { RunPlan } from './ai-run-plan'
-import { AiRunStopSignal } from './ai-run-provider-call'
-import { AiRunTransitions, applyStop } from './ai-run-transitions.service'
-import { sanitizeGuardrailCategories } from './guardrail-step-detail'
-
-import { AiRunStepType, Prisma } from '@/generated/prisma/client'
-import { MetricsService } from '@/infrastructure/observability'
+} from './ai-run-loop-persistence.js'
+import type { RunPlan } from './ai-run-plan.js'
+import { AiRunStopSignal } from './ai-run-provider-call.js'
+import { AiRunTransitions, applyStop } from './ai-run-transitions.service.js'
+import { sanitizeGuardrailCategories } from './guardrail-step-detail.js'
 
 /**
  * Owns every terminal (and per-call) durable write of the bounded tool loop (Track C — ADR-054, Arc E,

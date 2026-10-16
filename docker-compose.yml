@@ -321,6 +321,10 @@ services:
       # actually reaches this stack.
       WEB_TRUSTED_ORIGINS: ${WEB_TRUSTED_ORIGINS:-http://localhost:3000}
       WEB_INVITATION_LOCAL_HTTP_ORIGIN: ${WEB_INVITATION_LOCAL_HTTP_ORIGIN:-}
+      # Origin public files (avatars) load from; added to the CSP img-src. Must equal the origin of
+      # STORAGE_PUBLIC_BASE_URL (the default matches the local driver served by the api service).
+      # A set but unusable value stops the web service at start-up.
+      WEB_PUBLIC_FILES_ORIGIN: ${WEB_PUBLIC_FILES_ORIGIN:-http://localhost:5002}
       # Trusted inbound client-IP header (ADR-072) — disabled by default
       # (empty), matching apps/web's own safe default. Only set this when an
       # edge proxy/LB sits directly in front of THIS web container and

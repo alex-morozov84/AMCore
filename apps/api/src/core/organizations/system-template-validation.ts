@@ -1,6 +1,5 @@
-import { ORG_DEFAULT_PERMISSIONS, ORG_DEFAULT_ROLE_GRANTS } from '../auth/casl/org-role-defaults'
-
-import type { Prisma } from '@/generated/prisma/client'
+import type { Prisma } from '../../generated/prisma/client.js'
+import { ORG_DEFAULT_PERMISSIONS, ORG_DEFAULT_ROLE_GRANTS } from '../auth/casl/org-role-defaults.js'
 
 export function templateSignature(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(templateSignature).join(',')}]`

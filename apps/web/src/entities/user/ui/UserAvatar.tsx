@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/utils'
 interface UserAvatarProps {
   name?: string | null
   avatarUrl?: string | null
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
 
@@ -14,18 +14,21 @@ const sizeClasses = {
   sm: 'size-8 text-xs',
   md: 'size-10 text-sm',
   lg: 'size-12 text-base',
+  xl: 'size-20 text-xl',
 }
 
 const sizePx = {
   sm: 32,
   md: 40,
   lg: 48,
+  xl: 80,
 }
 
 const iconSizes = {
   sm: 'size-4',
   md: 'size-5',
   lg: 'size-6',
+  xl: 'size-10',
 }
 
 function getInitials(name: string): string {
@@ -48,6 +51,9 @@ export function UserAvatar({ name, avatarUrl, size = 'md', className }: UserAvat
         alt={name || 'User avatar'}
         width={sizePx[size]}
         height={sizePx[size]}
+        // Served as stored: derivatives are already sized WebP files, so the Next.js image optimizer
+        // (a server-side fetch of a remote URL) is not needed and no remote host list is required.
+        unoptimized
         className={cn(baseClasses, sizeClasses[size], 'object-cover', className)}
       />
     )

@@ -11,33 +11,36 @@ import {
   workReconciliationSchema,
 } from '@amcore/shared'
 
-import {
-  BackgroundCommandAdmission,
-  type CommandTargetSnapshot,
-  type PreparedCommand,
-} from './background-command-admission'
-import { projectWorkReceipt } from './background-command-codec'
-import { BackgroundCommandSettlement, type CommandOutcome } from './background-command-settlement'
-import { BackgroundControlAuthority } from './background-control-authority'
-import { BackgroundControlBudgets } from './background-control-budgets'
-import { backgroundControlError } from './background-control-error'
-
-import { AppException, NotFoundException } from '@/common/exceptions'
-import type { BackgroundCommandTarget } from '@/generated/prisma/client'
-import { CONTROL_LIMITS } from '@/infrastructure/background-work/control-limits'
+import { AppException, NotFoundException } from '../../common/exceptions/index.js'
+import type { BackgroundCommandTarget } from '../../generated/prisma/client.js'
+import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
 import {
   backgroundControlTransaction,
   type ControlTransaction,
   sampleControlClock,
-} from '@/infrastructure/background-work/control-transaction'
+} from '../../infrastructure/background-work/control-transaction.js'
 import type {
   DurableTransactionContext,
   DurableWorkControl,
-} from '@/infrastructure/background-work/durable-work'
-import { PgOutcomeBuffer } from '@/infrastructure/background-work/pg-outcome-buffer'
-import { ProviderEvidenceStore } from '@/infrastructure/background-work/provider-evidence.store'
-import { WorkPolicyError } from '@/infrastructure/background-work/work-policy-error'
-import { PrismaService } from '@/prisma'
+} from '../../infrastructure/background-work/durable-work.js'
+import { PgOutcomeBuffer } from '../../infrastructure/background-work/pg-outcome-buffer.js'
+import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { WorkPolicyError } from '../../infrastructure/background-work/work-policy-error.js'
+import { PrismaService } from '../../prisma/index.js'
+
+import {
+  BackgroundCommandAdmission,
+  type CommandTargetSnapshot,
+  type PreparedCommand,
+} from './background-command-admission.js'
+import { projectWorkReceipt } from './background-command-codec.js'
+import {
+  BackgroundCommandSettlement,
+  type CommandOutcome,
+} from './background-command-settlement.js'
+import { BackgroundControlAuthority } from './background-control-authority.js'
+import { BackgroundControlBudgets } from './background-control-budgets.js'
+import { backgroundControlError } from './background-control-error.js'
 
 const witnessSchema = z.strictObject({
   actorId: z.string().min(1).max(64),

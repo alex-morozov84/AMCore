@@ -3,12 +3,12 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 
 import { type AdminQueuesResponse, AuthType, SystemRole } from '@amcore/shared'
 
-import { SchemaResponse } from '../../common/schemas/schema-response'
-import { Auth } from '../auth/decorators/auth.decorator'
-import { SystemRoles } from '../auth/decorators/system-roles.decorator'
+import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { Auth } from '../auth/decorators/auth.decorator.js'
+import { SystemRoles } from '../auth/decorators/system-roles.decorator.js'
 
-import { AdminQueuesService } from './admin-queues.service'
-import { AdminQueuesResponseDto } from './dto/admin-queues.dto'
+import { AdminQueuesService } from './admin-queues.service.js'
+import { AdminQueuesResponseDto } from './dto/admin-queues.dto.js'
 
 /**
  * Bearer-only (OA-02, like every admin route): an API key owned by a SUPER_ADMIN must not

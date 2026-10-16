@@ -3,8 +3,8 @@ import { HttpAdapterHost } from '@nestjs/core'
 import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
-import { sanitizeRequestUrl } from '../../config/logging.config'
-import type { ErrorResponse, ValidationError } from '../types'
+import { sanitizeRequestUrl } from '../../config/logging.config.js'
+import type { ErrorResponse, ValidationError } from '../types.js'
 
 /**
  * Filter for handling standard NestJS HttpException

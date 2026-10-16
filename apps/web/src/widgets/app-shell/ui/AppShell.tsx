@@ -3,14 +3,12 @@
 import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
-import { LogoutButton } from '@/features/auth-logout'
 import { LocaleSwitcher } from '@/features/locale-switcher'
 import { AcceptedNavigationProvider } from '@/shared/lib/navigation/accepted-navigation'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -27,7 +25,12 @@ import {
 interface AppShellProps {
   homeHref?: string
   navigationAfterDashboard?: ReactNode
-  email?: string
+  /**
+   * Header end slot. The application places its account block here (for the default product shell,
+   * `AccountMenu` from `(dashboard)/layout.tsx` and the organization frame). The shell never
+   * imports the account block, so a downstream can move, replace or drop it.
+   */
+  headerEnd?: ReactNode
   /**
    * The `sidebar_state` cookie value, read server-side by
    * `(dashboard)/layout.tsx` via `await cookies()`. Restores the
@@ -64,14 +67,14 @@ function NavMenu({ afterDashboard, homeHref }: { afterDashboard?: ReactNode; hom
 
 /**
  * The dashboard app shell: a shadcn/Base UI Sidebar composition (nav,
- * account footer) around the page content. `SidebarProvider` owns the
+ * language switcher in the header) around the page content. `SidebarProvider` owns the
  * open/collapsed state itself (cookie-backed, `useSidebar()`) — there is no
  * separate app-level store for it. Route-level plumbing (session read, the
  * real auth gate, the cookie read below) stays in `(dashboard)/layout.tsx`;
- * this widget only receives the already-resolved `email`/`defaultSidebarOpen`.
+ * this widget only receives the already-resolved `defaultSidebarOpen` and the `headerEnd` slot.
  */
 export function AppShell({
-  email,
+  headerEnd,
   homeHref = '/',
   defaultSidebarOpen,
   children,
@@ -93,13 +96,6 @@ export function AppShell({
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter className="gap-3">
-            {email && <span className="truncate px-2 text-sm text-muted-foreground">{email}</span>}
-            <div className="flex items-center justify-between gap-2 px-2">
-              <LocaleSwitcher />
-              <LogoutButton variant="ghost" showText={false} />
-            </div>
-          </SidebarFooter>
           <SidebarRail toggleLabel={t('toggleSidebar')} />
         </Sidebar>
         {/* `SidebarInset` already renders the page's `<main>` landmark — a
@@ -109,6 +105,10 @@ export function AppShell({
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b border-border px-4">
             <SidebarTrigger toggleLabel={t('toggleSidebar')} />
+            <div className="ml-auto flex items-center gap-2">
+              <LocaleSwitcher />
+              {headerEnd}
+            </div>
           </header>
           <div className="mx-auto w-full max-w-7xl p-4">{children}</div>
         </SidebarInset>
