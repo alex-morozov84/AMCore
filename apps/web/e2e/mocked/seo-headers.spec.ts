@@ -23,11 +23,6 @@ test('a route outside the proxy matcher still carries the static noindex header'
   expect(response.headers()['x-robots-tag']).toBe(NOINDEX)
 })
 
-test('the Console login carries the static noindex header', async ({ request }) => {
-  const response = await request.get('/en/admin/login')
-  expect(response.headers()['x-robots-tag']).toBe(NOINDEX)
-})
-
 test('a private page is closed by the root noindex meta tag', async ({ page }) => {
   await page.goto('/en/login')
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', NOINDEX)

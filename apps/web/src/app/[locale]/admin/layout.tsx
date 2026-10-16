@@ -6,8 +6,9 @@ import { hasCanonicalConsoleHost } from '@/shared/lib/console-host-guard'
 import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
 
 export const dynamic = 'force-dynamic'
-// The Console must stay closed to search engines even if the root default ever changes. The
-// matching static `X-Robots-Tag` header is in `next.config.ts` (docs/frontend/seo.md).
+// The Console must stay closed to search engines even if the root default ever changes. This is its
+// only page-level control: it has no static header, because the slug lives in a Console-owned file
+// that a fork without the Console deletes (docs/frontend/seo.md).
 export const metadata = noindexMetadata
 
 /**

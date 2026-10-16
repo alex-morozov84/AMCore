@@ -6,7 +6,6 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
-import { ADMIN_CONSOLE_CONFIG } from './src/shared/lib/admin-console.generated'
 import { HTML_LIMITED_BOTS } from './src/shared/lib/seo/html-limited-bots'
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
@@ -164,23 +163,14 @@ const nextConfig: NextConfig = {
         '/api/invitation-operations/:path*',
         '/api/invitation-verification-return/:path*',
       ].map((source) => ({ source, headers: invitationPrivacyHeaders })),
-      // Static noindex for surfaces that must never be indexed, whatever the environment. These are
-      // build-time, path-based entries; the environment/host rule is the proxy's (shared/lib/seo).
-      // `/api/*` never passes the proxy. The Console login is reachable without authentication, and
-      // a header, unlike a meta tag, does not depend on where Next places page metadata. The Console
-      // slug comes from the generated config, so a disabled Console adds nothing.
+      // Static noindex for a surface that must never be indexed, whatever the environment. This is
+      // a build-time, path-based entry; the environment/host rule is the proxy's (shared/lib/seo).
+      // `/api/*` never passes the proxy. The Console has no entry here on purpose: its slug lives in
+      // a Console-owned file that a fork without the Console deletes, so a header would need its own
+      // scaffold seam. The Console is closed by `noindexMetadata` in its layout, delivered in
+      // `<head>` to every listed crawler (`htmlLimitedBots`), and by the proxy header on any host
+      // that is not the open site host (docs/frontend/seo.md).
       { source: '/api/:path*', headers: noindexHeaders },
-      ...(ADMIN_CONSOLE_CONFIG.enabled
-        ? [
-            {
-              source:
-                SUPPORTED_LOCALES.length > 1
-                  ? `/:locale/${ADMIN_CONSOLE_CONFIG.slug}/:path*`
-                  : `/${ADMIN_CONSOLE_CONFIG.slug}/:path*`,
-              headers: noindexHeaders,
-            },
-          ]
-        : []),
       {
         source: '/sw.js',
         headers: [

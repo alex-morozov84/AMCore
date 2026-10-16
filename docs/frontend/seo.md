@@ -37,9 +37,12 @@ X-Robots-Tag: noindex, nofollow       metadata decides
                                                 → root default: noindex, nofollow
 ```
 
-`/api/*` and the Console pages additionally carry a static `X-Robots-Tag: noindex, nofollow` from
-`next.config.ts`, whatever the environment. `/api/*` never passes the proxy, and a header does not
-depend on where Next places page metadata.
+`/api/*` additionally carries a static `X-Robots-Tag: noindex, nofollow` from `next.config.ts`,
+whatever the environment, because it never passes the proxy. The Console pages are closed by the
+`noindex` metadata of the Console layout, which `htmlLimitedBots` delivers in `<head>` to every
+listed crawler, and by the proxy header on every host that is not the open site host (in the `host`
+topology that is the whole Console host). The Console has no static header of its own: its slug
+lives in a Console-owned file that a fork without the Console deletes.
 
 ## Configuration
 

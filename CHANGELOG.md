@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The web app is closed to search engines by default and ships what a product with public pages
   needs to open them. **Behaviour change:** every proxied page response now carries
   `X-Robots-Tag: noindex, nofollow` unless `WEB_SEO_INDEXING=enabled` and `WEB_SITE_ORIGIN` is set
-  and the request `Host` equals that origin; `/api/*` and the Console carry the header always, and
-  pages are `noindex` by default. New: `buildPageMetadata` (canonical, hreflang, Open Graph,
+  and the request `Host` equals that origin; `/api/*` carries the header always, the Console layout
+  is `noindex`, and pages are `noindex` by default. New: `buildPageMetadata` (canonical, hreflang, Open Graph,
   Twitter), the public-page list that feeds `sitemap.xml`, `robots.txt`, a JSON-LD component and
   the guide `docs/frontend/seo.md`. next-intl's hreflang `Link` header is replaced by page
   metadata and sitemap alternates, and Googlebot now receives page metadata in `<head>`. The two
