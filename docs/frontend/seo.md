@@ -8,6 +8,9 @@ This guide tells you what to do, why each rule exists, how to check it, and what
 ignore it. Rules are labelled **enforced** (a test or the start-up check fails when it breaks) or
 **convention** (nothing fails; the guide and review are the control).
 
+Paths such as `src/app/…` are relative to `apps/web`; message catalogues are
+`apps/web/messages/<locale>.json`.
+
 ## Start here: your situation
 
 | Your product                                                           | What to do                                                                                                                          |
@@ -48,7 +51,9 @@ lives in a Console-owned file that a fork without the Console deletes.
 
 Both variables are read at run time, not at build time. One built image is therefore closed on
 staging and open in production; promote the same image (see
-[deployment](../operations/deployment.md)) and set the variables per environment.
+[deployment](../operations/deployment.md)) and set the variables per environment. A running process
+does not see a changed environment: restart or redeploy the web service after changing either
+variable. No rebuild is needed.
 
 | Variable           | Meaning                                                                                                                                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,8 +89,10 @@ check that they match.
    for what they are). `(site)` below is only an example name: create the folder
    `src/app/[locale]/(site)/`. It needs no `layout.tsx` of its own. The page inherits the root
    `[locale]` layout (fonts, theme, providers, the CSP nonce) and gets no app shell and no sign-in
-   check. The home page `/en` is the signed-in dashboard in this starter; a product with a public
-   landing page restructures that route first.
+   check. A route group does not decide indexing, the page's metadata does: a page in a new group is
+   closed until it calls `buildPageMetadata` (this is also why a `(crm)` group is private by default).
+   The home page `/en` is the signed-in dashboard in this starter; a product with a public landing
+   page restructures that route first.
 3. **Write the route and build its metadata with the helper.** The route file stays thin; compose
    the page in `src/_pages/pricing` like any other page (see the
    [architecture guide](./architecture-and-conventions.md)). Never write a `robots` key yourself.
@@ -122,7 +129,10 @@ check that they match.
    appends ` | <site name>` through its title template, so do not add the site name yourself. The
    helper builds the absolute, locale-prefixed canonical URL, the language variants with
    `x-default`, Open Graph and Twitter data, and opens the page only when indexing is effective.
-   Add the `pricing.*` message keys to every catalogue. In a fork scaffolded with one locale the
+   Add the `pricing.*` message keys to every catalogue. `src/_pages/pricing/index.ts` re-exports
+   `PricingPage` from `PricingPage.tsx`, the same shape as `src/_pages/settings`. An unsupported
+   locale segment such as `/de/pricing` ends in a 404 (`resolveLocaleParam` calls `notFound()`), so it
+   adds no URL to the index. In a fork scaffolded with one locale the
    route has no `[locale]` folder and no `params`: pass `DEFAULT_LOCALE` from `@amcore/shared` as
    `locale`; URLs have no prefix and no language variants are published.
 
@@ -144,13 +154,16 @@ check that they match.
 5. **Optional structured data**, inside the page component:
 
    ```tsx
+   import { getTranslations } from 'next-intl/server'
+
    import { JsonLd } from '@/shared/lib/seo/json-ld'
 
-   export function PricingPage() {
+   export async function PricingPage() {
+     const t = await getTranslations('pricing')
      return (
        <main>
          <JsonLd
-           data={{ '@context': 'https://schema.org', '@type': 'Product', name: 'Pro plan' }}
+           data={{ '@context': 'https://schema.org', '@type': 'Product', name: t('title') }}
          />
          {/* page content */}
        </main>
@@ -158,8 +171,10 @@ check that they match.
    }
    ```
 
+   Text in structured data is user-facing text: take it from the message catalogues like any other.
    The component escapes every `<` so a value cannot close the script tag. Check the result with
-   Google's Rich Results Test.
+   Google's Rich Results Test. Links from a public page to the login or application pages need no
+   `nofollow`: those pages are `noindex`.
 
 6. **Test it if you want a browser test.** `e2e/mocked/seo-headers.spec.ts` covers the closed
    defaults. A product adds its own test for its public pages.
@@ -174,15 +189,33 @@ A private page needs nothing for search engines: the whole app is closed by defa
    for "pages behind login". `admin` is the Operations Console.
 2. **Noindex is not access control.** A group does not protect a page: its layout is only a shell.
    Every page that shows account data must check the session itself with `requireSession()` from
-   `@/shared/api/bff/dal`, as the existing `(dashboard)` pages do. Search-engine rules hide a page
-   from search results; they do not stop anyone who has the URL.
+   `@/shared/api/bff/dal`, as the existing `(dashboard)` pages do. A signed-out visitor is
+   redirected to the localized login page; if the session store is unavailable it raises an error
+   instead. Search-engine rules hide a page from search results; they do not stop anyone who has
+   the URL.
 3. **Metadata.** Give the page a `title` (and `description`) as usual and set nothing else about
-   robots: it inherits the root `noindex`. Do not call `buildPageMetadata`, which opens a page when
-   indexing is enabled. To be explicit, use `export const metadata = noindexMetadata` from
-   `@/shared/lib/seo/page-metadata` instead of your own `robots` value. Setting `openGraph`,
-   `twitter` or `alternates` on a private page changes nothing for indexing.
+   robots: it inherits the root `noindex`.
+
+   ```ts
+   export async function generateMetadata({ params }: Props): Promise<Metadata> {
+     const locale = await resolveLocaleParam(params)
+     const t = await getTranslations({ locale, namespace: 'billing' })
+     return { title: t('title') } // inherits the root noindex; no robots key
+   }
+   ```
+
+   Do not call `buildPageMetadata`, which opens a page when indexing is enabled. To be explicit,
+   add the sanctioned object: `return { ...noindexMetadata, title: t('title') }`, or
+   `export const metadata = noindexMetadata` for a page with a fixed title, with `noindexMetadata`
+   from `@/shared/lib/seo/page-metadata`. Spreading `noindexMetadata` is allowed; what the guard
+   rejects is writing a `robots` key yourself. Setting `openGraph`, `twitter` or `alternates` on a
+   private page changes nothing for indexing.
+
 4. **Check it.** On a closed site `curl -sI` shows `X-Robots-Tag: noindex, nofollow`; on the open
    site host check the `<meta name="robots">` tag with the body command in [Verify](#verify).
+   Without a session the page must redirect to the login page:
+   `curl -sI https://shop.example.com/en/settings/billing | grep -iE '^HTTP|^location'` shows a
+   redirect status and a `location` ending in `/en/login`.
 
 ## Open production and keep everything else closed
 
@@ -218,31 +251,39 @@ use the same `-H 'Host: …'` trick. See [local stands](../operations/local-stan
 
 ## Verify
 
-Replace `https://shop.example.com` with your origin. Run all of these against production and the
-first two against staging.
+Replace `https://shop.example.com` with your origin. Run groups 1 to 5 against production, and groups
+1 and 2 against staging. If staging is behind basic authentication, add credentials
+(`curl -u user:password …`) or run from an allowed address: a bare `401` from the proxy carries no
+`X-Robots-Tag` and proves nothing. Each header command prints the status line first, so a missing
+`x-robots-tag` line next to `HTTP/… 200` means the header is absent (the open state), while no output
+at all means there was no response.
 
 ```bash
 # 1. Pages: no X-Robots-Tag on the site host when open; noindex on every other host.
-curl -sI https://shop.example.com/en/pricing | grep -i x-robots-tag
-curl -sI https://staging.example.com/en/pricing | grep -i x-robots-tag     # expect noindex, nofollow
+curl -sI https://shop.example.com/en/pricing | grep -iE '^HTTP|x-robots-tag'
+curl -sI https://staging.example.com/en/pricing | grep -iE '^HTTP|x-robots-tag'   # expect noindex, nofollow
 
 # 2. A private page and the API stay closed.
 curl -s -A 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' \
   https://shop.example.com/en/login | grep -oE '<meta name="robots"[^>]*>'   # expect noindex, nofollow
-curl -sI https://shop.example.com/api/auth/sessions | grep -i x-robots-tag # expect noindex, nofollow
+curl -sI https://shop.example.com/api/auth/sessions | grep -iE '^HTTP|x-robots-tag' # expect noindex, nofollow
 
 # 3. Crawler files.
 curl -s https://shop.example.com/robots.txt
 curl -sI https://shop.example.com/sitemap.xml | head -1                    # 200, or 404 with no listed pages
 
-# 4. Googlebot must receive the tags inside <head>, even when generateMetadata is slow.
+# 4. The Operations Console (path topology; `admin` is the default slug, see the Console guide).
+curl -s -A 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' \
+  https://shop.example.com/en/admin/login | grep -oE '<meta name="robots"[^>]*>'   # expect noindex, nofollow
+
+# 5. Googlebot must receive the tags inside <head>, even when generateMetadata is slow.
 curl -s -A 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' \
   https://shop.example.com/en/pricing |
   sed 's#</head>.*##' |
   grep -oE '<(link rel="(canonical|alternate)"|meta name="robots")[^>]*>'
 ```
 
-The fourth command must print the `canonical` link, one `alternate` link per locale plus
+The Googlebot command (group 5) must print the `canonical` link, one `alternate` link per locale plus
 `x-default`, and the `robots` meta tag. Repeat it with
 `-A 'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)'`. To prove the slow case on
 your own page, make its `generateMetadata` wait one second and run it again: a missing tag means
@@ -250,19 +291,19 @@ the tags were streamed into the page body, where Google does not accept them.
 
 ## Rules, reasons and consequences
 
-| Rule                                                                                                                          | Why                                                                                                                                                                                                                                    | Check                                                                                                             | If ignored                                                                                                    | Status                              |
-| ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| Only `shared/lib/seo` writes a `robots` metadata key.                                                                         | Metadata merges shallowly: a page's `robots` object replaces the layout's whole object, so `'index, follow'`, `{ googleBot: { index: true } }` or `{ nocache: true }` reopen indexing without `index: true`.                           | `robots-key-guard.test.ts` scans all sources and proves itself on each forbidden form.                            | A page silently becomes indexable.                                                                            | Enforced                            |
-| Close with `noindexMetadata`, open with `buildPageMetadata`.                                                                  | They return complete objects (`robots`, `openGraph`, `twitter`, `alternates`) so nothing is inherited by accident.                                                                                                                     | `page-metadata.test.ts`.                                                                                          | A hand-written object drops inherited fields (Open Graph site name, canonical, hreflang) or reopens indexing. | Enforced                            |
-| The proxy only adds `X-Robots-Tag`, never removes it.                                                                         | Next applies `next.config.ts` headers first and the proxy after; a static header must survive.                                                                                                                                         | `indexing.test.ts`.                                                                                               | A closed surface could be reopened by the proxy.                                                              | Enforced                            |
-| Indexing needs the exact site host. Only `Host` is read, never `X-Forwarded-Host`.                                            | The same image must stay closed on staging, aliases, raw IPs and the Console host.                                                                                                                                                     | `indexing.test.ts`.                                                                                               | A client could open a closed host with a forged header.                                                       | Enforced                            |
-| `enabled` with a missing, non-`https` or untrusted origin stops start-up.                                                     | A misconfiguration the operator asked for must be loud, not a silently closed or wrongly open site.                                                                                                                                    | `site-origin.test.ts`.                                                                                            | Wrong canonical URLs or an unexpectedly closed site.                                                          | Enforced                            |
-| `htmlLimitedBots` lists Googlebot.                                                                                            | For dynamic pages Next streams metadata into `<body>` unless the crawler is on this list; Google accepts `canonical` and hreflang only from `<head>`. Whether the tags reach `<head>` depends on how fast `generateMetadata` resolves. | `html-limited-bots.test.ts` requires exactly Next's default list plus the `Googlebot` token; verify step 4 above. | Tags land in `<body>` on slow pages and Google ignores them.                                                  | Enforced (list), manual (behaviour) |
-| hreflang comes from `buildPageMetadata` and the sitemap, not next-intl's `Link` header (`alternateLinks: false`).             | The header is built from the request's own `x-forwarded-host` on every response, including private pages and 404s.                                                                                                                     | `routing.ts`; verify step 4.                                                                                      | Wrong hosts in hreflang behind a proxy; hreflang on private pages.                                            | Convention                          |
-| `robots.txt` never lists private paths or the Console slug, and has no `Disallow`.                                            | A `Disallow` hides `noindex` from Google and Yandex, which must crawl a page to see it. Privacy comes from `noindex` plus authentication.                                                                                              | `crawler-files.test.ts`, `seo-headers.spec.ts`.                                                                   | Private URLs advertised; `noindex` never seen.                                                                | Enforced                            |
-| `sitemap.xml` answers 404 when the site is closed or no pages are listed.                                                     | A closed product has no sitemap; an empty file only produces warnings.                                                                                                                                                                 | `seo-headers.spec.ts`.                                                                                            | Search Console warnings.                                                                                      | Enforced                            |
-| A page that uses the helper is listed in `public-pages.ts`, and the reverse.                                                  | The sitemap is the one list of public URLs.                                                                                                                                                                                            | None: dynamic routes cannot be enumerated.                                                                        | Warning or a page missing from the sitemap.                                                                   | Convention                          |
-| Do not use `locale` or `params` in the root layout's `generateMetadata` beyond the existing `getTranslations({ locale, … })`. | The single-locale scaffold transform deletes both there.                                                                                                                                                                               | The scaffold transform fails or leaves an undeclared name.                                                        | A forked project that chose one locale does not build.                                                        | Convention                          |
+| Rule                                                                                                                          | Why                                                                                                                                                                                                                                    | Check                                                                                                              | If ignored                                                                                                    | Status                              |
+| ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Only `shared/lib/seo` writes a `robots` metadata key.                                                                         | Metadata merges shallowly: a page's `robots` object replaces the layout's whole object, so `'index, follow'`, `{ googleBot: { index: true } }` or `{ nocache: true }` reopen indexing without `index: true`.                           | `robots-key-guard.test.ts` scans all sources and proves itself on each forbidden form.                             | A page silently becomes indexable.                                                                            | Enforced                            |
+| Close with `noindexMetadata`, open with `buildPageMetadata`.                                                                  | They return complete objects (`robots`, `openGraph`, `twitter`, `alternates`) so nothing is inherited by accident.                                                                                                                     | `page-metadata.test.ts`.                                                                                           | A hand-written object drops inherited fields (Open Graph site name, canonical, hreflang) or reopens indexing. | Enforced                            |
+| The proxy only adds `X-Robots-Tag`, never removes it.                                                                         | Next applies `next.config.ts` headers first and the proxy after; a static header must survive.                                                                                                                                         | `indexing.test.ts`.                                                                                                | A closed surface could be reopened by the proxy.                                                              | Enforced                            |
+| Indexing needs the exact site host. Only `Host` is read, never `X-Forwarded-Host`.                                            | The same image must stay closed on staging, aliases, raw IPs and the Console host.                                                                                                                                                     | `indexing.test.ts`.                                                                                                | A client could open a closed host with a forged header.                                                       | Enforced                            |
+| `enabled` with a missing, non-`https` or untrusted origin stops start-up.                                                     | A misconfiguration the operator asked for must be loud, not a silently closed or wrongly open site.                                                                                                                                    | `site-origin.test.ts`.                                                                                             | Wrong canonical URLs or an unexpectedly closed site.                                                          | Enforced                            |
+| `htmlLimitedBots` lists Googlebot.                                                                                            | For dynamic pages Next streams metadata into `<body>` unless the crawler is on this list; Google accepts `canonical` and hreflang only from `<head>`. Whether the tags reach `<head>` depends on how fast `generateMetadata` resolves. | `html-limited-bots.test.ts` requires exactly Next's default list plus the `Googlebot` token; verify group 5 above. | Tags land in `<body>` on slow pages and Google ignores them.                                                  | Enforced (list), manual (behaviour) |
+| hreflang comes from `buildPageMetadata` and the sitemap, not next-intl's `Link` header (`alternateLinks: false`).             | The header is built from the request's own `x-forwarded-host` on every response, including private pages and 404s.                                                                                                                     | `routing.ts`; verify step 4.                                                                                       | Wrong hosts in hreflang behind a proxy; hreflang on private pages.                                            | Convention                          |
+| `robots.txt` never lists private paths or the Console slug, and has no `Disallow`.                                            | A `Disallow` hides `noindex` from Google and Yandex, which must crawl a page to see it. Privacy comes from `noindex` plus authentication.                                                                                              | `crawler-files.test.ts`, `seo-headers.spec.ts`.                                                                    | Private URLs advertised; `noindex` never seen.                                                                | Enforced                            |
+| `sitemap.xml` answers 404 when the site is closed or no pages are listed.                                                     | A closed product has no sitemap; an empty file only produces warnings.                                                                                                                                                                 | `seo-headers.spec.ts`.                                                                                             | Search Console warnings.                                                                                      | Enforced                            |
+| A page that uses the helper is listed in `public-pages.ts`, and the reverse.                                                  | The sitemap is the one list of public URLs.                                                                                                                                                                                            | None: dynamic routes cannot be enumerated.                                                                         | Warning or a page missing from the sitemap.                                                                   | Convention                          |
+| Do not use `locale` or `params` in the root layout's `generateMetadata` beyond the existing `getTranslations({ locale, … })`. | The single-locale scaffold transform deletes both there.                                                                                                                                                                               | The scaffold transform fails or leaves an undeclared name.                                                         | A forked project that chose one locale does not build.                                                        | Convention                          |
 
 ## Traps
 
@@ -272,8 +313,9 @@ the tags were streamed into the page body, where Google does not accept them.
   layout's whole object. The root sets neither `alternates.canonical` nor `openGraph.url`, so a
   page that forgets them cannot inherit the home page's.
 - **Forms that reopen indexing without `index: true`:** the string `'index, follow'`, a `googleBot`
-  override, a partial object such as `{ nocache: true }`, a spread of a variable, `other.robots`.
-  The guard test rejects the `robots` key itself.
+  override, a partial object such as `{ nocache: true }`, a spread of an object of your own that
+  contains `robots`, `other.robots`. The guard test rejects the `robots` key itself. Spreading
+  `noindexMetadata` is fine: that is the sanctioned object.
 - **`Disallow` hides `noindex`.** To remove a page from the index keep it crawlable and serve
   `noindex`.
 - **Aliases and previews.** `www`, the apex, a raw IP and preview hosts are different hosts. Only
