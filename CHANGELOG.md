@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Upgrade Prisma CLI, client and PostgreSQL adapter to 7.10.1, which selects
+  patched deepmerge-ts 8.0.2 for configuration loading. Upgrade OSV-Scanner to
+  2.7.0 with a verified binary checksum; retain weekly recursive SARIF reporting
+  and failure on scanner errors. Other dependency advisories remain open.
+
 - Restore native JSON prototype/constructor protection and preserve supported request encodings.
   Recognized body-parser failures use 400/413/415 instead of 500; keep true internal failures unchanged.
 
