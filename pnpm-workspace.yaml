@@ -17,16 +17,3 @@ allowBuilds:
   sharp: true
   ssh2: true
   unrs-resolver: true
-# Temporary exceptions only; ordinary patched dependencies resolve in parent ranges.
-# pnpm 11 reads overrides here, not from package.json. Remove each exception when
-# its stated parent/removal condition is satisfied and verify the affected consumer.
-overrides:
-  # MCP accepts ^1.19.9 || ^2.0.5. Keep patched v1 while its transport remains
-  # on the current integration; remove after a separately verified v2 update.
-  '@modelcontextprotocol/sdk>@hono/node-server': '1.19.17'
-  # Swagger 11.4.7 pins js-yaml 5.3.0 (GHSA-r3ph-w7gj-g6xm).
-  # Used by the API's OpenAPI YAML serializer; remove when Swagger 11 pins safe 5.x.
-  '@nestjs/swagger>js-yaml': '5.4.3'
-  # Prisma 7.10.0 pins mysql2 3.15.3 (GHSA-3f6p-5ww8-9rcr/GHSA-rgwj-5xj2-c3m3).
-  # CLI dependency; remove when supported Prisma requests a patched mysql2 version.
-  'prisma>mysql2': '3.24.5'

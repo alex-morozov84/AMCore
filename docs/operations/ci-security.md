@@ -544,6 +544,21 @@ package version remains installed. Duplicate alerts from different scanners do
 not represent independent vulnerabilities, and a green report-only scan does
 not prove that an image contains no vulnerable packages.
 
+### Transitive dependency exceptions
+
+Prefer the versions supported by each parent package. Before removing an override,
+check the parent's published dependency range, current advisories and the actual
+installed consumer. Use normal pnpm resolution and review the complete lockfile
+change. An override removal does not require updating every compatible dependency
+already retained by the lockfile.
+
+Swagger 12.0.2 selects js-yaml 5.4.2; Prisma 7.10.1 selects mysql2 3.24.4.
+MCP SDK 1.31.0 accepts Hono node-server 1.19.17, retained in the ordinary lockfile.
+These paths no longer need overrides. The web development tool shadcn uses MCP
+stdio, not the Hono HTTP transport. This does not certify unrelated package paths
+or replace source and deployed-image scans. Recheck advisory ranges before a
+future dependency update; a package's minimum supported version can be vulnerable.
+
 ### Dependency freshness report
 
 Dependabot handles patch/minor npm + action bumps and (per repo, see

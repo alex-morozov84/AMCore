@@ -120,6 +120,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patched deepmerge-ts 8.0.2 for configuration loading. Upgrade OSV-Scanner to
   2.7.0 with a verified binary checksum; retain weekly recursive SARIF reporting
   and failure on scanner errors. Other dependency advisories remain open.
+- Remove obsolete Swagger/js-yaml, Prisma/mysql2 and MCP/Hono dependency
+  overrides. Use parent-selected js-yaml 5.4.2 and mysql2 3.24.4; retain
+  supported Hono node-server 1.19.17 through the ordinary lockfile.
 
 - Restore native JSON prototype/constructor protection and preserve supported request encodings.
   Recognized body-parser failures use 400/413/415 instead of 500; keep true internal failures unchanged.
