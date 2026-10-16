@@ -15,6 +15,7 @@ const roots = [
   'apps/web/src/features/console-user-sessions',
   'apps/web/src/features/console-api-keys',
   'apps/web/src/features/console-background-work',
+  'apps/web/src/features/console-organization-setup',
   'apps/web/src/shared/api/console',
   'apps/web/src/shared/ui/console-detail',
   'apps/web/src/shared/lib/console-time-zone',
@@ -45,6 +46,7 @@ const sharedModules = [
 const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts'])]
 
 const verification = [
+  'apps/web/e2e/organization-setup/console-organization-setup.spec.ts',
   'apps/web/playwright.console-real-stack.config.ts',
   'docker/testing/console-session-e2e.yml',
   'scripts/stand/proxy-smoke.mjs',

@@ -80,14 +80,19 @@ From `apps/api`, the compiled entrypoints are:
 node dist/cli/geoip-update.js
 node dist/cli/telegram-setup.js
 node dist/cli/storage-check.js
+node dist/cli/organization-setup.js status
 ```
 
-The fourth entrypoint is `node dist/main.js`. Operator commands retain their
-existing environment, permissions, refusal and cleanup contracts. Telegram and
-storage direct-run guards compare canonical file URLs, so importing them does
-not execute the command and symlinked invocation remains supported. GeoIP is an
-executable command, not a side-effect-free library entry. Source operator scripts
-retain tsx; see [storage checks](../storage/README.md) and existing package commands.
+The application entrypoint is `node dist/main.js`. Operator commands retain their
+existing environment, permissions, refusal and cleanup contracts.
+Telegram, storage and organization-setup commands compare canonical file URLs
+before execution. Importing these modules does not run their commands.
+Invocation through a symlink remains supported. GeoIP always runs as an executable command.
+Organization setup requires trusted deployment access.
+The [first organization guide](../product-admin/organization-establishment.md)
+explains the creation policy, account preparation, mailbox proof, completion and safe repeats.
+Source operator scripts retain tsx; see [storage checks](../storage/README.md)
+and existing package commands.
 Never use real provider credentials for test fixtures.
 
 ## Tests and downstream changes

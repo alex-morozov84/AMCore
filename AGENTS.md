@@ -74,6 +74,7 @@ pnpm lint               # lint        pnpm typecheck   # types
 pnpm test               # unit tests  pnpm build       # build all
 pnpm test:background-work-contracts # isolated work registration/control/provider safety (Docker)
 pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
+pnpm --filter api organization:setup -- status # inspect trusted initial organization setup
 pnpm init:brand         # downstream fork identity/brand/theme initializer
 pnpm init:project       # downstream project choices; run with flags
 node scripts/api-e2e-ci.mjs --prepare # generate Prisma and build shared for API E2E

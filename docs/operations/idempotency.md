@@ -15,6 +15,19 @@ The primitive is implemented as a Nest interceptor, so it can both short-circuit
 before the handler and replay a cached response after a previous successful
 reservation.
 
+## Organization creation uses a separate domain result
+
+Organization creation does not use this Redis response cache. An optional
+`X-Organization-Creation-Id` UUIDv4 identifies a successful SQL result for one actor.
+Same-input replay checks original membership/grant identities and returns current
+organization metadata. Changed or deleted access is never restored. Minimal result
+records have no expiry and survive account/organization deletion. A lost response
+requires the same operation and input; creating a new key is not safe recovery.
+Trusted initial setup uses its own constant singleton completion fact.
+See [organization establishment](../product-admin/organization-establishment.md).
+
+The sections below describe only the opt-in Redis primitive.
+
 ## Scope And Header
 
 Current rules:

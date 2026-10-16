@@ -25,7 +25,10 @@ describe('operation inventory against the real plans', () => {
       // The account menu changes the shell header, adds the account catalogue namespace and
       // re-registers four e2e surfaces: +4 operations, +1 fact, -5 claims, +4 final operations
       // (measured against the previous baseline of 671/933/1649/654).
-      { name: 'measured operations', expected: 675, actual: inventory.operations.length },
+      // Establishment adds locale/story removal, the Console setup root/spec and mixed-guide
+      // seams: measured +12 operations, +18 facts, +24 claims and +11 final operations.
+      // All eight real plans retain their existing providers and exact-copy classification.
+      { name: 'measured operations', expected: 687, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -44,17 +47,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 934,
+        expected: 952,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1644,
+        expected: 1668,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 658,
+        expected: 669,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Independent self-service organization creation policy, ready/headless creation
+  with permanent operation results and safe recovery after a lost response.
+  Occupied identifiers have a specific localized explanation; cancelling a rejected
+  creation clears its error before reopening the form.
+- Trusted initial organization setup through a compiled runner command and
+  protected API, with passwordless account preparation, existing mailbox proof,
+  atomic first-ADMIN assignment and permanent protection against regrant/recreation.
+- Eligible initial-installation Console controls, with selected-recipient confirmation
+  and recovery across reloads. Three plain-language steps separate administrator selection,
+  organization details and confirmation; the result explains access and offers the next action.
+  If the selected account disappears before creation, the operator can explicitly
+  choose another recipient while keeping the organization details.
+  Platform SUPER_ADMIN bootstrap remains separate.
+
 - Operations Console now shows database-owned AI runs with gated pause/resume,
   cooperative cancellation, one linked text-only retry for proven transient
   failures, and 30-day cleanup of never-started cancelled or expired runs.

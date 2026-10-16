@@ -15,12 +15,18 @@ const entry = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
-function setup(data: OrganizationContextData, page = 1, explicitList = false) {
+function setup(
+  data: OrganizationContextData,
+  page = 1,
+  explicitList = false,
+  blocksAutoOpen = false
+) {
   const props = {
     data,
     state: { target: 'list', status: 'ready' as const },
     input: { kind: 'list' as const, page, locale: 'en' },
     explicitList,
+    blocksAutoOpen,
     refresh: vi.fn(),
     onReplace: vi.fn(),
     contextHref: (id: string) => `/workspace/${id}`,
@@ -51,4 +57,13 @@ describe('page-owned bounded navigation', () => {
     expect(one.props.onReplace).toHaveBeenCalledExactlyOnceWith('/workspace?page=1')
     expect(one.props.refresh).not.toHaveBeenCalled()
   })
+})
+
+it('waits for unresolved creation recovery before auto-opening exactly one membership', () => {
+  const data = { binding: 'session', data: { data: [entry], total: 1, page: 1, limit: 20 } }
+  const one = setup(data, 1, false, true)
+  expect(one.props.onReplace).not.toHaveBeenCalled()
+  expect(one.result.current.autoOpen).toBe(false)
+  one.rerender({ ...one.props, blocksAutoOpen: false })
+  expect(one.props.onReplace).toHaveBeenCalledExactlyOnceWith('/workspace/company')
 })

@@ -14,7 +14,13 @@ import {
 } from './organization-roles-fixture.mjs'
 
 export async function preview(m, profile = 'default') {
-  const profiles = ['default', 'user', 'organization', 'organization-roles']
+  const profiles = [
+    'default',
+    'user',
+    'organization',
+    'organization-roles',
+    'organization-creation',
+  ]
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_START
   profiles.push('notification-work')
   if (profile === 'notification-work' && m.fixtureProfile !== profile)
@@ -23,6 +29,14 @@ export async function preview(m, profile = 'default') {
   // AMCORE_CONSOLE_AI_PROFILE_START
   profiles.push('ai-run-control')
   // AMCORE_CONSOLE_AI_PROFILE_END
+  // AMCORE_CONSOLE_ESTABLISHMENT_PROFILE_START
+  profiles.push('organization-establishment')
+  if (
+    profile === 'organization-establishment' &&
+    (!m.consoleEnabled || m.fixtureProfile !== profile || m.purpose !== 'preview')
+  )
+    throw new Error('Initial setup preview needs a fresh enabled-Console stand with this profile')
+  // AMCORE_CONSOLE_ESTABLISHMENT_PROFILE_END
   if (!profiles.includes(profile)) throw new Error('Unknown fixture profile')
   await admitInvocation(m)
   const labels = await previewLabels(m)
@@ -45,6 +59,33 @@ export async function preview(m, profile = 'default') {
       args: ['--proxy-bypass-list=<-loopback>'],
     })
     await fixtureAccounts(m, api, profile)
+    // AMCORE_CONSOLE_ESTABLISHMENT_FIXTURE_START
+    if (profile === 'organization-establishment') {
+      const { executeSetupCommand } = await import('./setup-command.mjs')
+      const probes = await executeSetupCommand(m, { command: 'diagnostics' })
+      if (
+        probes.invalid.exit !== 2 ||
+        probes.invalid.output.status !== 'invalid_input' ||
+        probes.unavailable.exit !== 4 ||
+        probes.unavailable.output.status !== 'SETUP_UNCONFIRMED'
+      )
+        throw new Error('Compiled runner recovery diagnostics failed')
+      const recipient = m.accounts.find((account) => account.role === 'USER')
+      if (!recipient) throw new Error('Initial setup preview recipient missing')
+      if (m.establishmentPreviewRecipient && m.establishmentPreviewRecipient !== recipient.id)
+        throw new Error('Initial setup preview recipient changed')
+      if (!m.establishmentPreviewRecipient) {
+        // Demo-only mailbox substitute. Real rendered-mail proof belongs to the isolated E2E fixture.
+        await sql(
+          m,
+          'UPDATE core.users SET "emailVerified" = true WHERE id = :\'id\' AND "emailCanonical" = :\'email\';',
+          { id: recipient.id, email: recipient.email }
+        )
+        m.establishmentPreviewRecipient = recipient.id
+        await save(m)
+      }
+    }
+    // AMCORE_CONSOLE_ESTABLISHMENT_FIXTURE_END
     if (profile === 'organization') {
       const { organizationFixture } = await import('./organization-fixture.mjs')
       await organizationFixture(m, api)
@@ -87,6 +128,20 @@ export async function preview(m, profile = 'default') {
               ? SUPPORTED_LOCALES.some((locale) => url.pathname === `/${locale}`)
               : url.pathname === '/')
         )
+        if (profile === 'organization-creation' && account.role === 'USER') {
+          await page.goto(`${m.localePrefix}/organizations?view=list`)
+          await page
+            .getByRole('heading', { name: labels.product.creationTitle, exact: true })
+            .waitFor()
+          await page.getByRole('button', { name: labels.product.create, exact: true }).click()
+          await page.getByLabel(labels.product.organizationName, { exact: true }).waitFor()
+          await page.screenshot({
+            path: `${m.worktree}/.amcore/stands/${m.id}/preview-create-form.png`,
+          })
+          await page
+            .getByRole('button', { name: labels.product.cancelCreation, exact: true })
+            .click()
+        }
         // AMCORE_CONSOLE_PREVIEW_ACCESS_START
         if (account.role === 'SUPER_ADMIN') {
           await page.goto(
@@ -102,6 +157,26 @@ export async function preview(m, profile = 'default') {
             await page.waitForURL(`${m.origins.console}${m.localePrefix}`)
           }
           if (page.url().includes('/login')) throw new Error('Admin preview access not proved')
+          // AMCORE_CONSOLE_ESTABLISHMENT_PREVIEW_START
+          if (profile === 'organization-establishment') {
+            const base = m.origins.console
+              ? `${m.origins.console}${m.localePrefix}`
+              : `${m.localePrefix}/${m.consoleSlug}`
+            await page.goto(`${base}/organizations`)
+            await page
+              .getByRole('heading', { name: labels.console.setupTitle, exact: true })
+              .waitFor()
+            const states = labels.console.setupStates.map((text) =>
+              text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            )
+            await page
+              .getByRole('status')
+              .filter({ hasText: new RegExp(`^(?:${states.join('|')})$`) })
+              .or(page.getByRole('heading', { name: labels.console.setupFirstStep, exact: true }))
+              .or(page.getByRole('heading', { name: new RegExp(`^(?:${states.join('|')})$`) }))
+              .waitFor()
+          }
+          // AMCORE_CONSOLE_ESTABLISHMENT_PREVIEW_END
           if (profile === 'notification-work') {
             const { notificationWorkPreview } = await import('./notification-work-fixture.mjs')
             await notificationWorkPreview(page, m, SUPPORTED_LOCALES)

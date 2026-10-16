@@ -4,11 +4,10 @@ import { registerViaUi, uniqueEmail } from './helpers'
 
 /**
  * The four email-link auth flows (Track 9 PR4): `forgot-password`,
- * `reset-password`, `verify-email`, `resend-verification`. No real mailbox
- * exists in any test infra here (the backend's `sendNow`/EQS-02 direct-send
- * path has no capture hook), so a genuine "click the real emailed link"
- * round trip isn't testable without new backend scaffolding — out of scope
- * for a frontend-consumer PR. What real-stack CAN prove without any email:
+ * `reset-password`, `verify-email`, `resend-verification`. This ordinary lane
+ * has no mailbox capture. The separate organization-setup fixture proves an
+ * actual rendered recovery-link round trip through its internal collector.
+ * These tests prove without reading any email:
  * the enumeration-safe success response for both an existing and a
  * non-existing account (a real backend call either way), and the
  * missing/invalid-token states, which are exactly what a mistyped or stale

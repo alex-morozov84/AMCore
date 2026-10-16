@@ -26,6 +26,8 @@ import { MemberAccessService } from './member-access/member-access.service.js'
 import { MemberQueryService } from './member-query.service.js'
 import { MemberRoleSetService } from './member-role-set.service.js'
 import { MembersController } from './members.controller.js'
+import { OrganizationCreationController } from './organization-creation.controller.js'
+import { OrganizationCreationService } from './organization-creation.service.js'
 import { OrganizationsController } from './organizations.controller.js'
 import { OrganizationsService } from './organizations.service.js'
 import { PresetPermissionsController } from './preset-permissions.controller.js'
@@ -45,6 +47,7 @@ import { RolesController } from './roles.controller.js'
     EmailModule, // Provides EmailService for invite dispatch (OB-02 Stage D)
   ],
   controllers: [
+    OrganizationCreationController,
     OrganizationsController,
     CapabilitiesController,
     PresetPermissionsController,
@@ -58,6 +61,7 @@ import { RolesController } from './roles.controller.js'
   ],
   providers: [
     OrganizationsService,
+    OrganizationCreationService,
     CapabilityRegistry,
     MemberService,
     MemberQueryService,

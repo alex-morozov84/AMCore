@@ -6,6 +6,7 @@ import type {
 export interface ManagedTarget {
   id: string
   uuid: string
+  fixtureProfile?: string
   purpose: string
   topology: string
   worktree: string

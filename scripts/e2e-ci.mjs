@@ -23,8 +23,11 @@ async function browserLane(lane) {
   const operation = await cancellation()
   const args = ['scripts/stand.mjs', 'e2e', '--id', operation.standId, '--lane', 'mocked']
   if (lane.startsWith('path-')) args.splice(5, 1, 'real-stack', '--ci-group', lane.slice(5))
+  if (lane === 'setup-cli') args.splice(5, 1, 'real-stack', '--fixture', 'organization-setup')
   // AMCORE_CONSOLE_CI_COMMAND_START
   if (lane === 'host') args.splice(5, 1, 'console-real-stack')
+  if (lane === 'setup-console')
+    args.splice(5, 1, 'console-real-stack', '--fixture', 'organization-setup')
   // AMCORE_CONSOLE_CI_COMMAND_END
   let status = 0
   try {

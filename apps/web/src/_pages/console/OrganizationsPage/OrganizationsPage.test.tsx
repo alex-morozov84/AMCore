@@ -4,6 +4,7 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/features/console-organization-setup', () => ({ OrganizationSetup: () => null }))
 vi.mock('server-only', () => ({}))
 vi.mock('@/i18n/navigation', () => ({
   Link: ({ href, children }: { href: string; children: ReactNode }) => (

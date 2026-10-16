@@ -9,6 +9,7 @@ import { idempotencyEnv } from './idempotency.env.js'
 import { mediaEnv } from './media.env.js'
 import { oauthEnv } from './oauth.env.js'
 import { observabilityEnv } from './observability.env.js'
+import { organizationsEnv } from './organizations.env.js'
 import { queueEnv } from './queue.env.js'
 import { aiRealtimeEnv, notificationsRealtimeEnv } from './realtime.env.js'
 import { redisEnv } from './redis.env.js'
@@ -32,6 +33,7 @@ export const envSections = {
   aiRealtime: aiRealtimeEnv,
   queue: queueEnv,
   auth: authEnv,
+  organizations: organizationsEnv,
   oauth: oauthEnv,
   telegram: telegramEnv,
   email: emailEnv,
@@ -54,6 +56,7 @@ export const envBaseSchema = z.object({
   ...aiRealtimeEnv.shape,
   ...queueEnv.shape,
   ...authEnv.shape,
+  ...organizationsEnv.shape,
   ...oauthEnv.shape,
   ...telegramEnv.shape,
   ...emailEnv.shape,

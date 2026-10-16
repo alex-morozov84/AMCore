@@ -3,20 +3,16 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { RequestPrincipal } from '@amcore/shared'
 import { SystemRole } from '@amcore/shared'
 
-import {
-  AppException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '../../common/exceptions'
+import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
 import type { AppAbility } from '../auth/casl/ability.factory'
 import type { OrgAclVersionService } from '../auth/org-acl-version.service'
 
 import { CapabilityRegistry } from './capability-registry.service'
+import { OrganizationCreationService } from './organization-creation.service'
 import { OrganizationsService } from './organizations.service'
 
-import type { Organization, OrgMember, Role } from '@/generated/prisma/client'
+import type { Organization, OrgMember } from '@/generated/prisma/client'
 import type { PrismaClient } from '@/generated/prisma/client'
 
 // findOne reads `ability.can(Read, Organization)` only for api_key
@@ -28,6 +24,7 @@ const denyAbility = (): AppAbility =>
   ({ can: jest.fn().mockReturnValue(false) }) as unknown as AppAbility
 
 describe('OrganizationsService', () => {
+  let creation: jest.Mocked<Pick<OrganizationCreationService, 'create'>>
   let service: OrganizationsService
   let prisma: DeepMockProxy<PrismaClient>
   let aclVersionService: jest.Mocked<Pick<OrgAclVersionService, 'invalidate'>>
@@ -52,14 +49,6 @@ describe('OrganizationsService', () => {
     updatedAt: mockOrg.updatedAt.toISOString(),
   }
 
-  const mockRole: Role = {
-    id: 'role-admin',
-    name: 'ADMIN',
-    description: null,
-    isSystem: true,
-    organizationId: null,
-  }
-
   const mockMember: OrgMember = {
     id: 'member-1',
     userId: 'user-1',
@@ -79,44 +68,22 @@ describe('OrganizationsService', () => {
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
     aclVersionService = { invalidate: jest.fn().mockResolvedValue(undefined) }
+    creation = { create: jest.fn() }
     service = new OrganizationsService(
       prisma as unknown as PrismaService,
       aclVersionService as unknown as OrgAclVersionService,
-      new CapabilityRegistry()
+      new CapabilityRegistry(),
+      creation as unknown as OrganizationCreationService
     )
   })
 
   describe('create', () => {
-    it('creates org with auto-generated slug and assigns ADMIN role to creator', async () => {
-      prisma.organization.findUnique.mockResolvedValue(null) // slug not taken
-      prisma.role.findMany.mockResolvedValue([mockRole])
-      // $transaction is mocked to return the callback's result — Arc C maps the
-      // created org to the response shape (ISO dates) inside the callback.
-      prisma.$transaction.mockResolvedValue(expectedOrgResponse)
-
-      const result = await service.create('user-1', { name: 'Acme Corp' })
-
-      expect(result).toEqual(expectedOrgResponse)
-      expect(prisma.role.findMany).toHaveBeenCalledWith({
-        where: { name: 'ADMIN', organizationId: null },
-        select: { id: true, isSystem: true },
-      })
-      expect(prisma.$transaction).toHaveBeenCalled()
-    })
-
-    it('throws ConflictException when provided slug is already taken', async () => {
-      prisma.organization.findUnique.mockResolvedValue(mockOrg) // slug taken
-
-      await expect(service.create('user-1', { name: 'Acme', slug: 'acme-corp' })).rejects.toThrow(
-        ConflictException
+    it('uses the shared creation operation and preserves its response', async () => {
+      creation.create.mockResolvedValue(expectedOrgResponse)
+      expect(await service.create('user-1', { name: 'Acme Corp' }, 'operation')).toEqual(
+        expectedOrgResponse
       )
-    })
-
-    it('throws AppException when system roles are not seeded', async () => {
-      prisma.organization.findUnique.mockResolvedValue(null)
-      prisma.role.findMany.mockResolvedValue([]) // no ADMIN role
-
-      await expect(service.create('user-1', { name: 'Acme Corp' })).rejects.toThrow(AppException)
+      expect(creation.create).toHaveBeenCalledWith('user-1', { name: 'Acme Corp' }, 'operation')
     })
   })
 

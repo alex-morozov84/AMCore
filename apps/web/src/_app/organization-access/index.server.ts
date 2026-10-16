@@ -2,6 +2,7 @@ export { OrganizationAccessMount } from './ui/mount'
 
 import 'server-only'
 
+export { organizationCreationHandlers } from './server/creation-handlers'
 export {
   invitationManagerHandlers,
   invitationManagerMethodDenied,

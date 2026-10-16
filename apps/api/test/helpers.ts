@@ -353,6 +353,9 @@ export async function cleanDatabase(
  * Call before cleanDatabase to respect foreign key order.
  */
 export async function cleanOrgData(prisma: PrismaService): Promise<void> {
+  // Disposable fixtures explicitly erase completion history between independent tests.
+  await prisma.organizationCreationResult.deleteMany()
+  await prisma.organizationBootstrapResult.deleteMany()
   await prisma.permission.deleteMany({ where: { organizationId: { not: null } } })
   await prisma.role.deleteMany({ where: { organizationId: { not: null } } })
   await prisma.organization.deleteMany()

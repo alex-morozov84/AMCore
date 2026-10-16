@@ -1,10 +1,16 @@
 import { defineConfig, devices } from '@playwright/test'
 
-import { outputPaths, testOptions } from './e2e/support/managed-target.mjs'
+import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-target.mjs'
 
 export default defineConfig({
   ...outputPaths(),
-  testDir: './e2e/console-real-stack',
+  testDir:
+    activeTarget().fixtureProfile === 'organization-setup'
+      ? './e2e/organization-setup'
+      : './e2e/console-real-stack',
+  ...(activeTarget().fixtureProfile === 'organization-setup'
+    ? { testMatch: '**/console-organization-setup.spec.ts' }
+    : {}),
   fullyParallel: false,
   // Fixture writes include live ownership/marker checks; browser assertions keep their own limits.
   timeout: 120_000,

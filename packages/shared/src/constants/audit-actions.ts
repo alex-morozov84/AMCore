@@ -34,6 +34,8 @@ export const AUDIT_ACTIONS = [
   'background_work.command_denied',
   'background_work.command_resolution',
   'background_work.evidence_resolution',
+  'org.created',
+  'org.setup_account_prepared',
   'org.invite_accepted',
   'org.invite_created',
   'org.invite_revoked',

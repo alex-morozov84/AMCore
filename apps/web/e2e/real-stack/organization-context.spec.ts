@@ -29,7 +29,9 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   const calls: string[] = []
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
-    if (path.startsWith('/api/product-access/')) calls.push(path)
+    // Creation availability is independent of the existing authority-read sequence below.
+    if (path.startsWith('/api/product-access/') && !path.endsWith('/creation-policy'))
+      calls.push(path)
   })
 
   await page.goto(ui.path())

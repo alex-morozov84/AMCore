@@ -26,6 +26,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
+    "organization:setup": "tsx src/cli/organization-setup.ts",
     "telegram:setup": "tsx src/cli/telegram-setup.ts",
     "storage:check": "tsx src/cli/storage-check.ts",
     "lint:fix": "node ../../scripts/lint.mjs --scope api --fix"
