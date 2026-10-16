@@ -90,8 +90,8 @@ jobs:
 
       - name: Install OSV-Scanner
         env:
-          OSV_SCANNER_VERSION: 2.6.0
-          OSV_SCANNER_LINUX_AMD64_SHA256: ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108
+          OSV_SCANNER_VERSION: 2.7.0
+          OSV_SCANNER_LINUX_AMD64_SHA256: 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           asset="osv-scanner_linux_amd64"
