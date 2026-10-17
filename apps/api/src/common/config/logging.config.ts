@@ -100,6 +100,11 @@ function serializeRequestBody(
  */
 export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Params {
   const isDevelopment = process.env.NODE_ENV !== 'production'
+  // pino-pretty runs in a worker thread, so the main thread cannot guarantee that a line it
+  // has handed over is written before the process dies (Nest re-emits the shutdown signal
+  // right after its hooks). Keep it for interactive development; tests and production log
+  // through pino's own destination, which the shutdown hook drains synchronously.
+  const prettyOutput = isDevelopment && process.env.NODE_ENV !== 'test'
 
   return {
     pinoHttp: {
@@ -110,8 +115,8 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
         }
       },
 
-      // Pretty console output in development
-      transport: isDevelopment
+      // Pretty console output in interactive development only
+      transport: prettyOutput
         ? {
             target: 'pino-pretty',
             options: {

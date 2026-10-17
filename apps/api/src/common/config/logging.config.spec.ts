@@ -14,6 +14,30 @@ describe('createLoggingConfig', () => {
     get: jest.fn(),
   } as unknown as ClsService
 
+  describe('pretty transport', () => {
+    const original = process.env.NODE_ENV
+    afterEach(() => {
+      if (original === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = original
+    })
+    const transportFor = (nodeEnv: string | undefined) => {
+      if (nodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = nodeEnv
+      return (createLoggingConfig(clsServiceMock, 4096).pinoHttp as { transport?: unknown })
+        .transport
+    }
+
+    it('uses the worker-thread pretty transport only for interactive development', () => {
+      expect(transportFor('development')).toMatchObject({ target: 'pino-pretty' })
+      expect(transportFor(undefined)).toMatchObject({ target: 'pino-pretty' })
+    })
+
+    it('logs through the main-thread destination in tests and production', () => {
+      expect(transportFor('test')).toBeUndefined()
+      expect(transportFor('production')).toBeUndefined()
+    })
+  })
+
   it('redacts nested credential fields and hashed secrets', () => {
     const config = createLoggingConfig(clsServiceMock, 4096)
 
