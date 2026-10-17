@@ -22,9 +22,11 @@ export class ShutdownService implements OnApplicationShutdown {
 
   onApplicationShutdown(signal?: string): void {
     this.logger.info(`Application shutdown (${signal ?? 'unknown'}), flushing logs...`)
+    // Nest has already closed the app here. Write the last line before the flush: Nest re-emits
+    // the signal right after this hook, so a line written after the flush can be lost.
+    this.logger.info('✅ Application closed successfully')
     try {
       this.app?.flushLogs()
-      this.logger.info('✅ Application closed successfully')
     } catch (error) {
       this.logger.error({ err: error }, 'Error flushing logs during shutdown')
       process.exitCode = 1
