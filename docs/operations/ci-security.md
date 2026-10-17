@@ -583,6 +583,15 @@ use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
 
+The report also has a **Dependabot health** section. GitHub kills a Dependabot
+update job after a fixed 55 minutes (it cannot be extended) and a killed job opens
+**no PR**, so the only symptom is silence. The section warns when the latest
+`npm_and_yarn in /` job did not finish, or when about 40 or more packages are
+behind inside their major (a job prepares one update per outdated package, roughly
+40 s each here). The root npm entry in `dependabot.yml` therefore runs twice a week
+(Mon and Thu, 06:00 UTC) to keep each backlog small; if the warning appears, update
+the backlog by hand once instead of waiting for the next run.
+
 Forkers can keep this stack lean:
 
 - keep GitHub-native features first;

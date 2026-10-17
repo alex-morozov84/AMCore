@@ -5,8 +5,12 @@ version: 2
 updates:
   - package-ecosystem: 'npm'
     directory: '/'
+    # Twice a week (Mon, Thu 06:00 UTC): a job prepares one update per outdated
+    # package and GitHub kills it after 55 minutes, so a smaller backlog per run
+    # keeps it inside the limit. A killed job opens no PR.
     schedule:
-      interval: 'weekly'
+      interval: 'cron'
+      cronjob: '0 6 * * 1,4'
     open-pull-requests-limit: 10
     # Dependabot puts a package in the FIRST group that matches, so the narrow
     # groups come before the catch-all. Each narrow group is a set that must

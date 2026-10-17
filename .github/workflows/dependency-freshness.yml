@@ -1,8 +1,10 @@
 name: Dependency freshness
 
 # Surfaces the update signals Dependabot does NOT raise (ignored semver-majors,
-# Docker base-image digest drift, curl-pinned CLI releases) into a single tracking
-# issue, edited in place each run. Complements dependabot.yml; does not open PRs.
+# Docker base-image digest drift, curl-pinned CLI releases) and Dependabot's own
+# health (a root update job cut off by the fixed 55 minute limit opens no PR) into
+# a single tracking issue, edited in place each run. Complements dependabot.yml;
+# does not open PRs.
 
 on:
   schedule:
@@ -18,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: read # lists the Dependabot update runs for the health section
       contents: read
       issues: write
     steps:
@@ -41,6 +44,7 @@ jobs:
       - name: Generate freshness report
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: node scripts/dependency-freshness.mjs > "$RUNNER_TEMP/report.md"
 
       - name: Upsert tracking issue
