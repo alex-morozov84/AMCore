@@ -618,6 +618,34 @@ upserts. Review both effects before using it on an installation: exact current
 authorization templates are unchanged, but AI catalogue defaults are reapplied.
 It is not a routine production migration or a repair command.
 
+For an explicit deployment seed, use a source checkout matching the deployed
+version and the Node/pnpm versions declared by its root `package.json`.
+Prepare dependencies and the seed's generated/shared imports:
+
+```sh
+export pnpm_config_frozen_lockfile=true
+pnpm install --frozen-lockfile
+pnpm --filter @amcore/shared build
+pnpm --filter api db:generate
+```
+
+Provide `MIGRATION_DATABASE_URL` through your normal secret handling. It must name
+the selected direct endpoint reachable from this host, use the schema-owner role,
+and retain the required TLS verification and trusted CA. Compose env files do not
+configure host commands; the container-only hostname `postgres` is not a host endpoint.
+
+```sh
+: "${MIGRATION_DATABASE_URL:?set the selected host-reachable migration URL first}"
+DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter api exec tsx prisma/seed.ts
+```
+
+This invokes the same guarded seed directly, with the explicitly selected URL.
+The final migrator does not contain pnpm/tsx or the seed's API dependencies.
+Stop on a connection, TLS, permission or template refusal; do not switch targets
+or bypass verification. A successful seed prints `System roles and AI catalogue seeded`.
+Before initial setup, use the runner's documented `status` command to confirm
+readiness. Status does not verify every database privilege or every AI catalogue field.
+
 ## Initial organization and administrator
 
 Migration `20261015150000_organization_establishment` adds two minimal permanent result
@@ -634,7 +662,8 @@ service inherits the same policy; it does not reconfigure existing API replicas.
 Roll out that policy consistently before admitting traffic or running initial setup.
 Prepare an ordinary account, complete normal mailbox proof, then assign
 its verified ID as organization `ADMIN`. Run `organization-setup.js` from the runner;
-migrations and seed use the CLI-capable migrator. First platform `SUPER_ADMIN` trust
+migrations use the migrator. Explicit seed runs from the matching prepared source
+checkout, as described under [Seeding](#seeding). First platform `SUPER_ADMIN` trust
 is separate. The [establishment runbook](../product-admin/organization-establishment.md)
 gives exact image commands, prerequisites, status/exit codes and failure recovery.
 

@@ -10,7 +10,7 @@ import { directory } from './state.mjs'
 export const label = 'org.amcore.stand'
 // Services whose images the stand builds itself. Only these carry ownership labels on
 // the built image (`build.labels`); pulled images (postgres, redis, caddy) never do.
-export const builtServices = ['migrate', 'api', 'worker', 'web']
+export const builtServices = ['migrate', 'seed', 'api', 'worker', 'web']
 export function labels(m) {
   return { [label]: m.uuid, 'org.amcore.attempt': m.attempt, 'org.amcore.worktree': m.worktree }
 }
@@ -68,6 +68,7 @@ export async function configuration(m) {
     postgres: { POSTGRES_USER: 'amcore', POSTGRES_DB: 'amcore', POSTGRES_PASSWORD: m.dbPassword },
     redis: {},
     migrate: { DATABASE_URL: db, E2E_DATABASE_URL: db },
+    seed: { DATABASE_URL: db },
     api: { ...app, PROCESS_ROLE: 'web' },
     worker: { ...app, PROCESS_ROLE: 'worker' },
     web: {
@@ -120,6 +121,11 @@ export async function configuration(m) {
     yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${labelLines(m, '      ')}`
     if (builtServices.includes(service))
       yaml += `    build:\n      labels:\n${labelLines(m, '        ')}`
+    if (service === 'seed')
+      yaml +=
+        `      context: ${JSON.stringify(m.snapshot)}\n      dockerfile: apps/api/Dockerfile\n      target: build\n` +
+        `    working_dir: /app/apps/api\n    user: node\n    init: true\n    restart: 'no'\n` +
+        `    command: ['./node_modules/.bin/tsx', 'prisma/seed.ts']\n`
     if (m.images?.[service]) yaml += `    image: ${m.images[service]}\n`
     // AMCORE_CONSOLE_NOTIFICATION_SERVICE_START
     if (service === 'notification-provider')
@@ -270,7 +276,21 @@ export function validateModel(m) {
       throw new Error('Unscoped resource')
   }
   const db = `postgresql://amcore:${m.dbPassword}@postgres:5432/amcore`
-  for (const name of ['api', 'worker', 'migrate'])
+  const seed = m.model.services.seed
+  if (
+    seed?.build?.target !== 'build' ||
+    seed.build.dockerfile !== 'apps/api/Dockerfile' ||
+    seed.working_dir !== '/app/apps/api' ||
+    seed.user !== 'node' ||
+    seed.init !== true ||
+    seed.restart !== 'no' ||
+    JSON.stringify(seed.command) !==
+      JSON.stringify(['./node_modules/.bin/tsx', 'prisma/seed.ts']) ||
+    seed.ports?.length ||
+    seed.volumes?.length
+  )
+    throw new Error('Unsafe managed seed service')
+  for (const name of ['api', 'worker', 'migrate', 'seed'])
     if (m.model.services[name].environment.DATABASE_URL !== db) throw new Error('Foreign DB target')
   if (m.model.services.migrate.environment.E2E_DATABASE_URL !== db)
     throw new Error('Migration URL mismatch')

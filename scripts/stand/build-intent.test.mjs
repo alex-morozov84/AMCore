@@ -47,7 +47,7 @@ test('intent is persisted before the build runs and settles only after a success
   assert.equal(entry.state, 'settled')
   assert.equal(entry.outcome, 'succeeded')
   assert.equal(entry.evidence, 'compose-build-exit-0')
-  assert.deepEqual(entry.services, ['migrate', 'api', 'worker', 'web'])
+  assert.deepEqual(entry.services, ['migrate', 'seed', 'api', 'worker', 'web'])
   assert.deepEqual([entry.sourceHash, entry.engine], [m.sourceHash, m.engine])
   assert.deepEqual(unresolvedBuilds(m), [])
 })

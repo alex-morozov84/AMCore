@@ -28,7 +28,8 @@ that the published CLI declares. Do not remove their files to silence findings.
 
 Generation remains part of the API build. `migrate deploy` does not generate a
 client or run the seed command. Host `db:generate` and `db:seed` retain their
-existing behavior. The final image needs no package or engine downloads.
+existing behavior. Managed stands use a separate API-build seed service; they do
+not execute seed through this image. The final image needs no package or engine downloads.
 
 The operating-system user and the database role are separate controls. Use the
 schema-owning migrator database role only for this job, through

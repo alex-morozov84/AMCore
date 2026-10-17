@@ -181,6 +181,12 @@ admitted container and explicit local transport. No target fallback or automatic
 adoption occurs; recreation requires a new admission. Preview SQL uses the same
 invocation-scoped lease/target capability. Bootstrap is a separate bounded step.
 
+Managed stands apply migrations through the production migrator. Their separate
+`seed` service runs the existing guarded catalogue seed from the API `build` target,
+as user `node`, against the same admitted local database. Its image participates
+in the stand's build-intent, identity and cleanup inventory. The service has no
+published ports or source mounts. It is absent from production Compose.
+
 ## What an agent gives the reviewer
 
 Manual preview always uses `demo.user@preview.amcore.test` (USER) and
