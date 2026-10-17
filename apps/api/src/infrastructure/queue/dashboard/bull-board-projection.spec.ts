@@ -199,7 +199,6 @@ describe('closed queue projection', () => {
       activeRateLimitTtl: 0,
       supportsGlobalRateLimit: false,
       jobSchedulerCount: 0,
-      hasWorkers: null,
     })
   })
 

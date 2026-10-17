@@ -189,7 +189,6 @@ export function pickQueue(raw: unknown, context: ProjectionContext): Json {
     activeRateLimitTtl: 0,
     supportsGlobalRateLimit: false,
     jobSchedulerCount: 0,
-    hasWorkers: null,
   }
   const displayName = text(source.displayName, 64)
   if (displayName) queue.displayName = displayName

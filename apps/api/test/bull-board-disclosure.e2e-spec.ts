@@ -48,7 +48,6 @@ const EXPECTED_QUEUE_KEYS = [
   'description',
   'displayName',
   'globalConcurrency',
-  'hasWorkers',
   'isPaused',
   'jobSchedulerCount',
   'jobs',
@@ -259,7 +258,7 @@ describe('Bull Board discloses only the reviewed data (e2e)', () => {
     expect(Object.keys(res.body)).toEqual(['queues'])
     for (const queue of res.body.queues) {
       expect(Object.keys(queue).every((key) => EXPECTED_QUEUE_KEYS.includes(key))).toBe(true)
-      expect(queue).toMatchObject({ readOnlyMode: true, allowRetries: false, hasWorkers: null })
+      expect(queue).toMatchObject({ readOnlyMode: true, allowRetries: false })
       for (const job of queue.jobs) {
         expect(Object.keys(job).every((key) => EXPECTED_JOB_KEYS.includes(key))).toBe(true)
       }
