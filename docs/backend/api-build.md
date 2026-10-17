@@ -39,6 +39,8 @@ copying JavaScript without its package boundary changes Node's interpretation.
 The standard Dockerfile preserves that boundary and includes the native checker
 script in the builder stage. Migrations remain a separate one-shot deployment
 step. See [deployment](../operations/deployment.md).
+The [migration image](../operations/migrator-image.md) uses its own frozen CLI
+graph; it does not inherit this API build or move client generation to rollout.
 
 ## Development
 

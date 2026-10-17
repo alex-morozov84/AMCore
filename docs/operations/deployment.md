@@ -3,6 +3,9 @@
 How to take AMCore from clone → migrated schema → running app, locally and in
 production.
 
+The [migration image guide](migrator-image.md) covers the independent Prisma CLI
+image, its frozen dependency graph, maintenance and security reports.
+
 The API Dockerfile refreshes `perl-base` from Debian security repositories in
 build/migrator and runner targets. The pinned Node base still includes an older
 package; remove this explicit refresh only after a base update includes the fixes
@@ -482,11 +485,16 @@ the slim app image. Kubernetes — a Job, ideally a Helm `pre-upgrade` hook:
 
 ```yaml
 # Job (migrator image built from the same source state), runs once before rollout
-command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
+# Keep the image ENTRYPOINT and CMD: Tini must remain the init process.
+# For status/resolve, override args with the complete local CLI command instead.
 env:
   - name: DATABASE_URL # direct URL; only DATABASE_URL is needed here
     valueFrom: { secretKeyRef: { name: amcore-db, key: direct-url } }
 ```
+
+The migrator's connection options and direct database capability requirements
+also apply to Jobs. See [migration image lifecycle](migrator-image.md#process-and-database-lifecycle).
+Do not replace the image entrypoint with Kubernetes `command` or a shell wrapper.
 
 An init container is a simpler but caveated alternative (it runs per Pod and
 relies on Prisma's advisory lock to serialize replicas, which can hang under

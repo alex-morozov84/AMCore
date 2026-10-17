@@ -1,0 +1,7 @@
+packages: []
+minimumReleaseAgeStrict: true
+storeDir: .pnpm-store
+cacheDir: .pnpm-store/cache
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true

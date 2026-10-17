@@ -7,6 +7,7 @@
 // report, never a nonzero exit or a thrown error.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { dockerPins, migratorFreshness, renderMigrator } from './lib/migrator-freshness.mjs'
 
 // Every probe is bounded: on timeout execFileSync kills the child and throws, so
 // a slow/hanging registry or API degrades to a note in the report instead of
@@ -63,18 +64,19 @@ function dockerDrift(path) {
   try {
     dockerfile = readFileSync(path, 'utf8')
   } catch {
-    return { path, error: `\`${path}\` not found` }
+    return [{ path, error: `\`${path}\` not found` }]
   }
-  const m = dockerfile.match(/FROM\s+(\S+?:\S+?)@sha256:([0-9a-f]{64})/)
-  if (!m) return { path, error: 'no digest-pinned base image found' }
-  const [, ref, pinned] = m
-  const res = run(
-    'docker',
-    ['buildx', 'imagetools', 'inspect', ref, '--format', '{{.Manifest.Digest}}'],
-    20000
-  )
-  const current = res.ok ? res.out.replace(/^sha256:/, '') : null
-  return { path, ref, pinned, current }
+  const pins = dockerPins(path, dockerfile)
+  if (!pins.length) return [{ path, error: 'no digest-pinned base image found' }]
+  return pins.map((pin) => {
+    const res = run(
+      'docker',
+      ['buildx', 'imagetools', 'inspect', pin.ref, '--format', '{{.Manifest.Digest}}'],
+      20000
+    )
+    const current = res.ok ? res.out.replace(/^sha256:/, '') : null
+    return { ...pin, path: `${path} (${pin.stages.join(', ')})`, current }
+  })
 }
 
 // tool -> upstream repo + the `<VAR>: <version>` pin declared in a workflow file.
@@ -105,7 +107,7 @@ function cliDrift() {
   })
 }
 
-function render({ npm, docker, cli }) {
+function render({ npm, docker, cli, migrator }) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const out = [
     '<!-- dependency-freshness:auto -->',
@@ -115,7 +117,7 @@ function render({ npm, docker, cli }) {
     '',
     '**How to use this issue.** It is a living dashboard, not a task list. For each',
     'item, either open a normal PR to update it (majors: their own PR + CI; CLI tools:',
-    'version + sha256 together; Docker digest: re-resolve and bump both `FROM` lines),',
+    'version + sha256 together; Docker digest: inspect and update the affected `FROM` stages),',
     'or leave it if it is an intentionally-deferred item — the _why_ for those lives in',
     'the maintainer backlog, not here. Do **not** close this issue: it is rewritten',
     'weekly, and an item drops off automatically once updated.',
@@ -140,7 +142,7 @@ function render({ npm, docker, cli }) {
       out.push(`✅ \`${d.path}\`: \`${d.ref}\` pin matches the upstream digest.`, '')
     else
       out.push(
-        `⚠️ \`${d.path}\`: \`${d.ref}\` moved upstream — re-resolve and bump both \`FROM\` lines.`,
+        `⚠️ \`${d.path}\`: \`${d.ref}\` moved upstream — review every affected \`FROM\` stage.`,
         '',
         `- pinned:  \`sha256:${d.pinned}\``,
         `- current: \`sha256:${d.current}\``,
@@ -148,6 +150,7 @@ function render({ npm, docker, cli }) {
       )
   }
 
+  out.push(...renderMigrator(migrator))
   out.push('', '## curl-pinned CLI tools', '', '| Tool | Pinned | Latest | |', '|---|---|---|---|')
   for (const c of cli) {
     const mark = c.pinned == null || c.latest == null ? '❔' : c.stale ? '⚠️' : '✅'
@@ -157,4 +160,11 @@ function render({ npm, docker, cli }) {
   return out.join('\n')
 }
 
-console.log(render({ npm: npmMajors(), docker: DOCKERFILES.map(dockerDrift), cli: cliDrift() }))
+console.log(
+  render({
+    npm: npmMajors(),
+    docker: DOCKERFILES.flatMap(dockerDrift),
+    cli: cliDrift(),
+    migrator: await migratorFreshness(process.cwd()),
+  })
+)

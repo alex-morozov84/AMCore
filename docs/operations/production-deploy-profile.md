@@ -200,6 +200,9 @@ automation.
 
 ## See also
 
+- [Migration image](migrator-image.md) — the separate frozen CLI graph, version
+  guard and upkeep; promote the resulting migrator digest with its matching API.
+
 - [Deployment & migrations](deployment.md) — the branch/release/environment
   model this contract extends, the one-shot migration contract, process
   roles, TLS/reverse-proxy setup, and the `docker/compose/prod.yml`

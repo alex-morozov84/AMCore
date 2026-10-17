@@ -24,6 +24,9 @@ each one assumes the previous is done:
 
 Already running? Reach for whichever concern below applies.
 
+- **[Migration image](migrator-image.md)** — isolated Prisma CLI packaging,
+  frozen lock maintenance, version guards, security reports and recovery boundaries.
+
 - **[Deployment & migrations](deployment.md)** — clone → migrate → run, locally
   and in production. One-shot `prisma migrate deploy`, production env
   requirements, the `web` / `worker` / `all` process roles, TLS/reverse-proxy

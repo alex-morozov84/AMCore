@@ -31,14 +31,23 @@ of workflow self-hardening to keep the example forkable.
   weekly full-history scan is the backstop for historical drift.
 - **OSV-Scanner** produces repository-level vulnerability SARIF on the weekly
   schedule without blocking routine development.
-- **Trivy** scans the built production API image for `HIGH` / `CRITICAL`
-  vulnerabilities and uploads SARIF.
-- **boot-smoke** proves the exact production API image built in CI can:
+- **Trivy** preserves the runner scan and its default scanners/filter policy.
+  A separate vulnerability-only migrator scan uploads `trivy-image-migrator`
+  SARIF with HIGH/CRITICAL findings including unfixed vulnerabilities. Its full
+  JSON inventory includes all severities and packages. Findings remain report-only;
+  scanner errors, missing/malformed reports and mismatched image identity fail.
+  Each run creates fresh reports and checks SARIF findings against the JSON inventory.
+  The runner report uploads before the independent migrator scan starts.
+  Runner category `trivy-image` and its existing secret coverage remain separate.
+- **boot-smoke** checks both exact production artifacts built in CI:
   - pass the fast in-image checks;
   - run `prisma migrate deploy` successfully;
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
+    The required lint dependency first checks coherent Prisma versions and both
+    frozen graphs. The [migration image guide](migrator-image.md) describes isolated
+    dependency upkeep and the residual security risk of API build tooling.
 - **Test** is the aggregate for unit+real-Redis, capability extension,
   notification/AI extension, focused API fallback and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.
