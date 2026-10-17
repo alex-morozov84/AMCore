@@ -23,6 +23,16 @@ No global coverage percentage gate. Confidence comes from the critical-path
 flow lists below being real and current, not a line-coverage number — the
 same "confidence over coverage" philosophy the backend test suite follows.
 
+## Lint contract fixtures
+
+Lint contract tests use `createLintFixture()` from `scripts/lib/lint-fixture.mjs`.
+Create one disposable working-tree copy per test file and register its cleanup.
+The copy links installed dependencies and runs the real paired lint wrapper with
+unchanged relative paths and policy. It never installs dependencies.
+Keep temporary TypeScript probes outside the live checkout: parallel source
+inventory guards can otherwise enumerate a probe just before its owner deletes it.
+Source guards keep their complete inventory and fail on unreadable source files.
+
 ## Production deployment version recovery
 
 From the repository root, with dependencies and Playwright Chromium installed:

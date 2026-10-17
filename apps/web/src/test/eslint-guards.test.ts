@@ -15,15 +15,21 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { lintFixture } from '../../../../scripts/lib/lint-fixture.mjs'
+import { createLintFixture } from '../../../../scripts/lib/lint-fixture.mjs'
 import { policy as config } from '../../eslint.config.mjs'
+
+let fixture: ReturnType<typeof createLintFixture>
+beforeAll(() => {
+  fixture = createLintFixture()
+})
+afterAll(() => fixture?.cleanup())
 
 const WEB_ROOT = path.resolve(import.meta.dirname, '../..')
 
 async function lint(code: string, filePath: string) {
-  return lintFixture(code, filePath) as Array<{ ruleId: string | null; message: string }>
+  return fixture.lint(code, filePath) as Array<{ ruleId: string | null; message: string }>
 }
 
 /** Rule ids reported for `code`, restricted to the rule under test. */
