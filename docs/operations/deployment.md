@@ -634,6 +634,24 @@ the selected direct endpoint reachable from this host, use the schema-owner role
 and retain the required TLS verification and trusted CA. Compose env files do not
 configure host commands; the container-only hostname `postgres` is not a host endpoint.
 
+The source seed connects through **node-postgres**, not Prisma's native CLI.
+Prepare a host seed URL for that driver while keeping the selected database and
+schema-owner credential. Use `sslmode=verify-full` to verify the certificate and
+hostname. For a custom CA, use `sslrootcert` with a readable absolute **host**
+file path. For example, the URL query includes:
+
+```text
+sslmode=verify-full&sslrootcert=%2Fabsolute%2Fhost%2Fpath%2Fmigration-ca.pem
+```
+
+For a server certificate trusted by Node's default CA store, `sslmode=verify-full`
+needs no custom `sslrootcert`. In node-postgres, `sslcert` identifies a **client
+certificate**, not a trusted root CA; Prisma's `sslaccept` does not configure this
+driver. Do not copy the migrator's container CA path or TLS parameters unchanged.
+Keep certificate and hostname verification enabled; do not bypass a TLS refusal.
+See the [node-postgres connection-string reference](https://github.com/brianc/node-postgres/tree/master/packages/pg-connection-string#tcp-connections).
+Supply the completed URL through the same secret handling, without logging it.
+
 ```sh
 : "${MIGRATION_DATABASE_URL:?set the selected host-reachable migration URL first}"
 DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter api exec tsx prisma/seed.ts
