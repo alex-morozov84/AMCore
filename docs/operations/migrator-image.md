@@ -51,23 +51,115 @@ unchanged, including shared-role Compose deployments. This interval checks for
 a closed client socket during SQL; it does not limit normal statement duration.
 
 Existing startup options keep PostgreSQL whitespace/backslash escaping.
-Conflicting disconnect-check settings, duplicate `options` URL parameters and
+Conflicting disconnect-check settings, duplicate `options` or `pgbouncer` URL parameters and
 malformed options fail without logging the connection URL. No fallback disables
 the setting. The image uses the official Prisma CLI and engine, not a custom
 SQL executor or cancellation supervisor.
 
+### Supported configuration boundary
+
+Default deploy and local CLI `migrate status` / `migrate resolve` arguments
+keep the image's `prisma.config.mjs` and Tini entrypoint. Other CLI arguments
+must preserve both and the selected datasource URL to retain this lifecycle
+contract. The base file `prisma.base.config.ts` lacks the required image setting.
+Do not use `--config ./prisma.base.config.ts` for a production migration.
+
+An alternative `--config`, `--url`, mounted replacement configuration, or
+`--entrypoint` can bypass the checked path. It requires separate lifecycle
+admission before use; a successful default preflight does not cover it.
+An ordinary init flag does not establish equivalent process-group forwarding.
+Production must not set the test-only `E2E_DATABASE_URL`: it takes precedence
+over `DATABASE_URL` in the inherited configuration.
+
+### Endpoint preflight
+
 Use a direct PostgreSQL endpoint that accepts and applies this session setting.
 Confirm the effective value through the actual migration CLI before rollout.
-With `DATABASE_URL` supplied by your secret manager, run the read-only preflight:
+Use the exact promoted migrator digest and that environment's migration
+credential. For standalone Docker, have your secret manager export the selected
+URL as `DATABASE_URL`; do not put its value in a command line or report.
 
 ```sh
-docker run --rm -e DATABASE_URL <amcore-api-migrator-image> \
+docker run --rm -e DATABASE_URL <amcore-api-migrator-image>@sha256:<digest> \
   ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+```
+
+For a hostname reachable only inside Compose, run through the existing service.
+Use the same project name, environment file and profiles as the rollout. The
+following commands run from the repository root using the production overlay;
+its required image variables must contain the promoted digests. The target
+PostgreSQL service must already be running and healthy: `--no-deps` does not
+start infrastructure.
+
+```sh
+docker compose -f docker-compose.yml -f docker/compose/prod.yml \
+  run --rm --no-deps migrate \
+  ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+```
+
+The service joins its configured Compose network and selects
+`MIGRATION_DATABASE_URL`, falling back to `COMPOSE_DATABASE_URL` or the bundled
+PostgreSQL URL. Do not substitute an API/runtime credential or an unrelated
+host URL to make this check pass. Do not print `docker compose config` output
+containing secrets into logs or review material.
+
+### Custom CA and network access
+
+Keep certificate verification enabled. For Prisma's native CLI, the selected
+URL must use `sslmode=require`, `sslaccept=strict` and an `sslcert` path matching
+the certificate file **inside** the container. Supply the URL through the secret
+manager. The CA file contains the trusted certificate, not its private key.
+
+For standalone Docker, choose an existing network that reaches the exact
+endpoint. Replace the bracketed image/network values and absolute host path:
+
+```sh
+docker run --rm --network <migration-network> -e DATABASE_URL \
+  --mount type=bind,src=/absolute/path/migration-ca.pem,dst=/run/secrets/migration-ca.pem,readonly \
+  <amcore-api-migrator-image>@sha256:<digest> \
+  ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+```
+
+Here the URL contains `sslcert=/run/secrets/migration-ca.pem`. The non-root image
+user must be able to read the mounted file. Preserve the same network, CA mount,
+URL and digest when running deploy. Do not disable TLS verification on refusal.
+
+For Compose with a custom CA, create a local overlay such as
+`migration-ca.override.yml`. Replace the absolute host path with your CA file:
+
+```yaml
+services:
+  migrate:
+    volumes:
+      - type: bind
+        source: /absolute/path/migration-ca.pem
+        target: /run/secrets/migration-ca.pem
+        read_only: true
+```
+
+Set the selected migration URL's `sslcert` to that container path. Apply the
+same overlay to preflight and deploy, preserving the other rollout settings:
+
+```sh
+docker compose -f docker-compose.yml -f docker/compose/prod.yml \
+  -f migration-ca.override.yml run --rm --no-deps migrate \
+  ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+# Only after the preflight exits zero:
+docker compose -f docker-compose.yml -f docker/compose/prod.yml \
+  -f migration-ca.override.yml run --rm --no-deps migrate
+```
+
+```text
+promoted digest + migration URL + network + trusted CA
+  -> actual CLI preflight -> exit zero -> deploy with the same settings
 ```
 
 Require exit zero before running deploy against that endpoint. This is an explicit
 operator preflight; the image does not run it automatically before each command.
 Unknown, denied, ignored or zero settings do not satisfy this prerequisite.
+If the image, selected endpoint/URL, credential, CA or configuration changes,
+repeat the preflight for that exact combination. A failed check stops rollout;
+retain a secret-free error and investigate the connection or endpoint capability.
 Managed-provider support requires evidence for the selected version and endpoint;
 the presence of a provider parameter in documentation is insufficient.
 No bounded network-blackhole guarantee follows from this setting: detection

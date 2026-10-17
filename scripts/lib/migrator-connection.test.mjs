@@ -79,3 +79,29 @@ test('ambiguous URL, wrong protocol and explicitly pooled mode refuse safely', (
       }
     )
 })
+
+for (const query of [
+  'pgbouncer=false&pgbouncer=true',
+  'pgbouncer=true&pgbouncer=false',
+  'pgbouncer=false&pgbouncer=false',
+  'pgbouncer=true&pgbouncer=true',
+  'pgbouncer=false&%70gbouncer=true',
+])
+  test(`duplicate pooling keys refuse without exposing credentials: ${query}`, () => {
+    assert.throws(
+      () => migrationConnectionUrl(`${original}&${query}`),
+      (error) => {
+        assert.equal(error.message, 'Duplicate migration pooling parameter')
+        assert.doesNotMatch(error.message, /USER|PASSWORD|postgresql:\/\//)
+        return true
+      }
+    )
+  })
+
+test('single false pooling flag preserves the valid URL contract', () => {
+  const result = new URL(migrationConnectionUrl(`${original}&pgbouncer=false`))
+  const expected = new URL(migrationConnectionUrl(original))
+  assert.deepEqual(result.searchParams.getAll('pgbouncer'), ['false'])
+  result.searchParams.delete('pgbouncer')
+  assert.equal(result.href, expected.href)
+})

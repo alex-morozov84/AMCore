@@ -56,7 +56,9 @@ export function migrationConnectionUrl(value) {
   }
   if (!['postgres:', 'postgresql:'].includes(url.protocol))
     throw new Error('Migration datasource requires a PostgreSQL URL')
-  if (url.searchParams.get('pgbouncer') === 'true')
+  const pooling = url.searchParams.getAll('pgbouncer')
+  if (pooling.length > 1) throw new Error('Duplicate migration pooling parameter')
+  if (pooling[0] === 'true')
     throw new Error('Migration datasource requires a direct PostgreSQL endpoint')
   const options = url.searchParams.getAll('options')
   if (options.length > 1) throw new Error('Duplicate migration startup options')
