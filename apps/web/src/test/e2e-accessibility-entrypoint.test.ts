@@ -2,13 +2,19 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { lintFixture } from '../../../../scripts/lib/lint-fixture.mjs'
+import { createLintFixture } from '../../../../scripts/lib/lint-fixture.mjs'
+
+let fixture: ReturnType<typeof createLintFixture>
+beforeAll(() => {
+  fixture = createLintFixture()
+})
+afterAll(() => fixture?.cleanup())
 async function imports(code: string, filePath = 'e2e/mocked/fixture.spec.ts') {
-  return lintFixture(code, filePath).filter(
-    (message: { ruleId: string }) => message.ruleId === 'no-restricted-imports'
-  )
+  return fixture
+    .lint(code, filePath)
+    .filter((message: { ruleId: string }) => message.ruleId === 'no-restricted-imports')
 }
 
 describe('E2E accessibility entrypoint', () => {
