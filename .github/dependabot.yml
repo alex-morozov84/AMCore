@@ -50,6 +50,17 @@ updates:
         update-types:
           - 'patch'
           - 'minor'
+      # axe-core 4.14.0 adds a stricter label-content-name-mismatch check that fails
+      # Storybook stories (UserSessionsCard, AccountMenu): buttons whose aria-label
+      # does not contain their visible text. Merge only after fixing those labels.
+      axe-core:
+        applies-to: version-updates
+        patterns:
+          - 'axe-core'
+          - '@axe-core/*'
+        update-types:
+          - 'patch'
+          - 'minor'
       npm-non-major:
         applies-to: version-updates
         patterns:
