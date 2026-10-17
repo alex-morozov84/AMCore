@@ -40,6 +40,7 @@ describe('installed Bull Board vs the reviewed boundary', () => {
       [
         'GET /api/redis/stats',
         'GET /api/queues',
+        'GET /api/queues/has-workers',
         'GET /api/job-schedulers',
         'GET /api/queues/:queueName/metrics',
         'GET /api/queues/:queueName/default-job-options',
@@ -101,7 +102,6 @@ describe('installed Bull Board vs the reviewed boundary', () => {
         'description',
         'displayName',
         'globalConcurrency',
-        'hasWorkers',
         'isPaused',
         'jobSchedulerCount',
         'jobs',
