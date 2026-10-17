@@ -8,7 +8,34 @@ updates:
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 10
+    # Dependabot puts a package in the FIRST group that matches, so the narrow
+    # groups come before the catch-all. Each narrow group is a set that must
+    # move together and can fail on its own, so one red group never blocks
+    # the rest. A red PR stays open until the set is compatible again.
     groups:
+      # @nestjs/platform-fastify pins an exact fastify version; bumping fastify
+      # alone installs two copies and breaks the plugin types. Merge when Nest
+      # ships a release that requires the new fastify.
+      fastify-stack:
+        applies-to: version-updates
+        patterns:
+          - 'fastify'
+          - '@fastify/*'
+          - '@nestjs/platform-fastify'
+        update-types:
+          - 'patch'
+          - 'minor'
+      # Bull Board and BullMQ are pinned to a reviewed boundary (routes,
+      # response fields, assets, source graph) by the upgrade-guard specs.
+      # Merge only after reviewing the release and updating those fixtures.
+      queue-board:
+        applies-to: version-updates
+        patterns:
+          - '@bull-board/*'
+          - 'bullmq'
+        update-types:
+          - 'patch'
+          - 'minor'
       npm-non-major:
         applies-to: version-updates
         patterns:
