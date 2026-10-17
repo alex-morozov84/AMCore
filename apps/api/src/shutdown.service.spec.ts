@@ -39,6 +39,24 @@ describe('ShutdownService', () => {
     expect(process.exitCode).toBeUndefined()
   })
 
+  it('writes the closing line before the flush so the flush carries it out', () => {
+    const calls: string[] = []
+    ;(logger.info as jest.Mock).mockImplementation((message: string) => calls.push(message))
+    const app = {
+      flushLogs: jest.fn(() => calls.push('flush')),
+    } as unknown as INestApplication
+    const service = new ShutdownService(logger)
+    service.setApp(app)
+
+    service.onApplicationShutdown('SIGTERM')
+
+    expect(calls).toEqual([
+      'Application shutdown (SIGTERM), flushing logs...',
+      '✅ Application closed successfully',
+      'flush',
+    ])
+  })
+
   it('marks a failed log flush via exitCode without forcing process exit', () => {
     const app = {
       flushLogs: jest.fn(() => {
