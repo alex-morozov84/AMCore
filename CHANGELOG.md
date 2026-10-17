@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Package migrations in an independent non-root Prisma CLI image with an isolated
+  frozen dependency graph, version guards, dedicated upkeep and image reports.
+  API build-tool security risks remain separate from final-image minimization.
+
 - Storage documentation now has one page per S3-compatible provider with an honest status, a
   testing guide for `storage:check`, troubleshooting, security and migration guides. Yandex
   Object Storage was verified on a real account on 2026-10-15 (`external` and `acl` modes, CORS,

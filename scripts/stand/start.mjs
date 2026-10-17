@@ -33,15 +33,7 @@ export async function start(m) {
   await dataAdmission(m)
   await compose(m, ['up', '--no-deps', '--exit-code-from', 'migrate', 'migrate'])
   await dataAdmission(m)
-  if (!m.catalogInitialized)
-    await compose(m, [
-      'run',
-      '--rm',
-      '--no-deps',
-      'migrate',
-      './node_modules/.bin/tsx',
-      'prisma/seed.ts',
-    ])
+  if (!m.catalogInitialized) await compose(m, ['run', '--rm', '--no-deps', 'seed'])
   m.catalogInitialized = true
   await save(m)
   await dataAdmission(m)

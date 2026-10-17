@@ -118,6 +118,15 @@ sequential; GitHub lanes have independent runners and fresh stands. See
 [frontend testing](../frontend/testing.md#complete-ci-e2e-locally) for group
 selection and inventory proof. These commands never reuse owner preview data.
 
+### Migration image in Docker stands
+
+The Docker stand's `migrate` service uses the separate
+[migration image](migrator-image.md). Keep its Tini entrypoint and default CLI
+command. The image adds its disconnect-check startup option only to the selected
+migration URL. It preserves `E2E_DATABASE_URL` priority and does not change the
+stand's API/worker URLs or database role defaults. Host-side API Testcontainers
+continue to use their own Prisma CLI configuration; they do not use this image.
+
 ### API Testcontainers
 
 Backend Jest + SWC E2E uses `pnpm --filter api test:e2e`; scope it with
@@ -171,6 +180,12 @@ transaction control and reconnects are unsupported. Redis likewise uses its exac
 admitted container and explicit local transport. No target fallback or automatic
 adoption occurs; recreation requires a new admission. Preview SQL uses the same
 invocation-scoped lease/target capability. Bootstrap is a separate bounded step.
+
+Managed stands apply migrations through the production migrator. Their separate
+`seed` service runs the existing guarded catalogue seed from the API `build` target,
+as user `node`, against the same admitted local database. Its image participates
+in the stand's build-intent, identity and cleanup inventory. The service has no
+published ports or source mounts. It is absent from production Compose.
 
 ## What an agent gives the reviewer
 

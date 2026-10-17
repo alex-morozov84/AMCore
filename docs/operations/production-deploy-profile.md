@@ -62,6 +62,12 @@ the same discipline Kamal, Docker's own publishing guidance, and GitHub's own
 "build once, deploy many" pattern converge on independently — it isn't an
 AMCore-specific invention.
 
+Before the one-shot migration job, run the promoted migrator digest's
+[endpoint preflight](migrator-image.md#process-and-database-lifecycle) with that
+environment's migration credential. Require success for the exact endpoint.
+Keep the image's Tini entrypoint through job overrides and digest promotion.
+A scan report or a passing build does not establish database lifecycle support.
+
 ### Why a required reviewer, not just a tag push
 
 A `v*` tag is protected (immutable, no update/delete — see
@@ -199,6 +205,9 @@ automation.
    for you; that failure is the point, not a bug.
 
 ## See also
+
+- [Migration image](migrator-image.md) — the separate frozen CLI graph, version
+  guard and upkeep; promote the resulting migrator digest with its matching API.
 
 - [Deployment & migrations](deployment.md) — the branch/release/environment
   model this contract extends, the one-shot migration contract, process

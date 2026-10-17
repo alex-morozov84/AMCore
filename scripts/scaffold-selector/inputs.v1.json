@@ -157,6 +157,8 @@
           "pnpm-lock.yaml",
           "pnpm-workspace.yaml",
           "scripts/lint.mjs",
+          "scripts/migrator-contract.mjs",
+          "scripts/scan-migrator-image.mjs",
           "turbo.json"
         ]
       },

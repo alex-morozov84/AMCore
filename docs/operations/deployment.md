@@ -3,6 +3,9 @@
 How to take AMCore from clone → migrated schema → running app, locally and in
 production.
 
+The [migration image guide](migrator-image.md) covers the independent Prisma CLI
+image, its frozen dependency graph, maintenance and security reports.
+
 The API Dockerfile refreshes `perl-base` from Debian security repositories in
 build/migrator and runner targets. The pinned Node base still includes an older
 package; remove this explicit refresh only after a base update includes the fixes
@@ -482,11 +485,16 @@ the slim app image. Kubernetes — a Job, ideally a Helm `pre-upgrade` hook:
 
 ```yaml
 # Job (migrator image built from the same source state), runs once before rollout
-command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
+# Keep the image ENTRYPOINT and CMD: Tini must remain the init process.
+# For status/resolve, override args with the complete local CLI command instead.
 env:
   - name: DATABASE_URL # direct URL; only DATABASE_URL is needed here
     valueFrom: { secretKeyRef: { name: amcore-db, key: direct-url } }
 ```
+
+The migrator's connection options and direct database capability requirements
+also apply to Jobs. See [migration image lifecycle](migrator-image.md#process-and-database-lifecycle).
+Do not replace the image entrypoint with Kubernetes `command` or a shell wrapper.
 
 An init container is a simpler but caveated alternative (it runs per Pod and
 relies on Prisma's advisory lock to serialize replicas, which can hang under
@@ -610,6 +618,52 @@ upserts. Review both effects before using it on an installation: exact current
 authorization templates are unchanged, but AI catalogue defaults are reapplied.
 It is not a routine production migration or a repair command.
 
+For an explicit deployment seed, use a source checkout matching the deployed
+version and the Node/pnpm versions declared by its root `package.json`.
+Prepare dependencies and the seed's generated/shared imports:
+
+```sh
+export pnpm_config_frozen_lockfile=true
+pnpm install --frozen-lockfile
+pnpm --filter @amcore/shared build
+pnpm --filter api db:generate
+```
+
+Provide `MIGRATION_DATABASE_URL` through your normal secret handling. It must name
+the selected direct endpoint reachable from this host, use the schema-owner role,
+and retain the required TLS verification and trusted CA. Compose env files do not
+configure host commands; the container-only hostname `postgres` is not a host endpoint.
+
+The source seed connects through **node-postgres**, not Prisma's native CLI.
+Prepare a host seed URL for that driver while keeping the selected database and
+schema-owner credential. Use `sslmode=verify-full` to verify the certificate and
+hostname. For a custom CA, use `sslrootcert` with a readable absolute **host**
+file path. For example, the URL query includes:
+
+```text
+sslmode=verify-full&sslrootcert=%2Fabsolute%2Fhost%2Fpath%2Fmigration-ca.pem
+```
+
+For a server certificate trusted by Node's default CA store, `sslmode=verify-full`
+needs no custom `sslrootcert`. In node-postgres, `sslcert` identifies a **client
+certificate**, not a trusted root CA; Prisma's `sslaccept` does not configure this
+driver. Do not copy the migrator's container CA path or TLS parameters unchanged.
+Keep certificate and hostname verification enabled; do not bypass a TLS refusal.
+See the [node-postgres connection-string reference](https://github.com/brianc/node-postgres/tree/master/packages/pg-connection-string#tcp-connections).
+Supply the completed URL through the same secret handling, without logging it.
+
+```sh
+: "${MIGRATION_DATABASE_URL:?set the selected host-reachable migration URL first}"
+DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter api exec tsx prisma/seed.ts
+```
+
+This invokes the same guarded seed directly, with the explicitly selected URL.
+The final migrator does not contain pnpm/tsx or the seed's API dependencies.
+Stop on a connection, TLS, permission or template refusal; do not switch targets
+or bypass verification. A successful seed prints `System roles and AI catalogue seeded`.
+Before initial setup, use the runner's documented `status` command to confirm
+readiness. Status does not verify every database privilege or every AI catalogue field.
+
 ## Initial organization and administrator
 
 Migration `20261015150000_organization_establishment` adds two minimal permanent result
@@ -626,7 +680,8 @@ service inherits the same policy; it does not reconfigure existing API replicas.
 Roll out that policy consistently before admitting traffic or running initial setup.
 Prepare an ordinary account, complete normal mailbox proof, then assign
 its verified ID as organization `ADMIN`. Run `organization-setup.js` from the runner;
-migrations and seed use the CLI-capable migrator. First platform `SUPER_ADMIN` trust
+migrations use the migrator. Explicit seed runs from the matching prepared source
+checkout, as described under [Seeding](#seeding). First platform `SUPER_ADMIN` trust
 is separate. The [establishment runbook](../product-admin/organization-establishment.md)
 gives exact image commands, prerequisites, status/exit codes and failure recovery.
 

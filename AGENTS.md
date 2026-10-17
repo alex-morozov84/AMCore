@@ -92,6 +92,11 @@ one-time Operations Console topology choice (see `PROJECT_CONTEXT.md`).
 
 Production migrates with `db:migrate:prod` (`prisma migrate deploy`) as a one-shot
 step, never `db:migrate`. See `docs/operations/deployment.md`.
+The [migration image](docs/operations/migrator-image.md) has an isolated installer
+and frozen lock under `docker/migrator`; root install does not refresh that graph.
+Keep its Prisma version coherent with the API CLI/client/adapter. Preserve its
+Tini entrypoint and migration-only startup options; verify endpoint capability
+before rollout. Do not change API/worker role defaults to satisfy image checks.
 
 ## How to contribute (workflow)
 

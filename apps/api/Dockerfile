@@ -111,15 +111,36 @@ RUN find /prod/api/node_modules/.pnpm -maxdepth 1 \( \
 # ===========================================
 # Migrator — CLI-capable one-shot migration target
 # ===========================================
-# The app runner is intentionally CLI-free. Production migrations use this target
-# (same source state, full build-stage dependencies) to run `prisma migrate deploy`
-# once before web/worker rollout.
-FROM build AS migrator
+# Prepare the official CLI's complete dependency tree outside the API workspace.
+# The isolated manifest owns its installer pin and its own frozen lockfile.
+FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS migrator-dependencies
+
+WORKDIR /migrator
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates perl-base && \
+    rm -rf /var/lib/apt/lists/*
+COPY docker/migrator/package.json docker/migrator/pnpm-workspace.yaml docker/migrator/pnpm-lock.yaml ./
+COPY docker/migrator/installer.mjs ./installer.mjs
+RUN node installer.mjs /opt/migrator-pnpm && \
+    node /opt/migrator-pnpm/bin/pnpm.mjs install --prod --frozen-lockfile
+
+# Do not inherit build tooling, installer caches, or the API dependency graph.
+FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS migrator
 
 WORKDIR /app/apps/api
-
 ENV NODE_ENV=production
-
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates perl-base tini && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn* && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg
+COPY --from=migrator-dependencies /migrator/package.json ./package.json
+COPY --from=migrator-dependencies /migrator/node_modules ./node_modules
+COPY apps/api/prisma.config.ts ./prisma.base.config.ts
+COPY docker/migrator/prisma.config.mjs docker/migrator/connection-options.mjs ./
+COPY docker/migrator/check-connection.sql ./migrator-check.sql
+COPY apps/api/prisma ./prisma
+USER node
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "docker-entrypoint.sh"]
 CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 # ===========================================
