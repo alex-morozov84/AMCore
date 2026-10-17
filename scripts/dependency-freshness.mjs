@@ -7,6 +7,7 @@
 // report, never a nonzero exit or a thrown error.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { backlogCount, renderDependabotHealth } from './lib/dependabot-health.mjs'
 import { dockerPins, migratorFreshness, renderMigrator } from './lib/migrator-freshness.mjs'
 
 // Every probe is bounded: on timeout execFileSync kills the child and throws, so
@@ -28,7 +29,7 @@ const run = (cmd, args, timeoutMs = 30000) => {
 
 const major = (v) => Number.parseInt(String(v).replace(/^\D+/, '').split('.')[0], 10)
 
-function npmMajors() {
+function loadOutdated() {
   // pnpm outdated exits non-zero when anything is outdated; capture stdout anyway.
   // `-r` may prefix the stream with a workspace/engine-warning line that itself
   // contains `{` (e.g. `{"node":">=24.0.0"}`), so anchor on the first line that
@@ -45,6 +46,11 @@ function npmMajors() {
   } catch {
     return { error: 'could not parse `pnpm outdated` output' }
   }
+  return { data }
+}
+
+function npmMajors({ data, error }) {
+  if (error) return { error }
   const rows = Object.entries(data)
     .filter(([, v]) => v?.current && v?.latest && major(v.latest) > major(v.current))
     .map(([name, v]) => ({
@@ -55,6 +61,20 @@ function npmMajors() {
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
   return { rows }
+}
+
+const RUN_FIELDS = 'name,status,conclusion,createdAt,updatedAt'
+
+function dependabotRuns() {
+  // Needs `actions: read` and a repository context (GH_REPO in the workflow).
+  const args = ['run', 'list', '--workflow', 'Dependabot Updates', '--limit', '100']
+  const { ok, out } = run('gh', [...args, '--json', RUN_FIELDS], 30000)
+  try {
+    if (ok) return { rows: JSON.parse(out) }
+  } catch {
+    // fall through to the note below
+  }
+  return { error: 'could not list the Dependabot update runs' }
 }
 
 const DOCKERFILES = ['apps/api/Dockerfile', 'apps/web/Dockerfile']
@@ -107,7 +127,7 @@ function cliDrift() {
   })
 }
 
-function render({ npm, docker, cli, migrator }) {
+function render({ npm, health, docker, cli, migrator }) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const out = [
     '<!-- dependency-freshness:auto -->',
@@ -122,6 +142,7 @@ function render({ npm, docker, cli, migrator }) {
     'the maintainer backlog, not here. Do **not** close this issue: it is rewritten',
     'weekly, and an item drops off automatically once updated.',
     '',
+    ...health,
     '## Pending major updates (Dependabot ignores majors)',
     '',
   ]
@@ -160,9 +181,15 @@ function render({ npm, docker, cli, migrator }) {
   return out.join('\n')
 }
 
+const outdated = loadOutdated()
+
 console.log(
   render({
-    npm: npmMajors(),
+    npm: npmMajors(outdated),
+    health: renderDependabotHealth({
+      runs: dependabotRuns(),
+      backlog: outdated.error ? { error: outdated.error } : { count: backlogCount(outdated.data) },
+    }),
     docker: DOCKERFILES.flatMap(dockerDrift),
     cli: cliDrift(),
     migrator: await migratorFreshness(process.cwd()),
