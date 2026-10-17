@@ -18,6 +18,7 @@ const image = {
           VulnerabilityID: 'fixture-advisory',
           PkgName: 'prisma',
           InstalledVersion: '7.10.1',
+          FixedVersion: '7.10.2',
           Severity: 'CRITICAL',
         },
       ],
@@ -57,6 +58,8 @@ if (process.env.FIXTURE_MODE !== 'missing') {
   if (args[0] === 'convert' && process.env.FIXTURE_MODE === 'missing-sarif') process.exit(0);
   if (args[0] === 'convert' && process.env.FIXTURE_MODE === 'lost-finding') data.runs[0].results = [];
   if (process.env.FIXTURE_MODE === 'wrong-image' && data.Metadata) data.Metadata.ImageID = 'other-image';
+  if (process.env.FIXTURE_MODE === 'unfixed' && data.Metadata)
+    data.Results[0].Vulnerabilities.push({ VulnerabilityID: 'unfixed-advisory', PkgName: 'zlib1g', InstalledVersion: '1.2.13', Severity: 'HIGH' });
   writeFileSync(args[args.indexOf('--output') + 1], process.env.FIXTURE_MODE === 'malformed' ? '{broken' : JSON.stringify(data));
 }
 `,
@@ -79,6 +82,12 @@ if (process.env.FIXTURE_MODE !== 'missing') {
 
 test('actual migrator scan command accepts vulnerability findings', () => {
   const result = runFixture('findings')
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('actual migrator scan command keeps unfixed findings out of the SARIF check', () => {
+  const result = runFixture('unfixed')
   assert.equal(result.error, undefined)
   assert.equal(result.status, 0, result.stderr)
 })
