@@ -61,6 +61,17 @@ updates:
         update-types:
           - 'patch'
           - 'minor'
+      # Next 16.4 changed useRouter() internals and the Storybook Next.js mock
+      # (@storybook/nextjs-vite 10.6.2) throws on every story. Fixed upstream but not
+      # released; merge once a Storybook release with the fix (10.6.3 or later) is in.
+      next:
+        applies-to: version-updates
+        patterns:
+          - 'next'
+          - '@next/*'
+        update-types:
+          - 'patch'
+          - 'minor'
       npm-non-major:
         applies-to: version-updates
         patterns:
