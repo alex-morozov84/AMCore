@@ -15,7 +15,8 @@ worker processes. Production promotion uses immutable image digests; see
 ## Contents and commands
 
 The final image contains Node 24, OpenSSL, certificates, Prisma's complete official
-dependency tree, `prisma.config.ts`, schema files and SQL migration history.
+dependency tree, an image-specific Prisma configuration, schema files and SQL
+migration history. The configuration composes the unchanged API base configuration.
 Its working directory remains `/app/apps/api`. The default command is
 `./node_modules/.bin/prisma migrate deploy`. Operators can override it with the
 same local CLI for `--version`, `migrate status` and `migrate resolve`.
@@ -148,7 +149,9 @@ an empty filtered scan does not establish safety or exploitability.
 For comparisons, use the same architecture, Node digest, scanner database and
 filters within each baseline/candidate pair. Record installed Debian package
 versions separately: apt security refreshes can differ under the same base digest.
-ARM64 evidence does not substitute for AMD64 evidence.
+ARM64 evidence does not substitute for AMD64 evidence. Include Debian's Tini
+package in each architecture's inventory and advisory review. Rebuild with
+supported Debian security updates and repeat affected scans after package changes.
 
 Changing an image does not undo applied SQL. Use the documented
 [rollback and recovery](deployment.md#rollback) process and verify restored

@@ -47,6 +47,11 @@ queue inventory/observation and read-only Board regression suites against isolat
 Testcontainers. Docker is required; the focused API fallback job feeding Test runs this lane. See the
 [background-work contract](docs/backend/background-work.md#verify-a-registration).
 
+Migration image dependency updates use a separate frozen lock and installer.
+Follow [migration image maintenance](docs/operations/migrator-image.md#isolated-installation-and-maintenance)
+and run `node scripts/migrator-contract.mjs` before image checks. Root installation
+alone does not update this graph; Prisma updates must remain coherent across both.
+
 Single app: `pnpm --filter api dev`, `pnpm --filter web test`, etc.
 
 ### Size review advisory

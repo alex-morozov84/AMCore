@@ -304,7 +304,8 @@ and each states plainly what it does **not** give you.
    apply `docker/compose/prod.yml` over the base file to pin every service to an
    immutable digest, add restart policies, and bound container logs. The same
    page covers TLS/reverse proxy, process roles, the one-shot migration
-   contract, and [what "zero-downtime" honestly
+   contract, the [migration image endpoint preflight](docs/operations/migrator-image.md#process-and-database-lifecycle),
+   and [what "zero-downtime" honestly
    costs](docs/operations/deployment.md#zerolow-downtime-rollout--stated-honestly).
 3. **[Database role separation](docs/operations/database-role-separation.md)** —
    a migrator/owner role used only by `prisma migrate deploy`, and a DML-only

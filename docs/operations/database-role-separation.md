@@ -58,6 +58,19 @@ name entirely), add a matching block before that migration reaches
 production: a forgotten grant here doesn't fail at migration time, it fails
 silently until the running app actually queries that schema.
 
+## Migration connection lifecycle
+
+The [migration image](migrator-image.md#process-and-database-lifecycle) adds
+`client_connection_check_interval=50ms` only to its selected datasource URL.
+The role template does not set this role default. Existing roles need no
+additional `ALTER ROLE` for this image setting. Setting a role default would
+also affect future API/worker connections when Compose shares one role.
+
+For an external database, use a direct endpoint and run the image's documented
+preflight with the migration credential. Role provisioning and successful TLS
+alone do not prove that the endpoint applies the required session setting.
+Stop rollout if the preflight fails or the effective value is unknown.
+
 ## Setup
 
 [`docker/postgres/setup-roles.sql`](../../docker/postgres/setup-roles.sql)

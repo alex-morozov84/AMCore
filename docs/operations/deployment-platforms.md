@@ -48,6 +48,21 @@ AMCore is not a stateless static site:
    streamed HTTP response for minutes at a time breaks this feature
    specifically, even if everything else works.
 
+## Migration endpoint prerequisite
+
+The platform matrix does not verify migration lifecycle support for a particular
+managed database. The [migration image](migrator-image.md#process-and-database-lifecycle)
+requires a direct PostgreSQL endpoint that accepts and applies its
+`client_connection_check_interval=50ms` startup option. Run its read-only preflight
+against the selected version and endpoint before rollout. Unknown, denied,
+ignored or different effective settings block this migration path.
+
+Keep the image entrypoint in each platform's job configuration. In Kubernetes,
+leave `command` unset; use full CLI `args` for status or resolve overrides.
+Provider documentation, an admin role or a successful ordinary connection does
+not establish these capabilities. Network-blackhole detection has no fixed
+bound from this setting alone.
+
 ## Quick matrix
 
 | Platform         | Full recipe?                                 | Worker fits?                         | Redis                                    | Postgres                                             | Headline caveat                                                                              |
