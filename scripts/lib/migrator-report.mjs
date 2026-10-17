@@ -1,5 +1,22 @@
 import assert from 'node:assert/strict'
 
+// The SARIF (Security tab) carries only what can be acted on: HIGH/CRITICAL findings that
+// have a fixed version. Findings with no fix stay in the full JSON inventory. `trivy convert`
+// has no --ignore-unfixed, so the inventory is filtered here and the same rule validates it.
+export const hasFix = (vuln) => typeof vuln.FixedVersion === 'string' && vuln.FixedVersion !== ''
+export const isReportable = (vuln) => ['HIGH', 'CRITICAL'].includes(vuln.Severity) && hasFix(vuln)
+
+export function withFixableOnly(inventory) {
+  return {
+    ...inventory,
+    Results: inventory.Results.map((result) =>
+      result.Vulnerabilities
+        ? { ...result, Vulnerabilities: result.Vulnerabilities.filter(isReportable) }
+        : result
+    ),
+  }
+}
+
 export function validateInventory(report, imageId) {
   assert.equal(report.SchemaVersion, 2, 'Unsupported Trivy inventory schema')
   assert.equal(report.ArtifactType, 'container_image', 'Expected a container image scan')
@@ -42,10 +59,10 @@ export function validateSarif(report, inventory) {
   // Compare distinct advisory/package/version/severity identities, not raw counts.
   const expected = new Set(
     inventory.Results.flatMap((result) => result.Vulnerabilities ?? [])
-      .filter((vuln) => ['HIGH', 'CRITICAL'].includes(vuln.Severity))
+      .filter(isReportable)
       .map((vuln) =>
         JSON.stringify([vuln.VulnerabilityID, vuln.PkgName, vuln.InstalledVersion, vuln.Severity])
       )
   )
-  assert.deepEqual(actual, expected, 'SARIF findings differ from HIGH/CRITICAL inventory')
+  assert.deepEqual(actual, expected, 'SARIF findings differ from fixable HIGH/CRITICAL inventory')
 }

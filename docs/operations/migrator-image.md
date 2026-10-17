@@ -228,10 +228,15 @@ manifest -> isolated lock -> frozen install -> version guard -> image -> databas
 ## Security reports and remaining risk
 
 CI keeps the existing runner scan and adds an independent vulnerability-only
-migrator scan. Migrator SARIF includes HIGH/CRITICAL findings, including unfixed
-ones. The full JSON inventory retains all severities and packages. Findings are
-report-only; scanner errors and missing, malformed or wrong-image reports fail.
-See [CI security](ci-security.md).
+migrator scan. Migrator SARIF, which feeds the Security tab, includes only
+HIGH/CRITICAL findings that have a fixed version, the same policy as the runner
+scan (`--ignore-unfixed`). The full JSON inventory retains all severities, packages
+and unfixed findings, so nothing is hidden: it is uploaded as a CI artifact. A
+finding enters the Security tab on the first scan after its fix is published.
+`trivy convert` has no unfixed filter, so the script filters the inventory itself
+and checks the SARIF against the same rule. Findings are report-only; scanner
+errors and missing, malformed or wrong-image reports fail. See
+[CI security](ci-security.md).
 
 A smaller final image does not fix tools used earlier by the API builder.
 Its npm, pnpm and compiler require their own supported security maintenance.

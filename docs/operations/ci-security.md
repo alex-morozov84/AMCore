@@ -33,8 +33,9 @@ of workflow self-hardening to keep the example forkable.
   schedule without blocking routine development.
 - **Trivy** preserves the runner scan and its default scanners/filter policy.
   A separate vulnerability-only migrator scan uploads `trivy-image-migrator`
-  SARIF with HIGH/CRITICAL findings including unfixed vulnerabilities. Its full
-  JSON inventory includes all severities and packages. Findings remain report-only;
+  SARIF with HIGH/CRITICAL findings that have a fixed version, the runner scan's
+  policy. Its full JSON inventory includes all severities, packages and unfixed
+  findings. Findings remain report-only;
   scanner errors, missing/malformed reports and mismatched image identity fail.
   Each run creates fresh reports and checks SARIF findings against the JSON inventory.
   The runner report uploads before the independent migrator scan starts.
