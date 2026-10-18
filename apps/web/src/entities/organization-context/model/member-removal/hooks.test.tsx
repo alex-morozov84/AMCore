@@ -1,9 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiRequestError } from '@/shared/api/http-client'
 
-import { removeMember } from '../../api/member-removal-client'
+import { removalFailure, removeMember } from '../../api/member-removal-client'
 import { membersClient } from '../../api/members-client'
 import { createOrganizationAccessController } from '../access-controller'
 
@@ -151,6 +151,97 @@ describe('member removal state', () => {
         else reject(new Error('late'))
         expect(await pending).toEqual({ status: 'retired' })
       })
+    }
+  )
+})
+
+describe('server retry deadlines', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  })
+  afterEach(() => vi.useRealTimers())
+  it.each([
+    [503, 'MEMBER_API_KEYS_WRITE_UNAVAILABLE'],
+    [503, 'FORBIDDEN'],
+    [404, 'BUSINESS_RULE_VIOLATION'],
+  ])(
+    'keeps %i/%s unknown and blocks requests until Retry-After expires',
+    async (status, errorCode) => {
+      const { controller, result } = setup()
+      const refresh = vi.fn(async () => 'ready' as const)
+      controller.setRefresh(refresh)
+      vi.mocked(removeMember).mockRejectedValue(
+        removalFailure(Number(status), { errorCode }, new Headers({ 'Retry-After': '60' }))
+      )
+      await act(async () => {
+        await result.current.remove()
+      })
+      const deadline = Date.now() + 60000
+      expect(result.current.outcome).toMatchObject({ status: 'unknown', retryAt: deadline })
+      expect(result.current.retryAt).toBe(deadline)
+      await act(async () => {
+        await result.current.inspect()
+        await result.current.remove()
+      })
+      expect(refresh).toHaveBeenCalledTimes(1)
+      expect(membersClient.roles).not.toHaveBeenCalled()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(59999)
+        await result.current.inspect()
+      })
+      expect(refresh).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
+      expect(result.current.retryAt).toBeUndefined()
+      expect(removeMember).toHaveBeenCalledTimes(1)
+      vi.mocked(membersClient.roles).mockResolvedValue({ member: { memberId: 'member' } } as never)
+      await act(async () => {
+        await result.current.inspect()
+      })
+      expect(refresh).toHaveBeenCalledTimes(2)
+      expect(membersClient.roles).toHaveBeenCalledTimes(1)
+      expect(result.current.canRemove).toBe(true)
+    }
+  )
+  it.each([429, 503])(
+    'honors a %i inspection cooldown without automatic reads or writes',
+    async (status) => {
+      const { controller, result } = setup()
+      const refresh = vi.fn(async () => 'ready' as const)
+      controller.setRefresh(refresh)
+      vi.mocked(removeMember).mockRejectedValue(new Error('lost acknowledgment'))
+      vi.mocked(membersClient.roles).mockRejectedValueOnce(
+        new ApiRequestError(status, { errorCode: 'RATE_LIMIT_EXCEEDED' } as never, 60)
+      )
+      await act(async () => {
+        await result.current.remove()
+      })
+      await act(async () => {
+        await result.current.inspect()
+        await result.current.inspect()
+      })
+      expect(result.current.retryAt).toBe(Date.now() + 60000)
+      expect(result.current.canRemove).toBe(false)
+      expect(membersClient.roles).toHaveBeenCalledTimes(1)
+      expect(refresh).toHaveBeenCalledTimes(2)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(59999)
+        await result.current.inspect()
+        await result.current.remove()
+      })
+      expect(membersClient.roles).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
+      expect(membersClient.roles).toHaveBeenCalledTimes(1)
+      vi.mocked(membersClient.roles).mockResolvedValue({ member: { memberId: 'member' } } as never)
+      await act(async () => {
+        await result.current.inspect()
+      })
+      expect(result.current.canRemove).toBe(true)
+      expect(removeMember).toHaveBeenCalledTimes(1)
     }
   )
 })

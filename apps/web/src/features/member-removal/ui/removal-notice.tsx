@@ -81,7 +81,7 @@ export function RemovalNotice({
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
-                disabled={removal.checking || removal.busy}
+                disabled={removal.checking || removal.busy || Boolean(removal.retryAt)}
                 onClick={() => void removal.inspect()}
               >
                 {t('check')}

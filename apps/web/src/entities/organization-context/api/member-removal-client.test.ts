@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiRequestError } from '@/shared/api/http-client'
+import { createOrganizationAccessController } from '../model/access-controller'
 
-import { removeMember } from './member-removal-client'
+import { memberRemovalRejectionCodes, removeMember } from './member-removal-client'
 const binding = 'a'.repeat(64)
 afterEach(() => vi.unstubAllGlobals())
 const run = () => removeMember(binding, 'org', 'user', 'member', new AbortController().signal)
@@ -41,12 +41,35 @@ describe('removal transport acknowledgments and refusals', () => {
       'fetch',
       vi.fn().mockResolvedValue(Response.json({ errorCode }, { status: Number(status) }))
     )
-    try {
-      await run()
-      expect.unreachable()
-    } catch (error) {
-      expect(error).not.toBeInstanceOf(ApiRequestError)
-    }
+    const controller = createOrganizationAccessController(binding, 'org')
+    controller.setAuthority(true)
+    controller.setRefresh(async () => 'ready')
+    const outcome = await controller.execute('member', run, {
+      rejectionCodes: memberRemovalRejectionCodes,
+    })
+    expect(outcome.status).toBe('unknown')
+  })
+  it('preserves unknown503 Retry-After through the existing controller', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { errorCode: 'MEMBER_API_KEYS_WRITE_UNAVAILABLE' },
+            { status: 503, headers: { 'Retry-After': '60' } }
+          )
+        )
+    )
+    const controller = createOrganizationAccessController(binding, 'org')
+    controller.setAuthority(true)
+    controller.setRefresh(async () => 'ready')
+    const started = Date.now()
+    const outcome = await controller.execute('member', run, {
+      rejectionCodes: memberRemovalRejectionCodes,
+    })
+    expect(outcome.status).toBe('unknown')
+    expect('retryAt' in outcome && outcome.retryAt).toBeGreaterThanOrEqual(started + 60000)
   })
   it.each([
     new Response(null, { status: 204 }),

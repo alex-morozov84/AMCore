@@ -21,11 +21,18 @@ const rejectionPairs: Record<number, readonly string[]> = {
   429: ['RATE_LIMIT_EXCEEDED'],
 }
 export const memberRemovalRejectionCodes = new Set(Object.values(rejectionPairs).flat())
+// Keep HTTP retry metadata, but omit the outer error code so an unexpected pair stays unknown.
+class UnconfirmedRemovalError extends ApiRequestError {
+  constructor(cause: ApiRequestError) {
+    super(cause.status, undefined, cause.retryAfterSeconds)
+    this.cause = cause
+  }
+}
 export function removalFailure(status: number, body: unknown, headers: Headers): Error {
   const error = new ApiRequestError(status, body as never, parseRetryAfterSeconds(headers))
   return error.body?.errorCode && rejectionPairs[status]?.includes(error.body.errorCode)
     ? error
-    : new Error('MEMBER_REMOVAL_UNCONFIRMED', { cause: error })
+    : new UnconfirmedRemovalError(error)
 }
 export async function removeMember(
   binding: string,

@@ -51,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(useMemberRemoval).mockReturnValue({
     outcome: undefined,
+    retryAt: undefined,
     inspection: undefined,
     pending: false,
     checking: false,
@@ -74,6 +75,7 @@ describe('member removal confirmation and persistent result', () => {
   it('keeps unknown inspection visible after confirmation closes without replay', async () => {
     vi.mocked(useMemberRemoval).mockReturnValue({
       outcome: { status: 'unknown', error: new Error('lost') },
+      retryAt: undefined,
       inspection: undefined,
       pending: false,
       checking: false,
@@ -99,6 +101,7 @@ it('shows a known last-admin refusal without unknown-result inspection', () => {
   const error = new ApiRequestError(400, { errorCode: 'BUSINESS_RULE_VIOLATION' } as never)
   vi.mocked(useMemberRemoval).mockReturnValue({
     ...{
+      retryAt: undefined,
       inspection: undefined,
       pending: false,
       checking: false,
@@ -118,6 +121,7 @@ it('shows a known last-admin refusal without unknown-result inspection', () => {
 it.each(['denied', 'error'] as const)('keeps self-removal success with followup %s', (followup) => {
   vi.mocked(useMemberRemoval).mockReturnValue({
     ...{
+      retryAt: undefined,
       inspection: undefined,
       pending: false,
       checking: false,
@@ -138,4 +142,23 @@ it.each(['denied', 'error'] as const)('keeps self-removal success with followup 
   expect(Boolean(screen.queryByText(messages.memberRemoval.refreshFailed))).toBe(
     followup === 'error'
   )
+})
+
+it('disables unknown-result inspection during the server cooldown', () => {
+  vi.mocked(useMemberRemoval).mockReturnValue({
+    inspection: undefined,
+    pending: false,
+    checking: false,
+    busy: false,
+    canRemove: false,
+    retryAt: 60000,
+    remove,
+    inspect,
+    outcome: { status: 'unknown', error: new Error('unconfirmed') },
+  })
+  render(<Harness initialOpen={false} />)
+  const check = screen.getByRole('button', { name: messages.memberRemoval.check })
+  expect(check).toBeDisabled()
+  fireEvent.click(check)
+  expect(inspect).not.toHaveBeenCalled()
 })

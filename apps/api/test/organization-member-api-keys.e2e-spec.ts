@@ -541,6 +541,92 @@ describe('Organization member credential control (real DB)', () => {
     }
   })
 
+  it.each(['member-lost', 'personal-super-member-lost', 'bound-super-demoted'] as const)(
+    'removal rechecks authorization after resolver admission: %s',
+    async (mode) => {
+      const key = await create()
+      const jwt = c.app.get(JwtService)
+      const actor = jwt.verify(admin).sub
+      let token = admin
+      if (mode !== 'member-lost') {
+        await c.prisma.user.update({
+          where: { id: actor },
+          data: { systemRole: SystemRole.SuperAdmin },
+        })
+        const membership = await c.prisma.orgMember.findUniqueOrThrow({
+          where: { userId_organizationId: { userId: actor, organizationId: orgId } },
+        })
+        await c.prisma.memberRole.deleteMany({ where: { memberId: membership.id } })
+        const login = await request(http())
+          .post('/auth/login')
+          .send({ email: jwt.verify(admin).email, password: 'StrongP@ss123' })
+          .expect(200)
+        token = login.body.accessToken
+        if (mode === 'bound-super-demoted') {
+          const { iat: _, exp: __, ...claims } = jwt.verify(token)
+          token = jwt.sign({ ...claims, organizationId: orgId })
+        }
+      }
+      const targetBefore = await c.prisma.orgMember.findUniqueOrThrow({ where: { id: memberId } })
+      const keyBefore = await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+      const orgBefore = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+      const auditWhere = {
+        organizationId: orgId,
+        action: { in: ['api_key.revoked', 'organization.member_removed'] },
+      }
+      const auditBefore = await c.prisma.auditLog.count({ where: auditWhere })
+      const connection = await pool.connect()
+      let pending: Promise<request.Response> | undefined
+      try {
+        await connection.query('BEGIN')
+        await connection.query(
+          mode === 'bound-super-demoted'
+            ? 'SELECT id FROM core.users WHERE id=$1 FOR UPDATE'
+            : 'SELECT id FROM core.organizations WHERE id=$1 FOR UPDATE',
+          [mode === 'bound-super-demoted' ? actor : orgId]
+        )
+        pending = request(http())
+          .delete(`/organizations/${orgId}/members/${userId}`)
+          .query({ expectedMemberId: memberId })
+          .auth(token, { type: 'bearer' })
+          .then((r) => r)
+        // A real blocked transaction proves resolver admission completed, not HTTP arrival ordering.
+        await waitForDbBlock(pool)
+        if (mode === 'bound-super-demoted') {
+          await connection.query('UPDATE core.users SET "systemRole"=$2 WHERE id=$1', [
+            actor,
+            'USER',
+          ])
+        } else {
+          await connection.query(
+            'DELETE FROM core.org_members WHERE "userId"=$1 AND "organizationId"=$2',
+            [actor, orgId]
+          )
+          await connection.query(
+            'UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=$1',
+            [orgId]
+          )
+        }
+        await connection.query('COMMIT')
+        expect((await pending).status).toBe(403)
+        expect(await c.prisma.orgMember.findUniqueOrThrow({ where: { id: memberId } })).toEqual(
+          targetBefore
+        )
+        expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toEqual(
+          keyBefore
+        )
+        expect(await c.prisma.auditLog.count({ where: auditWhere })).toBe(auditBefore)
+        expect(
+          (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+        ).toBe(orgBefore.aclVersion + (mode === 'bound-super-demoted' ? 0 : 1))
+      } finally {
+        await connection.query('ROLLBACK')
+        connection.release()
+        if (pending) await Promise.allSettled([pending])
+      }
+    }
+  )
+
   it('system demotion while the actor lock is held defeats stale synthetic trust', async () => {
     const claims = c.app.get(JwtService).verify(admin)
     await c.prisma.user.update({

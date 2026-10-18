@@ -303,15 +303,18 @@ This is a supported-issuance guarantee, not validation of arbitrary Redis-inject
 
 Import `useMemberRemoval` and `MemberRemovalTarget` from `@/entities/organization-context`.
 Pass the existing controller and a frozen `{userId,memberId,email,name?,organizationName?}` target.
-Keep the hook owner mounted outside rows that disappear after removal. Do not replace its target while pending or unknown.
+Keep the hook owner mounted outside rows that disappear after removal. Do not replace its target while pending
+or while an unknown outcome remains unresolved. An inspection reporting a different membership permits
+deliberately selecting a fresh target; changing rows alone does not resolve an unknown outcome.
 Render your own warning and confirmation before calling `remove()`; the hook does not toast or navigate.
 
-| Hook field/action                     | Meaning                                                                                               |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `pending`, `busy`, `canRemove`        | Bounded command/follow-up state; use canRemove to enable a fresh confirmed action                     |
-| `outcome`                             | committed with followup, rejected/unknown with structured error and possible retryAt, or retired/busy |
-| `inspect()`, `checking`, `inspection` | Read-only authority and exact-user membership observation; same/different includes observed memberId  |
-| `remove()`                            | Executes one explicitly confirmed removal; never retries automatically                                |
+| Hook field/action                     | Meaning                                                                                                                                                           |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pending`, `busy`, `canRemove`        | Bounded command/follow-up state; use canRemove to enable a fresh confirmed action                                                                                 |
+| `outcome`                             | committed with followup, rejected/unknown with structured error and possible retryAt, or retired/busy                                                             |
+| `inspect()`, `checking`, `inspection` | Read-only authority and exact-user membership observation; same/different includes observed memberId                                                              |
+| `retryAt`                             | Shared command/inspection cooldown deadline; disable inspection and new confirmation while present. Expiry enables deliberate recovery, without sending requests. |
+| `remove()`                            | Executes one explicitly confirmed removal; never retries automatically                                                                                            |
 
 Commands use a20-second browser and15-second BFF deadline plus a separate bounded5-second follow-up.
 Inspection bounds authority refresh at5seconds and its exact-user read at20seconds.

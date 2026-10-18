@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { MemberRemovalResult } from '@amcore/shared'
 
-import { getErrorCode, getErrorStatus } from '@/shared/api/errors'
+import { getErrorCode, getErrorStatus, getRetryAfterMs } from '@/shared/api/errors'
 import { withDeadline } from '@/shared/lib/with-deadline'
 
 import { memberRemovalRejectionCodes, removeMember } from '../../api/member-removal-client'
@@ -40,11 +40,28 @@ export function useMemberRemoval(
   const [inspection, setInspection] = useState<RemovalInspection>()
   const [pending, setPending] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [retryAt, setRetryAt] = useState<number>()
+  const cooldown = useRef(0)
+  const delayRecovery = (deadline?: number) => {
+    cooldown.current = deadline ?? 0
+    setRetryAt(deadline)
+  }
+  useEffect(() => {
+    if (!retryAt) return
+    const timer = setTimeout(
+      () => {
+        if (lease.current === identity) setRetryAt(undefined)
+      },
+      Math.max(0, retryAt - Date.now())
+    )
+    return () => clearTimeout(timer)
+  }, [retryAt, identity])
   useEffect(() => {
     setOutcome(undefined)
     setInspection(undefined)
     setPending(false)
     setChecking(false)
+    delayRecovery()
   }, [identity])
   const operation = useRef(false)
   const inspectionRun = useRef(false)
@@ -59,6 +76,7 @@ export function useMemberRemoval(
     !pending &&
     !checking &&
     !busy &&
+    (!retryAt || Date.now() >= retryAt) &&
     outcome?.status !== 'committed' &&
     (outcome?.status !== 'unknown' || inspection?.status === 'same') &&
     (!inspection || inspection.status === 'same') &&
@@ -66,7 +84,14 @@ export function useMemberRemoval(
   )
 
   const remove = async () => {
-    if (!target || !canRemove || operation.current || lease.current !== identity) return
+    if (
+      !target ||
+      !canRemove ||
+      operation.current ||
+      lease.current !== identity ||
+      Date.now() < cooldown.current
+    )
+      return
     operation.current = true
     const epoch = controller.capture()
     setPending(true)
@@ -79,7 +104,9 @@ export function useMemberRemoval(
       )
       if (lease.current !== identity || !controller.current(epoch))
         return { status: 'retired' as const }
-      if (result.status !== 'retired' && result.status !== 'busy') setOutcome(result)
+      if (result.status === 'retired' || result.status === 'busy') return result
+      delayRecovery('retryAt' in result ? result.retryAt : undefined)
+      setOutcome(result)
       return result
     } finally {
       operation.current = false
@@ -87,7 +114,15 @@ export function useMemberRemoval(
     }
   }
   const inspect = async () => {
-    if (!target || pending || inspectionRun.current || busy || lease.current !== identity) return
+    if (
+      !target ||
+      pending ||
+      inspectionRun.current ||
+      busy ||
+      lease.current !== identity ||
+      Date.now() < cooldown.current
+    )
+      return
     if (outcome && 'retryAt' in outcome && outcome.retryAt && Date.now() < outcome.retryAt) return
     inspectionRun.current = true
     setChecking(true)
@@ -123,6 +158,8 @@ export function useMemberRemoval(
         })
     } catch (error) {
       if (!current()) return
+      const delay = getRetryAfterMs(error)
+      delayRecovery(delay ? Date.now() + delay : undefined)
       setInspection(
         getErrorStatus(error) === 403
           ? { status: 'denied' }
@@ -135,5 +172,5 @@ export function useMemberRemoval(
       if (lease.current === identity) setChecking(false)
     }
   }
-  return { outcome, inspection, pending, checking, busy, canRemove, remove, inspect }
+  return { outcome, inspection, pending, checking, busy, retryAt, canRemove, remove, inspect }
 }
