@@ -7,6 +7,12 @@ interface UserAvatarProps {
   name?: string | null
   avatarUrl?: string | null
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  /**
+   * The name is shown next to the avatar, so the avatar adds nothing to it. The initials are then
+   * drawn with CSS instead of text, which keeps a control's visible text equal to the name alone
+   * (WCAG 2.5.3 "Label in Name"), and the image gets an empty alt.
+   */
+  decorative?: boolean
   className?: string
 }
 
@@ -40,7 +46,13 @@ function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-export function UserAvatar({ name, avatarUrl, size = 'md', className }: UserAvatarProps) {
+export function UserAvatar({
+  name,
+  avatarUrl,
+  size = 'md',
+  decorative = false,
+  className,
+}: UserAvatarProps) {
   const baseClasses =
     'flex items-center justify-center rounded-full bg-muted font-medium text-muted-foreground'
 
@@ -48,13 +60,28 @@ export function UserAvatar({ name, avatarUrl, size = 'md', className }: UserAvat
     return (
       <Image
         src={avatarUrl}
-        alt={name || 'User avatar'}
+        alt={decorative ? '' : name || 'User avatar'}
         width={sizePx[size]}
         height={sizePx[size]}
         // Served as stored: derivatives are already sized WebP files, so the Next.js image optimizer
         // (a server-side fetch of a remote URL) is not needed and no remote host list is required.
         unoptimized
         className={cn(baseClasses, sizeClasses[size], 'object-cover', className)}
+      />
+    )
+  }
+
+  if (name && decorative) {
+    return (
+      <div
+        aria-hidden
+        data-initials={getInitials(name)}
+        className={cn(
+          baseClasses,
+          sizeClasses[size],
+          'before:content-[attr(data-initials)]',
+          className
+        )}
       />
     )
   }

@@ -44,7 +44,7 @@ export const ProfileOpen: Story = {
   decorators: [withUser({ name: 'Ada Lovelace', avatarUrl: null })],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(await canvas.findByRole('button', { name: 'Account menu' }))
+    await userEvent.click(await canvas.findByRole('button', { name: /account menu/i }))
     await userEvent.click(await within(document.body).findByRole('menuitem', { name: /Profile/ }))
     const dialog = await within(document.body).findByRole('dialog')
     await waitFor(() => expect(dialog).toBeVisible())

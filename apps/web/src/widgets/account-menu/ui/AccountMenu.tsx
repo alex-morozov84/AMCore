@@ -46,9 +46,10 @@ export function AccountMenu() {
         <DropdownMenuTrigger
           ref={trigger}
           render={<Button variant="ghost" className="h-auto gap-2 px-2 py-1" />}
-          aria-label={t('menuLabel')}
+          // WCAG 2.5.3: the accessible name starts with the visible text (the user's name or email).
+          aria-label={`${label}, ${t('menuLabel')}`}
         >
-          <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
+          <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" decorative />
           <span className="hidden w-36 truncate text-left text-sm sm:inline-block">{label}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">

@@ -60,7 +60,7 @@ describe('AccountMenu', () => {
 
   it('shows the name on the trigger and both identities in the menu', async () => {
     renderMenu(ada)
-    const trigger = screen.getByRole('button', { name: 'account.menuLabel' })
+    const trigger = screen.getByRole('button', { name: /account\.menuLabel/ })
     expect(trigger).toHaveTextContent('Ada Lovelace')
     await userEvent.click(trigger)
     expect(await screen.findByText('ada@example.test')).toBeInTheDocument()
@@ -68,14 +68,14 @@ describe('AccountMenu', () => {
 
   it('falls back to the email when the user has no name', async () => {
     renderMenu({ ...ada, name: null })
-    expect(screen.getByRole('button', { name: 'account.menuLabel' })).toHaveTextContent(
+    expect(screen.getByRole('button', { name: /account\.menuLabel/ })).toHaveTextContent(
       'ada@example.test'
     )
   })
 
   it('opens the profile dialog from the Profile item', async () => {
     renderMenu(ada)
-    await userEvent.click(screen.getByRole('button', { name: 'account.menuLabel' }))
+    await userEvent.click(screen.getByRole('button', { name: /account\.menuLabel/ }))
     await userEvent.click(await screen.findByRole('menuitem', { name: /account\.profile/ }))
     expect(await screen.findByRole('dialog')).toHaveTextContent('account.profileTitle')
   })
@@ -83,7 +83,7 @@ describe('AccountMenu', () => {
   it('logs out from the menu and goes to the login page', async () => {
     vi.mocked(authApi.logout).mockResolvedValue(undefined as never)
     renderMenu(ada)
-    await userEvent.click(screen.getByRole('button', { name: 'account.menuLabel' }))
+    await userEvent.click(screen.getByRole('button', { name: /account\.menuLabel/ }))
     await userEvent.click(await screen.findByRole('menuitem', { name: /auth\.logout/ }))
     await waitFor(() => expect(authApi.logout).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(push).toHaveBeenCalledWith('/login'))

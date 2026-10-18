@@ -7,14 +7,14 @@ block is built from a public headless operation, so a downstream can move, resty
 
 ## Blocks and ownership
 
-| Layer                   | Block                                               | Responsibility                                                                                                         |
-| ----------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `entities/user`         | `useCurrentUser`, **`useAvatarEditor`**             | Headless data and operations: `upload(file)`, `remove()`, pending, structured error, outcome. No UI, redirect or toast |
-| `entities/user`         | `UserAvatar`                                        | Image or initials presentation (`sm`, `md`, `lg`, `xl`); the image is shown as stored (`next/image` `unoptimized`)     |
-| `features/avatar-edit`  | `AvatarEditor` (ready)                              | File picker with the size and type hint, confirmed removal, messages by outcome                                        |
-| `widgets/account-menu`  | `AccountMenu`, `ProfileDialog` (ready)              | Menu and controlled dialog; the dialog has no trigger of its own and closes when the signed-in user changes            |
-| `widgets/app-shell`     | `headerEnd` slot                                    | The shell renders whatever the application passes; it never imports the account blocks                                 |
-| Application composition | `(dashboard)/layout.tsx` and the organization frame | One placement per shell composition (two today): each passes `<AccountMenu />` into `headerEnd`                        |
+| Layer                   | Block                                               | Responsibility                                                                                                                                                                                                                |
+| ----------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entities/user`         | `useCurrentUser`, **`useAvatarEditor`**             | Headless data and operations: `upload(file)`, `remove()`, pending, structured error, outcome. No UI, redirect or toast                                                                                                        |
+| `entities/user`         | `UserAvatar`                                        | Image or initials presentation (`sm`, `md`, `lg`, `xl`); the image is shown as stored (`next/image` `unoptimized`). `decorative` draws the initials with CSS and gives the image an empty alt, for use next to a visible name |
+| `features/avatar-edit`  | `AvatarEditor` (ready)                              | File picker with the size and type hint, confirmed removal, messages by outcome                                                                                                                                               |
+| `widgets/account-menu`  | `AccountMenu`, `ProfileDialog` (ready)              | Menu and controlled dialog; the dialog has no trigger of its own and closes when the signed-in user changes. The trigger's accessible name is the visible name plus "Account menu" (WCAG 2.5.3)                               |
+| `widgets/app-shell`     | `headerEnd` slot                                    | The shell renders whatever the application passes; it never imports the account blocks                                                                                                                                        |
+| Application composition | `(dashboard)/layout.tsx` and the organization frame | One placement per shell composition (two today): each passes `<AccountMenu />` into `headerEnd`                                                                                                                               |
 
 The header holds the locale switcher next to the account menu (the sidebar has no footer). **Log out is now in the account menu**: if you
 remove the menu, provide your own logout control (`useLogout` from `features/auth-logout`).
