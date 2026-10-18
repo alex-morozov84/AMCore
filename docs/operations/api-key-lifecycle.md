@@ -177,10 +177,13 @@ is unproved, keep maintenance and stop recovery for deployment-specific DBA revi
 Do not kill arbitrary DB sessions or restart normal writers to obtain a zero.
 
 After that barrier, reread membership and unrevoked IDs from primary. Inspect
-committed `core.audit_log` rows for the selected organization, user and recorded
-key IDs: each actual transition has `api_key.revoked`; successful platform batches
-have `admin.api_keys.revocation_requested`; removal has
-`organization.member_removed` with selected/revoked counts. Existing revoked rows
+committed `core.audit_log` fields `action`, `actorId`, `targetId`, `organizationId`,
+`requestId`, `createdAt` and `metadata`. Match key/removal rows by organization and
+recorded key/user IDs. Platform summaries have null organization/target IDs:
+match their actor and request/time instead; an organization-only filter misses them.
+Each actual transition has `api_key.revoked`; successful platform batches have
+`admin.api_keys.revocation_requested`; removal has `organization.member_removed`
+with selected/revoked counts. Existing revoked rows
 keep their first actor/time/reason. Missing required audit is a recovery failure.
 This checks current offboarding state, not an exact receipt for a lost request.
 If more work remains, restart only the same isolated recovery container, recheck
