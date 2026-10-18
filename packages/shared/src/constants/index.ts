@@ -44,6 +44,7 @@ export enum AuthErrorCode {
 
 // Resource error codes (machine-readable, used across modules for DB-conflict cases)
 export enum ResourceErrorCode {
+  RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND',
   RESOURCE_ALREADY_EXISTS = 'RESOURCE_ALREADY_EXISTS',
   API_KEY_ALREADY_EXISTS = 'API_KEY_ALREADY_EXISTS',
   SETTING_REVISION_CONFLICT = 'SETTING_REVISION_CONFLICT',

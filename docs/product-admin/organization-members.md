@@ -239,7 +239,7 @@ across searches. These are reference UI choices, not headless layout requirement
 
 You need current membership and full TeamAccess in the selected organization.
 The action removes organization membership, not the person's account.
-In Russian, the actions are **Удалить из организации…**, **Удалить участника**, **Отмена** and **Проверить состояние**.
+In Russian, the actions are **Удалить из организации…**, **Удалить участника**, **Отмена** and **Обновить данные участника**.
 
 1. On **Members**, find the colleague by name or email. Open their row menu and choose **Remove from organization…**.
 2. Check the organization, name and email. All the person's keys for this organization will be permanently revoked, including expired keys.
@@ -248,7 +248,9 @@ In Russian, the actions are **Удалить из организации…**, *
 
 Removing yourself requires the same authority and displays an additional access-loss warning.
 Another member must hold the builtin ADMIN role. A custom role named ADMIN does not qualify.
-After successful self-removal, the receipt remains visible with **Go to organizations**.
+After successful self-removal, the receipt remains visible with **Back to organizations**.
+Expected loss of organization access is part of success. The page hides obsolete member controls
+and does not offer membership inspection after confirmed removal. Other refresh failures remain visible.
 This does not sign you out or remove memberships or keys in other organizations.
 Already admitted requests may finish.
 
@@ -264,10 +266,10 @@ The count includes expired keys and all pages. Ask the deployment operator to fo
 [maintenance recovery](../operations/api-key-lifecycle.md#more-than-1000-keys-or-oversized-metadata).
 Repeated live batches cannot guarantee completion while issuance continues. Do not delete membership or keys with SQL.
 
-**Check state** performs reads; it never repeats removal. It distinguishes an observed original membership,
+**Refresh member details** is available for an unknown removal result and performs reads; it never repeats removal. It distinguishes an observed original membership,
 a different membership, unavailable membership/organization, denied access and read failure.
 A still-present membership does not prove the earlier request failed: a delayed writer may still finish.
-An unavailable result does not prove this removal succeeded. Check state cannot issue a receipt for a lost response.
+An unavailable result does not prove this removal succeeded. Refresh member details cannot issue a receipt for a lost response.
 A different membership requires selecting the person again from the refreshed list.
 A fresh removal always needs its own confirmation and membership identity.
 

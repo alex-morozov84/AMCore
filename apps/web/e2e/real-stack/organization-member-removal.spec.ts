@@ -135,7 +135,20 @@ test('member removal: cancellation, last ADMIN, lost acknowledgment, narrow RU a
   await page.reload()
   await open(email)
   await page.getByRole('alertdialog').getByRole('button', { name: t.confirm, exact: true }).click()
-  await expect(page.getByText(t.success!, { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(t.selfSuccessTitle!, { exact: true })).toBeVisible()
+  await expect(page.getByText(t.selfSuccess!, { exact: true })).toBeVisible()
+  await expect(page.getByText(t.refreshFailed!, { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: t.check, exact: true })).toHaveCount(0)
+  await expect(page.getByText(catalogue!.errors!.UNKNOWN_ERROR!, { exact: true })).toHaveCount(0)
+  await expect(page.getByText(catalogue!.errors!.RESOURCE_NOT_FOUND!, { exact: true })).toHaveCount(
+    0
+  )
+  await expect(
+    page.getByPlaceholder(catalogue!.organizationMembers!.memberSearchPlaceholder!)
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: catalogue!.organizationMembers!.retry, exact: true })
+  ).toHaveCount(0)
   await expect(page.getByRole('link', { name: t.organizations, exact: true })).toBeVisible()
   await expectNoAxeViolations(page)
   expect(failures).toEqual([])

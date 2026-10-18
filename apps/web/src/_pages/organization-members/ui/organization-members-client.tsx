@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ProductAccessBootstrap } from '@amcore/shared'
 
@@ -35,6 +36,7 @@ export function OrganizationMembersClient({
   listHref?: string
   query?: MemberListView
 }) {
+  const [removedIdentity, setRemovedIdentity] = useState<string>()
   const router = useRouteProgressRouter()
   const locale = useLocale()
   const t = useTranslations('organizationMembers')
@@ -42,6 +44,8 @@ export function OrganizationMembersClient({
   const access = useOrganizationContext(admission.binding, input)
   const allowed =
     access.data && 'canManageTeamAccess' in access.data.data && access.data.data.canManageTeamAccess
+  const identity = `${admission.binding}:${organizationId}`
+  const expectedAccessLoss = removedIdentity === identity && access.state.status === 'denied'
   return (
     <section className="space-y-6">
       <BackLink href={listHref ?? backHref}>{t('allOrganizations')}</BackLink>
@@ -61,12 +65,13 @@ export function OrganizationMembersClient({
           roles: rolesHref,
         }}
       />
-      <ApiErrorAlert error={access.state.error} />
+      {!expectedAccessLoss && <ApiErrorAlert error={access.state.error} />}
       <RoleLinkProvider roleHref={roleHrefUnder(rolesHref)}>
         <OrganizationMembers
           key={`${admission.binding}:${organizationId}`}
           controller={access.controller}
           actorId={admission.actor.id}
+          onSelfRemoved={() => setRemovedIdentity(identity)}
           organizationsHref={listHref ?? backHref}
           organizationName={
             access.data && 'organization' in access.data.data
@@ -87,7 +92,7 @@ export function OrganizationMembersClient({
         />
       </RoleLinkProvider>
       {access.state.status === 'ready' && !allowed && <p role="status">{t('denied')}</p>}
-      {Boolean(access.state.error) && (
+      {!expectedAccessLoss && Boolean(access.state.error) && (
         <Button
           variant="outline"
           disabled={access.state.status === 'pending' || access.busy}
