@@ -14,14 +14,13 @@ import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/pr
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
 import { EmailIdentityService } from '../auth/email-identity.service.js'
+import { issueInvitation } from '../invitations/invitation-issuance.js'
 import {
   currentInvitationIntent,
   invitationDefaultRole,
   lockInvitationRoles,
 } from '../invitations/invitation-role-intent.js'
-
 import { rejectManagedInvitation } from '../invitations/provisioning-settlement.js'
-import { issueInvitation } from '../invitations/invitation-issuance.js'
 
 import { assertInvitationActor, type InvitationActor } from './invitation-actor.js'
 import { InvitationAuthorization } from './invitation-authorization.js'
@@ -88,7 +87,11 @@ export class InvitationCommandService {
         invitationFingerprint(intent)
       )
       if (replay !== undefined) return null
-      await rejectManagedInvitation(tx, orgId, command.kind === 'create' ? { email: canonical! } : { id: command.id })
+      await rejectManagedInvitation(
+        tx,
+        orgId,
+        command.kind === 'create' ? { email: canonical! } : { id: command.id }
+      )
       const result =
         command.kind === 'create'
           ? await this.create(tx, orgId, command.dto, canonical!, actor)
@@ -189,8 +192,12 @@ export class InvitationCommandService {
       if (locked) await tx.orgInvite.delete({ where: { id: locked.id } })
     }
     const row = await issueInvitation(tx, {
-      organizationId: orgId, email: dto.email, emailCanonical: canonical,
-      actorId: actor.principal.sub, roles, now,
+      organizationId: orgId,
+      email: dto.email,
+      emailCanonical: canonical,
+      actorId: actor.principal.sub,
+      roles,
+      now,
     })
     const token = row.token
     await this.record(
@@ -246,8 +253,13 @@ export class InvitationCommandService {
       throw invitationConflict(InviteErrorCode.INVITE_GENERATION_CONFLICT)
     await this.limiter.consume(orgId, invite.emailCanonical, actor.principal.sub)
     const { token } = await issueInvitation(tx, {
-      organizationId: orgId, email: invite.email, emailCanonical: invite.emailCanonical,
-      actorId: actor.principal.sub, roles, now, current: invite,
+      organizationId: orgId,
+      email: invite.email,
+      emailCanonical: invite.emailCanonical,
+      actorId: actor.principal.sub,
+      roles,
+      now,
+      current: invite,
     })
     await this.record(
       tx,

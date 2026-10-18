@@ -112,7 +112,10 @@ test('provisioning capture is isolated, preserves queued methods and refuses uns
     assert.ok(transformed.includes('private async sendQueued('))
     assert.ok(transformed.endsWith('\n}\n'))
     assert.equal(await readFile(relative, 'utf8'), original)
-    await assert.rejects(executeSetupCommand(manifest, { command: 'bootstrap' }), /account preparation/)
+    await assert.rejects(
+      executeSetupCommand(manifest, { command: 'bootstrap' }),
+      /account preparation/
+    )
   } finally {
     await rm(snapshot, { recursive: true, force: true })
   }

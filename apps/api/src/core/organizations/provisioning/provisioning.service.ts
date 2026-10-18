@@ -24,7 +24,7 @@ import {
 import { ProvisioningLimiterService } from './provisioning-limiter.service.js'
 import { dispatchProvisioningMail } from './provisioning-mail.js'
 import { readProvisioning } from './provisioning-read.js'
-import { type ProvisioningCommand,recoverProvisioning } from './provisioning-recovery.js'
+import { type ProvisioningCommand, recoverProvisioning } from './provisioning-recovery.js'
 import { provisioningTransaction } from './provisioning-transaction.js'
 
 @Injectable()

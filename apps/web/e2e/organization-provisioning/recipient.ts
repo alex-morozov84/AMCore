@@ -1,4 +1,4 @@
-import { type Browser,expect } from '@playwright/test'
+import { type Browser, expect } from '@playwright/test'
 
 import type messages from '../../messages/en.json'
 import { guardedSql } from '../support/managed-target.mjs'

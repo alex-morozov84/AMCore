@@ -79,7 +79,10 @@ export const NotReady: Story = {
       handlers: [
         session,
         http.get(`${root}/status`, () =>
-          HttpResponse.json({ binding, data: { state: 'not-ready', reason: 'templates-unavailable' } })
+          HttpResponse.json({
+            binding,
+            data: { state: 'not-ready', reason: 'templates-unavailable' },
+          })
         ),
       ],
     },
@@ -94,7 +97,9 @@ export const OrganizationAlreadyExists: Story = {
   parameters: { msw: { handlers: [session, status('existing-org-without-receipt')] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await waitFor(() => expect(canvas.queryByRole('heading', { name: t.title })).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(canvas.queryByRole('heading', { name: t.title })).not.toBeInTheDocument()
+    )
     expect(canvas.queryByRole('button', { name: t.refresh })).not.toBeInTheDocument()
     expect(canvas.queryByText(t.deploymentHelp)).not.toBeInTheDocument()
     expect(canvas.queryByRole('button', { name: t.continue })).not.toBeInTheDocument()
@@ -155,11 +160,18 @@ export const AccessChanged: Story = {
   },
 }
 export const CompletedRussian: Story = {
-  parameters: { messages: russian, msw: { handlers: [session, status('completed-intact'), account(true)] } },
+  parameters: {
+    messages: russian,
+    msw: { handlers: [session, status('completed-intact'), account(true)] },
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await waitFor(() => expect(canvas.queryByText(russian.console.organizationSetup.loading)).not.toBeInTheDocument())
-    expect(canvas.queryByRole('heading', { name: russian.console.organizationSetup.title })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(canvas.queryByText(russian.console.organizationSetup.loading)).not.toBeInTheDocument()
+    )
+    expect(
+      canvas.queryByRole('heading', { name: russian.console.organizationSetup.title })
+    ).not.toBeInTheDocument()
   },
 }
 
@@ -212,13 +224,25 @@ export const RecipientUnavailableRussian: Story = {
 
 export const UnknownSetupBeforeHide: Story = {
   beforeEach: () => {
-    sessionStorage.setItem('amcore:initial-organization-setup:v1', JSON.stringify({
-      version: 1, binding, actorId: 'operator', selected,
-      draft: { email: selected.email, name: 'Anna shop', slug: 'anna-shop' }, step: 'review',
-      pending: { kind: 'bootstrap', input: { name: 'Anna shop', slug: 'anna-shop', adminUserId: selected.userId } },
-    }))
+    sessionStorage.setItem(
+      'amcore:initial-organization-setup:v1',
+      JSON.stringify({
+        version: 1,
+        binding,
+        actorId: 'operator',
+        selected,
+        draft: { email: selected.email, name: 'Anna shop', slug: 'anna-shop' },
+        step: 'review',
+        pending: {
+          kind: 'bootstrap',
+          input: { name: 'Anna shop', slug: 'anna-shop', adminUserId: selected.userId },
+        },
+      })
+    )
   },
-  parameters: { msw: { handlers: [session, status('existing-org-without-receipt'), account(true)] } },
+  parameters: {
+    msw: { handlers: [session, status('existing-org-without-receipt'), account(true)] },
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     expect(await canvas.findByText(t.unknown)).toBeVisible()

@@ -245,7 +245,7 @@ describe('actual issuance acknowledgment and snapshot', () => {
         ) => {
           const sql = ('strings' in query ? query.strings : query).join('')
           if (sql.includes('core.organization_provisionings')) return []
-    if (sql.includes('core.roles')) return [role]
+          if (sql.includes('core.roles')) return [role]
           if (sql.includes('core.org_invites'))
             return [
               {

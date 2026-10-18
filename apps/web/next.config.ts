@@ -6,8 +6,11 @@ import createNextIntlPlugin from 'next-intl/plugin'
 import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
+import { HTML_LIMITED_BOTS } from './src/shared/lib/seo/html-limited-bots'
+
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 const deploymentVersion = process.env.NEXT_DEPLOYMENT_ID || randomUUID()
+const noindexHeaders = [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]
 const invitationPrivacyHeaders = [
   { key: 'Referrer-Policy', value: 'no-referrer' },
   { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
@@ -33,6 +36,9 @@ const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_DEPLOYMENT_VERSION: deploymentVersion },
   // Standalone output for Docker
   output: 'standalone',
+  // Googlebot gets page metadata (canonical, hreflang, robots) in <head>, not streamed into <body>,
+  // however slowly it resolves. See shared/lib/seo/html-limited-bots.ts and docs/frontend/seo.md.
+  htmlLimitedBots: HTML_LIMITED_BOTS,
 
   // Monorepo root for standalone file tracing — without it Next traces from
   // apps/web and omits the workspace `@amcore/shared` package and the hoisted
@@ -157,6 +163,14 @@ const nextConfig: NextConfig = {
         '/api/invitation-operations/:path*',
         '/api/invitation-verification-return/:path*',
       ].map((source) => ({ source, headers: invitationPrivacyHeaders })),
+      // Static noindex for a surface that must never be indexed, whatever the environment. This is
+      // a build-time, path-based entry; the environment/host rule is the proxy's (shared/lib/seo).
+      // `/api/*` never passes the proxy. The Console has no entry here on purpose: its slug lives in
+      // a Console-owned file that a fork without the Console deletes, so a header would need its own
+      // scaffold seam. The Console is closed by `noindexMetadata` in its layout, delivered in
+      // `<head>` to every listed crawler (`htmlLimitedBots`), and by the proxy header on any host
+      // that is not the open site host (docs/frontend/seo.md).
+      { source: '/api/:path*', headers: noindexHeaders },
       {
         source: '/sw.js',
         headers: [

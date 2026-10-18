@@ -43,11 +43,17 @@ function BoundAttention({ admission }: { admission: ProductAccessBootstrap }) {
               : query.dataUpdatedAt > 0 &&
                 t('attentionCheckedAt', {
                   time: format.dateTime(query.dataUpdatedAt, {
-                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
                   }),
                 })}
           </p>
-          <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
+          <Button
+            variant="outline"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
             {t('attentionRefresh')}
           </Button>
         </div>

@@ -90,19 +90,37 @@ const EXPECTED: Record<string, Expected> = {
   'post /admin/organization-establishment/bootstrap': { status: '200', kind: 'json' },
   'get /admin/organizations/attention': { status: '200', kind: 'json' },
   'get /admin/organizations/{orgId}/administration': { status: '200', kind: 'json' },
-  'get /admin/organizations/{orgId}/administrator-invitations/{invitationId}': { status: '200', kind: 'json' },
-  'get /admin/organizations/{orgId}/administrator-operations/{operationId}': { status: '200', kind: 'json' },
+  'get /admin/organizations/{orgId}/administrator-invitations/{invitationId}': {
+    status: '200',
+    kind: 'json',
+  },
+  'get /admin/organizations/{orgId}/administrator-operations/{operationId}': {
+    status: '200',
+    kind: 'json',
+  },
   'post /admin/organizations/{orgId}/administrator-invitations': { status: '201', kind: 'json' },
   'post /admin/organizations/{orgId}/administrators': { status: '200', kind: 'json' },
-  'post /admin/organizations/{orgId}/administrator-invitations/{invitationId}/reissue': { status: '200', kind: 'json' },
-  'post /admin/organizations/{orgId}/administrator-invitations/{invitationId}/replace-recipient': { status: '200', kind: 'json' },
-  'post /admin/organizations/{orgId}/administrator-invitations/{invitationId}/cancel': { status: '200', kind: 'json' },
+  'post /admin/organizations/{orgId}/administrator-invitations/{invitationId}/reissue': {
+    status: '200',
+    kind: 'json',
+  },
+  'post /admin/organizations/{orgId}/administrator-invitations/{invitationId}/replace-recipient': {
+    status: '200',
+    kind: 'json',
+  },
+  'post /admin/organizations/{orgId}/administrator-invitations/{invitationId}/cancel': {
+    status: '200',
+    kind: 'json',
+  },
   'get /admin/organization-provisionings/policy': { status: '200', kind: 'json' },
   'post /admin/organization-provisionings': { status: '201', kind: 'json' },
   'get /admin/organization-provisionings/operations/{operationId}': { status: '200', kind: 'json' },
   'get /admin/organizations/{orgId}/provisioning': { status: '200', kind: 'json' },
   'post /admin/organizations/{orgId}/provisioning/reissue': { status: '200', kind: 'json' },
-  'post /admin/organizations/{orgId}/provisioning/replace-recipient': { status: '200', kind: 'json' },
+  'post /admin/organizations/{orgId}/provisioning/replace-recipient': {
+    status: '200',
+    kind: 'json',
+  },
   'post /admin/organizations/{orgId}/provisioning/cancel': { status: '200', kind: 'json' },
   // admin
   'get /admin/api-keys': { status: '200', kind: 'json' },

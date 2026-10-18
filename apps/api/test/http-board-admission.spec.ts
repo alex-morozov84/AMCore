@@ -272,11 +272,11 @@ for (const [name, makeAdapter, boardAdapter] of [
     })
     it('keeps defaults query disabled in the installed read-only asset', async () => {
       const result = await request(app.getHttpServer())
-        .get(`${mount}/static/js/async/g.ff87bf7356.js`)
+        .get(`${mount}/static/js/async/oa.cadae521aa.js`)
         .auth('allowed', { type: 'bearer' })
       expect(result.status).toBe(200)
-      expect(result.text).toContain('(a.name,l&&!a.readOnlyMode),w=Object.entries(k||{})')
-      expect(result.text).not.toContain('(a.name,l),w=Object.entries(k||{})')
+      expect(result.text).toContain('(a.name,l&&!a.readOnlyMode),_=Object.entries(L||{})')
+      expect(result.text).not.toContain('(a.name,l),_=Object.entries(L||{})')
     })
   })
 }

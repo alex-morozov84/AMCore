@@ -37,6 +37,7 @@ find for something, that page is under-documented; please open an issue.
 | Extend or operate the API HTTP runtime                                                   | [`backend/http-runtime.md`](backend/http-runtime.md) — Fastify plugins, upgrade checks and rollback.                                    |
 | Understand request parsing, decoded limits and transport errors                          | [`backend/request-body-contract.md`](backend/request-body-contract.md)                                                                  |
 | Build, develop or extend the ESM API                                                     | [`backend/api-build.md`](backend/api-build.md)                                                                                          |
+| Build and maintain the isolated migration image                                          | [`operations/migrator-image.md`](operations/migrator-image.md)                                                                          |
 | Build or verify shared package distribution                                              | [`backend/shared-package-build.md`](backend/shared-package-build.md)                                                                    |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                                    |
 | Register background work, an idempotent handler or a database-owned control adapter      | [`backend/background-work.md`](backend/background-work.md)                                                                              |
@@ -46,6 +47,7 @@ find for something, that page is under-documented; please open an issue.
 | Reuse or add a shared UI primitive (shadcn)                                              | [`frontend/shared-ui-and-shadcn.md`](frontend/shared-ui-and-shadcn.md)                                                                  |
 | Consume media/notifications/AI from the frontend                                         | [`frontend/api-consumption.md`](frontend/api-consumption.md)                                                                            |
 | Add a third-party script/style origin, or run CSP in report-only                         | [`frontend/browser-security-and-csp.md`](frontend/browser-security-and-csp.md)                                                          |
+| Make a page indexable by search engines, or keep the product closed to them              | [`frontend/seo.md`](frontend/seo.md)                                                                                                    |
 | Add a frontend test / pick the right layer                                               | [`frontend/testing.md`](frontend/testing.md)                                                                                            |
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                        |
 | Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                          |
@@ -133,6 +135,9 @@ provide an operator interface for admin session management.
   the static header baseline, nonce-based CSP, enforcement mode, HSTS,
   adding a third-party origin, downstream route-scoping, and the CSP
   violation-reporting endpoint.
+- **[Search-engine indexing](frontend/seo.md)** — closed by default; the two
+  run-time variables, making a page public with `buildPageMetadata`, the
+  sitemap list, verification commands, the traps and recovery after a leak.
 - **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
   real-stack E2E, Storybook, and axe scans), the technical boundary the E2E

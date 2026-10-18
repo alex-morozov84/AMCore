@@ -4,10 +4,12 @@ import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-ta
 
 export default defineConfig({
   ...outputPaths(),
-  testDir: activeTarget().fixtureProfile === 'organization-provisioning' ? './e2e/organization-provisioning' :
-    activeTarget().fixtureProfile === 'organization-setup'
-      ? './e2e/organization-setup'
-      : './e2e/console-real-stack',
+  testDir:
+    activeTarget().fixtureProfile === 'organization-provisioning'
+      ? './e2e/organization-provisioning'
+      : activeTarget().fixtureProfile === 'organization-setup'
+        ? './e2e/organization-setup'
+        : './e2e/console-real-stack',
   ...(activeTarget().fixtureProfile === 'organization-setup'
     ? { testMatch: '**/console-organization-setup.spec.ts' }
     : {}),

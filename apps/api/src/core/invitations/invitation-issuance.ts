@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 import type { Prisma } from '../../generated/prisma/client.js'
 
-import { type IntentRole,invitationRoleCreate } from './invitation-role-intent.js'
+import { type IntentRole, invitationRoleCreate } from './invitation-role-intent.js'
 
 /** Caller owns admission, locks, audit and transaction. Raw token exists only in this result. */
 export async function issueInvitation(

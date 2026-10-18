@@ -39,6 +39,46 @@ describe('ShutdownService', () => {
     expect(process.exitCode).toBeUndefined()
   })
 
+  it('drains the pino buffer synchronously after the last line, before the signal is re-emitted', () => {
+    const calls: string[] = []
+    const pinoLogger = {
+      setContext: jest.fn(),
+      info: jest.fn((message: string) => calls.push(message)),
+      error: jest.fn(),
+      // pino keeps its destination under a private symbol; the service finds it by description.
+      logger: { [Symbol('pino.stream')]: { flushSync: () => calls.push('flushSync') } },
+    } as unknown as PinoLogger
+    const app = {
+      flushLogs: jest.fn(() => calls.push('flushLogs')),
+    } as unknown as INestApplication
+    const service = new ShutdownService(pinoLogger)
+    service.setApp(app)
+
+    service.onApplicationShutdown('SIGTERM')
+
+    expect(calls).toEqual([
+      'Application shutdown (SIGTERM), flushing logs...',
+      '✅ Application closed successfully',
+      'flushLogs',
+      'flushSync',
+    ])
+  })
+
+  it('tolerates a logger without a flushable destination', () => {
+    const noDestination = {
+      setContext: jest.fn(),
+      info: jest.fn(),
+      error: jest.fn(),
+      logger: {},
+    } as unknown as PinoLogger
+    const service = new ShutdownService(noDestination)
+    service.setApp({ flushLogs: jest.fn() } as unknown as INestApplication)
+
+    service.onApplicationShutdown('SIGTERM')
+
+    expect(process.exitCode).toBeUndefined()
+  })
+
   it('marks a failed log flush via exitCode without forcing process exit', () => {
     const app = {
       flushLogs: jest.fn(() => {

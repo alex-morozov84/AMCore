@@ -183,31 +183,51 @@ describe('Explicit supersession and inconsistent managed owners (e2e)', () => {
   })
   it('rejects duplicate managed owners on recipient consent without creating a grant', async () => {
     const { orgId, current } = await prepareManagedInvitation(context, fixture, 'initial')
-    await context.prisma.organizationAdministratorInvitation.create({ data: {
-      id: createInvitationOperationId(), organizationId: orgId, creatorUserId: fixture.operatorId,
-      fingerprint: 'a'.repeat(64), currentInviteId: current.id, currentGeneration: current.generation,
-    } })
+    await context.prisma.organizationAdministratorInvitation.create({
+      data: {
+        id: createInvitationOperationId(),
+        organizationId: orgId,
+        creatorUserId: fixture.operatorId,
+        fingerprint: 'a'.repeat(64),
+        currentInviteId: current.id,
+        currentGeneration: current.generation,
+      },
+    })
     const recipient = await prepareProvisioningRecipient(context, fixture)
-    await recipient.inspect().expect(409).expect(res => expect(res.body.errorCode).toBe('PROVISIONING_MANAGED'))
+    await recipient
+      .inspect()
+      .expect(409)
+      .expect((res) => expect(res.body.errorCode).toBe('PROVISIONING_MANAGED'))
     await recipient.accept().expect(409)
     expect(await context.prisma.orgMember.count({ where: { userId: recipient.id } })).toBe(0)
-    expect((await context.prisma.organizationProvisioning.findFirstOrThrow()).state).toBe('awaiting')
-    expect((await context.prisma.organizationAdministratorInvitation.findFirstOrThrow()).state).toBe('awaiting')
+    expect((await context.prisma.organizationProvisioning.findFirstOrThrow()).state).toBe(
+      'awaiting'
+    )
+    expect(
+      (await context.prisma.organizationAdministratorInvitation.findFirstOrThrow()).state
+    ).toBe('awaiting')
   })
 
   it('serializes identical create requests across the shared operation boundary with one mail attempt', async () => {
     const { orgId } = await prepareManagedInvitation(context, fixture, 'additional')
-    const input = { operationId: createInvitationOperationId(), email: 'concurrent@e2e.amcore.test', reason: 'TEST-49 concurrent exact replay' }
+    const input = {
+      operationId: createInvitationOperationId(),
+      email: 'concurrent@e2e.amcore.test',
+      reason: 'TEST-49 concurrent exact replay',
+    }
     const dispatch = import.meta.jest.mocked(context.app.get(InvitationEmailService).dispatch)
     const before = dispatch.mock.calls.length
-    const fence = invitationFence(context.prisma, (model, method) => model === 'organizationAdministratorInvitation' && method === 'create')
+    const fence = invitationFence(
+      context.prisma,
+      (model, method) => model === 'organizationAdministratorInvitation' && method === 'create'
+    )
     let first: Promise<unknown> | undefined
     let second: Promise<unknown> | undefined
     try {
-      const winner = send(orgId, input).then(response => response)
+      const winner = send(orgId, input).then((response) => response)
       first = winner
       await fence.waitFor(winner)
-      const waiter = send(orgId, input).then(response => response)
+      const waiter = send(orgId, input).then((response) => response)
       second = waiter
       let waiting = false
       const deadline = Date.now() + 1000
@@ -223,8 +243,14 @@ describe('Explicit supersession and inconsistent managed owners (e2e)', () => {
       expect([a.status, b.status]).toEqual([201, 201])
       expect(a.body).toEqual(b.body)
       expect(dispatch.mock.calls.length - before).toBe(1)
-      expect(await context.prisma.organizationAdministratorInvitation.count({ where: { id: input.operationId } })).toBe(1)
-    } finally { fence.restore(); await Promise.allSettled([first, second]) }
+      expect(
+        await context.prisma.organizationAdministratorInvitation.count({
+          where: { id: input.operationId },
+        })
+      ).toBe(1)
+    } finally {
+      fence.restore()
+      await Promise.allSettled([first, second])
+    }
   })
-
 })

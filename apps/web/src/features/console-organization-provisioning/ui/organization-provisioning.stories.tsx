@@ -17,7 +17,13 @@ const readiness = http.get(`${root}/policy`, () => HttpResponse.json({ binding, 
 const meta = {
   title: 'features/console-organization-provisioning/Create and invite',
   component: OrganizationProvisioning,
-  parameters: { messages: { ...messages, console: { ...messages.console, audit: { ...messages.console.audit, actions: {} } } }, msw: { handlers: [session, readiness] } },
+  parameters: {
+    messages: {
+      ...messages,
+      console: { ...messages.console, audit: { ...messages.console.audit, actions: {} } },
+    },
+    msw: { handlers: [session, readiness] },
+  },
   beforeEach: () => {
     localStorage.removeItem('amcore:organization-provisioning:v1:create')
   },
@@ -174,7 +180,9 @@ export const CreatedResult: Story = {
     await userEvent.click(await canvas.findByRole('button', { name: t.createAndInvite }))
     const { screen } = await import('storybook/test')
     const dialog = await screen.findByRole('dialog')
-    await waitFor(() => expect(within(dialog).getByRole('heading', { name: t.created })).toBeVisible())
+    await waitFor(() =>
+      expect(within(dialog).getByRole('heading', { name: t.created })).toBeVisible()
+    )
     expect(within(dialog).getByRole('link', { name: t.openOrganization })).toHaveAttribute(
       'href',
       '/en/admin/organizations/north-shop'
@@ -187,7 +195,7 @@ export const CreatedResult: Story = {
 }
 
 export const ResetUnsentDraft: Story = {
-  play: async context => {
+  play: async (context) => {
     await ThreeSteps.play!(context)
     const canvas = within(context.canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: t.reset }))

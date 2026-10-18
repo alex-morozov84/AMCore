@@ -12,6 +12,7 @@ import {
 import { getCspMode } from '@/shared/lib/csp/csp-mode'
 import { generateNonce } from '@/shared/lib/csp/generate-nonce'
 import { getPublicFilesOrigin } from '@/shared/lib/csp/public-files-origin'
+import { applyIndexingPolicy } from '@/shared/lib/seo/indexing'
 
 import { routing } from './i18n/routing'
 
@@ -97,6 +98,9 @@ export default function proxy(request: NextRequest) {
     'Reporting-Endpoints',
     `${CSP_REPORTING_GROUP_NAME}="${request.nextUrl.origin}${CSP_REPORT_ENDPOINT_PATH}"`
   )
+  // Adds `X-Robots-Tag: noindex` unless this request is on the configured site host with
+  // indexing enabled; it never removes a header (docs/frontend/seo.md).
+  applyIndexingPolicy(request, response)
 
   return response
 }

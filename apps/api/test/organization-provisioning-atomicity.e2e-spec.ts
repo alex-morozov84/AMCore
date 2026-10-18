@@ -1,6 +1,6 @@
 import { createInvitationOperationId } from '@amcore/shared'
 
-import { type E2ETestContext,seedSystemRoles, setupE2ETest, teardownE2ETest } from './helpers'
+import { type E2ETestContext, seedSystemRoles, setupE2ETest, teardownE2ETest } from './helpers'
 import { invitationFence } from './helpers/invitation-race'
 import { prepareProvisioningFixture, prepareProvisioningRecipient } from './provisioning-fixture'
 

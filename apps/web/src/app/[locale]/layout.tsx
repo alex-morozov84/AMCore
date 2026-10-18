@@ -11,6 +11,7 @@ import { routing } from '@/i18n/routing'
 import { getThemeInitScript } from '@/shared/lib'
 import { NONCE_REQUEST_HEADER } from '@/shared/lib/csp/constants'
 import { ROUTE_PROGRESS_ENABLED } from '@/shared/lib/route-progress/route-progress-flag'
+import { rootSeoMetadata } from '@/shared/lib/seo/page-metadata'
 import { RouteProgressBar } from '@/shared/ui/route-progress-bar'
 
 import { Providers } from './providers'
@@ -44,8 +45,11 @@ export async function generateMetadata({
   const locale = await resolveLocaleParam(params)
   const t = await getTranslations({ locale, namespace: 'meta' })
 
+  // Do not use `locale` or `params` anywhere else in this function: the single-locale scaffold
+  // transform deletes both here and rewrites only the `getTranslations` shorthand above.
   return {
-    title: t('title'),
+    ...rootSeoMetadata(t('title')),
+    title: { default: t('title'), template: `%s | ${t('title')}` },
     description: t('description'),
   }
 }

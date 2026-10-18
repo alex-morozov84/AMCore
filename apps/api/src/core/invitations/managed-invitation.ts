@@ -46,7 +46,13 @@ export async function managedInvitationOwner(
 ): Promise<ManagedInvitationOwner | undefined> {
   const rows = await managedInvitationOwners(tx, orgId, { id: inviteId })
   const row = rows[0]
-  if (rows.length > 1 || (row && (row.organizationId !== orgId || row.state !== 'awaiting' || row.currentGeneration !== row.generation)))
+  if (
+    rows.length > 1 ||
+    (row &&
+      (row.organizationId !== orgId ||
+        row.state !== 'awaiting' ||
+        row.currentGeneration !== row.generation))
+  )
     throw provisioningError('PROVISIONING_MANAGED')
   return row
 }

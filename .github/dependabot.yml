@@ -5,10 +5,73 @@ version: 2
 updates:
   - package-ecosystem: 'npm'
     directory: '/'
+    # Twice a week (Mon, Thu 06:00 UTC): a job prepares one update per outdated
+    # package and GitHub kills it after 55 minutes, so a smaller backlog per run
+    # keeps it inside the limit. A killed job opens no PR.
     schedule:
-      interval: 'weekly'
+      interval: 'cron'
+      cronjob: '0 6 * * 1,4'
     open-pull-requests-limit: 10
+    # Dependabot puts a package in the FIRST group that matches, so the narrow
+    # groups come before the catch-all. Each narrow group is a set that must
+    # move together and can fail on its own, so one red group never blocks
+    # the rest. A red PR stays open until the set is compatible again.
     groups:
+      # @nestjs/platform-fastify pins an exact fastify version; bumping fastify
+      # alone installs two copies and breaks the plugin types. Merge when Nest
+      # ships a release that requires the new fastify.
+      fastify-stack:
+        applies-to: version-updates
+        patterns:
+          - 'fastify'
+          - '@fastify/*'
+          - '@nestjs/platform-fastify'
+        update-types:
+          - 'patch'
+          - 'minor'
+      # Bull Board is pinned to a reviewed boundary (routes, response fields,
+      # asset names and hashes) by the upgrade-guard specs. Merge only after
+      # reviewing the release and updating those fixtures.
+      bull-board:
+        applies-to: version-updates
+        patterns:
+          - '@bull-board/*'
+        update-types:
+          - 'patch'
+          - 'minor'
+      # BullMQ is pinned by script provenance: the repository keeps narrowed
+      # copies of its Lua transitions. Merge only after diffing the upstream
+      # scripts and porting any change into those copies. Kept apart from Bull
+      # Board so a Board update does not wait for this review.
+      bullmq:
+        applies-to: version-updates
+        patterns:
+          - 'bullmq'
+        update-types:
+          - 'patch'
+          - 'minor'
+      # axe-core 4.14.0 adds a stricter label-content-name-mismatch check that fails
+      # Storybook stories (UserSessionsCard, AccountMenu): buttons whose aria-label
+      # does not contain their visible text. Merge only after fixing those labels.
+      axe-core:
+        applies-to: version-updates
+        patterns:
+          - 'axe-core'
+          - '@axe-core/*'
+        update-types:
+          - 'patch'
+          - 'minor'
+      # Next 16.4 changed useRouter() internals and the Storybook Next.js mock
+      # (@storybook/nextjs-vite 10.6.2) throws on every story. Fixed upstream but not
+      # released; merge once a Storybook release with the fix (10.6.3 or later) is in.
+      next:
+        applies-to: version-updates
+        patterns:
+          - 'next'
+          - '@next/*'
+        update-types:
+          - 'patch'
+          - 'minor'
       npm-non-major:
         applies-to: version-updates
         patterns:
@@ -26,6 +89,23 @@ updates:
       # (#148), but the repo's been inactive since 2026-04-20 with no ETA.
       # Remove this entry once a clean version is confirmed and re-pinned.
       - dependency-name: 'jest-mock-extended'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
+
+  - package-ecosystem: 'npm'
+    directory: '/docker/migrator'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    groups:
+      migrator-non-major:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: ['patch', 'minor']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'chore(deps)'
       include: 'scope'

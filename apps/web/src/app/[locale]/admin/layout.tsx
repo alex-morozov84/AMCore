@@ -3,8 +3,13 @@ import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
 
 import { hasCanonicalConsoleHost } from '@/shared/lib/console-host-guard'
+import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
 
 export const dynamic = 'force-dynamic'
+// The Console must stay closed to search engines even if the root default ever changes. This is its
+// only page-level control: it has no static header, because the slug lives in a Console-owned file
+// that a fork without the Console deletes (docs/frontend/seo.md).
+export const metadata = noindexMetadata
 
 /**
  * Console-only "Control Room" typography. The fonts themselves load here,

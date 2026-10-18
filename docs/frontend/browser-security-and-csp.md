@@ -240,6 +240,17 @@ group today — but the supported pattern for a fork that does is:
    response header for a path, it silently **overwrites** whatever
    `next.config.ts` set for that same header name and path — a
    `next.config.ts` entry alone, without step 2, achieves nothing.
+
+   **Steps 1–3 relax the policy for those paths; they do not make the pages
+   static.** `app/[locale]/layout.tsx` still reads the nonce through
+   `headers()` for every route under it, so a page in that group stays
+   dynamically rendered (verified on a standalone build: with the CSP header
+   skipped in the proxy, the page still answers
+   `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`).
+   Getting static rendering or CDN caching needs the public pages to live
+   outside a layout that reads request headers, which is step 4. Dynamic
+   rendering does not stop indexing; see [Search-engine indexing](./seo.md).
+
 4. **For a high-cache public marketing surface, consider a separate Next
    [multi-zone](https://nextjs.org/docs/app/guides/multi-zones) or a
    separate domain entirely instead of steps 1–3.** A genuinely separate

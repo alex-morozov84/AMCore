@@ -29,7 +29,7 @@ A pending response is:
   "cancelledAt": null,
   "access": "not_established",
   "mailOutcome": "provider_acknowledged",
-  "policy": {"role":"ADMIN","mailMode":"provider","createAllowed":true}
+  "policy": { "role": "ADMIN", "mailMode": "provider", "createAllowed": true }
 }
 ```
 
@@ -55,14 +55,19 @@ returns independently paginated current ADMINs and awaiting additional invitatio
   "name": "North shop",
   "aclVersion": 4,
   "checkedAt": "2026-10-17T12:00:00.000Z",
-  "policy": {"role":"ADMIN","mailMode":"provider","createAllowed":true},
+  "policy": { "role": "ADMIN", "mailMode": "provider", "createAllowed": true },
   "administrators": {
     "total": 1,
     "data": [
-      {"userId":"<anna-user-id>","memberId":"<anna-member-id>","name":"Anna","email":"anna@example.test"}
+      {
+        "userId": "<anna-user-id>",
+        "memberId": "<anna-member-id>",
+        "name": "Anna",
+        "email": "anna@example.test"
+      }
     ]
   },
-  "invitations": {"total":0,"data":[]},
+  "invitations": { "total": 0, "data": [] },
   "initial": null
 }
 ```
@@ -93,7 +98,7 @@ the person is still an ADMIN. Only current membership/ADMIN data describes now.
       "slug": "north-shop",
       "adminCount": 0,
       "pendingAdminInvitationCount": 1,
-      "reasons": ["no_administrator","pending"]
+      "reasons": ["no_administrator", "pending"]
     }
   ]
 }

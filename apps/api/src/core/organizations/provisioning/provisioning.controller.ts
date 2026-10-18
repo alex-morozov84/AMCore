@@ -5,7 +5,7 @@ import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { SchemaResponse } from '../../../common/schemas/schema-response.js'
 import { EnvService } from '../../../env/env.service.js'
-import { RATE_LIMIT_POLICIES,RateLimit } from '../../../infrastructure/throttling/index.js'
+import { RATE_LIMIT_POLICIES, RateLimit } from '../../../infrastructure/throttling/index.js'
 import { Auth } from '../../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator.js'
 import { RequireFreshAuth } from '../../auth/decorators/require-fresh-auth.decorator.js'

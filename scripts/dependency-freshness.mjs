@@ -7,6 +7,8 @@
 // report, never a nonzero exit or a thrown error.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { backlogCount, renderDependabotHealth } from './lib/dependabot-health.mjs'
+import { dockerPins, migratorFreshness, renderMigrator } from './lib/migrator-freshness.mjs'
 
 // Every probe is bounded: on timeout execFileSync kills the child and throws, so
 // a slow/hanging registry or API degrades to a note in the report instead of
@@ -27,7 +29,7 @@ const run = (cmd, args, timeoutMs = 30000) => {
 
 const major = (v) => Number.parseInt(String(v).replace(/^\D+/, '').split('.')[0], 10)
 
-function npmMajors() {
+function loadOutdated() {
   // pnpm outdated exits non-zero when anything is outdated; capture stdout anyway.
   // `-r` may prefix the stream with a workspace/engine-warning line that itself
   // contains `{` (e.g. `{"node":">=24.0.0"}`), so anchor on the first line that
@@ -44,6 +46,11 @@ function npmMajors() {
   } catch {
     return { error: 'could not parse `pnpm outdated` output' }
   }
+  return { data }
+}
+
+function npmMajors({ data, error }) {
+  if (error) return { error }
   const rows = Object.entries(data)
     .filter(([, v]) => v?.current && v?.latest && major(v.latest) > major(v.current))
     .map(([name, v]) => ({
@@ -56,6 +63,20 @@ function npmMajors() {
   return { rows }
 }
 
+const RUN_FIELDS = 'name,status,conclusion,createdAt,updatedAt'
+
+function dependabotRuns() {
+  // Needs `actions: read` and a repository context (GH_REPO in the workflow).
+  const args = ['run', 'list', '--workflow', 'Dependabot Updates', '--limit', '100']
+  const { ok, out } = run('gh', [...args, '--json', RUN_FIELDS], 30000)
+  try {
+    if (ok) return { rows: JSON.parse(out) }
+  } catch {
+    // fall through to the note below
+  }
+  return { error: 'could not list the Dependabot update runs' }
+}
+
 const DOCKERFILES = ['apps/api/Dockerfile', 'apps/web/Dockerfile']
 
 function dockerDrift(path) {
@@ -63,18 +84,19 @@ function dockerDrift(path) {
   try {
     dockerfile = readFileSync(path, 'utf8')
   } catch {
-    return { path, error: `\`${path}\` not found` }
+    return [{ path, error: `\`${path}\` not found` }]
   }
-  const m = dockerfile.match(/FROM\s+(\S+?:\S+?)@sha256:([0-9a-f]{64})/)
-  if (!m) return { path, error: 'no digest-pinned base image found' }
-  const [, ref, pinned] = m
-  const res = run(
-    'docker',
-    ['buildx', 'imagetools', 'inspect', ref, '--format', '{{.Manifest.Digest}}'],
-    20000
-  )
-  const current = res.ok ? res.out.replace(/^sha256:/, '') : null
-  return { path, ref, pinned, current }
+  const pins = dockerPins(path, dockerfile)
+  if (!pins.length) return [{ path, error: 'no digest-pinned base image found' }]
+  return pins.map((pin) => {
+    const res = run(
+      'docker',
+      ['buildx', 'imagetools', 'inspect', pin.ref, '--format', '{{.Manifest.Digest}}'],
+      20000
+    )
+    const current = res.ok ? res.out.replace(/^sha256:/, '') : null
+    return { ...pin, path: `${path} (${pin.stages.join(', ')})`, current }
+  })
 }
 
 // tool -> upstream repo + the `<VAR>: <version>` pin declared in a workflow file.
@@ -105,7 +127,7 @@ function cliDrift() {
   })
 }
 
-function render({ npm, docker, cli }) {
+function render({ npm, health, docker, cli, migrator }) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const out = [
     '<!-- dependency-freshness:auto -->',
@@ -115,11 +137,12 @@ function render({ npm, docker, cli }) {
     '',
     '**How to use this issue.** It is a living dashboard, not a task list. For each',
     'item, either open a normal PR to update it (majors: their own PR + CI; CLI tools:',
-    'version + sha256 together; Docker digest: re-resolve and bump both `FROM` lines),',
+    'version + sha256 together; Docker digest: inspect and update the affected `FROM` stages),',
     'or leave it if it is an intentionally-deferred item — the _why_ for those lives in',
     'the maintainer backlog, not here. Do **not** close this issue: it is rewritten',
     'weekly, and an item drops off automatically once updated.',
     '',
+    ...health,
     '## Pending major updates (Dependabot ignores majors)',
     '',
   ]
@@ -140,7 +163,7 @@ function render({ npm, docker, cli }) {
       out.push(`✅ \`${d.path}\`: \`${d.ref}\` pin matches the upstream digest.`, '')
     else
       out.push(
-        `⚠️ \`${d.path}\`: \`${d.ref}\` moved upstream — re-resolve and bump both \`FROM\` lines.`,
+        `⚠️ \`${d.path}\`: \`${d.ref}\` moved upstream — review every affected \`FROM\` stage.`,
         '',
         `- pinned:  \`sha256:${d.pinned}\``,
         `- current: \`sha256:${d.current}\``,
@@ -148,6 +171,7 @@ function render({ npm, docker, cli }) {
       )
   }
 
+  out.push(...renderMigrator(migrator))
   out.push('', '## curl-pinned CLI tools', '', '| Tool | Pinned | Latest | |', '|---|---|---|---|')
   for (const c of cli) {
     const mark = c.pinned == null || c.latest == null ? '❔' : c.stale ? '⚠️' : '✅'
@@ -157,4 +181,17 @@ function render({ npm, docker, cli }) {
   return out.join('\n')
 }
 
-console.log(render({ npm: npmMajors(), docker: DOCKERFILES.map(dockerDrift), cli: cliDrift() }))
+const outdated = loadOutdated()
+
+console.log(
+  render({
+    npm: npmMajors(outdated),
+    health: renderDependabotHealth({
+      runs: dependabotRuns(),
+      backlog: outdated.error ? { error: outdated.error } : { count: backlogCount(outdated.data) },
+    }),
+    docker: DOCKERFILES.flatMap(dockerDrift),
+    cli: cliDrift(),
+    migrator: await migratorFreshness(process.cwd()),
+  })
+)

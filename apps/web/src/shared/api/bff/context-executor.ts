@@ -32,7 +32,10 @@ interface ContextOperationBase {
   readonly requestBytes?: number
   readonly invitationOperationId?: string
   readonly organizationCreationId?: string
-  readonly errorDetails?: { readonly code: string; readonly schema: ZodType<Record<string, unknown>> }
+  readonly errorDetails?: {
+    readonly code: string
+    readonly schema: ZodType<Record<string, unknown>>
+  }
   readonly timeoutMs?: 10000 | 15000
 }
 export type ContextOperation<T> = ContextOperationBase &
@@ -137,8 +140,13 @@ export async function executeContextOperation<T>(
           typeof body.errorCode === 'string'
             ? body.errorCode
             : `HTTP_${response.status}`
-        const details = operation.errorDetails?.code === code && body && typeof body === 'object' && 'details' in body
-          ? operation.errorDetails.schema.safeParse(body.details) : undefined
+        const details =
+          operation.errorDetails?.code === code &&
+          body &&
+          typeof body === 'object' &&
+          'details' in body
+            ? operation.errorDetails.schema.safeParse(body.details)
+            : undefined
         throw new ContextRequestError(
           response.status,
           code,

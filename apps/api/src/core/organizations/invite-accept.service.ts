@@ -15,12 +15,15 @@ import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/pr
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
 import {
+  checkAdministratorRecipient,
+  completeAdministratorInvitation,
+} from '../invitations/administrator-settlement.js'
+import {
   type InvitationCredential,
   invitationCredentialHint,
   invitationSecretHash,
 } from '../invitations/invitation-credential.js'
 import { InvitationLiveSessionService } from '../invitations/invitation-live-session.service.js'
-import { checkAdministratorRecipient, completeAdministratorInvitation } from '../invitations/administrator-settlement.js'
 import { currentInvitationIntent } from '../invitations/invitation-role-intent.js'
 
 import {
@@ -188,7 +191,14 @@ export class InviteAcceptService {
         403,
         InviteErrorCode.INVITE_EMAIL_NOT_VERIFIED
       )
-    const provisioning = await checkAdministratorRecipient(tx, invite.organizationId, invite.id, invite.generation, user.id, roles.map((role) => role.id))
+    const provisioning = await checkAdministratorRecipient(
+      tx,
+      invite.organizationId,
+      invite.id,
+      invite.generation,
+      user.id,
+      roles.map((role) => role.id)
+    )
     const existing = await tx.orgMember.findUnique({
       where: {
         userId_organizationId: { userId: user.id, organizationId: orgId },
@@ -215,7 +225,15 @@ export class InviteAcceptService {
       await this.organizations.bumpAclVersionTx(orgId, tx)
     }
     if (provisioning)
-      await completeAdministratorInvitation(tx, this.audit, provisioning, user.id, member.id, roles[0]!.id, await invitationClock(tx))
+      await completeAdministratorInvitation(
+        tx,
+        this.audit,
+        provisioning,
+        user.id,
+        member.id,
+        roles[0]!.id,
+        await invitationClock(tx)
+      )
     await this.audit.record(
       {
         action: 'org.invite_accepted',

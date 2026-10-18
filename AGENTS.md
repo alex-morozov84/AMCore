@@ -92,6 +92,11 @@ one-time Operations Console topology choice (see `PROJECT_CONTEXT.md`).
 
 Production migrates with `db:migrate:prod` (`prisma migrate deploy`) as a one-shot
 step, never `db:migrate`. See `docs/operations/deployment.md`.
+The [migration image](docs/operations/migrator-image.md) has an isolated installer
+and frozen lock under `docker/migrator`; root install does not refresh that graph.
+Keep its Prisma version coherent with the API CLI/client/adapter. Preserve its
+Tini entrypoint and migration-only startup options; verify endpoint capability
+before rollout. Do not change API/worker role defaults to satisfy image checks.
 
 ## How to contribute (workflow)
 
@@ -148,8 +153,10 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
 - **Docs impact check is required.** Before editing, identify which public docs
   the task can affect. When behavior, API contracts, extension points, security
   invariants, operations, commands, or contributor workflow change, update the
-  relevant `docs/`, `README.md`, `CONTRIBUTING.md`, and `AGENTS.md` in the same
-  PR. If no docs change is needed, state why in the final response. Record
+  relevant `docs/` and `CONTRIBUTING.md` in the same PR, and answer every line of
+  the "Where this change must be visible" block of the PR template (README, doc
+  maps, changelog, this file, OpenAPI). If no docs change is needed, state why in
+  the final response. Record
   significant or architectural choices in an ADR. Add notable user-facing
   changes under `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or
   change release tags. See `CONTRIBUTING.md` → _Changelog & releases_ for the
@@ -326,6 +333,17 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   are supported for local component CSS under the same rule, with camelCase
   class names; `app/globals.css` is exempt because that is where tokens are
   declared.
+- **Frontend indexing — closed by default; decide public or private before adding a
+  page.** A private page needs nothing: the whole app, `/api/*` and the Console are
+  `noindex`. A public page builds its metadata only with `buildPageMetadata()` from
+  `@/shared/lib/seo/page-metadata` and is listed in `src/_app/seo/public-pages.ts`
+  (the list the sitemap is built from). **Never write a `robots` metadata key**
+  anywhere else: metadata merges shallowly, so it can silently reopen indexing, and
+  a static test fails on it. Keep the indexing hook in `proxy.ts`, the routing
+  option `alternateLinks: false` and `htmlLimitedBots` as they are unless you have
+  read `docs/frontend/seo.md`. In the root `generateMetadata` do not use `locale` or
+  `params` beyond the existing `getTranslations` call (the single-locale scaffold
+  transform deletes them).
 - **Frontend i18n — English base, Russian second, both live.** Routes sit under
   `[locale]` with an explicit prefix (`/en/...`, `/ru/...`). Four rules an agent
   will otherwise break:

@@ -31,14 +31,24 @@ of workflow self-hardening to keep the example forkable.
   weekly full-history scan is the backstop for historical drift.
 - **OSV-Scanner** produces repository-level vulnerability SARIF on the weekly
   schedule without blocking routine development.
-- **Trivy** scans the built production API image for `HIGH` / `CRITICAL`
-  vulnerabilities and uploads SARIF.
-- **boot-smoke** proves the exact production API image built in CI can:
+- **Trivy** preserves the runner scan and its default scanners/filter policy.
+  A separate vulnerability-only migrator scan uploads `trivy-image-migrator`
+  SARIF with HIGH/CRITICAL findings that have a fixed version, the runner scan's
+  policy. Its full JSON inventory includes all severities, packages and unfixed
+  findings. Findings remain report-only;
+  scanner errors, missing/malformed reports and mismatched image identity fail.
+  Each run creates fresh reports and checks SARIF findings against the JSON inventory.
+  The runner report uploads before the independent migrator scan starts.
+  Runner category `trivy-image` and its existing secret coverage remain separate.
+- **boot-smoke** checks both exact production artifacts built in CI:
   - pass the fast in-image checks;
   - run `prisma migrate deploy` successfully;
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
+    The required lint dependency first checks coherent Prisma versions and both
+    frozen graphs. The [migration image guide](migrator-image.md) describes isolated
+    dependency upkeep and the residual security risk of API build tooling.
 - **Test** is the aggregate for unit+real-Redis, capability extension,
   notification/AI extension, focused API fallback and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.
@@ -573,6 +583,15 @@ a report only — triage each item and bump deliberately. For semver-major updat
 use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
+
+The report also has a **Dependabot health** section. GitHub kills a Dependabot
+update job after a fixed 55 minutes (it cannot be extended) and a killed job opens
+**no PR**, so the only symptom is silence. The section warns when the latest
+`npm_and_yarn in /` job did not finish, or when about 40 or more packages are
+behind inside their major (a job prepares one update per outdated package, roughly
+40 s each here). The root npm entry in `dependabot.yml` therefore runs twice a week
+(Mon and Thu, 06:00 UTC) to keep each backlog small; if the warning appears, update
+the backlog by hand once instead of waiting for the next run.
 
 Forkers can keep this stack lean:
 

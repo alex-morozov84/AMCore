@@ -28,7 +28,7 @@
     "typescript": "^5.0.0"
   },
   "devDependencies": {
-    "eslint-plugin-jest": "^29.16.6"
+    "eslint-plugin-jest": "^29.17.0"
   },
   "scripts": {
     "lint": "node ../../scripts/lint.mjs --scope config",

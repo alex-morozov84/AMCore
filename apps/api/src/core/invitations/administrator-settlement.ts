@@ -1,4 +1,8 @@
-import type { OrganizationAdministratorInvitation, OrganizationProvisioning, Prisma } from '../../generated/prisma/client.js'
+import type {
+  OrganizationAdministratorInvitation,
+  OrganizationProvisioning,
+  Prisma,
+} from '../../generated/prisma/client.js'
 import type { AuditLogService } from '../audit/index.js'
 import { canonicalAdmin } from '../organizations/canonical-admin.js'
 import { provisioningError } from '../organizations/provisioning/provisioning-error.js'
@@ -25,10 +29,13 @@ export async function checkAdministratorRecipient(
   if (owner.currentGeneration !== generation || roleIds.length !== 1 || roleIds[0] !== adminId)
     throw provisioningError('PROVISIONING_STATE_CHANGED')
   const member = await tx.orgMember.findUnique({
-    where: { userId_organizationId: { userId, organizationId: orgId } }, include: { roles: true },
+    where: { userId_organizationId: { userId, organizationId: orgId } },
+    include: { roles: true },
   })
-  if (member && !member.roles.some(r => r.roleId === adminId))
-    throw provisioningError(owner.kind === 'initial' ? 'PROVISIONING_ADMIN_CONFLICT' : 'ADMIN_MEMBER_ASSIGNMENT_REQUIRED')
+  if (member && !member.roles.some((r) => r.roleId === adminId))
+    throw provisioningError(
+      owner.kind === 'initial' ? 'PROVISIONING_ADMIN_CONFLICT' : 'ADMIN_MEMBER_ASSIGNMENT_REQUIRED'
+    )
   if (owner.kind === 'initial') {
     const [row] = await tx.$queryRaw<OrganizationProvisioning[]>`
       SELECT * FROM core.organization_provisionings WHERE "operationId"=${owner.id}::uuid FOR UPDATE`
@@ -50,13 +57,31 @@ export async function completeAdministratorInvitation(
 ): Promise<void> {
   if (managed.kind === 'initial')
     return completeProvisioning(tx, managed.row, userId, memberId, adminRoleId, now)
-  const grant = await tx.memberRole.findUniqueOrThrow({ where: { memberId_roleId: { memberId, roleId: adminRoleId } } })
-  await tx.organizationAdministratorInvitation.update({ where: { id: managed.row.id }, data: {
-    state: 'completed', completedAt: now, revision: { increment: 1 }, currentInviteId: null,
-    currentGeneration: null, inviteLocale: null, ...clearedProvisioningMail,
-  } })
-  await audit.record({ action: 'org.administrator_invitation_completed', actorId: userId, actorType: 'USER',
-    organizationId: managed.row.organizationId, targetType: 'ORGANIZATION', targetId: managed.row.organizationId,
-    metadata: { administratorInvitationId: managed.row.id, memberId, adminGrantId: grant.id },
-  }, { tx })
+  const grant = await tx.memberRole.findUniqueOrThrow({
+    where: { memberId_roleId: { memberId, roleId: adminRoleId } },
+  })
+  await tx.organizationAdministratorInvitation.update({
+    where: { id: managed.row.id },
+    data: {
+      state: 'completed',
+      completedAt: now,
+      revision: { increment: 1 },
+      currentInviteId: null,
+      currentGeneration: null,
+      inviteLocale: null,
+      ...clearedProvisioningMail,
+    },
+  })
+  await audit.record(
+    {
+      action: 'org.administrator_invitation_completed',
+      actorId: userId,
+      actorType: 'USER',
+      organizationId: managed.row.organizationId,
+      targetType: 'ORGANIZATION',
+      targetId: managed.row.organizationId,
+      metadata: { administratorInvitationId: managed.row.id, memberId, adminGrantId: grant.id },
+    },
+    { tx }
+  )
 }

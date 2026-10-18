@@ -83,12 +83,29 @@ export async function dispatchProvisioningMail(
       await lockInvitationOrg(tx, mail.orgId)
       const invite = await lockInvitation(tx, mail.inviteId, mail.orgId)
       if (mail.administratorIntentId) {
-        if (!invite || invite.generation !== mail.generation || invite.acceptedAt || invite.revokedAt) return
-        await tx.organizationAdministratorInvitation.updateMany({ where: {
-          id: mail.administratorIntentId, organizationId: mail.orgId, state: 'awaiting',
-          currentInviteId: mail.inviteId, currentGeneration: mail.generation,
-          attemptId: mail.attemptId, attemptGeneration: mail.generation, attemptInviteId: mail.inviteId,
-        }, data: { mailOutcome: mock ? 'mock' : 'provider_acknowledged', mailObservedAt: await invitationClock(tx) } })
+        if (
+          !invite ||
+          invite.generation !== mail.generation ||
+          invite.acceptedAt ||
+          invite.revokedAt
+        )
+          return
+        await tx.organizationAdministratorInvitation.updateMany({
+          where: {
+            id: mail.administratorIntentId,
+            organizationId: mail.orgId,
+            state: 'awaiting',
+            currentInviteId: mail.inviteId,
+            currentGeneration: mail.generation,
+            attemptId: mail.attemptId,
+            attemptGeneration: mail.generation,
+            attemptInviteId: mail.inviteId,
+          },
+          data: {
+            mailOutcome: mock ? 'mock' : 'provider_acknowledged',
+            mailObservedAt: await invitationClock(tx),
+          },
+        })
         return
       }
       const row = await lockMarkedProvisioning(tx, mail.inviteId)

@@ -11,7 +11,7 @@ import {
 describe('Pinned BullMQ source guard', () => {
   const nativeRequire = createRequire(resolve(process.cwd(), 'package.json'))
   const installed: ScriptSourceReader = {
-    version: '6.3.11',
+    version: '6.3.15',
     source: (path) =>
       readFileSync(nativeRequire.resolve(`bullmq/dist/cjs/commands/${path}`), 'utf8'),
     compiled: (name) => {

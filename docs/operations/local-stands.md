@@ -125,6 +125,13 @@ This opens and cancels the new form without creating an organization for the rev
 The web package's `test:e2e` and `test:e2e:real-stack` commands delegate to
 these managed lanes.
 
+A stand starts the web service closed to search engines. To try the open state, set
+`AMCORE_STAND_WEB_SITE_ORIGIN` (an `https` origin, for example `https://shop.example.test`; the stand
+adds it to the trusted origins) and `AMCORE_STAND_WEB_SEO_INDEXING=enabled` in the shell that runs
+`pnpm stand up`, then request the stand with `-H 'Host: shop.example.test'`. A running stand refuses a
+changed environment, so run `pnpm stand down` before the next `up` with other values. See
+[Search-engine indexing](../frontend/seo.md#try-the-open-state-locally).
+
 <!-- AMCORE_CONSOLE_STAND_COMMANDS_START -->
 
 `test:e2e:console-real-stack` delegates to the HTTPS host lane;
@@ -138,6 +145,15 @@ CI settings through the same entrypoint as each GitHub lane. Local execution is
 sequential; GitHub lanes have independent runners and fresh stands. See
 [frontend testing](../frontend/testing.md#complete-ci-e2e-locally) for group
 selection and inventory proof. These commands never reuse owner preview data.
+
+### Migration image in Docker stands
+
+The Docker stand's `migrate` service uses the separate
+[migration image](migrator-image.md). Keep its Tini entrypoint and default CLI
+command. The image adds its disconnect-check startup option only to the selected
+migration URL. It preserves `E2E_DATABASE_URL` priority and does not change the
+stand's API/worker URLs or database role defaults. Host-side API Testcontainers
+continue to use their own Prisma CLI configuration; they do not use this image.
 
 ### API Testcontainers
 
@@ -192,6 +208,12 @@ transaction control and reconnects are unsupported. Redis likewise uses its exac
 admitted container and explicit local transport. No target fallback or automatic
 adoption occurs; recreation requires a new admission. Preview SQL uses the same
 invocation-scoped lease/target capability. Bootstrap is a separate bounded step.
+
+Managed stands apply migrations through the production migrator. Their separate
+`seed` service runs the existing guarded catalogue seed from the API `build` target,
+as user `node`, against the same admitted local database. Its image participates
+in the stand's build-intent, identity and cleanup inventory. The service has no
+published ports or source mounts. It is absent from production Compose.
 
 ## What an agent gives the reviewer
 

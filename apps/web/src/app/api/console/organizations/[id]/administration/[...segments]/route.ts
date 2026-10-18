@@ -1,9 +1,14 @@
 import { administratorOrganization } from '@/shared/api/console/organization-administration'
 import { withConsoleHostGuard } from '@/shared/lib/console-host-guard'
 
-async function handle(request: Request, context: { params: Promise<{ id: string; segments?: string[] }> }) {
+async function handle(
+  request: Request,
+  context: { params: Promise<{ id: string; segments?: string[] }> }
+) {
   const params = await context.params
-  return withConsoleHostGuard(request, () => administratorOrganization(request, params.id, params.segments))
+  return withConsoleHostGuard(request, () =>
+    administratorOrganization(request, params.id, params.segments)
+  )
 }
 export const GET = handle
 export const POST = handle

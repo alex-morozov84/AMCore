@@ -1,5 +1,5 @@
 import { useTranslations } from 'next-intl'
-import type { AdministratorSummary,AdminOrganizationDetailResponse } from '@amcore/shared'
+import type { AdministratorSummary, AdminOrganizationDetailResponse } from '@amcore/shared'
 
 import { Button } from '@/shared/ui/button'
 
@@ -17,7 +17,11 @@ export function AdministratorMembers({
   onAction: (action: AdministratorDialogAction) => void
 }) {
   const t = useTranslations('console.organizationAdministration')
-  if (!members.length || members.every(member => administrators.some(admin => admin.userId === member.user.id))) return null
+  if (
+    !members.length ||
+    members.every((member) => administrators.some((admin) => admin.userId === member.user.id))
+  )
+    return null
   return (
     <section className="space-y-3">
       <h3 className="font-semibold">{t('promote')}</h3>

@@ -52,7 +52,8 @@ export function SessionDeviceCell({ session }: { session: AdminSession }) {
             <button
               type="button"
               aria-expanded={showRaw}
-              aria-label={tConsole('userSessionsShowRawDetailsFor', { device: label })}
+              // WCAG 2.5.3: the accessible name starts with the visible text.
+              aria-label={`${tConsole('userSessionsToggleUserAgent')}: ${tConsole('userSessionsShowRawDetailsFor', { device: label })}`}
               onClick={() => setShowRaw((current) => !current)}
               className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
             >

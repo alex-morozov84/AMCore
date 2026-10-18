@@ -58,9 +58,12 @@ export function BoundSetup({ admission }: { admission: ProductAccessBootstrap })
             </Alert>
           )}
           <ApiErrorAlert error={status.error ?? flow.error} />
-          {blocked && (!flow.record?.pending || installation.state === 'completed-changed' || flow.record.pending.kind === 'prepare') && (
-            <SetupOutcome installation={installation} account={account.data} />
-          )}
+          {blocked &&
+            (!flow.record?.pending ||
+              installation.state === 'completed-changed' ||
+              flow.record.pending.kind === 'prepare') && (
+              <SetupOutcome installation={installation} account={account.data} />
+            )}
           {flow.record?.pending ? (
             <SetupRecovery flow={flow} throttled={throttled} />
           ) : !blocked && installation && flow.record ? (

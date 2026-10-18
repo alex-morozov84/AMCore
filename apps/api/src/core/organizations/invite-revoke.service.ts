@@ -8,7 +8,6 @@ import { NotFoundException } from '../../common/exceptions/index.js'
 import { AuditActorType, AuditTargetType } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
-
 import { rejectManagedInvitation } from '../invitations/provisioning-settlement.js'
 
 import type { InvitationActor } from './invitation-actor.js'

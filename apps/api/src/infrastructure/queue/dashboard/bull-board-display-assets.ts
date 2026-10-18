@@ -17,9 +17,9 @@ const LOCALES = ['en-US', 'en-GB', 'ru-RU'] as const
 const FLOW_ASSET = 'js/async/8.f93064bab2.js'
 const FLOW_SHA256 = '204dea1cda0cb8f792d43cc182b3e68fbe202a1ffbe248837d412688299aee19'
 export const FLOW_CSS = '.jobFlowCard-Y7apDE{display:none!important}'
-export const INFO_ASSET = 'js/async/g.ff87bf7356.js'
-const INFO_SHA256 = 'a0a6b6b231fa1e69e7ebe03174526b1f7e32d28cc19696a0e8e0f245dbdcdc4c'
-const DEFAULTS_QUERY = '(a.name,l),w=Object.entries(k||{})'
+export const INFO_ASSET = 'js/async/oa.cadae521aa.js'
+const INFO_SHA256 = '12c98c54fbc4134f4e3515449fe2a0e494ee7a00e8e08a653173adf3b9bac8ba'
+const DEFAULTS_QUERY = '(a.name,l),_=Object.entries(L||{})'
 export const BOARD_DISPLAY_CSS = 'amcore-board-display.css'
 
 /** Fixed installed assets only; mismatched version/selector/translation shape prevents mounting. */
@@ -45,7 +45,7 @@ export function readBoardDisplayAssets(directory: string): {
   // disable its query for this projected read-only queue; no defaults section is rendered.
   const readOnlyInfo = infoSource.replace(
     DEFAULTS_QUERY,
-    '(a.name,l&&!a.readOnlyMode),w=Object.entries(k||{})'
+    '(a.name,l&&!a.readOnlyMode),_=Object.entries(L||{})'
   )
   const assets = LOCALES.map((locale) => {
     const filename = join(directory, 'locales', locale, 'messages.json')

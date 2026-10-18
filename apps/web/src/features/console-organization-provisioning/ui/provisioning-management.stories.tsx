@@ -70,7 +70,11 @@ export const AwaitingAdministrator: Story = {
     expect(check).toHaveAttribute('data-variant', 'default')
     await waitFor(() => expect(check).toBeEnabled())
     await userEvent.click(check)
-    expect(await canvas.findByText(t.checked)).toBeVisible()
+    expect(
+      await canvas.findByText(messages.console.organizationAdministration.refreshPending, {
+        exact: false,
+      })
+    ).toBeVisible()
     await userEvent.click(canvas.getByRole('button', { name: t.endWithoutAdmin }))
     const dialog = within(await within(document.body).findByRole('alertdialog'))
     await waitFor(() => expect(dialog.getByText(t.cancelWarning)).toBeVisible())
@@ -111,9 +115,7 @@ export const Cancelled: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    expect(await canvas.findByText(t.cancelledHelp)).toBeVisible()
-    expect(canvas.getByText(t.cancelledNext)).toBeVisible()
-    expect(canvas.queryByRole('link')).not.toBeInTheDocument()
+    await waitFor(() => expect(canvasElement).toBeEmptyDOMElement())
     expect(canvas.queryByRole('button')).not.toBeInTheDocument()
   },
 }
@@ -125,13 +127,11 @@ export const CancelledRussian: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    expect(
-      await canvas.findByText(russian.console.organizationProvisioning.cancelledHelp)
-    ).toBeVisible()
+    await waitFor(() => expect(canvasElement).toBeEmptyDOMElement())
     expect(canvas.queryByRole('button')).not.toBeInTheDocument()
   },
 }
-export const SavedResultSeparateFromNewForm: Story = {
+export const SavedResultDoesNotReopenReceipt: Story = {
   args: { orgId: undefined },
   beforeEach: () => {
     localStorage.setItem(
@@ -150,12 +150,9 @@ export const SavedResultSeparateFromNewForm: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    expect(await canvas.findByRole('heading', { name: t.created })).toHaveFocus()
-    expect(canvas.getByText(t.receiptHelp)).toBeVisible()
-    expect(canvas.getByRole('link', { name: t.openOrganization })).toHaveAttribute(
-      'href',
-      '/en/admin/organizations/north-shop'
-    )
+    await canvas.findByRole('button', { name: t.start })
+    expect(canvas.queryByRole('heading', { name: t.created })).not.toBeInTheDocument()
+    expect(canvas.queryByRole('link', { name: t.openOrganization })).not.toBeInTheDocument()
     expect(canvas.queryByText(t.pendingHelp)).not.toBeInTheDocument()
     expect(canvas.queryByText(t.cancelled)).not.toBeInTheDocument()
     expect(canvas.queryByRole('button', { name: t.checkStatus })).not.toBeInTheDocument()

@@ -94,6 +94,7 @@ record controls. Catalogue metadata never grants a permission.
 | **Route progress bar**                | ✅ Shipped      | First-party (no dependency) top navigation-progress indicator, reduced-motion aware, toggleable via a documented dev/agent-facing flag                                                                                                                                   |
 | **Component workshop**                | ✅ Shipped      | Storybook wired to the same MSW/theme/i18n stack as the real app; every story doubles as a Vitest test with a CI-gating axe check                                                                                                                                        |
 | **Browser security**                  | ✅ Shipped      | Security-header baseline, nonce-based Content Security Policy (enforced in production by default), a minimal violation-reporting endpoint                                                                                                                                |
+| **Search-engine indexing**            | ✅ Shipped      | Closed to search engines by default and opened per environment with two run-time variables; metadata, sitemap and robots helpers for the pages you choose to make public                                                                                                 |
 | **Testing pyramid**                   | ✅ Shipped      | Vitest + MSW, Playwright mocked/server-mocked/real-stack lanes proving auth/BFF/cookies/Redis end to end                                                                                                                                                                 |
 | **BFF API consumption**               | ✅ Foundational | Documented hooks for media, notifications, and AI through the BFF; shared `EventSource` realtime pattern; `429`/`Retry-After` retry policy                                                                                                                               |
 | **Operations Console**                | ✅ Shipped      | Optional `SUPER_ADMIN` control plane with Overview, Background work diagnostics and policy-eligible controls, user and organization detail pages, Users role changes and session revocation, approximate IP location, Audit browsing, path/host sessions and scaffolding |
@@ -304,7 +305,8 @@ and each states plainly what it does **not** give you.
    apply `docker/compose/prod.yml` over the base file to pin every service to an
    immutable digest, add restart policies, and bound container logs. The same
    page covers TLS/reverse proxy, process roles, the one-shot migration
-   contract, and [what "zero-downtime" honestly
+   contract, the [migration image endpoint preflight](docs/operations/migrator-image.md#process-and-database-lifecycle),
+   and [what "zero-downtime" honestly
    costs](docs/operations/deployment.md#zerolow-downtime-rollout--stated-honestly).
 3. **[Database role separation](docs/operations/database-role-separation.md)** —
    a migrator/owner role used only by `prisma migrate deploy`, and a DML-only
@@ -320,6 +322,9 @@ and each states plainly what it does **not** give you.
    Kubernetes, Cloud Run, Fly, Render, Railway, and why Vercel can host only the
    web app. A decision matrix, not recipes — VPS/Compose is the one path this
    repo owns end to end.
+
+Production stays closed to search engines until you open it on purpose; see
+[Search-engine indexing](docs/frontend/seo.md).
 
 Full operations index: [`docs/operations/`](docs/operations/README.md).
 

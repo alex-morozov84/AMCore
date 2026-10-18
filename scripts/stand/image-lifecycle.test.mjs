@@ -99,7 +99,7 @@ test('purge removes proved images by ID, keeps pulled images and is idempotent',
     await buildOwned(m, context)
     m.builds = [{ invocation: 'proof', state: 'settled', outcome: 'succeeded' }]
     await save(m)
-    assert.equal((await census(m)).length, 4)
+    assert.equal((await census(m)).length, builtServices.length)
     await cleanup(m, true)
     assert.equal(m.state, 'purged')
     assert.deepEqual(await census(m), [])

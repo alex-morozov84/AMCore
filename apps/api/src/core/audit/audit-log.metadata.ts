@@ -156,10 +156,20 @@ const backgroundControlMetadata: MetadataSpec = {
 }
 
 const administratorCommandMetadata: MetadataSpec = {
-  operationId: true, administratorInvitationId: true, memberId: true, adminGrantId: true,
-  revision: true, changed: true,
-  reason: value => typeof value === 'string' && value.trim().length > 0 && value.length <= 500
-    && Buffer.byteLength(value, 'utf8') <= 2000 && !/[\p{Cc}]/u.test(value) ? value : undefined,
+  operationId: true,
+  administratorInvitationId: true,
+  memberId: true,
+  adminGrantId: true,
+  revision: true,
+  changed: true,
+  reason: (value) =>
+    typeof value === 'string' &&
+    value.trim().length > 0 &&
+    value.length <= 500 &&
+    Buffer.byteLength(value, 'utf8') <= 2000 &&
+    !/[\p{Cc}]/u.test(value)
+      ? value
+      : undefined,
 }
 
 const specs: Record<AuditAction, MetadataSpec> = {

@@ -43,7 +43,8 @@ deploys matching code and schema, and configures mail, Redis and the public fron
 URL. The initial-setup command itself needs only the database configuration and
 creation policy. It does not start the API, workers or listeners.
 
-Use the CLI-capable **migrator** image for migration and seed. Use the **runner**
+Use the CLI-capable **migrator** image for migration. Explicit seed uses a matching
+prepared source checkout; see [Seeding](../operations/deployment.md#seeding). Use the **runner**
 image for organization setup. The runner contains compiled commands and runtime
 dependencies; it does not contain pnpm, tsx or the Prisma migration CLI.
 
@@ -52,7 +53,13 @@ in `.env` first. With its owned infrastructure already running:
 
 ```sh
 docker compose run --rm --no-deps migrate
-docker compose run --rm --no-deps --workdir /app --entrypoint pnpm migrate --filter api db:seed
+```
+
+Before initial setup, follow [Seeding](../operations/deployment.md#seeding) to prepare
+the matching source checkout and run its explicit guarded seed on the selected
+database. The final migrator cannot run seed. Then return to the same Compose deployment:
+
+```sh
 docker compose run --rm --no-deps api node dist/cli/organization-setup.js status
 ```
 

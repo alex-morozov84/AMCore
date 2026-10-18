@@ -1,7 +1,10 @@
 import { provisioningRoot } from '@/shared/api/console/organization-provisioning'
 import { withConsoleHostGuard } from '@/shared/lib/console-host-guard'
 
-async function handle(request: Request, context: { params: Promise<{ segments?: string[] }> }): Promise<Response> {
+async function handle(
+  request: Request,
+  context: { params: Promise<{ segments?: string[] }> }
+): Promise<Response> {
   const params = await context.params
   return withConsoleHostGuard(request, () => provisioningRoot(request, params.segments))
 }
