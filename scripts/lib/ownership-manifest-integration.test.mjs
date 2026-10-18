@@ -23,8 +23,9 @@ function cloneManifest(change) {
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
-  // Initial organization setup adds one closed feature root; nested files inherit ownership.
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 19)
+  // Provisioning owns two feature roots and a browser-scenario root.
+  // Nested files inherit ownership without individual registration.
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 22)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -60,10 +61,9 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assertExactScaffoldCounts([
     {
       name: 'console closed-root files',
-      // PR5 adds seven BFF routes, one Audit detail, seventeen feature files,
-      // Existing Console files plus the setup feature and three Overview public-files files,
-      // plus the Console layout's search-engine indexing test (`admin/layout.seo.test.ts`).
-      expected: 389,
+      // Exact Console inventory, including provisioning, administrator management
+      // and their route, story and browser proof files.
+      expected: 435,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

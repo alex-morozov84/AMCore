@@ -9,26 +9,11 @@ describe('operation inventory against the real plans', () => {
 
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
-      // Counts include board and invitation routes, selected-catalogue fixtures and story removals.
-      // Retiring the two obsolete security-exception seams removes four measured
-      // operations, eight facts/claims and four final operations across these scenarios.
-      // The roles list and capability editor stories add two story removals in each of the two
-      // Storybook-disabled scenarios: four operations, four facts/claims and four final operations.
-      // They are measured from every real plan, not estimated from file counts.
-      // Background-work route/UI facts add 2/6/16/2 in single EN and 4/6/16/4 in RU host
-      // (operations/facts/claims/final operations). The selection story adds 1/1/1/1 twice.
-      // EN disabled adds 3/5/8/2: host journey, closed feature root and queue-guide seam;
-      // content facts are counted in shared and Console streams, while writes coalesce.
-      // The locale lint fixture adds one edit/fact/claim/final operation in each
-      // of the three single-locale measured scenarios: three of each overall.
-      // The Console-only AI runbook seam adds two semantic claims without a new operation.
-      // The account menu changes the shell header, adds the account catalogue namespace and
-      // re-registers four e2e surfaces: +4 operations, +1 fact, -5 claims, +4 final operations
-      // (measured against the previous baseline of 671/933/1649/654).
-      // Establishment adds locale/story removal, the Console setup root/spec and mixed-guide
-      // seams: measured +12 operations, +18 facts, +24 claims and +11 final operations.
-      // All eight real plans retain their existing providers and exact-copy classification.
-      { name: 'measured operations', expected: 687, actual: inventory.operations.length },
+      // Provisioning adds Console roots, locale/story removal and mixed-doc seams.
+      // The eight real plans measure +20 operations, +29 facts, +33 claims
+      // and +18 final filesystem operations against the establishment baseline.
+      // Provider, scenario and exact-copy counts remain unchanged.
+      { name: 'measured operations', expected: 707, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -47,17 +32,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 952,
+        expected: 981,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1668,
+        expected: 1701,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 669,
+        expected: 687,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

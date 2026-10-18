@@ -342,10 +342,9 @@ describe('Notification dispatch (e2e)', () => {
       expect(enqueue).not.toHaveBeenCalled()
       expect(await repository.claimDueBatch(1)).toEqual([])
       // Move the stored floor to the due boundary; the same claim query can now acquire it.
-      await prisma.notificationDelivery.update({
-        where: { id: deliveryId },
-        data: { nextAttemptAt: new Date(Date.now() - 1) },
-      })
+      // The claim predicate uses the database clock, not the Node.js clock.
+      await prisma.$executeRaw`UPDATE "notifications"."notification_deliveries"
+        SET "nextAttemptAt" = clock_timestamp() - interval '1 millisecond' WHERE id = ${deliveryId}`
       expect(await repository.claimDueBatch(1)).toHaveLength(1)
     } finally {
       fetch.mockRestore()
@@ -558,10 +557,9 @@ describe('Notification dispatch (e2e)', () => {
       )
       // Just before the floor nothing is claimable; at/after it the row is.
       expect(await claimBatch(10)).toEqual([])
-      await prisma.notificationDelivery.update({
-        where: { id: deliveryId },
-        data: { nextAttemptAt: new Date(Date.now() - 1) },
-      })
+      // The claim predicate uses the database clock, not the Node.js clock.
+      await prisma.$executeRaw`UPDATE "notifications"."notification_deliveries"
+        SET "nextAttemptAt" = clock_timestamp() - interval '1 millisecond' WHERE id = ${deliveryId}`
       expect(await claimBatch(10)).toHaveLength(1)
 
       // A stale holder (the first claim's token) cannot overwrite the new attempt.
@@ -646,10 +644,9 @@ describe('Notification dispatch (e2e)', () => {
         data: { leaseExpiresAt: new Date(Date.now() - 60_000) },
       })
       await reap() // → RETRY_SCHEDULED, old attempt ABANDONED
-      await prisma.notificationDelivery.update({
-        where: { id: deliveryId },
-        data: { nextAttemptAt: new Date(Date.now() - 1) },
-      })
+      // The claim predicate uses the database clock, not the Node.js clock.
+      await prisma.$executeRaw`UPDATE "notifications"."notification_deliveries"
+        SET "nextAttemptAt" = clock_timestamp() - interval '1 millisecond' WHERE id = ${deliveryId}`
       const [newClaim] = await claimBatch(1) // a NEW holder, new lease token, attempt 2
       expect(newClaim!.attemptNumber).toBe(2)
 
