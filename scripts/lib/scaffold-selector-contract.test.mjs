@@ -79,15 +79,14 @@ test('every declared matcher pattern resolves in the current repository', () => 
   assert.doesNotThrow(() => validateDeclarationTree(declaration, files))
 })
 
-test('product-admin Console seam selects full generated verification', () => {
-  for (const name of [
-    'organization-establishment',
-    'organization-provisioning',
-    'organization-administration',
+test('product-admin and lifecycle Console seams select full generated verification', () => {
+  for (const pathname of [
+    'docs/product-admin/organization-establishment.md',
+    'docs/product-admin/organization-provisioning.md',
+    'docs/product-admin/organization-administration.md',
+    'docs/operations/api-key-lifecycle.md',
   ]) {
-    const matched = declaration.inputs.filter((input) =>
-      entryMatches(input, `docs/product-admin/${name}.md`)
-    )
+    const matched = declaration.inputs.filter((input) => entryMatches(input, pathname))
     assert.ok(
       matched.some(
         (input) => input.id === 'planning.public-seams' && input.lane === 'generated-full'

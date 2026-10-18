@@ -1,9 +1,9 @@
 # API key lifecycle operations
 
 Revocation retains safe metadata and destroys both verifier columns. This changes
-the schema and the behavior of API and cleanup processes together. See
-[API keys](../auth/api-keys.md) for credential semantics and
-[Console API keys](../operations-console/api-keys.md) for operator controls.
+the schema and the behavior of API and cleanup processes together.
+See [API keys](../auth/api-keys.md) for credential semantics.
+See [Console API keys](../operations-console/api-keys.md) for operator controls.
 
 ## Cutover
 

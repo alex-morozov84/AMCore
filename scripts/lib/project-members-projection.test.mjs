@@ -13,8 +13,18 @@ const scenarios = [
   ['console-disabled', { 'admin-console': 'disabled' }],
   ['storybook-disabled', { storybook: 'disabled' }],
   [
+    'host-route-off',
+    { 'admin-console': 'host', 'admin-console-slug': 'panel', 'route-progress': 'disabled' },
+  ],
+  [
     'combined-ru',
-    { mode: 'single', locale: 'ru', 'admin-console': 'disabled', storybook: 'disabled' },
+    {
+      mode: 'single',
+      locale: 'ru',
+      'admin-console': 'disabled',
+      storybook: 'disabled',
+      'route-progress': 'disabled',
+    },
   ],
 ]
 for (const [name, flags] of scenarios) {
@@ -59,6 +69,50 @@ for (const [name, flags] of scenarios) {
         read('apps/web/src/entities/organization-context/index.ts'),
         /useOrganizationMembers/
       )
+      const keyRoot =
+        'apps/web/src/app/api/product-access/organizations/[id]/members/[userId]/api-keys'
+      for (const route of ['route.ts', 'revoke-all/route.ts', '[keyId]/revoke/route.ts'])
+        assert.ok(exists(`${keyRoot}/${route}`), route)
+      assert.match(read('apps/web/src/entities/organization-context/index.ts'), /useMemberApiKeys/)
+      assert.match(
+        read('apps/web/src/entities/organization-context/index.server.ts'),
+        /readMemberKeys, revokeMemberKeys/
+      )
+      for (const file of ['hooks.ts', 'hooks.test.tsx'])
+        assert.ok(
+          exists(`apps/web/src/entities/organization-context/model/member-api-keys/${file}`)
+        )
+      for (const file of [
+        'member-api-keys-dialog.tsx',
+        'member-api-keys-host.tsx',
+        'member-key-list.tsx',
+        'member-key-skeleton.tsx',
+      ])
+        assert.ok(exists(`apps/web/src/features/member-api-keys/ui/${file}`))
+      assert.equal(
+        exists('apps/web/src/features/member-api-keys/ui/member-api-keys.stories.tsx'),
+        flags.storybook !== 'disabled'
+      )
+      assert.ok(exists('apps/api/src/core/organizations/member-api-keys/member-key.controller.ts'))
+      assert.match(
+        read('packages/shared/src/schemas/member-api-keys.ts'),
+        /MEMBER_KEY_ALL_LIMIT = 1000/
+      )
+      for (const locale of flags.mode === 'single' ? [flags.locale] : ['en', 'ru']) {
+        const messages = JSON.parse(read(`apps/web/messages/${locale}.json`))
+        assert.ok(messages.memberApiKeys.confirmAll)
+        assert.ok(messages.memberApiKeys.membership_removed)
+      }
+      for (const doc of [
+        'docs/product-admin/member-api-keys.md',
+        'docs/operations/api-key-lifecycle.md',
+      ]) {
+        for (const match of read(doc).matchAll(/\]\(([^)\s]+)\)/g)) {
+          const target = match[1].split('#')[0]
+          if (!target || target.includes('://') || target.startsWith('/')) continue
+          assert.ok(exists(path.join(path.dirname(doc), target)), `${name}: ${doc} -> ${target}`)
+        }
+      }
       for (const module of [
         'filter-panel',
         'data-table-surface',

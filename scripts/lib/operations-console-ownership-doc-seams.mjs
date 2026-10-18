@@ -15,6 +15,12 @@ const section = (start, end) => ({ start, end, retainEnd: true })
 const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
+  entry(
+    'console.member-key-lifecycle-controls',
+    'docs/operations/api-key-lifecycle.md',
+    { text: 'See [Console API keys](../operations-console/api-keys.md) for operator controls.' },
+    ['../operations-console/api-keys.md']
+  ),
   ...['SEARCH', 'URLS'].map((marker) =>
     entry(
       `console.provisioning-${marker.toLowerCase()}`,
