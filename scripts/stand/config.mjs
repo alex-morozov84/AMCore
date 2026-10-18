@@ -99,6 +99,10 @@ export async function configuration(m) {
       // AMCORE_CONSOLE_WEB_ENV_START
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console ?? '',
       ADMIN_CONSOLE_ORIGIN: m.origins.console ?? '',
+      // External tool links for the Overview card; empty unless the CLI shell sets them.
+      ADMIN_CONSOLE_METRICS_URL: process.env.AMCORE_STAND_CONSOLE_METRICS_URL ?? '',
+      ADMIN_CONSOLE_LOGS_URL: process.env.AMCORE_STAND_CONSOLE_LOGS_URL ?? '',
+      ADMIN_CONSOLE_ALERTS_URL: process.env.AMCORE_STAND_CONSOLE_ALERTS_URL ?? '',
       // AMCORE_CONSOLE_WEB_ENV_END
     },
   }

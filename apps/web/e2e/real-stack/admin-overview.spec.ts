@@ -47,6 +47,13 @@ test('path-mode Overview panel renders real readiness, version and process role 
   ]) {
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   }
+  // The stack sets no external tool address, so the card says so and still offers the guide.
+  await expect(page.getByRole('heading', { name: 'External tools', exact: true })).toBeVisible()
+  await expect(page.getByText('External tools are not configured.')).toBeVisible()
+  await expect(page.getByRole('link', { name: /Recovery instructions/ })).toHaveAttribute(
+    'rel',
+    'noopener noreferrer'
+  )
   const observed = page.locator('header time').last()
   const before = await observed.getAttribute('datetime')
   const refresh = page.getByRole('button', { name: 'Refresh', exact: true })

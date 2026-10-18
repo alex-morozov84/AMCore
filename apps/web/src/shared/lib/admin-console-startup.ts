@@ -1,11 +1,13 @@
 import { validateAdminConsoleStartup } from './admin-console-config'
+import { assertConsoleExternalLinks } from './console-external-links'
 
 import 'server-only'
 
-/** Terminates a Node server before it can accept traffic with invalid host config. */
+/** Terminates a Node server before it can accept traffic with invalid host or external-link config. */
 export function validateAdminConsoleStartupOrExit(): void {
   try {
     validateAdminConsoleStartup()
+    assertConsoleExternalLinks()
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Invalid Operations Console configuration'

@@ -1,3 +1,4 @@
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -23,8 +24,16 @@ describe('ConsolePageFrame', () => {
   it('does not resolve identity when admission is temporarily unavailable', async () => {
     vi.mocked(requireSuperAdmin).mockResolvedValue('unavailable')
 
-    await ConsolePageFrame({ children: <div>Console content</div>, fallback: <div>Loading</div> })
+    const frame = await ConsolePageFrame({
+      children: <div>Console content</div>,
+      fallback: <div>Loading</div>,
+    })
 
+    // Only the fallback is rendered: the page content, which carries the configured external tool
+    // addresses, never reaches a visitor whose admission could not be verified.
+    render(frame)
+    expect(screen.getByText('Unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('Console content')).not.toBeInTheDocument()
     expect(getConsoleAwareUser).not.toHaveBeenCalled()
     expect(cookies).not.toHaveBeenCalled()
     expect(ConsoleShell).not.toHaveBeenCalled()

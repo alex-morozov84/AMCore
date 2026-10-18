@@ -2,6 +2,7 @@ import { getFormatter, getTranslations } from 'next-intl/server'
 
 import { fetchConsoleOverview } from '@/shared/api/console/overview'
 import { resolvePrimary } from '@/shared/api/server'
+import { getConsoleExternalLinks } from '@/shared/lib/console-external-links'
 import {
   DEPLOYMENT_VERSION,
   deploymentVersionResponseSchema,
@@ -10,6 +11,7 @@ import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import { OverviewBody } from './OverviewBody'
+import { OverviewExternalTools } from './OverviewExternalTools'
 import { OverviewWebIdentity } from './OverviewIdentity'
 import { OverviewRefresh } from './OverviewRefresh'
 
@@ -39,6 +41,8 @@ export async function OverviewPage() {
         </div>
         {outcome.status === 'available' && <OverviewRefresh />}
       </header>
+      {/* Read per request, beside the API outcome: the links do not depend on the snapshot. */}
+      <OverviewExternalTools links={getConsoleExternalLinks()} t={t} />
       {outcome.status === 'unavailable' ? (
         <>
           <OverviewWebIdentity artifactId={artifactId} t={t} />

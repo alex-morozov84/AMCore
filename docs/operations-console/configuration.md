@@ -134,6 +134,74 @@ tab. Setting the
 variable on an already built web container does not change it. See
 [deployment identity](../operations/deployment.md) for build and rollout behavior.
 
+## External tool links
+
+The [Overview](overview.md) has an **External tools** card with links to the
+monitoring tools your team runs. The Console does not install, proxy or embed
+them: each link opens the tool in a new tab, and you sign in to the tool
+separately. Set the addresses in the **web** server environment:
+
+| Variable                    | Link on the card | Typical target                                   |
+| --------------------------- | ---------------- | ------------------------------------------------ |
+| `ADMIN_CONSOLE_METRICS_URL` | Metrics          | A Grafana dashboard, such as the AMCore overview |
+| `ADMIN_CONSOLE_LOGS_URL`    | Logs             | The log search page of your logging system       |
+| `ADMIN_CONSOLE_ALERTS_URL`  | Alerts           | Alertmanager, or Grafana alerting                |
+
+An empty or missing variable means "not configured": the card shows that tool as
+not configured and links to this section. When none is set, the card says so
+once. The **Recovery instructions** link is always shown; it opens the
+`docs/operations/runbooks` folder of the upstream repository on GitHub. A fork
+that publishes its own documentation changes `DOCS_REPOSITORY_URL` in
+`shared/lib/console-docs-links.ts`.
+
+An address must be an absolute `https` URL. Plain `http` is accepted only for
+`localhost` and `127.0.0.1`. Path, query and fragment are kept, so a link can
+open one dashboard. These values are refused:
+
+- addresses with a user name or password (`https://user:pw@host/`);
+- wildcard hosts, relative or scheme-less values (`//host/d/x`, `host/d/x`);
+- values with spaces or control characters, or longer than 2048 characters;
+- other schemes, such as `javascript:` or `ftp:`.
+
+A value that is set but refused stops the **web service** at start-up, including
+its product pages, and prints the variable name on standard error:
+
+```text
+ADMIN_CONSOLE_METRICS_URL must be an absolute https URL (or a loopback http URL) without credentials, spaces or wildcards
+```
+
+Fix the value and start the service again. The check runs at start-up; the
+addresses are read from the environment when the page is served, so changing a
+value needs a restart of the web container but not a rebuild.
+
+For the local `monitoring` profile ([observability guide](../operations/observability.md#local-verification-harness))
+you can set:
+
+```bash
+ADMIN_CONSOLE_METRICS_URL="http://localhost:3001"
+ADMIN_CONSOLE_ALERTS_URL="http://localhost:9093"
+```
+
+These loopback addresses work only in a browser on the same machine as the
+stack. Compose leaves all three variables empty by default, so the card never
+links to a tool that is not running.
+
+What the card does and does not prove:
+
+- A link means an address is configured. The Console does not contact the tool,
+  so it cannot tell whether the tool is running or whether you may sign in.
+- A **Logs** link does not prove that log collection is installed. AMCore ships
+  no log search; see [Log shipping](../operations/observability.md#log-shipping-non-goal).
+- Never put a token, API key or password in these addresses. The card is shown to
+  every `SUPER_ADMIN`, the address appears in the page and in browser history, and
+  a secret in the query cannot be detected by the start-up check.
+- The card is part of the Console page. When the API is unavailable, the Console
+  shows only its "temporarily unavailable" notice and no links. Keep direct
+  bookmarks to your monitoring tools for that case.
+
+The links carry no Console session or token, and the browser sends no `Referer`
+to the tool. Single sign-on between the Console and these tools is not provided.
+
 ## Database prerequisite: `pg_trgm` (Users/Organizations search)
 
 The Users and Organizations panels' search (ADR-082) is backed by

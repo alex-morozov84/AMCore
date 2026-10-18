@@ -110,6 +110,14 @@ function removeTokens(text) {
   )
 }
 
+const COMPOSE_ENV_KEYS = [
+  'ADMIN_CONSOLE_HOSTNAME',
+  'ADMIN_CONSOLE_ORIGIN',
+  'ADMIN_CONSOLE_METRICS_URL',
+  'ADMIN_CONSOLE_LOGS_URL',
+  'ADMIN_CONSOLE_ALERTS_URL',
+]
+
 const definitions = new Map([
   [
     'console.runtime-config',
@@ -125,12 +133,9 @@ const definitions = new Map([
   [
     'console.compose-env',
     {
-      claims: () =>
-        ['ADMIN_CONSOLE_HOSTNAME', 'ADMIN_CONSOLE_ORIGIN'].map((key) =>
-          absent(`yaml:services.web.environment.${key}`)
-        ),
+      claims: () => COMPOSE_ENV_KEYS.map((key) => absent(`yaml:services.web.environment.${key}`)),
       apply: (text) =>
-        ['ADMIN_CONSOLE_HOSTNAME', 'ADMIN_CONSOLE_ORIGIN'].reduce(
+        COMPOSE_ENV_KEYS.reduce(
           (source, key) => replaceExactBlock(source, `      ${key}: \${${key}:-}\n`, ''),
           text
         ),

@@ -171,6 +171,31 @@ describe('OverviewPage', () => {
     expect(screen.getByText('web-artifact-123')).toBeInTheDocument()
   })
 
+  it('shows the configured external tools beside the unavailable fallback, read from the environment', async () => {
+    vi.stubEnv('ADMIN_CONSOLE_METRICS_URL', 'https://grafana.example.com/d/amcore')
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({ status: 'unavailable', reason: 'timeout' })
+
+    renderPage(await OverviewPage())
+
+    expect(screen.getByRole('link', { name: /externalToolsMetrics/ })).toHaveAttribute(
+      'href',
+      'https://grafana.example.com/d/amcore'
+    )
+    expect(
+      screen.getByText('This is temporarily unavailable. Please try again.')
+    ).toBeInTheDocument()
+    vi.unstubAllEnvs()
+  })
+
+  it('shows the external tools card with the loaded snapshot too, and no link when unset', async () => {
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({ status: 'success', data: overviewFixture })
+
+    renderPage(await OverviewPage())
+
+    expect(screen.getByText('externalToolsNone')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /externalToolsMetrics/ })).not.toBeInTheDocument()
+  })
+
   it('propagates malformed 2xx contract errors to the route error boundary', async () => {
     const error = new BackendRequestError('invalid-payload', 'test-correlation', 200)
     vi.mocked(fetchConsoleOverview).mockRejectedValue(error)
