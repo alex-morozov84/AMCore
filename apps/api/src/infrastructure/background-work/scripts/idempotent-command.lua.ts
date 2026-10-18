@@ -3,7 +3,8 @@ import { HORIZON_CHECK_OVERHEAD_MS, PROVIDER_WINDOW_CLOCK } from '../provider-wi
 import { JOB_MEMBERSHIP_GUARD_LUA } from './job-membership.lua.js'
 
 /**
- * Standalone narrowed transitions from BullMQ 6.3.11 reprocessJob/removeJob (MIT).
+ * Standalone narrowed transitions from BullMQ 6.3.11 reprocessJob/removeJob (MIT), re-reviewed
+ * against 6.3.15 (see script-provenance.ts).
  * Copyright (c) 2018 BullForce Labs AB and contributors; BULLMQ-LICENSE.txt.
  * Relationship/scheduler/dedup helpers are deliberately unreachable for this profile.
  */

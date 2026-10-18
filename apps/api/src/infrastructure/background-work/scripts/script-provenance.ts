@@ -1,7 +1,12 @@
 // Pinned upstream source hashes. Updating this manifest requires semantic review.
+// 6.3.11 -> 6.3.15 review: pause-7, removeJob-2 and moveToDelayed-11 are byte-identical (sources
+// and compiled). reprocessJob-7 became reprocessJob-9: a retried prioritized job now goes back
+// through addJobWithPriority, and the parent-dependency block moved into
+// moveChildBackToParentDependencies. Neither is reachable from idempotent-command.lua.ts, which
+// denies PRIORITY_RETRY_UNSUPPORTED and RELATED_JOB, so its narrowed copy needs no change.
 export const SCRIPT_PROVENANCE = {
   package: 'bullmq',
-  version: '6.3.11',
+  version: '6.3.15',
   license: 'MIT',
   scripts: {
     'pause-7': {
@@ -16,19 +21,25 @@ export const SCRIPT_PROVENANCE = {
       },
       compiledSha256: 'da797a84855a762e0d48310c70684504c42c86cdd7a1d941aba96300bbf3646c',
     },
-    'reprocessJob-7': {
+    'reprocessJob-9': {
       sources: {
-        'reprocessJob-7.lua': 'eb55cf92e9150dc67851754bd65cc03c9d22dfbe8e7d1aa5bf9086057c52693a',
+        'reprocessJob-9.lua': 'f3787a3eb9a6381ddbe2f26ee0f314952e9bde545535a223fef904ab716546f7',
         'includes/addJobInTargetList.lua':
           '356385ce8c4ba1841de955ac76af5381f3b2074628133e870c2035c3d64a62a2',
         'includes/addBaseMarkerIfNeeded.lua':
           'bbdfb3922acec0e812a1f99988160bb7faab8099bf402d3cfc2dc96f81b6c00f',
+        'includes/addJobWithPriority.lua':
+          'b01312aa67e05384933c9a8d0f5ca752e6fb6a10d23cfb1da6988d566758dfc7',
+        'includes/getPriorityScore.lua':
+          '2543a3e682c15d9d8466b633aeb3a6d54a813ec23b5aa7aaf636457d62610206',
         'includes/getOrSetMaxEvents.lua':
           'ec9e059a7d303cff34329453cc4747be9f20bc4824abcb397ca4847c52bac8c4',
         'includes/isQueuePausedOrMaxed.lua':
           'b347fdeb087c7a7c6fda41e845f56f6ab8a34999238cff57fc33efcf63e9bee3',
+        'includes/moveChildBackToParentDependencies.lua':
+          '69f0d2e2ed6a627e78d81c85cbd2bbb648d0adbf42965d9e303abc90432d3eb4',
       },
-      compiledSha256: '8bf1c51038f2d3b8e73e8a0f4d05c99de4121911a8355254f2bf7d01be8314a7',
+      compiledSha256: '4ea1093385a876769f604fb60e2db13d993b0a801caaea7c2262a36ef589fdc7',
     },
     'removeJob-2': {
       sources: {
