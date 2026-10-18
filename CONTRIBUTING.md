@@ -219,7 +219,8 @@ Use the [backend conventions](docs/backend/architecture-and-conventions.md),
 1. Run `pnpm lint` and `pnpm typecheck` — must pass.
 2. Run `pnpm test` — all tests must pass.
 3. Run `pnpm format:check` — or `pnpm format` to fix.
-4. Check docs impact. Update affected `README.md`, `AGENTS.md`, and `docs/`
+4. Check docs impact. Follow the [documentation writing guide](docs/documentation-guide.md).
+   Update affected `README.md`, `AGENTS.md`, and `docs/`
    pages when behavior, API contracts, extension points, security invariants,
    operations, commands, or contributor workflow changed. If no docs update is
    needed, say so in the PR.

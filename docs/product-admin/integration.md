@@ -299,7 +299,9 @@ and recovery semantics. See [invitation reuse](invitations.md#reuse-with-your-ow
 
 ## Fixed internal organization for a shop
 
-Use a server-owned immutable organization ID returned by trusted initial setup.
+Use a server-owned immutable organization ID returned by trusted initial setup
+or operator create-and-invite. After the invited employee accepts, the same fixed
+organization recipe applies.
 The product can keep buyer registration enabled and self-service company creation
 disabled. Buyers remain personal accounts without staff membership.
 
@@ -339,3 +341,7 @@ using the headless member editor, a buyer denied by the server, and removed staf
 losing access with their existing login. No turnkey shop or new initializer mode
 is supplied. See [establishment](organization-establishment.md) for initial setup
 prerequisites, account proof, retention and recovery.
+
+## Organizations created by an operator
+
+[Provisioning](organization-provisioning.md) adds protected backend operations and optional Console UI. Console-disabled forks retain that API and the product recipient journey. A custom frontend implements the existing invitation APIs. A fixed shop stores the resulting immutable organization ID server-side and still checks current employee membership; buyer registration never grants staff rights.

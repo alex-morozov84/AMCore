@@ -15,7 +15,7 @@ const group = value('--ci-group')
 const fixture = value('--fixture')
 if (
   args.includes('--fixture') &&
-  (!['organization-setup', 'organization-shop'].includes(fixture) ||
+  (!['organization-setup', 'organization-shop', 'organization-provisioning'].includes(fixture) ||
     action !== 'e2e' ||
     lane === 'mocked')
 )

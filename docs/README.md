@@ -4,6 +4,7 @@
 
 The documentation map. The root [`README.md`](../README.md) is the project
 overview and quick start; **this page routes you to the right guide by intent**.
+Writing or updating a guide? Follow the [documentation writing guide](documentation-guide.md).
 Endpoint shapes (paths, request/response bodies, status codes) are **not** kept
 here — the Swagger/OpenAPI document at `/docs` in development is their source of
 truth. These guides cover the model, extension points, and invariants OpenAPI
@@ -27,6 +28,7 @@ find for something, that page is under-documented; please open an issue.
 ## Find the right guide
 
 [Create a company or prepare its first administrator](product-admin/organization-establishment.md) — policies, Console/CLI/API setup and recovery.
+[Create an organization and invite its administrator](product-admin/organization-provisioning.md) — Console, protected API, mail readiness and recovery.
 
 | I want to…                                                                               | Go to                                                                                                                                   |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |

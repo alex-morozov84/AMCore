@@ -85,6 +85,44 @@ test('capture override changes only the sanitized mock transport', async () => {
   }
 })
 
+test('provisioning capture is isolated, preserves queued methods and refuses unsafe allocation', async () => {
+  const manifest = {
+    purpose: 'e2e',
+    mocked: false,
+    fixtureProfile: 'organization-provisioning',
+    mailCaptureKey: 'a'.repeat(64),
+  }
+  for (const override of [{ purpose: 'preview' }, { mocked: true }, { mailCaptureKey: '' }])
+    assert.throws(() => assertOrganizationSetupFixture({ ...manifest, ...override }))
+  assert.deepEqual(standReporters(manifest, '/owned/provisioning'), [
+    ['list', { printSteps: false }],
+  ])
+  const snapshot = await mkdtemp(join(tmpdir(), 'amcore-provisioning-capture-'))
+  const relative = 'apps/api/src/infrastructure/email/providers/resend.provider.ts'
+  const original = await readFile(relative, 'utf8')
+  try {
+    await mkdir(join(snapshot, 'apps/api/src/infrastructure/email/providers'), { recursive: true })
+    await writeFile(join(snapshot, relative), original)
+    await prepareOrganizationSetupSource({ ...manifest, snapshot })
+    const transformed = await readFile(join(snapshot, relative), 'utf8')
+    assert.ok(transformed.includes("baseUrl: 'http://mail-capture:8099'"))
+    const sourceUrls = transformed.match(/https?:\/\/[^\s'"`)]+/gu) ?? []
+    assert.ok(sourceUrls.length > 0)
+    assert.ok(sourceUrls.every((value) => new URL(value).origin === 'http://mail-capture:8099'))
+    assert.ok(transformed.includes('http://mail-capture:8099/deliver'))
+    assert.ok(transformed.includes('async sendPrepared('))
+    assert.ok(transformed.includes('private async sendQueued('))
+    assert.ok(transformed.endsWith('\n}\n'))
+    assert.equal(await readFile(relative, 'utf8'), original)
+    await assert.rejects(
+      executeSetupCommand(manifest, { command: 'bootstrap' }),
+      /account preparation/
+    )
+  } finally {
+    await rm(snapshot, { recursive: true, force: true })
+  }
+})
+
 test('internal mailbox accepts only fake recipients, consumes once and bounds content', async (t) => {
   const program = mailCollectorProgram.replace(
     ".listen(8099, '0.0.0.0')",

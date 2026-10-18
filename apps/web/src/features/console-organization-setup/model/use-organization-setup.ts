@@ -27,6 +27,7 @@ export function useOrganizationSetup(admission: ProductAccessBootstrap) {
   const [uncertain, setUncertain] = useState(false)
   const [storageAvailable, setStorageAvailable] = useState(true)
   const [retryAt, setRetryAt] = useState<number>()
+  const [completedNow, setCompletedNow] = useState(false)
   const [recoverableRejection, setRecoverableRejection] = useState(false)
   const save = (next: SetupJournalRecord) => {
     if (!alive.current) return
@@ -123,6 +124,7 @@ export function useOrganizationSetup(admission: ProductAccessBootstrap) {
             }
           : {}),
       })
+      if (result.kind === 'bootstrap') setCompletedNow(true)
       setUncertain(false)
       setError(undefined)
       setRecoverableRejection(false)
@@ -152,6 +154,7 @@ export function useOrganizationSetup(admission: ProductAccessBootstrap) {
     status.isSuccess && !status.isFetching && status.data.state === 'eligible-empty' && !retired
   return {
     record,
+    completedNow,
     status,
     account,
     mutation,

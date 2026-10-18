@@ -16,6 +16,7 @@ export const adminUserMembershipSchema = z.object({
 })
 
 export const adminOrganizationMemberSchema = z.object({
+  memberId: z.string().optional(),
   user: adminUserResponseSchema.pick({ id: true, name: true, email: true }),
   roles: z.array(roleSchema),
   joinedAt: z.iso.datetime(),

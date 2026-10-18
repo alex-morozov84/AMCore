@@ -1,5 +1,12 @@
 /** Current semantic actions offered by the Console selector. Historical codes remain queryable. */
 export const AUDIT_ACTIONS = [
+  'org.administrator_invitation_created',
+  'org.administrator_invitation_reissued',
+  'org.administrator_invitation_replaced',
+  'org.administrator_invitation_cancelled',
+  'org.administrator_invitation_completed',
+  'org.administrator_assigned',
+
   'admin.audit_logs.viewed',
   'admin.api_keys.viewed',
   'admin.api_keys.revocation_requested',

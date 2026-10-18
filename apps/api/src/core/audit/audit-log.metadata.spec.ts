@@ -204,3 +204,35 @@ describe('sanitizeAuditMetadata — AI tool-loop + approval actions', () => {
     expect(result).not.toHaveProperty('contentType')
   })
 })
+
+describe('administrator command reason boundary', () => {
+  it('keeps the sanctioned bounded reason and drops raw input and unexpected keys', () => {
+    expect(
+      sanitizeAuditMetadata('org.administrator_assigned', {
+        operationId: '01900000-0000-7000-8000-000000000000',
+        reason: 'Support TEST-49',
+        memberId: 'member-x',
+        adminGrantId: 'grant-x',
+        changed: true,
+        email: 'person@example.test',
+        body: { reason: 'raw' },
+        token: 'fake-token...',
+      })
+    ).toEqual({
+      operationId: '01900000-0000-7000-8000-000000000000',
+      reason: 'Support TEST-49',
+      memberId: 'member-x',
+      adminGrantId: 'grant-x',
+      changed: true,
+    })
+  })
+  it.each(['', '  ', 'x'.repeat(501), 'line\nbreak', 'null\u0000byte'])(
+    'rejects an invalid reason without widening unrelated events',
+    (reason) => {
+      expect(sanitizeAuditMetadata('org.administrator_assigned', { reason })).toEqual({})
+      expect(sanitizeAuditMetadata('org.invite_accepted', { reason: 'Support TEST-49' })).toEqual(
+        {}
+      )
+    }
+  )
+})

@@ -325,3 +325,11 @@ invalid, with no substituted MEMBER role. Earlier migration behavior may already
 have revoked such rows; terminal state is preserved. Explicitly issue or replace
 valid role intent as appropriate. Restore a compatible application/database pair
 for rollback; old single-role writers are incompatible with the new schema.
+
+## Operator first-administrator invitations
+
+[Operator provisioning](../product-admin/organization-provisioning.md) has separate personal SUPER_ADMIN admission. It creates an organization and fixed ADMIN invitation atomically, without adding the operator as a member. Verification and explicit recipient acceptance stay required.
+
+Both active initial and additional administrator invitations are managed through that operator workflow. Ordinary manager create/reissue/revoke targeting either type return `409 PROVISIONING_MANAGED`; unmarked invitations and replay of already committed ordinary commands keep their current contracts.
+
+For a managed initial or additional administrator invitation, an existing member without canonical ADMIN receives `409 PROVISIONING_ADMIN_CONFLICT` (initial) or `409 ADMIN_MEMBER_ASSIGNMENT_REQUIRED` (additional) before claim. A platform operator can use the separate [explicit member assignment](../product-admin/organization-administration.md); acceptance itself never performs this promotion. An existing ADMIN still receives a consent step; acceptance records the original grant without duplicating it. Ordinary `already_access` continues preserving roles. Initial completion survives invitation retention and never restores later removed access.

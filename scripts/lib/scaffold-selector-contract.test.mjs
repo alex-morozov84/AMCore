@@ -80,11 +80,19 @@ test('every declared matcher pattern resolves in the current repository', () => 
 })
 
 test('product-admin Console seam selects full generated verification', () => {
-  const matched = declaration.inputs.filter((input) =>
-    entryMatches(input, 'docs/product-admin/organization-establishment.md')
-  )
-  assert.ok(
-    matched.some((input) => input.id === 'planning.public-seams' && input.lane === 'generated-full')
-  )
+  for (const name of [
+    'organization-establishment',
+    'organization-provisioning',
+    'organization-administration',
+  ]) {
+    const matched = declaration.inputs.filter((input) =>
+      entryMatches(input, `docs/product-admin/${name}.md`)
+    )
+    assert.ok(
+      matched.some(
+        (input) => input.id === 'planning.public-seams' && input.lane === 'generated-full'
+      )
+    )
+  }
   assert.equal(affected('docs/product-admin/integration.md'), false)
 })

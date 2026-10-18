@@ -328,3 +328,23 @@ role names or complete sets. A locked replacement no-op emits no event. An audit
 insert failure rolls the assignment/revision transaction back. A lost commit
 acknowledgment can leave a persisted event and an unconfirmed client outcome;
 clients must read state before another deliberate write, rather than replay.
+
+## Platform organization administrator actions
+
+The `org.administrator_invitation_created`, `org.administrator_invitation_reissued`,
+`org.administrator_invitation_replaced`, `org.administrator_invitation_cancelled`
+and `org.administrator_assigned` actions use the existing strict SECURITY audit.
+The transaction commits the grant/lifecycle, receipt and sanitized audit together.
+Audit failure rolls back the privileged change. Exact replay adds no event.
+
+These actions have a closed operational-reason exception:1–500 trimmed characters,
+at most2000UTF-8bytes, no control characters. Enter a ticket reference or operational
+justification, never secrets or personal information. Validation does not redact
+sensitive content automatically. These reasons remain in stored audit metadata,
+accessible to authorized database/backup administrators under deployment policy.
+The current live-SUPER_ADMIN Console audit projection does not expose these raw
+organization-administrator reasons, and there is no built-in raw export endpoint.
+The existing audit retention policy applies; invitation cleanup does not erase audit. Status, attention, receipts,
+application logs, mail and notifications exclude it. Receipt/intent fingerprints do
+not store plaintext reasons. Recipient completion uses
+`org.administrator_invitation_completed` with bounded grant/membership IDs.

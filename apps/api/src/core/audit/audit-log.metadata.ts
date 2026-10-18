@@ -155,7 +155,31 @@ const backgroundControlMetadata: MetadataSpec = {
       : undefined,
 }
 
+const administratorCommandMetadata: MetadataSpec = {
+  operationId: true,
+  administratorInvitationId: true,
+  memberId: true,
+  adminGrantId: true,
+  revision: true,
+  changed: true,
+  reason: (value) =>
+    typeof value === 'string' &&
+    value.trim().length > 0 &&
+    value.length <= 500 &&
+    Buffer.byteLength(value, 'utf8') <= 2000 &&
+    !/[\p{Cc}]/u.test(value)
+      ? value
+      : undefined,
+}
+
 const specs: Record<AuditAction, MetadataSpec> = {
+  'org.administrator_invitation_created': administratorCommandMetadata,
+  'org.administrator_invitation_reissued': administratorCommandMetadata,
+  'org.administrator_invitation_replaced': administratorCommandMetadata,
+  'org.administrator_invitation_cancelled': administratorCommandMetadata,
+  'org.administrator_invitation_completed': administratorCommandMetadata,
+  'org.administrator_assigned': administratorCommandMetadata,
+
   'background_work.command_intent': backgroundControlMetadata,
   'background_work.command_outcome': backgroundControlMetadata,
   'background_work.command_denied': backgroundControlMetadata,

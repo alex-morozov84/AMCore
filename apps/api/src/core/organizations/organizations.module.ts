@@ -6,6 +6,8 @@ import { AuditModule } from '../audit/index.js'
 import { AuthModule } from '../auth/auth.module.js'
 import { InvitationAuthorityModule } from '../invitations/invitation-authority.module.js'
 
+import { AdministrationController } from './administration/administration.controller.js'
+import { AdministrationService } from './administration/administration.service.js'
 import { AuthInvitesController } from './auth-invites.controller.js'
 import { CapabilitiesController } from './capabilities.controller.js'
 import { CapabilityRegistry } from './capability-registry.service.js'
@@ -31,6 +33,9 @@ import { OrganizationCreationService } from './organization-creation.service.js'
 import { OrganizationsController } from './organizations.controller.js'
 import { OrganizationsService } from './organizations.service.js'
 import { PresetPermissionsController } from './preset-permissions.controller.js'
+import { ProvisioningController } from './provisioning/provisioning.controller.js'
+import { ProvisioningService } from './provisioning/provisioning.service.js'
+import { ProvisioningLimiterService } from './provisioning/provisioning-limiter.service.js'
 import { RoleService } from './role.service.js'
 import { RoleAssignabilityService } from './role-assignability.service.js'
 import { RoleDefinitionCommandService } from './role-definition-command.service.js'
@@ -47,6 +52,8 @@ import { RolesController } from './roles.controller.js'
     EmailModule, // Provides EmailService for invite dispatch (OB-02 Stage D)
   ],
   controllers: [
+    AdministrationController,
+    ProvisioningController,
     OrganizationCreationController,
     OrganizationsController,
     CapabilitiesController,
@@ -60,6 +67,9 @@ import { RolesController } from './roles.controller.js'
     InviteOperationsController,
   ],
   providers: [
+    AdministrationService,
+    ProvisioningService,
+    ProvisioningLimiterService,
     OrganizationsService,
     OrganizationCreationService,
     CapabilityRegistry,

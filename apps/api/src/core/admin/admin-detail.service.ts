@@ -119,6 +119,7 @@ export class AdminDetailService {
           memberCount,
           members: {
             data: rows.map((row) => ({
+              memberId: row.id,
               user: row.user,
               roles: projectRoles(row.roles),
               joinedAt: row.createdAt.toISOString(),

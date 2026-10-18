@@ -1,4 +1,9 @@
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/features/console-organization-provisioning/ui/organization-provisioning.stories.tsx',
+  'apps/web/src/features/console-organization-provisioning/ui/provisioning-management.stories.tsx',
+  'apps/web/src/features/console-organization-administration/ui/organization-administration.stories.tsx',
+  'apps/web/e2e/organization-provisioning/recipient.ts',
+
   'apps/web/src/features/console-organization-setup/ui/organization-setup.stories.tsx',
   'apps/web/src/features/organization-create/ui/organization-create.stories.tsx',
   'apps/web/src/features/auth-login/ui/LoginForm.stories.tsx',

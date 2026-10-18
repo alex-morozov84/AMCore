@@ -14,6 +14,7 @@ import { AppException } from '../../common/exceptions/index.js'
 import type { OrgInvite, Prisma } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
 
+import { checkAdministratorRecipient } from './administrator-settlement.js'
 import {
   type InvitationCredential,
   invitationCredentialHint,
@@ -95,8 +96,16 @@ export class InvitationContinuationService {
         },
         select: { id: true },
       })
+      const provisioning = await checkAdministratorRecipient(
+        tx,
+        invite.organizationId,
+        invite.id,
+        invite.generation,
+        user.id,
+        roles.map((role) => role.id)
+      )
       const descriptor = { inviteId: invite.id, generation: invite.generation, organization }
-      return member
+      return member && !provisioning
         ? { state: 'already_access', ...descriptor }
         : {
             state: 'ready',

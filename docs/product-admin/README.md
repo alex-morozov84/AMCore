@@ -80,3 +80,7 @@ optional CSS Modules. Keep translations in every catalogue. Custom presentation
 uses the public headless API without importing ready pages or a shell; keep its
 request/session lifecycle shared. The [extension guide](extending-modules.md)
 describes ownership and the acceptance checklist for later modules.
+
+[Operator organization provisioning](organization-provisioning.md) creates an organization for another person and invites its first ADMIN. It supports Console-disabled API use and recovery without duplicate organizations.
+
+- [Add and recover organization administrators](organization-administration.md): current ADMINs, additional invitations, member assignment and no-Console recovery.

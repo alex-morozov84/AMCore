@@ -63,3 +63,5 @@ be enqueued at all.
 - Add subjects/messages for every supported locale.
 - Add HTML and plaintext render tests.
 - Verify provider/logging paths do not expose rendered bodies or payload values.
+
+Provisioning stores no raw invitation token/link or email body in its permanent result or mail-attempt projection. Late mail callbacks match the exact attempt and invitation generation; they cannot reopen completion or assign access. See [operator recovery](../product-admin/organization-provisioning.md).

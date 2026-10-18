@@ -33,6 +33,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 ## Start here
 
+- Designing or reviewing a user journey → [Short UI/UX checklist](./ux-checklist.md)
+
 [Organization creation and initial setup](../product-admin/organization-establishment.md) — ready and headless journeys, recovery and fixed shops.
 
 - Choosing button/tab semantics, list pagination, empty states or detail reveal →

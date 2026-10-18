@@ -7,7 +7,7 @@ import { assertOrganizationSetupFixture } from './organization-setup-fixture.mjs
 export async function consumeSetupMail(m, to) {
   assertOrganizationSetupFixture(m)
   if (
-    m.fixtureProfile !== 'organization-setup' ||
+    !['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile) ||
     !/^[a-z0-9._+-]{1,180}@e2e\.amcore\.test$/i.test(to)
   )
     throw new Error('Setup mail fixture unavailable')

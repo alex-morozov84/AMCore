@@ -15,8 +15,14 @@ export async function executeSetupCommand(m, input) {
     input.command === 'diagnostics' &&
     Object.keys(input).length === 1
   // AMCORE_CONSOLE_ESTABLISHMENT_DIAGNOSTICS_END
-  if (!previewDiagnostics && (m.purpose !== 'e2e' || m.fixtureProfile !== 'organization-setup'))
+  if (
+    !previewDiagnostics &&
+    (m.purpose !== 'e2e' ||
+      !['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile))
+  )
     throw new Error('Wrong setup fixture')
+  if (m.fixtureProfile === 'organization-provisioning' && input.command !== 'prepare-account')
+    throw new Error('Provisioning fixture allows only prerequisite account preparation')
   await dataAdmission(m)
   const schemas = () => createRequire(join(m.snapshot, 'apps/api/package.json'))('@amcore/shared')
   let args

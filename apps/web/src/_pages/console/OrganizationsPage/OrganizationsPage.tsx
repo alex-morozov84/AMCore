@@ -6,6 +6,8 @@ import {
   type DiscoverySortOrder,
   SearchInput,
 } from '@/features/console-discovery'
+import { OrganizationAttention } from '@/features/console-organization-administration'
+import { OrganizationProvisioning } from '@/features/console-organization-provisioning'
 import { OrganizationSetup } from '@/features/console-organization-setup'
 import { getConsoleOrganizationsHref } from '@/shared/lib/console-public-href'
 import { ConsoleFilterPanel } from '@/shared/ui/console-detail/ConsoleFilterPanel'
@@ -45,7 +47,9 @@ export async function OrganizationsPage({
     <section className="flex flex-col gap-4">
       <ConsoleRestorePosition />
       <h1 className="text-3xl font-semibold tracking-tight">{t('organizations')}</h1>
+      <OrganizationProvisioning />
       <OrganizationSetup />
+      <OrganizationAttention />
       <DiscoverySearchBoundary
         baseHref={baseHref}
         search={search}

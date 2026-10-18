@@ -8,6 +8,7 @@ import { NotFoundException } from '../../common/exceptions/index.js'
 import { AuditActorType, AuditTargetType } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
+import { rejectManagedInvitation } from '../invitations/provisioning-settlement.js'
 
 import type { InvitationActor } from './invitation-actor.js'
 import { InvitationAuthorization } from './invitation-authorization.js'
@@ -52,6 +53,7 @@ export class InviteRevokeService {
         )) !== undefined
       )
         return
+      await rejectManagedInvitation(tx, orgId, { id: inviteId })
       const invite = await lockInvitation(tx, inviteId, orgId)
       if (!invite) throw new NotFoundException('Invitation')
       if (invite.generation !== generation)

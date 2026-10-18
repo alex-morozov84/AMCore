@@ -144,3 +144,7 @@ Provider responsibilities:
 
 `ResendEmailProvider` performs real delivery. `MockEmailProvider` is for
 development/tests and logs metadata only.
+
+## First-administrator invitation recovery
+
+[Organization provisioning](../product-admin/organization-provisioning.md) commits the organization before direct invitation mail. It records only a safe last-attempt outcome, never a secret body/link in a queue. Provider acknowledgment is not delivery. An unknown send leaves the organization saved; explicit reissue rotates the invitation. Production mock blocks new operator invitation sends before commit, while reads and exact replay remain available. The global mock default and ordinary email APIs are unchanged.

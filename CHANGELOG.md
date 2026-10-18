@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Platform operators can invite additional organization administrators, explicitly promote verified members and recover organizations after a cancelled first invitation. Console lists all organizations needing attention, supports multiple administrators, uses recipient dialogs and can clear unsent creation drafts.
+
+- Operator organization creation with first-ADMIN invitations, safe retry and recipient recovery through Console and protected API; production mock email cannot start new B07 invitations.
+
 - Independent self-service organization creation policy, ready/headless creation
   with permanent operation results and safe recovery after a lost response.
   Occupied identifiers have a specific localized explanation; cancelling a rejected

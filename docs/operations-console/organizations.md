@@ -7,15 +7,19 @@ shows its name, slug, and creation and update times. Open a row's name for its
 full page. The **First organization** panel can create the first organization
 and assign a verified recipient `ADMIN` only on an eligible empty installation.
 It shares the command's rules and permanently closes after completion.
-The inventory/detail pages do not edit/delete organizations or change member roles.
+The inventory/detail pages do not edit/delete organizations. The protected
+administrator actions can add canonical ADMIN after explicit confirmation; they
+do not replace general member-role management.
 
 See [initial setup](../product-admin/organization-establishment.md#use-console-after-trusted-platform-access)
 for prerequisites, account preparation, email proof, confirmation and recovery.
 The operator must already have trusted platform access and receives no automatic
-company membership. Additional-organization provisioning is a separate workflow.
+company membership. To invite the first ADMIN of a new organization, use [operator provisioning](../product-admin/organization-provisioning.md). This works for the first or a later organization; it does not assign an existing verified account silently.
 
 From the Console home page, select **Organizations** in the left navigation.
-The setup panel appears above the search field. Follow **Administrator → Organization → Confirmation**.
+The creation action and **Needs attention** appear above the search field.
+Trusted initial setup appears only while eligible/relevant or needed to recover an
+unknown request. The default create action invites an administrator. For **First organization**, follow **Administrator → Organization → Confirmation**.
 Enter the employee's email and select **Continue**. An existing confirmed account can continue immediately;
 the page explains when the employee must confirm their email first. **Back** preserves entered details.
 The final action is **Create organization**. The result explains who has access and provides **Open organization**.
@@ -23,9 +27,32 @@ If the selected account was deleted before completion, choose **Change recipient
 and select another administrator. Organization details remain saved. Confirm the
 new account's mailbox before continuing. An unknown creation result must be checked
 first; completed setup never replaces its original administrator through this panel.
-If the page says an organization already exists, initial setup is unavailable.
-Use the inventory below to inspect that organization; this state does not ask
-the operator to repair deployment prerequisites or stop application writes.
+Once an organization exists, the redundant initial-only unavailable card is hidden.
+An unresolved trusted setup stays visible until its result is reconciled.
+
+## Administrators and unfinished invitations
+
+**Needs attention** shows organizations without current administrators and those
+with unfinished managed invitations. It includes every matching organization,
+with pagination, across operators and browsers. It does not show only your last
+creation. Open a row to see current administrators and invitation actions.
+
+The **Needs attention** list refreshes every 30 seconds while its browser tab is
+visible. **Refresh list** reads it immediately; it does not send invitations.
+The page shows when the list last updated. A read failure stops periodic checks;
+use **Refresh list** to retry after resolving the error. These reads cover the
+current page and never execute invitation commands.
+
+In an organization, **Invite an administrator** sends a new fixed-ADMIN invitation.
+For an existing verified member, use the member search and **Make administrator**.
+Both actions require a bounded operational reason, a review step and fresh
+platform authentication. The operator does not join automatically.
+Several administrators can coexist. Existing roles and administrators remain.
+
+**Change recipient** uses a dialog. **Cancel invitation** has a visible destructive
+confirmation. The organization remains, and you can create a new invitation later.
+The initial cancelled/completed history stays closed. See
+[administrator recovery and headless API](../product-admin/organization-administration.md).
 
 ## Find an organization
 

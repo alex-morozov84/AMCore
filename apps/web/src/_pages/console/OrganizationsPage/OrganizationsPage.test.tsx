@@ -5,6 +5,12 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/features/console-organization-setup', () => ({ OrganizationSetup: () => null }))
+vi.mock('@/features/console-organization-provisioning', () => ({
+  OrganizationProvisioning: () => <div data-testid="organization-provisioning" />,
+}))
+vi.mock('@/features/console-organization-administration', () => ({
+  OrganizationAttention: () => <div data-testid="organization-attention" />,
+}))
 vi.mock('server-only', () => ({}))
 vi.mock('@/i18n/navigation', () => ({
   Link: ({ href, children }: { href: string; children: ReactNode }) => (
@@ -56,6 +62,8 @@ describe('OrganizationsPage', () => {
     renderPage(await OrganizationsPage({ page: 1, limit: 20 }))
 
     expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
+    expect(screen.getByTestId('organization-provisioning')).toBeInTheDocument()
+    expect(screen.getByTestId('organization-attention')).toBeInTheDocument()
     expect(screen.getByLabelText('Search organizations')).toBeInTheDocument()
   })
 

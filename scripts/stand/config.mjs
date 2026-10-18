@@ -26,7 +26,11 @@ const overridden = (value) =>
 export async function configuration(m) {
   assertOrganizationSetupFixture(m)
   const db = `postgresql://amcore:${m.dbPassword}@postgres:5432/amcore`
-  const closedCreationProfiles = ['organization-setup', 'organization-shop']
+  const closedCreationProfiles = [
+    'organization-setup',
+    'organization-shop',
+    'organization-provisioning',
+  ]
   // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_START
   closedCreationProfiles.push('organization-establishment')
   // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_END
@@ -46,17 +50,26 @@ export async function configuration(m) {
     // The browser-facing API origin of this stand, so a public avatar URL resolves.
     ...(m.origins.api && { STORAGE_PUBLIC_BASE_URL: `${m.origins.api}/api/v1/storage/public` }),
     EMAIL_PROVIDER: 'mock',
-    AUTH_PUBLIC_SIGNUP_ENABLED: m.fixtureProfile === 'organization-setup' ? 'false' : 'true',
+    AUTH_PUBLIC_SIGNUP_ENABLED: ['organization-setup', 'organization-provisioning'].includes(
+      m.fixtureProfile
+    )
+      ? 'false'
+      : 'true',
     ORG_SELF_SERVICE_CREATION_ENABLED: closedCreationProfiles.includes(m.fixtureProfile)
       ? 'false'
       : 'true',
-    ...(m.fixtureProfile === 'organization-setup'
+    ...(['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)
       ? { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
       : {}),
     FRONTEND_URL: m.origins.product,
     CORS_ORIGIN: Object.values(m.origins).join(','),
     TRUST_PROXY: m.topology === 'host' ? '1' : 'false',
   }
+  if (m.fixtureProfile === 'organization-provisioning')
+    Object.assign(app, {
+      EMAIL_PROVIDER: 'resend',
+      RESEND_API_KEY: '<fake-e2e-provider-key>',
+    })
   // AMCORE_CONSOLE_NOTIFICATION_ENV_START
   if (m.fixtureProfile === 'notification-work')
     Object.assign(app, {
@@ -98,7 +111,7 @@ export async function configuration(m) {
     environments['notification-provider'] = {}
   }
   // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_END
-  if (m.fixtureProfile === 'organization-setup')
+  if (['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile))
     environments['mail-capture'] = { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
   // AMCORE_CONSOLE_CADDY_ENV_START
   if (m.topology === 'host')
@@ -176,7 +189,7 @@ export async function configuration(m) {
 export function validateModel(m) {
   assertOrganizationSetupFixture(m)
   const collector = m.model.services['mail-capture']
-  if (m.fixtureProfile === 'organization-setup') {
+  if (['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)) {
     if (
       !collector ||
       collector.image !== `${m.project}-api:latest` ||
@@ -187,6 +200,13 @@ export function validateModel(m) {
       throw new Error('Unsafe setup mail collector')
     for (const name of ['api', 'worker']) {
       const environment = m.model.services[name].environment
+      if (
+        m.fixtureProfile === 'organization-provisioning' &&
+        (environment.NODE_ENV !== 'development' ||
+          environment.EMAIL_PROVIDER !== 'resend' ||
+          environment.RESEND_API_KEY !== '<fake-e2e-provider-key>')
+      )
+        throw new Error('Provisioning fixture mail policy changed')
       if (
         environment.AUTH_PUBLIC_SIGNUP_ENABLED !== 'false' ||
         environment.ORG_SELF_SERVICE_CREATION_ENABLED !== 'false' ||

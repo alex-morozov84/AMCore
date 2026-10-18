@@ -1,0 +1,29 @@
+// Permanent domain result. No cascading relations: deletion must never reopen creation or ADMIN admission.
+model OrganizationProvisioning {
+  operationId          String   @id @db.Uuid
+  creatorUserId        String
+  organizationId       String   @unique(map: "organization_provisionings_org_key")
+  fingerprintVersion   Int      @default(1)
+  fingerprint          String   @db.VarChar(64)
+  createdAt            DateTime @default(now())
+  revision             Int      @default(1)
+  state                String   @default("awaiting")
+  currentInviteId      String?  @unique(map: "organization_provisionings_invite_key")
+  inviteLocale         String?
+  currentGeneration    Int?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  originalAdminUserId  String?
+  originalMemberId     String?
+  originalAdminRoleId  String?
+  originalAdminGrantId String?
+  attemptId            String?  @db.Uuid
+  attemptInviteId      String?
+  attemptGeneration    Int?
+  attemptAt            DateTime?
+  mailOutcome          String?
+  mailObservedAt       DateTime?
+
+  @@map("organization_provisionings")
+  @@schema("core")
+}

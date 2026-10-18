@@ -13,7 +13,7 @@ their organization role.
 | [Background work](background-work.md) | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup. |
 | [Queue board](queue-board.md)         | Look at the jobs of the background queues (view-only), opened from Background work.        |
 | [Users](users.md)                     | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |
-| [Organizations](organizations.md)     | Complete eligible initial setup; inspect organizations, members and roles.                 |
+| [Organizations](organizations.md)     | Create organizations and invite their first ADMIN; initial setup, inventory and members.   |
 | [API keys](api-keys.md)               | Inspect credential metadata and irreversibly revoke one or selected keys.                  |
 | [Audit](audit.md)                     | Browse recent system events and narrow them by action, identity, or time.                  |
 

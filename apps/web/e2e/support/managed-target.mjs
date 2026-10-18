@@ -39,7 +39,7 @@ export function outputPaths() {
 export function standReporters(m, dir) {
   // HTML/blob reports record built-in page.goto step URLs even when trace/video are off.
   // The rendered-mail fixture visits one-use secrets; keep only step-free console results.
-  return m.fixtureProfile === 'organization-setup'
+  return ['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)
     ? [['list', { printSteps: false }]]
     : [['list'], ['html', { open: 'never', outputFolder: `${dir}/report` }]]
 }
