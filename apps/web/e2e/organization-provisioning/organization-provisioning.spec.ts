@@ -152,7 +152,7 @@ test('operator steps, lost reply and actual recipient consent produce a working 
   await expect(attention.getByRole('heading', { name: 'South shop', exact: true })).toBeVisible()
   await expect(attention.getByRole('heading', { name: 'West shop', exact: true })).toBeVisible()
   await acceptAdministrator(browser, 'second-admin@e2e.amcore.test', 'South shop', en)
-  await attention.getByRole('button', { name: admin.refresh, exact: true }).click()
+  await attention.getByRole('button', { name: admin.attentionRefresh, exact: true }).click()
   await expect(attention.getByRole('heading', { name: 'South shop', exact: true })).toHaveCount(0)
   await expect(attention.getByRole('heading', { name: 'West shop', exact: true })).toBeVisible()
   // The first recipient has real mailbox proof already. Seed only an ordinary MEMBER of this second organization.
