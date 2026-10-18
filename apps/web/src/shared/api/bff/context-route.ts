@@ -20,6 +20,7 @@ export async function contextRoute(
         statusCode: error.status,
         errorCode: error.errorCode,
         message: 'Organization context request failed',
+        details: error.details,
       })
       if ((error.status === 429 || error.status === 503) && error.retryAfterSeconds !== undefined)
         response.headers.set('retry-after', String(error.retryAfterSeconds))

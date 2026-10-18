@@ -28,6 +28,7 @@ import {
   lockInvitationUser,
 } from './invitation-locks.js'
 import { currentInvitationIntent, type IntentRole } from './invitation-role-intent.js'
+import { checkAdministratorRecipient } from './administrator-settlement.js'
 import { invitationTransaction } from './invitation-transaction.js'
 
 @Injectable()
@@ -95,8 +96,9 @@ export class InvitationContinuationService {
         },
         select: { id: true },
       })
+      const provisioning = await checkAdministratorRecipient(tx, invite.organizationId, invite.id, invite.generation, user.id, roles.map((role) => role.id))
       const descriptor = { inviteId: invite.id, generation: invite.generation, organization }
-      return member
+      return member && !provisioning
         ? { state: 'already_access', ...descriptor }
         : {
             state: 'ready',

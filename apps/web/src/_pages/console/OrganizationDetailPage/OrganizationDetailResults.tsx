@@ -1,6 +1,8 @@
 import { getTranslations } from 'next-intl/server'
 import { adminDetailIdSchema } from '@amcore/shared'
 
+import { OrganizationAdministration } from '@/features/console-organization-administration'
+import { OrganizationProvisioning } from '@/features/console-organization-provisioning'
 import { fetchConsoleOrganizationDetail } from '@/shared/api/console/organizations'
 import { detailPageHref } from '@/shared/lib/console-detail-url'
 import {
@@ -59,6 +61,8 @@ export async function OrganizationDetailResults({
           </dl>
         </CardContent>
       </Card>
+      <OrganizationAdministration orgId={id} members={members.data} />
+      <OrganizationProvisioning orgId={id} />
       <section className="space-y-4" aria-label={t('members', { count: memberCount })}>
         <h2 className="text-xl font-semibold">{t('members', { count: memberCount })}</h2>
         <DetailRelationSearch

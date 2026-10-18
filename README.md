@@ -10,6 +10,8 @@
 
 ## Overview
 
+[Create an organization for another person](docs/product-admin/organization-provisioning.md) through Console or the protected API, with invitation recovery.
+
 AMCore is a production-oriented application starter for building secure, modular
 SaaS products, internal tools, and AI-enabled systems. The reusable surface is
 backend-first: a NestJS API foundation with strong application and security
@@ -31,8 +33,7 @@ Feature-specific admin surfaces remain intentionally product-owned.
 
 The optional [Operations Console](docs/operations-console/README.md) is a
 separate `SUPER_ADMIN` control plane. It ships **Overview** for instance
-readiness, deployment identity, local resource snapshots and storage probe interval editing, **Background work** safe diagnostics and audited queue/job controls, **Users** inventory, system-role changes and session revocation, read-only
-**Organizations**, and bounded **Audit** browsing. Path/host topology,
+readiness, deployment identity, local resource snapshots and storage probe interval editing, **Background work** safe diagnostics and audited queue/job controls, **Users** inventory, system-role changes and session revocation, **Organizations** inventory, first-admin provisioning, and bounded **Audit** browsing. Path/host topology,
 isolated host sessions, downstream scaffolding, deployment guidance, and a
 safe extension recipe are included. Session views show parsed devices and
 approximate IP locations; see [session management](docs/operations-console/users.md#manage-sessions)

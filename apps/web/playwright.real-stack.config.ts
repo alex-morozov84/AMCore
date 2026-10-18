@@ -4,12 +4,17 @@ import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-ta
 
 // The managed runner provisions a fresh local Docker stack and owns its cleanup.
 // Playwright never reuses an unrelated development server.
+let testDir =
+  activeTarget().fixtureProfile === 'organization-setup'
+    ? './e2e/organization-setup'
+    : './e2e/real-stack'
+// AMCORE_CONSOLE_PROVISIONING_TEST_DIR_START
+if (activeTarget().fixtureProfile === 'organization-provisioning')
+  testDir = './e2e/organization-provisioning'
+// AMCORE_CONSOLE_PROVISIONING_TEST_DIR_END
 export default defineConfig({
   ...outputPaths(),
-  testDir:
-    activeTarget().fixtureProfile === 'organization-setup'
-      ? './e2e/organization-setup'
-      : './e2e/real-stack',
+  testDir,
   ...(activeTarget().fixtureProfile === 'organization-setup'
     ? { testMatch: '**/organization-initial-setup.spec.ts' }
     : {}),

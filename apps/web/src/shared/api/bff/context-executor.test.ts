@@ -339,3 +339,17 @@ describe('typed context executor', () => {
     expect(deps.fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('closed administrator conflict projection', () => {
+  it('passes only explicitly declared bounded conflict details and drops arbitrary metadata', async () => {
+    const { deps, expected } = fixture()
+    deps.fetch = vi.fn().mockImplementation(async () => Response.json({ errorCode: 'ADMIN_INVITATION_ALREADY_PENDING', details: {
+      supersedesInvite: { id: 'invite-x', generation: 2 }, reason: 'must-not-leak', email: 'person@example.test',
+    } }, { status: 409 }))
+    const schema = z.object({ supersedesInvite: z.strictObject({ id: z.string().max(128), generation: z.number().int().positive() }) })
+    await expect(executeContextOperation({ ...operation, errorDetails: { code: 'ADMIN_INVITATION_ALREADY_PENDING', schema } }, { expectedSession: expected, headers: new Headers() }, deps))
+      .rejects.toMatchObject({ status: 409, details: { supersedesInvite: { id: 'invite-x', generation: 2 } } })
+    await expect(executeContextOperation(operation, { expectedSession: expected, headers: new Headers() }, deps))
+      .rejects.toMatchObject({ status: 409, details: undefined })
+  })
+})

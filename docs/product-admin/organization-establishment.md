@@ -3,7 +3,7 @@
 Registration creates a personal account. It does not create an organization or
 make a buyer an employee. An explicit organization creation assigns its creator
 the organization `ADMIN` role. Trusted initial setup can instead assign a selected
-verified account. Neither operation grants platform `SUPER_ADMIN`.
+verified account. [Operator provisioning](organization-provisioning.md) instead invites the first ADMIN of a new organization, including later organizations. None of these operations grants platform `SUPER_ADMIN`.
 
 ```text
 Self-service: personal account -> explicit create -> organization ADMIN -> team
@@ -79,6 +79,12 @@ administrator to correct the runtime role; setup never grants database privilege
 Prerequisites: migrations and guarded seed complete; self-service creation is
 `false`; choose the intended first employee. Buyer registration may remain `true`.
 
+For a normal installation with working invitation email, prefer
+[create-and-invite](organization-provisioning.md): the employee explicitly accepts.
+Use the verified-account path below only on an eligible empty installation when
+you intentionally choose trusted initial assignment without an invitation.
+Choose one path for this organization, not both.
+
 1. Prepare that employee's ordinary account with the command below or the Console panel.
 2. Let the employee confirm their mailbox through normal recovery or verification.
 3. Create the initial organization for the verified account.
@@ -98,6 +104,10 @@ repeating setup does not restore them. Never clear its completion marker to retr
 
 Prerequisites: initialize canonical roles and enable self-service creation. Enable
 public signup if new people should register without invitations.
+
+Use the PRODUCT **Organizations** page, not Operations Console. In the default
+path topology it is `/en/organizations`; `/en/admin/organizations` is the separate
+platform SUPER_ADMIN area. An ordinary creator does not need or receive Console access.
 
 1. Register or sign in to a personal account.
 2. Open **Organizations**, then **Create organization**.
@@ -189,8 +199,10 @@ yet been established. See the API reference below.
 
 Prerequisites: the first platform `SUPER_ADMIN` already has access through the
 [separate trusted procedure](../auth/rbac.md#administering-super_admin).
-Select **Organizations** in the left navigation, then find **First organization** above the search field.
-The form shows three steps: **Administrator → Organization → Confirmation**.
+Select **Organizations** in the left navigation. On an eligible empty installation,
+choose **Use an already verified account** in the secondary **First organization** panel.
+The default **Create organization** action uses an invitation instead.
+The trusted form shows three steps: **Administrator → Organization → Confirmation**.
 
 1. Under **Who will manage the organization?**, enter the employee's email and select
    **Continue**. The application uses their existing account or creates one without a password or staff rights.
@@ -201,16 +213,25 @@ The form shows three steps: **Administrator → Organization → Confirmation**.
 4. Under **Is everything correct?**, check the organization and administrator together. **Back** preserves
    entered details. **Create organization** creates the organization and assigns its administrator.
 5. **Organization created** shows the first administrator, explains how they can sign in, and offers
-   **Open organization** for the Console operator. Reloading retains this result instead of reopening the form.
+   **Open organization** for the Console operator. This current completion stays visible until
+   you leave. After reload, use the inventory and current administrator list; initial setup stays closed.
 
 If the application is not ready, the page explains what the deployment administrator must finish.
-An existing organization instead points to the inventory; it does not ask the operator to repair deployment.
+An existing organization hides the redundant initial-only card. An unresolved request
+stays visible for recovery even if another organization already exists. A completed
+installation uses the normal inventory and [administrator management](organization-administration.md).
 The first administrator receives `ADMIN` only in this organization, never platform `SUPER_ADMIN`.
 
 Console uses the same operations as the command. Mutations require recent
 authentication and may ask for step-up. The operator receives no automatic company
-membership. Completed or ineligible installations show status and recovery guidance.
-They cannot prepare more accounts through setup.
+membership. Closed setup cannot prepare more accounts. Historical closed panels are
+hidden; deployment prerequisite failures and unresolved requests retain relevant guidance.
+
+For a lost response, select **Check result** in the saved-action block.
+**Repeat this action** resends only the saved original action; **Confirm result**
+checks an already completed matching result. **Check again** retries an unavailable
+status read. Do not replace the recipient or start normal creation while the old
+setup result is unknown.
 
 A reload first reads server status and restores the current editable step in the same tab/session.
 An unfinished request takes precedence over step navigation. A lost preparation response can be resolved by
@@ -234,6 +255,31 @@ mailbox confirmation again before continuing.
 | `completed-intact`             | Original account, organization, membership and ADMIN grant remain; status/exact replay only |
 | `completed-changed`            | Completion remains, but original identity or access changed; investigate without recreation |
 | `unavailable`                  | The server cannot determine state; no eligibility may be inferred                           |
+
+A status read is an observation, not a reservation or a cancellation of an
+in-flight request. If another organization appears while your original completion
+is unknown, keep the original action and check its result again. Do not switch to
+a new create solely because the list or one status read changed. An exact repeat
+uses the original name, slug and user ID; the server serializes it with setup.
+If another creation wins first and there is no setup completion, setup refuses
+rather than adopting that organization. If setup completes first, its saved result
+identifies its own organization. Concurrent changes can make a previous read stale.
+An unavailable read proves neither eligibility nor rollback; keep recovery visible.
+
+Bootstrap has one installation-scoped permanent result, not a per-request UUID.
+Read `GET /api/v1/admin/organization-establishment/status` without repeating a
+write to obtain its original IDs and completion time. `completed-intact` identifies
+the successful original setup; an exact matching repeat only acknowledges it.
+`completed-changed` also retains those IDs but exact replay returns
+`409 SETUP_STATE_CHANGED`; it never repairs access. Inventory rows carry no setup-
+origin badge: compare the status `ids.organizationId` to the organization you open.
+See [response examples](organization-provisioning-responses.md#initial-setup-status).
+
+Console recovery labels are **Check result / Проверить результат**,
+**Repeat this action / Повторить это действие**,
+**Confirm result / Подтвердить результат**, and
+**Check again / Проверить ещё раз**. These refer to the saved initial action,
+not a fresh create-and-invite request.
 
 Preparation and completion serialize with competing initial setup. If preparation
 wins first, its ordinary account may remain when another recipient is selected.
@@ -278,11 +324,33 @@ access returns `409 ORGANIZATION_CREATION_RESULT_CHANGED`. Neither repairs acces
 Explicit identifier collisions return `409 CONFLICT`. Unknown completion returns
 `503 ORGANIZATION_CREATION_UNCONFIRMED`. See `/docs` for complete schemas and errors.
 
-The initial-only protected API lives under `/admin/organization-establishment`:
-`GET status`, `POST accounts/prepare`, `GET accounts/:userId/status`, `POST bootstrap`.
+The initial-only protected API has these full backend paths:
+
+| Action                   | Endpoint                                                               |
+| ------------------------ | ---------------------------------------------------------------------- |
+| Read installation state  | `GET /api/v1/admin/organization-establishment/status`                  |
+| Prepare ordinary account | `POST /api/v1/admin/organization-establishment/accounts/prepare`       |
+| Read selected account    | `GET /api/v1/admin/organization-establishment/accounts/:userId/status` |
+| Complete initial setup   | `POST /api/v1/admin/organization-establishment/bootstrap`              |
+
 All require live `SUPER_ADMIN` bearer admission; writes additionally require recent
 authentication. Account lookup after completion is restricted to its original user ID.
 API keys cannot use these or the self-service creation handlers.
+
+Preparation takes `{"email":"anna@example.test","locale":"en"}`; locale is optional
+and accepts `en` or `ru`. Bootstrap takes
+`{"name":"North shop","slug":"north-shop","adminUserId":"<verified-user-id>"}`.
+Save these exact non-secret inputs securely before sending if recovery must survive
+a browser/session change. Bootstrap has no operation ID.
+
+After a session change, Console cannot restore its retired form. Read server status
+first. A completion identifies the installation result, not which operator requested
+it; compare its IDs and current administrators. An exact repeat with securely saved
+input can distinguish matching intent, but is not required just to read completion.
+If the original input is lost, do not reconstruct it from email or start a replacement
+setup while its outcome is unknown. Have authorized deployment support reconcile
+status, current records and audit. There is no endpoint that recovers the original
+name/slug from the completion hash.
 
 Product browser clients use the typed `/api/product-access/organizations` routes
 and `useOrganizationCreation` from the public organization-context entity.

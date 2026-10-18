@@ -46,7 +46,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     ...choices,
     fixtureVersion: 2,
     fixtureProfile,
-    ...(fixtureProfile === 'organization-setup'
+    ...(['organization-setup', 'organization-provisioning'].includes(fixtureProfile)
       ? { mailCaptureKey: randomBytes(32).toString('hex') }
       : {}),
     mocked,

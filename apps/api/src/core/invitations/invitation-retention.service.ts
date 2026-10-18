@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 
-import type { Prisma } from '../../generated/prisma/client.js'
+import type { OrganizationAdministratorInvitation, Prisma } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks.js'
 import { invitationTransaction } from './invitation-transaction.js'
+import { clearedProvisioningMail,lockMarkedProvisioning } from './provisioning-settlement.js'
 
 const RETENTION_MS = 30 * 86400000
 @Injectable()
@@ -38,6 +39,17 @@ export class InvitationRetentionService {
             : (invite.acceptedAt && invite.acceptedAt <= cutoff) ||
               (invite.revokedAt && invite.revokedAt <= cutoff)
         if (!stale) return 0
+        const provisioning = await lockMarkedProvisioning(tx, invite.id)
+        if (provisioning && provisioning.state === 'awaiting')
+          await tx.organizationProvisioning.update({ where: { operationId: provisioning.operationId }, data: {
+            currentInviteId: null, currentGeneration: null, inviteLocale: null, revision: { increment: 1 }, ...clearedProvisioningMail,
+          } })
+        const [administrator] = await tx.$queryRaw<OrganizationAdministratorInvitation[]>`
+          SELECT * FROM core.organization_administrator_invitations WHERE "currentInviteId"=${invite.id} FOR UPDATE`
+        if (administrator?.state === 'awaiting')
+          await tx.organizationAdministratorInvitation.update({ where: { id: administrator.id }, data: {
+            currentInviteId: null, currentGeneration: null, inviteLocale: null, revision: { increment: 1 }, ...clearedProvisioningMail,
+          } })
         await tx.orgInvite.delete({ where: { id: invite.id } })
         return 1
       })
@@ -51,6 +63,19 @@ export class InvitationRetentionService {
       completedAt: { lte: new Date(now.getTime() - RETENTION_MS) },
     })
     await this.pruneRows('invitationContinuation', { expiresAt: { lte: now } })
+    const terminal = await this.prisma.organizationAdministratorInvitation.findMany({
+      where: { OR: [{ completedAt: { lte: new Date(now.getTime() - RETENTION_MS) } }, { cancelledAt: { lte: new Date(now.getTime() - RETENTION_MS) } }] },
+      select: { id: true, organizationId: true }, take: 1000, orderBy: { id: 'asc' },
+    })
+    for (const row of terminal) await invitationTransaction(this.prisma, async tx => {
+      const exists = await tx.organization.findUnique({ where: { id: row.organizationId }, select: { id: true } })
+      if (!exists) return
+      await lockInvitationOrg(tx, row.organizationId)
+      await tx.organizationAdministratorInvitation.deleteMany({ where: {
+        id: row.id, state: { in: ['completed', 'cancelled'] },
+        OR: [{ completedAt: { lte: new Date(now.getTime() - RETENTION_MS) } }, { cancelledAt: { lte: new Date(now.getTime() - RETENTION_MS) } }],
+      } })
+    })
     const ids = await this.prisma.invitationAuthHandoff.findMany({
       where: {
         status: { in: ['confirmed', 'aborted'] },

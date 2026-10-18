@@ -178,6 +178,9 @@ requires the same shape for a second, concrete caller.
 
 ## Interaction patterns: buttons, tabs and lists
 
+Start with the short [UI/UX checklist](./ux-checklist.md) for the user's goal,
+understandable actions, consequences and recovery. The rules below cover implementation.
+
 Use the existing `shared/ui` components before composing a page-local alternative.
 Keep feature wrappers thin: they supply localized labels, policy/state and event
 handlers; shared components own the repeated markup, styling and accessibility

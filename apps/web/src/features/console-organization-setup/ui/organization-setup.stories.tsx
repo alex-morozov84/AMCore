@@ -1,9 +1,7 @@
-import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
-import { expect, userEvent, within } from 'storybook/test'
-
-import { getConsoleOrganizationDetailHref } from '@/shared/lib/console-public-href'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import messages from '../../../../messages/en.json'
 import russian from '../../../../messages/ru.json'
@@ -68,6 +66,7 @@ type Story = StoryObj<typeof meta>
 export const Eligible: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: t.trustedStart }))
     expect(await canvas.findByRole('heading', { name: t.headings.administrator })).toBeVisible()
     expect(canvas.getByRole('button', { name: t.continue })).toBeVisible()
     expect(canvas.getByLabelText(t.email)).toBeVisible()
@@ -80,7 +79,7 @@ export const NotReady: Story = {
       handlers: [
         session,
         http.get(`${root}/status`, () =>
-          HttpResponse.json({ binding, data: { state: 'not-ready', reason: 'creation-enabled' } })
+          HttpResponse.json({ binding, data: { state: 'not-ready', reason: 'templates-unavailable' } })
         ),
       ],
     },
@@ -95,7 +94,8 @@ export const OrganizationAlreadyExists: Story = {
   parameters: { msw: { handlers: [session, status('existing-org-without-receipt')] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    expect(await canvas.findByText(t.existingOrganizationHelp)).toBeVisible()
+    await waitFor(() => expect(canvas.queryByRole('heading', { name: t.title })).not.toBeInTheDocument())
+    expect(canvas.queryByRole('button', { name: t.refresh })).not.toBeInTheDocument()
     expect(canvas.queryByText(t.deploymentHelp)).not.toBeInTheDocument()
     expect(canvas.queryByRole('button', { name: t.continue })).not.toBeInTheDocument()
   },
@@ -104,6 +104,7 @@ export const RecipientNeedsVerification: Story = {
   parameters: { msw: { handlers: [session, status(), prepare(false), account(false)] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: t.trustedStart }))
     await userEvent.type(await canvas.findByLabelText(t.email), selected.email)
     await userEvent.click(canvas.getByRole('button', { name: t.continue }))
     expect(await canvas.findByText(t.unverified)).toBeVisible()
@@ -117,6 +118,7 @@ export const VerifiedAccountAndBack: Story = {
   parameters: { msw: { handlers: [session, status(), prepare(true), account(true)] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: t.trustedStart }))
     await userEvent.type(await canvas.findByLabelText(t.email), selected.email)
     await userEvent.click(canvas.getByRole('button', { name: t.continue }))
     expect(await canvas.findByRole('heading', { name: t.headings.organization })).toBeVisible()
@@ -140,51 +142,24 @@ export const Completed: Story = {
   parameters: { msw: { handlers: [session, status('completed-intact'), account(true)] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    expect(await canvas.findByRole('heading', { name: t.states['completed-intact'] })).toBeVisible()
-    expect(
-      await canvas.findByText(t.completedAdministrator.replace('{email}', selected.email))
-    ).toBeVisible()
-    expect(canvas.getByText(t.nextSteps)).toBeVisible()
-    expect(canvas.getByRole('link', { name: t.openOrganization })).toHaveAttribute(
-      'href',
-      new URL(
-        localizedFrontendUrl(
-          'https://fixture.invalid',
-          DEFAULT_LOCALE,
-          getConsoleOrganizationDetailHref('company')
-        )
-      ).pathname
-    )
-    expect(canvas.queryByText(t.verified)).not.toBeInTheDocument()
-    expect(canvas.queryByRole('button', { name: t.continue })).not.toBeInTheDocument()
+    await waitFor(() => expect(canvas.queryByText(t.loading)).not.toBeInTheDocument())
+    expect(canvas.queryByRole('heading', { name: t.title })).not.toBeInTheDocument()
   },
 }
 export const AccessChanged: Story = {
   parameters: { msw: { handlers: [session, status('completed-changed'), account(true)] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    expect(
-      await canvas.findByRole('heading', { name: t.states['completed-changed'] })
-    ).toBeVisible()
-    expect(canvas.getByText(t.changedHelp)).toBeVisible()
-    expect(canvas.getByRole('link', { name: t.openAdministrator })).toBeVisible()
-    expect(canvas.queryByText(t.nextSteps)).not.toBeInTheDocument()
-    expect(canvas.queryByText(t.verified)).not.toBeInTheDocument()
+    await waitFor(() => expect(canvas.queryByText(t.loading)).not.toBeInTheDocument())
+    expect(canvas.queryByRole('heading', { name: t.title })).not.toBeInTheDocument()
   },
 }
 export const CompletedRussian: Story = {
-  parameters: {
-    messages: russian,
-    msw: { handlers: [session, status('completed-intact'), account(true)] },
-  },
+  parameters: { messages: russian, msw: { handlers: [session, status('completed-intact'), account(true)] } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    const ru = russian.console.organizationSetup
-    expect(
-      await canvas.findByRole('heading', { name: ru.states['completed-intact'] })
-    ).toBeVisible()
-    expect(canvas.getByText(ru.nextSteps)).toBeVisible()
-    expect(canvas.queryByText(ru.verified)).not.toBeInTheDocument()
+    await waitFor(() => expect(canvas.queryByText(russian.console.organizationSetup.loading)).not.toBeInTheDocument())
+    expect(canvas.queryByRole('heading', { name: russian.console.organizationSetup.title })).not.toBeInTheDocument()
   },
 }
 
@@ -232,5 +207,23 @@ export const RecipientUnavailableRussian: Story = {
     expect(canvas.queryByText(ru.loading)).not.toBeInTheDocument()
     await userEvent.click(canvas.getByRole('button', { name: ru.changeRecipient }))
     expect(await canvas.findByLabelText(ru.email)).toHaveValue(selected.email)
+  },
+}
+
+export const UnknownSetupBeforeHide: Story = {
+  beforeEach: () => {
+    sessionStorage.setItem('amcore:initial-organization-setup:v1', JSON.stringify({
+      version: 1, binding, actorId: 'operator', selected,
+      draft: { email: selected.email, name: 'Anna shop', slug: 'anna-shop' }, step: 'review',
+      pending: { kind: 'bootstrap', input: { name: 'Anna shop', slug: 'anna-shop', adminUserId: selected.userId } },
+    }))
+  },
+  parameters: { msw: { handlers: [session, status('existing-org-without-receipt'), account(true)] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    expect(await canvas.findByText(t.unknown)).toBeVisible()
+    expect(canvas.getByRole('button', { name: t.checkResult })).toBeVisible()
+    expect(canvas.getByRole('button', { name: t.repeat })).toBeVisible()
+    expect(canvas.queryByText(t.existingOrganizationHelp)).not.toBeInTheDocument()
   },
 }

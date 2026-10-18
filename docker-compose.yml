@@ -85,6 +85,12 @@ x-app-env: &app-env
   # Dev-only secret; production requires a real value >= 32 chars (ADR-029/040).
   AUTH_PUBLIC_SIGNUP_ENABLED: ${AUTH_PUBLIC_SIGNUP_ENABLED:-true}
   ORG_SELF_SERVICE_CREATION_ENABLED: ${ORG_SELF_SERVICE_CREATION_ENABLED:-true}
+  # Secret-bearing invitations use direct email; all backend roles need matching mail/link settings.
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-mock}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  EMAIL_FROM: ${EMAIL_FROM:-noreply@amcore.com}
+  SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@amcore.com}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3002}
   JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-min-32-characters-change-me}
   # Storage: local by default; set STORAGE_DRIVER=s3 + the vars below for real S3.
   STORAGE_DRIVER: ${STORAGE_DRIVER:-local}

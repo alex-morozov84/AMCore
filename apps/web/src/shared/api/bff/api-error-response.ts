@@ -21,6 +21,7 @@ export interface ApiErrorParams {
   message: string
   errorCode?: string
   errors?: ValidationError[]
+  details?: Record<string, unknown>
 }
 
 /**
@@ -41,6 +42,7 @@ export function apiErrorResponse(request: Request, params: ApiErrorParams): Next
     path: new URL(request.url).pathname,
     method: request.method,
     correlationId: crypto.randomUUID(),
+    ...(params.details ? { details: params.details } : {}),
     ...(params.errors ? { errors: params.errors } : {}),
   }
 

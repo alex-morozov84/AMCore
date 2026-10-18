@@ -1,0 +1,30 @@
+// Bounded administrator invitation work; addresses remain in the retained OrgInvite only.
+model OrganizationAdministratorInvitation {
+  id                 String @id @db.Uuid
+  organizationId     String
+  creatorUserId      String
+  fingerprintVersion Int @default(1)
+  fingerprint        String @db.VarChar(64)
+  createdAt          DateTime @default(now())
+  revision           Int @default(1)
+  state              String @default("awaiting")
+  currentInviteId    String? @unique
+  currentGeneration  Int?
+  inviteLocale       String?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  attemptId          String? @db.Uuid
+  attemptInviteId    String?
+  attemptGeneration  Int?
+  attemptAt          DateTime?
+  mailOutcome        String?
+  mailObservedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  currentInvite OrgInvite? @relation(fields: [currentInviteId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, state, createdAt, id])
+  @@index([state, completedAt, cancelledAt])
+  @@map("organization_administrator_invitations")
+  @@schema("core")
+}

@@ -1,0 +1,37 @@
+CREATE TABLE core.organization_provisionings (
+  "operationId" UUID NOT NULL,
+  "creatorUserId" TEXT NOT NULL,
+  "organizationId" TEXT NOT NULL,
+  "fingerprintVersion" INTEGER NOT NULL DEFAULT 1,
+  "fingerprint" VARCHAR(64) NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "revision" INTEGER NOT NULL DEFAULT 1,
+  "state" TEXT NOT NULL DEFAULT 'awaiting',
+  "currentInviteId" TEXT,
+  "currentGeneration" INTEGER,
+  "inviteLocale" TEXT,
+  "completedAt" TIMESTAMP(3),
+  "cancelledAt" TIMESTAMP(3),
+  "originalAdminUserId" TEXT,
+  "originalMemberId" TEXT,
+  "originalAdminRoleId" TEXT,
+  "originalAdminGrantId" TEXT,
+  "attemptId" UUID,
+  "attemptInviteId" TEXT,
+  "attemptGeneration" INTEGER,
+  "attemptAt" TIMESTAMP(3),
+  "mailOutcome" TEXT,
+  "mailObservedAt" TIMESTAMP(3),
+  PRIMARY KEY ("operationId"),
+  CHECK (revision > 0 AND "fingerprintVersion" = 1),
+  CHECK (("currentInviteId" IS NULL) = ("currentGeneration" IS NULL)),
+  CHECK (state IN ('awaiting', 'completed', 'cancelled')),
+  CHECK ((state = 'completed') = ("completedAt" IS NOT NULL)),
+  CHECK ((state = 'cancelled') = ("cancelledAt" IS NOT NULL)),
+  CHECK ((state = 'completed' AND "originalAdminUserId" IS NOT NULL AND "originalMemberId" IS NOT NULL AND "originalAdminRoleId" IS NOT NULL AND "originalAdminGrantId" IS NOT NULL)
+    OR (state <> 'completed' AND "originalAdminUserId" IS NULL AND "originalMemberId" IS NULL AND "originalAdminRoleId" IS NULL AND "originalAdminGrantId" IS NULL)),
+  CHECK (state = 'awaiting' OR "currentInviteId" IS NULL),
+  CHECK ("mailOutcome" IS NULL OR "mailOutcome" IN ('unconfirmed', 'provider_acknowledged', 'mock'))
+);
+CREATE UNIQUE INDEX organization_provisionings_org_key ON core.organization_provisionings ("organizationId");
+CREATE UNIQUE INDEX organization_provisionings_invite_key ON core.organization_provisionings ("currentInviteId");

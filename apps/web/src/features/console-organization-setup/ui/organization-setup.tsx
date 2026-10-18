@@ -33,6 +33,13 @@ export function OrganizationSetup() {
   const sessionThrottled = useRetryDeadline(
     session.error ? session.errorUpdatedAt + (getRetryAfterMs(session.error) ?? 0) : undefined
   )
+  if (session.data && !session.isError)
+    return (
+      <BoundSetup
+        key={`${session.data.binding}:${session.data.actor.id}`}
+        admission={session.data}
+      />
+    )
   return (
     <Card>
       <CardHeader>
@@ -54,11 +61,6 @@ export function OrganizationSetup() {
               {t('refresh')}
             </Button>
           </>
-        ) : session.data ? (
-          <BoundSetup
-            key={`${session.data.binding}:${session.data.actor.id}`}
-            admission={session.data}
-          />
         ) : null}
       </CardContent>
     </Card>

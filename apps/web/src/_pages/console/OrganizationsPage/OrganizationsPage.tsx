@@ -1,3 +1,7 @@
+import { OrganizationAttention } from '@/features/console-organization-administration'
+
+import { OrganizationProvisioning } from '@/features/console-organization-provisioning'
+
 import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
 
@@ -45,7 +49,9 @@ export async function OrganizationsPage({
     <section className="flex flex-col gap-4">
       <ConsoleRestorePosition />
       <h1 className="text-3xl font-semibold tracking-tight">{t('organizations')}</h1>
+      <OrganizationProvisioning />
       <OrganizationSetup />
+      <OrganizationAttention />
       <DiscoverySearchBoundary
         baseHref={baseHref}
         search={search}

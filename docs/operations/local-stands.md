@@ -65,6 +65,34 @@ The fixed-shop example uses `--fixture organization-shop` on a fresh Docker E2E
 instead: buyer signup stays enabled and self-service organization creation is disabled.
 It has no mail collector or initial-account mutation helper access.
 
+<!-- AMCORE_CONSOLE_PROVISIONING_STAND_START -->
+
+### Organization creation and first-administrator invitation
+
+Use a separate closed-registration fixture for operator provisioning:
+
+```sh
+pnpm stand e2e --lane console-real-stack --fixture organization-provisioning -- organization-provisioning.spec.ts
+```
+
+This fresh fixture selects Resend with fake credentials. Its sanitized source copy
+routes direct mail to the same internal collector; SDK fallback URLs also remain
+internal. It does not contact Resend or prove external inbox delivery. The fixture
+keeps the managed development environment; it does not bypass production startup
+requirements or prove production TLS configuration.
+
+The test prepares only its first operator account through the guarded setup helper.
+It uses an actual recovery email before granting that disposable account platform
+access. Organization creation then uses Console. The recipient receives the actual
+rendered invitation and verification emails, registers through the invitation and
+explicitly accepts. Registration and verification must leave membership empty.
+The helper cannot bootstrap an organization or administer the recipient account.
+
+The collector, ownership checks and secret-artifact restrictions above also apply
+to this fixture. It cannot reuse a preview or send mail to ordinary addresses.
+
+<!-- AMCORE_CONSOLE_PROVISIONING_STAND_END -->
+
 <!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_START -->
 
 Test the same lifecycle through the HTTPS Console with:

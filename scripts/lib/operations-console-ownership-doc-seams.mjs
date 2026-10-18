@@ -15,6 +15,30 @@ const section = (start, end) => ({ start, end, retainEnd: true })
 const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
+  ...['SEARCH', 'URLS'].map((marker) =>
+    entry(
+      `console.provisioning-${marker.toLowerCase()}`,
+      'docs/product-admin/organization-provisioning.md',
+      block(
+        `<!-- AMCORE_CONSOLE_PROVISIONING_${marker}_START -->`,
+        `<!-- AMCORE_CONSOLE_PROVISIONING_${marker}_END -->`
+      ),
+      [`AMCORE_CONSOLE_PROVISIONING_${marker}_START`],
+      { operationKey: 'console.provisioning-guide' }
+    )
+  ),
+  ...[
+    ['provisioning', 'docs/product-admin/organization-provisioning.md', 'PROVISIONING'],
+    ['administration', 'docs/product-admin/organization-administration.md', 'ADMINISTRATION'],
+    ['provisioning-stand', 'docs/operations/local-stands.md', 'PROVISIONING_STAND'],
+  ].map(([id, path, marker]) =>
+    entry(
+      `console.${id}-guide`,
+      path,
+      block(`<!-- AMCORE_CONSOLE_${marker}_START -->`, `<!-- AMCORE_CONSOLE_${marker}_END -->`),
+      ['console-real-stack', `AMCORE_CONSOLE_${marker}_START`]
+    )
+  ),
   entry(
     'console.establishment-guide',
     'docs/product-admin/organization-establishment.md',

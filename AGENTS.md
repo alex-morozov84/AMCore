@@ -142,6 +142,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   operation, or registered extension point. Completely novel unmarked meaning
   cannot be inferred reliably: the author and reviewer must classify it and
   add a marker/extension contract when it belongs to an optional dimension.
+- **Documentation writing:** before creating or changing documentation, read
+  [`docs/documentation-guide.md`](docs/documentation-guide.md). Use its reader,
+  scope, verification and brevity rules; do not add a new review gate for routine edits.
 - **Docs impact check is required.** Before editing, identify which public docs
   the task can affect. When behavior, API contracts, extension points, security
   invariants, operations, commands, or contributor workflow change, update the
@@ -304,6 +307,9 @@ step, never `db:migrate`. See `docs/operations/deployment.md`.
   universal.** Both marker packages are installed in `apps/web`; use them when
   the capability boundary applies, and do not add marker imports to ordinary
   universal modules.
+- **Frontend usability:** before designing or materially changing a user journey,
+  read and apply `docs/frontend/ux-checklist.md`. Check it again before owner
+  preview; record the pattern choice, actual checks and gaps in task evidence.
 - **Frontend interaction patterns:** read
   `docs/frontend/architecture-and-conventions.md#interaction-patterns-buttons-tabs-and-lists`
   before adding buttons, tabs, filters or list/detail journeys. Reuse shared

@@ -40,6 +40,7 @@ function setup() {
     query: TemplateStringsArray | { strings: string[] }
   ) => {
     const sql = ('strings' in query ? query.strings : query).join('')
+    if (sql.includes('core.organization_provisionings')) return []
     if (sql.includes('core.roles')) return [role]
     if (sql.includes('core.org_invites'))
       return [{ id: 'invitation', generation: 1, expiresAt: new Date(now.getTime() + 60000) }]
@@ -243,7 +244,8 @@ describe('actual issuance acknowledgment and snapshot', () => {
           query: TemplateStringsArray | { strings: string[] }
         ) => {
           const sql = ('strings' in query ? query.strings : query).join('')
-          if (sql.includes('core.roles')) return [role]
+          if (sql.includes('core.organization_provisionings')) return []
+    if (sql.includes('core.roles')) return [role]
           if (sql.includes('core.org_invites'))
             return [
               {

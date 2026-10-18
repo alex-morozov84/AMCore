@@ -1,22 +1,39 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+export const isOrganizationMailFixture = (m) =>
+  ['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)
+
 export function assertOrganizationSetupFixture(m) {
   if (m.fixtureProfile === 'organization-shop' && (m.purpose !== 'e2e' || m.mocked))
     throw new Error('Organization shop fixture requires a fresh Docker E2E allocation')
-  if (m.fixtureProfile !== 'organization-setup') return
+  if (!isOrganizationMailFixture(m)) return
   if (m.purpose !== 'e2e' || m.mocked || !/^[a-f0-9]{64}$/.test(m.mailCaptureKey ?? ''))
     throw new Error('Organization setup fixture requires a fresh Docker E2E allocation')
 }
 
-/** Replaces only a sanitized copy's mock transport. Production source and env schema stay unchanged. */
+/** Replaces only a sanitized copy's selected transport. Production code has no capture option. */
 export async function prepareOrganizationSetupSource(m) {
-  if (m.fixtureProfile !== 'organization-setup') return
+  if (!isOrganizationMailFixture(m)) return
   assertOrganizationSetupFixture(m)
-  const path = join(m.snapshot, 'apps/api/src/infrastructure/email/providers/mock.provider.ts')
-  const source = await readFile(path, 'utf8')
+  const provisioning = m.fixtureProfile === 'organization-provisioning'
+  const provider = provisioning ? 'resend' : 'mock'
+  const path = join(
+    m.snapshot,
+    `apps/api/src/infrastructure/email/providers/${provider}.provider.ts`
+  )
+  let source = await readFile(path, 'utf8')
+  if (provisioning) {
+    if (!source.includes("baseUrl: 'https://api.resend.com'"))
+      throw new Error('Fixture provider transport changed')
+    // Even non-direct SDK paths remain internal and fail closed at the collector.
+    source = source.replace(
+      "baseUrl: 'https://api.resend.com'",
+      "baseUrl: 'http://mail-capture:8099'"
+    )
+  }
   const start = source.indexOf('  async send(params: SendEmailParams): Promise<SendEmailResult> {')
-  const end = source.indexOf('\n  }\n}', start)
+  const end = source.indexOf('\n  }', start)
   if (start < 0 || end < 0)
     throw new Error('Mock email transport changed; fixture adaptation required')
   const body = `  async send(params: SendEmailParams): Promise<SendEmailResult> {

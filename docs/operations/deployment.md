@@ -1194,3 +1194,7 @@ The API emits ESM. Preserve its `package.json` with `type: module` alongside
 `dist`, runtime dependencies and the current shared package. The standard image
 build runs native type checking before emission. Do not deploy output from a
 failed build. See [API build and ESM runtime](../backend/api-build.md).
+
+## Operator organization provisioning
+
+After trusted SUPER_ADMIN access, migrations and guarded role initialization, use [organization provisioning](../product-admin/organization-provisioning.md) for the first or later organization. In production configure `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM` and public product `FRONTEND_URL`; the reference Compose forwards these to API and worker. Apply configuration to every API replica. `production` with `mock` rejects new operator administrator invitations before commit. Real-provider failure after commit retains the organization for explicit recovery. Console-disabled installations use the same protected backend API.

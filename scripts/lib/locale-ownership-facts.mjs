@@ -102,6 +102,20 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one(
+      'apps/web/src/features/console-organization-provisioning/ui/organization-provisioning.stories.tsx',
+      { disposition: 'rewrite' }
+    ),
+    one(
+      'apps/web/src/features/console-organization-provisioning/ui/provisioning-management.stories.tsx',
+      { disposition: 'rewrite' }
+    ),
+    one(
+      'apps/web/src/features/console-organization-administration/ui/organization-administration.stories.tsx',
+      { disposition: 'rewrite' }
+    ),
+    one('apps/web/e2e/organization-provisioning/recipient.ts', { disposition: 'rewrite' }),
+
     one('apps/web/src/features/console-organization-setup/ui/organization-setup.stories.tsx', {
       disposition: 'rewrite',
     }),

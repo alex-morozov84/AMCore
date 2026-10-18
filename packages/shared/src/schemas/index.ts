@@ -468,3 +468,7 @@ export * from './organization-members-budget'
 export * from './role-definition'
 export * from './role-definition-budget'
 export * from './storage-probe-setting'
+
+export * from './organization-provisioning'
+
+export * from './organization-administration'

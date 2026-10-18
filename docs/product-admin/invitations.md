@@ -146,3 +146,19 @@ Some choices move or delete files. Follow the
 [project scaffolding guide](../frontend/brand-theme-and-tokens.md#project-scaffolding)
 before applying them to a fork. Custom presentation still uses the same
 invitation permissions, recovery and recipient consent contract.
+
+For the first ADMIN of an operator-created organization, use [organization provisioning](organization-provisioning.md). Its initial invitation has separate operator recovery; ordinary member invitation controls cannot change that active invitation. Recipient login, verification and consent remain the same.
+
+## Platform-managed administrator invitations
+
+Both initial provisioning and additional administrator invitations belong to the
+[platform administrator workflow](organization-administration.md). Ordinary
+manager create/reissue/revoke cannot change an active managed invitation, including
+an expired retained link. An already committed ordinary replay stays read-only.
+The platform workflow does not bypass ordinary `TeamAccess` authority.
+
+For these managed invitations only, an existing non-ADMIN member cannot silently
+receive ADMIN through acceptance. The platform operator must select the exact
+member and explicitly confirm the assignment. Ordinary unmarked `already_access`
+still preserves roles. An existing ADMIN still explicitly accepts a managed
+invitation; no duplicate role grant is created.

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
 
@@ -17,9 +17,11 @@ import { EmailIdentityService } from '../auth/email-identity.service.js'
 import {
   currentInvitationIntent,
   invitationDefaultRole,
-  invitationRoleCreate,
   lockInvitationRoles,
 } from '../invitations/invitation-role-intent.js'
+
+import { rejectManagedInvitation } from '../invitations/provisioning-settlement.js'
+import { issueInvitation } from '../invitations/invitation-issuance.js'
 
 import { assertInvitationActor, type InvitationActor } from './invitation-actor.js'
 import { InvitationAuthorization } from './invitation-authorization.js'
@@ -86,6 +88,7 @@ export class InvitationCommandService {
         invitationFingerprint(intent)
       )
       if (replay !== undefined) return null
+      await rejectManagedInvitation(tx, orgId, command.kind === 'create' ? { email: canonical! } : { id: command.id })
       const result =
         command.kind === 'create'
           ? await this.create(tx, orgId, command.dto, canonical!, actor)
@@ -185,20 +188,11 @@ export class InvitationCommandService {
         throw invitationConflict(InviteErrorCode.INVITE_ALREADY_PENDING)
       if (locked) await tx.orgInvite.delete({ where: { id: locked.id } })
     }
-    const token = randomBytes(32).toString('base64url')
-    const row = await tx.orgInvite.create({
-      data: {
-        organizationId: orgId,
-        email: dto.email,
-        emailCanonical: canonical,
-        tokenHash: this.hash(token),
-        expiresAt: new Date(now.getTime() + 7 * 86_400_000),
-        issuedAt: now,
-        invitedById: actor.principal.sub,
-        roleIntents: { create: invitationRoleCreate(roles) },
-      },
-      select: { id: true },
+    const row = await issueInvitation(tx, {
+      organizationId: orgId, email: dto.email, emailCanonical: canonical,
+      actorId: actor.principal.sub, roles, now,
     })
+    const token = row.token
     await this.record(
       tx,
       orgId,
@@ -251,20 +245,9 @@ export class InvitationCommandService {
     if (invite.generation === 2_147_483_647)
       throw invitationConflict(InviteErrorCode.INVITE_GENERATION_CONFLICT)
     await this.limiter.consume(orgId, invite.emailCanonical, actor.principal.sub)
-    const token = randomBytes(32).toString('base64url')
-    await tx.orgInviteRoleIntent.deleteMany({ where: { inviteId: id } })
-    await tx.orgInvite.update({
-      where: { id },
-      data: {
-        generation: { increment: 1 },
-        tokenHash: this.hash(token),
-        issuedAt: now,
-        issuedAtEstimated: false,
-        intentInvalid: false,
-        invitedById: actor.principal.sub,
-        expiresAt: new Date(now.getTime() + 7 * 86_400_000),
-        roleIntents: { create: invitationRoleCreate(roles) },
-      },
+    const { token } = await issueInvitation(tx, {
+      organizationId: orgId, email: invite.email, emailCanonical: invite.emailCanonical,
+      actorId: actor.principal.sub, roles, now, current: invite,
     })
     await this.record(
       tx,
