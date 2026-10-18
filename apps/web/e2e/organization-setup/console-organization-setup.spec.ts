@@ -47,6 +47,7 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await page.goto(
     localizedFrontendUrl(m.origins.console, coerceSupportedLocale('en'), 'organizations')
   )
+  await page.getByRole('button', { name: en.trustedStart, exact: true }).click()
   await expect(page.getByRole('heading', { name: en.headings.administrator })).toBeVisible()
   await expectNoAxeViolations(page)
 
