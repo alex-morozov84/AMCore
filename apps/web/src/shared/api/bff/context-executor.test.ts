@@ -37,6 +37,28 @@ const operation = {
 }
 
 describe('typed context executor', () => {
+  it('enforces separate upstream and envelope byte budgets including Unicode at the exact boundary', async () => {
+    const { deps, expected } = fixture()
+    const apiBytes = 245760
+    const name = 'я'.repeat(Math.floor((apiBytes - 11) / 2)) + 'a'.repeat((apiBytes - 11) % 2)
+    const data = { name }
+    expect(new TextEncoder().encode(JSON.stringify(data)).byteLength).toBe(apiBytes)
+    const envelopeBytes = new TextEncoder().encode(
+      JSON.stringify({ binding: expected, data })
+    ).byteLength
+    const bounded = { ...operation, responseBytes: apiBytes, envelopeBytes: 262144 }
+    deps.fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json(data)))
+    const input = { expectedSession: expected, headers: new Headers() }
+    expect((await executeContextOperation(bounded, input, deps)).data).toEqual(data)
+    await expect(
+      executeContextOperation({ ...bounded, envelopeBytes: envelopeBytes - 1 }, input, deps)
+    ).rejects.toMatchObject({ status: 502 })
+    deps.fetch = vi.fn().mockResolvedValue(Response.json({ name: name + 'a' }))
+    await expect(executeContextOperation(bounded, input, deps)).rejects.toMatchObject({
+      status: 502,
+    })
+  })
+
   it('preserves exact202 invitation acknowledgment with code-owned operation proof', async () => {
     const { deps, expected } = fixture()
     const operationId = '01900000-0000-7000-8000-000000000000'
@@ -380,4 +402,27 @@ describe('closed administrator conflict projection', () => {
       )
     ).rejects.toMatchObject({ status: 409, details: undefined })
   })
+})
+
+// The code-owned member-key deadline includes vault refresh, dispatch and parsing.
+it('allows a member-key acknowledgment after the generic five-second deadline', async () => {
+  vi.useFakeTimers()
+  try {
+    const { deps, expected } = fixture()
+    deps.fetch = vi.fn(
+      () =>
+        new Promise<Response>((resolve) =>
+          setTimeout(() => resolve(Response.json({ name: 'Renamed' })), 6500)
+        )
+    )
+    const pending = executeContextOperation(
+      { ...operation, timeoutMs: 15000 },
+      { expectedSession: expected, headers: new Headers() },
+      deps
+    )
+    await vi.advanceTimersByTimeAsync(6500)
+    await expect(pending).resolves.toMatchObject({ data: { name: 'Renamed' } })
+  } finally {
+    vi.useRealTimers()
+  }
 })

@@ -27,6 +27,7 @@ import {
   teardownE2ETest,
 } from './helpers'
 import { acceptInvitationForTest, invitationSeedRole } from './helpers/invitation-contract'
+import { keyTestActor } from './helpers/member-key-actor'
 import { holdMemberTransaction, waitForDbBlock } from './helpers/organization-members-race'
 const jest = import.meta.jest
 
@@ -209,7 +210,7 @@ describe('Organization member reads and atomic role set (real DB)', () => {
               )
             : kind === 'remove'
               ? service.removeRole(orgId, userId, roleId, principal())
-              : service.removeMember(orgId, userId, principal())
+              : service.removeMember(orgId, userId, keyTestActor(principal()))
         await waitForDbBlock(pool)
         hold.release()
         expect((await first).status).toBe(200)
@@ -237,7 +238,7 @@ describe('Organization member reads and atomic role set (real DB)', () => {
           ? service.assignRole(orgId, userId, custom.id, principal())
           : kind === 'remove'
             ? service.removeRole(orgId, userId, roleId, principal())
-            : service.removeMember(orgId, userId, principal())
+            : service.removeMember(orgId, userId, keyTestActor(principal()))
       let replacement: Promise<request.Response> | undefined
       try {
         await hold.entered
@@ -394,7 +395,7 @@ describe('Organization member reads and atomic role set (real DB)', () => {
     const reading = context.app.get(MemberQueryService).list(orgId, orgId, { page: 1, limit: 20 })
     try {
       await entered
-      await context.app.get(MemberService).removeMember(orgId, userId, principal())
+      await context.app.get(MemberService).removeMember(orgId, userId, keyTestActor(principal()))
       resume()
       const result = await reading
       expect(result.total).toBe(2)
@@ -577,7 +578,7 @@ describe('Organization member reads and atomic role set (real DB)', () => {
   })
   it('R2 removed and rejoined user cannot accept an old membership draft', async () => {
     const input = await dto([])
-    await context.app.get(MemberService).removeMember(orgId, userId, principal())
+    await context.app.get(MemberService).removeMember(orgId, userId, keyTestActor(principal()))
     const next = await seedOrgMember(prisma, { orgId, userId, roleId })
     const fresh = await prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
     await save({ ...input, expectedAclVersion: fresh.aclVersion }).expect(409)

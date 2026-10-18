@@ -2,6 +2,7 @@
 export type { ApiError, ApiResponse } from './api'
 export type { ApiErrorResponse, ValidationError } from './api-errors'
 export type { JwtPayload } from './jwt'
+export * from './member-api-keys'
 export type { OAuthTokens, OAuthUserProfile } from './oauth'
 export * from './organization-administration'
 export type { OrganizationContextFamily } from './organization-context'

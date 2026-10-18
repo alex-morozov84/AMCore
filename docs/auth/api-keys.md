@@ -8,14 +8,14 @@ API keys are for server-to-server access — scripts, integrations, CI pipelines
 
 ## How API keys differ from user tokens
 
-|                 | JWT (user session)                                | API key                                                       |
-| --------------- | ------------------------------------------------- | ------------------------------------------------------------- |
-| **Issued via**  | Login flow                                        | `POST /api/v1/api-keys` (JWT-auth)                            |
-| **Lifetime**    | 15 min access / 7 days refresh                    | Set at creation, or no expiry                                 |
-| **Permissions** | Full user permissions                             | `userPerms ∩ apiKey.scopes` (see Effective permissions below) |
-| **Header**      | `Authorization: Bearer eyJ...`                    | `Authorization: Bearer amcore_live_...`                       |
-| **Org context** | Picked via `/switch`                              | Bound to one org at creation                                  |
-| **Revocable**   | Session revocation blocks refresh; access expires | `DELETE /api/v1/api-keys/:id`                                 |
+|                 | JWT (user session)                                                   | API key                                                       |
+| --------------- | -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Issued via**  | Login flow                                                           | `POST /api/v1/api-keys` (JWT-auth)                            |
+| **Lifetime**    | 15 min access / 7 days refresh                                       | Set at creation, or no expiry                                 |
+| **Permissions** | Full user permissions                                                | `userPerms ∩ apiKey.scopes` (see Effective permissions below) |
+| **Header**      | `Authorization: Bearer eyJ...`                                       | `Authorization: Bearer amcore_live_...`                       |
+| **Org context** | Path selection on covered routes; `/switch` for legacy bound context | Bound to one org at creation                                  |
+| **Revocable**   | Session revocation blocks refresh; access expires                    | `DELETE /api/v1/api-keys/:id`                                 |
 
 Both auth methods use the same `Authorization: Bearer` header — the server tells them apart by the token format. JWTs are `eyJ...`; API keys are `amcore_live_...`.
 
@@ -157,7 +157,7 @@ The allowlist:
 | `DELETE /organizations/:id`                                                                           | ✅                | Requires trusted owner TeamAccess, exact `manage:TeamAccess` scope, and scoped owner delete authority on every Organization scalar.                                                                                                                                                                                                           |
 | `/organizations/:id/switch`                                                                           | ❌                | Mints a new JWT — would let a scoped key trade itself for a full-permission token.                                                                                                                                                                                                                                                            |
 | `GET /organizations/:id/capabilities` and `POST /organizations/:id/roles/:roleId/permissions/presets` | ❌                | Role-editor discovery and preset authoring require an employee bearer token and full TeamAccess.                                                                                                                                                                                                                                              |
-| `/organizations/:id/members/**`                                                                       | ✅                | Member management requires full owner TeamAccess and exact `manage:TeamAccess` scope. Role assignment validates role ownership — a member of org A cannot be assigned a custom role from org B.                                                                                                                                               |
+| Existing member DELETE and legacy single-role writes                                                  | ✅                | Only existing member DELETE and legacy POST/DELETE role assignment accept keys with full owner TeamAccess and exact `manage:TeamAccess`. Member reads, complete role replacement, access explanation and member-key inventory/revoke are bearer-only. Role ownership remains organization-bound.                                              |
 | `/organizations/:id/roles/**`                                                                         | ✅                | Org-role management requires full owner TeamAccess and exact `manage:TeamAccess` scope. `GET /organizations/:id/roles` requires `principal.organizationId === :id` so an admin switched into one org cannot enumerate another org's role/permission catalogue.                                                                                |
 | `/api-keys/**`                                                                                        | ❌                | Credential management — you can't create/list/revoke keys with a key.                                                                                                                                                                                                                                                                         |
 | `/auth/sessions/**`                                                                                   | ❌                | Browser session management — out of scope for integrations.                                                                                                                                                                                                                                                                                   |
@@ -184,7 +184,7 @@ API-key route fails CI until runtime auth and Swagger security metadata agree.
 
 ## Organization binding
 
-An API key is bound to one organization at creation. The runtime re-verifies on every request that the key's owner is still a member of that organization — membership removal denies authentication but retains the key. Rejoining can restore access to an unexpired, unrevoked key within current rights/scopes. This is the chosen membership policy; explicit revocation remains irreversible.
+An API key is bound to one organization at creation. The runtime re-verifies on every request that the key's owner is still a member of that organization — successful supported membership removal permanently revokes the member's keys in that organization. Rejoining requires a new key. The removal transaction retains safe metadata and audit; it does not restore authenticating verifier data. More than1000 unrevoked keys refuses removal without changes; see [member-key controls](../product-admin/member-api-keys.md).
 
 | Scenario                                   | Result                                 |
 | ------------------------------------------ | -------------------------------------- |
@@ -320,3 +320,10 @@ export AMCORE_API_KEY="amcore_live_..."
 **Replace deliberately.** For planned replacement create a new own key, migrate/test consumers, then revoke the old key. For suspected compromise revoke first, even if it causes downtime. There is no dedicated rotation endpoint, scope editing or reactivation. Scopes are an immutable issuance ceiling, not a permission snapshot: future owner grants can enlarge access within that ceiling. Last use cannot prove consumer migration.
 
 Safe metadata becomes purge-eligible30 days after the first expiry or revocation. Nightly/manual cleanup removes eligible rows; parent user/organization Cascade may remove them sooner. Audit retention is separate. No legacy deleted history can be recovered. No-expiry and past-expiry issuance remain supported. See the [deployment and restore runbook](../operations/api-key-lifecycle.md).
+
+## Organization administrator controls
+
+[Member-key management](../product-admin/member-api-keys.md) supplies bearer-only,
+org+member-scoped safe inventory and permanent single/all revocation. It does not
+extend owner-wide list/revoke authority to unrelated organizations. Owner endpoints
+remain available for cleanup even after loss of membership.

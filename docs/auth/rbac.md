@@ -43,10 +43,10 @@ Layer 2 — Org permissions  org membership + roles + permissions, evaluated by 
 A **system role** is a server-wide access level stored on the user record and
 mirrored into the JWT.
 
-| Role          | Assigned to         | What it grants                                           |
-| ------------- | ------------------- | -------------------------------------------------------- |
-| `USER`        | Everyone by default | Normal platform access; still subject to org permissions |
-| `SUPER_ADMIN` | Platform owner(s)   | Full access to everything, including the admin panel     |
+| Role          | Assigned to         | What it grants                                                                  |
+| ------------- | ------------------- | ------------------------------------------------------------------------------- |
+| `USER`        | Everyone by default | Normal platform access; still subject to org permissions                        |
+| `SUPER_ADMIN` | Platform owner(s)   | Platform owner grant; route credential, membership and scope checks still apply |
 
 `SUPER_ADMIN` is granted manually — there is no self-promotion endpoint. In a
 controller, gate a route with `@SystemRoles`:
@@ -628,3 +628,17 @@ the last builtin ADMIN and persists audit in the same transaction. Self-edit
 warnings cover any role change: custom DENY rules can remove access after adding
 a role. The next request evaluates fresh authority; a previously admitted write
 can still commit. UI role names do not predict the resulting permission set.
+
+## Member credential administration
+
+[Member-key inventory and revocation](../product-admin/member-api-keys.md) requires
+personal bearer auth, selected current membership and full TeamAccess, including
+membership for SUPER_ADMIN. A synthetic JWT owner grant requires both an original
+SUPER_ADMIN claim and a live SUPER_ADMIN role; promotion never elevates an old USER
+claim. An API key must belong to the selected organization as well as satisfy its
+owner's membership and the route's exact scope requirement.
+Existing original-bound live SUPER_ADMIN JWT DELETE
+retains its explicitly supported membership bypass; personal unbound JWT does not.
+Supported member removal now permanently revokes organization keys in the same
+transaction. At1001 unrevoked keys it refuses atomically; deployment maintenance
+may be required for bounded recovery. Rejoin cannot restore an old revoked secret.

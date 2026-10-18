@@ -35,7 +35,12 @@ export interface ApiKeyListItem {
   lastUsedAt: string | null
   createdAt: string
   revokedAt: string | null
-  revocationReason: 'owner_revoked' | 'platform_revoked' | null
+  revocationReason:
+    | 'owner_revoked'
+    | 'platform_revoked'
+    | 'organization_admin_revoked'
+    | 'membership_removed'
+    | null
   status: 'unexpired' | 'expired' | 'revoked'
 }
 
@@ -61,6 +66,7 @@ export class ApiKeysService {
     const keyHash = this.hashLongToken(longToken, salt)
 
     const apiKey = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM core.organizations WHERE id = ${input.organizationId} FOR UPDATE`
       const membership = await tx.orgMember.findUnique({
         where: { userId_organizationId: { userId, organizationId: input.organizationId } },
         select: { id: true },

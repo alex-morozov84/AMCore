@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 
 import { EmailModule } from '../../infrastructure/email/index.js'
 import { PrismaModule } from '../../prisma/index.js'
+import { ApiKeysModule } from '../api-keys/api-keys.module.js'
 import { AuditModule } from '../audit/index.js'
 import { AuthModule } from '../auth/auth.module.js'
 import { InvitationAuthorityModule } from '../invitations/invitation-authority.module.js'
@@ -25,6 +26,9 @@ import { InviteRevokeService } from './invite-revoke.service.js'
 import { InvitesController } from './invites.controller.js'
 import { MemberService } from './member.service.js'
 import { MemberAccessService } from './member-access/member-access.service.js'
+import { MemberKeyController } from './member-api-keys/member-key.controller.js'
+import { MemberKeyCommandService } from './member-api-keys/member-key-command.service.js'
+import { MemberKeyQueryService } from './member-api-keys/member-key-query.service.js'
 import { MemberQueryService } from './member-query.service.js'
 import { MemberRoleSetService } from './member-role-set.service.js'
 import { MembersController } from './members.controller.js'
@@ -46,6 +50,7 @@ import { RolesController } from './roles.controller.js'
 @Module({
   imports: [
     PrismaModule,
+    ApiKeysModule,
     InvitationAuthorityModule,
     AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global) + UserCacheService + EmailIdentityService
     AuditModule,
@@ -59,6 +64,7 @@ import { RolesController } from './roles.controller.js'
     CapabilitiesController,
     PresetPermissionsController,
     MembersController,
+    MemberKeyController,
     RoleDefinitionsController,
     RolesController,
     InvitesController,
@@ -74,6 +80,8 @@ import { RolesController } from './roles.controller.js'
     OrganizationCreationService,
     CapabilityRegistry,
     MemberService,
+    MemberKeyCommandService,
+    MemberKeyQueryService,
     MemberQueryService,
     MemberAccessService,
     MemberRoleSetService,

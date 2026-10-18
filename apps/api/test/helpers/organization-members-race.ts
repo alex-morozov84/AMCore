@@ -82,13 +82,13 @@ export function holdMemberTransaction(
     },
   }
 }
-export async function waitForDbBlock(pool: Pool): Promise<void> {
+export async function waitForDbBlock(pool: Pool, minimum = 1): Promise<void> {
   const end = Date.now() + 3000
   while (Date.now() < end) {
     const result = await pool.query(
       'SELECT pid FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0'
     )
-    if (result.rowCount) return
+    if ((result.rowCount ?? 0) >= minimum) return
   }
   throw new Error('No actual DB waiter observed')
 }

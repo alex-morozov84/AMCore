@@ -1,0 +1,822 @@
+import { createHash, randomBytes } from 'node:crypto'
+
+import { JwtService } from '@nestjs/jwt'
+import { Pool } from 'pg'
+import request from 'supertest'
+
+import { SystemRole } from '@amcore/shared'
+
+import { ApiKeyRevocationService } from '../src/core/api-keys/api-key-revocation.service'
+import { ApiKeysModule } from '../src/core/api-keys/api-keys.module'
+import { AuditLogService } from '../src/core/audit'
+import { InviteService } from '../src/core/organizations/invite.service'
+
+import {
+  cleanDatabase,
+  cleanOrgData,
+  type E2ETestContext,
+  seedOrgMember,
+  seedSystemRoles,
+  setupE2ETest,
+  teardownE2ETest,
+} from './helpers'
+import { acceptInvitationForTest, invitationSeedRole } from './helpers/invitation-contract'
+import {
+  deferred,
+  holdMemberTransaction,
+  waitForDbBlock,
+} from './helpers/organization-members-race'
+const jest = import.meta.jest
+
+describe('Organization member credential control (real DB)', () => {
+  let pool: Pool
+  let c: E2ETestContext
+  let admin: string, memberToken: string, orgId: string, userId: string, memberId: string
+  const http = () => c.app.getHttpServer()
+  const base = () => `/organizations/${orgId}/members/${userId}/api-keys`
+  beforeAll(async () => {
+    c = await setupE2ETest()
+    pool = new Pool({ connectionString: c.postgresContainer.getConnectionUri() })
+    await seedSystemRoles(c.prisma)
+  }, 120000)
+  afterAll(async () => {
+    await pool?.end()
+    if (c) await teardownE2ETest(c)
+  }, 120000)
+  beforeEach(async () => {
+    await cleanOrgData(c.prisma)
+    await cleanDatabase(c.prisma, c.cache, c.throttlerStorage)
+    admin = (
+      await request(http())
+        .post('/auth/register')
+        .send({ email: 'keys-admin@example.test', password: 'StrongP@ss123' })
+        .expect(201)
+    ).body.accessToken
+    orgId = (
+      await request(http())
+        .post('/organizations')
+        .auth(admin, { type: 'bearer' })
+        .send({ name: 'Key control' })
+        .expect(201)
+    ).body.id
+    memberToken = (
+      await request(http())
+        .post('/auth/register')
+        .send({ email: 'keys-member@example.test', password: 'StrongP@ss123' })
+        .expect(201)
+    ).body.accessToken
+    userId = c.app.get(JwtService).verify(memberToken).sub
+    const role = await c.prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })
+    memberId = (await seedOrgMember(c.prisma, { orgId, userId, roleId: role.id })).memberId
+  })
+  const create = async () =>
+    (
+      await request(http())
+        .post('/api-keys')
+        .auth(memberToken, { type: 'bearer' })
+        .send({ name: 'Worker integration', organizationId: orgId, scopes: ['read:Organization'] })
+        .expect(201)
+    ).body
+  const read = () =>
+    request(http())
+      .get(base())
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+  const revoke = (keyId?: string) =>
+    request(http())
+      .post(`${base()}/${keyId ? `${keyId}/revoke` : 'revoke-all'}`)
+      .auth(admin, { type: 'bearer' })
+      .send({ expectedMemberId: memberId })
+
+  it('safe snapshot and explicit idempotent single revoke retain first audit and verifier destruction', async () => {
+    const key = await create()
+    const list = await read().expect(200)
+    expect(list.body).toMatchObject({ total: 1, revocableCount: 1, member: { memberId, userId } })
+    for (const secret of [key.key, 'keyHash', 'shortToken', 'salt'])
+      expect(JSON.stringify(list.body)).not.toContain(secret)
+    await revoke(key.id)
+      .expect(200)
+      .expect((r) => expect(r.body.affectedCount).toBe(1))
+    const first = await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+    expect(first).toMatchObject({
+      keyHash: null,
+      salt: null,
+      revocationReason: 'organization_admin_revoked',
+    })
+    await revoke(key.id)
+      .expect(200)
+      .expect((r) => expect(r.body.affectedCount).toBe(0))
+    expect((await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt).toEqual(
+      first.revokedAt
+    )
+    expect(
+      await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+    ).toBe(1)
+    await request(http()).get('/auth/me').auth(key.key, { type: 'bearer' }).expect(401)
+  })
+  it('requires live membership and team authority; keys never manage credentials', async () => {
+    const key = await create()
+    await request(http())
+      .get(base())
+      .query({ expectedMemberId: memberId })
+      .auth(memberToken, { type: 'bearer' })
+      .expect(403)
+    for (const operation of ['read', 'single', 'all']) {
+      const r =
+        operation === 'read'
+          ? request(http()).get(base()).query({ expectedMemberId: memberId })
+          : request(http())
+              .post(`${base()}/${operation === 'single' ? `${key.id}/revoke` : 'revoke-all'}`)
+              .send({ expectedMemberId: memberId })
+      await r.auth(key.key, { type: 'bearer' }).expect(401)
+    }
+    await request(http())
+      .post(`${base()}/revoke-all`)
+      .auth(admin, { type: 'bearer' })
+      .send({ expectedMemberId: 'different-member' })
+      .expect(409)
+  })
+  it('rejects foreign key selectors and revokes across pages including expired rows', async () => {
+    await create()
+    const otherOrg = (
+      await request(http())
+        .post('/organizations')
+        .auth(admin, { type: 'bearer' })
+        .send({ name: 'Other' })
+        .expect(201)
+    ).body.id
+    const foreign = (
+      await request(http())
+        .post('/api-keys')
+        .auth(admin, { type: 'bearer' })
+        .send({ name: 'Foreign', organizationId: otherOrg, scopes: ['read:Organization'] })
+        .expect(201)
+    ).body
+    await revoke(foreign.id).expect(404)
+    await c.prisma.apiKey.createMany({
+      data: Array.from({ length: 25 }, (_, i) => ({
+        name: 'Expired integration',
+        shortToken: `expired-${i}`,
+        keyHash: 'hash',
+        salt: 'salt',
+        userId,
+        organizationId: orgId,
+        expiresAt: new Date(Date.now() - 1000),
+      })),
+    })
+    await revoke()
+      .expect(200)
+      .expect((r) => expect(r.body).toMatchObject({ requestedCount: 26, affectedCount: 26 }))
+    expect(
+      await c.prisma.apiKey.count({ where: { organizationId: orgId, userId, revokedAt: null } })
+    ).toBe(0)
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: foreign.id } })).revokedAt
+    ).toBeNull()
+    await revoke()
+      .expect(200)
+      .expect((r) => expect(r.body.requestedCount).toBe(0))
+  })
+  it('real deletion revokes keys; recreated membership never restores an old secret', async () => {
+    const key = await create()
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(admin, { type: 'bearer' })
+      .expect(204)
+    expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toMatchObject({
+      keyHash: null,
+      salt: null,
+      revocationReason: 'membership_removed',
+    })
+    const role = await c.prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })
+    const rawToken = randomBytes(32).toString('base64url')
+    const recipient = c.app.get(JwtService).verify(memberToken)
+    await c.prisma.user.update({ where: { id: userId }, data: { emailVerified: true } })
+    await c.prisma.orgInvite.create({
+      data: {
+        organizationId: orgId,
+        email: recipient.email,
+        emailCanonical: recipient.email,
+        ...(await invitationSeedRole(c.prisma, role.id)),
+        invitedById: c.app.get(JwtService).verify(admin).sub,
+        tokenHash: createHash('sha256').update(rawToken).digest('hex'),
+        expiresAt: new Date(Date.now() + 60000),
+      },
+    })
+    await acceptInvitationForTest(
+      c.app.get(InviteService),
+      c.prisma,
+      rawToken,
+      { type: 'jwt', sub: userId, email: recipient.email, systemRole: SystemRole.User },
+      '127.0.0.1'
+    )
+    const joined = await c.prisma.orgMember.findUniqueOrThrow({
+      where: { userId_organizationId: { userId, organizationId: orgId } },
+    })
+    expect(joined.id).not.toBe(memberId)
+    await request(http()).get('/auth/me').auth(key.key, { type: 'bearer' }).expect(401)
+    await read().expect(409)
+  })
+  it('1001 refuses all and deletion atomically even when metadata is oversized', async () => {
+    await c.prisma.apiKey.createMany({
+      data: Array.from({ length: 1001 }, (_, i) => ({
+        name: 'Many',
+        shortToken: `many-${i}`,
+        keyHash: 'hash',
+        salt: 'salt',
+        userId,
+        organizationId: orgId,
+        scopes: i === 1000 ? ['x'.repeat(70000)] : [],
+      })),
+    })
+    await read().expect(503)
+    await revoke().expect(409)
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(admin, { type: 'bearer' })
+      .expect(409)
+    expect(await c.prisma.apiKey.count({ where: { organizationId: orgId, revokedAt: null } })).toBe(
+      1001
+    )
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+  })
+  it('audit failure rolls back key transition, membership and ACL', async () => {
+    const key = await create()
+    const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+    const audit = jest
+      .spyOn(c.app.get(AuditLogService), 'record')
+      .mockRejectedValueOnce(new Error('Audit unavailable'))
+    try {
+      await request(http())
+        .delete(`/organizations/${orgId}/members/${userId}`)
+        .auth(admin, { type: 'bearer' })
+        .expect(503)
+    } finally {
+      audit.mockRestore()
+    }
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+    expect(
+      (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+    ).toBe(before.aclVersion)
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt
+    ).toBeNull()
+  })
+  it('preserves only the original-bound live SUPER_ADMIN legacy deletion exception', async () => {
+    const claims = c.app.get(JwtService).verify(admin)
+    await c.prisma.user.update({
+      where: { id: claims.sub },
+      data: { systemRole: SystemRole.SuperAdmin },
+    })
+    await c.prisma.orgMember.deleteMany({ where: { organizationId: orgId, userId: claims.sub } })
+    const { iat: _, exp: __, ...rest } = claims
+    const bound = c.app
+      .get(JwtService)
+      .sign({ ...rest, systemRole: SystemRole.SuperAdmin, organizationId: orgId })
+    const personal = c.app.get(JwtService).sign({ ...rest, systemRole: SystemRole.SuperAdmin })
+    await request(http())
+      .get(base())
+      .query({ expectedMemberId: memberId })
+      .auth(bound, { type: 'bearer' })
+      .expect(403)
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(personal, { type: 'bearer' })
+      .expect(403)
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(bound, { type: 'bearer' })
+      .expect(204)
+  })
+  it('live SUPER_ADMIN with membership uses synthetic trust without an org role', async () => {
+    const claims = c.app.get(JwtService).verify(admin)
+    await c.prisma.user.update({
+      where: { id: claims.sub },
+      data: { systemRole: SystemRole.SuperAdmin },
+    })
+    const actorMembership = await c.prisma.orgMember.findUniqueOrThrow({
+      where: { userId_organizationId: { userId: claims.sub, organizationId: orgId } },
+    })
+    await c.prisma.memberRole.deleteMany({ where: { memberId: actorMembership.id } })
+    await request(http())
+      .get(base())
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(403)
+    const login = await request(http())
+      .post('/auth/login')
+      .send({ email: claims.email, password: 'StrongP@ss123' })
+      .expect(200)
+    const key = await create()
+    await request(http())
+      .get(base())
+      .query({ expectedMemberId: memberId })
+      .auth(login.body.accessToken, { type: 'bearer' })
+      .expect(200)
+    await request(http())
+      .post(`${base()}/${key.id}/revoke`)
+      .send({ expectedMemberId: memberId })
+      .auth(login.body.accessToken, { type: 'bearer' })
+      .expect(200)
+    const operatorKey = (
+      await request(http())
+        .post('/api-keys')
+        .auth(login.body.accessToken, { type: 'bearer' })
+        .send({
+          name: 'Synthetic owner operator',
+          organizationId: orgId,
+          scopes: ['manage:TeamAccess'],
+        })
+        .expect(201)
+    ).body
+    await request(http())
+      .get(base())
+      .query({ expectedMemberId: memberId })
+      .auth(operatorKey.key, { type: 'bearer' })
+      .expect(401)
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(operatorKey.key, { type: 'bearer' })
+      .expect(204)
+  })
+  it.each([
+    ['read:Organization', 403],
+    ['manage:TeamAccess', 204],
+  ] as const)('legacy member DELETE requires exact key scope %s', async (scope, status) => {
+    const key = (
+      await request(http())
+        .post('/api-keys')
+        .auth(admin, { type: 'bearer' })
+        .send({ name: 'Removal operator', organizationId: orgId, scopes: [scope] })
+        .expect(201)
+    ).body
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(key.key, { type: 'bearer' })
+      .expect(status)
+    expect(Boolean(await c.prisma.orgMember.findUnique({ where: { id: memberId } }))).toBe(
+      status !== 204
+    )
+  })
+  it('oversized identity refuses inventory while bounded ID revocation still works', async () => {
+    const key = await create()
+    await c.prisma.user.update({ where: { id: userId }, data: { name: 'x'.repeat(17000) } })
+    await read().expect(503)
+    await revoke(key.id).expect(200)
+  })
+  it.each(['create-first', 'all-first', 'remove-first'] as const)(
+    'serializes %s with controlled real database barriers',
+    async (order) => {
+      await create()
+      const hold = holdMemberTransaction(c.prisma, false)
+      let first: Promise<request.Response> | undefined,
+        second: Promise<request.Response> | undefined
+      try {
+        first =
+          order === 'create-first'
+            ? create()
+            : order === 'all-first'
+              ? revoke().then((r) => r)
+              : request(http())
+                  .delete(`/organizations/${orgId}/members/${userId}`)
+                  .auth(admin, { type: 'bearer' })
+                  .then((r) => r)
+        await hold.entered
+        second =
+          order === 'create-first'
+            ? revoke().then((r) => r)
+            : request(http())
+                .post('/api-keys')
+                .auth(memberToken, { type: 'bearer' })
+                .send({ name: 'Late', organizationId: orgId, scopes: ['read:Organization'] })
+                .then((r) => r)
+        await waitForDbBlock(pool)
+        hold.release()
+        const [a, b] = await Promise.all([first, second])
+        const observed =
+          order === 'create-first'
+            ? ['id' in a ? typeof a.id : 'undefined', b.body.affectedCount]
+            : order === 'all-first'
+              ? [a.body.affectedCount, b.status]
+              : [a.status, b.status]
+        const expected = {
+          'create-first': ['string', 2],
+          'all-first': [1, 201],
+          'remove-first': [204, 403],
+        }
+        expect(observed).toEqual(expected[order])
+        expect(
+          await c.prisma.apiKey.count({ where: { organizationId: orgId, userId, revokedAt: null } })
+        ).toBe(order === 'all-first' ? 1 : 0)
+      } finally {
+        hold.restore()
+        await Promise.allSettled([...(first ? [first] : []), ...(second ? [second] : [])])
+      }
+    }
+  )
+  it('rechecks actor roles after waiting on organization lock', async () => {
+    const key = await create()
+    const actor = c.app.get(JwtService).verify(admin).sub
+    const connection = await pool.connect()
+    let pending: Promise<request.Response> | undefined
+    try {
+      await connection.query('BEGIN')
+      await connection.query('SELECT id FROM core.organizations WHERE id=$1 FOR UPDATE', [orgId])
+      pending = revoke(key.id).then((r) => r)
+      await waitForDbBlock(pool)
+      await connection.query(
+        'DELETE FROM core.member_roles WHERE "memberId"=(SELECT id FROM core.org_members WHERE "userId"=$1 AND "organizationId"=$2)',
+        [actor, orgId]
+      )
+      await connection.query(
+        'UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=$1',
+        [orgId]
+      )
+      await connection.query('COMMIT')
+      expect((await pending).status).toBe(403)
+      expect(
+        (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt
+      ).toBeNull()
+    } finally {
+      await connection.query('ROLLBACK')
+      connection.release()
+      if (pending) await Promise.allSettled([pending])
+    }
+  })
+
+  it('system demotion while the actor lock is held defeats stale synthetic trust', async () => {
+    const claims = c.app.get(JwtService).verify(admin)
+    await c.prisma.user.update({
+      where: { id: claims.sub },
+      data: { systemRole: SystemRole.SuperAdmin },
+    })
+    const membership = await c.prisma.orgMember.findUniqueOrThrow({
+      where: { userId_organizationId: { userId: claims.sub, organizationId: orgId } },
+    })
+    await c.prisma.memberRole.deleteMany({ where: { memberId: membership.id } })
+    const login = await request(http())
+      .post('/auth/login')
+      .send({ email: claims.email, password: 'StrongP@ss123' })
+      .expect(200)
+    const connection = await pool.connect()
+    let pending: Promise<request.Response> | undefined
+    try {
+      await connection.query('BEGIN')
+      await connection.query('SELECT id FROM core.users WHERE id=$1 FOR UPDATE', [claims.sub])
+      pending = request(http())
+        .post(`${base()}/revoke-all`)
+        .auth(login.body.accessToken, { type: 'bearer' })
+        .send({ expectedMemberId: memberId })
+        .then((r) => r)
+      await waitForDbBlock(pool)
+      await connection.query('UPDATE core.users SET "systemRole"=$2 WHERE id=$1', [
+        claims.sub,
+        'USER',
+      ])
+      await connection.query('COMMIT')
+      expect((await pending).status).toBe(403)
+    } finally {
+      await connection.query('ROLLBACK')
+      connection.release()
+      if (pending) await Promise.allSettled([pending])
+    }
+  })
+  it.each(['all', 'single', 'remove'] as const)(
+    'cleanup between selection and key lock: %s',
+    async (operation) => {
+      const key = await create()
+      await c.prisma.apiKey.update({
+        where: { id: key.id },
+        data: { expiresAt: new Date(Date.now() - 31 * 86400000) },
+      })
+      const connection = await pool.connect()
+      let pending: Promise<request.Response> | undefined
+      try {
+        await connection.query('BEGIN')
+        await connection.query('SELECT id FROM core.api_keys WHERE id=$1 FOR UPDATE', [key.id])
+        const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+        pending =
+          operation === 'remove'
+            ? request(http())
+                .delete(`/organizations/${orgId}/members/${userId}`)
+                .auth(admin, { type: 'bearer' })
+                .then((r) => r)
+            : revoke(operation === 'single' ? key.id : undefined).then((r) => r)
+        await waitForDbBlock(pool)
+        await connection.query('DELETE FROM core.api_keys WHERE id=$1', [key.id])
+        await connection.query('COMMIT')
+        const result = await pending
+        expect(result.status).toBe(
+          operation === 'remove' ? 204 : operation === 'single' ? 404 : 200
+        )
+        const member = await c.prisma.orgMember.findUnique({ where: { id: memberId } })
+        const after = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+        const summary = await c.prisma.auditLog.findFirst({
+          where: { action: 'organization.member_removed', targetId: userId },
+        })
+        const observed = {
+          body: result.body,
+          memberPresent: Boolean(member),
+          aclDelta: after.aclVersion - before.aclVersion,
+          summary: summary?.metadata,
+        }
+        const expected = {
+          all: { body: { requestedCount: 1, affectedCount: 0 }, memberPresent: true, aclDelta: 0 },
+          single: {
+            body: { errorCode: 'MEMBER_API_KEY_UNAVAILABLE' },
+            memberPresent: true,
+            aclDelta: 0,
+          },
+          remove: {
+            memberPresent: false,
+            aclDelta: 1,
+            summary: { selectedKeyCount: 1, revokedKeyCount: 0 },
+          },
+        }
+        expect(observed).toMatchObject(expected[operation])
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(0)
+      } finally {
+        await connection.query('ROLLBACK')
+        connection.release()
+        if (pending) await Promise.allSettled([pending])
+      }
+    }
+  )
+  const removal = () =>
+    request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(admin, { type: 'bearer' })
+      .then((r) => r)
+  function holdTransition() {
+    const entered = deferred(),
+      release = deferred()
+    const service = c.app.select(ApiKeysModule).get(ApiKeyRevocationService, { strict: true })
+    const original = service.revokeMember.bind(service)
+    const spy = jest.spyOn(service, 'revokeMember').mockImplementationOnce(async (...args) => {
+      const result = await original(...args)
+      entered.resolve()
+      await release.promise
+      return result
+    })
+    return {
+      entered: entered.promise,
+      release: release.resolve,
+      restore: () => {
+        release.resolve()
+        spy.mockRestore()
+      },
+    }
+  }
+  it.each(['owner', 'platform'] as const)(
+    '%s first transition survives an overlapping organization all command',
+    async (kind) => {
+      const key = await create()
+      const service = c.app.get(ApiKeyRevocationService)
+      const entered = deferred(),
+        release = deferred()
+      const actor = kind === 'owner' ? userId : c.app.get(JwtService).verify(admin).sub
+      const first = c.prisma.$transaction(async (tx) => {
+        await service.revoke([key.id], actor, kind === 'platform', tx)
+        const row = await tx.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+        entered.resolve()
+        await release.promise
+        return row
+      })
+      let second: Promise<request.Response> | undefined
+      try {
+        await entered.promise
+        second = revoke().then((r) => r)
+        await waitForDbBlock(pool)
+        release.resolve()
+        const row = await first
+        expect((await second).body).toMatchObject({ requestedCount: 1, affectedCount: 0 })
+        expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toEqual(row)
+        expect(row.revocationReason).toBe(kind === 'owner' ? 'owner_revoked' : 'platform_revoked')
+        expect(row.revokedByUserId).toBe(actor)
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(1)
+      } finally {
+        release.resolve()
+        await Promise.allSettled([first, ...(second ? [second] : [])])
+      }
+    }
+  )
+  it.each(['single', 'all', 'remove'] as const)(
+    'organization %s wins against overlapping owner and platform revocation',
+    async (operation) => {
+      const key = await create()
+      const hold = holdTransition()
+      const first =
+        operation === 'remove'
+          ? removal()
+          : revoke(operation === 'single' ? key.id : undefined).then((r) => r)
+      const service = c.app.get(ApiKeyRevocationService)
+      let others: Array<Promise<unknown>> = []
+      try {
+        await Promise.race([
+          hold.entered,
+          first.then(() => {
+            throw new Error('Command missed transition fence')
+          }),
+        ])
+        others = [
+          service.revoke([key.id], userId, false),
+          service.revoke([key.id], c.app.get(JwtService).verify(admin).sub, true),
+        ]
+        await waitForDbBlock(pool, 2)
+        hold.release()
+        expect((await first).status).toBe(operation === 'remove' ? 204 : 200)
+        const row = await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+        expect(await Promise.all(others)).toEqual([
+          { requestedCount: 1, affectedCount: 0 },
+          { requestedCount: 1, affectedCount: 0 },
+        ])
+        expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toEqual(row)
+        expect(row.revocationReason).toBe(
+          operation === 'remove' ? 'membership_removed' : 'organization_admin_revoked'
+        )
+        expect(row.revokedByUserId).toBe(c.app.get(JwtService).verify(admin).sub)
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(1)
+      } finally {
+        hold.restore()
+        await Promise.allSettled([first, ...others])
+      }
+    }
+  )
+  it.each([
+    ['user', 'all'],
+    ['user', 'remove'],
+    ['organization', 'all'],
+    ['organization', 'remove'],
+  ] as const)(
+    '%s cascade waits or rolls back against organization %s without partial audit',
+    async (parent, operation) => {
+      const key = await create()
+      const hold = holdTransition()
+      const first = operation === 'remove' ? removal() : revoke().then((r) => r)
+      const connection = await pool.connect()
+      let cascade: Promise<{ deleted: boolean; code?: string }> | undefined
+      try {
+        await Promise.race([
+          hold.entered,
+          first.then(() => {
+            throw new Error('Command missed transition fence')
+          }),
+        ])
+        await connection.query('BEGIN')
+        await connection.query("SET LOCAL lock_timeout = '4000ms'")
+        cascade = connection
+          .query(
+            parent === 'user'
+              ? 'DELETE FROM core.users WHERE id=$1'
+              : 'DELETE FROM core.organizations WHERE id=$1',
+            [parent === 'user' ? userId : orgId]
+          )
+          .then(
+            () => ({ deleted: true }),
+            (error: { code: string }) => ({ deleted: false, code: error.code })
+          )
+        await waitForDbBlock(pool)
+        hold.release()
+        const response = await first
+        const outcome = await cascade
+        await connection.query(outcome.deleted ? 'COMMIT' : 'ROLLBACK')
+        const committed = response.status === (operation === 'remove' ? 204 : 200)
+        // PostgreSQL may select either transaction as the deadlock victim.
+        const allowed = committed
+          ? [{ deleted: true }, { deleted: false, code: '40P01' }]
+          : [{ deleted: true }]
+        expect(allowed).toContainEqual(outcome)
+        expect([operation === 'remove' ? 204 : 200, 409, 503]).toContain(response.status)
+        const errors: Record<number, string> = {
+          409: 'MEMBER_API_KEYS_CONFLICT',
+          503: 'MEMBER_API_KEYS_WRITE_UNAVAILABLE',
+        }
+        expect(response.body.errorCode).toBe(errors[response.status])
+        const remaining = await c.prisma.apiKey.findUnique({ where: { id: key.id } })
+        expect(Boolean(remaining)).toBe(!outcome.deleted)
+        expect(Boolean(remaining?.revokedAt)).toBe(!outcome.deleted && committed)
+        expect(Boolean(await c.prisma.orgMember.findUnique({ where: { id: memberId } }))).toBe(
+          !outcome.deleted && operation === 'all'
+        )
+        const survivingParent =
+          parent === 'user'
+            ? await c.prisma.user.findUnique({ where: { id: userId } })
+            : await c.prisma.organization.findUnique({ where: { id: orgId } })
+        expect(Boolean(survivingParent)).toBe(!outcome.deleted)
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(Number(committed))
+        expect(
+          await c.prisma.auditLog.count({
+            where: {
+              action:
+                operation === 'remove'
+                  ? 'organization.member_removed'
+                  : 'organization.api_keys.revocation_requested',
+              targetId: userId,
+            },
+          })
+        ).toBe(Number(committed))
+      } finally {
+        hold.restore()
+        await Promise.allSettled([first, ...(cascade ? [cascade] : [])])
+        await connection.query('ROLLBACK')
+        connection.release()
+      }
+    }
+  )
+  it('recovery platform batch requires step-up and accepts its returned access token', async () => {
+    const key = await create()
+    const actorId = c.app.get(JwtService).verify(admin).sub
+    await c.prisma.user.update({
+      where: { id: actorId },
+      data: { systemRole: SystemRole.SuperAdmin },
+    })
+    const login = await request(http())
+      .post('/auth/login')
+      .send({ email: 'keys-admin@example.test', password: 'StrongP@ss123' })
+      .expect(200)
+    const token = login.body.accessToken as string
+    const { sid } = c.app.get(JwtService).verify(token)
+    await c.prisma.session.update({
+      where: { id: sid },
+      data: { lastAuthAt: new Date(Date.now() - 86400000) },
+    })
+    await request(http())
+      .post('/admin/api-keys/revoke')
+      .auth(token, { type: 'bearer' })
+      .send({ ids: [key.id] })
+      .expect(403)
+      .expect((r) => expect(r.body.errorCode).toBe('STEP_UP_REQUIRED'))
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt
+    ).toBeNull()
+    const stepped = await request(http())
+      .post('/auth/step-up')
+      .auth(token, { type: 'bearer' })
+      .send({ password: 'StrongP@ss123' })
+      .expect(200)
+    expect(typeof stepped.body.accessToken).toBe('string')
+    await request(http())
+      .post('/admin/api-keys/revoke')
+      .auth(stepped.body.accessToken, { type: 'bearer' })
+      .send({ ids: [key.id] })
+      .expect(200)
+      .expect((r) => expect(r.body.affectedCount).toBe(1))
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revocationReason
+    ).toBe('platform_revoked')
+  })
+  it('last administrator refusal leaves that administrator key usable', async () => {
+    const actor = c.app.get(JwtService).verify(admin).sub
+    const key = (
+      await request(http())
+        .post('/api-keys')
+        .auth(admin, { type: 'bearer' })
+        .send({ name: 'Admin integration', organizationId: orgId, scopes: ['read:Organization'] })
+        .expect(201)
+    ).body
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${actor}`)
+      .auth(admin, { type: 'bearer' })
+      .expect(400)
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt
+    ).toBeNull()
+    await request(http()).get('/auth/me').auth(key.key, { type: 'bearer' }).expect(200)
+  })
+  it('1000 transitions and their required summary metadata remain atomic and bounded', async () => {
+    await c.prisma.apiKey.createMany({
+      data: Array.from({ length: 1000 }, (_, i) => ({
+        name: 'Bounded',
+        shortToken: `bounded-${i}`,
+        keyHash: 'hash',
+        salt: 'salt',
+        userId,
+        organizationId: orgId,
+      })),
+    })
+    await revoke()
+      .expect(200)
+      .expect((r) => expect(r.body).toMatchObject({ requestedCount: 1000, affectedCount: 1000 }))
+    const summary = await c.prisma.auditLog.findFirstOrThrow({
+      where: { action: 'organization.api_keys.revocation_requested', organizationId: orgId },
+    })
+    expect(summary.metadata).toMatchObject({
+      requestedCount: 1000,
+      affectedCount: 1000,
+      memberId,
+      operation: 'all',
+      reason: 'organization_admin_revoked',
+    })
+    expect(
+      await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', organizationId: orgId } })
+    ).toBe(1000)
+  })
+})

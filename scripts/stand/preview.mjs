@@ -20,6 +20,7 @@ export async function preview(m, profile = 'default') {
     'organization',
     'organization-roles',
     'organization-creation',
+    'member-api-keys',
   ]
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_START
   profiles.push('notification-work')
@@ -91,6 +92,10 @@ export async function preview(m, profile = 'default') {
       await organizationFixture(m, api)
     }
     if (profile === 'organization-roles') await organizationRolesFixture(m, api)
+    if (profile === 'member-api-keys') {
+      const { memberApiKeysFixture } = await import('./member-api-keys-fixture.mjs')
+      await memberApiKeysFixture(m, api)
+    }
     // AMCORE_CONSOLE_NOTIFICATION_FIXTURE_START
     if (profile === 'notification-work') {
       const { notificationWorkFixture } = await import('./notification-work-fixture.mjs')
@@ -203,6 +208,10 @@ export async function preview(m, profile = 'default') {
     if (profile === 'organization-roles')
       for (const line of organizationRolesAddresses(m, m.localePrefix, m.origins.product))
         console.log(line)
+    if (profile === 'member-api-keys')
+      console.log(
+        `Members: ${m.origins.product}${m.localePrefix}/organizations/${m.organization.id}/members`
+      )
     let scenario = 'login, inspect current changes'
     // AMCORE_CONSOLE_PREVIEW_SCENARIO_START
     scenario += ' and Console access'

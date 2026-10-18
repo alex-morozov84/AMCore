@@ -29,6 +29,7 @@ interface ContextOperationBase {
   readonly organizationId?: string
   readonly body?: unknown
   readonly responseBytes?: number
+  readonly envelopeBytes?: number
   readonly requestBytes?: number
   readonly invitationOperationId?: string
   readonly organizationCreationId?: string
@@ -159,7 +160,8 @@ export async function executeContextOperation<T>(
       const parsed = operation.schema.safeParse(body)
       if (!parsed.success) throw new ContextRequestError(502, 'INVALID_UPSTREAM_RESPONSE')
       const envelope = { binding: captured.binding, data: parsed.data }
-      if (operation.responseBytes && serializedJsonBytes(envelope) > operation.responseBytes)
+      const envelopeBytes = operation.envelopeBytes ?? operation.responseBytes
+      if (envelopeBytes && serializedJsonBytes(envelope) > envelopeBytes)
         throw new ContextRequestError(502, 'INVALID_UPSTREAM_RESPONSE')
       return envelope
     },

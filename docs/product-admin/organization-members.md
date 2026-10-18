@@ -31,7 +31,7 @@ does not retry the earlier write.
 
 ## Ready interface
 
-Each row has **Edit** (roles) and **Access**, which explains what the person can do in this
+Each row has **API keys** for [safe inventory and explicit revocation](member-api-keys.md), **Edit** (roles) and **Access**, which explains what the person can do in this
 organization and which roles give or block it; see the
 [member access explanation](member-access.md).
 

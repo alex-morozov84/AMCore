@@ -236,3 +236,65 @@ describe('administrator command reason boundary', () => {
     }
   )
 })
+
+describe('member credential audit work bounds', () => {
+  it.each([0, 1000])('retains exact member counts at %i without secret fields', (count) => {
+    expect(
+      sanitizeAuditMetadata('organization.api_keys.revocation_requested', {
+        operation: 'all',
+        memberId: 'member-a',
+        requestedCount: count,
+        affectedCount: count,
+        reason: 'organization_admin_revoked',
+        keyHash: '<fake-hash>',
+        salt: '<fake-salt>',
+        key: '<fake-key>',
+      })
+    ).toEqual({
+      operation: 'all',
+      memberId: 'member-a',
+      requestedCount: count,
+      affectedCount: count,
+      reason: 'organization_admin_revoked',
+    })
+    expect(
+      sanitizeAuditMetadata('organization.member_removed', {
+        memberId: 'member-a',
+        selectedKeyCount: count,
+        revokedKeyCount: count,
+        reason: 'membership_removed',
+      })
+    ).toEqual({
+      memberId: 'member-a',
+      selectedKeyCount: count,
+      revokedKeyCount: count,
+      reason: 'membership_removed',
+    })
+  })
+  it('does not broaden the existing platform batch100 bound to the member1000 bound', () => {
+    expect(
+      sanitizeAuditMetadata('organization.api_keys.revocation_requested', {
+        requestedCount: 1001,
+        affectedCount: 1001,
+      })
+    ).toEqual({})
+    expect(
+      sanitizeAuditMetadata('organization.member_removed', {
+        selectedKeyCount: 1001,
+        revokedKeyCount: 1001,
+      })
+    ).toEqual({})
+    expect(
+      sanitizeAuditMetadata('admin.api_keys.revocation_requested', {
+        requestedCount: 100,
+        affectedCount: 100,
+      })
+    ).toEqual({ requestedCount: 100, affectedCount: 100 })
+    expect(
+      sanitizeAuditMetadata('admin.api_keys.revocation_requested', {
+        requestedCount: 101,
+        affectedCount: 101,
+      })
+    ).toEqual({})
+  })
+})

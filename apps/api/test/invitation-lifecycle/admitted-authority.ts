@@ -6,6 +6,7 @@ import { EmailService } from '../../src/infrastructure/email/email.service'
 import { seedOrgMember } from '../helpers'
 import { afterInvitationAdmission, invitationHttp, invitationJwt } from '../helpers/invitation-http'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
+import { keyTestActor } from '../helpers/member-key-actor'
 const jest = import.meta.jest
 
 async function secondAdmin(f: InvitationProofFixture): Promise<void> {
@@ -61,7 +62,9 @@ export function registerAdmittedAuthorityProofs(getFixture: () => InvitationProo
             () => invitationHttp(f, jwt, operation, invite.id),
             async () => {
               if (loss === 'membership')
-                await context.app.get(MemberService).removeMember(orgId, owner.sub, owner)
+                await context.app
+                  .get(MemberService)
+                  .removeMember(orgId, owner.sub, keyTestActor(owner))
               else if (loss === 'role') await roles.deleteRole(orgId, roleId, owner)
               else await roles.removePermission(orgId, roleId, permissionId, owner)
               baseline = await truth(invite.id)

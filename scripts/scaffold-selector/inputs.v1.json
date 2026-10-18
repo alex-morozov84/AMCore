@@ -107,6 +107,7 @@
           "docs/operations-console/development.md",
           "docs/operations/README.md",
           "docs/operations/audit-log.md",
+          "docs/operations/api-key-lifecycle.md",
           "docs/operations/ci-security.md",
           "docs/operations/deployment.md",
           "docs/operations/geoip-setup.md",

@@ -335,12 +335,13 @@ index 48c5b9d..8d2b9bd 100644
  import { ProvisioningController } from './provisioning/provisioning.controller.js'
  import { ProvisioningService } from './provisioning/provisioning.service.js'
  import { ProvisioningLimiterService } from './provisioning/provisioning-limiter.service.js'
-@@ -48,6 +49,7 @@ import { RolesController } from './roles.controller.js'
+@@ -48,7 +49,8 @@ import { RolesController } from './roles.controller.js'
      OrganizationsController,
      CapabilitiesController,
      PresetPermissionsController,
 +    FixtureOrdersController,
      MembersController,
+     MemberKeyController,
      RoleDefinitionsController,
      RolesController,
 diff --git a/apps/api/test/fixture-order-access.e2e-spec.ts b/apps/api/test/fixture-order-access.e2e-spec.ts

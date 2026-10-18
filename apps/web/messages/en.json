@@ -143,7 +143,12 @@
     "ADMIN_OPERATION_EXPIRED": "This request is too old. Check the organization before starting a new action.",
     "ADMIN_INTENT_MISMATCH": "This request was submitted with different details. Recover its original result.",
     "ADMIN_OPERATION_OWNED_BY_OTHER": "Another operator submitted this request. Check the current organization state.",
-    "ADMIN_OPERATION_UNCONFIRMED": "The result is unknown. Check the saved request before trying another action."
+    "ADMIN_OPERATION_UNCONFIRMED": "The result is unknown. Check the saved request before trying another action.",
+    "MEMBER_API_KEY_UNAVAILABLE": "This key is unavailable. Reload the list.",
+    "MEMBER_API_KEYS_CONFLICT": "Membership changed. Reload before confirming a new request.",
+    "MEMBER_API_KEYS_LIMIT": "More than 1000 keys. Contact the deployment operator for bounded maintenance recovery.",
+    "MEMBER_API_KEYS_READ_UNAVAILABLE": "Key metadata is unavailable. Retry loading or contact the deployment operator.",
+    "MEMBER_API_KEYS_WRITE_UNAVAILABLE": "The key operation was not confirmed. Check keys before a new request."
   },
   "validation": {
     "required": "This field is required.",
@@ -332,7 +337,9 @@
         "org.administrator_invitation_replaced": "Administrator recipient changed",
         "org.administrator_invitation_cancelled": "Administrator invitation cancelled",
         "org.administrator_invitation_completed": "Administrator invitation accepted",
-        "org.administrator_assigned": "Organization administrator assigned"
+        "org.administrator_assigned": "Organization administrator assigned",
+        "organization.api_keys.revocation_requested": "Organization member keys revoked",
+        "organization.member_removed": "Organization member removed"
       },
       "draftTimeZone": "Invalid time entered in {zone}. Correct it using the selected time zone.",
       "summaryInterval": "Probe interval",
@@ -584,7 +591,9 @@
       "page": "Page {page} of {pages}",
       "invalidFilters": "Invalid API key filters. Check the IDs and query values.",
       "missing": "One or more keys are no longer available. Refresh the list and select keys again.",
-      "notApplicable": "—"
+      "notApplicable": "—",
+      "organization_admin_revoked": "Revoked by an organization administrator",
+      "membership_removed": "Revoked when membership ended"
     },
     "identityLookup": {
       "lookupSearch": "At least 2 characters",
@@ -1495,7 +1504,8 @@
     "roleDetailsFor": "Open the role {name} in a new tab",
     "actions": "Actions",
     "actionFor": "Actions for {name}",
-    "access": "Access"
+    "access": "Access",
+    "apiKeys": "API keys"
   },
   "invitationRecipient": {
     "signInTitle": "Continue your invitation",
@@ -1933,5 +1943,53 @@
     "disabled": "Organization creation is disabled. An administrator can invite you to an existing organization.",
     "refreshPolicy": "Check availability again",
     "wait": "Wait before repeating this request."
+  },
+  "memberApiKeys": {
+    "title": "API keys",
+    "description": "Keys belonging to this member in the selected organization.",
+    "explanation": "Keys use current membership, permissions and scopes. Unexpired does not mean access is allowed. Last use is approximate.",
+    "filter": "Key status",
+    "all": "All",
+    "unexpired": "Unexpired",
+    "expired": "Expired",
+    "revoked": "Revoked",
+    "revoke": "Revoke…",
+    "revokeAll": "Revoke all…",
+    "confirmOne": "Revoke this key?",
+    "confirmAll": "Revoke all keys for this member?",
+    "irreversible": "Revocation is permanent. Integrations using this key will stop working.",
+    "allWarning": "Permanently revoke every currently unrevoked key for this member in this organization, including expired keys and other pages. New keys can still be created while membership permits.",
+    "confirm": "Revoke permanently",
+    "cancel": "Cancel",
+    "close": "Close",
+    "loading": "Loading keys",
+    "unavailable": "Key access is unavailable.",
+    "counts": "Matching keys: {total}. Revocable: {count, plural, one {# key} other {# keys}}.",
+    "limit": "More than 1000 keys cannot be revoked together. Contact the deployment operator. Removal may require maintenance to stop issuance and revoke keys in batches.",
+    "result": "Revoked: {count, plural, one {# key} other {# keys}}.",
+    "rejected": "The request was refused. No change was confirmed.",
+    "unknown": "The result is unknown. Check the keys before confirming a new request. The previous request will not be repeated.",
+    "refreshFailed": "Revocation succeeded, but the list could not be refreshed.",
+    "check": "Check keys",
+    "retry": "Retry loading",
+    "empty": "No keys",
+    "noMatches": "No keys match this status",
+    "outOfRange": "This page has no keys",
+    "emptyHint": "Choose another status or return to the previous page.",
+    "created": "Created",
+    "expires": "Expires",
+    "lastUsed": "Last used (approximate)",
+    "scopes": "Scopes",
+    "notRecorded": "Not recorded",
+    "noExpiry": "No expiry",
+    "previous": "Previous",
+    "next": "Next",
+    "owner_revoked": "Revoked by the owner",
+    "platform_revoked": "Revoked by a platform operator",
+    "organization_admin_revoked": "Revoked by an organization administrator",
+    "membership_removed": "Revoked when membership ended",
+    "revokedOn": "Revoked: {date}",
+    "identity": "{organization} · {name} · {email}",
+    "selectedOrganization": "Selected organization"
   }
 }

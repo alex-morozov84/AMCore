@@ -34,6 +34,8 @@ export const AUDIT_ACTIONS = [
   'ai.tool.invoked',
   'api_key.created',
   'api_key.revoked',
+  'organization.api_keys.revocation_requested',
+  'organization.member_removed',
   'auth.step_up_failed',
   'auth.step_up_succeeded',
   'background_work.command_intent',

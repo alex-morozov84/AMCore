@@ -13,6 +13,6 @@ import { ApiKeyGuard } from './guards/api-key.guard.js'
   imports: [PrismaModule, AuditModule],
   controllers: [ApiKeysController],
   providers: [ApiKeyRevocationService, ApiKeysService, ApiKeyAbuseLimiterService, ApiKeyGuard],
-  exports: [ApiKeyGuard],
+  exports: [ApiKeyGuard, ApiKeyRevocationService],
 })
 export class ApiKeysModule {}

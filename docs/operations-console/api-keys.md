@@ -66,9 +66,11 @@ parent user/organization deletion can remove it sooner through Cascade. Audit ha
 independent retention. There is no reconstructed history for previously deleted
 keys and no permanent archive guarantee.
 
-Keys remain user-owned and organization-bound. Membership removal retains them
-but denies authentication; rejoining can restore access to an unexpired, unrevoked
-key within current rights/scopes. Explicit revoke is permanent. Organization removal
+Keys remain user-owned and organization-bound. Successful supported membership removal permanently revokes them in that
+organization. Returning members require new keys. More than1000 unrevoked keys
+refuses removal atomically; see [bounded recovery](../operations/api-key-lifecycle.md#more-than-1000-keys-or-oversized-metadata).
+Organization administrator and member-removal reasons are distinct from owner and
+platform revocation. Explicit revoke remains permanent. Organization removal
 warnings/manual key management belong to the product administration workflow.
 
 This screen does not issue keys, edit scopes, rotate via a dedicated endpoint,

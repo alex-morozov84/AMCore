@@ -253,7 +253,7 @@ The account menu and avatar editor have the same kind of fixture:
 `scripts/fixtures/account-avatar-headless.mjs` (see the
 [account menu guide](account-menu-and-profile.md#executed-custom-ui-example)).
 
-The executable `scripts/fixtures/organization-members-headless.mjs` creates a
+The executable `scripts/fixtures/organization-members-headless.mjs` includes an inline member-key panel using the same controller and explicit revoke confirmation. It creates a
 separate disposable consumer with a list and inline editor instead of the ready
 table/dialog. `--projected` also selects single-Russian routing, Console disabled
 and Storybook disabled in that fixture. It prints the managed real-stack browser
@@ -345,3 +345,10 @@ prerequisites, account proof, retention and recovery.
 ## Organizations created by an operator
 
 [Provisioning](organization-provisioning.md) adds protected backend operations and optional Console UI. Console-disabled forks retain that API and the product recipient journey. A custom frontend implements the existing invitation APIs. A fixed shop stores the resulting immutable organization ID server-side and still checks current employee membership; buyer registration never grants staff rights.
+
+## Member-key integration
+
+Use the [member-key guide](member-api-keys.md#custom-presentation-without-ready-ui)
+for `useMemberApiKeys`, named server operations and explicit unknown-result
+handling. Pass the existing organization controller. Do not add a context provider
+inside a dialog or couple product controls to Operations Console.

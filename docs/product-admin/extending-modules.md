@@ -63,3 +63,10 @@ Distinguish a committed write followed by failed reread from a failed write. Nev
 blindly retry an ambiguous write; retirement cannot undo committed SQL. Share one
 context owner across related blocks. The members module supplies atomic assignment replacement; invitation management supplies generation-fenced commands and explicit recipient
 consent; product-specific management journeys remain downstream-owned.
+
+## Member-key integration
+
+Use the [member-key guide](member-api-keys.md#custom-presentation-without-ready-ui)
+for `useMemberApiKeys`, named server operations and explicit unknown-result
+handling. Pass the existing organization controller. Do not add a context provider
+inside a dialog or couple product controls to Operations Console.

@@ -20,6 +20,7 @@ export {
   reissueOrganizationInvitation,
   revokeOrganizationInvitation,
 } from './api/invitations.server'
+export { readMemberKeys, revokeMemberKeys } from './api/member-api-keys.server'
 export { readMemberRoles, readOrganizationMembers, replaceMemberRoles } from './api/members.server'
 export {
   createRoleDefinition,

@@ -175,8 +175,16 @@ describe('Platform API keys (e2e)', () => {
     await bulk(f.admin.token, [f.key.id, 'cm123456789012345678901234']).expect(404)
     expect(await prisma.apiKey.count({ where: { revokedAt: { not: null } } })).toBe(0)
     const audit = app.get(AuditLogService),
-      original = audit.record.bind(audit)
+      original = audit.record.bind(audit),
+      originalMany = audit.recordMany.bind(audit)
     for (const failAction of ['api_key.revoked', 'admin.api_keys.revocation_requested']) {
+      const batchSpy = jestApi
+        .spyOn(audit, 'recordMany')
+        .mockImplementation(async (entries, tx) => {
+          if (entries.some((entry) => entry.action === failAction))
+            throw new Error('forced audit rollback')
+          return originalMany(entries, tx)
+        })
       const spy = jestApi.spyOn(audit, 'record').mockImplementation(async (entry, options) => {
         if (entry.action === failAction) throw new Error('forced audit rollback')
         return original(entry, options)
@@ -185,6 +193,7 @@ describe('Platform API keys (e2e)', () => {
         app.get(ApiKeyRevocationService).revoke([f.key.id, second.id], f.admin.id, true)
       ).rejects.toThrow('forced audit rollback')
       spy.mockRestore()
+      batchSpy.mockRestore()
       expect(await prisma.apiKey.count({ where: { revokedAt: { not: null } } })).toBe(0)
       expect(
         await prisma.auditLog.count({
@@ -231,7 +240,7 @@ describe('Platform API keys (e2e)', () => {
       (await prisma.apiKey.findUniqueOrThrow({ where: { id: f.key.id } })).revokedAt
     ).toBeNull()
   })
-  it('retains membership-removed keys and restores access after rejoin, but never after revoke', async () => {
+  it('denies keys without fixture membership and never restores a revoked verifier', async () => {
     const f = await fixture()
     const member = await prisma.orgMember.findUniqueOrThrow({
       where: { userId_organizationId: { userId: f.owner.id, organizationId: f.organizationId } },
