@@ -43,7 +43,7 @@ async function collectCspViolations(page: Page): Promise<string[]> {
 }
 
 async function openProfile(page: Page) {
-  await page.getByLabel(t.menuLabel, { exact: true }).click()
+  await page.getByLabel(t.menuLabel).click()
   await page.getByRole('menuitem', { name: t.profile }).click()
   const dialog = page.getByRole('dialog', { name: t.profileTitle })
   await expect(dialog).toBeVisible()
@@ -65,9 +65,9 @@ test.describe('account menu and avatar', () => {
     await registerViaUi(page, uniqueEmail('avatar'), { name: 'Avatar Fixture' })
 
     // Found by label, not role: an open modal dialog hides the rest of the page from role queries.
-    const trigger = page.getByLabel(t.menuLabel, { exact: true })
+    const trigger = page.getByLabel(t.menuLabel)
     await expect(trigger).toContainText('Avatar Fixture')
-    await expect(trigger.getByText('AF')).toBeVisible()
+    await expect(trigger.locator('[data-initials="AF"]')).toBeVisible()
 
     const dialog = await openProfile(page)
     await expect(dialog.getByText('Avatar Fixture')).toBeVisible()
@@ -92,7 +92,7 @@ test.describe('account menu and avatar', () => {
       .getByRole('button', { name: t.avatar.removeConfirm })
       .click()
     await expect(dialog.getByText(t.avatar.removed)).toBeVisible()
-    await expect(trigger.getByText('AF')).toBeVisible()
+    await expect(trigger.locator('[data-initials="AF"]')).toBeVisible()
 
     expect(violations, `CSP violations: ${violations.join(', ')}`).toHaveLength(0)
   })
@@ -119,7 +119,7 @@ test.describe('account menu and avatar', () => {
   test('works with the keyboard only and returns focus to the menu button', async ({ page }) => {
     await registerViaUi(page, uniqueEmail('avatar-keys'), { name: 'Avatar Keys' })
     // Found by label, not role: an open modal dialog hides the rest of the page from role queries.
-    const trigger = page.getByLabel(t.menuLabel, { exact: true })
+    const trigger = page.getByLabel(t.menuLabel)
     await trigger.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('menu')).toBeVisible()
@@ -133,7 +133,7 @@ test.describe('account menu and avatar', () => {
 
   test('has no axe violations with the menu and the dialog open', async ({ page }) => {
     await registerViaUi(page, uniqueEmail('avatar-axe'), { name: 'Avatar Axe' })
-    await page.getByLabel(t.menuLabel, { exact: true }).click()
+    await page.getByLabel(t.menuLabel).click()
     await expect(page.getByRole('menu')).toBeVisible()
     await expectNoAxeViolations(page)
     await page.keyboard.press('Escape')
@@ -145,7 +145,7 @@ test.describe('account menu and avatar', () => {
     await page.setViewportSize({ width: 375, height: 812 })
     await registerViaUi(page, uniqueEmail('avatar-narrow'), { name: 'Avatar Narrow' })
     // Found by label, not role: an open modal dialog hides the rest of the page from role queries.
-    const trigger = page.getByLabel(t.menuLabel, { exact: true })
+    const trigger = page.getByLabel(t.menuLabel)
     await expect(trigger).toBeVisible()
     await expect(trigger.getByText('Avatar Narrow')).toBeHidden()
     await trigger.click()
