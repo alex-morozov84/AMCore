@@ -121,8 +121,15 @@ existing DELETE bypass instead; never fabricate a credential.
    IDs in a protected file `{"ids":["<key-id>"]}`. Verify target org/user carefully.
 
 4. Authenticate the platform operator through existing `/api/v1/auth/login` on
-   `http://127.0.0.1:15002`, with `/auth/step-up` when required. Store auth header
-   in a 0600 curl config; keep password/tokens out of history and logs. Submit:
+   `http://127.0.0.1:15002`. Store the returned access token as the bearer header
+   in a 0600 curl config; keep password/tokens out of history and logs.
+   If fresh authentication is required, send an authenticated
+   `POST http://127.0.0.1:15002/api/v1/auth/step-up` with JSON
+   `{"password":"<operator-password>"}` from a protected request file.
+   Replace the bearer header in the protected config with the returned
+   `accessToken` before the next platform request. Refreshing a token alone does
+   not renew authentication freshness. If step-up cannot succeed, stop recovery
+   and reauthenticate through a supported method; never bypass fresh-auth. Submit:
 
    ```sh
    curl --fail-with-body --config <protected-auth.conf> \

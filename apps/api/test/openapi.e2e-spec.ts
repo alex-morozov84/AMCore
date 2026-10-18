@@ -264,6 +264,26 @@ describe('OpenAPI success surface (e2e)', () => {
   let context: E2ETestContext
   let document: OpenAPIObject
 
+  it('documents irreversible member deletion and its failure outcomes', () => {
+    const operation = document.paths['/organizations/{orgId}/members/{userId}']!.delete!
+    expect(operation.description).toContain('Rejoining never restores old keys')
+    expect(operation.description).toContain('1001 refuses without changes')
+    for (const [status, codes] of Object.entries({
+      '204': ['irreversibly revoked'],
+      '400': ['ORGANIZATION_LAST_ADMIN'],
+      '404': ['RESOURCE_NOT_FOUND'],
+      '409': ['MEMBER_API_KEYS_LIMIT', 'MEMBER_API_KEYS_CONFLICT'],
+      '503': ['MEMBER_API_KEYS_WRITE_UNAVAILABLE', 'unknown'],
+    })) {
+      const response = operation.responses[status]!
+      expect(response).not.toHaveProperty('$ref')
+      for (const code of codes) expect(JSON.stringify(response)).toContain(code)
+    }
+    expect(operation.security).toEqual(
+      expect.arrayContaining([{ bearer: [] }, { apiKeyBearer: [] }])
+    )
+  })
+
   it('keeps member and invitation schemas distinct', () => {
     expect(document.components?.schemas).toBeDefined()
     assertInvitationSchemaContracts(document)

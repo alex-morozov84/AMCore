@@ -6,6 +6,8 @@ import request from 'supertest'
 
 import { SystemRole } from '@amcore/shared'
 
+import { ApiKeyRevocationService } from '../src/core/api-keys/api-key-revocation.service'
+import { ApiKeysModule } from '../src/core/api-keys/api-keys.module'
 import { AuditLogService } from '../src/core/audit'
 import { InviteService } from '../src/core/organizations/invite.service'
 
@@ -19,7 +21,11 @@ import {
   teardownE2ETest,
 } from './helpers'
 import { acceptInvitationForTest, invitationSeedRole } from './helpers/invitation-contract'
-import { holdMemberTransaction, waitForDbBlock } from './helpers/organization-members-race'
+import {
+  deferred,
+  holdMemberTransaction,
+  waitForDbBlock,
+} from './helpers/organization-members-race'
 const jest = import.meta.jest
 
 describe('Organization member credential control (real DB)', () => {
@@ -475,32 +481,297 @@ describe('Organization member credential control (real DB)', () => {
       if (pending) await Promise.allSettled([pending])
     }
   })
-  it('cleanup between candidate selection and key lock is a bounded all no-op', async () => {
-    const key = await create()
-    await c.prisma.apiKey.update({
-      where: { id: key.id },
-      data: { expiresAt: new Date(Date.now() - 31 * 86400000) },
-    })
-    const connection = await pool.connect()
-    let pending: Promise<request.Response> | undefined
-    try {
-      await connection.query('BEGIN')
-      await connection.query('SELECT id FROM core.api_keys WHERE id=$1 FOR UPDATE', [key.id])
-      pending = revoke().then((r) => r)
-      await waitForDbBlock(pool)
-      await connection.query('DELETE FROM core.api_keys WHERE id=$1', [key.id])
-      await connection.query('COMMIT')
-      const result = await pending
-      expect(result.status).toBe(200)
-      expect(result.body).toMatchObject({ requestedCount: 1, affectedCount: 0 })
-      expect(
-        await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
-      ).toBe(0)
-    } finally {
-      await connection.query('ROLLBACK')
-      connection.release()
-      if (pending) await Promise.allSettled([pending])
+  it.each(['all', 'single', 'remove'] as const)(
+    'cleanup between selection and key lock: %s',
+    async (operation) => {
+      const key = await create()
+      await c.prisma.apiKey.update({
+        where: { id: key.id },
+        data: { expiresAt: new Date(Date.now() - 31 * 86400000) },
+      })
+      const connection = await pool.connect()
+      let pending: Promise<request.Response> | undefined
+      try {
+        await connection.query('BEGIN')
+        await connection.query('SELECT id FROM core.api_keys WHERE id=$1 FOR UPDATE', [key.id])
+        const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+        pending =
+          operation === 'remove'
+            ? request(http())
+                .delete(`/organizations/${orgId}/members/${userId}`)
+                .auth(admin, { type: 'bearer' })
+                .then((r) => r)
+            : revoke(operation === 'single' ? key.id : undefined).then((r) => r)
+        await waitForDbBlock(pool)
+        await connection.query('DELETE FROM core.api_keys WHERE id=$1', [key.id])
+        await connection.query('COMMIT')
+        const result = await pending
+        expect(result.status).toBe(
+          operation === 'remove' ? 204 : operation === 'single' ? 404 : 200
+        )
+        const member = await c.prisma.orgMember.findUnique({ where: { id: memberId } })
+        const after = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+        const summary = await c.prisma.auditLog.findFirst({
+          where: { action: 'organization.member_removed', targetId: userId },
+        })
+        const observed = {
+          body: result.body,
+          memberPresent: Boolean(member),
+          aclDelta: after.aclVersion - before.aclVersion,
+          summary: summary?.metadata,
+        }
+        const expected = {
+          all: { body: { requestedCount: 1, affectedCount: 0 }, memberPresent: true, aclDelta: 0 },
+          single: {
+            body: { errorCode: 'MEMBER_API_KEY_UNAVAILABLE' },
+            memberPresent: true,
+            aclDelta: 0,
+          },
+          remove: {
+            memberPresent: false,
+            aclDelta: 1,
+            summary: { selectedKeyCount: 1, revokedKeyCount: 0 },
+          },
+        }
+        expect(observed).toMatchObject(expected[operation])
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(0)
+      } finally {
+        await connection.query('ROLLBACK')
+        connection.release()
+        if (pending) await Promise.allSettled([pending])
+      }
     }
+  )
+  const removal = () =>
+    request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(admin, { type: 'bearer' })
+      .then((r) => r)
+  function holdTransition() {
+    const entered = deferred(),
+      release = deferred()
+    const service = c.app.select(ApiKeysModule).get(ApiKeyRevocationService, { strict: true })
+    const original = service.revokeMember.bind(service)
+    const spy = jest.spyOn(service, 'revokeMember').mockImplementationOnce(async (...args) => {
+      const result = await original(...args)
+      entered.resolve()
+      await release.promise
+      return result
+    })
+    return {
+      entered: entered.promise,
+      release: release.resolve,
+      restore: () => {
+        release.resolve()
+        spy.mockRestore()
+      },
+    }
+  }
+  it.each(['owner', 'platform'] as const)(
+    '%s first transition survives an overlapping organization all command',
+    async (kind) => {
+      const key = await create()
+      const service = c.app.get(ApiKeyRevocationService)
+      const entered = deferred(),
+        release = deferred()
+      const actor = kind === 'owner' ? userId : c.app.get(JwtService).verify(admin).sub
+      const first = c.prisma.$transaction(async (tx) => {
+        await service.revoke([key.id], actor, kind === 'platform', tx)
+        const row = await tx.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+        entered.resolve()
+        await release.promise
+        return row
+      })
+      let second: Promise<request.Response> | undefined
+      try {
+        await entered.promise
+        second = revoke().then((r) => r)
+        await waitForDbBlock(pool)
+        release.resolve()
+        const row = await first
+        expect((await second).body).toMatchObject({ requestedCount: 1, affectedCount: 0 })
+        expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toEqual(row)
+        expect(row.revocationReason).toBe(kind === 'owner' ? 'owner_revoked' : 'platform_revoked')
+        expect(row.revokedByUserId).toBe(actor)
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(1)
+      } finally {
+        release.resolve()
+        await Promise.allSettled([first, ...(second ? [second] : [])])
+      }
+    }
+  )
+  it.each(['single', 'all', 'remove'] as const)(
+    'organization %s wins against overlapping owner and platform revocation',
+    async (operation) => {
+      const key = await create()
+      const hold = holdTransition()
+      const first =
+        operation === 'remove'
+          ? removal()
+          : revoke(operation === 'single' ? key.id : undefined).then((r) => r)
+      const service = c.app.get(ApiKeyRevocationService)
+      let others: Array<Promise<unknown>> = []
+      try {
+        await Promise.race([
+          hold.entered,
+          first.then(() => {
+            throw new Error('Command missed transition fence')
+          }),
+        ])
+        others = [
+          service.revoke([key.id], userId, false),
+          service.revoke([key.id], c.app.get(JwtService).verify(admin).sub, true),
+        ]
+        await waitForDbBlock(pool, 2)
+        hold.release()
+        expect((await first).status).toBe(operation === 'remove' ? 204 : 200)
+        const row = await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+        expect(await Promise.all(others)).toEqual([
+          { requestedCount: 1, affectedCount: 0 },
+          { requestedCount: 1, affectedCount: 0 },
+        ])
+        expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toEqual(row)
+        expect(row.revocationReason).toBe(
+          operation === 'remove' ? 'membership_removed' : 'organization_admin_revoked'
+        )
+        expect(row.revokedByUserId).toBe(c.app.get(JwtService).verify(admin).sub)
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(1)
+      } finally {
+        hold.restore()
+        await Promise.allSettled([first, ...others])
+      }
+    }
+  )
+  it.each([
+    ['user', 'all'],
+    ['user', 'remove'],
+    ['organization', 'all'],
+    ['organization', 'remove'],
+  ] as const)(
+    '%s cascade waits or rolls back against organization %s without partial audit',
+    async (parent, operation) => {
+      const key = await create()
+      const hold = holdTransition()
+      const first = operation === 'remove' ? removal() : revoke().then((r) => r)
+      const connection = await pool.connect()
+      let cascade: Promise<{ deleted: boolean; code?: string }> | undefined
+      try {
+        await Promise.race([
+          hold.entered,
+          first.then(() => {
+            throw new Error('Command missed transition fence')
+          }),
+        ])
+        await connection.query('BEGIN')
+        await connection.query("SET LOCAL lock_timeout = '4000ms'")
+        cascade = connection
+          .query(
+            parent === 'user'
+              ? 'DELETE FROM core.users WHERE id=$1'
+              : 'DELETE FROM core.organizations WHERE id=$1',
+            [parent === 'user' ? userId : orgId]
+          )
+          .then(
+            () => ({ deleted: true }),
+            (error: { code: string }) => ({ deleted: false, code: error.code })
+          )
+        await waitForDbBlock(pool)
+        hold.release()
+        const response = await first
+        const outcome = await cascade
+        await connection.query(outcome.deleted ? 'COMMIT' : 'ROLLBACK')
+        const committed = response.status === (operation === 'remove' ? 204 : 200)
+        // PostgreSQL may select either transaction as the deadlock victim.
+        const allowed = committed
+          ? [{ deleted: true }, { deleted: false, code: '40P01' }]
+          : [{ deleted: true }]
+        expect(allowed).toContainEqual(outcome)
+        expect([operation === 'remove' ? 204 : 200, 409, 503]).toContain(response.status)
+        const errors: Record<number, string> = {
+          409: 'MEMBER_API_KEYS_CONFLICT',
+          503: 'MEMBER_API_KEYS_WRITE_UNAVAILABLE',
+        }
+        expect(response.body.errorCode).toBe(errors[response.status])
+        const remaining = await c.prisma.apiKey.findUnique({ where: { id: key.id } })
+        expect(Boolean(remaining)).toBe(!outcome.deleted)
+        expect(Boolean(remaining?.revokedAt)).toBe(!outcome.deleted && committed)
+        expect(Boolean(await c.prisma.orgMember.findUnique({ where: { id: memberId } }))).toBe(
+          !outcome.deleted && operation === 'all'
+        )
+        const survivingParent =
+          parent === 'user'
+            ? await c.prisma.user.findUnique({ where: { id: userId } })
+            : await c.prisma.organization.findUnique({ where: { id: orgId } })
+        expect(Boolean(survivingParent)).toBe(!outcome.deleted)
+        expect(
+          await c.prisma.auditLog.count({ where: { action: 'api_key.revoked', targetId: key.id } })
+        ).toBe(Number(committed))
+        expect(
+          await c.prisma.auditLog.count({
+            where: {
+              action:
+                operation === 'remove'
+                  ? 'organization.member_removed'
+                  : 'organization.api_keys.revocation_requested',
+              targetId: userId,
+            },
+          })
+        ).toBe(Number(committed))
+      } finally {
+        hold.restore()
+        await Promise.allSettled([first, ...(cascade ? [cascade] : [])])
+        await connection.query('ROLLBACK')
+        connection.release()
+      }
+    }
+  )
+  it('recovery platform batch requires step-up and accepts its returned access token', async () => {
+    const key = await create()
+    const actorId = c.app.get(JwtService).verify(admin).sub
+    await c.prisma.user.update({
+      where: { id: actorId },
+      data: { systemRole: SystemRole.SuperAdmin },
+    })
+    const login = await request(http())
+      .post('/auth/login')
+      .send({ email: 'keys-admin@example.test', password: 'StrongP@ss123' })
+      .expect(200)
+    const token = login.body.accessToken as string
+    const { sid } = c.app.get(JwtService).verify(token)
+    await c.prisma.session.update({
+      where: { id: sid },
+      data: { lastAuthAt: new Date(Date.now() - 86400000) },
+    })
+    await request(http())
+      .post('/admin/api-keys/revoke')
+      .auth(token, { type: 'bearer' })
+      .send({ ids: [key.id] })
+      .expect(403)
+      .expect((r) => expect(r.body.errorCode).toBe('STEP_UP_REQUIRED'))
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revokedAt
+    ).toBeNull()
+    const stepped = await request(http())
+      .post('/auth/step-up')
+      .auth(token, { type: 'bearer' })
+      .send({ password: 'StrongP@ss123' })
+      .expect(200)
+    expect(typeof stepped.body.accessToken).toBe('string')
+    await request(http())
+      .post('/admin/api-keys/revoke')
+      .auth(stepped.body.accessToken, { type: 'bearer' })
+      .send({ ids: [key.id] })
+      .expect(200)
+      .expect((r) => expect(r.body.affectedCount).toBe(1))
+    expect(
+      (await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).revocationReason
+    ).toBe('platform_revoked')
   })
   it('last administrator refusal leaves that administrator key usable', async () => {
     const actor = c.app.get(JwtService).verify(admin).sub

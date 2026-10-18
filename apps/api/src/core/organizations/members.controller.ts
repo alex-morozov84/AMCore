@@ -210,8 +210,26 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
-  @ApiOperation({ summary: 'Remove a member from the organization — requires full TeamAccess' })
-  @ApiNoContentResponse({ description: 'Member removed' })
+  @ApiOperation({
+    summary: 'Remove a member and permanently revoke their organization API keys',
+    description:
+      'Requires full TeamAccess. Atomically destroys key verifiers, records audit, removes membership and advances ACL. Rejoining never restores old keys. At most1000 unrevoked keys;1001 refuses without changes. An unconfirmed outcome requires inspection, never automatic replay. Existing bearer/API-key policy and original-bound live SUPER_ADMIN exception remain unchanged.',
+  })
+  @ApiParam({ name: 'orgId', description: 'Target organization ID' })
+  @ApiParam({ name: 'userId', description: 'Target member user ID' })
+  @ApiNoContentResponse({ description: 'Member removed; organization keys irreversibly revoked' })
+  @ApiBadRequestResponse({
+    description: 'ORGANIZATION_LAST_ADMIN: last administrator cannot leave',
+  })
+  @ApiNotFoundResponse({ description: 'RESOURCE_NOT_FOUND: member absent from the organization' })
+  @ApiConflictResponse({
+    description:
+      'MEMBER_API_KEYS_LIMIT: more than1000 unrevoked keys, no changes; MEMBER_API_KEYS_CONFLICT: concurrent write aborted',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'MEMBER_API_KEYS_WRITE_UNAVAILABLE: outcome may be unknown; inspect membership and keys before any fresh request',
+  })
   @RequestContextPolicy({
     kind: 'organization',
     selector: { param: 'orgId' },
