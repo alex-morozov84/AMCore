@@ -106,7 +106,9 @@ test('provisioning capture is isolated, preserves queued methods and refuses uns
     await prepareOrganizationSetupSource({ ...manifest, snapshot })
     const transformed = await readFile(join(snapshot, relative), 'utf8')
     assert.ok(transformed.includes("baseUrl: 'http://mail-capture:8099'"))
-    assert.ok(!transformed.includes('https://api.resend.com'))
+    const sourceUrls = transformed.match(/https?:\/\/[^\s'"`)]+/gu) ?? []
+    assert.ok(sourceUrls.length > 0)
+    assert.ok(sourceUrls.every((value) => new URL(value).origin === 'http://mail-capture:8099'))
     assert.ok(transformed.includes('http://mail-capture:8099/deliver'))
     assert.ok(transformed.includes('async sendPrepared('))
     assert.ok(transformed.includes('private async sendQueued('))
