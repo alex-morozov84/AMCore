@@ -29,6 +29,7 @@ vi.mock('@/entities/organization-context', () => ({
     data: { total: state.total, page: q.page, data: q.page === 1 ? [{}] : [] },
   }),
 }))
+vi.mock('@/features/member-api-keys', () => ({ MemberApiKeysHost: () => null }))
 vi.mock('@/features/member-access', () => ({
   MemberAccessDialog: ({ userId, onClose }: { userId: string; onClose: () => void }) => (
     <div role="dialog" aria-label={`access ${userId}`}>

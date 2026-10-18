@@ -57,6 +57,7 @@ import {
 } from './dto/organization-members.dto.js'
 import { MemberService } from './member.service.js'
 import { MemberAccessService } from './member-access/member-access.service.js'
+import { CurrentMemberKeyActor, type MemberKeyActor } from './member-api-keys/member-key-actor.js'
 import { MemberQueryService } from './member-query.service.js'
 import { MemberRoleSetService } from './member-role-set.service.js'
 
@@ -219,9 +220,9 @@ export class MembersController {
   removeMember(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
-    @CurrentUser() principal: RequestPrincipal
+    @CurrentMemberKeyActor() actor: MemberKeyActor
   ): Promise<void> {
-    return this.memberService.removeMember(orgId, targetUserId, principal)
+    return this.memberService.removeMember(orgId, targetUserId, actor)
   }
 
   @Post(':userId/roles/:roleId')

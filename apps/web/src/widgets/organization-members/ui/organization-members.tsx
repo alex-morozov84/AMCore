@@ -8,6 +8,7 @@ import {
   useOrganizationMembers,
 } from '@/entities/organization-context'
 import { MemberAccessDialog } from '@/features/member-access'
+import { MemberApiKeysHost } from '@/features/member-api-keys'
 import { MemberRoleDialog, MemberSearch } from '@/features/member-role-assignment'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -26,10 +27,12 @@ export function OrganizationMembers({
   query: controlledQuery,
   onQueryChange,
   authorityStatus,
+  organizationName,
 }: {
   controller: OrganizationAccessController
   actorId: string
   authorityStatus?: OrganizationContextState['status']
+  organizationName?: string
   query?: MemberListQuery
   onQueryChange?: (query: MemberListQuery, reason: 'search' | 'page') => void
 }) {
@@ -82,6 +85,14 @@ export function OrganizationMembers({
     totalPages,
     setQuery,
   ])
+  const [keyTarget, setKeyTarget] = useState<{
+    userId: string
+    memberId: string
+    name?: string | null
+    email?: string
+    organizationName?: string
+  }>()
+  const [keysOpen, setKeysOpen] = useState(false)
   const [userId, setUserId] = useState<string>()
   const [accessUserId, setAccessUserId] = useState<string>()
   return (
@@ -144,6 +155,16 @@ export function OrganizationMembers({
             disabled={!members.ready || members.busy}
             onEdit={setUserId}
             onAccess={setAccessUserId}
+            onKeys={(userId, memberId, identity) => {
+              setKeyTarget({
+                userId,
+                memberId,
+                name: identity.name,
+                email: identity.email,
+                organizationName,
+              })
+              setKeysOpen(true)
+            }}
           />
         ) : members.data ? (
           <p>{t('empty')}</p>
@@ -178,6 +199,15 @@ export function OrganizationMembers({
           }
         />
       )}
+      <MemberApiKeysHost
+        controller={controller}
+        target={keyTarget}
+        open={keysOpen}
+        onClose={() => {
+          setKeysOpen(false)
+          heading.current?.focus()
+        }}
+      />
       {userId && (
         <MemberRoleDialog
           key={userId}

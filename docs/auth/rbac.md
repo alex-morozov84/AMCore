@@ -628,3 +628,13 @@ the last builtin ADMIN and persists audit in the same transaction. Self-edit
 warnings cover any role change: custom DENY rules can remove access after adding
 a role. The next request evaluates fresh authority; a previously admitted write
 can still commit. UI role names do not predict the resulting permission set.
+
+## Member credential administration
+
+[Member-key inventory and revocation](../product-admin/member-api-keys.md) requires
+personal bearer auth, selected current membership and full TeamAccess, including
+membership for SUPER_ADMIN. Existing original-bound live SUPER_ADMIN JWT DELETE
+retains its explicitly supported membership bypass; personal unbound JWT does not.
+Supported member removal now permanently revokes organization keys in the same
+transaction. At1001 unrevoked keys it refuses atomically; deployment maintenance
+may be required for bounded recovery. Rejoin cannot restore an old revoked secret.

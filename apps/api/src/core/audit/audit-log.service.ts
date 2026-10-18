@@ -34,6 +34,12 @@ export class AuditLogService {
     await this.recordBestEffort(data)
   }
 
+  async recordMany(entries: AuditLogEntry[], tx: Prisma.TransactionClient): Promise<void> {
+    if (entries.length > 1000) throw new Error('Audit batch exceeds member-key limit')
+    if (entries.length)
+      await tx.auditLog.createMany({ data: entries.map((entry) => this.toCreateInput(entry)) })
+  }
+
   private async recordBestEffort(data: Prisma.AuditLogCreateInput): Promise<void> {
     try {
       await this.prisma.auditLog.create({ data })

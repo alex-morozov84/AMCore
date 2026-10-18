@@ -10,6 +10,9 @@ This guide covers everything — from "how do I log a user in" to "how do I rest
 personal signup, explicit company creation, trusted first organization ADMIN and
 first platform SUPER_ADMIN access.
 
+[Member API-key control](../product-admin/member-api-keys.md) covers organization-scoped inventory, permanent
+revocation, member removal and bounded operator recovery.
+
 ## What's included
 
 | Topic                                                 | What it covers                                                                     |

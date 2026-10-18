@@ -70,3 +70,84 @@ trusted replay is incomplete, use invalidation. Never infer revocation from miss
 or expired Audit retention. There is no external monotonic revocation ledger.
 A normal dump schema check cannot prove this credential-safety condition; include
 it in your restore drill alongside the [backup/restore guide](backup-restore.md).
+
+## More than 1000 keys or oversized metadata
+
+Member-key all/remove operations refuse more than 1000 unrevoked target keys.
+At 1001 no key or membership changes. This is not an issuance cap: reducing the
+set while the member keeps creating keys cannot guarantee offboarding. Large
+metadata can also prevent normal inventory from returning IDs. The recovery below
+uses read-only IDs and existing audited writers, not direct SQL changes or a new CLI.
+
+Required operators have deployment control, trusted DB READ access, a current
+SUPER_ADMIN for platform revoke, and a trusted org administrator for final member
+DELETE. They can be the same person; no cooperation from the departing user is
+required. A previously valid original-bound live SUPER_ADMIN JWT can use the
+existing DELETE bypass instead; never fabricate a credential.
+
+1. Close ingress in maintenance and suspend automatic restart/scaling controllers.
+   Drain and stop every normal API replica, native API process, web/BFF and custom
+   key/membership writer. For the single-host Compose reference, stop
+   `docker compose stop web worker api`; stop optional bundled Caddy with
+   `docker compose --profile edge stop caddy`. Close external nginx/ingress too.
+   Verify stopped/drained writers; keep database and Redis running.
+2. Refuse if the recovery name or port is already occupied. Start the matching
+   existing API image only for the operator:
+
+   ```sh
+   docker compose run --no-deps -d --name amcore-key-recovery \
+     -p 127.0.0.1:15002:5002 -e PROCESS_ROLE=web api
+   ```
+
+   Record container ID. HTTP role has no workers/cron. Verify that no untrusted
+   local process or network peer can call it. Loopback alone is insufficient on a
+   shared host; restrict network access or keep maintenance until isolation works.
+   Other topologies need their own verified equivalent controls.
+
+3. Use existing `psql` with trusted connection configuration and a READ ONLY
+   transaction. Bind `org_id` and `user_id` as psql variables. Read only bounded IDs:
+
+   ```sql
+   BEGIN READ ONLY;
+   SELECT id FROM core.api_keys
+   WHERE "organizationId" = :'org_id' AND "userId" = :'user_id'
+     AND "revokedAt" IS NULL ORDER BY id LIMIT 100;
+   SELECT id FROM core.org_members
+   WHERE "organizationId" = :'org_id' AND "userId" = :'user_id';
+   COMMIT;
+   ```
+
+   Never select secret/verifier/scopes for this recovery. Put at most 100 distinct
+   IDs in a protected file `{"ids":["<key-id>"]}`. Verify target org/user carefully.
+
+4. Authenticate the platform operator through existing `/api/v1/auth/login` on
+   `http://127.0.0.1:15002`, with `/auth/step-up` when required. Store auth header
+   in a 0600 curl config; keep password/tokens out of history and logs. Submit:
+
+   ```sh
+   curl --fail-with-body --config <protected-auth.conf> \
+     -H 'Content-Type: application/json' --data-binary @<selected-ids.json> \
+     http://127.0.0.1:15002/api/v1/admin/api-keys/revoke
+   ```
+
+   Expect 200 actual counts and existing platform audit. 404 cleanup race requires
+   rereading/reselecting IDs. 429 honors Retry-After. Unknown response requires
+   inspection before a fresh request. Reauthenticate normally for expired
+   credentials/fresh-auth. Do not bypass these guards or auto-retry writes.
+
+5. Repeat explicit bounded batches until unrevoked count is<=1000, preferably0.
+   Keep ordinary issuance blocked. With trusted org-admin credentials, invoke
+   normal `DELETE /api/v1/organizations/<org-id>/members/<user-id>` on that private
+   API and expect 204. Existing last-admin guard, revocation, audit, delete and ACL
+   advancement share the commit. SQL must not delete OrgMember or modify keys.
+6. Verify absent membership, zero unrevoked target keys and durable audits. Stop
+   and remove only the recorded recovery container:
+   `docker stop amcore-key-recovery`, then `docker rm amcore-key-recovery`.
+   Delete protected temporary auth/request files. Restart matching original
+   services, verify health and old-key 401, then reopen ingress last. On failure,
+   retain maintenance rather than report successful offboarding.
+
+New reasons use an ordinary schema migration before matching app startup:
+`organization_admin_revoked` and `membership_removed`, alongside existing owner and
+platform reasons. All four preserve first-transition time/actor. No historical-data
+transfer or dedicated recovery binary is required.

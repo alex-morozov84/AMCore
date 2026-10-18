@@ -288,6 +288,7 @@ model ApiKey {
   @@index([organizationId])
   @@index([expiresAt])
   @@index([revokedAt])
+  @@index([organizationId, userId, revokedAt, id])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("api_keys")
   @@schema("core")

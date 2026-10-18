@@ -67,6 +67,11 @@ export function OrganizationMembersClient({
           key={`${admission.binding}:${organizationId}`}
           controller={access.controller}
           actorId={admission.actor.id}
+          organizationName={
+            access.data && 'organization' in access.data.data
+              ? access.data.data.organization.name
+              : initialOrganizationName
+          }
           authorityStatus={access.state.status}
           query={query}
           onQueryChange={

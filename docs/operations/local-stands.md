@@ -239,6 +239,11 @@ blocked delete, a holder of more roles than the per-role breakdown covers and a 
 organization. Rows are written only through marker-locked fixture SQL and are
 skipped when already present; a repeat run verifies the recorded identity and never undoes edits.
 The command prints one roles page address per organization.
+`--profile member-api-keys` creates an organization with four sample members:
+No integrations, Export manager (3 keys), Automation manager (25 keys) and Large
+integration set (1001 keys). Sample keys have no usable secret. This fixture uses
+managed marker-admitted SQL and never resets completed owner actions. Open the
+printed Members address to inspect empty, expiry, pagination, revoke and limit.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_START -->
 
 The default also prepares SUPER_ADMIN when the Console feature is enabled.

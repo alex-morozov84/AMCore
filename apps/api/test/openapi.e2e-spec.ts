@@ -171,6 +171,15 @@ const EXPECTED: Record<string, Expected> = {
   'delete /organizations/{id}': { status: '204', kind: 'none' },
   'post /organizations/{id}/switch': { status: '200', kind: 'json' },
   // members
+  'get /organizations/{orgId}/members/{userId}/api-keys': { status: '200', kind: 'json' },
+  'post /organizations/{orgId}/members/{userId}/api-keys/{keyId}/revoke': {
+    status: '200',
+    kind: 'json',
+  },
+  'post /organizations/{orgId}/members/{userId}/api-keys/revoke-all': {
+    status: '200',
+    kind: 'json',
+  },
   'get /organizations/{orgId}/members': { status: '200', kind: 'json' },
   'get /organizations/{orgId}/members/{userId}/access': { status: '200', kind: 'json' },
   'get /organizations/{orgId}/members/{userId}/roles': { status: '200', kind: 'json' },

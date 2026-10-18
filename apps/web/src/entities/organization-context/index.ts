@@ -26,6 +26,7 @@ export {
   createInvitationManagerOperations,
   type InvitationManagerOperations,
 } from './model/invitations/operations-controller'
+export { useMemberApiKeys } from './model/member-api-keys/hooks'
 export {
   type AuthorityRefreshResult,
   type OrganizationAccessController,

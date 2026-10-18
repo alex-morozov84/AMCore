@@ -5,7 +5,12 @@ import { HttpException } from '@nestjs/common'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { FastifyAdapter } from '@nestjs/platform-fastify'
 
-import { MEMBER_REQUEST_BYTES, ROLE_REQUEST_BYTES, WORK_COMMAND_INPUT_BYTES } from '@amcore/shared'
+import {
+  MEMBER_KEY_REQUEST_BYTES,
+  MEMBER_REQUEST_BYTES,
+  ROLE_REQUEST_BYTES,
+  WORK_COMMAND_INPUT_BYTES,
+} from '@amcore/shared'
 
 import { decodedBodyLimit } from './decoded-body-limit.js'
 import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary.js'
@@ -19,6 +24,13 @@ import { unmatchedBodyLimit } from './unmatched-body-limit.js'
 type BudgetRequest = { url: string; method: string; headers: Record<string, unknown> }
 
 function bodyBudget(req: BudgetRequest, prefix: string): number {
+  const path = req.url.split('?')[0]
+  if (
+    req.method === 'POST' &&
+    path?.startsWith(`${prefix}/organizations/`) &&
+    /\/members\/[^/]+\/api-keys\/(?:[^/]+\/revoke|revoke-all)$/.test(path)
+  )
+    return MEMBER_KEY_REQUEST_BYTES
   if (isMemberRoleJsonRequest(req, prefix)) return MEMBER_REQUEST_BYTES
   if (isRoleDefinitionRequest(req, prefix)) return ROLE_REQUEST_BYTES
   const json = /^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type'] ?? ''))

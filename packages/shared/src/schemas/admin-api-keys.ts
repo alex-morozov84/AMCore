@@ -5,7 +5,12 @@ import { paginatedResponseSchema, paginationQuerySchema } from './pagination'
 
 export const apiKeyStatusSchema = z.enum(['unexpired', 'expired', 'revoked'])
 export const apiKeyStatusFilterSchema = z.enum(['all', 'unexpired', 'expired', 'revoked'])
-export const apiKeyRevocationReasonSchema = z.enum(['owner_revoked', 'platform_revoked'])
+export const apiKeyRevocationReasonSchema = z.enum([
+  'owner_revoked',
+  'platform_revoked',
+  'organization_admin_revoked',
+  'membership_removed',
+])
 export const ADMIN_API_KEY_SORT_FIELDS = [
   'name',
   'createdAt',

@@ -2,6 +2,11 @@ import type { Prisma } from '../../generated/prisma/client.js'
 
 import type { AuditAction } from './audit-log.actions.js'
 
+const memberKeyCount = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 1000
+    ? value
+    : undefined
+
 interface MetadataSpec {
   [key: string]: MetadataRule
 }
@@ -192,6 +197,19 @@ const specs: Record<AuditAction, MetadataSpec> = {
     organization: auditFilterFlag,
     time: auditFilterFlag,
     resultCount: auditResultCount,
+  },
+  'organization.api_keys.revocation_requested': {
+    operation: boundedString(6, /^(single|all)$/),
+    memberId: boundedString(128, /^[A-Za-z0-9_-]+$/),
+    requestedCount: memberKeyCount,
+    affectedCount: memberKeyCount,
+    reason: boundedString(26, /^organization_admin_revoked$/),
+  },
+  'organization.member_removed': {
+    memberId: boundedString(128, /^[A-Za-z0-9_-]+$/),
+    selectedKeyCount: memberKeyCount,
+    revokedKeyCount: memberKeyCount,
+    reason: boundedString(18, /^membership_removed$/),
   },
   'admin.api_keys.viewed': {
     search: auditFilterFlag,

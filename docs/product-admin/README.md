@@ -84,3 +84,7 @@ describes ownership and the acceptance checklist for later modules.
 [Operator organization provisioning](organization-provisioning.md) creates an organization for another person and invites its first ADMIN. It supports Console-disabled API use and recovery without duplicate organizations.
 
 - [Add and recover organization administrators](organization-administration.md): current ADMINs, additional invitations, member assignment and no-Console recovery.
+
+[Member API keys](member-api-keys.md) adds safe inventory and explicit single/all
+revocation through the member menu. Supported backend member removal permanently
+revokes organization keys; the removal UI remains separate.

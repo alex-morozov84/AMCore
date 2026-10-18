@@ -3,6 +3,7 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { RequestPrincipal } from '@amcore/shared'
 import { SystemRole } from '@amcore/shared'
 
+import { keyTestActor } from '../../../test/helpers/member-key-actor'
 import {
   BusinessRuleViolationException,
   ConflictException,
@@ -10,6 +11,11 @@ import {
   NotFoundException,
 } from '../../common/exceptions'
 import type { PrismaService } from '../../prisma'
+
+jest.mock('./member-api-keys/member-key-authority', () => ({
+  lockKeyActor: jest.fn().mockResolvedValue('USER'),
+  authorizeMemberKeys: jest.fn().mockResolvedValue(undefined),
+}))
 
 import { MemberService } from './member.service'
 import type { OrganizationsService } from './organizations.service'
@@ -62,7 +68,10 @@ describe('MemberService', () => {
       prisma as unknown as PrismaService,
       orgsService as unknown as OrganizationsService,
       new RoleAssignabilityService(),
-      { record: jest.fn().mockResolvedValue(undefined) } as never
+      { record: jest.fn().mockResolvedValue(undefined) } as never,
+      {
+        revokeMember: jest.fn().mockResolvedValue({ requestedCount: 0, affectedCount: 0 }),
+      } as never
     )
     // After OA-05 the assignRole() flow executes its real work inside
     // $transaction (the role-ownership check, the conflict lookup, and
@@ -82,7 +91,7 @@ describe('MemberService', () => {
       prisma.memberRole.findMany.mockResolvedValue([]) // not an admin
       prisma.orgMember.delete.mockResolvedValue(mockMember)
 
-      await service.removeMember('org-1', 'user-2', principal)
+      await service.removeMember('org-1', 'user-2', keyTestActor(principal))
 
       expect(prisma.orgMember.delete).toHaveBeenCalledWith({ where: { id: mockMember.id } })
       expect(orgsService.bumpAclVersionTx).toHaveBeenCalled()
@@ -92,9 +101,9 @@ describe('MemberService', () => {
 
     it('throws NotFoundException when member not in org', async () => {
       prisma.orgMember.findUnique.mockResolvedValue(null)
-      await expect(service.removeMember('org-1', 'user-2', principal)).rejects.toThrow(
-        NotFoundException
-      )
+      await expect(
+        service.removeMember('org-1', 'user-2', keyTestActor(principal))
+      ).rejects.toThrow(NotFoundException)
     })
 
     it('throws BusinessRuleViolationException when removing last admin', async () => {
@@ -102,9 +111,9 @@ describe('MemberService', () => {
       prisma.role.findMany.mockResolvedValue([mockAdminRole])
       prisma.memberRole.findMany.mockResolvedValue([{ member: { userId: 'user-2' } }] as never) // only 1 admin, and it's the target
 
-      await expect(service.removeMember('org-1', 'user-2', principal)).rejects.toThrow(
-        BusinessRuleViolationException
-      )
+      await expect(
+        service.removeMember('org-1', 'user-2', keyTestActor(principal))
+      ).rejects.toThrow(BusinessRuleViolationException)
     })
 
     /**
@@ -121,7 +130,7 @@ describe('MemberService', () => {
         prisma.memberRole.findMany.mockResolvedValue([])
         prisma.orgMember.delete.mockResolvedValue(mockMember)
 
-        await service.removeMember('org-1', 'user-2', principal)
+        await service.removeMember('org-1', 'user-2', keyTestActor(principal))
 
         const txOrder = (prisma.$transaction as unknown as jest.Mock).mock.invocationCallOrder[0]
         const lockOrder = prisma.$executeRaw.mock.invocationCallOrder[0]

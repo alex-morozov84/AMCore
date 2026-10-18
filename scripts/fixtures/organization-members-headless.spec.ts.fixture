@@ -14,6 +14,8 @@ test('different inline custom UI uses public headless roles with real BFF and no
   expect(register.status()).toBe(201)
   const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
   const org = await directApi('organizations', { name: 'Custom composition' }, login.accessToken)
+  await directApi('api-keys',{name:'Custom headless export',organizationId:org.id,scopes:['read:Organization']},login.accessToken)
+  const keyMessages=JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`),'utf8')).memberApiKeys
   const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')).organizationMembers
   await page.goto(new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/members`)).pathname)
   await expect(page.getByTestId('custom-headless-members')).toBeVisible()
@@ -26,5 +28,10 @@ test('different inline custom UI uses public headless roles with real BFF and no
   expect((await response).status()).toBe(200)
   await expect(page.getByText(t.saved, { exact: true })).toBeVisible()
   expect(await page.getByRole('dialog').count()).toBe(0)
+  const keys=page.getByTestId('custom-headless-member-keys')
+  await expect(keys.getByText('Custom headless export')).toBeVisible()
+  await keys.getByRole('button',{name:keyMessages.revokeAll,exact:true}).click()
+  await page.getByRole('alertdialog').getByRole('button',{name:keyMessages.confirm,exact:true}).click()
+  await expect(keys.getByRole('button',{name:keyMessages.revokeAll,exact:true})).toBeDisabled()
   await expectNoAxeViolations(page)
 })

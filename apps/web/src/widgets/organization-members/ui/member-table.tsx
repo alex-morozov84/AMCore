@@ -16,12 +16,14 @@ export function MemberTable({
   disabled,
   onEdit,
   onAccess,
+  onKeys,
 }: {
   rows: Row[]
   actorId: string
   disabled: boolean
   onEdit: (userId: string) => void
   onAccess: (userId: string) => void
+  onKeys?: (userId: string, memberId: string, identity: Row['user']) => void
 }) {
   const t = useTranslations('organizationMembers')
   const format = useFormatter()
@@ -55,6 +57,11 @@ export function MemberTable({
     >
       <DropdownMenuItem onClick={() => onEdit(row.user.id)}>{t('edit')}</DropdownMenuItem>
       <DropdownMenuItem onClick={() => onAccess(row.user.id)}>{t('access')}</DropdownMenuItem>
+      {onKeys && (
+        <DropdownMenuItem onClick={() => onKeys(row.user.id, row.memberId, row.user)}>
+          {t('apiKeys')}
+        </DropdownMenuItem>
+      )}
     </RowActionsMenu>
   )
   return (

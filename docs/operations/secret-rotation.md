@@ -404,3 +404,9 @@ For planned replacement create a new own key, migrate/test consumers, then revok
 the old one; for compromise revoke first. Approximate last use cannot prove
 migration. See [API keys](../auth/api-keys.md) and
 [lifecycle restore safety](api-key-lifecycle.md).
+
+Supported member removal permanently revokes AMCore keys in that organization.
+Returning staff issue new keys; other organizations remain unaffected. Above1000
+unrevoked keys, removal refuses without changes. Use the
+[bounded maintenance recovery](api-key-lifecycle.md#more-than-1000-keys-or-oversized-metadata)
+rather than relying on the departing member to clean up their credentials.

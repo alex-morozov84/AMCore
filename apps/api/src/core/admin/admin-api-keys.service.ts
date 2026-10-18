@@ -73,7 +73,12 @@ export class AdminApiKeysService {
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         revokedAt: row.revokedAt?.toISOString() ?? null,
-        revocationReason: row.revocationReason as 'owner_revoked' | 'platform_revoked' | null,
+        revocationReason: row.revocationReason as
+          | 'owner_revoked'
+          | 'platform_revoked'
+          | 'organization_admin_revoked'
+          | 'membership_removed'
+          | null,
       })),
       total,
       page: query.page,

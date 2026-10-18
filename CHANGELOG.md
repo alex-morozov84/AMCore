@@ -151,6 +151,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Member removal atomically revokes organization keys; rejoining requires new credentials.
+  All/remove refuses above 1000 keys, with bounded operator maintenance recovery.
+
 - Upgrade Prisma CLI, client and PostgreSQL adapter to 7.10.1, which selects
   patched deepmerge-ts 8.0.2 for configuration loading. Upgrade OSV-Scanner to
   2.7.0 with a verified binary checksum; retain weekly recursive SARIF reporting
@@ -172,6 +175,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API E2E uses fresh supervised processes, rejects retries and forced exits, and bounds shared cleanup. Full CI coverage uses three shards and attempt-specific artifacts. The tracked main ruleset requires its stable aggregate check; live protection needs separate owner-authorized activation.
 
 ### Features
+
+- Organization member API-key inventory with explicit permanent single/all revocation
+  and headless integration.
 
 - Operations Console Overview shows the public files check next to the private files
   check: delivery mode, bucket layout and public base URL, a result per state, and a

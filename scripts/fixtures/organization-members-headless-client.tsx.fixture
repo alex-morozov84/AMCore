@@ -4,12 +4,13 @@ import { useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { MemberRolesResponse, ProductAccessBootstrap } from '@amcore/shared'
 
-import { type OrganizationAccessController, useMemberRoleAssignments, useOrganizationContext, useOrganizationMembers } from '@/entities/organization-context'
+import { type OrganizationAccessController, useMemberApiKeys, useMemberRoleAssignments, useOrganizationContext, useOrganizationMembers } from '@/entities/organization-context'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 
 // Different presentation: list beside a persistent inline editor, no ready slices.
-export function CustomMembers({ admission, id }: { admission: ProductAccessBootstrap; id: string; query?: { page: number; search: string }; membersHref?: string; listHref?: string }) {
+export function CustomMembers({ admission, id }: { admission: ProductAccessBootstrap; id: string; query?: { page: number; search: string }; membersHref?: string; listHref?: string; initialOrganizationName?: string; invitationsHref?: string; rolesHref?: string }) {
   const locale = useLocale()
   const t = useTranslations('organizationMembers')
   const context = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
@@ -24,6 +25,9 @@ export function CustomMembers({ admission, id }: { admission: ProductAccessBoots
       </li>)}</ul>
       {selected && <InlineRoles key={selected} controller={context.controller} userId={selected} actorId={admission.actor.id} />}
     </div>
+    {selected && members.data?.data.find((m) => m.user.id === selected) && <InlineKeys
+      controller={context.controller} userId={selected}
+      memberId={members.data.data.find((m) => m.user.id === selected)!.memberId} />}
     <Button onClick={() => void context.refresh()} disabled={context.state.status === 'pending' || context.controller.isBusy()}>{t('refresh')}</Button>
   </section>
 }
@@ -59,5 +63,26 @@ function InlineRoles({ controller, userId, actorId }: { controller: Organization
     {selected.length === 0 && <p>{t('zero')}</p>}
     {changed && userId === actorId && <label className="flex gap-2"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />{t('selfWarning')}</label>}
     <Button onClick={() => void save()} disabled={!editable || !roles.ready || roles.busy || notice === 'unknown' || (changed && userId === actorId && !ack)}>{t('save')}</Button>
+  </section>
+}
+
+function InlineKeys({controller,userId,memberId}: {controller:OrganizationAccessController;userId:string;memberId:string}) {
+  const t=useTranslations('memberApiKeys')
+  const keys=useMemberApiKeys(controller,userId,{expectedMemberId:memberId,page:1,limit:20,status:'all'})
+  const [confirm,setConfirm]=useState(false)
+  const [notice,setNotice]=useState<string>()
+  const [uncertain,setUncertain]=useState(false)
+  async function revoke() {
+    const result=await keys.revoke()
+    if(result.status==='committed') setNotice(t('result',{count:result.result.affectedCount}))
+    else if(result.status==='unknown'||result.status==='rejected') {setNotice(t(result.status));setUncertain(result.status==='unknown')}
+  }
+  return <section className="space-y-3 rounded-lg border p-4" data-testid="custom-headless-member-keys">
+    <h2>{t('title')}</h2><ApiErrorAlert error={keys.error}/>
+    {notice && <p role="status">{notice}</p>}
+    {keys.available && keys.data?.data.map(key=><p key={key.id}>{key.name}</p>)}
+    <Button variant="outline" disabled={!keys.available||keys.busy||uncertain||!keys.data?.revocableCount||keys.data.revocableCount>1000} onClick={()=>setConfirm(true)}>{t('revokeAll')}</Button>
+    <Button variant="outline" onClick={()=>void keys.refresh().then(()=>setUncertain(false)).catch(()=>undefined)}>{t('check')}</Button>
+    <ConfirmDialog open={confirm} onOpenChange={setConfirm} title={t('confirmAll')} description={t('allWarning')} confirmLabel={t('confirm')} cancelLabel={t('cancel')} variant="destructive" onConfirm={()=>void revoke()}/>
   </section>
 }

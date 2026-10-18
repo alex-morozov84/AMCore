@@ -9,9 +9,18 @@ import {
   NotFoundException,
 } from '../../common/exceptions/index.js'
 import type { Prisma } from '../../generated/prisma/client.js'
+import { AuditActorType, AuditTargetType } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
+import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service.js'
 import { AuditLogService } from '../audit/index.js'
 
+import type { MemberKeyActor } from './member-api-keys/member-key-actor.js'
+import { authorizeMemberKeys, lockKeyActor } from './member-api-keys/member-key-authority.js'
+import {
+  MEMBER_KEY_TRANSACTION,
+  memberKeyTimeouts,
+  memberKeyWriteFailure,
+} from './member-api-keys/member-key-transaction.js'
 import { recordMemberRoles } from './member-role-audit.js'
 import { lockOrganizationMembers } from './organization-mutation-lock.js'
 import { OrganizationsService } from './organizations.service.js'
@@ -35,40 +44,54 @@ export class MemberService {
     private readonly prisma: PrismaService,
     private readonly orgsService: OrganizationsService,
     private readonly roleAssignability: RoleAssignabilityService,
-    private readonly audit: AuditLogService
+    private readonly audit: AuditLogService,
+    private readonly keyRevocation: ApiKeyRevocationService
   ) {}
 
-  async removeMember(
-    orgId: string,
-    targetUserId: string,
-    principal: RequestPrincipal
-  ): Promise<void> {
-    this.assertOrgContext(principal, orgId)
-
-    // OA-09 companion: all last-admin-sensitive reads happen inside
-    // the transaction after acquiring a per-org advisory lock. Under
-    // Postgres READ COMMITTED, two concurrent removeMember calls would
-    // otherwise both see two admins and both succeed, leaving the org
-    // with zero administrators. The advisory lock serializes them on
-    // the same `org:last-admin:${orgId}` key so the second caller
-    // observes the post-commit state of the first.
-    await this.prisma.$transaction(async (tx) => {
-      await lockOrganizationMembers(tx, orgId)
-
-      const member = await tx.orgMember.findUnique({
-        where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
-      })
-      if (!member) throw new NotFoundException('Member not found in this organization')
-
-      await this.assertNotLastAdmin(orgId, targetUserId, tx)
-
-      // OA-12: delete + bump in the same transaction so a transient
-      // DB failure between delete and bump cannot leave the cache
-      // serving stale permissions for the removed member.
-      await tx.orgMember.delete({ where: { id: member.id } })
-      await this.orgsService.bumpAclVersionTx(orgId, tx)
-    })
-    await this.orgsService.invalidateAclVersion(orgId)
+  async removeMember(orgId: string, targetUserId: string, actor: MemberKeyActor): Promise<void> {
+    this.assertOrgContext(actor.principal, orgId)
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await memberKeyTimeouts(tx)
+        const role = await lockKeyActor(tx, actor)
+        await lockOrganizationMembers(tx, orgId)
+        await authorizeMemberKeys(tx, orgId, actor, role, true)
+        const member = await tx.orgMember.findUnique({
+          where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
+        })
+        if (!member) throw new NotFoundException('Member not found in this organization')
+        await this.assertNotLastAdmin(orgId, targetUserId, tx)
+        const counts = await this.keyRevocation.revokeMember(
+          tx,
+          orgId,
+          targetUserId,
+          actor.principal.sub,
+          'membership_removed'
+        )
+        await this.audit.record(
+          {
+            action: 'organization.member_removed',
+            actorId: actor.principal.sub,
+            actorType: AuditActorType.USER,
+            organizationId: orgId,
+            targetId: targetUserId,
+            targetType: AuditTargetType.USER,
+            metadata: {
+              memberId: member.id,
+              selectedKeyCount: counts.requestedCount,
+              revokedKeyCount: counts.affectedCount,
+              reason: 'membership_removed',
+            },
+          },
+          { tx }
+        )
+        await tx.orgMember.delete({ where: { id: member.id } })
+        await this.orgsService.bumpAclVersionTx(orgId, tx)
+      }, MEMBER_KEY_TRANSACTION)
+    } catch (error) {
+      memberKeyWriteFailure(error)
+    }
+    await this.orgsService.invalidateAclVersion(orgId).catch(() => undefined)
   }
 
   async assignRole(
