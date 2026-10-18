@@ -79,7 +79,7 @@ set while the member keeps creating keys cannot guarantee offboarding. Large
 metadata can also prevent normal inventory from returning IDs. The recovery below
 uses read-only IDs and existing audited writers, not direct SQL changes or a new CLI.
 
-Required operators have deployment control, trusted DB READ access, a current
+Required operators have deployment control, trusted primary DB READ access and visibility of application sessions, a current
 SUPER_ADMIN for platform revoke, and a trusted org administrator for final member
 DELETE. They can be the same person; no cooperation from the departing user is
 required. A previously valid original-bound live SUPER_ADMIN JWT can use the
@@ -132,14 +132,15 @@ existing DELETE bypass instead; never fabricate a credential.
    and reauthenticate through a supported method; never bypass fresh-auth. Submit:
 
    ```sh
-   curl --fail-with-body --config <protected-auth.conf> \
-     -H 'Content-Type: application/json' --data-binary @<selected-ids.json> \
+   curl --fail-with-body --config ./protected-auth.conf \
+     -H 'Content-Type: application/json' --data-binary @./selected-ids.json \
      http://127.0.0.1:15002/api/v1/admin/api-keys/revoke
    ```
 
    Expect 200 actual counts and existing platform audit. 404 cleanup race requires
    rereading/reselecting IDs. 429 honors Retry-After. Unknown response requires
-   inspection before a fresh request. Reauthenticate normally for expired
+   the stopped-writer check below before any further mutation; one inventory read
+   cannot prove the old request finished. Reauthenticate normally for expired
    credentials/fresh-auth. Do not bypass these guards or auto-retry writes.
 
 5. Repeat explicit bounded batches until unrevoked count is<=1000, preferably0.
@@ -151,8 +152,40 @@ existing DELETE bypass instead; never fabricate a credential.
    and remove only the recorded recovery container:
    `docker stop amcore-key-recovery`, then `docker rm amcore-key-recovery`.
    Delete protected temporary auth/request files. Restart matching original
-   services, verify health and old-key 401, then reopen ingress last. On failure,
-   retain maintenance rather than report successful offboarding.
+   services; require their Compose healthchecks to pass and API
+   `GET /api/v1/health/ready` to return 200. Verify old-key 401, then reopen ingress
+   last. On failure, retain maintenance rather than report successful offboarding.
+
+### Lost recovery response and completion checks
+
+Keep ingress and all ordinary writers stopped. If a batch or final DELETE loses
+its response, do not infer completion from a timeout or one unchanged count.
+For direct-to-primary single-host Compose, stop the recorded recovery container
+and verify that its process exited. In a new READ ONLY transaction on primary,
+require this count to be zero before inspecting the result:
+
+```sql
+SELECT count(*) FROM pg_stat_activity
+WHERE datname = current_database()
+  AND application_name IN ('amcore-web', 'amcore-worker', 'amcore-all');
+```
+
+The query counts idle sessions too: no application session may remain. Together
+with stopped processes, it establishes that their old transactions have finished.
+If a pooler hides sessions, custom writers remain, or session visibility/isolation
+is unproved, keep maintenance and stop recovery for deployment-specific DBA review.
+Do not kill arbitrary DB sessions or restart normal writers to obtain a zero.
+
+After that barrier, reread membership and unrevoked IDs from primary. Inspect
+committed `core.audit_log` rows for the selected organization, user and recorded
+key IDs: each actual transition has `api_key.revoked`; successful platform batches
+have `admin.api_keys.revocation_requested`; removal has
+`organization.member_removed` with selected/revoked counts. Existing revoked rows
+keep their first actor/time/reason. Missing required audit is a recovery failure.
+This checks current offboarding state, not an exact receipt for a lost request.
+If more work remains, restart only the same isolated recovery container, recheck
+its isolation and authenticate before a newly selected, explicitly confirmed
+batch or DELETE. Keep ordinary issuance stopped throughout.
 
 New reasons use an ordinary schema migration before matching app startup:
 `organization_admin_revoked` and `membership_removed`, alongside existing owner and

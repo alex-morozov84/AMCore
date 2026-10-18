@@ -142,13 +142,47 @@ export function MemberKeysModel({
 }
 ```
 
-The hook exposes read state, refresh, busy and revoke; headless code does not toast,
-navigate or import ready widgets/Console. Its read timeout is 20 seconds; commands
+The model example leaves rendering and confirmation to your client component.
+Use the following contract to implement that presentation; no private imports are needed.
+`MemberKeyQuery`, `MemberKeyList` and `MemberKeyResult` are public types from `@amcore/shared`.
+
+| Hook field                      | Contract                                                                                                                                                                               |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data`                          | `MemberKeyList` or undefined; `organization: {id, name}`, `member: {memberId, userId, name, email}`, `data` rows, `total`, `page`, `limit`, `revocableCount`, `asOf`, `revokeAllLimit` |
+| List row                        | `id`, `name`, `scopes: string[]`, `status`, `createdAt`, nullable `expiresAt`, `lastUsedAt`, `revokedAt`, `revocationReason`; timestamps are ISO strings                               |
+| `ready` / `available`           | Authority is ready / this target's read succeeded and data exists; use `available` before confirming                                                                                   |
+| `pending` / `error` / `retryAt` | Current read state; error is unknown; optional retry time is epoch milliseconds                                                                                                        |
+| `busy`                          | A write for this member is pending; disable duplicate confirmation                                                                                                                     |
+| `refresh(signal?: AbortSignal)` | Promise of `MemberKeyList` or undefined when retired; can reject; never repeats a write                                                                                                |
+| `revoke(keyId?: string)`        | Promise of the outcome below; omit keyId for all, only after explicit confirmation                                                                                                     |
+
+The outcome discriminator is `status`:
+
+| Status                 | Additional fields and action                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `committed`            | `result: MemberKeyResult`, `followup`: ready/denied/missing/changed/error/retired. Preserve success even when followup is not ready; refresh or leave the unavailable target, never replay |
+| `rejected` / `unknown` | `error: unknown`, optional `retryAt` in epoch milliseconds. Show a confirmed refusal / possible commit separately; unknown requires Check keys before a new confirmation                   |
+| `busy` / `retired`     | No result; suppress duplicate submission / discard the old target's presentation                                                                                                           |
+
+`MemberKeyResult` contains `organizationId`, `userId`, `memberId`, optional `keyId`,
+`requestedCount` and `affectedCount`. It contains no secret. Bind confirmation to
+session, organization, user, member and key; clear it when any target changes.
+Ignore late success and failure from a retired target. A refreshed list is current
+state, not a receipt proving whether a particular lost request committed.
+
+Headless code does not toast, navigate or import ready widgets/Console. Its read timeout is 20 seconds; commands
 use BFF 15 seconds and browser transport 20 seconds, followed by a separate bounded
 5-second authority refresh. Timeout does not prove rollback.
 The named server entry is `@/entities/organization-context/index.server`:
-`readMemberKeys` and `revokeMemberKeys`. BFF uses session binding, strict Origin on
-mutations, runtime schemas and private no-store responses. Keep these boundaries
+`readMemberKeys(orgId, userId, rawQuery, input)` and
+`revokeMemberKeys(orgId, userId, rawCommand, input, keyId?)`.
+IDs are strings; raw inputs are validated against the query/command contracts above.
+Both return `Promise<{binding: string, data: T}>`, with `T` respectively
+`MemberKeyList` or `MemberKeyResult`. Input is
+`{expectedSession: string | undefined, headers: Headers, signal?: AbortSignal}`.
+Use the existing server-only BFF route helpers to capture input from the request;
+never pass a browser-supplied bearer or import this entry into client code.
+BFF uses session binding, strict Origin on mutations, runtime schemas and private no-store responses. Keep these boundaries
 when supplying your own layout. Shared primitives and contracts remain usable when
 Console is disabled. [Integration](integration.md) and
 [extension rules](extending-modules.md) explain placement and ownership.
