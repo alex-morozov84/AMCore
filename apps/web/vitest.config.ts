@@ -34,6 +34,11 @@ export default defineConfig({
           environment: 'jsdom',
           globals: true,
           setupFiles: ['./src/test/setup.ts'],
+          // Vitest's 5 s default is too tight for a loaded runner: the tests that run ESLint
+          // in process (eslint-guards, the e2e accessibility entrypoint guard) take ~1.5 s on a
+          // laptop and 5-8 s on CI, and the first one also pays for the lazy config load.
+          // Fast tests are not slowed down; only a real hang takes longer to fail.
+          testTimeout: 20_000,
           include: ['src/**/*.{test,spec}.{ts,tsx}'],
           // Testcontainers-backed tests (real Redis, not mocked) run
           // separately via `pnpm test:integration` — needs Docker, too
