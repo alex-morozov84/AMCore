@@ -79,6 +79,11 @@ All new routes below require a personal bearer credential and selected org
 context. API-key authentication is rejected even for SUPER_ADMIN-owned keys.
 Base: `/api/v1/organizations/:orgId/members/:userId/api-keys`.
 
+The route selects the organization through `orgId`; a prior switch-token request
+is not required. Use a current personal access token. Get `memberId` and `user.id`
+from the same row of `GET /api/v1/organizations/:orgId/members`: use `user.id`
+for `:userId` and `memberId` for `expectedMemberId`. These identifiers differ.
+
 | Method | Suffix           | Input                                                                                    | Result                                                                        |
 | ------ | ---------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | GET    | none             | expectedMemberId; page default 1 max 10000; limit default 20 max 100; status default all | 200 safe list, identity, filtered total, revocableCount, asOf, revokeAllLimit |
