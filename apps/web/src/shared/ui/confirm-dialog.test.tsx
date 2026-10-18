@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -58,6 +58,17 @@ describe('ConfirmDialog', () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('scrollable mode focuses Cancel and bounds content without changing confirmation', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(<Harness {...baseProps} onConfirm={onConfirm} scrollable />)
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByRole('alertdialog')).toHaveClass('overflow-hidden')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
+    await user.keyboard('{Escape}')
+    expect(onConfirm).not.toHaveBeenCalled()
   })
 
   it('disables the confirm button when disabled', async () => {

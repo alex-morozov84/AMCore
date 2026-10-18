@@ -1,5 +1,6 @@
 import {
   memberAccessSchema,
+  memberRemovalQuerySchema,
   memberRolesQuerySchema,
   memberRolesResponseSchema,
   organizationMembersQuerySchema,
@@ -24,3 +25,5 @@ export class ReplaceMemberRolesDto extends createSchemaDto(replaceMemberRolesSch
 export class ReplaceMemberRolesResponseDto extends createSchemaDto(
   replaceMemberRolesResponseSchema
 ) {}
+
+export class MemberRemovalQueryDto extends createSchemaDto(memberRemovalQuerySchema) {}

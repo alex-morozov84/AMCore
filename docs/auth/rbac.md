@@ -642,3 +642,8 @@ retains its explicitly supported membership bypass; personal unbound JWT does no
 Supported member removal now permanently revokes organization keys in the same
 transaction. At1001 unrevoked keys it refuses atomically; deployment maintenance
 may be required for bounded recovery. Rejoin cannot restore an old revoked secret.
+
+Browser [confirmed member removal](../product-admin/organization-members.md#remove-a-member)
+uses supported personal JWT issuance, so the existing resolver and locked transaction require membership,
+including for SUPER_ADMIN. The browser's organization header cannot turn that credential into an original-bound JWT.
+The optional direct DELETE membership precondition does not change legacy credential admission.

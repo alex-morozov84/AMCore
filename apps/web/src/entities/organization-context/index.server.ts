@@ -21,6 +21,7 @@ export {
   revokeOrganizationInvitation,
 } from './api/invitations.server'
 export { readMemberKeys, revokeMemberKeys } from './api/member-api-keys.server'
+export { removeOrganizationMember } from './api/member-removal.server'
 export { readMemberRoles, readOrganizationMembers, replaceMemberRoles } from './api/members.server'
 export {
   createRoleDefinition,

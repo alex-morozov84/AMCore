@@ -327,3 +327,6 @@ Safe metadata becomes purge-eligible30 days after the first expiry or revocation
 org+member-scoped safe inventory and permanent single/all revocation. It does not
 extend owner-wide list/revoke authority to unrelated organizations. Owner endpoints
 remain available for cleanup even after loss of membership.
+
+Use [confirmed member removal](../product-admin/organization-members.md#remove-a-member)
+for the ready product flow and membership-fenced browser operation. Rejoining never restores removed-member keys.

@@ -70,3 +70,9 @@ Use the [member-key guide](member-api-keys.md#custom-presentation-without-ready-
 for `useMemberApiKeys`, named server operations and explicit unknown-result
 handling. Pass the existing organization controller. Do not add a context provider
 inside a dialog or couple product controls to Operations Console.
+
+## Member removal integration
+
+The [removal hook](organization-members.md#custom-removal-presentation) exposes confirmation-independent
+state and read-only inspection. Keep the frozen membership identity until the operation settles;
+a new membership requires a new selection. The domain layer imports no ready feature, widget or Console.

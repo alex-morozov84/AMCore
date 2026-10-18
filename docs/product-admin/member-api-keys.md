@@ -186,3 +186,7 @@ BFF uses session binding, strict Origin on mutations, runtime schemas and privat
 when supplying your own layout. Shared primitives and contracts remain usable when
 Console is disabled. [Integration](integration.md) and
 [extension rules](extending-modules.md) explain placement and ownership.
+
+The Members row menu also offers [confirmed member removal](organization-members.md#remove-a-member).
+Its warning is unconditional. Removal and permanent key revocation commit together;
+there is no separate partially completed revoke step.

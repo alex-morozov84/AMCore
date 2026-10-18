@@ -48,6 +48,7 @@ import {
 
 import {
   MemberAccessResponseDto,
+  MemberRemovalQueryDto,
   MemberRolesQueryDto,
   MemberRolesResponseDto,
   OrganizationMembersQueryDto,
@@ -217,14 +218,22 @@ export class MembersController {
   })
   @ApiParam({ name: 'orgId', description: 'Target organization ID' })
   @ApiParam({ name: 'userId', description: 'Target member user ID' })
+  @ApiQuery({
+    name: 'expectedMemberId',
+    required: false,
+    type: String,
+    description:
+      'Optional membership identity precondition. Mismatch refuses without effects. Omission retains legacy current-target deletion; browser removal requires this value.',
+  })
   @ApiNoContentResponse({ description: 'Member removed; organization keys irreversibly revoked' })
   @ApiBadRequestResponse({
-    description: 'ORGANIZATION_LAST_ADMIN: last administrator cannot leave',
+    description:
+      'BUSINESS_RULE_VIOLATION: last builtin administrator cannot be removed; invalid query returns validation error',
   })
   @ApiNotFoundResponse({ description: 'RESOURCE_NOT_FOUND: member absent from the organization' })
   @ApiConflictResponse({
     description:
-      'MEMBER_API_KEYS_LIMIT: more than1000 unrevoked keys, no changes; MEMBER_API_KEYS_CONFLICT: concurrent write aborted',
+      'MEMBER_ROLES_CONFLICT: membership identity changed; MEMBER_API_KEYS_LIMIT: more than1000 unrevoked keys, no changes; MEMBER_API_KEYS_CONFLICT: concurrent write aborted',
   })
   @ApiServiceUnavailableResponse({
     description:
@@ -238,9 +247,10 @@ export class MembersController {
   removeMember(
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
-    @CurrentMemberKeyActor() actor: MemberKeyActor
+    @CurrentMemberKeyActor() actor: MemberKeyActor,
+    @Query({ schema: MemberRemovalQueryDto.schema }) query: MemberRemovalQueryDto
   ): Promise<void> {
-    return this.memberService.removeMember(orgId, targetUserId, actor)
+    return this.memberService.removeMember(orgId, targetUserId, actor, query.expectedMemberId)
   }
 
   @Post(':userId/roles/:roleId')

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common'
 import { type RequestPrincipal } from '@amcore/shared'
 
 import {
+  AppException,
   BusinessRuleViolationException,
   ConflictException,
   ForbiddenException,
@@ -48,7 +49,12 @@ export class MemberService {
     private readonly keyRevocation: ApiKeyRevocationService
   ) {}
 
-  async removeMember(orgId: string, targetUserId: string, actor: MemberKeyActor): Promise<void> {
+  async removeMember(
+    orgId: string,
+    targetUserId: string,
+    actor: MemberKeyActor,
+    expectedMemberId?: string
+  ): Promise<void> {
     this.assertOrgContext(actor.principal, orgId)
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -60,6 +66,8 @@ export class MemberService {
           where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } },
         })
         if (!member) throw new NotFoundException('Member not found in this organization')
+        if (expectedMemberId !== undefined && member.id !== expectedMemberId)
+          throw new AppException('Membership identity changed', 409, 'MEMBER_ROLES_CONFLICT')
         await this.assertNotLastAdmin(orgId, targetUserId, tx)
         const counts = await this.keyRevocation.revokeMember(
           tx,

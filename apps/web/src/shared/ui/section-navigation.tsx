@@ -11,7 +11,7 @@ export function SectionNavigation({
   items: { label: string; href: string; active: boolean }[]
 }) {
   return (
-    <nav aria-label={label} className="flex gap-1 border-b border-border pb-2">
+    <nav aria-label={label} className="flex flex-wrap gap-1 border-b border-border pb-2">
       {items.map((item) => (
         <RouteProgressLink
           key={item.href}

@@ -48,7 +48,7 @@ export function OrganizationMembersClient({
       <PageTitle>
         {access.data && 'organization' in access.data.data
           ? access.data.data.organization.name
-          : access.initialPending
+          : access.initialPending || access.state.status === 'denied'
             ? initialOrganizationName
             : undefined}
       </PageTitle>
@@ -67,6 +67,7 @@ export function OrganizationMembersClient({
           key={`${admission.binding}:${organizationId}`}
           controller={access.controller}
           actorId={admission.actor.id}
+          organizationsHref={listHref ?? backHref}
           organizationName={
             access.data && 'organization' in access.data.data
               ? access.data.data.organization.name

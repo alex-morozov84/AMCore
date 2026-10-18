@@ -68,3 +68,17 @@ export const Disabled: Story = {
     disabled: true,
   },
 }
+
+export const Scrollable: Story = {
+  args: {
+    ...Destructive.args,
+    scrollable: true,
+    title: 'Remove member from organization?',
+    description:
+      'A long member identity and a warning about permanently revoked organization API keys. '.repeat(
+        12
+      ),
+    confirmLabel: 'Remove member',
+    cancelLabel: 'Cancel',
+  },
+}

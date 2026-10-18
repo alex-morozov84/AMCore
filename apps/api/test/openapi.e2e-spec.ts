@@ -270,7 +270,7 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation.description).toContain('1001 refuses without changes')
     for (const [status, codes] of Object.entries({
       '204': ['irreversibly revoked'],
-      '400': ['ORGANIZATION_LAST_ADMIN'],
+      '400': ['BUSINESS_RULE_VIOLATION'],
       '404': ['RESOURCE_NOT_FOUND'],
       '409': ['MEMBER_API_KEYS_LIMIT', 'MEMBER_API_KEYS_CONFLICT'],
       '503': ['MEMBER_API_KEYS_WRITE_UNAVAILABLE', 'unknown'],
@@ -737,6 +737,24 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(document.paths['/admin/background-work/works']?.get?.description).toContain(
       'masked original recipients and Telegram connection generations'
     )
+  })
+
+  it('documents optional fenced member removal and actual legacy refusal codes', () => {
+    const op = document.paths['/organizations/{orgId}/members/{userId}']!.delete!
+    expect(op.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'expectedMemberId', in: 'query', required: false }),
+      ])
+    )
+    expect(op.responses['400']).toMatchObject({
+      description: expect.stringContaining('BUSINESS_RULE_VIOLATION'),
+    })
+    expect(op.responses['404']).toMatchObject({
+      description: expect.stringContaining('RESOURCE_NOT_FOUND'),
+    })
+    expect(op.responses['409']).toMatchObject({
+      description: expect.stringContaining('MEMBER_ROLES_CONFLICT'),
+    })
   })
 
   it('documents the bearer-only background-work queue summary away from the Bull Board path', () => {

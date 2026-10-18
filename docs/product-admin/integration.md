@@ -352,3 +352,9 @@ Use the [member-key guide](member-api-keys.md#custom-presentation-without-ready-
 for `useMemberApiKeys`, named server operations and explicit unknown-result
 handling. Pass the existing organization controller. Do not add a context provider
 inside a dialog or couple product controls to Operations Console.
+
+### Member removal in a custom layout
+
+Use the [public removal hook and server operation](organization-members.md#custom-removal-presentation)
+with the existing organization controller. Keep the result owner mounted after its row disappears or authority becomes denied.
+Physical routes, navigation and messages remain application-owned; no Console dependency or new placement mode is introduced.

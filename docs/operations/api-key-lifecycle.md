@@ -84,6 +84,8 @@ SUPER_ADMIN for platform revoke, and a trusted org administrator for final membe
 DELETE. They can be the same person; no cooperation from the departing user is
 required. A previously valid original-bound live SUPER_ADMIN JWT can use the
 existing DELETE bypass instead; never fabricate a credential.
+Here original-bound means the authenticated JWT already carries this organization ID;
+the SUPER_ADMIN claim at issuance and the current primary system role must both qualify.
 
 1. Close ingress in maintenance and suspend automatic restart/scaling controllers.
    Drain and stop every normal API replica, native API process, web/BFF and custom
@@ -194,3 +196,9 @@ New reasons use an ordinary schema migration before matching app startup:
 `organization_admin_revoked` and `membership_removed`, alongside existing owner and
 platform reasons. All four preserve first-transition time/actor. No historical-data
 transfer or dedicated recovery binary is required.
+
+For a stale-confirmation-safe final DELETE, supply `?expectedMemberId=<membership-id>` from the
+current membership read. A mismatch refuses before key/audit/membership effects. Legacy omission still
+removes the current membership. The [product removal guide](../product-admin/organization-members.md#remove-a-member)
+explains ready UI, actual error codes and unknown-result inspection. The precondition does not replace
+the maintenance/quiescence requirements above or create an idempotent operation receipt.

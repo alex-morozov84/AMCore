@@ -88,6 +88,31 @@ describe('Organization member credential control (real DB)', () => {
       .auth(admin, { type: 'bearer' })
       .send({ expectedMemberId: memberId })
 
+  it.each([
+    'expectedMemberId=',
+    'expectedMemberId=bad%2Fid',
+    'expectedMemberId=one&expectedMemberId=two',
+    'unknown=one',
+  ])('invalid removal query %s cannot become an unfenced deletion', async (query) => {
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}?${query}`)
+      .auth(admin, { type: 'bearer' })
+      .expect(400)
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+  })
+  it('matching membership precondition returns empty204 and a missing target retains RESOURCE_NOT_FOUND', async () => {
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(204)
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(404)
+      .expect((response) => expect(response.body.errorCode).toBe('RESOURCE_NOT_FOUND'))
+  })
   it('safe snapshot and explicit idempotent single revoke retain first audit and verifier destruction', async () => {
     const key = await create()
     const list = await read().expect(200)
@@ -214,8 +239,61 @@ describe('Organization member credential control (real DB)', () => {
       where: { userId_organizationId: { userId, organizationId: orgId } },
     })
     expect(joined.id).not.toBe(memberId)
+    const replacement = await create()
+    const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+    const audits = await c.prisma.auditLog.count({
+      where: { action: 'organization.member_removed', targetId: userId },
+    })
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(409)
+      .expect((response) => expect(response.body.errorCode).toBe('MEMBER_ROLES_CONFLICT'))
+    expect(await c.prisma.orgMember.findUniqueOrThrow({ where: { id: joined.id } })).toMatchObject({
+      userId,
+    })
+    expect(
+      await c.prisma.apiKey.findUniqueOrThrow({ where: { id: replacement.id } })
+    ).toMatchObject({ revokedAt: null })
+    expect(
+      (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+    ).toBe(before.aclVersion)
+    expect(
+      await c.prisma.auditLog.count({
+        where: { action: 'organization.member_removed', targetId: userId },
+      })
+    ).toBe(audits)
+
     await request(http()).get('/auth/me').auth(key.key, { type: 'bearer' }).expect(401)
     await read().expect(409)
+  })
+  it('fenced removal commits all1000 keys, including expired keys, with membership and summary', async () => {
+    await c.prisma.apiKey.createMany({
+      data: Array.from({ length: 1000 }, (_, i) => ({
+        name: 'Removal boundary',
+        shortToken: `boundary-${i}`,
+        keyHash: 'hash',
+        salt: 'salt',
+        userId,
+        organizationId: orgId,
+        expiresAt: i % 2 ? new Date(0) : null,
+      })),
+    })
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(204)
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).toBeNull()
+    expect(
+      await c.prisma.apiKey.count({ where: { organizationId: orgId, userId, revokedAt: null } })
+    ).toBe(0)
+    expect(
+      await c.prisma.auditLog.findFirst({
+        where: { action: 'organization.member_removed', targetId: userId },
+      })
+    ).toMatchObject({ metadata: { selectedKeyCount: 1000, revokedKeyCount: 1000 } })
   })
   it('1001 refuses all and deletion atomically even when metadata is oversized', async () => {
     await c.prisma.apiKey.createMany({
@@ -229,16 +307,35 @@ describe('Organization member credential control (real DB)', () => {
         scopes: i === 1000 ? ['x'.repeat(70000)] : [],
       })),
     })
+    const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+    const auditCount = await c.prisma.auditLog.count({
+      where: {
+        organizationId: orgId,
+        action: { in: ['organization.member_removed', 'api_key.revoked'] },
+      },
+    })
     await read().expect(503)
     await revoke().expect(409)
     await request(http())
       .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
       .auth(admin, { type: 'bearer' })
       .expect(409)
     expect(await c.prisma.apiKey.count({ where: { organizationId: orgId, revokedAt: null } })).toBe(
       1001
     )
     expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+    expect(
+      (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+    ).toBe(before.aclVersion)
+    expect(
+      await c.prisma.auditLog.count({
+        where: {
+          organizationId: orgId,
+          action: { in: ['organization.member_removed', 'api_key.revoked'] },
+        },
+      })
+    ).toBe(auditCount)
   })
   it('audit failure rolls back key transition, membership and ACL', async () => {
     const key = await create()

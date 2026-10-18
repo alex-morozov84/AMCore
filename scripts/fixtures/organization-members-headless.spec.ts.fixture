@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { localizedFrontendUrl, DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 import { expectNoAxeViolations } from '../shared/axe'
-import { activeTarget } from '../support/managed-target.mjs'
+import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { directApi } from './credential-containment.helpers'
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
 
@@ -33,5 +33,18 @@ test('different inline custom UI uses public headless roles with real BFF and no
   await keys.getByRole('button',{name:keyMessages.revokeAll,exact:true}).click()
   await page.getByRole('alertdialog').getByRole('button',{name:keyMessages.confirm,exact:true}).click()
   await expect(keys.getByRole('button',{name:keyMessages.revokeAll,exact:true})).toBeDisabled()
+  const removalText=JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`),'utf8')).memberRemoval
+  const colleague=await directApi('auth/register',{email:uniqueEmail('headless-second-admin'),password:TEST_PASSWORD})
+  guardedSql(`INSERT INTO core.org_members (id,"userId","organizationId") VALUES (:'member',:'user',:'org');
+    INSERT INTO core.member_roles (id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true;
+    UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
+    {member:`member-${colleague.user.id}`,user:colleague.user.id,org:org.id,link:`link-${colleague.user.id}`})
+  await page.reload()
+  const own=page.getByRole('listitem').filter({hasText:email})
+  await own.getByRole('button',{name:removalText.action,exact:true}).click()
+  const removal=page.getByTestId('custom-headless-removal')
+  await removal.getByRole('checkbox',{name:removalText.warning,exact:true}).check()
+  await removal.getByRole('button',{name:removalText.confirm,exact:true}).click()
+  await expect(removal.getByText(removalText.success,{exact:true})).toBeVisible()
   await expectNoAxeViolations(page)
 })

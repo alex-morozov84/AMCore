@@ -10,8 +10,8 @@ super-administrator does not waive membership on these endpoints. API keys canno
 use the member list, role snapshot or full replacement endpoints.
 
 The members tab can be narrowed to the holders of one role with `?role=<roleId>` (the role page links
-there). Role-definition editing (see the [Roles tab](role-definitions.md#ready-role-screens)), invitations and member removal are separate workflows;
-this page changes assignments of existing roles only. For route placement and a
+there). Role-definition editing (see the [Roles tab](role-definitions.md#ready-role-screens)) and invitations are separate workflows.
+The Members page changes role assignments and supports [confirmed member removal](#remove-a-member). For route placement and a
 different custom presentation, use the [integration guide](integration.md#custom-member-editor).
 
 ## Assign or remove roles
@@ -234,3 +234,85 @@ with a localized missing-description fallback. The descriptions remain available
 in the editor on touch devices. The editor choice region is 256 px on mobile and
 up to 400 px (bounded by 45% of viewport height) on desktop; its size stays stable
 across searches. These are reference UI choices, not headless layout requirements.
+
+## Remove a member
+
+You need current membership and full TeamAccess in the selected organization.
+The action removes organization membership, not the person's account.
+In Russian, the actions are **Удалить из организации…**, **Удалить участника**, **Отмена** and **Проверить состояние**.
+
+1. On **Members**, find the colleague by name or email. Open their row menu and choose **Remove from organization…**.
+2. Check the organization, name and email. All the person's keys for this organization will be permanently revoked, including expired keys.
+3. Choose **Cancel** to make no request, or **Remove member** to confirm. Rejoining will require new keys.
+4. Read the status above the list. A confirmed success means membership and key revocation committed together.
+
+Removing yourself requires the same authority and displays an additional access-loss warning.
+Another member must hold the builtin ADMIN role. A custom role named ADMIN does not qualify.
+After successful self-removal, the receipt remains visible with **Go to organizations**.
+This does not sign you out or remove memberships or keys in other organizations.
+Already admitted requests may finish.
+
+The dialog uses the existing row-menu and confirmation pattern. On narrow or short screens,
+the warning scrolls while the final buttons remain reachable. Keyboard focus starts on Cancel.
+The permanent-key warning does not depend on key inventory or visibility of own-key settings.
+
+### Refusals and unknown results
+
+The last builtin ADMIN cannot be removed. First assign that builtin role to another member.
+At more than1000 unrevoked keys, removal refuses without changing membership, keys, ACL or audit.
+The count includes expired keys and all pages. Ask the deployment operator to follow the
+[maintenance recovery](../operations/api-key-lifecycle.md#more-than-1000-keys-or-oversized-metadata).
+Repeated live batches cannot guarantee completion while issuance continues. Do not delete membership or keys with SQL.
+
+**Check state** performs reads; it never repeats removal. It distinguishes an observed original membership,
+a different membership, unavailable membership/organization, denied access and read failure.
+A still-present membership does not prove the earlier request failed: a delayed writer may still finish.
+An unavailable result does not prove this removal succeeded. Check state cannot issue a receipt for a lost response.
+A different membership requires selecting the person again from the refreshed list.
+A fresh removal always needs its own confirmation and membership identity.
+
+An acknowledged success remains success if the follow-up list or authority refresh fails.
+An unconfirmed request shows an unknown-result warning. Never automatically repeat its DELETE.
+The notice survives dialog close and list updates in the mounted page. Reload/navigation discards local notices;
+leaving the page does not cancel a committed or still-running request. Signing into a different session retires old callbacks.
+
+### Direct API and browser contract
+
+Direct `DELETE /api/v1/organizations/:orgId/members/:userId` remains bodyless and returns empty204.
+Optional query `expectedMemberId=<membership-id>` compares the membership under the existing transaction lock,
+after live authorization and before effects. A mismatch returns409 `MEMBER_ROLES_CONFLICT`.
+Omitting the query retains legacy deletion of the current membership; an old unfenced request can affect a rejoined member.
+Use the member list's `memberId`, not the user ID, for the precondition.
+
+Existing400 `BUSINESS_RULE_VIOLATION` means the last builtin ADMIN cannot be removed in this operation.
+404 `RESOURCE_NOT_FOUND` means the target/resource is unavailable.409 `MEMBER_API_KEYS_LIMIT` and
+`MEMBER_API_KEYS_CONFLICT` are confirmed refusals.503 `MEMBER_API_KEYS_WRITE_UNAVAILABLE`, lost responses,
+deadlines and invalid acknowledgments leave the outcome unknown. Honor a valid Retry-After before deliberate recovery.
+
+Browser DELETE uses `/api/product-access/organizations/:id/members/:userId?expectedMemberId=<membership-id>`.
+It requires the precondition, exact trusted Origin, session binding and no request body or Content-Encoding.
+Duplicate/unknown query fields and unsupported methods are refused. The BFF converts only an exact upstream empty204
+into `{binding,data:{removed:true}}`; no bearer reaches the browser. Supported product sessions carry personal JWTs.
+Resolver admission and locked authorization require current membership even for SUPER_ADMIN with these credentials.
+The legacy direct API's bound-token exception and scoped API-key admission remain unchanged.
+This is a supported-issuance guarantee, not validation of arbitrary Redis-injected credentials.
+
+### Custom removal presentation
+
+Import `useMemberRemoval` and `MemberRemovalTarget` from `@/entities/organization-context`.
+Pass the existing controller and a frozen `{userId,memberId,email,name?,organizationName?}` target.
+Keep the hook owner mounted outside rows that disappear after removal. Do not replace its target while pending or unknown.
+Render your own warning and confirmation before calling `remove()`; the hook does not toast or navigate.
+
+| Hook field/action                     | Meaning                                                                                               |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `pending`, `busy`, `canRemove`        | Bounded command/follow-up state; use canRemove to enable a fresh confirmed action                     |
+| `outcome`                             | committed with followup, rejected/unknown with structured error and possible retryAt, or retired/busy |
+| `inspect()`, `checking`, `inspection` | Read-only authority and exact-user membership observation; same/different includes observed memberId  |
+| `remove()`                            | Executes one explicitly confirmed removal; never retries automatically                                |
+
+Commands use a20-second browser and15-second BFF deadline plus a separate bounded5-second follow-up.
+Inspection bounds authority refresh at5seconds and its exact-user read at20seconds.
+The named server entry exports `removeOrganizationMember(orgId,userId,{expectedMemberId},input)`;
+input has `expectedSession`, `headers` and optional `signal`, as for other context operations.
+It returns the typed acknowledgment envelope. Keep it server-only and supply the mutation Origin check in the route adapter.

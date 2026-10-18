@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import {
+  type MemberRemovalTarget,
   type OrganizationAccessController,
   type OrganizationContextState,
   useOrganizationMembers,
 } from '@/entities/organization-context'
 import { MemberAccessDialog } from '@/features/member-access'
 import { MemberApiKeysHost } from '@/features/member-api-keys'
+import { MemberRemoval } from '@/features/member-removal'
 import { MemberRoleDialog, MemberSearch } from '@/features/member-role-assignment'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -28,11 +30,13 @@ export function OrganizationMembers({
   onQueryChange,
   authorityStatus,
   organizationName,
+  organizationsHref,
 }: {
   controller: OrganizationAccessController
   actorId: string
   authorityStatus?: OrganizationContextState['status']
   organizationName?: string
+  organizationsHref?: string
   query?: MemberListQuery
   onQueryChange?: (query: MemberListQuery, reason: 'search' | 'page') => void
 }) {
@@ -47,6 +51,9 @@ export function OrganizationMembers({
     },
     [onQueryChange]
   )
+  const [removalTarget, setRemovalTarget] = useState<MemberRemovalTarget>()
+  const [removalOpen, setRemovalOpen] = useState(false)
+  const [removalLocked, setRemovalLocked] = useState(false)
   const [navigation, setNavigation] = useState(0)
   const members = useOrganizationMembers(controller, query)
   const authorityUnavailable =
@@ -100,6 +107,19 @@ export function OrganizationMembers({
       <h2 className="sr-only" ref={heading} tabIndex={-1}>
         {t('title')}
       </h2>
+      {removalTarget && (
+        <MemberRemoval
+          key={`${controller.binding}:${controller.organizationId}:${removalTarget.memberId}`}
+          controller={controller}
+          target={removalTarget}
+          actorId={actorId}
+          organizationsHref={organizationsHref}
+          heading={heading}
+          onLock={setRemovalLocked}
+          open={removalOpen}
+          onOpenChange={setRemovalOpen}
+        />
+      )}
       <FilterPanel>
         <MemberSearch
           identity={JSON.stringify([
@@ -153,6 +173,18 @@ export function OrganizationMembers({
             rows={members.data.data}
             actorId={actorId}
             disabled={!members.ready || members.busy}
+            removalDisabled={removalLocked}
+            onRemove={(row) => {
+              if (removalLocked) return
+              setRemovalOpen(true)
+              setRemovalTarget({
+                userId: row.user.id,
+                memberId: row.memberId,
+                name: row.user.name,
+                email: row.user.email,
+                organizationName,
+              })
+            }}
             onEdit={setUserId}
             onAccess={setAccessUserId}
             onKeys={(userId, memberId, identity) => {

@@ -1,6 +1,6 @@
 'use client'
 
-import type { ComponentProps, ReactNode } from 'react'
+import { type ComponentProps, type ReactNode, useId, useRef } from 'react'
 
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ export interface ConfirmDialogProps {
    * concern (a toast, a follow-up dialog, whatever fits the caller). */
   onConfirm: () => void
   disabled?: boolean
+  scrollable?: boolean
   finalFocus?: ComponentProps<typeof AlertDialogContent>['finalFocus']
 }
 
@@ -55,16 +56,30 @@ export function ConfirmDialog({
   onConfirm,
   disabled,
   finalFocus,
+  scrollable = false,
 }: ConfirmDialogProps) {
+  const cancel = useRef<HTMLButtonElement>(null)
+  const titleId = useId()
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent finalFocus={finalFocus}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+      <AlertDialogContent
+        finalFocus={finalFocus}
+        initialFocus={scrollable ? cancel : undefined}
+        className={
+          scrollable ? 'flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden' : undefined
+        }
+      >
+        <AlertDialogHeader
+          role={scrollable ? 'region' : undefined}
+          aria-labelledby={scrollable ? titleId : undefined}
+          tabIndex={scrollable ? 0 : undefined}
+          className={scrollable ? 'min-h-0 overflow-y-auto [scrollbar-gutter:stable]' : undefined}
+        >
+          <AlertDialogTitle id={titleId}>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
+        <AlertDialogFooter className={scrollable ? 'shrink-0' : undefined}>
+          <AlertDialogCancel ref={cancel}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             variant={variant}
             disabled={disabled}
