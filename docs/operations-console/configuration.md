@@ -195,9 +195,10 @@ What the card does and does not prove:
 - Never put a token, API key or password in these addresses. The card is shown to
   every `SUPER_ADMIN`, the address appears in the page and in browser history, and
   a secret in the query cannot be detected by the start-up check.
-- The card is part of the Console page. When the API is unavailable, the Console
-  shows only its "temporarily unavailable" notice and no links. Keep direct
-  bookmarks to your monitoring tools for that case.
+- The card is part of the Console page. When the API cannot confirm that you are
+  a `SUPER_ADMIN`, the Console shows no page content and no links: a
+  "temporarily unavailable" notice, or a not-found page when the API is not
+  reachable at all. Keep direct bookmarks to your monitoring tools for that case.
 
 The links carry no Console session or token, and the browser sends no `Referer`
 to the tool. Single sign-on between the Console and these tools is not provided.

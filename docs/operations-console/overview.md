@@ -21,7 +21,7 @@ runbooks. Each link opens in a new tab. A tool that is not configured is listed
 as "not configured" with a **How to connect** link; when no tool is configured the
 card says so once. A link only means an address is set: the Console does not check
 that the tool works. The card is hidden together with the rest of the page when the
-API is unavailable. See [External tool links](configuration.md#external-tool-links)
+API cannot confirm your access. See [External tool links](configuration.md#external-tool-links)
 for the variables, the accepted addresses and the start-up check.
 
 ## Snapshot and readiness

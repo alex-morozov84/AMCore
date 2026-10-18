@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   assertConsoleExternalLinks,
@@ -78,5 +78,37 @@ describe('assertConsoleExternalLinks', () => {
     ['ADMIN_CONSOLE_ALERTS_URL', 'grafana.example.com'],
   ])('refuses %s=%s at start-up and names the variable', (name, value) => {
     expect(() => assertConsoleExternalLinks({ [name]: value })).toThrow(new RegExp(name))
+  })
+})
+
+describe('validateAdminConsoleStartupOrExit', () => {
+  it('stops the server and names the variable when an external tool address is unusable', async () => {
+    vi.resetModules()
+    vi.doMock('server-only', () => ({}))
+    vi.stubEnv('ADMIN_CONSOLE_METRICS_URL', 'http://grafana.example.com')
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const { validateAdminConsoleStartupOrExit } = await import('./admin-console-startup')
+    validateAdminConsoleStartupOrExit()
+
+    expect(exit).toHaveBeenCalledWith(1)
+    expect(String(write.mock.calls[0]?.[0])).toMatch(/ADMIN_CONSOLE_METRICS_URL must be/)
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('lets the server start when every address is empty or usable', async () => {
+    vi.resetModules()
+    vi.doMock('server-only', () => ({}))
+    vi.stubEnv('ADMIN_CONSOLE_METRICS_URL', 'https://grafana.example.com/d/x')
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+
+    const { validateAdminConsoleStartupOrExit } = await import('./admin-console-startup')
+    validateAdminConsoleStartupOrExit()
+
+    expect(exit).not.toHaveBeenCalled()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
   })
 })
