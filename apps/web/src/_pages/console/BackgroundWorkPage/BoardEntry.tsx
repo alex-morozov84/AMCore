@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { ComponentProps } from 'react'
 import { useTranslations } from 'next-intl'
 import { ExternalLink, TriangleAlert } from 'lucide-react'
 
@@ -8,34 +8,14 @@ import { cn } from '@/shared/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { buttonVariants } from '@/shared/ui/button'
 import { InfoTooltip } from '@/shared/ui/info-tooltip'
+import { NewTabLink as SharedNewTabLink } from '@/shared/ui/new-tab-link'
 
 import type { BoardEntryState } from './board-entry-state'
 
-/** Opens in a new tab: said to everyone, not only to those who can see the icon. */
-function NewTabLink({
-  href,
-  className,
-  onClick,
-  children,
-}: {
-  href: string
-  className?: string
-  onClick?: () => void
-  children: ReactNode
-}) {
+/** The shared new-tab link with this page's translated "opens in a new tab" label. */
+function NewTabLink(props: Omit<ComponentProps<typeof SharedNewTabLink>, 'newTabLabel'>) {
   const t = useTranslations('console.backgroundWork.board')
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={className}
-      onClick={onClick}
-    >
-      {children}
-      <span className="sr-only"> {t('openLinkNewTab')}</span>
-    </a>
-  )
+  return <SharedNewTabLink {...props} newTabLabel={t('openLinkNewTab')} />
 }
 
 /**

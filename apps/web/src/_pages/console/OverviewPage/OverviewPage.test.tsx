@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as DeploymentIdentity from '@/shared/lib/deployment-version/identity'
 
@@ -116,6 +116,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('OverviewPage', () => {
   it('renders the not-ready alert for an observed degraded instance, not the unavailable fallback', async () => {
     vi.mocked(fetchConsoleOverview).mockResolvedValue({
@@ -184,10 +188,16 @@ describe('OverviewPage', () => {
     expect(
       screen.getByText('This is temporarily unavailable. Please try again.')
     ).toBeInTheDocument()
-    vi.unstubAllEnvs()
   })
 
   it('shows the external tools card with the loaded snapshot too, and no link when unset', async () => {
+    // The machine running the test may set these; the card must see them empty.
+    for (const name of [
+      'ADMIN_CONSOLE_METRICS_URL',
+      'ADMIN_CONSOLE_LOGS_URL',
+      'ADMIN_CONSOLE_ALERTS_URL',
+    ])
+      vi.stubEnv(name, '')
     vi.mocked(fetchConsoleOverview).mockResolvedValue({ status: 'success', data: overviewFixture })
 
     renderPage(await OverviewPage())

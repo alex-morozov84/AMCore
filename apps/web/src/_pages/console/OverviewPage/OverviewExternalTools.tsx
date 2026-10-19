@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 import { docsFolderHref, docsPageHref } from '@/shared/lib/console-docs-links'
@@ -7,9 +6,9 @@ import {
   type ConsoleExternalLinks,
   type ConsoleExternalTool,
 } from '@/shared/lib/console-external-links'
-import { cn } from '@/shared/lib/utils'
 import { buttonVariants } from '@/shared/ui/button'
 import { InfoTooltip } from '@/shared/ui/info-tooltip'
+import { NewTabLink } from '@/shared/ui/new-tab-link'
 
 import type { OverviewTranslations } from './overview-types'
 
@@ -22,24 +21,59 @@ const LABELS = {
 const HOW_TO_HREF = docsPageHref('docs/operations-console/configuration.md', 'external-tool-links')
 const RECOVERY_HREF = docsFolderHref('docs/operations/runbooks')
 
-/** Opens in a new tab: said to everyone, not only to those who can see the icon. */
-function NewTabLink({
-  href,
-  className,
+type ToolProps = { t: OverviewTranslations }
+
+function ConfiguredTools({
+  tools,
   t,
-  children,
-}: {
-  href: string
-  className?: string
-  t: OverviewTranslations
-  children: ReactNode
-}) {
+}: ToolProps & { tools: { tool: ConsoleExternalTool; href: string }[] }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
-      {children}
-      <ExternalLink aria-hidden className="ml-1 inline size-4 align-text-bottom" />
-      <span className="sr-only"> {t('backgroundWork.board.openLinkNewTab')}</span>
-    </a>
+    <div className="mt-3 flex flex-wrap gap-3">
+      {tools.map(({ tool, href }) => (
+        <NewTabLink
+          key={tool}
+          href={href}
+          newTabLabel={t('overviewPublicOpenNewTab')}
+          className={buttonVariants({ variant: 'outline' })}
+        >
+          {t(LABELS[tool])}
+          <ExternalLink aria-hidden className="size-4" />
+        </NewTabLink>
+      ))}
+    </div>
+  )
+}
+
+function UnconfiguredTools({ tools, t }: ToolProps & { tools: ConsoleExternalTool[] }) {
+  return (
+    <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
+      {tools.map((tool) => (
+        <li key={tool}>{t('externalToolsToolNotConfigured', { tool: t(LABELS[tool]) })}</li>
+      ))}
+    </ul>
+  )
+}
+
+function GuideLinks({ showHowTo, t }: ToolProps & { showHowTo: boolean }) {
+  return (
+    <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      {showHowTo && (
+        <NewTabLink
+          href={HOW_TO_HREF}
+          newTabLabel={t('overviewPublicOpenNewTab')}
+          className="underline"
+        >
+          {t('externalToolsHowTo')}
+        </NewTabLink>
+      )}
+      <NewTabLink
+        href={RECOVERY_HREF}
+        newTabLabel={t('overviewPublicOpenNewTab')}
+        className="underline"
+      >
+        {t('externalToolsRecovery')}
+      </NewTabLink>
+    </p>
   )
 }
 
@@ -48,14 +82,11 @@ function NewTabLink({
  * Plain text, not a disabled button, says what is missing: a disabled control is skipped by the
  * keyboard and hides its reason. The addresses arrive already normalized by the server.
  */
-export function OverviewExternalTools({
-  links,
-  t,
-}: {
-  links: ConsoleExternalLinks
-  t: OverviewTranslations
-}) {
-  const configured = CONSOLE_EXTERNAL_TOOLS.filter((tool) => links[tool] !== null)
+export function OverviewExternalTools({ links, t }: ToolProps & { links: ConsoleExternalLinks }) {
+  const configured = CONSOLE_EXTERNAL_TOOLS.flatMap((tool) => {
+    const href = links[tool]
+    return href === null ? [] : [{ tool, href }]
+  })
   const missing = CONSOLE_EXTERNAL_TOOLS.filter((tool) => links[tool] === null)
   return (
     <section className="rounded-lg border bg-surface-elevated p-6 shadow-md">
@@ -63,39 +94,13 @@ export function OverviewExternalTools({
         <h2 className="text-lg font-semibold">{t('externalToolsTitle')}</h2>
         <InfoTooltip label={t('externalToolsHelp')} />
       </div>
-      {configured.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">{t('externalToolsNone')}</p>
+      {configured.length > 0 ? (
+        <ConfiguredTools tools={configured} t={t} />
       ) : (
-        <div className="mt-3 flex flex-wrap gap-3">
-          {configured.map((tool) => (
-            <NewTabLink
-              key={tool}
-              href={links[tool] as string}
-              t={t}
-              className={cn(buttonVariants({ variant: 'outline' }))}
-            >
-              {t(LABELS[tool])}
-            </NewTabLink>
-          ))}
-        </div>
+        <p className="mt-3 text-sm text-muted-foreground">{t('externalToolsNone')}</p>
       )}
-      {configured.length > 0 && missing.length > 0 && (
-        <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
-          {missing.map((tool) => (
-            <li key={tool}>{t('externalToolsToolNotConfigured', { tool: t(LABELS[tool]) })}</li>
-          ))}
-        </ul>
-      )}
-      <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-        {missing.length > 0 && (
-          <NewTabLink href={HOW_TO_HREF} t={t} className="underline">
-            {t('externalToolsHowTo')}
-          </NewTabLink>
-        )}
-        <NewTabLink href={RECOVERY_HREF} t={t} className="underline">
-          {t('externalToolsRecovery')}
-        </NewTabLink>
-      </p>
+      {configured.length > 0 && missing.length > 0 && <UnconfiguredTools tools={missing} t={t} />}
+      <GuideLinks showHowTo={missing.length > 0} t={t} />
     </section>
   )
 }

@@ -143,7 +143,7 @@ separately. Only a `SUPER_ADMIN` can open the Console, so only a `SUPER_ADMIN`
 sees the card. Organization owners and administrators get a not-found page
 instead of the Console.
 
-## What AMCore provides and what you deploy
+### What AMCore provides and what you deploy
 
 AMCore does not install or run these tools in production. Plan to deploy them
 yourself and then set their addresses below.
@@ -159,7 +159,7 @@ verification and is never part of the production Compose files. See the
 [observability guide](../operations/observability.md) for the dashboard, rules
 and runbooks.
 
-## Set the addresses
+### Set the addresses
 
 Set the addresses in the environment of the **web service**. With the bundled
 Compose file this is the `web` container, which reads them from the `.env` file
@@ -256,7 +256,7 @@ What the card does and does not prove:
 The links carry no Console session or token, and the browser sends no `Referer`
 to the tool. Single sign-on between the Console and these tools is not provided.
 
-## Documentation links
+### Documentation links
 
 The **Recovery instructions** link is always shown. It opens the
 `docs/operations/runbooks` folder of the upstream repository,
@@ -265,7 +265,9 @@ link and the guide links on the Background work and Overview storage screens use
 the same base. The base is not an environment variable: it is the constant
 `DOCS_REPOSITORY_URL` in `apps/web/src/shared/lib/console-docs-links.ts`, so
 changing it needs a rebuild of the web image (with the bundled Compose file,
-`docker compose build web`, then `docker compose up -d web`).
+`docker compose build web`, then `docker compose up -d web`). Every address
+points to the `main` branch, which can be newer than the version you deployed, so
+a guide may describe behavior your deployment does not have yet.
 
 The constant holds a repository root, such as `https://github.com/your-org/your-repo`.
 The functions `docsPageHref` and `docsFolderHref` in the same file build each

@@ -17,7 +17,7 @@ const text: Record<string, string> = {
   externalToolsToolNotConfigured: '{tool}: not configured.',
   externalToolsHowTo: 'How to connect',
   externalToolsRecovery: 'Recovery instructions',
-  'backgroundWork.board.openLinkNewTab': '(opens in a new tab)',
+  overviewPublicOpenNewTab: '(opens in a new tab)',
 }
 const t = ((key: string, values?: Record<string, string>) =>
   (text[key] ?? key).replace('{tool}', values?.tool ?? '')) as unknown as OverviewTranslations

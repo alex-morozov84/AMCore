@@ -665,7 +665,7 @@
     "externalToolsMetrics": "Метрики",
     "externalToolsLogs": "Логи",
     "externalToolsAlerts": "Оповещения",
-    "externalToolsToolNotConfigured": "{tool}: не настроено.",
+    "externalToolsToolNotConfigured": "{tool}: не настроены.",
     "externalToolsHowTo": "Как подключить",
     "externalToolsRecovery": "Инструкции по восстановлению",
     "overviewFilesTitle": "Файловое хранилище",
