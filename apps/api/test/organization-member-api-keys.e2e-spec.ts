@@ -88,6 +88,31 @@ describe('Organization member credential control (real DB)', () => {
       .auth(admin, { type: 'bearer' })
       .send({ expectedMemberId: memberId })
 
+  it.each([
+    'expectedMemberId=',
+    'expectedMemberId=bad%2Fid',
+    'expectedMemberId=one&expectedMemberId=two',
+    'unknown=one',
+  ])('invalid removal query %s cannot become an unfenced deletion', async (query) => {
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}?${query}`)
+      .auth(admin, { type: 'bearer' })
+      .expect(400)
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+  })
+  it('matching membership precondition returns empty204 and a missing target retains RESOURCE_NOT_FOUND', async () => {
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(204)
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(404)
+      .expect((response) => expect(response.body.errorCode).toBe('RESOURCE_NOT_FOUND'))
+  })
   it('safe snapshot and explicit idempotent single revoke retain first audit and verifier destruction', async () => {
     const key = await create()
     const list = await read().expect(200)
@@ -214,8 +239,61 @@ describe('Organization member credential control (real DB)', () => {
       where: { userId_organizationId: { userId, organizationId: orgId } },
     })
     expect(joined.id).not.toBe(memberId)
+    const replacement = await create()
+    const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+    const audits = await c.prisma.auditLog.count({
+      where: { action: 'organization.member_removed', targetId: userId },
+    })
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(409)
+      .expect((response) => expect(response.body.errorCode).toBe('MEMBER_ROLES_CONFLICT'))
+    expect(await c.prisma.orgMember.findUniqueOrThrow({ where: { id: joined.id } })).toMatchObject({
+      userId,
+    })
+    expect(
+      await c.prisma.apiKey.findUniqueOrThrow({ where: { id: replacement.id } })
+    ).toMatchObject({ revokedAt: null })
+    expect(
+      (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+    ).toBe(before.aclVersion)
+    expect(
+      await c.prisma.auditLog.count({
+        where: { action: 'organization.member_removed', targetId: userId },
+      })
+    ).toBe(audits)
+
     await request(http()).get('/auth/me').auth(key.key, { type: 'bearer' }).expect(401)
     await read().expect(409)
+  })
+  it('fenced removal commits all1000 keys, including expired keys, with membership and summary', async () => {
+    await c.prisma.apiKey.createMany({
+      data: Array.from({ length: 1000 }, (_, i) => ({
+        name: 'Removal boundary',
+        shortToken: `boundary-${i}`,
+        keyHash: 'hash',
+        salt: 'salt',
+        userId,
+        organizationId: orgId,
+        expiresAt: i % 2 ? new Date(0) : null,
+      })),
+    })
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
+      .auth(admin, { type: 'bearer' })
+      .expect(204)
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).toBeNull()
+    expect(
+      await c.prisma.apiKey.count({ where: { organizationId: orgId, userId, revokedAt: null } })
+    ).toBe(0)
+    expect(
+      await c.prisma.auditLog.findFirst({
+        where: { action: 'organization.member_removed', targetId: userId },
+      })
+    ).toMatchObject({ metadata: { selectedKeyCount: 1000, revokedKeyCount: 1000 } })
   })
   it('1001 refuses all and deletion atomically even when metadata is oversized', async () => {
     await c.prisma.apiKey.createMany({
@@ -229,16 +307,35 @@ describe('Organization member credential control (real DB)', () => {
         scopes: i === 1000 ? ['x'.repeat(70000)] : [],
       })),
     })
+    const before = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+    const auditCount = await c.prisma.auditLog.count({
+      where: {
+        organizationId: orgId,
+        action: { in: ['organization.member_removed', 'api_key.revoked'] },
+      },
+    })
     await read().expect(503)
     await revoke().expect(409)
     await request(http())
       .delete(`/organizations/${orgId}/members/${userId}`)
+      .query({ expectedMemberId: memberId })
       .auth(admin, { type: 'bearer' })
       .expect(409)
     expect(await c.prisma.apiKey.count({ where: { organizationId: orgId, revokedAt: null } })).toBe(
       1001
     )
     expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+    expect(
+      (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+    ).toBe(before.aclVersion)
+    expect(
+      await c.prisma.auditLog.count({
+        where: {
+          organizationId: orgId,
+          action: { in: ['organization.member_removed', 'api_key.revoked'] },
+        },
+      })
+    ).toBe(auditCount)
   })
   it('audit failure rolls back key transition, membership and ACL', async () => {
     const key = await create()
@@ -443,6 +540,92 @@ describe('Organization member credential control (real DB)', () => {
       if (pending) await Promise.allSettled([pending])
     }
   })
+
+  it.each(['member-lost', 'personal-super-member-lost', 'bound-super-demoted'] as const)(
+    'removal rechecks authorization after resolver admission: %s',
+    async (mode) => {
+      const key = await create()
+      const jwt = c.app.get(JwtService)
+      const actor = jwt.verify(admin).sub
+      let token = admin
+      if (mode !== 'member-lost') {
+        await c.prisma.user.update({
+          where: { id: actor },
+          data: { systemRole: SystemRole.SuperAdmin },
+        })
+        const membership = await c.prisma.orgMember.findUniqueOrThrow({
+          where: { userId_organizationId: { userId: actor, organizationId: orgId } },
+        })
+        await c.prisma.memberRole.deleteMany({ where: { memberId: membership.id } })
+        const login = await request(http())
+          .post('/auth/login')
+          .send({ email: jwt.verify(admin).email, password: 'StrongP@ss123' })
+          .expect(200)
+        token = login.body.accessToken
+        if (mode === 'bound-super-demoted') {
+          const { iat: _, exp: __, ...claims } = jwt.verify(token)
+          token = jwt.sign({ ...claims, organizationId: orgId })
+        }
+      }
+      const targetBefore = await c.prisma.orgMember.findUniqueOrThrow({ where: { id: memberId } })
+      const keyBefore = await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })
+      const orgBefore = await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })
+      const auditWhere = {
+        organizationId: orgId,
+        action: { in: ['api_key.revoked', 'organization.member_removed'] },
+      }
+      const auditBefore = await c.prisma.auditLog.count({ where: auditWhere })
+      const connection = await pool.connect()
+      let pending: Promise<request.Response> | undefined
+      try {
+        await connection.query('BEGIN')
+        await connection.query(
+          mode === 'bound-super-demoted'
+            ? 'SELECT id FROM core.users WHERE id=$1 FOR UPDATE'
+            : 'SELECT id FROM core.organizations WHERE id=$1 FOR UPDATE',
+          [mode === 'bound-super-demoted' ? actor : orgId]
+        )
+        pending = request(http())
+          .delete(`/organizations/${orgId}/members/${userId}`)
+          .query({ expectedMemberId: memberId })
+          .auth(token, { type: 'bearer' })
+          .then((r) => r)
+        // A real blocked transaction proves resolver admission completed, not HTTP arrival ordering.
+        await waitForDbBlock(pool)
+        if (mode === 'bound-super-demoted') {
+          await connection.query('UPDATE core.users SET "systemRole"=$2 WHERE id=$1', [
+            actor,
+            'USER',
+          ])
+        } else {
+          await connection.query(
+            'DELETE FROM core.org_members WHERE "userId"=$1 AND "organizationId"=$2',
+            [actor, orgId]
+          )
+          await connection.query(
+            'UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=$1',
+            [orgId]
+          )
+        }
+        await connection.query('COMMIT')
+        expect((await pending).status).toBe(403)
+        expect(await c.prisma.orgMember.findUniqueOrThrow({ where: { id: memberId } })).toEqual(
+          targetBefore
+        )
+        expect(await c.prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).toEqual(
+          keyBefore
+        )
+        expect(await c.prisma.auditLog.count({ where: auditWhere })).toBe(auditBefore)
+        expect(
+          (await c.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion
+        ).toBe(orgBefore.aclVersion + (mode === 'bound-super-demoted' ? 0 : 1))
+      } finally {
+        await connection.query('ROLLBACK')
+        connection.release()
+        if (pending) await Promise.allSettled([pending])
+      }
+    }
+  )
 
   it('system demotion while the actor lock is held defeats stale synthetic trust', async () => {
     const claims = c.app.get(JwtService).verify(admin)

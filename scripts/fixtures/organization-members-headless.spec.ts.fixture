@@ -3,11 +3,12 @@ import { join } from 'node:path'
 import { localizedFrontendUrl, DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 import { expectNoAxeViolations } from '../shared/axe'
-import { activeTarget } from '../support/managed-target.mjs'
+import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { directApi } from './credential-containment.helpers'
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
 
 test('different inline custom UI uses public headless roles with real BFF and no ready widget', async ({ page, context }) => {
+  test.setTimeout(120000)
   const target = activeTarget()
   const email = uniqueEmail('custom-member')
   const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
@@ -33,5 +34,62 @@ test('different inline custom UI uses public headless roles with real BFF and no
   await keys.getByRole('button',{name:keyMessages.revokeAll,exact:true}).click()
   await page.getByRole('alertdialog').getByRole('button',{name:keyMessages.confirm,exact:true}).click()
   await expect(keys.getByRole('button',{name:keyMessages.revokeAll,exact:true})).toBeDisabled()
+  const removalText=JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`),'utf8')).memberRemoval
+  const colleague=await directApi('auth/register',{email:uniqueEmail('headless-second-admin'),password:TEST_PASSWORD})
+  guardedSql(`INSERT INTO core.org_members (id,"userId","organizationId") VALUES (:'member',:'user',:'org');
+    INSERT INTO core.member_roles (id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true;
+    UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
+    {member:`c${colleague.user.id.slice(1)}x`,user:colleague.user.id,org:org.id,link:`c${colleague.user.id.slice(1)}y`})
+  await page.reload()
+  const colleagueRow=page.getByRole('listitem').filter({hasText:colleague.user.email})
+  await colleagueRow.getByRole('button',{name:removalText.action,exact:true}).click()
+  const inline=page.getByTestId('custom-headless-removal')
+  let release!:()=>void
+  let entered!:()=>void
+  const intercepted=new Promise<void>(resolve=>{entered=resolve})
+  const barrier=new Promise<void>(resolve=>{release=resolve})
+  const pattern='**/api/product-access/organizations/*/members/*?expectedMemberId=*'
+  await page.route(pattern,async route=>{
+    if(route.request().method()!=='DELETE'){await route.continue();return}
+    entered()
+    await barrier
+    await route.abort('failed')
+  })
+  try {
+    await inline.getByRole('checkbox',{name:removalText.warning,exact:true}).check()
+    await inline.getByRole('button',{name:removalText.confirm,exact:true}).click()
+    await intercepted
+    const switches=page.getByRole('button',{name:removalText.action,exact:true})
+    await expect(switches).toHaveCount(2)
+    await expect(switches.nth(0)).toBeDisabled()
+    await expect(switches.nth(1)).toBeDisabled()
+    await switches.nth(0).dispatchEvent('click')
+    await expect(inline.getByRole('heading')).toHaveText(colleague.user.email)
+    release()
+    await expect(inline.getByText(removalText.unknown,{exact:true})).toBeVisible()
+    await switches.nth(1).dispatchEvent('click')
+    await expect(inline.getByRole('heading')).toHaveText(colleague.user.email)
+    await expect(inline.getByText(removalText.unknown,{exact:true})).toBeVisible()
+    await expect(switches.nth(0)).toBeDisabled()
+    await expect(switches.nth(1)).toBeDisabled()
+    guardedSql(`DELETE FROM core.org_members WHERE "userId"=:'user' AND "organizationId"=:'org';
+      INSERT INTO core.org_members (id,"userId","organizationId") VALUES (:'member',:'user',:'org');
+      INSERT INTO core.member_roles (id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true;
+      UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
+      {member:`c${colleague.user.id.slice(1)}z`,user:colleague.user.id,org:org.id,link:`c${colleague.user.id.slice(1)}w`})
+    await inline.getByRole('button',{name:removalText.check,exact:true}).click()
+    await expect(inline.getByText(removalText.different,{exact:true})).toBeVisible()
+    await expect(switches.nth(0)).toBeEnabled()
+    await expect(switches.nth(1)).toBeEnabled()
+  } finally {
+    release()
+    await page.unroute(pattern)
+  }
+  const own=page.getByRole('listitem').filter({hasText:email})
+  await own.getByRole('button',{name:removalText.action,exact:true}).click()
+  const removal=page.getByTestId('custom-headless-removal')
+  await removal.getByRole('checkbox',{name:removalText.warning,exact:true}).check()
+  await removal.getByRole('button',{name:removalText.confirm,exact:true}).click()
+  await expect(removal.getByText(removalText.success,{exact:true})).toBeVisible()
   await expectNoAxeViolations(page)
 })

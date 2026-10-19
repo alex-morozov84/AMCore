@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import {
+  type MemberRemovalTarget,
   type OrganizationAccessController,
   type OrganizationContextState,
   useOrganizationMembers,
 } from '@/entities/organization-context'
 import { MemberAccessDialog } from '@/features/member-access'
 import { MemberApiKeysHost } from '@/features/member-api-keys'
+import { MemberRemoval } from '@/features/member-removal'
 import { MemberRoleDialog, MemberSearch } from '@/features/member-role-assignment'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -28,11 +30,15 @@ export function OrganizationMembers({
   onQueryChange,
   authorityStatus,
   organizationName,
+  organizationsHref,
+  onSelfRemoved,
 }: {
   controller: OrganizationAccessController
   actorId: string
   authorityStatus?: OrganizationContextState['status']
   organizationName?: string
+  organizationsHref?: string
+  onSelfRemoved?: () => void
   query?: MemberListQuery
   onQueryChange?: (query: MemberListQuery, reason: 'search' | 'page') => void
 }) {
@@ -47,6 +53,10 @@ export function OrganizationMembers({
     },
     [onQueryChange]
   )
+  const [removalTarget, setRemovalTarget] = useState<MemberRemovalTarget>()
+  const [selfRemoved, setSelfRemoved] = useState(false)
+  const [removalOpen, setRemovalOpen] = useState(false)
+  const [removalLocked, setRemovalLocked] = useState(false)
   const [navigation, setNavigation] = useState(0)
   const members = useOrganizationMembers(controller, query)
   const authorityUnavailable =
@@ -100,136 +110,175 @@ export function OrganizationMembers({
       <h2 className="sr-only" ref={heading} tabIndex={-1}>
         {t('title')}
       </h2>
-      <FilterPanel>
-        <MemberSearch
-          identity={JSON.stringify([
-            controller.binding,
-            controller.organizationId,
-            'members',
-            navigation,
-          ])}
-          search={query.search}
-          page={query.page}
-          id="organization-member-search"
-          placeholder={t('memberSearchPlaceholder')}
-          onCommit={(search) => setQuery({ ...query, search, page: 1 })}
+      {removalTarget && (
+        <MemberRemoval
+          key={`${controller.binding}:${controller.organizationId}:${removalTarget.memberId}`}
+          controller={controller}
+          target={removalTarget}
+          actorId={actorId}
+          organizationsHref={organizationsHref}
+          onSelfRemoved={() => {
+            setSelfRemoved(true)
+            onSelfRemoved?.()
+          }}
+          heading={heading}
+          onLock={setRemovalLocked}
+          open={removalOpen}
+          onOpenChange={setRemovalOpen}
         />
-        {query.roleId && (
-          <RoleFilter
+      )}
+      {!selfRemoved && (
+        <>
+          <FilterPanel>
+            <MemberSearch
+              identity={JSON.stringify([
+                controller.binding,
+                controller.organizationId,
+                'members',
+                navigation,
+              ])}
+              search={query.search}
+              page={query.page}
+              id="organization-member-search"
+              placeholder={t('memberSearchPlaceholder')}
+              onCommit={(search) => setQuery({ ...query, search, page: 1 })}
+            />
+            {query.roleId && (
+              <RoleFilter
+                controller={controller}
+                roleId={query.roleId}
+                onClear={() => setQuery({ search: query.search, page: 1 })}
+              />
+            )}
+          </FilterPanel>
+          <ApiErrorAlert error={members.error} />
+          {Boolean(members.error) && (
+            <Button
+              variant="outline"
+              disabled={members.retryAt !== undefined || members.busy}
+              onClick={() => void controller.refresh().catch(() => undefined)}
+            >
+              {t('retry')}
+            </Button>
+          )}
+          {members.ready &&
+            members.data &&
+            !members.pending &&
+            !members.error &&
+            !recoveringPage && (
+              <p aria-live="polite" className="text-sm text-foreground-muted">
+                {t('count', { count: members.data.total })}
+              </p>
+            )}
+          <div
+            aria-busy={
+              !authorityUnavailable && (members.pending || !members.ready || recoveringPage)
+            }
+          >
+            {authorityUnavailable || members.error ? null : members.pending || recoveringPage ? (
+              <MemberListSkeleton />
+            ) : !members.ready ? (
+              authorityStatus === undefined ||
+              authorityStatus === 'pending' ||
+              authorityStatus === 'ready' ? (
+                <MemberListSkeleton />
+              ) : null
+            ) : members.data && members.data.data.length > 0 ? (
+              <MemberTable
+                rows={members.data.data}
+                actorId={actorId}
+                disabled={!members.ready || members.busy}
+                removalDisabled={removalLocked}
+                onRemove={(row) => {
+                  if (removalLocked) return
+                  setRemovalOpen(true)
+                  setRemovalTarget({
+                    userId: row.user.id,
+                    memberId: row.memberId,
+                    name: row.user.name,
+                    email: row.user.email,
+                    organizationName,
+                  })
+                }}
+                onEdit={setUserId}
+                onAccess={setAccessUserId}
+                onKeys={(userId, memberId, identity) => {
+                  setKeyTarget({
+                    userId,
+                    memberId,
+                    name: identity.name,
+                    email: identity.email,
+                    organizationName,
+                  })
+                  setKeysOpen(true)
+                }}
+              />
+            ) : members.data ? (
+              <p>{t('empty')}</p>
+            ) : null}
+          </div>
+          {members.ready && members.data && !members.error && !recoveringPage && totalPages > 1 && (
+            <ListPagination
+              status={t('pageStatus', { page: query.page, totalPages })}
+              previous={
+                query.page > 1 ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={members.pending}
+                    onClick={() => navigatePage(query.page - 1)}
+                  >
+                    {t('previous')}
+                  </Button>
+                ) : undefined
+              }
+              next={
+                query.page < totalPages ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={members.pending}
+                    onClick={() => navigatePage(query.page + 1)}
+                  >
+                    {t('next')}
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+          <MemberApiKeysHost
             controller={controller}
-            roleId={query.roleId}
-            onClear={() => setQuery({ search: query.search, page: 1 })}
-          />
-        )}
-      </FilterPanel>
-      <ApiErrorAlert error={members.error} />
-      {Boolean(members.error) && (
-        <Button
-          variant="outline"
-          disabled={members.retryAt !== undefined || members.busy}
-          onClick={() => void controller.refresh().catch(() => undefined)}
-        >
-          {t('retry')}
-        </Button>
-      )}
-      {members.ready && members.data && !members.pending && !members.error && !recoveringPage && (
-        <p aria-live="polite" className="text-sm text-foreground-muted">
-          {t('count', { count: members.data.total })}
-        </p>
-      )}
-      <div
-        aria-busy={!authorityUnavailable && (members.pending || !members.ready || recoveringPage)}
-      >
-        {authorityUnavailable || members.error ? null : members.pending || recoveringPage ? (
-          <MemberListSkeleton />
-        ) : !members.ready ? (
-          authorityStatus === undefined ||
-          authorityStatus === 'pending' ||
-          authorityStatus === 'ready' ? (
-            <MemberListSkeleton />
-          ) : null
-        ) : members.data && members.data.data.length > 0 ? (
-          <MemberTable
-            rows={members.data.data}
-            actorId={actorId}
-            disabled={!members.ready || members.busy}
-            onEdit={setUserId}
-            onAccess={setAccessUserId}
-            onKeys={(userId, memberId, identity) => {
-              setKeyTarget({
-                userId,
-                memberId,
-                name: identity.name,
-                email: identity.email,
-                organizationName,
-              })
-              setKeysOpen(true)
+            target={keyTarget}
+            open={keysOpen}
+            onClose={() => {
+              setKeysOpen(false)
+              heading.current?.focus()
             }}
           />
-        ) : members.data ? (
-          <p>{t('empty')}</p>
-        ) : null}
-      </div>
-      {members.ready && members.data && !members.error && !recoveringPage && totalPages > 1 && (
-        <ListPagination
-          status={t('pageStatus', { page: query.page, totalPages })}
-          previous={
-            query.page > 1 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={members.pending}
-                onClick={() => navigatePage(query.page - 1)}
-              >
-                {t('previous')}
-              </Button>
-            ) : undefined
-          }
-          next={
-            query.page < totalPages ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={members.pending}
-                onClick={() => navigatePage(query.page + 1)}
-              >
-                {t('next')}
-              </Button>
-            ) : undefined
-          }
-        />
-      )}
-      <MemberApiKeysHost
-        controller={controller}
-        target={keyTarget}
-        open={keysOpen}
-        onClose={() => {
-          setKeysOpen(false)
-          heading.current?.focus()
-        }}
-      />
-      {userId && (
-        <MemberRoleDialog
-          key={userId}
-          controller={controller}
-          actorId={actorId}
-          userId={userId}
-          onClose={() => {
-            setUserId(undefined)
-            heading.current?.focus()
-          }}
-        />
-      )}
-      {accessUserId && (
-        <MemberAccessDialog
-          key={accessUserId}
-          controller={controller}
-          userId={accessUserId}
-          onClose={() => {
-            setAccessUserId(undefined)
-            heading.current?.focus()
-          }}
-        />
+          {userId && (
+            <MemberRoleDialog
+              key={userId}
+              controller={controller}
+              actorId={actorId}
+              userId={userId}
+              onClose={() => {
+                setUserId(undefined)
+                heading.current?.focus()
+              }}
+            />
+          )}
+          {accessUserId && (
+            <MemberAccessDialog
+              key={accessUserId}
+              controller={controller}
+              userId={accessUserId}
+              onClose={() => {
+                setAccessUserId(undefined)
+                heading.current?.focus()
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   )

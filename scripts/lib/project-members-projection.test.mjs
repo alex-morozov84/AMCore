@@ -4,6 +4,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
+import { assertMemberRemovalProjection } from './member-removal-projection-assertions.mjs'
 import { prepareProjectInit } from './project-init-plan.mjs'
 import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
@@ -39,6 +40,7 @@ for (const [name, flags] of scenarios) {
       plan.assertApplied()
       const read = (file) => readFileSync(path.join(copy.root, file), 'utf8')
       const exists = (file) => existsSync(path.join(copy.root, file))
+      assertMemberRemovalProjection({ read, exists, flags })
       const prefix = flags.mode === 'single' ? '' : '[locale]/'
       assert.ok(
         exists(
@@ -69,6 +71,17 @@ for (const [name, flags] of scenarios) {
         read('apps/web/src/entities/organization-context/index.ts'),
         /useOrganizationMembers/
       )
+      assert.ok(
+        exists('apps/web/src/app/api/product-access/organizations/[id]/members/[userId]/route.ts')
+      )
+      assert.match(read('apps/web/src/entities/organization-context/index.ts'), /useMemberRemoval/)
+      assert.match(
+        read('apps/web/src/entities/organization-context/index.server.ts'),
+        /removeOrganizationMember/
+      )
+      assert.ok(exists('apps/web/src/entities/organization-context/model/member-removal/hooks.ts'))
+      assert.ok(exists('apps/web/src/features/member-removal/ui/member-removal.tsx'))
+      assert.match(read('docs/product-admin/organization-members.md'), /expectedMemberId/)
       const keyRoot =
         'apps/web/src/app/api/product-access/organizations/[id]/members/[userId]/api-keys'
       for (const route of ['route.ts', 'revoke-all/route.ts', '[keyId]/revoke/route.ts'])
@@ -100,6 +113,8 @@ for (const [name, flags] of scenarios) {
       )
       for (const locale of flags.mode === 'single' ? [flags.locale] : ['en', 'ru']) {
         const messages = JSON.parse(read(`apps/web/messages/${locale}.json`))
+        assert.ok(messages.memberRemoval.warning)
+        assert.ok(messages.memberRemoval.confirm)
         assert.ok(messages.memberApiKeys.confirmAll)
         assert.ok(messages.memberApiKeys.membership_removed)
       }

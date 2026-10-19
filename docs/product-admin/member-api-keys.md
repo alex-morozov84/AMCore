@@ -58,8 +58,9 @@ keys ONLY in the selected organization, removes membership, records audit and
 advances organization ACL. Returning to the organization requires a new key:
 the old secret cannot authenticate again. Other organizations' keys are unchanged.
 The last-administrator guard runs before any key revocation. A failed transaction
-changes neither keys nor membership. The ready Members interface does not yet
-provide a member-removal action; API removal is a separate operation.
+changes neither keys nor membership. The ready Members interface provides
+[confirmed member removal](organization-members.md#remove-a-member) through the row menu,
+with an explicit permanent-key warning. Direct API removal remains available.
 
 All/remove accepts at most 1000 unrevoked keys. At 1001 it returns
 `409 MEMBER_API_KEYS_LIMIT` without revoking any key or removing membership.
@@ -186,3 +187,7 @@ BFF uses session binding, strict Origin on mutations, runtime schemas and privat
 when supplying your own layout. Shared primitives and contracts remain usable when
 Console is disabled. [Integration](integration.md) and
 [extension rules](extending-modules.md) explain placement and ownership.
+
+The Members row menu also offers [confirmed member removal](organization-members.md#remove-a-member).
+Its warning is unconditional. Removal and permanent key revocation commit together;
+there is no separate partially completed revoke step.

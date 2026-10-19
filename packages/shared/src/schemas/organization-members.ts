@@ -100,3 +100,11 @@ export const replaceMemberRolesResponseSchema = z.strictObject({
   aclVersion: z.number().int().nonnegative(),
   changed: z.boolean(),
 })
+
+/** Direct legacy DELETE may omit the identity; browser callers must supply it. */
+export const memberRemovalQuerySchema = z.strictObject({
+  expectedMemberId: memberIdSchema.optional(),
+})
+export const memberRemovalCommandSchema = z.strictObject({ expectedMemberId: memberIdSchema })
+/** Server-side adaptation of an exact empty 204 acknowledgment, never a read inference. */
+export const memberRemovalResultSchema = z.strictObject({ removed: z.literal(true) })

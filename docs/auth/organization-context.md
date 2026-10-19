@@ -165,3 +165,12 @@ See [RBAC](./rbac.md), [API consumption](../frontend/api-consumption.md),
 [managed local checks](../operations/local-stands.md).
 
 For ready pages and custom UI, see [product administration](../product-admin/README.md).
+
+### Member removal transport
+
+DELETE `/api/product-access/organizations/:id/members/:userId` requires `expectedMemberId` as a strict query,
+exact trusted Origin and session binding. It is bodyless and private/no-store. An exact upstream204 becomes
+`{binding,data:{removed:true}}`; any other success shape is unconfirmed.
+The [removal contract](../product-admin/organization-members.md#direct-api-and-browser-contract)
+describes actual refusal codes, identity fencing and supported personal-token admission.
+Caller Authorization and organization headers cannot replace the vault credential or code-owned selector.

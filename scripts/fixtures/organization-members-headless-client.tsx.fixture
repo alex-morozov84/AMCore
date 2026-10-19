@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { MemberRolesResponse, ProductAccessBootstrap } from '@amcore/shared'
 
-import { type OrganizationAccessController, useMemberApiKeys, useMemberRoleAssignments, useOrganizationContext, useOrganizationMembers } from '@/entities/organization-context'
+import { type MemberRemovalTarget, type OrganizationAccessController, useMemberRemoval, useMemberApiKeys, useMemberRoleAssignments, useOrganizationContext, useOrganizationMembers } from '@/entities/organization-context'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
@@ -15,6 +15,11 @@ export function CustomMembers({ admission, id }: { admission: ProductAccessBoots
   const t = useTranslations('organizationMembers')
   const context = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
   const members = useOrganizationMembers(context.controller, { page: 1, search: '' })
+  const [removalTarget, setRemovalTarget] = useState<MemberRemovalTarget>()
+  const removal = useMemberRemoval(context.controller, removalTarget)
+  const removalLocked = removal.pending || removal.checking ||
+    (removal.outcome?.status === 'unknown' && removal.inspection?.status !== 'different')
+  const removalText = useTranslations('memberRemoval')
   const [selected, setSelected] = useState<string>()
   return <section className="space-y-6" data-testid="custom-headless-members">
     <h1 className="text-2xl font-semibold">{t('title')}</h1>
@@ -22,12 +27,17 @@ export function CustomMembers({ admission, id }: { admission: ProductAccessBoots
     <div className="grid gap-6 md:grid-cols-2">
       <ul className="space-y-3">{members.ready && members.data?.data.map((member) => <li key={member.memberId}>
         <Button variant="outline" onClick={() => setSelected(member.user.id)}>{member.user.email}</Button>
+        <Button variant="outline" disabled={removalLocked} onClick={() => {
+          if (removalLocked || context.controller.isBusy()) return
+          setRemovalTarget({ userId:member.user.id, memberId:member.memberId, email:member.user.email, name:member.user.name })
+        }}>{removalText('action')}</Button>
       </li>)}</ul>
       {selected && <InlineRoles key={selected} controller={context.controller} userId={selected} actorId={admission.actor.id} />}
     </div>
     {selected && members.data?.data.find((m) => m.user.id === selected) && <InlineKeys
       controller={context.controller} userId={selected}
       memberId={members.data.data.find((m) => m.user.id === selected)!.memberId} />}
+    {removalTarget && <InlineRemoval key={removalTarget.memberId} controller={context.controller} target={removalTarget} removal={removal} />}
     <Button onClick={() => void context.refresh()} disabled={context.state.status === 'pending' || context.controller.isBusy()}>{t('refresh')}</Button>
   </section>
 }
@@ -84,5 +94,22 @@ function InlineKeys({controller,userId,memberId}: {controller:OrganizationAccess
     <Button variant="outline" disabled={!keys.available||keys.busy||uncertain||!keys.data?.revocableCount||keys.data.revocableCount>1000} onClick={()=>setConfirm(true)}>{t('revokeAll')}</Button>
     <Button variant="outline" onClick={()=>void keys.refresh().then(()=>setUncertain(false)).catch(()=>undefined)}>{t('check')}</Button>
     <ConfirmDialog open={confirm} onOpenChange={setConfirm} title={t('confirmAll')} description={t('allWarning')} confirmLabel={t('confirm')} cancelLabel={t('cancel')} variant="destructive" onConfirm={()=>void revoke()}/>
+  </section>
+}
+
+// Independent inline confirmation consumes only the public domain hook; no ready removal feature.
+function InlineRemoval({target,removal}:{controller:OrganizationAccessController;target:MemberRemovalTarget;removal:ReturnType<typeof useMemberRemoval>}) {
+  const t=useTranslations('memberRemoval')
+  const [ack,setAck]=useState(false)
+  const outcome=removal.outcome
+  return <section data-testid="custom-headless-removal" className="space-y-3 rounded-lg border p-4">
+    <h2>{target.email}</h2>
+    <label className="flex gap-2"><input type="checkbox" checked={ack} onChange={event=>setAck(event.target.checked)} />{t('warning')}</label>
+    <Button variant="destructive" disabled={!ack||!removal.canRemove} onClick={()=>{setAck(false);void removal.remove()}}>{t('confirm')}</Button>
+    {outcome?.status==='committed'&&<p role="status">{t('success')}</p>}
+    {outcome?.status==='unknown'&&<p role="status">{t('unknown')}</p>}
+    {outcome?.status==='rejected'&&<ApiErrorAlert error={outcome.error}/>}
+    {outcome&&<Button onClick={()=>void removal.inspect()} disabled={removal.pending||removal.checking||Boolean(removal.retryAt)}>{t('check')}</Button>}
+    {removal.inspection&&<p role="status">{t(removal.inspection.status)}</p>}
   </section>
 }

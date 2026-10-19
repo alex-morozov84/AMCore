@@ -1,6 +1,8 @@
 import type { z } from 'zod'
 
 import type {
+  memberRemovalCommandSchema,
+  memberRemovalResultSchema,
   memberRolesQuerySchema,
   memberRolesResponseSchema,
   memberRoleSummarySchema,
@@ -17,3 +19,6 @@ export type OrganizationMembersResponse = z.infer<typeof organizationMembersResp
 export type MemberRolesResponse = z.infer<typeof memberRolesResponseSchema>
 export type ReplaceMemberRoles = z.infer<typeof replaceMemberRolesSchema>
 export type ReplaceMemberRolesResponse = z.infer<typeof replaceMemberRolesResponseSchema>
+
+export type MemberRemovalCommand = z.infer<typeof memberRemovalCommandSchema>
+export type MemberRemovalResult = z.infer<typeof memberRemovalResultSchema>

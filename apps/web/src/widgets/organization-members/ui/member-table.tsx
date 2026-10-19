@@ -4,7 +4,7 @@ import type { OrganizationMembersResponse } from '@amcore/shared'
 
 import { Card, CardContent } from '@/shared/ui/card'
 import { DataTableSurface } from '@/shared/ui/data-table-surface'
-import { DropdownMenuItem } from '@/shared/ui/dropdown-menu'
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/shared/ui/dropdown-menu'
 import { RoleBadges } from '@/shared/ui/role-badges'
 import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
@@ -17,12 +17,16 @@ export function MemberTable({
   onEdit,
   onAccess,
   onKeys,
+  onRemove,
+  removalDisabled,
 }: {
   rows: Row[]
   actorId: string
   disabled: boolean
   onEdit: (userId: string) => void
   onAccess: (userId: string) => void
+  removalDisabled?: boolean
+  onRemove?: (row: Row) => void
   onKeys?: (userId: string, memberId: string, identity: Row['user']) => void
 }) {
   const t = useTranslations('organizationMembers')
@@ -61,6 +65,14 @@ export function MemberTable({
         <DropdownMenuItem onClick={() => onKeys(row.user.id, row.memberId, row.user)}>
           {t('apiKeys')}
         </DropdownMenuItem>
+      )}
+      {onRemove && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={removalDisabled} onClick={() => onRemove(row)}>
+            {t('remove')}
+          </DropdownMenuItem>
+        </>
       )}
     </RowActionsMenu>
   )

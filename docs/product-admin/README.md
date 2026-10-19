@@ -3,6 +3,7 @@
 AMCore supplies an Organizations selector and read-only organization overview for
 signed-in members, explicit self-service organization creation when enabled, plus a [members and role-assignment page](organization-members.md)
 and [invitation management](invitations.md) for members with full TeamAccess.
+The Members page also provides [confirmed removal with permanent key revocation](organization-members.md#remove-a-member).
 
 This product surface is independent of the [Operations Console](../operations-console/README.md), which is restricted to
 platform super-administrators. An organization role does not grant Console access.
