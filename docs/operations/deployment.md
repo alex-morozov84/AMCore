@@ -416,7 +416,9 @@ automatic rotation, and `json-file` stays Docker's own default only for
 backward compatibility and Kubernetes-runtime scenarios. `local`'s own
 caveat: its files are for the Docker daemon and `docker logs`/`docker
 compose logs` only, not for an external log-shipping tool to read directly
-— use `json-file` instead if you need that. `COMPOSE_LOG_DRIVER` only
+— use `json-file` instead if you need that, or apply the opt-in
+[log-search overlay](log-search.md), which does it for `api`, `worker` and `web` and adds searchable
+storage. `COMPOSE_LOG_DRIVER` only
 accepts `local` or `json-file`; another driver uses different log-opt names
 and fails at container **start**, not at `compose config` time. Requires a
 Compose CLI supporting the `!reset` merge tag — available since Compose CLI

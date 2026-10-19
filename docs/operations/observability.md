@@ -71,34 +71,23 @@ the raw `email` field entirely — no pseudonym gap to fill there, so no
 redaction is needed, only the surplus field's removal. An email subject can carry
 user or organization names, so no log line includes it.
 
-## Log Shipping (Non-Goal)
+## Log Search and Shipping
 
-AMCore deliberately does not ship a log-shipping/aggregation layer. Structured
-Pino JSON goes to each container's stdout only; `docker/compose/prod.yml`'s
-shared `x-logging` block rotates it via Docker's own `local` driver
-(`COMPOSE_LOG_DRIVER`, default `local` — the only other accepted value is
-`json-file`; anything else, e.g. `syslog`/`journald`, uses different option
-names entirely and fails at container **start**, not at `compose config`
-time) at `COMPOSE_LOG_MAX_SIZE`/`COMPOSE_LOG_MAX_FILE` (default `20m` × `5`
-files per container — see `.env.example`). This bounds disk usage
-automatically; it does not make history searchable.
+By default AMCore ships no log pipeline: structured Pino JSON goes to each container's stdout and
+`docker/compose/prod.yml`'s shared `x-logging` block rotates it with Docker's own `local` driver
+(`COMPOSE_LOG_DRIVER`, default `local`; the only other accepted value is `json-file`, because other
+drivers use different option names and fail at container **start**, not at `compose config` time)
+at `COMPOSE_LOG_MAX_SIZE` × `COMPOSE_LOG_MAX_FILE` (default `20m` × `5` files per container, see
+`.env.example`). That bounds disk use; it does not make history searchable. Once a line rolls past
+the window it is gone, and `local`'s files are for the Docker daemon and `docker logs` only, not for
+an external shipper.
 
-The direct consequence under the shipped default (`local` driver): once a log
-line rolls past that 20MB×5 window, it is gone. There is no documented way to
-search historical logs, and no way to correlate a `correlationId` across the
-`api` and `worker` processes once either has rotated past the point where a
-given request's lines lived — `local`'s own files are for the Docker daemon
-and `docker logs`/`docker compose logs` only, not for an external shipper to
-read directly (see `.env.example`'s own comment and the file's `x-logging`
-comment). Switching `COMPOSE_LOG_DRIVER` to `json-file` is the documented
-escape hatch when an external tool needs the raw files directly, but AMCore
-does not itself ship or configure that tool, a shipping pipeline, or a
-searchable log store — a fork needing durable, searchable, cross-process log
-history is expected to add a real shipper (Vector, Fluent Bit, a platform's
-own log-shipping sidecar) reading from `json-file` on top of this, the same
-way this repo ships an exemplary metrics/alerting/dashboard surface but
-expects a fork to wire its own paging integration (see
-[Alerting](#alerting) below).
+For durable, searchable, cross-process history, apply the opt-in
+[log-search reference overlay](log-search.md): it switches `api`, `worker` and `web` to `json-file`,
+ships their lines with Grafana Alloy to a single-node Loki, and serves them through an authenticated
+Grafana on `127.0.0.1`. Nothing in the application depends on it. Its alerts and runbooks are in
+`prometheus/optional/amcore-log-shipping.yml` and [log-shipping](runbooks/log-shipping.md). High
+availability, backups and a standalone monitoring host are not part of it.
 
 ## Web Server Logs
 

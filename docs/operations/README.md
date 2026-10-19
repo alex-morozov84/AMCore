@@ -77,7 +77,7 @@ Already running? Reach for whichever concern below applies.
   (Prometheus + Grafana + Alertmanager) that verifies them against this
   repo's own running stack, and shipped alert rules with dashboard panels.
   **Runbooks** (`runbooks/http.md`, `node-runtime.md`,
-  `metrics-collector-health.md`, `db.md`, `redis.md`, `queues.md`, `email.md`,
+  `metrics-collector-health.md`, `log-shipping.md`, `db.md`, `redis.md`, `queues.md`, `email.md`,
   `realtime.md`) give each alert a symptom, ranked likely causes, diagnostic
   steps with executable diagnostic PromQL and the matching dashboard panel,
   mitigation, and escalation guidance. A static + live CI contract
@@ -86,6 +86,10 @@ Already running? Reach for whichever concern below applies.
   dashboard↔runbook chain from silently drifting; the guide's "Change or
   extend observability" recipe shows how to update every linked artifact
   without weakening that contract.
+- **[Search application logs](log-search.md)** — the opt-in Alloy + Loki + Grafana reference
+  overlay: install, find everything one request did by `correlationId`, retention and disk,
+  failure behavior, the security model of the collector, and its alerts and
+  [runbooks](runbooks/log-shipping.md).
 - **`pg_stat_statements`** — [Bootstrap](pg-stat-statements-setup.md) (a
   one-time privileged step, never a migration), [security
   settings](pg-stat-statements-security.md), [the `amcore_observer`

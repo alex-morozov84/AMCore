@@ -95,6 +95,11 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // Optional bundled `monitoring` profile — consumed by the `grafana`
   // compose service's own environment, not the app's env schema at all.
   'GF_SECURITY_ADMIN_PASSWORD',
+  // docker/compose/logs.yml only (log-search reference overlay): the overlay's own Grafana
+  // password and port and Loki's retention period — compose interpolation, not the app's schema.
+  'LOGS_GRAFANA_ADMIN_PASSWORD',
+  'LOGS_GRAFANA_PORT',
+  'LOGS_RETENTION_PERIOD',
 ])
 const WEBHOOK_SECRET_PATTERN = /^WEBHOOK_[A-Z0-9_]+_SECRET$/
 

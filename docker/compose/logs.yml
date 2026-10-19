@@ -1,0 +1,151 @@
+# Log-search reference overlay for docker-compose.yml (docs/operations/log-search.md).
+# Opt-in: nothing in the application depends on it. Apply it on top of the base file and
+# the production overlay, in this order:
+#
+#   docker compose -f docker-compose.yml -f docker/compose/prod.yml -f docker/compose/logs.yml up -d
+#
+# Pipeline: api/worker/web stdout -> Docker `json-file` files -> Alloy -> Loki -> Grafana.
+#
+# What this changes:
+#   - api, worker and web log with the `json-file` driver (size-bounded, same COMPOSE_LOG_MAX_*
+#     variables as prod.yml) and write their Compose service and project into every line. Alloy
+#     reads those files and keeps only lines that carry those labels. The Docker `local` driver
+#     of prod.yml is replaced for these three services because its files are for the Docker
+#     daemon only.
+#   - loki: single-binary Loki, filesystem storage, bounded retention. No published port.
+#   - alloy: reads the json-file logs read-only and sends them to Loki. No published port, no
+#     Docker socket, and no route to anything but Loki.
+#   - logs-grafana: the only way in. Authenticated, published on 127.0.0.1 only; reach it
+#     from an operator machine through an SSH tunnel.
+#
+# Security invariant (see the guide): Alloy can read every container's log files and
+# `config.v2.json`, which hold container environment variables including secrets. It is
+# therefore treated as a secret-visible, host-privileged component: pinned by digest, read-only
+# root filesystem, no capabilities, no published port, no network except `logs`, which is
+# `internal: true`. Run as root only because Docker's files are root-owned.
+#
+# Do not attach another service to the `logs` network or publish Loki: it has no authentication.
+
+x-app-logging: &app-logging
+  driver: json-file
+  options:
+    max-size: ${COMPOSE_LOG_MAX_SIZE:-20m}
+    max-file: '${COMPOSE_LOG_MAX_FILE:-5}'
+    labels: com.docker.compose.service,com.docker.compose.project
+
+services:
+  api:
+    logging: *app-logging
+
+  worker:
+    logging: *app-logging
+
+  web:
+    logging: *app-logging
+
+  loki:
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki.yml
+      - -config.expand-env=true
+    environment:
+      LOGS_RETENTION_PERIOD: ${LOGS_RETENTION_PERIOD:-168h}
+    volumes:
+      - ./docker/log-search/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    networks:
+      - logs
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # The Loki image has no shell or HTTP client, so it cannot carry a healthcheck. Readiness is
+    # checked from outside (docs/operations/runbooks/log-shipping.md); Alloy and Grafana retry
+    # until Loki accepts connections.
+    logging: &infra-logging
+      driver: json-file
+      options:
+        max-size: ${COMPOSE_LOG_MAX_SIZE:-20m}
+        max-file: '${COMPOSE_LOG_MAX_FILE:-5}'
+
+  alloy:
+    image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/alloy-data
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+    # Docker's log files are root-owned (640): the collector reads them as uid 0 and holds no
+    # capability beyond that.
+    user: '0:0'
+    volumes:
+      - ./docker/log-search/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - alloy_data:/alloy-data
+      - loki_data:/loki-data:ro
+    networks:
+      - logs
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      loki:
+        condition: service_started
+    logging: *infra-logging
+
+  logs-grafana:
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    restart: unless-stopped
+    # Same fail-closed pattern as the `monitoring` profile's Grafana: an unset password stops
+    # the container instead of falling back to Grafana's built-in default.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if [ -z "$$GF_SECURITY_ADMIN_PASSWORD" ]; then
+          echo 'LOGS_GRAFANA_ADMIN_PASSWORD must be set in .env to use docker/compose/logs.yml (no shipped default admin password).' >&2
+          exit 1
+        fi
+        exec /run.sh
+    ports:
+      - '127.0.0.1:${LOGS_GRAFANA_PORT:-3002}:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${LOGS_GRAFANA_ADMIN_PASSWORD:-}
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      # Deterministic, offline-capable boot: no plugin preinstall, no update or analytics calls.
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+    volumes:
+      - ./docker/log-search/grafana/provisioning:/etc/grafana/provisioning:ro
+      - logs_grafana_data:/var/lib/grafana
+    networks:
+      - default
+      - logs
+    depends_on:
+      loki:
+        condition: service_started
+    logging: *infra-logging
+
+networks:
+  # No route to the outside: Alloy, which can read secrets, can only reach Loki.
+  logs:
+    internal: true
+
+volumes:
+  loki_data:
+  alloy_data:
+  logs_grafana_data:

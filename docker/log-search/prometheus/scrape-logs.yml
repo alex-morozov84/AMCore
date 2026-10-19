@@ -1,0 +1,22 @@
+# Prometheus scrape jobs for the log-search reference overlay (docker/compose/logs.yml).
+# Copy these jobs into the `scrape_configs` of a Prometheus that can reach the overlay's
+# internal `logs` network (attach that Prometheus to the network, or run it from the same
+# Compose project). They feed docs/operations/prometheus/optional/amcore-log-shipping.yml.
+#
+# Alloy and Loki publish no host port. Alloy serves its own metrics and, through its component
+# HTTP path, the filesystem metrics of the read-only Loki volume.
+scrape_configs:
+  - job_name: amcore-log-collector
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['alloy:12345']
+
+  - job_name: amcore-log-collector-disk
+    metrics_path: /api/v0/component/prometheus.exporter.unix.disk/metrics
+    static_configs:
+      - targets: ['alloy:12345']
+
+  - job_name: amcore-loki
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['loki:3100']

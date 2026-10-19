@@ -1,0 +1,77 @@
+// AMCore — Grafana Alloy pipeline for the log-search reference overlay
+// (docker/compose/logs.yml, docs/operations/log-search.md).
+//
+// Docker `json-file` files -> allowlist by Compose service -> Loki. No Docker socket.
+//
+// The collector can read EVERY container's files and `config.v2.json` under the mounted
+// directory, which hold container environment variables including secrets. Two controls keep
+// that from mattering: Alloy sits on a network with no route out except to Loki, and the
+// allowlist below drops everything that is not api, worker or web before anything is sent.
+
+// 1. Find the log files Docker writes for every container on the host.
+local.file_match "containers" {
+  path_targets = [{ "__path__" = "/var/lib/docker/containers/*/*-json.log" }]
+  sync_period  = "10s"
+}
+
+loki.source.file "containers" {
+  targets    = local.file_match.containers.targets
+  forward_to = [loki.process.app.receiver]
+}
+
+// 2. Unwrap Docker's envelope, keep only the three application services, label by service.
+//    The overlay sets the json-file `labels` option on those services only, so a line without
+//    `attrs` (Postgres, Redis, any other project) has an empty `service` label and is dropped.
+loki.process "app" {
+  forward_to = [loki.write.default.receiver]
+
+  // {"log":"<line>\n","stream":"stdout","time":"...","attrs":{"com.docker.compose.service":"api",...}}
+  stage.json {
+    expressions = { line = "log", stream = "stream", ts = "time", attrs = "attrs" }
+  }
+  stage.json {
+    source      = "attrs"
+    expressions = {
+      service = "\"com.docker.compose.service\"",
+      project = "\"com.docker.compose.project\"",
+    }
+  }
+  stage.labels {
+    values = { service = "service", compose_project = "project", stream = "stream" }
+  }
+  stage.match {
+    selector = "{service!~\"api|worker|web\"}"
+    action   = "drop"
+  }
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339Nano"
+  }
+  // The stored line is the application's own JSON record, without Docker's envelope.
+  stage.output {
+    source = "line"
+  }
+  stage.replace {
+    expression = "(\\n$)"
+    replace    = ""
+  }
+}
+
+// 3. Send to Loki. Failures are retried with backoff and positions only advance after a
+//    successful send, so a Loki outage delays delivery and does not lose lines that are
+//    still inside the Docker rotation window.
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// Disk metrics for the Loki volume, scraped through Alloy's component HTTP path
+// (/api/v0/component/prometheus.exporter.unix.disk/metrics). Only the filesystem
+// collector runs; the Loki volume is mounted read-only at /loki-data.
+prometheus.exporter.unix "disk" {
+  set_collectors = ["filesystem"]
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|sys|etc|run|var/lib/docker|var/lib/alloy)($|/)"
+  }
+}

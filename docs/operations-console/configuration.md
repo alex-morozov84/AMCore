@@ -243,7 +243,8 @@ What the card does and does not prove:
   mistyped but valid-looking address, such as a wrong host name, is not detected;
   the link fails when someone opens it.
 - A **Logs** link does not prove that log collection is installed. AMCore ships
-  no log search; see [Log shipping](../operations/observability.md#log-shipping-non-goal).
+  log search only as an opt-in overlay; see [Search application logs](../operations/log-search.md).
+  A link to its Grafana needs an SSH tunnel to the Docker host.
 - Never put a token, API key or password in these addresses, in the path, the
   query or the fragment. The card is shown to every `SUPER_ADMIN`, the address
   appears in the page and in browser history, and the start-up check cannot detect
