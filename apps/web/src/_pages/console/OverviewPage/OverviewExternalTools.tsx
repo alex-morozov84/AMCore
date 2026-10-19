@@ -55,6 +55,7 @@ function UnconfiguredTools({ tools, t }: ToolProps & { tools: ConsoleExternalToo
 }
 
 function GuideLinks({ showHowTo, t }: ToolProps & { showHowTo: boolean }) {
+  const icon = <ExternalLink aria-hidden className="ml-1 inline size-4 align-text-bottom" />
   return (
     <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
       {showHowTo && (
@@ -64,6 +65,7 @@ function GuideLinks({ showHowTo, t }: ToolProps & { showHowTo: boolean }) {
           className="underline"
         >
           {t('externalToolsHowTo')}
+          {icon}
         </NewTabLink>
       )}
       <NewTabLink
@@ -72,6 +74,7 @@ function GuideLinks({ showHowTo, t }: ToolProps & { showHowTo: boolean }) {
         className="underline"
       >
         {t('externalToolsRecovery')}
+        {icon}
       </NewTabLink>
     </p>
   )

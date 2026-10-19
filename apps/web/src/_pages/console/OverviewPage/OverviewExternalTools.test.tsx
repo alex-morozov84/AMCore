@@ -65,6 +65,15 @@ describe('OverviewExternalTools', () => {
     expect(screen.queryByText(/not configured/)).not.toBeInTheDocument()
   })
 
+  it('marks every link, button-style or text, with the external-link icon', () => {
+    renderCard({ metrics: 'https://grafana.example.com/d/x', logs: null, alerts: null })
+    const links = screen.getAllByRole('link')
+    expect(links).toHaveLength(3)
+    for (const link of links) {
+      expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
+    }
+  })
+
   it('opens every link in a new tab without opener or referrer and announces it', () => {
     renderCard({ metrics: 'https://grafana.example.com/d/x', logs: null, alerts: null })
     for (const link of screen.getAllByRole('link')) {
