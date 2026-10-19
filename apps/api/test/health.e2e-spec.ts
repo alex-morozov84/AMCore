@@ -34,6 +34,17 @@ describe('Health (e2e)', () => {
     expect(Object.keys(response.body.info ?? {})).toEqual(keys)
   })
 
+  it('keeps Redis up when many probes overlap on one Redis', async () => {
+    const paths = ['/health', '/health/startup', '/health/ready']
+    const responses = await Promise.all(
+      paths.flatMap((path) =>
+        Array.from({ length: 10 }, () => request(app.getHttpServer()).get(path))
+      )
+    )
+
+    expect(responses.map((response) => response.status)).toEqual(Array(30).fill(200))
+  })
+
   it.each(['/health', '/health/ready', '/health/live'])(
     'preserves 503 for a returned down indicator at %s',
     async (path) => {

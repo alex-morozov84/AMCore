@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Redis health checks no longer report a false `value mismatch` when several probes overlap.
+  Each probe now uses its own short-lived key, so `/health`, `/health/startup` and `/health/ready`
+  stay up on a healthy Redis. A Redis operation that fails or returns the wrong value still
+  reports down.
+
 - Role details links retain their visible text in accessible names in both locales.
   Identity lookup buttons also retain their visible email or organization slug.
   Storybook and Playwright use the same axe-core accessibility engine version.
