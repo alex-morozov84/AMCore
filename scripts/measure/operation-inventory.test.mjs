@@ -9,11 +9,9 @@ describe('operation inventory against the real plans', () => {
 
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
-      // The member-key story is removed in both Storybook-disabled recipes.
-      // Console removal adds one lifecycle-link edit. Its content fact appears
-      // in both console and shared-content groups: +3 operations/filesystem
-      // operations, +4 reported facts/claims, with no new provider.
-      { name: 'measured operations', expected: 710, actual: inventory.operations.length },
+      // Two catalogue-bound role fixtures add selected-locale edits; the two
+      // accessibility stories add Storybook-disabled deletions. Providers stay fixed.
+      { name: 'measured operations', expected: 720, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -32,17 +30,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 985,
+        expected: 995,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1705,
+        expected: 1715,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 690,
+        expected: 700,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

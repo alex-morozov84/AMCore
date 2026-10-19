@@ -54,6 +54,8 @@ for (const locale of ['en', 'ru']) {
       for (const path of [
         story,
         'apps/web/src/features/organization-create/ui/organization-create.stories.tsx',
+        'apps/web/src/shared/ui/role-checklist.test.tsx',
+        'apps/web/src/shared/ui/role-checklist.stories.tsx',
       ]) {
         const result = readFileSync(`${copy.root}/${path}`, 'utf8')
         assert.ok(result.includes(`messages/${locale}.json`))

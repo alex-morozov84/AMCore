@@ -78,7 +78,10 @@ export function RoleChecklist({
               href={roleHref(role.id)}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={labels.detailsFor?.(role.name)}
+              // Keep the visible label in the accessible name, regardless of contextual copy.
+              aria-label={
+                labels.detailsFor ? `${labels.details}: ${labels.detailsFor(role.name)}` : undefined
+              }
               className="shrink-0 self-start text-sm underline underline-offset-4"
             >
               {labels.details}

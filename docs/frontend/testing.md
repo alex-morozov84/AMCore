@@ -340,6 +340,17 @@ don't stretch this technique to cover that case.
 
 ## Accessibility
 
+Keep `axe-core` and `@axe-core/playwright` on the same resolved engine version.
+The unit contract `src/test/axe-version-contract.test.ts` checks the direct and
+Playwright resolutions; updating only one package can leave browser checks
+enforcing different rules.
+
+For a text link or button, its accessible name must contain its visible text.
+Prefer the visible text as the name; when extra context is needed, retain that
+text in the name. Test translated names in component tests, and provide a
+browser component state with the actual links/actions rendered. Static JSX lint cannot
+evaluate all translated or dynamically composed names.
+
 `@axe-core/playwright` — the only actively-maintained option; `jest-axe`
 and `vitest-axe` both wrap the same `axe-core` engine but neither wrapper
 is actively developed. Rides on the E2E layers above (near-zero marginal

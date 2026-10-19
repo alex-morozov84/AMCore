@@ -83,10 +83,10 @@ export function IdentityLookup({
                 onSelect(item.id)
                 dismiss()
               }}
-              aria-label={`${copy.lookupSelect}: ${item.name ?? item.email ?? item.slug ?? item.id}`}
               className="w-full cursor-pointer rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:outline-2"
             >
-              <span>{item.name ?? item.email ?? item.slug ?? item.id}</span>
+              <span className="sr-only">{copy.lookupSelect}: </span>
+              <span>{item.name ?? item.email ?? item.slug ?? item.id}</span>{' '}
               {(item.email || item.slug) && (
                 <span className="ml-2 text-xs text-muted-foreground">
                   {item.email ?? item.slug}

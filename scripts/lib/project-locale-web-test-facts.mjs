@@ -1,6 +1,8 @@
 import { localeContent, localeDelete } from './project-locale-fact-helpers.mjs'
 
 const catalogueFixtures = [
+  ['apps/web/src/shared/ui/role-checklist.test.tsx', 'catalogue-pair'],
+  ['apps/web/src/shared/ui/role-checklist.stories.tsx', 'catalogue-pair'],
   ['apps/web/e2e/organization-provisioning/recipient.ts', 'invitation'],
   [
     'apps/web/src/features/console-organization-provisioning/ui/organization-provisioning.stories.tsx',
