@@ -1,6 +1,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations, waitForAnimationsToFinish } from '../../shared/axe'
+import { waitForIdleRegions } from '../../shared/visual-stability'
 import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from '../admin-helpers'
 import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../helpers'
 import { waitForSessionTransitions } from '../sessions-readability'
@@ -193,7 +194,7 @@ test('the Sessions card has no axe violations, populated or empty', async ({ pag
   await openTargetDetail(page, targetEmail)
   await expect(page.getByRole('heading', { name: 'Sessions (2 total)' })).toBeVisible()
   await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(2)
-  await expect(page.locator('[aria-busy]:visible')).toHaveAttribute('aria-busy', 'false')
+  await waitForIdleRegions(page)
   await expect(page.getByRole('button', { name: /revoke all sessions/i })).toBeEnabled()
   await waitForSessionTransitions(
     page.locator('[data-slot="card"]').filter({
