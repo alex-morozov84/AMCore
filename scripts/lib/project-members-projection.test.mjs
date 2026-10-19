@@ -4,6 +4,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
+import { assertMemberRemovalProjection } from './member-removal-projection-assertions.mjs'
 import { prepareProjectInit } from './project-init-plan.mjs'
 import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 
@@ -39,6 +40,7 @@ for (const [name, flags] of scenarios) {
       plan.assertApplied()
       const read = (file) => readFileSync(path.join(copy.root, file), 'utf8')
       const exists = (file) => existsSync(path.join(copy.root, file))
+      assertMemberRemovalProjection({ read, exists, flags })
       const prefix = flags.mode === 'single' ? '' : '[locale]/'
       assert.ok(
         exists(
