@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { expect, userEvent, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import {
   Combobox,
@@ -41,10 +41,10 @@ export const SearchAndKeyboard: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByLabelText('Collection'))
     const popup = within(canvasElement.ownerDocument.body)
-    await userEvent.type(popup.getByLabelText('Search collections'), 'Reports')
-    await expect(popup.getAllByRole('option')).toHaveLength(1)
+    await userEvent.type(await popup.findByLabelText('Search collections'), 'Reports')
+    await waitFor(() => expect(popup.getAllByRole('option')).toHaveLength(1))
     await userEvent.keyboard('{ArrowDown}{Enter}')
-    await expect(canvas.getByLabelText('Collection')).toHaveTextContent('Reports')
+    await waitFor(() => expect(canvas.getByLabelText('Collection')).toHaveTextContent('Reports'))
   },
 }
 export const Disabled: Story = { args: { disabled: true } }
