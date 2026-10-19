@@ -37,8 +37,8 @@ describe('Health (e2e)', () => {
   it('keeps Redis up when many probes overlap on one Redis', async () => {
     const paths = ['/health', '/health/startup', '/health/ready']
     const responses = await Promise.all(
-      Array.from({ length: 30 }, (_, i) =>
-        request(app.getHttpServer()).get(paths[i % paths.length])
+      paths.flatMap((path) =>
+        Array.from({ length: 10 }, () => request(app.getHttpServer()).get(path))
       )
     )
 
