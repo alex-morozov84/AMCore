@@ -67,3 +67,5 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
   [Top route progress bar § The two building blocks](./route-progress.md#the-two-building-blocks-use-these-not-raw-next-apis)
 - Using, configuring, or extending the Operations Console →
   [Operations Console](../operations-console/README.md)
+
+[My API keys](../product-admin/own-api-keys.md) — create a personal integration key, save its secret once, and inspect or revoke your keys across organizations.

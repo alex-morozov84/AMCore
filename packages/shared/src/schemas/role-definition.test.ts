@@ -115,8 +115,14 @@ describe('capability descriptor risk', () => {
   it('declares `fullControl` only on the unrestricted team-access capability and the response schema accepts it', () => {
     const risky = CAPABILITY_CATALOGUE.filter((entry) => 'risk' in entry).map((entry) => entry.id)
     expect(risky).toEqual(['teamAccess.manage'])
+    const capabilities = CAPABILITY_CATALOGUE.map((entry) => {
+      const descriptor = { ...entry }
+      Reflect.deleteProperty(descriptor, 'additionalApiKeyScopes')
+      return descriptor
+    })
+    expect(capabilityCatalogueResponseSchema.safeParse({ capabilities }).success).toBe(true)
     expect(
       capabilityCatalogueResponseSchema.safeParse({ capabilities: CAPABILITY_CATALOGUE }).success
-    ).toBe(true)
+    ).toBe(false)
   })
 })

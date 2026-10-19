@@ -42,6 +42,7 @@ export function OrganizationAccessClientMount({
       membersHref={hrefs.membersHref}
       invitationsHref={hrefs.invitationsHref}
       rolesHref={hrefs.rolesHref}
+      ownApiKeysHref={hrefs.ownApiKeysHref}
       contextHref={hrefs.contextHref}
       pageHref={hrefs.pageHref}
       listHref={hrefs.listHref}

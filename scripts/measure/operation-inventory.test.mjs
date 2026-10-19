@@ -12,7 +12,10 @@ describe('operation inventory against the real plans', () => {
       // Two catalogue-bound role fixtures add selected-locale edits; the two
       // accessibility stories add Storybook-disabled deletions. The Console external tool links add
       // two shared modules with tests and their environment, compose and stand entries. Providers stay fixed.
-      { name: 'measured operations', expected: 726, actual: inventory.operations.length },
+      // Own-key settings add a page move and two pathname edits in three locale
+      // recipes (+9), plus three story deletions in two Storybook-off recipes
+      // (+6): 15 additional operations/facts/claims. No new provider or manifest.
+      { name: 'measured operations', expected: 741, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -31,17 +34,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1001,
+        expected: 1016,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1727,
+        expected: 1742,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 706,
+        expected: 721,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

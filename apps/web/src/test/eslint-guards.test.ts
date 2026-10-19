@@ -244,6 +244,24 @@ describe('FSD boundaries', () => {
       true,
     ],
     [
+      'composition may enter named own-key server API',
+      'src/_app/product-api/probe.ts',
+      "'@/entities/api-key/index.server'",
+      false,
+    ],
+    [
+      'composition cannot enter own-key server internals',
+      'src/_app/product-api/probe.ts',
+      "'@/entities/api-key/api/own-api-keys.server'",
+      true,
+    ],
+    [
+      'shared cannot import own-key server API',
+      'src/shared/lib/probe.ts',
+      "'@/entities/api-key/index.server'",
+      true,
+    ],
+    [
       'composition may enter named organization server API',
       'src/_app/product-api/probe.ts',
       "'@/entities/organization-context/index.server'",

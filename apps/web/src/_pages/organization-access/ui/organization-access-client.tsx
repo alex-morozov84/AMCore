@@ -32,6 +32,7 @@ export interface OrganizationAccessClientProps {
   membersHref?: (id: string) => string
   invitationsHref?: (id: string) => string
   rolesHref?: (id: string) => string
+  ownApiKeysHref?: (id: string) => string
   contextHref: (id: string) => string
   pageHref: (page: number) => string
   listHref: string
@@ -99,6 +100,7 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
           }}
         />
       )}
+
       <div role="status" aria-live="polite" className="sr-only">
         {pending
           ? selected

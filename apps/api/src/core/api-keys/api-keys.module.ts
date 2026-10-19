@@ -8,11 +8,18 @@ import { ApiKeyRevocationService } from './api-key-revocation.service.js'
 import { ApiKeysController } from './api-keys.controller.js'
 import { ApiKeysService } from './api-keys.service.js'
 import { ApiKeyGuard } from './guards/api-key.guard.js'
+import { OwnKeyOrganizationsService } from './own-key-organizations.service.js'
 
 @Module({
   imports: [PrismaModule, AuditModule],
   controllers: [ApiKeysController],
-  providers: [ApiKeyRevocationService, ApiKeysService, ApiKeyAbuseLimiterService, ApiKeyGuard],
+  providers: [
+    OwnKeyOrganizationsService,
+    ApiKeyRevocationService,
+    ApiKeysService,
+    ApiKeyAbuseLimiterService,
+    ApiKeyGuard,
+  ],
   exports: [ApiKeyGuard, ApiKeyRevocationService],
 })
 export class ApiKeysModule {}

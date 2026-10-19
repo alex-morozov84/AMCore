@@ -91,9 +91,13 @@ test('Organizations search input resyncs from the URL on browser Back', async ({
 test('Organizations discovery states have no axe violations', async ({ page }) => {
   await signInAsPathAdmin(page, 'axe-orgs-discovery')
   const token = uniqueEmail('axe-org-search-token').split('@')[0]
+  const fixture = uniqueEmail('axe-org-row').split('@')[0]
+  createOrganization(`Accessible ${fixture}`, `${fixture}-slug`)
 
   await page.goto(`/en/admin/organizations?search=${token}`)
   await expect(page.getByText(/no matching organizations/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create organization', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Refresh list', exact: true })).toBeEnabled()
   await expectNoAxeViolations(page)
 
   await page.goto('/en/admin/organizations?sortBy=name&sortOrder=desc')
@@ -101,5 +105,7 @@ test('Organizations discovery states have no axe violations', async ({ page }) =
     'aria-sort',
     'descending'
   )
+  await expect(page.getByRole('button', { name: 'Create organization', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Refresh list', exact: true })).toBeEnabled()
   await expectNoAxeViolations(page)
 })

@@ -4,6 +4,7 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import {
   Action,
   type ActorAffordances,
+  apiKeyScopeOptions,
   type AssignPermissionInput,
   CAPABILITY_CATALOGUE,
   type CapabilityCatalogueResponse,
@@ -171,6 +172,7 @@ function classify(
 @Injectable()
 export class CapabilityRegistry {
   constructor() {
+    apiKeyScopeOptions(CAPABILITY_CATALOGUE)
     const ids = CAPABILITY_CATALOGUE.map((entry) => entry.id)
     if (
       ids.length !== new Set(ids).size ||
@@ -197,7 +199,14 @@ export class CapabilityRegistry {
   catalogue(): CapabilityCatalogueResponse {
     return {
       capabilities: CAPABILITY_CATALOGUE.map((entry) => ({
-        ...entry,
+        id: entry.id,
+        subject: entry.subject,
+        action: entry.action,
+        operation: entry.operation,
+        method: entry.method,
+        path: entry.path,
+        labelKey: entry.labelKey,
+        ...((entry as CapabilityDescriptor).risk && { risk: (entry as CapabilityDescriptor).risk }),
         credentials: [...entry.credentials],
         presets: [...entry.presets],
         editableFields: [...entry.editableFields],

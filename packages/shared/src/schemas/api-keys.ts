@@ -35,7 +35,7 @@ import { paginatedResponseSchema } from './pagination'
 const ACTIONS = Object.values(Action) as readonly string[]
 const SUBJECTS = Object.values(Subject) as readonly string[]
 
-const scopeSchema = z.string().superRefine((value, ctx) => {
+export const apiKeyScopeSchema = z.string().superRefine((value, ctx) => {
   const parts = value.split(':')
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     ctx.addIssue({
@@ -70,7 +70,7 @@ const scopeSchema = z.string().superRefine((value, ctx) => {
 export const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
   organizationId: z.string().cuid(),
-  scopes: z.array(scopeSchema).min(1),
+  scopes: z.array(apiKeyScopeSchema).min(1),
   expiresAt: z.string().datetime().optional(),
 })
 
@@ -85,10 +85,17 @@ export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>
  */
 export const apiKeyQuerySchema = paginationQuerySchema.extend({
   status: apiKeyStatusFilterSchema.default('all'),
+  search: z.string().trim().max(100).optional(),
+  organizationId: z.string().cuid().optional(),
+  organizationAvailability: z.literal('unavailable').optional(),
 })
 export type ApiKeyQuery = z.infer<typeof apiKeyQuerySchema>
 
 export const apiKeyListItemSchema = z.object({
+  organizationName: z
+    .string()
+    .nullable()
+    .describe('Current name when the owner is a member in the list read snapshot; null otherwise.'),
   id: z.string(),
   name: z.string(),
   organizationId: z.string(),

@@ -95,7 +95,9 @@ If the owner loses a permission later, the key loses it too on the next request 
 
 **Endpoint:** `POST /api/v1/api-keys` — **JWT only**, API keys cannot manage credentials.
 
-The creator must be a member of the bound organization.
+The creator must be a member of the bound organization. This includes ordinary members;
+there is no administrator-only issuance gate. The ready [My API keys page](../product-admin/own-api-keys.md)
+initially shows creation to full team administrators.
 
 ```bash
 curl -X POST https://api.example.com/api/v1/api-keys \
@@ -200,6 +202,12 @@ Use one key per (owner, organization) pair. To grant cross-org access, issue mul
 
 **Endpoint:** `GET /api/v1/api-keys` — **JWT only**.
 
+Lists the signed-in owner’s keys across organizations, including former memberships.
+Each row requires nullable `organizationName`: the current name appears only when
+membership exists in the same REPEATABLE READ snapshot as the page and count.
+Otherwise it is null. This is not an instantaneous revocation of already-delivered names.
+Owner list/revoke does not require current organization membership.
+
 Paginated list. Accepts `?page=N&limit=M` with `1 ≤ page` and
 `1 ≤ limit ≤ 100`; defaults `page=1, limit=20`. Keys are ordered newest first
 (`createdAt DESC, id ASC`). No secret fields are exposed. The default includes retained historical rows; `status=all|unexpired|expired|revoked` filters lifecycle status. Rows include `status`, `revokedAt` and `revocationReason`. Revoked takes precedence over expired; expiry equal to the verification time is expired.
@@ -216,6 +224,7 @@ curl 'https://api.example.com/api/v1/api-keys?page=1&limit=20' \
       "id": "cm1xyz...",
       "name": "CI Pipeline",
       "organizationId": "cm1abc...",
+      "organizationName": "Acme",
       "scopes": ["read:User", "read:Organization"],
       "status": "unexpired",
       "revokedAt": null,

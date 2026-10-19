@@ -1,0 +1,40 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
+import { expect, test } from '@playwright/test'
+
+import { closeCredentialPage } from '../shared/credential-artifacts'
+import { activeTarget, guardedSql } from '../support/managed-target.mjs'
+import { directApi } from './credential-containment.helpers'
+import { TEST_PASSWORD, uniqueEmail } from './helpers'
+
+test.use({ trace: 'off', screenshot: 'off', video: 'off' })
+test.afterEach(({ page }, info) => closeCredentialPage(page, info))
+test('ordinary noncreator MEMBER creates/lists/revokes through independent entity hooks', async ({page, context}) => {
+  test.setTimeout(120000)
+  const target = activeTarget()
+  const owner = await directApi('auth/register', { email: uniqueEmail('headless-owner'), password: TEST_PASSWORD })
+  const org = await directApi('organizations', {name: 'Headless member proof'}, owner.accessToken)
+  const email = uniqueEmail('headless-member')
+  expect((await context.request.post('/api/auth/register', {headers: {origin: target.origins.product}, data: {email, password:TEST_PASSWORD}})).status()).toBe(201)
+  const member = await directApi('auth/login', {email,password:TEST_PASSWORD})
+  guardedSql(`INSERT INTO core.org_members (id,"userId","organizationId") VALUES (:'member',:'user',:'org');
+    INSERT INTO core.member_roles (id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='MEMBER' AND "isSystem"=true;
+    UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
+    {member:`c${member.user.id.slice(1)}x`,user:member.user.id,org:org.id,link:`c${member.user.id.slice(1)}y`})
+  const authority = await directApi(`organizations/${org.id}/context`, undefined, member.accessToken)
+  expect(authority.canManageTeamAccess).toBe(false)
+  const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`),'utf8')).ownApiKeys
+  const path = new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'settings/api-keys')).pathname
+  await page.goto(`${path}?organizationId=${org.id}`)
+  await expect(page.getByTestId('custom-own-keys')).toBeVisible()
+  await page.bringToFront()
+  await page.getByRole('button',{name:t.create,exact:true}).click()
+  await page.bringToFront()
+  await expect(page.getByRole('textbox',{name:t.secret,exact:true})).toBeVisible()
+  await page.getByRole('button',{name:t.saved,exact:true}).click()
+  await expect(page.getByRole('textbox',{name:t.secret,exact:true})).toHaveCount(0)
+  await page.getByRole('button',{name:t.revoke,exact:true}).click()
+  await expect(page.getByText(t.revoked,{exact:true})).toBeVisible()
+})

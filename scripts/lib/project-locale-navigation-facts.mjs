@@ -19,6 +19,8 @@ const facts = {
   // Import only `usePathname`, nothing else - a plain adapter swap, not the
   // file-specific `locale.navigation-adapter` branches above.
   'locale.navigation-plain-pathname': [
+    'apps/web/src/_app/organization-access/ui/navigation-entry.tsx',
+    'apps/web/src/widgets/own-api-keys/ui/own-api-keys-host.tsx',
     'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',
     'apps/web/src/widgets/console-shell/ui/ConsoleBreadcrumb.tsx',
     'apps/web/src/shared/ui/console-detail/ConsoleContextLink.tsx',

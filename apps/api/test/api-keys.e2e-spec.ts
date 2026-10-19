@@ -1,12 +1,16 @@
+import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
+import { ApiKeysService } from '../src/core/api-keys/api-keys.service'
+import type { Prisma } from '../src/generated/prisma/client'
 import type { PrismaService } from '../src/prisma'
 
 import {
   cleanDatabase,
   cleanOrgData,
   type E2ETestContext,
+  seedOrgMember,
   seedSystemRoles,
   setupE2ETest,
   teardownE2ETest,
@@ -75,6 +79,276 @@ describe('API Keys (e2e)', () => {
       scopes: string[]
     }
   }
+
+  describe('own-key search and organization metadata', () => {
+    it('combines literal name, organization and status with owner-scoped counts', async () => {
+      const actor = await registerWithOrg('search@example.test', 'First', 'search-first')
+      const second = await createOrganization(actor.token, 'Second', 'search-second')
+      const foreign = await registerWithOrg('foreign@example.test', 'Foreign', 'search-foreign')
+      const firstKey = await createApiKey(actor.token, actor.organizationId, 'Отчёт_%\\ Exact')
+      await createApiKey(actor.token, actor.organizationId, 'Отчёт wildcard')
+      await createApiKey(actor.token, second, 'Отчёт_%\\ Exact')
+      await createApiKey(foreign.token, foreign.organizationId, 'Отчёт_%\\ Exact')
+      const list = (q: Record<string, string | number>) =>
+        request(app.getHttpServer()).get('/api-keys').auth(actor.token, { type: 'bearer' }).query(q)
+      const result = await list({
+        search: '  ОТЧЁТ_%\\  ',
+        organizationId: actor.organizationId,
+        status: 'unexpired',
+        limit: 1,
+      }).expect(200)
+      expect(result.body.total).toBe(1)
+      expect(result.body.data.map((k: { id: string }) => k.id)).toEqual([firstKey.id])
+      await list({
+        organizationId: actor.organizationId,
+        organizationAvailability: 'unavailable',
+      }).expect(400)
+      await list({ page: Number.MAX_SAFE_INTEGER, limit: 100 }).expect(400)
+      await request(app.getHttpServer())
+        .get('/api-keys?search=a&search=b')
+        .auth(actor.token, { type: 'bearer' })
+        .expect(400)
+      await prisma.orgMember.deleteMany({ where: { userId: actor.userId, organizationId: second } })
+      const unavailable = await list({ organizationAvailability: 'unavailable' }).expect(200)
+      expect(unavailable.body.total).toBe(1)
+      expect(unavailable.body.data[0].organizationName).toBeNull()
+    })
+
+    it('bounds purpose-specific options, pins selected outside search and never exposes former names', async () => {
+      const actor = await registerWithOrg('facets@example.test', 'Same name', 'facets-one')
+      const noKeys = await createOrganization(actor.token, 'No keys', 'facets-no-keys')
+      const former = await createOrganization(actor.token, 'Private former name', 'facets-former')
+      const reader = await registerAndGetToken('facet-reader@example.test')
+      const role = await prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })
+      await seedOrgMember(prisma, {
+        orgId: actor.organizationId,
+        userId: reader.userId,
+        roleId: role.id,
+      })
+      await createApiKey(actor.token, actor.organizationId)
+      await createApiKey(actor.token, former)
+      await prisma.orgMember.deleteMany({ where: { userId: actor.userId, organizationId: former } })
+      const options = (token: string, q: Record<string, string | number>) =>
+        request(app.getHttpServer())
+          .get('/api-keys/organizations')
+          .auth(token, { type: 'bearer' })
+          .query(q)
+      const inventory = await options(actor.token, {
+        purpose: 'inventory',
+        search: 'not matched',
+        selectedId: actor.organizationId,
+      }).expect(200)
+      expect(inventory.body).toMatchObject({
+        total: 0,
+        data: [],
+        hasUnavailable: true,
+        selected: { id: actor.organizationId },
+      })
+      expect(inventory.body.selected).not.toHaveProperty('canManageTeamAccess')
+      expect(JSON.stringify(inventory.body)).not.toContain('Private former name')
+      const creation = await options(actor.token, {
+        purpose: 'creation',
+        selectedId: noKeys,
+      }).expect(200)
+      expect(creation.body.total).toBe(2)
+      expect(creation.body.selected).toMatchObject({ id: noKeys, canManageTeamAccess: true })
+      const member = await options(reader.token, { purpose: 'creation' }).expect(200)
+      expect(member.body.data[0].canManageTeamAccess).toBe(false)
+      const hidden = await options(reader.token, {
+        purpose: 'inventory',
+        selectedId: noKeys,
+      }).expect(200)
+      expect(hidden.body.selected).toBeNull()
+      await options(actor.token, { purpose: 'creation', limit: 21 }).expect(400)
+      await options(actor.token, { purpose: 'creation', unknown: 'x' }).expect(400)
+    })
+  })
+
+  describe('personal issuance and catalogue runtime requirements', () => {
+    it('allows a distinct noncreator MEMBER to issue only their own key', async () => {
+      const admin = await registerWithOrg('admin@example.test')
+      const member = await registerAndGetToken('member@example.test')
+      const role = await prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })
+      const { memberId } = await seedOrgMember(prisma, {
+        orgId: admin.organizationId,
+        userId: member.userId,
+        roleId: role.id,
+      })
+      const assignments = await prisma.memberRole.findMany({
+        where: { memberId },
+        include: { role: true },
+      })
+      expect(assignments.map((link) => link.role.name)).toEqual(['MEMBER'])
+      const context = await request(app.getHttpServer())
+        .get(`/organizations/${admin.organizationId}/context`)
+        .auth(member.token, { type: 'bearer' })
+        .expect(200)
+      expect(context.body.canManageTeamAccess).toBe(false)
+      const key = await createApiKey(member.token, admin.organizationId, 'Own export', [
+        'read:Organization',
+      ])
+      expect((await prisma.apiKey.findUniqueOrThrow({ where: { id: key.id } })).userId).toBe(
+        member.userId
+      )
+      await request(app.getHttpServer())
+        .delete(`/api-keys/${key.id}`)
+        .auth(admin.token, { type: 'bearer' })
+        .expect(404)
+    })
+
+    it('keeps owner-wide cleanup but conceals the current name of a former organization', async () => {
+      const admin = await registerWithOrg('admin@example.test', 'Former organization')
+      const member = await registerAndGetToken('member@example.test')
+      const role = await prisma.role.findFirstOrThrow({ where: { name: 'MEMBER', isSystem: true } })
+      const { memberId } = await seedOrgMember(prisma, {
+        orgId: admin.organizationId,
+        userId: member.userId,
+        roleId: role.id,
+      })
+      const oldKey = await createApiKey(member.token, admin.organizationId)
+      const currentOrg = await createOrganization(member.token, 'Current organization')
+      const currentKey = await createApiKey(member.token, currentOrg)
+      await request(app.getHttpServer())
+        .delete(
+          `/organizations/${admin.organizationId}/members/${member.userId}?expectedMemberId=${memberId}`
+        )
+        .auth(admin.token, { type: 'bearer' })
+        .expect(204)
+      await request(app.getHttpServer())
+        .patch(`/organizations/${admin.organizationId}`)
+        .auth(admin.token, { type: 'bearer' })
+        .send({ name: 'Private new name' })
+        .expect(200)
+      const list = await request(app.getHttpServer())
+        .get('/api-keys?status=all&limit=1&page=1')
+        .auth(member.token, { type: 'bearer' })
+        .expect(200)
+      expect(list.body.total).toBe(2)
+      expect(list.body.data).toHaveLength(1)
+      const all = await request(app.getHttpServer())
+        .get('/api-keys')
+        .auth(member.token, { type: 'bearer' })
+        .expect(200)
+      expect(all.body.data.find((key: { id: string }) => key.id === oldKey.id)).toMatchObject({
+        organizationName: null,
+        status: 'revoked',
+        revocationReason: 'membership_removed',
+      })
+      expect(all.body.data.find((key: { id: string }) => key.id === currentKey.id)).toMatchObject({
+        organizationName: 'Current organization',
+        status: 'unexpired',
+      })
+      expect(JSON.stringify(all.body)).not.toContain('Private new name')
+      await request(app.getHttpServer())
+        .delete(`/api-keys/${oldKey.id}`)
+        .auth(member.token, { type: 'bearer' })
+        .expect(204)
+    })
+
+    it('keeps page and count in one real snapshot during a controlled concurrent creation', async () => {
+      const owner = await registerWithOrg('snapshot@example.test')
+      const first = await createApiKey(owner.token, owner.organizationId, 'Before snapshot')
+      let pageRead!: () => void
+      let allowCount!: () => void
+      const pageReady = new Promise<void>((resolve) => {
+        pageRead = resolve
+      })
+      const countGate = new Promise<void>((resolve) => {
+        allowCount = resolve
+      })
+      const transaction = prisma.$transaction.bind(prisma)
+      type Work = (tx: Prisma.TransactionClient) => Promise<unknown>
+      // Gate only the owner-list transaction. Real SQL uses the service's supplied isolation level.
+      const spy = jest.spyOn(prisma, '$transaction').mockImplementationOnce((async (
+        work: Work,
+        options: { isolationLevel: Prisma.TransactionIsolationLevel }
+      ) =>
+        transaction(async (tx) => {
+          const apiKey = new Proxy(tx.apiKey, {
+            get(target, property) {
+              if (property === 'findMany')
+                return async (args: Prisma.ApiKeyFindManyArgs) => {
+                  const rows = await target.findMany(args)
+                  pageRead()
+                  return rows
+                }
+              if (property === 'count')
+                return async (args: Prisma.ApiKeyCountArgs) => {
+                  await countGate
+                  return target.count(args)
+                }
+              return Reflect.get(target, property)
+            },
+          })
+          return work(
+            new Proxy(tx, {
+              get(target, property) {
+                return property === 'apiKey' ? apiKey : Reflect.get(target, property)
+              },
+            })
+          )
+        }, options)) as never)
+      const reading = app.get(ApiKeysService).findAllForUser(owner.userId, 1, 20)
+      spy.mockRestore()
+      try {
+        await pageReady
+        await createApiKey(owner.token, owner.organizationId, 'After snapshot')
+      } finally {
+        allowCount()
+      }
+      const snapshot = await reading
+      expect(snapshot.total).toBe(1)
+      expect(snapshot.data.map((key) => key.id)).toEqual([first.id])
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get('/api-keys')
+            .auth(owner.token, { type: 'bearer' })
+            .expect(200)
+        ).body.total
+      ).toBe(2)
+    })
+
+    it('DELETE requires delete and full TeamAccess, but no read scope', async () => {
+      const owner = await registerWithOrg('owner@example.test')
+      for (const scopes of [['delete:Organization'], ['manage:TeamAccess']]) {
+        const key = await createApiKey(owner.token, owner.organizationId, 'Incomplete', scopes)
+        await request(app.getHttpServer())
+          .delete(`/organizations/${owner.organizationId}`)
+          .auth(key.key, { type: 'bearer' })
+          .expect(403)
+      }
+      const key = await createApiKey(owner.token, owner.organizationId, 'Complete', [
+        'delete:Organization',
+        'manage:TeamAccess',
+      ])
+      await request(app.getHttpServer())
+        .delete(`/organizations/${owner.organizationId}`)
+        .auth(key.key, { type: 'bearer' })
+        .expect(204)
+    })
+
+    it('PATCH requires a response-read scope in addition to update', async () => {
+      const owner = await registerWithOrg('owner@example.test')
+      const incomplete = await createApiKey(owner.token, owner.organizationId, 'Incomplete', [
+        'update:Organization',
+      ])
+      await request(app.getHttpServer())
+        .patch(`/organizations/${owner.organizationId}`)
+        .auth(incomplete.key, { type: 'bearer' })
+        .send({ name: 'Changed' })
+        .expect(403)
+      const complete = await createApiKey(owner.token, owner.organizationId, 'Complete', [
+        'update:Organization',
+        'read:Organization',
+      ])
+      await request(app.getHttpServer())
+        .patch(`/organizations/${owner.organizationId}`)
+        .auth(complete.key, { type: 'bearer' })
+        .send({ name: 'Changed' })
+        .expect(200)
+    })
+  })
 
   describe('POST /api-keys', () => {
     it('creates key and returns full key value once', async () => {

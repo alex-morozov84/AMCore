@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- My API keys settings with personal creation, catalogue scope selection, one-time secret handling, session checks and owner-wide inventory/revocation. Ordinary member issuance remains available through the API and headless hooks.
+
 - Organization members can be removed through a confirmed ready or custom headless flow, with a permanent API-key warning, membership identity precondition and read-only unknown-result inspection.
 
 - Console Overview has an **External tools** card with links to the metrics, logs and alerts tools an operator configures (`ADMIN_CONSOLE_METRICS_URL`, `ADMIN_CONSOLE_LOGS_URL`, `ADMIN_CONSOLE_ALERTS_URL`) and to the public recovery runbooks. Unset tools are shown as not configured; an unusable value stops the web service at start-up. The Console does not contact the tools or sign in to them.

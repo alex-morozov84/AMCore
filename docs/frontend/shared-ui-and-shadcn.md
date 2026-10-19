@@ -61,6 +61,20 @@ new dependency. Use `contentClassName` when a real composition needs different
 spacing. Domain wrappers supply their content and layout without copying summary
 markup.
 
+### Searchable selection and timestamps
+
+Use `combobox.tsx` for a searchable selection popup. It wraps the installed Base UI
+Combobox primitives with shared tokens and keyboard behavior. Compose `Combobox`,
+`ComboboxTrigger`, `ComboboxContent`, `ComboboxInput`, `ComboboxList` and
+`ComboboxItem`; supply localized labels and controlled selection/search values.
+For server-filtered options, pass `filter={null}`. Keep fetching, debounce,
+pagination, permissions and option identity in the owning feature or entity.
+
+Use `Timestamp` from `@/shared/ui/timestamp` for the common numeric date and smaller
+clock below it. Supply an ISO value and an optional time zone; `inline` and `date`
+variants support compact detail contexts. ConsoleTimestamp delegates to it and
+retains the Console's time-zone preference. Other consumers need no Console state.
+
 ### Password fields and page titles
 
 Use `PasswordInput` from `@/shared/ui/password-input` in password forms.

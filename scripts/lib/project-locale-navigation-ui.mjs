@@ -56,6 +56,17 @@ export function rewriteNavigationAdapter(model, ctx) {
   model.replaceNode(rawKey, retainedRawKey(rawKey), { ...ctx, includeLeadingComments: true })
 }
 
+function mergePathnameImport(model, nextImport, ctx) {
+  const clause = nextImport.importClause
+  const bindings = clause?.namedBindings
+  if (clause?.name || clause?.isTypeOnly || !bindings || !ts.isNamedImports(bindings))
+    throw new Error('pathname projection requires named value imports from next/navigation')
+  const specifiers = [
+    ...new Set(['usePathname', ...bindings.elements.map((item) => item.getText())]),
+  ]
+  model.replaceNode(nextImport, `import { ${specifiers.join(', ')} } from 'next/navigation'`, ctx)
+}
+
 /**
  * For a consumer that imports only `usePathname` from `@/i18n/navigation`
  * and nothing else (no `useRouter`/`Link`, no file-specific state like
@@ -64,6 +75,11 @@ export function rewriteNavigationAdapter(model, ctx) {
  */
 export function rewritePlainPathnameAdapter(model, ctx) {
   const localeImport = uniqueImport(model, '@/i18n/navigation', ctx)
+  if (model.sourceFile.statements.some((node) => isImportOf(node, 'next/navigation'))) {
+    mergePathnameImport(model, uniqueImport(model, 'next/navigation', ctx), ctx)
+    model.removeNode(localeImport, ctx)
+    return
+  }
   const hasIntl = model.sourceFile.statements.some((node) => isImportOf(node, 'next-intl'))
   if (!hasIntl) {
     model.replaceNode(localeImport, "import { usePathname } from 'next/navigation'", ctx)

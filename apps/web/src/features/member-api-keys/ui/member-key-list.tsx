@@ -2,6 +2,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import type { MemberKeyList } from '@amcore/shared'
 import { Ban, Clock3, KeyRound } from 'lucide-react'
 
+import { KeyStatus } from '@/entities/api-key'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
@@ -56,21 +57,13 @@ export function MemberKeyListView({
       )}
       <div className="space-y-3">
         {data.data.map((key) => {
-          const { Icon, card, badge } = STATUS_VIEW[key.status]
+          const { card } = STATUS_VIEW[key.status]
           return (
             <Card key={key.id} className={cn('border-l-4', card)}>
               <CardContent className="space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h3 className="break-all font-medium">{key.name}</h3>
-                  <span
-                    className={cn(
-                      'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium',
-                      badge
-                    )}
-                  >
-                    <Icon className="size-3.5" aria-hidden="true" />
-                    {t(key.status)}
-                  </span>
+                  <KeyStatus status={key.status} />
                 </div>
                 <dl className="grid gap-1 text-sm text-muted-foreground">
                   <div>

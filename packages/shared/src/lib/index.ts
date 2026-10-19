@@ -1,5 +1,10 @@
 // Shared helpers public API
 export { escapeLikeLiteral } from './admin-search'
+export {
+  type ApiKeyScopeOption,
+  apiKeyScopeOptions,
+  selectedApiKeyScopes,
+} from './api-key-scope-options'
 export { localePathPrefix, localizedFrontendUrl } from './frontend-url'
 export {
   createInvitationOperationId,

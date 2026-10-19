@@ -5,6 +5,7 @@ import { SidebarProvider } from '@/shared/ui/sidebar'
 
 import { OrganizationNavigationEntry } from './navigation-entry'
 
+vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/organizations' }))
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }))
 vi.mock('@/shared/ui/route-progress-link', () => ({
   RouteProgressLink: (props: React.ComponentProps<'a'>) => <a {...props}>{props.children}</a>,
@@ -21,9 +22,9 @@ describe('organization menu placement', () => {
           </ul>
         </SidebarProvider>
       )
-      expect(screen.getByRole('link', { name: 'title' })).toHaveAttribute(
+      expect(screen.getAllByRole('link', { name: 'title' })[0]).toHaveAttribute(
         'href',
-        placement?.organizationsPath ?? '/organizations'
+        `${placement?.organizationsPath ?? '/organizations'}?view=list`
       )
     }
   )

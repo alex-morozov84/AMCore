@@ -24,7 +24,9 @@ export const memberKeyListSchema = z.strictObject({
     name: z.string().nullable(),
     email: z.string(),
   }),
-  data: z.array(apiKeyListItemSchema.omit({ organizationId: true })).max(100),
+  data: z
+    .array(apiKeyListItemSchema.omit({ organizationId: true, organizationName: true }))
+    .max(100),
   total: count,
   page: z.number().int().min(1).max(10000),
   limit: z.number().int().min(1).max(100),

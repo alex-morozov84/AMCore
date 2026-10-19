@@ -368,3 +368,13 @@ never sees a request that never crosses the browser. See
 - [Testing](./testing.md) — which layer to test a given hook/flow at.
 - [Media](../media/README.md), [Notifications](../notifications/README.md),
   [AI](../ai/README.md) — the backend contracts these hooks consume.
+
+## Own API-key adapter
+
+The ready [own-key flow](../product-admin/own-api-keys.md#browser-and-api-contracts) uses
+dedicated `/api/own-api-keys` handlers with strict input, binding, byte budgets and
+exact success acknowledgments. Its session probe uses only vault/refresh. A fresh
+post201 probe precedes secret reveal. Creation bypasses Query/MutationCache.
+The generic `/api/api-keys` path and its accepted aliases remain supported; the
+JWT-containment classifier does not block API-key issuance. Generic traffic does
+not acquire the dedicated adapter’s validation or client lifecycle guarantees.

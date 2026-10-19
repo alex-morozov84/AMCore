@@ -1,6 +1,14 @@
 export type { OrganizationContextData } from './api/context-client'
 export { organizationCreationClient } from './api/creation-client'
 export { invitationsClient } from './api/invitations-client'
+export {
+  type Capability,
+  areaViews as capabilityAreaViews,
+  isAreaOpen,
+  isLarge,
+  LARGE_CATALOGUE,
+  matchesQuery,
+} from './model/catalogue-view'
 export { type OrganizationContextInput, organizationContextKey } from './model/context-input'
 export { createOrganizationContextLease, type OrganizationContextRun } from './model/context-lease'
 export {
@@ -44,3 +52,4 @@ export {
 export type { RoleCreateOutcome, RoleDeleteOutcome, RoleSaveOutcome } from './model/roles/outcomes'
 export { useCatalogueText } from './model/use-catalogue-text'
 export { useOrganizationContext } from './model/use-organization-context'
+export { CapabilitySelection } from './ui/capability-selection'

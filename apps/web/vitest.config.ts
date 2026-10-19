@@ -62,6 +62,7 @@ export default defineConfig({
           include: [
             // Cold discovery of these primitives reloads the browser before stories run.
             '@base-ui/react/checkbox',
+            '@base-ui/react/combobox',
             '@base-ui/react/select',
             '@base-ui/react/tabs',
             // msw's browser handler-matching pulls in `path-to-regexp`, a
