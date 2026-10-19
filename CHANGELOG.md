@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Role details links retain their visible text in accessible names in both locales.
+  Identity lookup buttons also retain their visible email or organization slug.
+  Storybook and Playwright use the same axe-core accessibility engine version.
+
 ### Added
 
 - Organization members can be removed through a confirmed ready or custom headless flow, with a permanent API-key warning, membership identity precondition and read-only unknown-result inspection.
