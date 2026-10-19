@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Inject, Injectable } from '@nestjs/common'
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus'
@@ -14,9 +16,11 @@ export class RedisHealthIndicator {
     const indicator = this.healthIndicatorService.check(key)
 
     try {
-      // Test Redis connectivity by setting and getting a test value
-      const testKey = '__health_check__'
-      const testValue = Date.now().toString()
+      // Test Redis connectivity by setting and getting a test value. Each probe owns its
+      // key: probes overlap across endpoints and across replicas sharing one Redis, and a
+      // shared key would let one probe read another's value and report a false mismatch.
+      const testValue = randomUUID()
+      const testKey = `__health_check__:${testValue}`
 
       await this.cacheManager.set(testKey, testValue, 1000) // 1 second TTL
       const result = await this.cacheManager.get<string>(testKey)

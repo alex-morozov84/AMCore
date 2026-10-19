@@ -28,25 +28,47 @@ describe('RedisHealthIndicator', () => {
   })
 
   it('should return healthy status when Redis is accessible', async () => {
-    cacheManager.set.mockResolvedValue(undefined)
-    cacheManager.get.mockImplementation(async (key: string) => {
-      if (key === '__health_check__') {
-        return Promise.resolve(Date.now().toString())
-      }
-      return Promise.resolve(undefined)
+    const store = new Map<string, unknown>()
+    cacheManager.set.mockImplementation(async (key: string, value: unknown) => {
+      store.set(key, value)
+      return value
     })
-
-    // Mock get to return the same value that was set
-    jest.spyOn(Date, 'now').mockReturnValue(1234567890)
-    cacheManager.get.mockResolvedValue('1234567890')
+    cacheManager.get.mockImplementation(async (key: string) => store.get(key))
 
     const result = await indicator.isHealthy('redis')
 
     expect(healthIndicatorService.check).toHaveBeenCalledWith('redis')
-    expect(cacheManager.set).toHaveBeenCalledWith('__health_check__', '1234567890', 1000)
+    expect(cacheManager.set).toHaveBeenCalledWith(
+      expect.stringMatching(/^__health_check__:[0-9a-f-]{36}$/),
+      expect.any(String),
+      1000
+    )
     expect(mockIndicator.up).toHaveBeenCalled()
     expect(result).toEqual({ redis: { status: 'up' } })
+  })
 
+  it('should stay healthy when probes overlap on the same Redis', async () => {
+    // Every write lands before any read: the worst interleaving for a shared key.
+    // Distinct clock values make the old shared-key probe fail deterministically.
+    jest.spyOn(Date, 'now').mockReturnValueOnce(1).mockReturnValueOnce(2)
+    const store = new Map<string, unknown>()
+    let writes = 0
+    let allWritten: () => void = () => undefined
+    const writesDone = new Promise<void>((resolve) => (allWritten = resolve))
+    cacheManager.set.mockImplementation(async (key: string, value: unknown) => {
+      store.set(key, value)
+      if (++writes === 2) allWritten()
+      await writesDone
+      return value
+    })
+    cacheManager.get.mockImplementation(async (key: string) => store.get(key))
+
+    const results = await Promise.all([indicator.isHealthy('redis'), indicator.isHealthy('redis')])
+
+    expect(mockIndicator.down).not.toHaveBeenCalled()
+    expect(mockIndicator.up).toHaveBeenCalledTimes(2)
+    expect(results).toHaveLength(2)
+    expect(new Set(cacheManager.set.mock.calls.map(([key]) => key)).size).toBe(2)
     jest.restoreAllMocks()
   })
 
