@@ -159,6 +159,7 @@ const EXPECTED: Record<string, Expected> = {
   'get /storage/public': { status: '200', kind: 'binary' },
   // api-keys
   'post /api-keys': { status: '201', kind: 'json' },
+  'get /api-keys/organizations': { status: '200', kind: 'json' },
   'get /api-keys': { status: '200', kind: 'json' },
   'delete /api-keys/{id}': { status: '204', kind: 'none' },
   // organizations
@@ -711,6 +712,26 @@ describe('OpenAPI success surface (e2e)', () => {
       'description',
       'Command input exceeds the 32KiB byte ceiling'
     )
+  })
+
+  it('documents membership-safe nullable organization names only on the owner key inventory', () => {
+    const schemas = document.components?.schemas ?? {}
+    const resolve = (value: unknown): Record<string, unknown> => {
+      const schema = value as { $ref?: string }
+      return (schema?.$ref ? schemas[schema.$ref.split('/').at(-1)!] : value) as Record<
+        string,
+        unknown
+      >
+    }
+    const response = document.paths['/api-keys']!.get!.responses!['200'] as {
+      content?: { 'application/json'?: { schema?: unknown } }
+    }
+    const envelope = resolve(response.content?.['application/json']?.schema)
+    const data = (envelope.properties as Record<string, unknown>).data as { items: unknown }
+    const row = resolve(data.items)
+    expect(row.required).toContain('organizationName')
+    const name = (row.properties as Record<string, unknown>).organizationName
+    expect(JSON.stringify(name)).toContain('null')
   })
 
   it('documents closed registered failure maps on common work diagnostics', () => {

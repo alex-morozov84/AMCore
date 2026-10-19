@@ -1,0 +1,27 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+import type { OwnApiKeyAdmission } from '@amcore/shared'
+
+import { useOwnApiKeyController, useOwnApiKeySecret, useOwnApiKeys, useCreateOwnApiKey, useRevokeOwnApiKey } from '@/entities/api-key'
+import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
+
+/** Independent MEMBER composition: no organization controller, ready feature, widget or page. */
+export function CustomOwnKeys({ admission, organizationId }: { admission: OwnApiKeyAdmission; organizationId?: string; listHref?: string; invalidQuery?: boolean; baseHref?: string }) {
+  const t = useTranslations('ownApiKeys')
+  const { controller, attempt, session } = useOwnApiKeyController(admission, organizationId)
+  const inventory = useOwnApiKeys(controller, { page: 1, limit: 20, status: 'all' })
+  const create = useCreateOwnApiKey(controller)
+  const revoke = useRevokeOwnApiKey(controller)
+  const secret = useOwnApiKeySecret(controller, organizationId)
+  return <section data-testid="custom-own-keys" className="space-y-4">
+    <h1>{t('title')}</h1>
+    <p>{session}</p>
+    <Button disabled={!organizationId || session !== 'verified' || attempt.phase !== 'idle'} onClick={async () => { await create({ name: 'Headless export', organizationId: organizationId!, scopes: ['read:Organization'] }); await inventory.refetch() }}>{t('create')}</Button>
+    {secret && <Input readOnly value={secret} aria-label={t('secret')} />}
+    {attempt.phase === 'confirmed' && <Button onClick={() => controller.acknowledgeSaved()}>{t('saved')}</Button>}
+    {attempt.phase === 'unknown' && <p>{t('unknown')}</p>}
+    <ul>{inventory.data?.data.map(key => <li key={key.id}><span>{key.name}</span><span>{t(key.status)}</span>{!key.revokedAt && <Button onClick={async () => { await revoke(key.id); await inventory.refetch() }}>{t('revoke')}</Button>}</li>)}</ul>
+  </section>
+}

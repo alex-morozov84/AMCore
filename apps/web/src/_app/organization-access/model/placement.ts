@@ -1,5 +1,6 @@
 export interface OrganizationAccessPlacement {
   readonly organizationsPath: string
+  readonly ownApiKeysPath?: string
   readonly homeHref: string
 }
 
@@ -8,6 +9,7 @@ export const organizationAccessPlacement: OrganizationAccessPlacement = Object.f
   normalizePlacement({
     organizationsPath: '/organizations',
     homeHref: '/',
+    ownApiKeysPath: '/settings/api-keys',
   })
 )
 
@@ -27,6 +29,9 @@ function placementPath(value: string, field: string, allowRoot: boolean) {
 
 function normalizePlacement(placement: OrganizationAccessPlacement): OrganizationAccessPlacement {
   return {
+    ...(placement.ownApiKeysPath && {
+      ownApiKeysPath: placementPath(placement.ownApiKeysPath, 'ownApiKeysPath', false),
+    }),
     organizationsPath: placementPath(placement.organizationsPath, 'organizationsPath', false),
     homeHref: placementPath(placement.homeHref, 'homeHref', true),
   }
@@ -37,6 +42,10 @@ export function organizationAccessHrefs(placement: OrganizationAccessPlacement) 
   const path = placementPath(placement.organizationsPath, 'organizationsPath', false)
   const homeHref = placementPath(placement.homeHref, 'homeHref', true)
   return {
+    ownApiKeysHref: placement.ownApiKeysPath
+      ? (id: string) =>
+          `${placementPath(placement.ownApiKeysPath!, 'ownApiKeysPath', false)}?organizationId=${encodeURIComponent(id)}`
+      : undefined,
     menuHref: path,
     listHref: `${path}?view=list`,
     invitationsHref: (id: string) => `${path}/${encodeURIComponent(id)}/invites`,

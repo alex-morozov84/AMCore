@@ -54,7 +54,7 @@ const below = (...types) =>
   types.flatMap((type) => [
     { element: { type, fileInternalPath: PUBLIC_API } },
     ...(type === 'entities'
-      ? ['organization-context', 'invitation-flow'].map((slice) => ({
+      ? ['organization-context', 'invitation-flow', 'api-key'].map((slice) => ({
           element: { type, captured: { slice }, fileInternalPath: 'index.server.ts' },
         }))
       : []),

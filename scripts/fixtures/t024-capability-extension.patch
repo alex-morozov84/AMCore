@@ -1098,7 +1098,7 @@ diff --git a/packages/shared/src/constants/capability-catalogue.ts b/packages/sh
 index e1d4d35..6e3761a 100644
 --- a/packages/shared/src/constants/capability-catalogue.ts
 +++ b/packages/shared/src/constants/capability-catalogue.ts
-@@ -66,6 +66,20 @@ export const CAPABILITY_CATALOGUE = [
+@@ -66,6 +66,21 @@ export const CAPABILITY_CATALOGUE = [
      presets: ['own', 'all'] as const,
      editableFields: [] as const,
    },
@@ -1111,6 +1111,7 @@ index e1d4d35..6e3761a 100644
 +  },
 +  {
 +    id: 'fixtureOrder.update', subject: Subject.FixtureOrder, action: Action.Update,
++    additionalApiKeyScopes: ['read:FixtureOrder'],
 +    operation: 'fixtureOrders.update', method: 'PATCH',
 +    path: '/organizations/:orgId/fixture-orders/:id',
 +    credentials: ['bearer', 'apiKey'] as const, labelKey: 'fixtureOrderUpdate',

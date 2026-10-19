@@ -33,6 +33,7 @@ describe('ApiKeysService', () => {
     createdAt: new Date('2024-01-01'),
     userId: 'user-1',
     organizationId: 'org-1',
+    organization: { name: 'Current organization', members: [{ id: 'member-1' }] },
   }
 
   const mockApiKeyWithUser = {
@@ -205,6 +206,34 @@ describe('ApiKeysService', () => {
   })
 
   describe('verifyByShortToken', () => {
+    it('reads safe owner metadata in a repeatable snapshot and hides former organization names', async () => {
+      mockCtx.prisma.apiKey.findMany.mockResolvedValue([
+        mockApiKey,
+        {
+          ...mockApiKey,
+          id: 'former-key',
+          organization: { name: 'Private renamed organization', members: [] },
+        },
+      ] as never)
+      mockCtx.prisma.apiKey.count.mockResolvedValue(2)
+      const result = await service.findAllForUser('user-1', 1, 20, 'all')
+      expect(result.data.map((key) => key.organizationName)).toEqual(['Current organization', null])
+      expect(JSON.stringify(result)).not.toContain('Private renamed organization')
+      expect(mockCtx.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: 'RepeatableRead',
+      })
+      const query = mockCtx.prisma.apiKey.findMany.mock.calls[0]![0]!
+      expect(query.where).toEqual({ userId: 'user-1' })
+      expect(query.select).not.toHaveProperty('keyHash')
+      expect(query.select).not.toHaveProperty('salt')
+      expect(query.select?.organization).toEqual({
+        select: {
+          name: true,
+          members: { where: { userId: 'user-1' }, take: 1, select: { id: true } },
+        },
+      })
+    })
+
     it('should return apiKey for valid token', async () => {
       jest.spyOn(service as any, 'verifyLongToken').mockReturnValue(true)
       mockCtx.prisma.apiKey.findUnique.mockResolvedValue(mockApiKeyWithUser)

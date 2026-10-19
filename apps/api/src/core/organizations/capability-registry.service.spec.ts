@@ -1,6 +1,6 @@
 import type { RawRuleOf } from '@casl/ability'
 
-import { Action, Subject } from '@amcore/shared'
+import { Action, capabilityCatalogueResponseSchema, Subject } from '@amcore/shared'
 
 import type { AppAbility, TeamAccessDecision } from '../auth/casl/ability.factory'
 import { createPrismaAbility } from '../auth/casl/prisma-ability'
@@ -20,6 +20,13 @@ const ability = (rules: unknown[]) =>
   createPrismaAbility<AppAbility>(rules as RawRuleOf<AppAbility>[])
 
 describe('capability actor projection', () => {
+  it('keeps scope requirements code-only and preserves the strict public catalogue', () => {
+    const response = registry.catalogue()
+    expect(capabilityCatalogueResponseSchema.safeParse(response).success).toBe(true)
+    for (const entry of response.capabilities)
+      expect(entry).not.toHaveProperty('additionalApiKeyScopes')
+  })
+
   it('never calls a conditional allow blanket access and preserves conditional DENY uncertainty', () => {
     const conditional = ability([
       { action: Action.Read, subject: Subject.Organization },

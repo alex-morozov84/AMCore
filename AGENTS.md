@@ -237,8 +237,8 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   `@/shared/lib/utils`) — there is no `@/shared/ui` barrel, and no layer-level
   barrel anywhere. A slice may not import a sibling slice in another group.
   `_app/<slice>` enters lower slice public APIs and is not imported from below.
-  The explicitly named `entities/organization-context/index.server.ts` and
-  `entities/invitation-flow/index.server.ts` are server-only public DAL entries;
+  The explicitly named `entities/organization-context/index.server.ts`,
+  `entities/invitation-flow/index.server.ts` and `entities/api-key/index.server.ts` are server-only public DAL entries;
   other deep server imports remain forbidden.
   TanStack Query for server state, Zustand for local client state (kept as
   the convention; no live store exists today — see

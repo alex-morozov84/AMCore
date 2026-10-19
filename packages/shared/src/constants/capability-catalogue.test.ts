@@ -10,7 +10,12 @@ describe('capability catalogue contract', () => {
     const ids = CAPABILITY_CATALOGUE.map((entry) => entry.id)
     expect(new Set(ids).size).toBe(ids.length)
     expect(
-      capabilityCatalogueResponseSchema.safeParse({ capabilities: CAPABILITY_CATALOGUE }).success
+      capabilityCatalogueResponseSchema.safeParse({
+        capabilities: CAPABILITY_CATALOGUE.map((entry) => {
+          const { additionalApiKeyScopes: _scopes, ...publicEntry } = entry as CapabilityDescriptor
+          return publicEntry
+        }),
+      }).success
     ).toBe(true)
   })
 

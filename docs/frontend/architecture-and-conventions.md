@@ -61,6 +61,8 @@ import { LoginForm } from '@/features/auth-login/ui/LoginForm'
 Each slice folder's public entry points define what other layers may use.
 The exact additional public entries are:
 
+- `entities/api-key/index.server.ts`: actor-bound own-key admission and server operations;
+  create secrets never enter Server Component props.
 - `entities/organization-context/index.server.ts`: the server-only DAL and
   family descriptor, available to layers that may import this entity.
 - `entities/invitation-flow/index.server.ts`: recipient admission returning only
