@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
+import { addCorrelationHeader } from './bootstrap/correlation-openapi.js'
 import { addParserResponses } from './bootstrap/parser-openapi.js'
 import { schemaOpenApiConverter } from './common/schemas/schema-openapi.js'
 import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mount-state.js'
@@ -98,5 +99,7 @@ export function buildApiDocument(app: INestApplication, pathPrefix: string): Ope
     standardSchemaConverter: schemaOpenApiConverter,
   })
   addParserResponses(document)
-  return addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
+  addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
+  addCorrelationHeader(document)
+  return document
 }

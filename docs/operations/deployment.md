@@ -161,8 +161,14 @@ that already exited successfully. Re-run it explicitly **before** recreating the
 git pull
 docker compose build
 docker compose run --rm migrate                 # apply new migrations once
-docker compose up -d --no-deps api worker web   # recreate the app with the new image
+docker compose up -d --no-deps worker           # workers first: they must read every job the API can write
+docker compose up -d --no-deps api web          # then recreate the API and web with the new image
 ```
+
+Workers go first because the queued-job envelope is a strict contract: a worker that
+does not know a newer key fails that job terminally. Rollback runs in the opposite
+order and needs a drain; see
+[Changing the job envelope](../backend/background-work.md#changing-the-job-envelope).
 
 Invitation upgrades require draining old invitation writers before migration.
 The earlier `20261003180000_invitation_role_intent` repair is followed by
@@ -387,7 +393,8 @@ export COMPOSE_WEB_IMAGE="ghcr.io/<org>/<repo>/web@sha256:..."
 
 docker compose -f docker-compose.yml -f docker/compose/prod.yml pull
 docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate
-docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api worker web
+docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps worker
+docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api web
 ```
 
 `pull` fails loudly if a digest is missing or unreachable — it never falls
@@ -395,8 +402,9 @@ back to building locally, the same "never silently rebuild" rule
 `.github/workflows/deploy-template.yml`'s promote path already enforces.
 `run --rm migrate` re-runs the one-shot migration step against the new image
 before any app container restarts, same as the local-build "Upgrades" path
-above. `--no-deps` on the final `up` avoids bouncing `postgres`/`redis` just
-to recreate `api`/`worker`/`web`.
+above. The two `up` commands recreate the worker before the API and web (see the
+envelope rule in [Upgrades](#upgrades-new-migrations-in-a-release)). `--no-deps` avoids
+bouncing `postgres`/`redis` just to recreate `api`/`worker`/`web`.
 
 Every `*_IMAGE` var is **required** by the overlay (no default) — leaving one
 unset fails `pull`/`up` immediately with a clear message rather than

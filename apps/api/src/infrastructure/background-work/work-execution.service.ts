@@ -10,7 +10,7 @@ import { z } from 'zod'
 
 import { readBoundedJob } from './bounded-job-reader.js'
 import { managedJobKey } from './managed-job-key.js'
-import { parseManagedJob } from './managed-job-profile.js'
+import { managedEnvelopeSchema, parseManagedJob } from './managed-job-profile.js'
 import { startIdempotentInvocation } from './scripts/idempotent-start.js'
 import { reportManagedInvocation } from './scripts/invocation-report.js'
 import {
@@ -37,15 +37,6 @@ export interface ProviderWindowExecution {
     handler: WorkHandler
   ): Promise<void>
 }
-
-const envelopeSchema = z.strictObject({
-  protocolVersion: z.literal(1),
-  incarnation: z.uuidv7(),
-  jobVersion: z.number().int().positive(),
-  executionPolicyVersion: z.number().int().positive(),
-  createdAt: z.number().int().nonnegative(),
-  payload: z.unknown(),
-})
 
 /** Shared execution entry; policy-local admission precedes every business handler. */
 @Injectable()
@@ -85,7 +76,7 @@ export class WorkExecutionService {
       (!job.data || typeof job.data !== 'object' || !('protocolVersion' in job.data))
     )
       await this.providerWindow.prepareLegacy(definition, queue, job, token)
-    const envelope = envelopeSchema.safeParse(job.data)
+    const envelope = managedEnvelopeSchema.safeParse(job.data)
     if (!envelope.success) {
       if (
         definition.kind === 'wake' &&
@@ -126,7 +117,7 @@ export class WorkExecutionService {
     queue: Queue,
     job: Job,
     token: string,
-    envelope: z.infer<typeof envelopeSchema>,
+    envelope: z.infer<typeof managedEnvelopeSchema>,
     payload: unknown,
     handler: WorkHandler
   ): Promise<void> {

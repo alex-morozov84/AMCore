@@ -326,6 +326,57 @@ Deploy backend schema changes before starting producers and workers that depend
 on them. Keep business deduplication records for the full period in which business
 replay is permitted; stock queue history retention cannot provide that guarantee.
 
+## Request correlation
+
+A job started during an HTTP request stores that request's `correlationId` in its
+envelope. The worker runs the job in a log context, so every worker log line of the
+run carries `correlationId`, `workId`, `jobId` and, inside the handler, `invocationId`.
+Searching the log store for the request ID therefore finds the API lines and the
+worker lines of the same job.
+
+- The ID is a search aid. A client chooses it with `X-Request-ID` or
+  `X-Correlation-ID`, so it never proves who made a request. The API accepts one
+  value of 1–128 characters from `A-Za-z0-9._:-`; anything else is replaced by a
+  generated UUID.
+- A job created outside a request (a scheduled task) has no ID and its worker lines
+  carry none.
+- Wake jobs never carry the ID. A wake job is a hint over database rows and one
+  wake can serve many requests. Search those by their domain key (`deliveryId`,
+  `runId`).
+- A duplicate add returns the first job and keeps the first request's ID. The
+  producer logs `job.enqueued` with `jobId`, `incarnation` and `duplicate: true`,
+  so the later request is still findable and linked to that job.
+- A manual retry from the Operations Console reuses the stored envelope, so the
+  retried worker lines carry the original request's ID. The command's audit record
+  holds the operator's own `requestId`, the `jobId` and the `incarnation`.
+
+## Changing the job envelope
+
+The envelope (`managedEnvelopeSchema`) is a strict wire contract between producers
+and workers. A reader that does not know a key rejects the job as `VERSION_UNSUPPORTED`,
+and that failure is terminal: a queued email becomes a dead letter and is not sent.
+Plan every envelope change around that.
+
+| Change                                                     | Version                     | Roll forward                                        | Roll back                                                                      |
+| ---------------------------------------------------------- | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Add an optional, bounded key                               | `protocolVersion` stays `1` | Deploy workers first, then the API                  | Roll back the API first, drain, then roll back workers                         |
+| Remove a key, change its type or meaning, make it required | New `protocolVersion`       | Release a reader for both versions, then the writer | Keep the dual reader until no job of the new version can exist (queue drained) |
+
+To drain before a rollback, count jobs that carry the new key in every queue state:
+waiting, prioritized, active, retrying with backoff, and delayed (a delay can be up
+to 30 days). The Console queue board shows the counts. A job you do not wait for fails
+terminally on the old worker.
+
+With the shipped Compose topology, `api` and `worker` run from one image. Recreate the
+worker first, then the API and web (`up -d --no-deps worker`, then
+`up -d --no-deps api web`), as [deployment](../operations/deployment.md) shows.
+
+`managed-envelope-contract.spec.ts` fails when the schema, the producer's key order
+and omission rules, or the Lua readers disagree about the envelope's keys. Keep a
+new key in `managedEnvelopeSchema` first; the producer must emit keys in schema order
+and omit an absent optional key, because the executor compares the parsed envelope's
+JSON with the stored data.
+
 ## Retained uncertainty and capacity
 
 ADMIN intent/receipts and provider execution evidence have separate PG budgets.

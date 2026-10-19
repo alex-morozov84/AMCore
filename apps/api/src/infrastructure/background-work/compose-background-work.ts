@@ -2,6 +2,7 @@ import { BullModule, getQueueToken } from '@nestjs/bullmq'
 import { type DynamicModule, Global, Module, type Provider } from '@nestjs/common'
 import { DiscoveryModule } from '@nestjs/core'
 import type { Queue } from 'bullmq'
+import { ClsService } from 'nestjs-cls'
 import { PinoLogger } from 'nestjs-pino'
 
 import { EnvModule } from '../../env/env.module.js'
@@ -154,9 +155,9 @@ function producerProvider(definition: WorkDefinition): Extract<Provider, { provi
     }
   return {
     provide: definition.tokens.producer,
-    inject: [getQueueToken(definition.queue.name), WorkReadiness, PinoLogger],
-    useFactory: (queue: Queue, readiness: WorkReadiness, logger: PinoLogger) =>
-      new ManagedProducer(definition, queue, readiness, createProducerObserver(logger)),
+    inject: [getQueueToken(definition.queue.name), WorkReadiness, PinoLogger, ClsService],
+    useFactory: (queue: Queue, readiness: WorkReadiness, logger: PinoLogger, cls: ClsService) =>
+      new ManagedProducer(definition, queue, readiness, createProducerObserver(logger, cls)),
   }
 }
 

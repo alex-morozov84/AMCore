@@ -9,10 +9,30 @@ of this page describes `apps/api`.
 
 ## Structured Logs
 
-`apps/api`'s application logs are structured Pino JSON in production and
-carry a `correlationId` on every record. The value is read from
-`X-Request-ID` / `X-Correlation-ID` when present, otherwise AMCore generates
-one per request.
+`apps/api`'s application logs are structured Pino JSON in production. Every
+record written while a request or a queued job runs carries a `correlationId`.
+
+**Where the ID comes from.** The API reads `X-Request-ID`, then `X-Correlation-ID`,
+and accepts the first value that is a single string of 1–128 characters from
+`A-Za-z0-9._:-`. A repeated, oversized or oddly encoded header is ignored without
+being logged, and AMCore generates a UUID. Every API response returns the ID in
+`X-Correlation-Id`, error bodies carry it as `correlationId`, and audit records store
+it as `requestId`. The ID is a search aid: a client chooses it, so it never proves
+who made a request and must not be used for authorization or integrity.
+
+**Worker lines.** A job started during a request stores that request's ID, so the
+worker's lines for that job carry the same `correlationId` plus `workId`, `jobId` and
+`invocationId`. A job started outside a request, and every wake job
+(notifications, AI runs), has no request ID; search those by `jobId`, `deliveryId` or
+`runId`. When the API adds a job it logs one `job.enqueued` line with `jobId`,
+`incarnation` and `duplicate`; for a duplicate add the job keeps the first
+request's ID and this line links the later request to it. See
+[Request correlation](../backend/background-work.md#request-correlation).
+
+**Finding a request.** Take the ID from the `X-Correlation-Id` response header, from
+an error body's `correlationId`, or from the audit record's `requestId`. The web
+server also sends its own ID outbound as `X-Correlation-Id`, so a request made through
+the web app carries the web server's ID end to end.
 
 HTTP request logs include bounded request metadata — method, route, status, user
 id when authenticated, user agent, and an **anonymized client IP**. IPv4 keeps
@@ -34,8 +54,8 @@ Invitation continuation and handoff headers, OAuth authorization code/state and
 login tickets are also redacted. Response `Set-Cookie` and `Location` values are
 redacted because authentication cookies and redirects may carry credentials.
 
-Email addresses in enqueue and direct-send log lines
-are redacted via `redactEmail()` (`a***@example.com` — domain kept, since
+Email addresses in enqueue, direct-send and provider log lines (Resend and the
+mock provider) are redacted via `redactEmail()` (`a***@example.com` — domain kept, since
 delivery/bounce triage is overwhelmingly domain-level) rather than the
 `logging.config.ts` redact list: Pino's own redaction fully replaces a value
 with `[Redacted]`, which would destroy the domain. A stable `userId` pseudonym
@@ -46,7 +66,8 @@ terminal events expose only bounded job ID, template and attempt information,
 without recipient, payload or raw provider exception. Auth's own
 `User registered`/`User logged in` log lines already carry `userId` and drop
 the raw `email` field entirely — no pseudonym gap to fill there, so no
-redaction is needed, only the surplus field's removal.
+redaction is needed, only the surplus field's removal. An email subject can carry
+user or organization names, so no log line includes it.
 
 ## Log Shipping (Non-Goal)
 

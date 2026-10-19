@@ -4,7 +4,11 @@
 #
 #   docker compose -f docker-compose.yml -f docker/compose/prod.yml pull
 #   docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api worker web
+#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps worker
+#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api web
+#
+# The worker is recreated first: the queued-job envelope is a strict contract, so a worker
+# must read every job the new API can write (docs/backend/background-work.md).
 #
 # What this changes vs. the base file (which builds locally by default, for
 # the zero-config quick start in the root README):
