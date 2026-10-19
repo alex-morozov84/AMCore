@@ -1,5 +1,5 @@
 import { getQueueToken, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq'
-import { Inject, type Type } from '@nestjs/common'
+import { Inject, Optional, type Type } from '@nestjs/common'
 import { ModuleRef } from '@nestjs/core'
 import type { Job, Queue } from 'bullmq'
 import { DelayedError, UnrecoverableError } from 'bullmq'
@@ -20,13 +20,15 @@ export function managedProcessor(definition: WorkDefinition): Type<WorkerHost> {
       @Inject(getQueueToken(queueName)) private readonly queue: Queue,
       @Inject(WorkExecutionService) private readonly execution: WorkExecutionService,
       @Inject(ModuleRef) private readonly modules: ModuleRef,
-      @Inject(ClsService) private readonly cls: ClsService
+      @Optional() @Inject(ClsService) private readonly cls?: ClsService
     ) {
       super()
     }
 
     /** Runs each job in its own log context: request ID (if any), work ID and job ID. */
     process(job: Job, token?: string): Promise<void> {
+      // The application always provides CLS; a processor built by hand without it still runs.
+      if (!this.cls) return this.run(job, token)
       return this.cls.runWith(workerLogStore(definition.id, job), () => this.run(job, token))
     }
 
