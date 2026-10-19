@@ -441,6 +441,8 @@ The optional [Console Overview](../operations-console/overview.md) presents thes
 local snapshots and the responding web server build. Its page does not send
 notifications; configure monitoring delivery independently. See
 [Console configuration](../operations-console/configuration.md#overview-metadata-and-resource-settings).
+The Overview can also link to your dashboards, logs and alerts; see
+[External tool links](../operations-console/configuration.md#external-tool-links).
 
 ## Local Verification Harness
 
@@ -504,7 +506,7 @@ cannot resolve a bare relative path against a Git checkout the way a real
 hyperlink would need) — a fork's own checkout has the linked file at the
 same relative location regardless of its Git remote. `docs/operations/runbooks/`
 ships one file per category (`http`, `node-runtime`,
-`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`),
+`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`, `storage`),
 each anchor matching a `runbook_path` above exactly: symptom, ranked likely
 causes, diagnostic steps with executable PromQL derived from the rule and the matching
 dashboard panel, mitigation, and escalation guidance.

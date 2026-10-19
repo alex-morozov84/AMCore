@@ -311,7 +311,7 @@ export const operationsConsoleDocSeams = [
     'docs/operations/observability.md',
     block(
       'The optional [Console Overview](../operations-console/overview.md) presents these',
-      '[Console configuration](../operations-console/configuration.md#overview-metadata-and-resource-settings).'
+      '[External tool links](../operations-console/configuration.md#external-tool-links).'
     )
   ),
   ...['docs/storage/configuration.md', 'docs/operations/deployment.md'].map((path) =>

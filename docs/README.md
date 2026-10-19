@@ -160,8 +160,8 @@ provide an operator interface for admin session management.
   and [invitations](product-admin/invitations.md);
   product-domain management UI remains downstream-owned.
 - **[Operations Console](operations-console/README.md)** — the optional
-  `SUPER_ADMIN` control plane: Overview readiness, API/web identity and local
-  resources, Background work diagnostics and policy-eligible controls, user and organization details,
+  `SUPER_ADMIN` control plane: Overview readiness, API/web identity, local
+  resources and links to your monitoring tools, Background work diagnostics and policy-eligible controls, user and organization details,
   Users system-role changes, bounded Audit browsing, topology,
   host-session boundary, downstream scaffolding, deployment, verification,
   and safe extension rules.

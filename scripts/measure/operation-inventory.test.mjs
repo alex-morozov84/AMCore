@@ -10,8 +10,9 @@ describe('operation inventory against the real plans', () => {
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
       // Two catalogue-bound role fixtures add selected-locale edits; the two
-      // accessibility stories add Storybook-disabled deletions. Providers stay fixed.
-      { name: 'measured operations', expected: 720, actual: inventory.operations.length },
+      // accessibility stories add Storybook-disabled deletions. The Console external tool links add
+      // two shared modules with tests and their environment, compose and stand entries. Providers stay fixed.
+      { name: 'measured operations', expected: 726, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -30,17 +31,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 995,
+        expected: 1001,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1715,
+        expected: 1727,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 700,
+        expected: 706,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

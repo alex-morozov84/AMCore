@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
+import { NewTabLink } from '@/shared/ui/new-tab-link'
 
 import type { OverviewTranslations } from './overview-types'
 import { PRIVATE_EXPOSURE_RUNBOOK_HREF } from './storage-runbook-link'
@@ -57,15 +58,13 @@ export function OverviewExposureBanner({
           )}
         </p>
         <p className="mt-1">{t('overviewPublicExposedAction')}</p>
-        <a
+        <NewTabLink
           href={PRIVATE_EXPOSURE_RUNBOOK_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
+          newTabLabel={t('overviewPublicOpenNewTab')}
           className="mt-1 inline-block underline"
         >
           {t('overviewPublicExposedRunbook')}
-          <span className="sr-only"> {t('overviewPublicOpenNewTab')}</span>
-        </a>
+        </NewTabLink>
       </AlertDescription>
     </Alert>
   )

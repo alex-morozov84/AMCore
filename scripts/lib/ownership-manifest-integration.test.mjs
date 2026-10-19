@@ -63,12 +63,12 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       name: 'console closed-root files',
       // Exact Console inventory, including provisioning, administrator management
       // and their route, story and browser proof files.
-      expected: 435,
+      expected: 440,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {
       name: 'console dead shared modules',
-      expected: 12,
+      expected: 14,
       actual: projection.deadSharedModules.size,
     },
     {

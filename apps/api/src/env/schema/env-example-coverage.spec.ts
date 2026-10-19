@@ -43,6 +43,11 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'CADDY_WEB_DOMAIN',
   'ADMIN_CONSOLE_HOSTNAME',
   'ADMIN_CONSOLE_ORIGIN',
+  // apps/web-only: addresses of the external tools the Console Overview links to; read by the web
+  // server at request time, validated at its start-up.
+  'ADMIN_CONSOLE_METRICS_URL',
+  'ADMIN_CONSOLE_LOGS_URL',
+  'ADMIN_CONSOLE_ALERTS_URL',
   // Optional bundled `backup`/`restore` profiles — consumed by the `backup`
   // compose service's own environment, not the app's env schema.
   'BACKUP_INTERVAL_SECONDS',

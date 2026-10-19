@@ -134,6 +134,149 @@ tab. Setting the
 variable on an already built web container does not change it. See
 [deployment identity](../operations/deployment.md) for build and rollout behavior.
 
+## External tool links
+
+The [Overview](overview.md) has an **External tools** card with links to the
+monitoring tools your team runs. The Console does not install, proxy or embed
+them: each link opens the tool in a new tab, and you sign in to the tool
+separately. Only a `SUPER_ADMIN` can open the Console, so only a `SUPER_ADMIN`
+sees the card. Organization owners and administrators get a not-found page
+instead of the Console.
+
+### What AMCore provides and what you deploy
+
+AMCore does not install or run these tools in production. Plan to deploy them
+yourself and then set their addresses below.
+
+| Tool    | Provided by AMCore                                                                    | You deploy                                  |
+| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Metrics | The metrics endpoint, an overview dashboard file, and a dev-only `monitoring` profile | Your own Prometheus and Grafana             |
+| Alerts  | Alert rules, runbooks and an example Alertmanager setup                               | Your own Alertmanager and its receivers     |
+| Logs    | Structured log output only; no collection and no search                               | A log system of your choice, or none at all |
+
+The `monitoring` profile starts Prometheus, Grafana and Alertmanager for local
+verification and is never part of the production Compose files. See the
+[observability guide](../operations/observability.md) for the dashboard, rules
+and runbooks.
+
+### Set the addresses
+
+Set the addresses in the environment of the **web service**. With the bundled
+Compose file this is the `web` container, which reads them from the `.env` file
+next to `docker-compose.yml`. With another Compose file or platform, set the same
+variables in the web container's environment by the means that platform offers.
+
+| Variable                    | Link on the card | Typical target                                   |
+| --------------------------- | ---------------- | ------------------------------------------------ |
+| `ADMIN_CONSOLE_METRICS_URL` | Metrics          | A Grafana dashboard, such as the AMCore overview |
+| `ADMIN_CONSOLE_LOGS_URL`    | Logs             | The log search page of your logging system       |
+| `ADMIN_CONSOLE_ALERTS_URL`  | Alerts           | Alertmanager, or Grafana alerting                |
+
+```bash
+ADMIN_CONSOLE_METRICS_URL=https://grafana.example.com/d/amcore-overview
+ADMIN_CONSOLE_ALERTS_URL=https://alerts.example.com
+```
+
+An empty or missing variable means "not configured". Each configured tool is a
+link labelled with its name: **Metrics**, **Logs** or **Alerts**. Leave
+`ADMIN_CONSOLE_LOGS_URL` empty if you run no log search system: the start-up check
+accepts a Grafana address for it, but it cannot know whether that Grafana has a
+log data source, and without one the link opens an empty page.
+
+When all three are empty, the card shows the single line "External tools are not
+configured." instead of one row per tool. When only some are set, each unset tool
+is listed as "not configured". The **How to connect** link, which opens this
+section, stays on the card in both cases and disappears only when all three tools
+are set.
+
+An address must be an absolute `https` URL with a host name or an IPv4 address; a
+port is allowed (`https://grafana.example.com:8443/d/x`). Plain `http` is accepted
+only for `localhost` and `127.0.0.1`. IPv6 addresses in brackets are refused. Path,
+query and fragment are kept, so a link can open one dashboard. These values are
+refused:
+
+- addresses with a user name or password (`https://user:pw@host/`);
+- wildcard hosts such as `https://*.example.com`, and relative or scheme-less
+  values (`//host/d/x`, `host/d/x`);
+- values with spaces or control characters, or longer than 2048 characters;
+- other schemes, such as `javascript:` or `ftp:`;
+- `http` addresses of any other host, such as `http://grafana.internal:3000`.
+
+A value that is set but refused stops the **web service** at start-up. That is
+the whole web application, including the product's own pages, not only the
+Console: the process exits and prints the name of the offending variable on
+standard error. With the bundled Compose file, read it with
+`docker compose logs web`. For the metrics variable the message is:
+
+```text
+ADMIN_CONSOLE_METRICS_URL must be an absolute https URL (or a loopback http URL) without credentials, spaces or wildcards
+```
+
+Correct the value and start the web service again. A tool that can be reached
+only over plain `http` needs TLS in front of it before it can be linked; until
+then leave its variable empty.
+
+The Console reads the addresses from the web container's environment while it
+serves the page, so a new value needs no rebuild. A container's environment is
+fixed when the container is created, so the container must be **recreated** to
+receive a new value. With the bundled Compose file, run
+`docker compose up -d web`; `docker compose restart web` keeps the old
+environment. Then open the Overview and check the card.
+
+For the local `monitoring` profile ([observability guide](../operations/observability.md#local-verification-harness))
+you can set:
+
+```bash
+ADMIN_CONSOLE_METRICS_URL=http://localhost:3001
+ADMIN_CONSOLE_ALERTS_URL=http://localhost:9093
+```
+
+These loopback addresses open the tool on the machine of whoever clicks the link,
+so they work only in a browser on the same machine as the stack. Compose leaves
+all three variables empty by default, so the card never links to a tool that is
+not running.
+
+What the card does and does not prove:
+
+- A link means an address is configured. The Console does not contact the tool,
+  so it cannot tell whether the tool is running or whether you may sign in. A
+  mistyped but valid-looking address, such as a wrong host name, is not detected;
+  the link fails when someone opens it.
+- A **Logs** link does not prove that log collection is installed. AMCore ships
+  no log search; see [Log shipping](../operations/observability.md#log-shipping-non-goal).
+- Never put a token, API key or password in these addresses, in the path, the
+  query or the fragment. The card is shown to every `SUPER_ADMIN`, the address
+  appears in the page and in browser history, and the start-up check cannot detect
+  a secret in any of those parts.
+- The card is part of the Console page. When the API cannot confirm that you are
+  a `SUPER_ADMIN`, the Console shows no page content and no links: a
+  "temporarily unavailable" notice, or a not-found page when the API is not
+  reachable at all. Keep direct bookmarks to your monitoring tools for that case.
+
+The links carry no Console session or token, and the browser sends no `Referer`
+to the tool. Single sign-on between the Console and these tools is not provided.
+
+### Documentation links
+
+The **Recovery instructions** link is always shown. It opens the
+`docs/operations/runbooks` folder of the upstream repository,
+`https://github.com/alex-morozov84/AMCore`, on GitHub. The **How to connect**
+link and the guide links on the Background work and Overview storage screens use
+the same base. The base is not an environment variable: it is the constant
+`DOCS_REPOSITORY_URL` in `apps/web/src/shared/lib/console-docs-links.ts`, so
+changing it needs a rebuild of the web image (with the bundled Compose file,
+`docker compose build web`, then `docker compose up -d web`). Every address
+points to the `main` branch, which can be newer than the version you deployed, so
+a guide may describe behavior your deployment does not have yet.
+
+The constant holds a repository root, such as `https://github.com/your-org/your-repo`.
+The functions `docsPageHref` and `docsFolderHref` in the same file build each
+address as `<root>/blob/main/<page path>` for a page and
+`<root>/tree/main/<folder path>` for a folder. A fork that keeps its
+documentation in a GitHub repository changes only the constant. A documentation
+site with a different path scheme, such as `https://docs.example.com`, also needs
+those two functions changed.
+
 ## Database prerequisite: `pg_trgm` (Users/Organizations search)
 
 The Users and Organizations panels' search (ADR-082) is backed by

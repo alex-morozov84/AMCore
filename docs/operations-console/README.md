@@ -9,7 +9,7 @@ their organization role.
 
 | Screen                                | Use it to                                                                                  |
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [Overview](overview.md)               | Check API readiness, file storage and resources; edit the probe interval; identify builds. |
+| [Overview](overview.md)               | Check API readiness, storage and resources; open monitoring tools; edit probe interval.    |
 | [Background work](background-work.md) | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup. |
 | [Queue board](queue-board.md)         | Look at the jobs of the background queues (view-only), opened from Background work.        |
 | [Users](users.md)                     | Find users, inspect details/memberships, change system roles, and view or revoke sessions. |

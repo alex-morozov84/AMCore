@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as DeploymentIdentity from '@/shared/lib/deployment-version/identity'
 
@@ -116,6 +116,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('OverviewPage', () => {
   it('renders the not-ready alert for an observed degraded instance, not the unavailable fallback', async () => {
     vi.mocked(fetchConsoleOverview).mockResolvedValue({
@@ -169,6 +173,37 @@ describe('OverviewPage', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('API instance not ready')).not.toBeInTheDocument()
     expect(screen.getByText('web-artifact-123')).toBeInTheDocument()
+  })
+
+  it('shows the configured external tools beside the unavailable fallback, read from the environment', async () => {
+    vi.stubEnv('ADMIN_CONSOLE_METRICS_URL', 'https://grafana.example.com/d/amcore')
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({ status: 'unavailable', reason: 'timeout' })
+
+    renderPage(await OverviewPage())
+
+    expect(screen.getByRole('link', { name: /externalToolsMetrics/ })).toHaveAttribute(
+      'href',
+      'https://grafana.example.com/d/amcore'
+    )
+    expect(
+      screen.getByText('This is temporarily unavailable. Please try again.')
+    ).toBeInTheDocument()
+  })
+
+  it('shows the external tools card with the loaded snapshot too, and no link when unset', async () => {
+    // The machine running the test may set these; the card must see them empty.
+    for (const name of [
+      'ADMIN_CONSOLE_METRICS_URL',
+      'ADMIN_CONSOLE_LOGS_URL',
+      'ADMIN_CONSOLE_ALERTS_URL',
+    ])
+      vi.stubEnv(name, '')
+    vi.mocked(fetchConsoleOverview).mockResolvedValue({ status: 'success', data: overviewFixture })
+
+    renderPage(await OverviewPage())
+
+    expect(screen.getByText('externalToolsNone')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /externalToolsMetrics/ })).not.toBeInTheDocument()
   })
 
   it('propagates malformed 2xx contract errors to the route error boundary', async () => {

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Organization members can be removed through a confirmed ready or custom headless flow, with a permanent API-key warning, membership identity precondition and read-only unknown-result inspection.
 
+- Console Overview has an **External tools** card with links to the metrics, logs and alerts tools an operator configures (`ADMIN_CONSOLE_METRICS_URL`, `ADMIN_CONSOLE_LOGS_URL`, `ADMIN_CONSOLE_ALERTS_URL`) and to the public recovery runbooks. Unset tools are shown as not configured; an unusable value stops the web service at start-up. The Console does not contact the tools or sign in to them.
+
 - Platform operators can invite additional organization administrators, explicitly promote verified members and recover organizations after a cancelled first invitation. Console lists all organizations needing attention, supports multiple administrators, uses recipient dialogs and can clear unsent creation drafts.
 
 - Operator organization creation with first-ADMIN invitations, safe retry and recipient recovery through Console and protected API; production mock email cannot start new B07 invitations.

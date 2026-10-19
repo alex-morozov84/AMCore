@@ -8,6 +8,9 @@ const entry = (path, key) => ({
   detectors: [
     'ADMIN_CONSOLE_HOSTNAME',
     'ADMIN_CONSOLE_ORIGIN',
+    'ADMIN_CONSOLE_METRICS_URL',
+    'ADMIN_CONSOLE_LOGS_URL',
+    'ADMIN_CONSOLE_ALERTS_URL',
     'console-real-stack',
     'feature-import',
   ],
