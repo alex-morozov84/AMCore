@@ -125,6 +125,32 @@ describe('ResendEmailProvider', () => {
       )
     })
 
+    it.each([
+      ['success', () => mockSend.mockResolvedValue({ data: { id: 'email_1' }, error: null })],
+      [
+        'provider error',
+        () => mockSend.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded' } }),
+      ],
+      ['thrown error', () => mockSend.mockRejectedValue(new Error('network'))],
+    ])('never logs the raw recipient or subject on %s', async (_label, arrange) => {
+      arrange()
+
+      await provider.send({
+        to: 'private.person@example.com',
+        subject: 'Invitation to Secret Org',
+        html: '<p>Test</p>',
+      })
+
+      const logged = JSON.stringify([
+        ...mockLogger.info.mock.calls,
+        ...mockLogger.warn.mock.calls,
+        ...mockLogger.error.mock.calls,
+      ])
+      expect(logged).toContain('p***@example.com')
+      expect(logged).not.toContain('private.person')
+      expect(logged).not.toContain('Secret Org')
+    })
+
     it('should use custom from address', async () => {
       mockSend.mockResolvedValue({
         data: { id: 'email_123' },

@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { Resend } from 'resend'
 
+import { redactEmail } from '../../../common/utils/index.js'
 import { EnvService } from '../../../env/env.service.js'
 import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types.js'
 import type { QueuedEmailOutcome, QueuedEmailProvider } from '../queued-email-provider.js'
@@ -199,7 +200,12 @@ export class ResendEmailProvider implements EmailProvider {
         // The processor owns the error-level `email.job.dead_letter` signal once
         // a job is truly terminal (EQS-03); error here would alert on every
         // transient retry.
-        this.logger.warn({ to, subject, errorCode, retryable }, 'Failed to send email via Resend')
+        // The subject can carry user or organization names, so it is never logged; the
+        // recipient is redacted because a retained log store outlives log rotation.
+        this.logger.warn(
+          { to: redactEmail(to), errorCode, retryable },
+          'Failed to send email via Resend'
+        )
 
         // Only the normalized delay crosses the boundary (flat lowercase header map in the
         // installed SDK); a deterministic error never carries one.
@@ -214,7 +220,7 @@ export class ResendEmailProvider implements EmailProvider {
         }
       }
 
-      this.logger.info({ id: data?.id, to, subject }, 'Email sent successfully via Resend')
+      this.logger.info({ id: data?.id, to: redactEmail(to) }, 'Email sent successfully via Resend')
 
       return {
         id: data?.id || '',
@@ -225,7 +231,7 @@ export class ResendEmailProvider implements EmailProvider {
 
       // Thrown (network/timeout/unexpected) — transient by default, retry.
       // warn, not error (per-attempt; the processor owns the terminal signal).
-      this.logger.warn({ to, subject, error: message }, 'Resend API error')
+      this.logger.warn({ to: redactEmail(to), error: message }, 'Resend API error')
 
       return {
         id: '',

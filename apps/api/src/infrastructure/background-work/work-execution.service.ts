@@ -4,6 +4,7 @@ import { Inject, Injectable, Optional } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import { UnrecoverableError } from 'bullmq'
 import type { Redis } from 'ioredis'
+import { ClsService } from 'nestjs-cls'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 
@@ -53,7 +54,10 @@ export class WorkExecutionService {
     private readonly readiness: WorkReadiness,
     @Optional()
     @Inject(PROVIDER_WINDOW_EXECUTION)
-    private readonly providerWindow?: ProviderWindowExecution
+    private readonly providerWindow?: ProviderWindowExecution,
+    @Optional()
+    @Inject(ClsService)
+    private readonly cls?: ClsService
   ) {}
 
   discardSecret(definition: WorkDefinition, job: Job): boolean {
@@ -181,6 +185,8 @@ export class WorkExecutionService {
     incarnation: string,
     invocationId: string
   ): WorkInvocation {
+    // Every log line of the handler run carries the invocation; the processor set the rest.
+    this.cls?.set('invocationId', invocationId)
     return {
       workId: definition.id,
       jobId: job.id!,

@@ -7,6 +7,7 @@ import { createUuidV7 as uuidv7 } from '@amcore/shared'
 import { DEFAULT_JOB_OPTIONS } from '../queue/interfaces/job-options.interface.js'
 
 import { managedJobKey } from './managed-job-key.js'
+import type { ProducerObserver } from './producer-observer.js'
 import { initializeManagedQueue } from './scripts/initialize-queue.js'
 import type { WorkDefinition } from './work-definition.js'
 import { canonicalWire, parseWorkPayload } from './work-payload.js'
@@ -49,7 +50,8 @@ export class ManagedProducer<D extends WorkDefinition> {
   constructor(
     private readonly definition: D,
     private readonly queue: Queue,
-    private readonly readiness: WorkReadiness
+    private readonly readiness: WorkReadiness,
+    private readonly observer?: ProducerObserver
   ) {}
 
   async add<K extends keyof D['jobs'] & string>(
@@ -104,6 +106,14 @@ export class ManagedProducer<D extends WorkDefinition> {
       !z.uuid().safeParse(identity.incarnation).success
     )
       throw new Error('METADATA_UNAVAILABLE')
+    this.observer?.enqueued({
+      queue: this.queue.name,
+      workId: this.definition.id,
+      jobName,
+      jobId: job.id!,
+      incarnation: identity.incarnation,
+      duplicate: identity.incarnation !== envelope.incarnation,
+    })
     return { jobId: job.id!, incarnation: identity.incarnation }
   }
 }

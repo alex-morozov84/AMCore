@@ -2,7 +2,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { types } from 'node:util'
 
 import { HttpException } from '@nestjs/common'
-import { FastifyAdapter } from '@nestjs/platform-fastify'
+import { FastifyAdapter as NestFastifyAdapter } from '@nestjs/platform-fastify'
 import type { Response } from 'express'
 
 import { PayloadTooLargeException } from '../common/exceptions/domain/index.js'
@@ -10,7 +10,10 @@ import { configureFastifyIdempotency } from '../infrastructure/idempotency/fasti
 import { applyBoardHeaders } from '../infrastructure/queue/dashboard/bull-board-boundary.middleware.js'
 import { safeErrorResult } from '../infrastructure/queue/dashboard/bull-board-errors.js'
 
-class AmcoreFastifyAdapter extends FastifyAdapter<Server> {
+// The class is deliberately named `FastifyAdapter`: nestjs-cls picks the middleware mount point
+// by `constructor.name === 'FastifyAdapter'`. Any other name makes it treat the adapter as
+// Express and mount the correlation-ID middleware on `/` only, so no real request got an ID.
+class FastifyAdapter extends NestFastifyAdapter<Server> {
   override mapException(error: unknown): unknown {
     if (
       error instanceof Error &&
@@ -31,8 +34,8 @@ export function createHttpAdapter(
   mount = '/api/v1/admin/queues',
   trustProxy: boolean | number | string = false,
   boardMounted = false
-): FastifyAdapter<Server> {
-  const adapter = new AmcoreFastifyAdapter({
+): NestFastifyAdapter<Server> {
+  const adapter = new FastifyAdapter({
     trustProxy:
       typeof trustProxy === 'number'
         ? (_address: string, hop: number) => hop < trustProxy
