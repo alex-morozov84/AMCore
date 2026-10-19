@@ -65,8 +65,10 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
 
 Every API response carries the request's ID in `X-Correlation-Id`. Error bodies carry it as
 `correlationId` and audit records as `requestId`. Send your own with `X-Request-ID` to know it in
-advance; see [Observability](observability.md#structured-logs) for the accepted format. The ID is a
-search aid, not proof of identity.
+advance. An accepted ID is one value of 1 to 128 characters from `A-Z a-z 0-9 . _ : -` (for example
+`req-55`); anything else is replaced by a generated UUID. See
+[Observability](observability.md#structured-logs). The ID is a search aid, not proof of identity.
+Log timestamps are UTC; Grafana shows them in your browser's time zone.
 
 | You want                           | Search in Explore                                               |
 | ---------------------------------- | --------------------------------------------------------------- |
@@ -78,6 +80,12 @@ search aid, not proof of identity.
 
 Prefer the first form: it is the fastest. On the reference data set (140,000 lines over 7 days) it
 took about 0.2 s and the `json` form about 0.6 s.
+
+**Did this request start a worker job?** Look for a `job.enqueued` line with the request's ID. If it
+is there, the worker's `Job finished` line for that `jobId` carries the same ID. If the API logged
+`Email sent (direct, not queued)` instead, no worker was involved. If neither appears, the work was
+not started as a job by this request; it may be a notification (wake job), which you search by
+`deliveryId`.
 
 **What you will see for a request that queued an email:** the API lines (request, queue, the
 `job.enqueued` line with `jobId`, `incarnation` and `duplicate`) and one worker line `Job finished`
@@ -94,6 +102,14 @@ Limits of the link between a request and its jobs:
 - A manual retry from the Operations Console runs under the original request's ID. The command's
   audit record holds the operator's own `requestId`.
 
+## Give a colleague access
+
+Two things are needed, and neither is on the overlay's public side. First, an SSH account on the Docker
+host that may open the tunnel. Second, a Grafana user: sign in as `admin`, open **Administration**,
+**Users and access**, **Users**, and create a user with the **Viewer** role. A Viewer can run Explore
+queries against the Loki data source (tested), so every Grafana user can read **all** stored logs;
+there is no per-user or per-service restriction. Give the `admin` password to nobody.
+
 ## Retention, disk and sizing
 
 - Retention is `LOGS_RETENTION_PERIOD` (default 168h). Loki deletes expired data after the compactor
@@ -102,7 +118,8 @@ Limits of the link between a request and its jobs:
 - Loki has no size-based retention. Growth is bounded by the retention period and the ingestion
   limits in `docker/log-search/loki/loki.yml` (4 MB/s, 3 MB/s per stream). Size the volume for your
   traffic and keep the [disk alert](#alerts).
-- Docker's own files stay bounded by `COMPOSE_LOG_MAX_SIZE` and `COMPOSE_LOG_MAX_FILE`
+- To see how much the store uses, run `docker run --rm -v <project>_loki_data:/d:ro alpine du -sh /d`.
+  Docker's own files stay bounded by `COMPOSE_LOG_MAX_SIZE` and `COMPOSE_LOG_MAX_FILE`
   (20m × 5 per service by default). They are your safety net while the pipeline is down.
 - Measured on an idle Compose stack: Loki about 80 MiB, Alloy about 50 MiB, Grafana about 210 MiB.
 
@@ -144,9 +161,11 @@ Treat Alloy as a secret-visible, host-privileged component.
   the Docker API, needs a root-equivalent socket in a container. Rotation was tested (see above). No
   alert covers a Docker upgrade that changes the file format, so search for a fresh request after every
   Docker upgrade.
-- Logs are only as clean as what the services write. Recipients are redacted and subjects are never
-  logged, and a scan of the stored lines found no email address, password, token or secret from the
-  test environment. Review any new log line before you add it.
+- Logs are only as clean as what the services write. The redaction is applied by the code that logs a
+  recipient (`redactEmail`), not by a filter on all output: a new log line that prints an address stores
+  it. Today recipients are redacted, subjects are never logged, and a scan of the stored lines found no
+  email address, password, token or secret from the test environment. Review every new log line before
+  you add it.
 
 ## Alerts
 

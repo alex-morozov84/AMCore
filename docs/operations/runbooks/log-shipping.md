@@ -6,6 +6,9 @@ and Loki), not the application. The application keeps running when the pipeline 
 risk is losing log lines after they rotate out of Docker's files
 (`COMPOSE_LOG_MAX_SIZE` × `COMPOSE_LOG_MAX_FILE` per service, 20m × 5 by default).
 
+These alerts exist only if you load the rules into a Prometheus that scrapes the overlay (see
+[Alerts](../log-search.md#alerts)); the overlay ships none. Without one, run these checks by hand.
+
 Commands below use this shorthand; run them from the repository root on the Docker host:
 
 ```sh
@@ -87,6 +90,30 @@ minutes. A healthy pipeline never retries.
    `labels`. A container created before the overlay was applied keeps its old log driver; recreate it
    with `$COMPOSE_LOGS up -d api worker web`. Alloy drops every line that carries no service label.
 
+## Lines stop after a Docker upgrade
+
+**Symptom:** a fresh request is not searchable in Grafana, yet Alloy and Loki are running and no alert
+fires. No alert covers this case: Alloy keeps reading but may find nothing it can use.
+
+**Diagnostic steps:**
+
+1. Check the containers still use the overlay's log driver: `docker inspect <container> --format
+'{{ .HostConfig.LogConfig }}'` must show `json-file` with `labels`. If not, recreate them with
+   `$COMPOSE_LOGS up -d api worker web`.
+2. Compare the raw file with the format Alloy expects, one JSON object per line with `log`, `stream`,
+   `time` and, for these services, `attrs`:
+
+   ```sh
+   ID=$($COMPOSE_LOGS ps -q worker)
+   docker run --rm -v /var/lib/docker/containers:/c:ro alpine tail -n 1 /c/$ID/$ID-json.log
+   ```
+
+3. Confirm the data root is still `/var/lib/docker` (`docker info --format '{{ .DockerRootDir }}'`).
+4. `$COMPOSE_LOGS logs --tail 50 alloy` shows which files it tails and any parse error.
+
+**Resolution:** if the file format changed, `docker/log-search/alloy/config.alloy` must be adapted to it;
+until then the lines are available only through `docker logs`.
+
 ## Entries dropped
 
 **Symptom:** `AMCoreLogEntriesDropped` is firing: Alloy gave up on entries after repeated send
@@ -142,12 +169,19 @@ On Docker Desktop and OrbStack it describes the virtual machine's disk, not the 
 
 **Resolution, in order:**
 
-1. Lower `LOGS_RETENTION_PERIOD` in `.env` and recreate Loki (`$COMPOSE_LOGS up -d loki`). The
-   compactor deletes expired data after `retention_delete_delay` (2h) and then on its 10-minute
-   cycle, so space returns gradually, not at once.
-2. Find what grew: a service that started logging heavily shows as a jump in its stream.
-3. Grow the volume or move Docker's data root to a larger disk. Shrinking the retention is
+1. Check the store size: `docker run --rm -v <project>_loki_data:/d:ro alpine du -sh /d` (the project
+   name is the Compose project, usually the checkout directory name).
+2. Lower `LOGS_RETENTION_PERIOD` in `.env` and recreate Loki (`$COMPOSE_LOGS up -d loki`). The
+   compactor applies it when it next runs, deletes expired data after `retention_delete_delay` (2h)
+   and then on its 10-minute cycle, so space returns gradually and this is not an emergency lever.
+3. Find what grew: a service that started logging heavily shows as a jump in its stream.
+4. Grow the volume or move Docker's data root to a larger disk. Shrinking the retention is
    cheaper than a bigger disk when the extra history is not needed.
 
-If the volume is completely full, Loki stops writing and the collector cannot deliver; free space
-first, then restart Loki.
+There is no safe manual delete inside the store. If the volume is completely full and you cannot grow
+it, the last resort is to discard the whole store: `$COMPOSE_LOGS stop loki alloy`, then remove the
+`loki_data` volume (`docker volume rm <project>_loki_data`), then `$COMPOSE_LOGS up -d loki alloy`.
+This **deletes every stored log line**. Alloy keeps its read positions, so it does not resend lines
+it already read; remove the `alloy_data` volume too if you want it to resend what Docker's files still
+hold. Free space first
+in every other case, then restart Loki.
