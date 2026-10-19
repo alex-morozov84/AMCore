@@ -83,7 +83,8 @@ took about 0.2 s and the `json` form about 0.6 s.
 
 **Did this request start a worker job?** Look for a `job.enqueued` line with the request's ID. If it
 is there, the worker's `Job finished` line for that `jobId` carries the same ID. If the API logged
-`Email sent (direct, not queued)` instead, no worker was involved. If neither appears, the work was
+`Email sent (direct, not queued)` instead, no worker was involved. If `job.enqueued` appears but no worker line ever follows, the job is waiting or the `worker` service
+is down: check `ps worker` and the queue board in the Operations Console. If neither appears, the work was
 not started as a job by this request; it may be a notification (wake job), which you search by
 `deliveryId`.
 
@@ -105,10 +106,13 @@ Limits of the link between a request and its jobs:
 ## Give a colleague access
 
 Two things are needed, and neither is on the overlay's public side. First, an SSH account on the Docker
-host that may open the tunnel. Second, a Grafana user: sign in as `admin`, open **Administration**,
+host that may open the tunnel and nothing else; a key line in `authorized_keys` such as
+`restrict,port-forwarding,permitopen="127.0.0.1:3002" <public key>` does that in OpenSSH (not run
+here), and the colleague opens the tunnel with `ssh -N -L ...`. Second, a Grafana user: sign in as `admin`, open **Administration**,
 **Users and access**, **Users**, and create a user with the **Viewer** role. A Viewer can run Explore
 queries against the Loki data source (tested), so every Grafana user can read **all** stored logs;
-there is no per-user or per-service restriction. Give the `admin` password to nobody.
+there is no per-user or per-service restriction. Set the user's password when you create it and delete
+the user, and the SSH key, when access ends. Give the `admin` password to nobody.
 
 ## Retention, disk and sizing
 
@@ -165,7 +169,8 @@ Treat Alloy as a secret-visible, host-privileged component.
   recipient (`redactEmail`), not by a filter on all output: a new log line that prints an address stores
   it. Today recipients are redacted, subjects are never logged, and a scan of the stored lines found no
   email address, password, token or secret from the test environment. Review every new log line before
-  you add it.
+  you add it; no lint rule or test enforces this. A line that leaked an address can be removed only
+  by discarding the whole store ([Disk low](runbooks/log-shipping.md#disk-low)).
 
 ## Alerts
 

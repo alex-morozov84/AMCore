@@ -85,21 +85,39 @@ minutes. A healthy pipeline never retries.
 
 1. `$COMPOSE_LOGS logs --tail 50 alloy` shows the send errors and their cause.
 2. `$COMPOSE_LOGS exec logs-grafana wget -q -O- http://loki:3100/ready` must print `ready`.
-3. If no application line reaches Loki at all, inspect the service's log options:
-   `docker inspect <container> --format '{{ .HostConfig.LogConfig }}'` must show `json-file` with
-   `labels`. A container created before the overlay was applied keeps its old log driver; recreate it
-   with `$COMPOSE_LOGS up -d api worker web`. Alloy drops every line that carries no service label.
+3. If no application line reaches Loki at all, inspect the service's log options. The output must
+   show `json-file` with `labels`:
+
+   ```sh
+   docker inspect <container> --format '{{ .HostConfig.LogConfig }}'
+   ```
+
+   A container created before the overlay was applied keeps its old log driver; recreate it with
+   `$COMPOSE_LOGS up -d api worker web`. Alloy drops every line that carries no service label.
 
 ## Lines stop after a Docker upgrade
 
 **Symptom:** a fresh request is not searchable in Grafana, yet Alloy and Loki are running and no alert
 fires. No alert covers this case: Alloy keeps reading but may find nothing it can use.
 
+**Likely causes, ranked:**
+
+1. The services were recreated without the overlay's log driver, so they no longer write the labels
+   Alloy needs (checked first below).
+2. Docker's data root moved from `/var/lib/docker`.
+3. The Docker upgrade changed the log file format, which needs a change to the Alloy configuration.
+
+The steps below use the `$COMPOSE_LOGS` shorthand defined at the top of this page.
+
 **Diagnostic steps:**
 
-1. Check the containers still use the overlay's log driver: `docker inspect <container> --format
-'{{ .HostConfig.LogConfig }}'` must show `json-file` with `labels`. If not, recreate them with
-   `$COMPOSE_LOGS up -d api worker web`.
+1. Check the containers still use the overlay's log driver (the output must show `json-file` with
+   `labels`). If not, recreate them with `$COMPOSE_LOGS up -d api worker web`:
+
+   ```sh
+   docker inspect <container> --format '{{ .HostConfig.LogConfig }}'
+   ```
+
 2. Compare the raw file with the format Alloy expects, one JSON object per line with `log`, `stream`,
    `time` and, for these services, `attrs`:
 
@@ -183,5 +201,6 @@ it, the last resort is to discard the whole store: `$COMPOSE_LOGS stop loki allo
 `loki_data` volume (`docker volume rm <project>_loki_data`), then `$COMPOSE_LOGS up -d loki alloy`.
 This **deletes every stored log line**. Alloy keeps its read positions, so it does not resend lines
 it already read; remove the `alloy_data` volume too if you want it to resend what Docker's files still
-hold. Free space first
-in every other case, then restart Loki.
+hold. In every other case, free space first (freeing space elsewhere on the same disk, such as unused
+images, also helps), then restart Loki. Lowering the retention needs a running Loki, so it cannot help
+when Loki cannot start on a completely full volume.
