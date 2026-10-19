@@ -140,7 +140,8 @@ The [Overview](overview.md) has an **External tools** card with links to the
 monitoring tools your team runs. The Console does not install, proxy or embed
 them: each link opens the tool in a new tab, and you sign in to the tool
 separately. Only a `SUPER_ADMIN` can open the Console, so only a `SUPER_ADMIN`
-sees the card; organization owners and administrators never do.
+sees the card. Organization owners and administrators get a not-found page
+instead of the Console.
 
 ## What AMCore provides and what you deploy
 
@@ -160,9 +161,10 @@ and runbooks.
 
 ## Set the addresses
 
-Set the addresses in the environment of the **web service** (the `web` container
-of the bundled Compose file, which reads them from the `.env` file next to
-`docker-compose.yml`):
+Set the addresses in the environment of the **web service**. With the bundled
+Compose file this is the `web` container, which reads them from the `.env` file
+next to `docker-compose.yml`. With another Compose file or platform, set the same
+variables in the web container's environment by the means that platform offers.
 
 | Variable                    | Link on the card | Typical target                                   |
 | --------------------------- | ---------------- | ------------------------------------------------ |
@@ -175,17 +177,23 @@ ADMIN_CONSOLE_METRICS_URL=https://grafana.example.com/d/amcore-overview
 ADMIN_CONSOLE_ALERTS_URL=https://alerts.example.com
 ```
 
-An empty or missing variable means "not configured". Leave `ADMIN_CONSOLE_LOGS_URL`
-empty if you run no log search system: a Grafana address without a log data
-source opens an empty page. When all three are empty, the card shows the single
-line "External tools are not configured." instead of one row per tool. When only
-some are set, each unset tool is listed as "not configured". In both cases the
-**How to connect** link, which opens this section, stays on the card.
+An empty or missing variable means "not configured". Each configured tool is a
+link labelled with its name: **Metrics**, **Logs** or **Alerts**. Leave
+`ADMIN_CONSOLE_LOGS_URL` empty if you run no log search system: the start-up check
+accepts a Grafana address for it, but it cannot know whether that Grafana has a
+log data source, and without one the link opens an empty page.
 
-An address must be an absolute `https` URL with a host name or an IPv4 address.
-Plain `http` is accepted only for `localhost` and `127.0.0.1`. IPv6 addresses in
-brackets are refused. Path, query and fragment are kept, so a link can open one
-dashboard. These values are refused:
+When all three are empty, the card shows the single line "External tools are not
+configured." instead of one row per tool. When only some are set, each unset tool
+is listed as "not configured". The **How to connect** link, which opens this
+section, stays on the card in both cases and disappears only when all three tools
+are set.
+
+An address must be an absolute `https` URL with a host name or an IPv4 address; a
+port is allowed (`https://grafana.example.com:8443/d/x`). Plain `http` is accepted
+only for `localhost` and `127.0.0.1`. IPv6 addresses in brackets are refused. Path,
+query and fragment are kept, so a link can open one dashboard. These values are
+refused:
 
 - addresses with a user name or password (`https://user:pw@host/`);
 - wildcard hosts such as `https://*.example.com`, and relative or scheme-less
@@ -196,16 +204,23 @@ dashboard. These values are refused:
 
 A value that is set but refused stops the **web service** at start-up. That is
 the whole web application, including the product's own pages, not only the
-Console: the process exits and prints the variable name on standard error.
+Console: the process exits and prints the name of the offending variable on
+standard error. With the bundled Compose file, read it with
+`docker compose logs web`. For the metrics variable the message is:
 
 ```text
 ADMIN_CONSOLE_METRICS_URL must be an absolute https URL (or a loopback http URL) without credentials, spaces or wildcards
 ```
 
-Correct the value and start the web service again. The addresses are read from
-the environment while the page is served, so a new value needs no rebuild, but
-the container must be **recreated** to receive it. With the bundled Compose file,
-run `docker compose up -d web`; `docker compose restart web` keeps the old
+Correct the value and start the web service again. A tool that can be reached
+only over plain `http` needs TLS in front of it before it can be linked; until
+then leave its variable empty.
+
+The Console reads the addresses from the web container's environment while it
+serves the page, so a new value needs no rebuild. A container's environment is
+fixed when the container is created, so the container must be **recreated** to
+receive a new value. With the bundled Compose file, run
+`docker compose up -d web`; `docker compose restart web` keeps the old
 environment. Then open the Overview and check the card.
 
 For the local `monitoring` profile ([observability guide](../operations/observability.md#local-verification-harness))
@@ -244,18 +259,21 @@ to the tool. Single sign-on between the Console and these tools is not provided.
 ## Documentation links
 
 The **Recovery instructions** link is always shown. It opens the
-`docs/operations/runbooks` folder of the upstream repository on GitHub. The
-**How to connect** link and the guide links on other Console screens use the
-same base. The base is not an environment variable: it is the constant
+`docs/operations/runbooks` folder of the upstream repository,
+`https://github.com/alex-morozov84/AMCore`, on GitHub. The **How to connect**
+link and the guide links on the Background work and Overview storage screens use
+the same base. The base is not an environment variable: it is the constant
 `DOCS_REPOSITORY_URL` in `apps/web/src/shared/lib/console-docs-links.ts`, so
-changing it needs a rebuild of the web image.
+changing it needs a rebuild of the web image (with the bundled Compose file,
+`docker compose build web`, then `docker compose up -d web`).
 
 The constant holds a repository root, such as `https://github.com/your-org/your-repo`.
-The same file builds each address as `<root>/blob/main/<page path>` for a page
-and `<root>/tree/main/<folder path>` for a folder. A fork that keeps its
+The functions `docsPageHref` and `docsFolderHref` in the same file build each
+address as `<root>/blob/main/<page path>` for a page and
+`<root>/tree/main/<folder path>` for a folder. A fork that keeps its
 documentation in a GitHub repository changes only the constant. A documentation
 site with a different path scheme, such as `https://docs.example.com`, also needs
-the two small functions in that file changed.
+those two functions changed.
 
 ## Database prerequisite: `pg_trgm` (Users/Organizations search)
 

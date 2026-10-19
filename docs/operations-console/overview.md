@@ -16,8 +16,8 @@ new snapshot; a healthy card does not certify other instances.
 
 The **External tools** card sits under the page title. It holds links to the
 Metrics, Logs and Alerts tools that the operator who deployed the Console
-configured, and an always-present **Recovery instructions** link to the public
-runbooks. Each link opens in a new tab. A tool that is not configured is listed
+configured, and an always-present **Recovery instructions** link to the runbooks
+of the upstream repository (a fork can change this base). Each link opens in a new tab. A tool that is not configured is listed
 as "not configured"; when no tool is configured the card shows the single line
 "External tools are not configured." instead of one row per tool. The **How to
 connect** link stays on the card while any tool is unset. A link only means an address is set: the Console does not check
