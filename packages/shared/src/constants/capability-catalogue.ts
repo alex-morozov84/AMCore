@@ -8,6 +8,8 @@ export interface CapabilityDescriptor<TSubject extends string = Subject> {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   path: `/${string}`
   credentials: readonly ('bearer' | 'apiKey')[]
+  /** Complete direct scope requirements; code-only, never part of the catalogue HTTP DTO. */
+  additionalApiKeyScopes?: readonly string[]
   labelKey: string
   presets: readonly string[]
   editableFields: readonly string[]
@@ -44,6 +46,7 @@ export const CAPABILITY_CATALOGUE = [
   },
   {
     id: 'organization.update',
+    additionalApiKeyScopes: ['read:Organization'],
     subject: Subject.Organization,
     action: Action.Update,
     operation: 'organizations.update',
@@ -56,6 +59,7 @@ export const CAPABILITY_CATALOGUE = [
   },
   {
     id: 'organization.delete',
+    additionalApiKeyScopes: ['manage:TeamAccess'],
     subject: Subject.Organization,
     action: Action.Delete,
     operation: 'organizations.remove',

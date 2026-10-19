@@ -25,12 +25,10 @@ the shared/API extension points below.
 
 The selected-context response keeps `canManageTeamAccess` for existing callers;
 its value equals the named `teamAccess.manage` actor decision. The two-card
-organization overview uses only this verified team decision. It has no role,
-member, invitation or permission editing page.
+organization overview uses only this verified team decision. The separate ready Members, Roles and Invitations screens provide their own controls.
 
-The catalogue and preset routes are backend API contracts. The current web BFF
-does not expose an editor transport for them; a downstream editor must add an
-explicit typed same-origin operation with the normal session and Origin checks.
+The ready role editor uses typed same-origin catalogue and role operations with
+session and Origin checks. See the [role editor](../product-admin/role-definitions.md#ready-role-screens).
 
 ## Author a permission
 
@@ -159,3 +157,19 @@ subject, however, the old key may become effective on a route that separately
 accepts API keys. The same future activation applies to a dormant
 `manage:NewSubject` scope. Freezing wildcard meaning would need a separate
 versioned credential mechanism.
+
+## API-key scope options
+
+`CapabilityDescriptor.additionalApiKeyScopes?: readonly string[]` declares complete
+direct canonical scope requirements for an API-key-eligible operation. Missing/empty
+means no additions. `apiKeyScopeOptions` validates declarations, groups identical
+primary `action:Subject` scopes, unions direct additions, deduplicates and sorts by
+literal code-point order. There is no transitive dependency graph. Malformed scopes,
+`manage:all` and nonempty metadata on bearer-only entries fail definition validation.
+
+PATCH Organization requires update plus read for its response. DELETE requires delete
+plus `manage:TeamAccess`, without read. Field-name metadata does not imply a read grant.
+Prove these requirements against handlers, independently of descriptor validation.
+This new metadata is code-only and explicitly omitted from the unchanged strict HTTP
+catalogue projection. Custom key UI uses compiled descriptors, not `/capabilities`
+as a complete key-option endpoint. See [own keys](../product-admin/own-api-keys.md).

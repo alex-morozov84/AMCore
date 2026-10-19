@@ -76,3 +76,14 @@ inside a dialog or couple product controls to Operations Console.
 The [removal hook](organization-members.md#custom-removal-presentation) exposes confirmation-independent
 state and read-only inspection. Keep the frozen membership identity until the operation settles;
 a new membership requires a new selection. The domain layer imports no ready feature, widget or Console.
+
+## Own-key integration
+
+See [own-key custom presentation](own-api-keys.md#custom-presentation) for actor-bound
+entity hooks and the independent settings mount. These operations require no
+organization controller; inventory/revocation survives membership loss. Keep one
+transient page host per binding, with no credential persistence or MutationCache.
+The optional placement `ownApiKeysPath` controls the personal navigation entry.
+Own-key entity, feature and widget roots belong to the product surface, independently
+of Console. Shared catalogue metadata, BFF primitives, translations and route wiring
+retain their explicit consumers when omitting a ready screen.

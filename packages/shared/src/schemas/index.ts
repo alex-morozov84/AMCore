@@ -190,6 +190,7 @@ export {
   apiKeyListResponseSchema,
   type ApiKeyQuery,
   apiKeyQuerySchema,
+  apiKeyScopeSchema,
   type CreateApiKeyInput,
   type CreateApiKeyResponse,
   createApiKeyResponseSchema,
@@ -468,6 +469,8 @@ export * from './organization-establishment'
 export * from './organization-members'
 export * from './organization-members-budget'
 export * from './organization-provisioning'
+export * from './own-api-keys'
+export * from './own-key-organizations'
 export * from './role-definition'
 export * from './role-definition-budget'
 export * from './storage-probe-setting'

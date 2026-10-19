@@ -5,11 +5,11 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
-import type { ApiKeyListResponse } from '@amcore/shared'
+import type { ApiKeyListResponse, ApiKeyQuery } from '@amcore/shared'
 import type { CreateApiKeyInput } from '@amcore/shared'
 
 import { ForbiddenException } from '../../common/exceptions/index.js'
-import { AuditActorType, AuditTargetType, type Prisma } from '../../generated/prisma/client.js'
+import { AuditActorType, AuditTargetType, Prisma } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
 
@@ -27,6 +27,7 @@ export interface CreateApiKeyResult {
 }
 
 export interface ApiKeyListItem {
+  organizationName: string | null
   id: string
   name: string
   organizationId: string
@@ -130,26 +131,60 @@ export class ApiKeysService {
     userId: string,
     page: number,
     limit: number,
-    status: 'all' | 'unexpired' | 'expired' | 'revoked' = 'all'
+    status: 'all' | 'unexpired' | 'expired' | 'revoked' = 'all',
+    filters: Pick<ApiKeyQuery, 'search' | 'organizationId' | 'organizationAvailability'> = {}
   ): Promise<ApiKeyListResponse> {
     // ADR-036: paginated envelope. ORDER BY createdAt DESC, id ASC for
     // deterministic page boundaries (createdAt is usually unique but
     // not guaranteed; id tie-break is mandatory).
     const now = new Date()
-    const where = { userId, ...apiKeyStatusWhere(status, now) }
-    const skip = (page - 1) * limit
-    const [keys, total] = await Promise.all([
-      this.prisma.apiKey.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    const where = {
+      userId,
+      ...apiKeyStatusWhere(status, now),
+      ...(filters.search && {
+        name: {
+          contains: filters.search.replace(/[\\%_]/g, (c) => `\\${c}`),
+          mode: 'insensitive' as const,
+        },
       }),
-      this.prisma.apiKey.count({ where }),
-    ])
+      ...(filters.organizationId && { organizationId: filters.organizationId }),
+      ...(filters.organizationAvailability && { organization: { members: { none: { userId } } } }),
+    }
+    const skip = (page - 1) * limit
+    const [keys, total] = await this.prisma.$transaction(
+      async (tx) =>
+        Promise.all([
+          tx.apiKey.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            select: {
+              id: true,
+              name: true,
+              organizationId: true,
+              scopes: true,
+              expiresAt: true,
+              lastUsedAt: true,
+              createdAt: true,
+              revokedAt: true,
+              revocationReason: true,
+              organization: {
+                select: {
+                  name: true,
+                  members: { where: { userId }, take: 1, select: { id: true } },
+                },
+              },
+            },
+          }),
+          tx.apiKey.count({ where }),
+        ]),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }
+    )
 
     return {
       data: keys.map((k) => ({
+        organizationName: k.organization.members.length ? k.organization.name : null,
         id: k.id,
         name: k.name,
         organizationId: k.organizationId,

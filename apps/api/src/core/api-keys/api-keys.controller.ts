@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
@@ -18,14 +19,17 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
+import type { FastifyRequest } from 'fastify'
 
 import {
   type ApiKeyListResponse,
   AuthType,
+  type OwnKeyOrganizations,
   PAGINATION,
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { BadRequestException } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -35,6 +39,11 @@ import { ApiKeyListResponseDto } from './dto/api-key-list-response.dto.js'
 import { ApiKeyQueryDto } from './dto/api-key-query.dto.js'
 import { CreateApiKeyDto } from './dto/create-api-key.dto.js'
 import { CreateApiKeyResponseDto } from './dto/create-api-key-response.dto.js'
+import {
+  OwnKeyOrganizationsDto,
+  OwnKeyOrganizationsQueryDto,
+} from './dto/own-key-organizations.dto.js'
+import { OwnKeyOrganizationsService } from './own-key-organizations.service.js'
 
 /**
  * Credential management routes are bearer-only.
@@ -60,7 +69,10 @@ import { CreateApiKeyResponseDto } from './dto/create-api-key-response.dto.js'
 @ApiResponse({ status: 400, description: 'Invalid input' })
 @Controller('api-keys')
 export class ApiKeysController {
-  constructor(private readonly apiKeysService: ApiKeysService) {}
+  constructor(
+    private readonly apiKeysService: ApiKeysService,
+    private readonly organizations: OwnKeyOrganizationsService
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create an API key for the current user — returns the secret once' })
@@ -72,7 +84,33 @@ export class ApiKeysController {
     return this.apiKeysService.create(user.sub, dto)
   }
 
+  @Get('organizations')
+  @ApiOperation({
+    summary: 'List bounded organization options for own API-key inventory or creation',
+  })
+  @ApiQuery({ name: 'purpose', enum: ['inventory', 'creation'], required: true })
+  @ApiQuery({ name: 'search', type: String, required: false, maxLength: 100 })
+  @ApiQuery({ name: 'selectedId', type: String, required: false })
+  @ApiQuery({ name: 'page', type: Number, required: false, minimum: 1 })
+  @ApiQuery({ name: 'limit', type: Number, required: false, minimum: 1, maximum: 20 })
+  @SchemaResponse({
+    type: OwnKeyOrganizationsDto,
+    status: 200,
+    description: 'Actor-scoped organization options; creation hints are not issuance authority',
+  })
+  listOrganizations(
+    @CurrentUser() user: RequestPrincipal,
+    @Query({ schema: OwnKeyOrganizationsQueryDto.schema }) query: OwnKeyOrganizationsQueryDto,
+    @Req() request: FastifyRequest
+  ): Promise<OwnKeyOrganizations> {
+    assertOwnQueryBudget(request)
+    return this.organizations.list(user, query)
+  }
+
   @Get()
+  @ApiQuery({ name: 'search', type: String, required: false, maxLength: 100 })
+  @ApiQuery({ name: 'organizationId', type: String, required: false })
+  @ApiQuery({ name: 'organizationAvailability', enum: ['unavailable'], required: false })
   @ApiOperation({ summary: 'List API keys owned by the current user' })
   @ApiQuery({
     name: 'page',
@@ -99,13 +137,16 @@ export class ApiKeysController {
   @SchemaResponse({ type: ApiKeyListResponseDto, status: 200, description: 'Paginated API keys' })
   findAll(
     @CurrentUser() user: RequestPrincipal,
-    @Query({ schema: ApiKeyQueryDto.schema }) pagination: ApiKeyQueryDto
+    @Query({ schema: ApiKeyQueryDto.schema }) pagination: ApiKeyQueryDto,
+    @Req() request: FastifyRequest
   ): Promise<ApiKeyListResponse> {
+    assertOwnQueryBudget(request)
     return this.apiKeysService.findAllForUser(
       user.sub,
       pagination.page,
       pagination.limit,
-      pagination.status
+      pagination.status,
+      pagination
     )
   }
 
@@ -120,4 +161,9 @@ export class ApiKeysController {
   revoke(@CurrentUser() user: RequestPrincipal, @Param('id') id: string): Promise<void> {
     return this.apiKeysService.revoke(id, user.sub)
   }
+}
+
+function assertOwnQueryBudget(request: FastifyRequest): void {
+  if (Buffer.byteLength(request.url.split('?')[1] ?? '', 'utf8') > 2048)
+    throw new BadRequestException('Query too large')
 }

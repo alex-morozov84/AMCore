@@ -88,4 +88,6 @@ describes ownership and the acceptance checklist for later modules.
 
 [Member API keys](member-api-keys.md) adds safe inventory and explicit single/all
 revocation through the member menu. Supported backend member removal permanently
-revokes organization keys; the removal UI remains separate.
+revokes organization keys through the confirmed Members removal flow.
+
+[My API keys](own-api-keys.md) adds personal creation, one-time secret handling and all-organization owner cleanup.

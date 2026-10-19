@@ -144,15 +144,14 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     .click()
   const mobile = page.locator('[data-slot="sidebar"][data-mobile="true"]')
   await expect(mobile).toBeVisible()
-  const navigationContext = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === `/api/product-access/organizations/${second.id}/context`
-  )
   await mobile.getByRole('link', { name: lastUi.text('title'), exact: true }).click()
-  await (await navigationContext).finished()
-  await expect(page.locator('[aria-busy="false"]')).toBeVisible()
+  await expect(page).toHaveURL(`${origin}${lastUi.path()}?view=list`)
   await expect(mobile).toHaveCount(0)
+  await page.getByRole('link', { name: lastUi.open(second.name), exact: true }).click()
   await expect(page.getByRole('heading', { name: second.name, exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: lastUi.text('refresh'), exact: true })
+  ).toBeEnabled()
 
   const beforeChanged = calls.length
   expect(
