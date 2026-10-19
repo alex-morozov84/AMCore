@@ -48,6 +48,45 @@ describe('managed processor log context', () => {
     expect(run).toHaveBeenCalledTimes(1)
   })
 
+  it('logs one job.finished line inside the context after a successful run', async () => {
+    const logger = { info: jest.fn(), warn: jest.fn() }
+    const execution = { discardSecret: () => false, run: jest.fn(async () => undefined) }
+    const Processor = managedProcessor(definition) as unknown as new (...args: unknown[]) => {
+      process(job: Job, token?: string): Promise<void>
+    }
+    const processor = new Processor({} as Queue, execution, modules, undefined, logger)
+
+    await processor.process(job, 'token')
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'job.finished', queue: 'image', outcome: 'completed' }),
+      'Job finished'
+    )
+    expect(logger.warn).not.toHaveBeenCalled()
+  })
+
+  it('warns and rethrows when the run fails, without the failure text', async () => {
+    const logger = { info: jest.fn(), warn: jest.fn() }
+    const execution = {
+      discardSecret: () => false,
+      run: jest.fn(async () => {
+        throw new Error('provider said password=hunter2')
+      }),
+    }
+    const Processor = managedProcessor(definition) as unknown as new (...args: unknown[]) => {
+      process(job: Job, token?: string): Promise<void>
+    }
+    const processor = new Processor({} as Queue, execution, modules, undefined, logger)
+
+    await expect(processor.process(job, 'token')).rejects.toThrow('TRANSIENT_FAILURE')
+
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('hunter2')
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'transient_failure' }),
+      'Job did not finish'
+    )
+  })
+
   it('still runs a job when no CLS service is provided', async () => {
     const { processor, run } = build(undefined)
 

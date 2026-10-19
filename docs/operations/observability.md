@@ -10,7 +10,8 @@ of this page describes `apps/api`.
 ## Structured Logs
 
 `apps/api`'s application logs are structured Pino JSON in production. Every
-record written while a request or a queued job runs carries a `correlationId`.
+record written while a request runs, and every worker line of a job that a request started,
+carries a `correlationId`; jobs started outside a request carry none (see below).
 
 **Where the ID comes from.** The API reads `X-Request-ID`, then `X-Correlation-ID`,
 and accepts the first value that is a single string of 1–128 characters from
@@ -21,8 +22,9 @@ it as `requestId`. The ID is a search aid: a client chooses it, so it never prov
 who made a request and must not be used for authorization or integrity.
 
 **Worker lines.** A job started during a request stores that request's ID, so the
-worker's lines for that job carry the same `correlationId` plus `workId`, `jobId` and
-`invocationId`. A job started outside a request, and every wake job
+worker's lines for that job carry the same `correlationId` plus `workId` and `jobId`.
+Idempotent and wake runs add an `invocationId` inside the handler; a queued email does
+not. A job started outside a request, and every wake job
 (notifications, AI runs), has no request ID; search those by `jobId`, `deliveryId` or
 `runId`. When the API adds a job it logs one `job.enqueued` line with `jobId`,
 `incarnation` and `duplicate`; for a duplicate add the job keeps the first

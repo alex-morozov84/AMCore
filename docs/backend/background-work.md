@@ -330,7 +330,8 @@ replay is permitted; stock queue history retention cannot provide that guarantee
 
 A job started during an HTTP request stores that request's `correlationId` in its
 envelope. The worker runs the job in a log context, so every worker log line of the
-run carries `correlationId`, `workId`, `jobId` and, inside the handler, `invocationId`.
+run carries `correlationId`, `workId` and `jobId`. Idempotent and wake runs also carry
+`invocationId` inside the handler; a queued email (`provider-window`) does not.
 Searching the log store for the request ID therefore finds the API lines and the
 worker lines of the same job.
 
