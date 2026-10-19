@@ -18,8 +18,9 @@ The **External tools** card sits under the page title. It holds links to the
 Metrics, Logs and Alerts tools that the operator who deployed the Console
 configured, and an always-present **Recovery instructions** link to the public
 runbooks. Each link opens in a new tab. A tool that is not configured is listed
-as "not configured" with a **How to connect** link; when no tool is configured the
-card says so once. A link only means an address is set: the Console does not check
+as "not configured"; when no tool is configured the card shows the single line
+"External tools are not configured." instead of one row per tool. The **How to
+connect** link stays on the card while any tool is unset. A link only means an address is set: the Console does not check
 that the tool works. The card is hidden together with the rest of the page when the
 API cannot confirm your access. See [External tool links](configuration.md#external-tool-links)
 for the variables, the accepted addresses and the start-up check.

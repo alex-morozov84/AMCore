@@ -139,7 +139,30 @@ variable on an already built web container does not change it. See
 The [Overview](overview.md) has an **External tools** card with links to the
 monitoring tools your team runs. The Console does not install, proxy or embed
 them: each link opens the tool in a new tab, and you sign in to the tool
-separately. Set the addresses in the **web** server environment:
+separately. Only a `SUPER_ADMIN` can open the Console, so only a `SUPER_ADMIN`
+sees the card; organization owners and administrators never do.
+
+## What AMCore provides and what you deploy
+
+AMCore does not install or run these tools in production. Plan to deploy them
+yourself and then set their addresses below.
+
+| Tool    | Provided by AMCore                                                                    | You deploy                                  |
+| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Metrics | The metrics endpoint, an overview dashboard file, and a dev-only `monitoring` profile | Your own Prometheus and Grafana             |
+| Alerts  | Alert rules, runbooks and an example Alertmanager setup                               | Your own Alertmanager and its receivers     |
+| Logs    | Structured log output only; no collection and no search                               | A log system of your choice, or none at all |
+
+The `monitoring` profile starts Prometheus, Grafana and Alertmanager for local
+verification and is never part of the production Compose files. See the
+[observability guide](../operations/observability.md) for the dashboard, rules
+and runbooks.
+
+## Set the addresses
+
+Set the addresses in the environment of the **web service** (the `web` container
+of the bundled Compose file, which reads them from the `.env` file next to
+`docker-compose.yml`):
 
 | Variable                    | Link on the card | Typical target                                   |
 | --------------------------- | ---------------- | ------------------------------------------------ |
@@ -147,54 +170,69 @@ separately. Set the addresses in the **web** server environment:
 | `ADMIN_CONSOLE_LOGS_URL`    | Logs             | The log search page of your logging system       |
 | `ADMIN_CONSOLE_ALERTS_URL`  | Alerts           | Alertmanager, or Grafana alerting                |
 
-An empty or missing variable means "not configured": the card shows that tool as
-not configured and links to this section. When none is set, the card says so
-once. The **Recovery instructions** link is always shown; it opens the
-`docs/operations/runbooks` folder of the upstream repository on GitHub. A fork
-that publishes its own documentation changes `DOCS_REPOSITORY_URL` in
-`shared/lib/console-docs-links.ts`.
+```bash
+ADMIN_CONSOLE_METRICS_URL=https://grafana.example.com/d/amcore-overview
+ADMIN_CONSOLE_ALERTS_URL=https://alerts.example.com
+```
 
-An address must be an absolute `https` URL. Plain `http` is accepted only for
-`localhost` and `127.0.0.1`. Path, query and fragment are kept, so a link can
-open one dashboard. These values are refused:
+An empty or missing variable means "not configured". Leave `ADMIN_CONSOLE_LOGS_URL`
+empty if you run no log search system: a Grafana address without a log data
+source opens an empty page. When all three are empty, the card shows the single
+line "External tools are not configured." instead of one row per tool. When only
+some are set, each unset tool is listed as "not configured". In both cases the
+**How to connect** link, which opens this section, stays on the card.
+
+An address must be an absolute `https` URL with a host name or an IPv4 address.
+Plain `http` is accepted only for `localhost` and `127.0.0.1`. IPv6 addresses in
+brackets are refused. Path, query and fragment are kept, so a link can open one
+dashboard. These values are refused:
 
 - addresses with a user name or password (`https://user:pw@host/`);
-- wildcard hosts, relative or scheme-less values (`//host/d/x`, `host/d/x`);
+- wildcard hosts such as `https://*.example.com`, and relative or scheme-less
+  values (`//host/d/x`, `host/d/x`);
 - values with spaces or control characters, or longer than 2048 characters;
-- other schemes, such as `javascript:` or `ftp:`.
+- other schemes, such as `javascript:` or `ftp:`;
+- `http` addresses of any other host, such as `http://grafana.internal:3000`.
 
-A value that is set but refused stops the **web service** at start-up, including
-its product pages, and prints the variable name on standard error:
+A value that is set but refused stops the **web service** at start-up. That is
+the whole web application, including the product's own pages, not only the
+Console: the process exits and prints the variable name on standard error.
 
 ```text
 ADMIN_CONSOLE_METRICS_URL must be an absolute https URL (or a loopback http URL) without credentials, spaces or wildcards
 ```
 
-Fix the value and start the service again. The check runs at start-up; the
-addresses are read from the environment when the page is served, so changing a
-value needs a restart of the web container but not a rebuild.
+Correct the value and start the web service again. The addresses are read from
+the environment while the page is served, so a new value needs no rebuild, but
+the container must be **recreated** to receive it. With the bundled Compose file,
+run `docker compose up -d web`; `docker compose restart web` keeps the old
+environment. Then open the Overview and check the card.
 
 For the local `monitoring` profile ([observability guide](../operations/observability.md#local-verification-harness))
 you can set:
 
 ```bash
-ADMIN_CONSOLE_METRICS_URL="http://localhost:3001"
-ADMIN_CONSOLE_ALERTS_URL="http://localhost:9093"
+ADMIN_CONSOLE_METRICS_URL=http://localhost:3001
+ADMIN_CONSOLE_ALERTS_URL=http://localhost:9093
 ```
 
-These loopback addresses work only in a browser on the same machine as the
-stack. Compose leaves all three variables empty by default, so the card never
-links to a tool that is not running.
+These loopback addresses open the tool on the machine of whoever clicks the link,
+so they work only in a browser on the same machine as the stack. Compose leaves
+all three variables empty by default, so the card never links to a tool that is
+not running.
 
 What the card does and does not prove:
 
 - A link means an address is configured. The Console does not contact the tool,
-  so it cannot tell whether the tool is running or whether you may sign in.
+  so it cannot tell whether the tool is running or whether you may sign in. A
+  mistyped but valid-looking address, such as a wrong host name, is not detected;
+  the link fails when someone opens it.
 - A **Logs** link does not prove that log collection is installed. AMCore ships
   no log search; see [Log shipping](../operations/observability.md#log-shipping-non-goal).
-- Never put a token, API key or password in these addresses. The card is shown to
-  every `SUPER_ADMIN`, the address appears in the page and in browser history, and
-  a secret in the query cannot be detected by the start-up check.
+- Never put a token, API key or password in these addresses, in the path, the
+  query or the fragment. The card is shown to every `SUPER_ADMIN`, the address
+  appears in the page and in browser history, and the start-up check cannot detect
+  a secret in any of those parts.
 - The card is part of the Console page. When the API cannot confirm that you are
   a `SUPER_ADMIN`, the Console shows no page content and no links: a
   "temporarily unavailable" notice, or a not-found page when the API is not
@@ -202,6 +240,22 @@ What the card does and does not prove:
 
 The links carry no Console session or token, and the browser sends no `Referer`
 to the tool. Single sign-on between the Console and these tools is not provided.
+
+## Documentation links
+
+The **Recovery instructions** link is always shown. It opens the
+`docs/operations/runbooks` folder of the upstream repository on GitHub. The
+**How to connect** link and the guide links on other Console screens use the
+same base. The base is not an environment variable: it is the constant
+`DOCS_REPOSITORY_URL` in `apps/web/src/shared/lib/console-docs-links.ts`, so
+changing it needs a rebuild of the web image.
+
+The constant holds a repository root, such as `https://github.com/your-org/your-repo`.
+The same file builds each address as `<root>/blob/main/<page path>` for a page
+and `<root>/tree/main/<folder path>` for a folder. A fork that keeps its
+documentation in a GitHub repository changes only the constant. A documentation
+site with a different path scheme, such as `https://docs.example.com`, also needs
+the two small functions in that file changed.
 
 ## Database prerequisite: `pg_trgm` (Users/Organizations search)
 
