@@ -38,6 +38,28 @@ describe('createLoggingConfig', () => {
     })
   })
 
+  describe('log context mixin', () => {
+    const mixin = () =>
+      (createLoggingConfig(clsServiceMock, 4096).pinoHttp as { mixin: () => object }).mixin()
+
+    afterEach(() => (clsServiceMock.get as jest.Mock).mockReset())
+
+    it('adds only the correlation ID outside a job run', () => {
+      expect(mixin()).toEqual({ correlationId: 'test-correlation-id' })
+    })
+
+    it('adds the job identity set by a worker run', () => {
+      const store: Record<string, string> = { workId: 'email', jobId: 'j1', invocationId: 'i1' }
+      ;(clsServiceMock.get as jest.Mock).mockImplementation((key: string) => store[key])
+      expect(mixin()).toEqual({
+        correlationId: 'test-correlation-id',
+        workId: 'email',
+        jobId: 'j1',
+        invocationId: 'i1',
+      })
+    })
+  })
+
   it('redacts nested credential fields and hashed secrets', () => {
     const config = createLoggingConfig(clsServiceMock, 4096)
 

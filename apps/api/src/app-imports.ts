@@ -3,7 +3,7 @@ import { CacheModule } from '@nestjs/cache-manager'
 import type { ModuleMetadata, Provider } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
-import type { Request } from 'express'
+import type { Request, Response } from 'express'
 import { ClsModule, ClsService } from 'nestjs-cls'
 import { LoggerModule } from 'nestjs-pino'
 import { v4 as uuidv4 } from 'uuid'
@@ -17,7 +17,12 @@ import {
 } from './common/exceptions/filters/index.js'
 import { SchemaResponseInterceptor } from './common/schemas/schema-response.interceptor.js'
 import { createSchemaValidationPipe } from './common/schemas/schema-validation.js'
-import { anonymizeIp, getClientIp } from './common/utils/index.js'
+import {
+  anonymizeIp,
+  CORRELATION_ID_HEADER,
+  getClientIp,
+  pickCorrelationId,
+} from './common/utils/index.js'
 import { AdminModule } from './core/admin/admin.module.js'
 import { AiWebModule } from './core/ai/ai-web.module.js'
 import { AuthModule } from './core/auth/auth.module.js'
@@ -80,12 +85,17 @@ export function coreImports(
         mount: true,
         generateId: true,
         idGenerator: (req: Request) => {
-          // Priority: load balancer → upstream → generate new
-          return (req.headers['x-request-id'] ||
-            req.headers['x-correlation-id'] ||
-            uuidv4()) as string
+          // Priority: load balancer → upstream → generate new. Only a well-formed value is
+          // accepted: the ID is a log-store search key and a queued-job field.
+          return pickCorrelationId(
+            [req.headers['x-request-id'], req.headers['x-correlation-id']],
+            uuidv4
+          )
         },
-        setup: (cls, req: Request & { user?: { sub: string } }) => {
+        setup: (cls, req: Request & { user?: { sub: string } }, res: Response) => {
+          // Echo the ID so an operator can search the logs for a successful request too.
+          res.setHeader(CORRELATION_ID_HEADER, cls.getId())
+
           // Auto-inject userId from JWT (if authenticated). user.sub = userId (RequestPrincipal)
           if (req.user?.sub) {
             cls.set('userId', req.user.sub)

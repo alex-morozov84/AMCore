@@ -52,9 +52,55 @@ export function validateImageConsistency(composeText, ciText) {
   return violations
 }
 
+const LOGS_PAIRS = [
+  { service: 'loki', envVar: 'LOKI_IMAGE' },
+  { service: 'alloy', envVar: 'ALLOY_IMAGE' },
+]
+
+/**
+ * The log-search overlay (docker/compose/logs.yml) pins Loki and Alloy, which CI validates the
+ * configuration with, and ships its own Grafana, which must be the same image as the
+ * `monitoring` profile's Grafana so the two never drift.
+ */
+export function validateLogsOverlayImages(composeText, logsText, ciText) {
+  const logs = readComposeImages(
+    logsText,
+    LOGS_PAIRS.map((p) => p.service)
+  )
+  const ci = readCiEnvImages(
+    ciText,
+    LOGS_PAIRS.map((p) => p.envVar)
+  )
+  const violations = LOGS_PAIRS.flatMap((pair) => {
+    const overlayImage = logs.find((c) => c.service === pair.service).expected
+    const ciImage = ci.find((c) => c.envVar === pair.envVar).actual
+    return overlayImage === ciImage
+      ? []
+      : [
+          `docker/compose/logs.yml's "${pair.service}" image (${overlayImage}) does not match ` +
+            `ci.yml's ${pair.envVar} (${ciImage})`,
+        ]
+  })
+  const [monitoringGrafana] = readComposeImages(composeText, ['grafana'])
+  const [logsGrafana] = readComposeImages(logsText, ['logs-grafana'])
+  if (monitoringGrafana.expected !== logsGrafana.expected) {
+    violations.push(
+      `docker/compose/logs.yml's "logs-grafana" image (${logsGrafana.expected}) does not match ` +
+        `docker-compose.yml's "grafana" image (${monitoringGrafana.expected})`
+    )
+  }
+  return violations
+}
+
 export function runAgainstRealRepo({
   composePath = 'docker-compose.yml',
+  logsPath = 'docker/compose/logs.yml',
   ciPath = '.github/workflows/ci.yml',
 } = {}) {
-  return validateImageConsistency(readFileSync(composePath, 'utf8'), readFileSync(ciPath, 'utf8'))
+  const composeText = readFileSync(composePath, 'utf8')
+  const ciText = readFileSync(ciPath, 'utf8')
+  return [
+    ...validateImageConsistency(composeText, ciText),
+    ...validateLogsOverlayImages(composeText, readFileSync(logsPath, 'utf8'), ciText),
+  ]
 }

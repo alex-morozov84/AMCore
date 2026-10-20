@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { checkMetricReferences, collectVectorSelectorNames } from './query.mjs'
+import {
+  checkMetricReferences,
+  collectVectorSelectorNames,
+  OTHER_TARGET_RULE_FILES,
+} from './query.mjs'
 import { getAllExpressions } from '../validate-expression-extraction.mjs'
 
 test('collects a bare vectorSelector name', () => {
@@ -73,7 +77,9 @@ test('checkMetricReferences fails every expression when parse_query errors, inst
 
   try {
     const violations = await checkMetricReferences()
-    const expressionCount = getAllExpressions().length
+    const expressionCount = getAllExpressions().filter(
+      (e) => !OTHER_TARGET_RULE_FILES.has(e.file)
+    ).length
     assert.equal(
       violations.length,
       expressionCount,

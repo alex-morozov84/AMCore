@@ -1,0 +1,25 @@
+# Grafana datasource for the log-search reference overlay (docker/compose/logs.yml).
+# One file per datasource: a later monitoring deployment adds its own Prometheus datasource
+# file beside this one without editing it. The uid is fixed so dashboards, derived-field links
+# and the observability-contract harness can refer to it.
+apiVersion: 1
+
+datasources:
+  - name: AMCore Loki
+    uid: amcore-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    editable: false
+    jsonData:
+      maxLines: 1000
+      # Makes every `correlationId` in a log line a link that searches for the same ID, so an
+      # operator can follow one request from the API lines to the worker lines of its jobs.
+      derivedFields:
+        - name: correlationId
+          matcherType: regex
+          matcherRegex: '"correlationId":"([A-Za-z0-9._:-]{1,128})"'
+          url: '{service=~"api|worker|web"} |= "$${__value.raw}"'
+          datasourceUid: amcore-loki
+          urlDisplayLabel: Search this correlationId

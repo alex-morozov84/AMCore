@@ -11,6 +11,13 @@ export type TruncatedBody = {
 }
 
 /**
+ * CLS keys a queued-job run sets (`workId`, `jobId`, `invocationId`); the mixin copies them onto
+ * every log line of that run. Request lines never set them. `trace_id`/`span_id` are reserved
+ * for tracing as sibling fields of `correlationId`, so adding tracing later renames nothing.
+ */
+export const WORKER_LOG_CONTEXT_KEYS = ['workId', 'jobId', 'invocationId'] as const
+
+/**
  * Query-string keys whose value must never reach a log line in either
  * representation a request carries it in: the structured `req.query`
  * object (redacted below via Pino's path-based `redact.paths`) and the
@@ -110,9 +117,12 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
     pinoHttp: {
       // Mixin applies to ALL logs (including manual logger.warn/error calls in exception filters)
       mixin() {
-        return {
-          correlationId: cls.getId(),
+        const context: Record<string, unknown> = { correlationId: cls.getId() }
+        for (const key of WORKER_LOG_CONTEXT_KEYS) {
+          const value: unknown = cls.get(key)
+          if (value !== undefined) context[key] = value
         }
+        return context
       },
 
       // Pretty console output in interactive development only

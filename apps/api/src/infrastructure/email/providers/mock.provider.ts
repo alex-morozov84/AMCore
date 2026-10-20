@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
+import { redactEmail } from '../../../common/utils/index.js'
 import { EnvService } from '../../../env/env.service.js'
 import { ControlConnection } from '../../background-work/control-connection.js'
 import type { EmailProvider, SendEmailParams, SendEmailResult } from '../email.types.js'
@@ -70,10 +71,17 @@ export class MockEmailProvider implements EmailProvider {
   }
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
-    const { to, subject, html, text, from, replyTo } = params
+    const { to, html, text, from, replyTo } = params
 
+    // Same redaction as the real provider: a stand using the mock still ships logs to a store.
     this.logger.info(
-      { to, from, subject, replyTo, hasHtml: !!html, hasText: !!text },
+      {
+        to: redactEmail(to),
+        from: redactEmail(from),
+        replyTo: redactEmail(replyTo),
+        hasHtml: !!html,
+        hasText: !!text,
+      },
       'Email sent (MOCK)'
     )
 

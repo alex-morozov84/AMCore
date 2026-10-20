@@ -5,6 +5,16 @@ import { getAllExpressions, getRecordingRuleNames } from '../validate-expression
 
 const TARGET_MATCH = '{job=~"amcore-(api|worker)"}'
 
+/**
+ * Rule files whose metrics come from targets the live stack does not run (Alloy, Loki and the
+ * disk exporter of the opt-in log-search overlay). Their expressions are still parsed and
+ * evaluated below; only the "metric exists on amcore-api/worker" check does not apply, so
+ * they are proven by promtool and by a live scrape of the overlay instead.
+ */
+export const OTHER_TARGET_RULE_FILES = new Set([
+  'docs/operations/prometheus/optional/amcore-log-shipping.yml',
+])
+
 /** Builds the allowed metric-name set from what the two real targets expose. */
 export async function buildAllowedMetricNames() {
   const { body } = await getJson(
@@ -76,6 +86,7 @@ export async function checkMetricReferences() {
     if (!jobsSeen.has(job)) violations.push(`no metadata returned for target job "${job}"`)
   }
   for (const expression of getAllExpressions()) {
+    if (OTHER_TARGET_RULE_FILES.has(expression.file)) continue
     violations.push(...(await checkExpressionMetricReferences(expression, names)))
   }
   return violations

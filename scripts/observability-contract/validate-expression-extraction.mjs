@@ -12,6 +12,7 @@ import { extractPromqlFences } from './extract/runbook.mjs'
 const RULE_FILES = [
   'docs/operations/prometheus/amcore-alerts.yml',
   'docs/operations/prometheus/optional/amcore-slo-burn-rate.yml',
+  'docs/operations/prometheus/optional/amcore-log-shipping.yml',
 ]
 const DASHBOARD_PATH = 'docker/monitoring/grafana/dashboards/amcore-overview.json'
 const RUNBOOK_PATHS = [
@@ -24,6 +25,7 @@ const RUNBOOK_PATHS = [
   'docs/operations/runbooks/realtime.md',
   'docs/operations/runbooks/node-runtime.md',
   'docs/operations/runbooks/metrics-collector-health.md',
+  'docs/operations/runbooks/log-shipping.md',
 ]
 
 /** Every PromQL expression this repo ships, each `{ expr, file, line, label }`. */

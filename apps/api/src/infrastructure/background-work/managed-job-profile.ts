@@ -2,15 +2,26 @@ import { z } from 'zod'
 
 import { workJobIdSchema } from '@amcore/shared'
 
+import { CORRELATION_ID_PATTERN } from '../../common/utils/correlation-id.js'
+
 import { type JobBinding, jobVersions, type WorkDefinition } from './work-definition.js'
 import { parseWorkPayload } from './work-payload.js'
 
+/**
+ * The one definition of the queued-job wire envelope; producer, executor and the profile reader
+ * all parse with it, and `managed-envelope-contract.spec.ts` ties it to the producer type and the
+ * Lua readers. Key order matters: the executor compares `JSON.stringify` of the parsed value with
+ * the stored data, so the producer must emit keys in this order and omit absent optional keys.
+ * Evolution rule: docs/backend/background-work.md ("Changing the job envelope").
+ */
 export const managedEnvelopeSchema = z.strictObject({
   protocolVersion: z.literal(1),
   incarnation: z.uuidv7(),
   jobVersion: z.number().int().positive(),
   executionPolicyVersion: z.number().int().positive(),
   createdAt: z.number().int().nonnegative(),
+  /** Request that caused the job; absent for wake jobs and jobs started outside a request. */
+  correlationId: z.string().regex(CORRELATION_ID_PATTERN).optional(),
   payload: z.unknown(),
 })
 const keepSchema = z.strictObject({

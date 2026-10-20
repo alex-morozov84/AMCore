@@ -35,10 +35,11 @@ worker services. Apply changes consistently to every API replica.
 
 ```sh
 docker compose run --rm migrate
-docker compose up -d --build api worker web
+docker compose up -d --build worker
+docker compose up -d --build api web
 ```
 
-These commands apply migrations and start matching containers. They do not seed
+These commands apply migrations and start matching containers, workers first. They do not seed
 roles or establish the first platform administrator. Follow the deployment guide
 for a fresh installation; ordinary rollouts must not run seed as a repair command.
 
