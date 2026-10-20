@@ -3,7 +3,7 @@
 # ===========================================
 # Debian slim (glibc), not Alpine (musl): the API depends on `sharp`/libvips for
 # media processing. Slim ships sharp's prebuilt glibc binary with bundled libvips
-# out of the box and matches the glibc CI runners. node:24 + pnpm@11.1.2 align
+# out of the box and matches the glibc CI runners. node:24 + pnpm@12.14.0 align
 # with the repo's `engines` / `packageManager`. A CI-gated smoke test
 # (.github/workflows/ci.yml) verifies a real sharp WebP encode plus module
 # resolution inside the final runner image.
@@ -14,7 +14,7 @@ FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7
 RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade perl-base && \
     rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+RUN corepack enable && corepack prepare pnpm@12.14.0 --activate
 
 # The pnpm content-addressed store lives in a BuildKit cache mount (see the
 # `--mount=type=cache,id=pnpm-store` steps below), not in an image layer. It
@@ -34,7 +34,7 @@ WORKDIR /app
 # ===========================================
 FROM base AS build
 
-# pnpm 11 may reinstall before scripts after COPY; every install must keep the lockfile frozen.
+# pnpm may reinstall before scripts after COPY; every install must keep the lockfile frozen.
 ENV pnpm_config_frozen_lockfile=true
 
 # Prisma CLI runs in this build/migrator stage. Install OpenSSL explicitly so
@@ -69,11 +69,10 @@ RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" pnpm --filter api build
 # Produce a self-contained production bundle (flat node_modules with all deps,
 # including the workspace `@amcore/shared`, resolvable from the bundle root).
 #
-# `--legacy`: pnpm 11's `deploy` otherwise requires `injectWorkspacePackages=true`
-# in pnpm-workspace.yaml to vendor workspace deps. `--legacy` is the documented
-# fallback that doesn't need that global setting, so this packaging fix stays
-# local to the Dockerfile and does NOT change the repo-wide dev install workflow
-# for `@amcore/shared`. See ai/decisions/adr-038-pnpm-docker-deploy-packaging.md.
+# pnpm 12's `deploy` vendors workspace deps without `injectWorkspacePackages=true`
+# and resolves from the frozen root lockfile, so the bundle holds exactly the
+# locked production closure. The old `--legacy` mode re-resolved from the
+# registry (newer versions, extra optional peers) and is no longer needed.
 #
 # `--ignore-scripts`: skip the api postinstall (which would re-run prisma
 # generate during deploy); sharp/argon2 resolve prebuilt binaries at runtime and
@@ -81,14 +80,14 @@ RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" pnpm --filter api build
 # API build, so the deployed app does not need the Prisma CLI.
 #
 # `deploy` imports packages from the pnpm store, which now lives in the cache
-# mount rather than the image layer, so it needs the same mount. `--legacy`
-# re-resolves the dependency graph, which fetches registry metadata for every
-# package on each run of this layer (it sits after `COPY apps/api`, so any
-# source edit re-runs it). That metadata lives in pnpm's separate cache dir, so
-# it gets its own cache mount; otherwise each source-only rebuild re-downloads it.
+# mount rather than the image layer, so it needs the same mount. The supply-chain
+# policy check fetches registry metadata on each run of this layer (it sits after
+# `COPY apps/api`, so any source edit re-runs it). That metadata lives in pnpm's
+# separate cache dir, so it gets its own cache mount; otherwise each source-only
+# rebuild re-downloads it.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     --mount=type=cache,id=pnpm-metadata,target=/pnpm/cache \
-    pnpm --filter api deploy --prod --legacy --ignore-scripts /prod/api
+    pnpm --filter api deploy --prod --ignore-scripts /prod/api
 
 # pnpm still materializes Prisma's optional CLI peer variant in `.pnpm` when the
 # workspace has the dev-only `prisma` package installed. The app imports only the

@@ -14,6 +14,12 @@ const lock = (root, path) => {
   )
   return documents.map((doc) => doc.toJS())
 }
+// pnpm 12 may prepend a package-manager document; the application graph is the one with the API importer.
+const appDocument = (documents) => {
+  const apps = documents.filter((doc) => doc?.importers?.['apps/api'])
+  assert.equal(apps.length, 1, 'Root lock must hold exactly one application document')
+  return apps[0]
+}
 const version = (entry) => entry?.version?.split('(')[0]
 
 function verifyRootFamily(api, locked, expected) {
@@ -72,7 +78,7 @@ export function verifyMigrator(root) {
   const pin = installerPin(manifest)
   verifyRootFamily(
     json(root, 'apps/api/package.json'),
-    lock(root, 'pnpm-lock.yaml')[0].importers['apps/api'],
+    appDocument(lock(root, 'pnpm-lock.yaml')).importers['apps/api'],
     manifest.dependencies.prisma
   )
   const documents = lock(root, 'docker/migrator/pnpm-lock.yaml')
