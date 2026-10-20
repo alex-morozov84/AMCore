@@ -37,7 +37,8 @@ export COMPOSE_LOGS="docker compose -f docker-compose.yml -f docker/compose/prod
    ```
 
 2. If it restarts, the log names the faulty line of `docker/log-search/alloy/config.alloy`.
-3. If it runs, confirm Prometheus shares the `logs` network with it. Attach only a Prometheus you
+3. If it runs, confirm Prometheus shares the network: `docker network inspect <project>_logs` must
+   list it (how to attach: [Alerts](../log-search.md#alerts)). Attach only a Prometheus you
    control, because it can read all logs there.
 
 **Resolution:** fix the configuration or network, then `$COMPOSE_LOGS up -d alloy`. Alloy resumes
@@ -143,7 +144,8 @@ failures.
 `docker logs` while they remain inside the rotation window.
 
 **Diagnostic steps:** read the `reason` label of `loki_write_dropped_entries_total` in
-Prometheus and the Alloy log. The usual causes are a long Loki outage ([Log store
+Prometheus, or without one with
+`$COMPOSE_LOGS exec logs-grafana wget -q -O- http://alloy:12345/metrics`, and the Alloy log. The usual causes are a long Loki outage ([Log store
 down](#log-store-down)) and Loki refusing lines ([Store refusing lines](#store-refusing-lines)).
 
 ## Store refusing lines

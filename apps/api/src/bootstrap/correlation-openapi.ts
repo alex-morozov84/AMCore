@@ -2,7 +2,7 @@ import type { OpenAPIObject } from '@nestjs/swagger'
 
 const HEADER_COMPONENT = 'CorrelationId'
 
-/** Every API response carries `X-Correlation-Id`; document it once and reference it everywhere. */
+/** Every response of an API route carries `X-Correlation-Id`; document it once and reference it everywhere. */
 export function addCorrelationHeader(document: OpenAPIObject): void {
   document.components ??= {}
   document.components.headers ??= {}

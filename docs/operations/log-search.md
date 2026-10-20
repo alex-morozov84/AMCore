@@ -63,7 +63,7 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
 
 ## Find a request
 
-Every API response carries the request's ID in `X-Correlation-Id`. Error bodies carry it as
+Every response of an API route (under `/api/v1`) carries the request's ID in `X-Correlation-Id`. Error bodies carry it as
 `correlationId` and audit records as `requestId`. Send your own with `X-Request-ID` to know it in
 advance. An accepted ID is one value of 1 to 128 characters from `A-Z a-z 0-9 . _ : -` (for example
 `req-55`); anything else is replaced by a generated UUID. See
@@ -155,10 +155,16 @@ Treat Alloy as a secret-visible, host-privileged component.
   that the overlay sets on `api`, `worker` and `web` **and** the name of this Compose project;
   everything else is dropped inside Alloy. That covers Postgres and Redis, and also another
   Compose project on the same host with its own `api`, `worker` or `web`. Two stacks with this
-  overlay on one host therefore each store only their own lines.
+  overlay on one host therefore each store only their own lines (tested with a second Compose
+  project that had `api`, `worker` and `web` services and the `labels` option; not tested with two
+  full overlay stacks). A second stack needs its own project name (`docker compose -p <name>` or
+  `COMPOSE_PROJECT_NAME`), `LOGS_GRAFANA_PORT` and admin password. Each Alloy still reads the other
+  stack's files and secrets, and both share the host's disk, so a second stack doubles the exposure
+  and the disk use.
 - It has a read-only root filesystem, no capabilities, `no-new-privileges`, no published port, no
-  Docker socket and a network that cannot reach anything but Loki. Keep it that way: do not attach it
-  to another network and do not mount more host paths.
+  Docker socket and a network that cannot reach anything but Loki. Besides Docker's log
+  directory it mounts its own state volume and, read-only, the Loki volume for the disk alerts. Keep
+  it that way: do not attach it to another network and do not mount more host paths.
 - Loki has no authentication. It publishes no port, and only Alloy and the overlay's Grafana share its
   `logs` network. Anything else on that network can read **all** stored logs from Loki and open
   Alloy's HTTP UI. Do not publish Loki and do not attach other services to the network. The only
@@ -168,7 +174,8 @@ Treat Alloy as a secret-visible, host-privileged component.
   is not on the application's network, so it cannot reach Postgres, Redis or the API. Do not add
   the application's database as a Grafana data source and do not attach Grafana to that network:
   Grafana proxies queries and holds data source credentials, so it should be able to reach logs
-  only. Every Grafana user, including a Viewer, reads all stored logs.
+  only. If someone needs database data next to logs, run a separate Grafana for the database with
+  its own users. Every Grafana user, including a Viewer, reads all stored logs.
 - Docker's documentation says the files of its logging drivers are meant for the Docker daemon and
   that external tools should avoid them. This reference reads them read-only because the alternative,
   the Docker API, needs a root-equivalent socket in a container. Rotation was tested (see above). No
@@ -187,23 +194,69 @@ Treat Alloy as a secret-visible, host-privileged component.
 down, shipping retrying, entries dropped, store refusing lines, flush failing, disk low (15%) and disk
 critical (5%). Their runbooks are in [log-shipping](runbooks/log-shipping.md).
 
-This overlay does not ship a Prometheus. To get the alerts, load the rules into a Prometheus that you
-run, attach that Prometheus to the overlay's `logs` network, and copy the scrape jobs from
-`docker/log-search/prometheus/scrape-logs.yml`. **That Prometheus can then read all stored logs from
-Loki and open Alloy's HTTP UI, not only the metrics.** Treat it like the log Grafana: attach only a
-Prometheus whose access you control, and attach nothing else. If you cannot accept that, do not
-attach it; check the pipeline by hand instead. Until you do one or the other, nobody is notified.
+This overlay does not ship a Prometheus. You have two choices.
+
+**Attach your Prometheus.** It must run as a Docker container on this host. The `logs` network is
+declared `internal: true` (no route to the outside) and has the name `<project>_logs`, where
+`<project>` is the Compose project name (`docker network ls` shows it).
+
+1. Load the rules into it and copy the scrape jobs from
+   `docker/log-search/prometheus/scrape-logs.yml`.
+2. In the Compose file of your Prometheus, join the existing network:
+
+   ```yaml
+   services:
+     prometheus:
+       networks: [default, amcore-logs]
+   networks:
+     amcore-logs:
+       external: true
+       name: <project>_logs
+   ```
+
+3. Check: `docker network inspect <project>_logs` lists only `alloy`, `loki`, `logs-grafana` and your
+   Prometheus, and its targets `alloy:12345` and `loki:3100` show `up`.
+
+**That Prometheus can then read all stored logs from Loki and open Alloy's HTTP UI, not only the
+metrics.** No metrics-only restriction ships. Anyone who can query that Prometheus, edit its
+configuration (for example add a `remote_write` or a Grafana data source), or run another container
+on its networks can reach the logs, so attach only a Prometheus whose operators you trust as much as
+the log Grafana. It stays able to reach the outside through its own other network; the overlay's
+no-route-out rule covers Alloy and Loki only. Attach nothing else to `logs`. A Prometheus on another
+host, or outside Docker, cannot be attached; use the second choice.
+
+**Check by hand.** No alert fires, so run these after changes and about once a day:
+
+| Alert it replaces       | Manual check                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| collector or store down | `$COMPOSE_LOGS ps alloy loki`                                                                            |
+| retrying, dropped       | `$COMPOSE_LOGS exec logs-grafana wget -q -O- http://alloy:12345/metrics`, look at `loki_write_*`         |
+| refusing, flush failing | `$COMPOSE_LOGS logs --tail 50 loki` (look for `failed to flush`, `rate limit`) and the Alloy log         |
+| disk low, critical      | `docker run --rm -v <project>_loki_data:/d:ro alpine du -sh /d`, compared with the free disk of the host |
+
+Until you do one of the two choices, nobody is notified. `$COMPOSE_LOGS` is defined in the
+[runbook](runbooks/log-shipping.md).
 
 ## Use a managed Loki instead
 
-Skip `loki` and `logs-grafana`, point Alloy at your endpoint by changing the `url` of `loki.write` in
-`docker/log-search/alloy/config.alloy` and adding the endpoint's authentication block, and give Alloy
-network access to that endpoint. **Limit Alloy's egress to that endpoint** (a host firewall or an
+Use a copy of `docker/compose/logs.yml` without the `loki` and `logs-grafana` services (and without
+Alloy's `depends_on: loki`). Point Alloy at your endpoint by changing the `url` of `loki.write` in
+`docker/log-search/alloy/config.alloy` and adding the endpoint's authentication block (see Alloy's
+`loki.write` reference for `basic_auth` or `bearer_token`). Alloy then needs a network with a route
+to that endpoint, so remove `internal: true` from `logs` or give Alloy another network. **Limit Alloy's egress to that endpoint** (a host firewall or an
 egress proxy). Alloy reads every container's files and secrets, and the overlay's only barrier
 against sending them elsewhere is a network with no route out; the `logs` network stops being
 `internal` for this variant, so without that limit the "no route out" control no longer holds.
-This variant was not run; check it against Alloy's `loki.write` reference and keep the
-secret-visible invariant above.
+This variant was not run. Three things change:
+
+- Of the Security bullets, the read-only filesystem, the dropped capabilities, no published port,
+  no Docker socket and the line allowlist still hold. The no-route-out rule holds only with your
+  egress limit, and the Loki and Grafana bullets no longer apply.
+- Of the alerts, collector down, shipping retrying and entries dropped still apply. Store down,
+  refusing lines, flush failing and the two disk alerts watch a local Loki and the `loki_data`
+  volume, so drop them and use your provider's own monitoring.
+- Log lines now leave the host. Redaction is by the code that logs (see Security), so check the
+  provider's data location, access control and retention before sending.
 
 ## Upgrade the pinned images
 

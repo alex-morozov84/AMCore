@@ -16,7 +16,7 @@ carries a `correlationId`; jobs started outside a request carry none (see below)
 **Where the ID comes from.** The API reads `X-Request-ID`, then `X-Correlation-ID`,
 and accepts the first value that is a single string of 1–128 characters from
 `A-Za-z0-9._:-`. A repeated, oversized or oddly encoded header is ignored without
-being logged, and AMCore generates a UUID. Every API response returns the ID in
+being logged, and AMCore generates a UUID. Every response of an API route (under `/api/v1`) returns the ID in
 `X-Correlation-Id`, error bodies carry it as `correlationId`, and audit records store
 it as `requestId`. The ID is a search aid: a client chooses it, so it never proves
 who made a request and must not be used for authorization or integrity.
