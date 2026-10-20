@@ -6,6 +6,7 @@ import {
   auditCommandDetailsSchema,
   auditDisplayIdSchema,
   auditSummarySchema,
+  isCorrelationId,
 } from '@amcore/shared'
 
 type Item = AdminAuditResponse['items'][number]
@@ -13,6 +14,7 @@ type User = { id: string; name: string | null; email: string }
 type Organization = { id: string; name: string; slug: string }
 export interface AuditProjectionRow {
   id: string
+  requestId: string | null
   createdAt: Date
   actorType: Item['actorType']
   actorId: string | null
@@ -152,6 +154,8 @@ export function projectAuditRow(
   const organizationId = safeAuditId(row.organizationId)
   return {
     id: safeAuditId(row.id),
+    // A value that is not a well-formed correlation ID is left out, never an error for the page.
+    requestId: isCorrelationId(row.requestId) ? row.requestId : undefined,
     createdAt: row.createdAt.toISOString(),
     actorType: row.actorType,
     actorId,

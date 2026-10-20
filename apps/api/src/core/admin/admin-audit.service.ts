@@ -19,6 +19,7 @@ import { projectAuditRow, safeAuditId } from './audit-projection.js'
 const SELECT = {
   id: true,
   cursorKey: true,
+  requestId: true,
   createdAt: true,
   actorType: true,
   actorId: true,

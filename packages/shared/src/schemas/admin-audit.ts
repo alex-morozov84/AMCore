@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { CORRELATION_ID_PATTERN } from '../constants/correlation-id'
+
 export const auditDisplayIdSchema = z
   .string()
   .min(1)
@@ -119,6 +121,8 @@ export const auditCommandDetailsSchema = z.strictObject({
 
 export const adminAuditItemSchema = z.object({
   id: auditDisplayIdSchema.nullable(),
+  /** The request's correlation ID: a log-search key, chosen by the caller, never proof of identity. */
+  requestId: z.string().regex(CORRELATION_ID_PATTERN).optional(),
   createdAt: utcTime,
   actorType: z.enum(['USER', 'API_KEY', 'SYSTEM']),
   actorId: auditDisplayIdSchema.nullable(),
