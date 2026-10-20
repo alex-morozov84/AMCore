@@ -11,6 +11,7 @@ const entry = (path, key) => ({
     'ADMIN_CONSOLE_METRICS_URL',
     'ADMIN_CONSOLE_LOGS_URL',
     'ADMIN_CONSOLE_ALERTS_URL',
+    'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
     'console-real-stack',
     'feature-import',
   ],

@@ -268,6 +268,17 @@ second time in `.github/workflows/ci.yml`, and the observability contract checks
 upgrade, change both, then check `loki -verify-config` and `alloy validate` (CI runs both), the metric
 names used by the alert rules, and a search for a known request.
 
+<!-- AMCORE_CONSOLE_LOG_LINKS_START -->
+
+## Open the logs from the Operations Console
+
+If you run the Operations Console, it can show a **Find in logs** link beside job, request and
+delivery IDs. Set `ADMIN_CONSOLE_LOGS_GRAFANA_URL=http://localhost:3002` in the `web` service
+environment and recreate it (`docker compose up -d web`). The link opens this Grafana while your
+SSH tunnel is open. See [Find in logs links](../operations-console/configuration.md#find-in-logs-links).
+
+<!-- AMCORE_CONSOLE_LOG_LINKS_END -->
+
 ## Turn it off
 
 ```sh

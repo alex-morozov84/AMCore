@@ -88,7 +88,7 @@ export const operationsConsoleCodeSeams = [
     'owned-block',
     {
       start: '# For console host mode',
-      end: 'ADMIN_CONSOLE_ALERTS_URL=',
+      end: 'ADMIN_CONSOLE_LOGS_GRAFANA_URL=',
     },
     [
       'ADMIN_CONSOLE_HOSTNAME',
@@ -96,6 +96,7 @@ export const operationsConsoleCodeSeams = [
       'ADMIN_CONSOLE_METRICS_URL',
       'ADMIN_CONSOLE_LOGS_URL',
       'ADMIN_CONSOLE_ALERTS_URL',
+      'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
     ]
   ),
   seam(
@@ -135,6 +136,14 @@ export const operationsConsoleCodeSeams = [
     'structural-operation',
     { text: 'ADMIN_CONSOLE_ALERTS_URL: ${ADMIN_CONSOLE_ALERTS_URL:-}' },
     ['ADMIN_CONSOLE_ALERTS_URL'],
+    { operationKey: 'console.compose-env' }
+  ),
+  seam(
+    'console.compose-logs-grafana-url',
+    'docker-compose.yml',
+    'structural-operation',
+    { text: 'ADMIN_CONSOLE_LOGS_GRAFANA_URL: ${ADMIN_CONSOLE_LOGS_GRAFANA_URL:-}' },
+    ['ADMIN_CONSOLE_LOGS_GRAFANA_URL'],
     { operationKey: 'console.compose-env' }
   ),
   seam(

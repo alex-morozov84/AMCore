@@ -48,6 +48,8 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'ADMIN_CONSOLE_METRICS_URL',
   'ADMIN_CONSOLE_LOGS_URL',
   'ADMIN_CONSOLE_ALERTS_URL',
+  // apps/web-only: the Grafana that "Find in logs" links open; same rules as the addresses above.
+  'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
   // Optional bundled `backup`/`restore` profiles — consumed by the `backup`
   // compose service's own environment, not the app's env schema.
   'BACKUP_INTERVAL_SECONDS',

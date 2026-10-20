@@ -148,11 +148,11 @@ instead of the Console.
 AMCore does not install or run these tools in production. Plan to deploy them
 yourself and then set their addresses below.
 
-| Tool    | Provided by AMCore                                                                    | You deploy                                  |
-| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------- |
-| Metrics | The metrics endpoint, an overview dashboard file, and a dev-only `monitoring` profile | Your own Prometheus and Grafana             |
-| Alerts  | Alert rules, runbooks and an example Alertmanager setup                               | Your own Alertmanager and its receivers     |
-| Logs    | Structured log output only; no collection and no search                               | A log system of your choice, or none at all |
+| Tool    | Provided by AMCore                                                                         | You deploy                                               |
+| ------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| Metrics | The metrics endpoint, an overview dashboard file, and a dev-only `monitoring` profile      | Your own Prometheus and Grafana                          |
+| Alerts  | Alert rules, runbooks and an example Alertmanager setup                                    | Your own Alertmanager and its receivers                  |
+| Logs    | Structured log output, and an opt-in overlay that collects and searches it (Loki, Grafana) | The overlay, a log system of your choice, or none at all |
 
 The `monitoring` profile starts Prometheus, Grafana and Alertmanager for local
 verification and is never part of the production Compose files. See the
@@ -256,6 +256,48 @@ What the card does and does not prove:
 
 The links carry no Console session or token, and the browser sends no `Referer`
 to the tool. Single sign-on between the Console and these tools is not provided.
+
+### Find in logs links
+
+With the [log-search overlay](../operations/log-search.md) running, the Console can open the log
+search for one ID with a **Find in logs** link. Set one more variable in the web service
+environment, in the same way as the three above:
+
+```bash
+ADMIN_CONSOLE_LOGS_GRAFANA_URL=http://localhost:3002
+```
+
+| Question                      | Answer                                                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What value do I set?          | The address of the Grafana from the overlay. It follows the address rules above. A path is allowed (`https://host.example.com/grafana`).             |
+| Which value with the overlay? | `http://localhost:3002`. The overlay's Grafana listens on `127.0.0.1` of the Docker host, so the link works only while **your** SSH tunnel is open.  |
+| Can I use my own Grafana?     | Yes, if it has a Loki data source with the uid `amcore-loki` that reads the overlay's Loki. Without that data source the link opens an empty search. |
+| What if it is empty?          | No **Find in logs** links appear and nothing else changes. When **Logs** is set, the card says "Log links on jobs and audit events: not configured." |
+
+Where the links appear:
+
+| Screen                                          | ID that is searched                           |
+| ----------------------------------------------- | --------------------------------------------- |
+| [Background work](background-work.md) job cards | The job, delivery or run ID shown on the card |
+| [Audit](audit.md) command details               | The task ID                                   |
+| [Audit](audit.md) event                         | The request ID, when the event has one        |
+
+Each link opens Grafana in a new tab and runs `{service=~"api|worker"} |= "<ID>"` over the last
+7 days, the default retention of the overlay. If your retention is longer, widen the time range in
+Grafana. What a search finds:
+
+- A queued job: the API line that queued it and the worker lines of its run.
+- A notification delivery or an AI run: only the lines that the worker logged with that ID. Many
+  deliveries log only failures, so an empty result does not mean the delivery did not happen.
+- A request ID: all API and worker lines of that request. The ID is a search aid that the caller can
+  choose; it does not prove who made the request.
+- An ID older than the retention, or a line that was never logged: no result. Grafana then shows an
+  empty list; check [what is lost and kept](../operations/log-search.md#what-fails-and-what-is-lost).
+
+The Console only builds the address. It sends no token or session, and Grafana asks for its own login.
+A set but unusable value stops the web service at start-up with the variable's name, like the
+addresses above; recreate the container to apply a new value (`docker compose up -d web`). Only IDs
+made of letters, digits and `. _ : -` get a link.
 
 ### Documentation links
 

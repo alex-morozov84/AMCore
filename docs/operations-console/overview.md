@@ -22,8 +22,11 @@ as "not configured"; when no tool is configured the card shows the single line
 "External tools are not configured." instead of one row per tool. The **How to
 connect** link stays on the card while any tool is unset. A link only means an address is set: the Console does not check
 that the tool works. The card is hidden together with the rest of the page when the
-API cannot confirm your access. See [External tool links](configuration.md#external-tool-links)
-for the variables, the accepted addresses and the start-up check.
+API cannot confirm your access. When **Logs** is set but the log-search address is not, the card also says
+"Log links on jobs and audit events: not configured."
+See [External tool links](configuration.md#external-tool-links)
+for the variables, the accepted addresses and the start-up check, and
+[Find in logs links](configuration.md#find-in-logs-links) for the links on jobs and audit events.
 
 ## Snapshot and readiness
 
