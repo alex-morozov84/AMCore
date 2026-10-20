@@ -16,7 +16,7 @@ import { InvalidObjectKeyError } from '../object-key'
 import { runStorageProviderContract } from '../storage.contract-spec'
 import { StorageDeleteManyException } from '../storage.interface'
 
-import { setupS3Mock } from './s3-mock'
+import { setupS3Mock } from './s3.testkit'
 import { type S3StorageConfig, S3StorageProvider } from './s3-storage.provider'
 
 function makeProvider(overrides: Partial<S3StorageConfig> = {}): S3StorageProvider {

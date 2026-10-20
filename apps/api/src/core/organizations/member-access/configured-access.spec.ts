@@ -5,8 +5,6 @@ import {
   memberAccessSchema,
 } from '@amcore/shared'
 
-import { AccessUnavailableError } from './access-budget'
-import { explainAccess } from './access-evaluator'
 import {
   input,
   ORDER_UPDATE,
@@ -14,7 +12,9 @@ import {
   orderPresetRule,
   rule,
   USER_ID,
-} from './access-fixtures'
+} from './access.testkit'
+import { AccessUnavailableError } from './access-budget'
+import { explainAccess } from './access-evaluator'
 
 type Role = { id: string; rules: ReturnType<typeof rule>[] }
 

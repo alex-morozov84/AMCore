@@ -18,7 +18,7 @@ import { StorageProbeService } from './storage-probe.service'
 
 import type { EnvService } from '@/env/env.service'
 import type { MetricsService } from '@/infrastructure/observability'
-import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.fixture'
+import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.testkit'
 
 function env(values: Record<string, unknown>): EnvService {
   return { get: (key: string) => values[key] } as unknown as EnvService

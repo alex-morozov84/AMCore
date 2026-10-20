@@ -2,7 +2,7 @@ import type { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
 import type { SettingRow } from './setting-definition'
-import { testDefinition } from './setting-definition.fixture'
+import { testDefinition } from './setting-definition.testkit'
 import { SettingRegistry } from './setting-registry'
 import type { SettingRepository } from './setting-repository'
 import { SettingsReader } from './settings-reader'

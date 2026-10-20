@@ -3,7 +3,11 @@ import type { PinoLogger } from 'nestjs-pino'
 
 import { ForbiddenException, NotFoundException } from '../../common/exceptions'
 import type { AuditLogService } from '../audit'
-import { createMockContext, type MockContext, mockContextToPrisma } from '../auth/test-context'
+import {
+  createMockContext,
+  type MockContext,
+  mockContextToPrisma,
+} from '../auth/auth-context.testkit'
 
 import type { ApiKeyRevocationService } from './api-key-revocation.service'
 import { ApiKeysService } from './api-keys.service'
