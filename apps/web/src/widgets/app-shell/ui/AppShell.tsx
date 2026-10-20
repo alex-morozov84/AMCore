@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
+import { LayoutDashboardIcon, MonitorIcon, PanelLeftIcon } from 'lucide-react'
 
 import { LocaleSwitcher } from '@/features/locale-switcher'
 import { AcceptedNavigationProvider } from '@/shared/lib/navigation/accepted-navigation'
@@ -9,6 +10,7 @@ import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -24,7 +26,9 @@ import {
 
 interface AppShellProps {
   homeHref?: string
+  sessionsHref?: string
   navigationAfterDashboard?: ReactNode
+  sidebarFooter?: ReactNode
   /**
    * Header end slot. The application places its account block here (for the default product shell,
    * `AccountMenu` from `(dashboard)/layout.tsx` and the organization frame). The shell never
@@ -44,20 +48,33 @@ interface AppShellProps {
 }
 
 /** Existing dashboard/session items plus app-owned navigation slot. */
-function NavMenu({ afterDashboard, homeHref }: { afterDashboard?: ReactNode; homeHref: string }) {
+function NavMenu({
+  afterDashboard,
+  homeHref,
+  sessionsHref,
+}: {
+  afterDashboard?: ReactNode
+  homeHref: string
+  sessionsHref: string
+}) {
   const t = useTranslations('nav')
   const tSessions = useTranslations('sessions')
 
   return (
     <SidebarMenu>
-      {afterDashboard}
       <SidebarMenuItem>
-        <SidebarMenuButton render={<RouteProgressLink href={homeHref} />}>
+        <SidebarMenuButton tooltip={t('dashboard')} render={<RouteProgressLink href={homeHref} />}>
+          <LayoutDashboardIcon aria-hidden="true" />
           <span>{t('dashboard')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
+      {afterDashboard}
       <SidebarMenuItem>
-        <SidebarMenuButton render={<RouteProgressLink href="/settings/sessions" />}>
+        <SidebarMenuButton
+          tooltip={tSessions('title')}
+          render={<RouteProgressLink href={sessionsHref} />}
+        >
+          <MonitorIcon aria-hidden="true" />
           <span>{tSessions('title')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -76,33 +93,47 @@ function NavMenu({ afterDashboard, homeHref }: { afterDashboard?: ReactNode; hom
 export function AppShell({
   headerEnd,
   homeHref = '/',
+  sessionsHref = '/settings/sessions',
   defaultSidebarOpen,
   children,
   navigationAfterDashboard,
+  sidebarFooter,
 }: AppShellProps) {
   const t = useTranslations('nav')
 
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen}>
       <MobileNavigationBoundary>
-        <Sidebar mobileTitle={t('mobileTitle')} mobileDescription={t('mobileDescription')}>
+        <Sidebar
+          collapsible="icon"
+          mobileTitle={t('mobileTitle')}
+          mobileDescription={t('mobileDescription')}
+        >
           <SidebarHeader>
-            <span className="px-2 py-1.5 font-semibold">AMCore</span>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <PanelLeftIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span className="font-semibold group-data-[collapsible=icon]:hidden">AMCore</span>
+            </div>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <NavMenu afterDashboard={navigationAfterDashboard} homeHref={homeHref} />
+                <NavMenu
+                  afterDashboard={navigationAfterDashboard}
+                  homeHref={homeHref}
+                  sessionsHref={sessionsHref}
+                />
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
+          {sidebarFooter && <SidebarFooter>{sidebarFooter}</SidebarFooter>}
           <SidebarRail toggleLabel={t('toggleSidebar')} />
         </Sidebar>
         {/* `SidebarInset` already renders the page's `<main>` landmark — a
       nested one here would trip axe's landmark-main-is-top-level/
       no-duplicate-main rules, caught live by sidebar.stories.tsx's a11y
       gate. */}
-        <SidebarInset>
+        <SidebarInset className="min-w-0">
           <header className="flex h-14 items-center gap-2 border-b border-border px-4">
             <SidebarTrigger toggleLabel={t('toggleSidebar')} />
             <div className="ml-auto flex items-center gap-2">
@@ -110,7 +141,7 @@ export function AppShell({
               {headerEnd}
             </div>
           </header>
-          <div className="mx-auto w-full max-w-7xl p-4">{children}</div>
+          <div className="w-full p-4 sm:p-6">{children}</div>
         </SidebarInset>
       </MobileNavigationBoundary>
     </SidebarProvider>

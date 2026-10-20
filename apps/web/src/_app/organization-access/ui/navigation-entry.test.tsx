@@ -24,7 +24,7 @@ describe('organization menu placement', () => {
       )
       expect(screen.getAllByRole('link', { name: 'title' })[0]).toHaveAttribute(
         'href',
-        `${placement?.organizationsPath ?? '/organizations'}?view=list`
+        `${placement?.organizationsPath ?? '/manage/organizations'}?view=list`
       )
     }
   )

@@ -31,6 +31,7 @@ export function invitationOperationHandler(
           `/auth/invites/operations/${id}`,
           invitationOperationResponseSchema,
           {
+            context: deps.webContext,
             source: request.headers,
             signal,
             method: 'GET',

@@ -1,11 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { parse, stringify } from 'yaml'
 import { compose } from './docker.mjs'
 import { setupMailCollectorService } from './setup-mail-collector.mjs'
 import { assertOrganizationSetupFixture } from './organization-setup-fixture.mjs'
 import { directory } from './state.mjs'
+import { appleOAuthEnvironment, assertAppleOAuthFixture } from './apple-oauth-fixture.mjs'
 
 export const label = 'org.amcore.stand'
 // Services whose images the stand builds itself. Only these carry ownership labels on
@@ -30,6 +31,7 @@ export async function configuration(m) {
     'organization-setup',
     'organization-shop',
     'organization-provisioning',
+    'product-admin-closed-signup',
   ]
   // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_START
   closedCreationProfiles.push('organization-establishment')
@@ -50,18 +52,26 @@ export async function configuration(m) {
     // The browser-facing API origin of this stand, so a public avatar URL resolves.
     ...(m.origins.api && { STORAGE_PUBLIC_BASE_URL: `${m.origins.api}/api/v1/storage/public` }),
     EMAIL_PROVIDER: 'mock',
-    AUTH_PUBLIC_SIGNUP_ENABLED: ['organization-setup', 'organization-provisioning'].includes(
-      m.fixtureProfile
-    )
+    AUTH_PUBLIC_SIGNUP_ENABLED: [
+      'organization-setup',
+      'organization-provisioning',
+      'product-admin-closed-signup',
+    ].includes(m.fixtureProfile)
       ? 'false'
       : 'true',
     ORG_SELF_SERVICE_CREATION_ENABLED: closedCreationProfiles.includes(m.fixtureProfile)
       ? 'false'
       : 'true',
-    ...(['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)
+    ...(['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
+      m.fixtureProfile
+    )
       ? { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
       : {}),
     FRONTEND_URL: m.origins.product,
+    PRODUCT_ADMIN_ORIGIN: m.origins.staff ?? '',
+    WEB_FRONTEND_CONTEXT_KEY: createHmac('sha256', m.jwtSecret)
+      .update('amcore-web-context-v1')
+      .digest('hex'),
     CORS_ORIGIN: Object.values(m.origins).join(','),
     TRUST_PROXY: m.topology === 'host' ? '1' : 'false',
   }
@@ -85,10 +95,15 @@ export async function configuration(m) {
     api: { ...app, PROCESS_ROLE: 'web' },
     worker: { ...app, PROCESS_ROLE: 'worker' },
     web: {
+      FRONTEND_URL: m.origins.product,
+      PRODUCT_ADMIN_ORIGIN: m.origins.staff ?? '',
+      WEB_FRONTEND_CONTEXT_KEY: app.WEB_FRONTEND_CONTEXT_KEY,
       NODE_ENV: 'production',
       API_URL: 'http://api:5002',
       REDIS_URL: 'redis://redis:6379',
-      WEB_TRUSTED_ORIGINS: [m.origins.product, siteOrigin].filter(Boolean).join(','),
+      WEB_TRUSTED_ORIGINS: [m.origins.product, m.origins.staff, siteOrigin]
+        .filter(Boolean)
+        .join(','),
       WEB_SITE_ORIGIN: siteOrigin,
       WEB_SEO_INDEXING: seoIndexing,
       // The stand's API serves public files, so its origin may load images.
@@ -115,16 +130,29 @@ export async function configuration(m) {
     environments['notification-provider'] = {}
   }
   // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_END
-  if (['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile))
+  if (
+    ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
+      m.fixtureProfile
+    )
+  )
     environments['mail-capture'] = { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
+  if (m.productAdminHost)
+    environments.caddy = {
+      CADDY_DOMAIN: m.hostnames.api,
+      CADDY_WEB_DOMAIN: m.hostnames.product,
+      PRODUCT_ADMIN_HOSTNAME: m.hostnames.staff,
+      CADDY_EMAIL: 'stand@example.invalid',
+    }
   // AMCORE_CONSOLE_CADDY_ENV_START
-  if (m.topology === 'host')
+  if (m.topology === 'host' && !m.productAdminHost)
     environments.caddy = {
       CADDY_DOMAIN: m.hostnames.api,
       CADDY_WEB_DOMAIN: m.hostnames.product,
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console,
       CADDY_EMAIL: 'stand@example.invalid',
     }
+  if (m.productAdminHost && m.consoleEnabled && m.consoleTopology === 'host')
+    environments.caddy.ADMIN_CONSOLE_HOSTNAME = m.hostnames.console
   // AMCORE_CONSOLE_CADDY_ENV_END
   const ports = {
     postgres: [],
@@ -133,6 +161,7 @@ export async function configuration(m) {
     web: [`127.0.0.1:${m.ports.web}:3000`],
     caddy: [`127.0.0.1:${m.ports.tls}:443`],
   }
+  Object.assign(environments.api, await appleOAuthEnvironment(m))
   let yaml = 'services:\n'
   for (const [service, environment] of Object.entries(environments)) {
     yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${labelLines(m, '      ')}`
@@ -159,6 +188,11 @@ export async function configuration(m) {
         .slice(1)
         .join('\n')
     if (ports[service]) yaml += `    ports: ${overridden(ports[service])}\n`
+    if (
+      service === 'api' &&
+      ['product-admin-oauth', 'product-admin-oauth-path'].includes(m.fixtureProfile)
+    )
+      yaml += `    volumes:\n      - ${JSON.stringify(`${m.snapshot}/docker/testing/apple-oidc.mjs:/app/fixtures/apple-oidc.mjs:ro`)}\n`
   }
   const base = parse(await readFile(join(m.snapshot, 'docker-compose.yml'), 'utf8'))
   // AMCORE_CONSOLE_NOTIFICATION_VOLUME_START
@@ -173,8 +207,10 @@ export async function configuration(m) {
   m.envFile = join(directory(m.id), 'compose.env')
   m.overlay = join(directory(m.id), 'managed.yml')
   const envLines = [
+    `WEB_FRONTEND_CONTEXT_KEY=${app.WEB_FRONTEND_CONTEXT_KEY}`,
     'COMPOSE_PROFILES=',
     `CADDY_WEB_DOMAIN=${m.hostnames.product}`,
+    ...(m.productAdminHost ? [`PRODUCT_ADMIN_HOSTNAME=${m.hostnames.staff}`] : []),
     // AMCORE_CONSOLE_COMPOSE_ENV_START
     `ADMIN_CONSOLE_HOSTNAME=${m.topology === 'host' ? m.hostnames.console : ''}`,
     // AMCORE_CONSOLE_COMPOSE_ENV_END
@@ -192,8 +228,13 @@ export async function configuration(m) {
 
 export function validateModel(m) {
   assertOrganizationSetupFixture(m)
+  assertAppleOAuthFixture(m)
   const collector = m.model.services['mail-capture']
-  if (['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)) {
+  if (
+    ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
+      m.fixtureProfile
+    )
+  ) {
     if (
       !collector ||
       collector.image !== `${m.project}-api:latest` ||
@@ -238,14 +279,27 @@ export function validateModel(m) {
   )
     throw new Error('Invalid managed ports')
   const suffix = m.uuid.replaceAll('-', '').slice(0, 12)
+  const expectedNames = [
+    'api',
+    'console',
+    'product',
+    ...(m.productAdminHost ? ['staff'] : []),
+  ].sort()
+  if (Object.keys(m.hostnames).sort().join(',') !== expectedNames.join(','))
+    throw new Error('Foreign stand hostname inventory')
   for (const [key, prefix] of [
     ['product', 'app'],
     ['console', 'console'],
     ['api', 'api'],
   ]) {
-    if (m.hostnames[key] !== `${prefix}-${suffix}.localhost`)
-      throw new Error('Foreign stand hostname')
+    const expected =
+      m.productAdminHost && key !== 'product'
+        ? `${prefix}.${m.hostnames.product}`
+        : `${prefix}-${suffix}.localhost`
+    if (m.hostnames[key] !== expected) throw new Error('Foreign stand hostname')
   }
+  if (m.productAdminHost && m.hostnames.staff !== `staff.${m.hostnames.product}`)
+    throw new Error('Foreign staff hostname')
   const wantedOrigins =
     m.topology === 'host'
       ? Object.fromEntries(
@@ -255,6 +309,8 @@ export function validateModel(m) {
           product: `http://${m.hostnames.product}:${m.ports.web}`,
           api: `http://127.0.0.1:${m.ports.api}`,
         }
+  if (m.productAdminHost && (!m.consoleEnabled || m.consoleTopology !== 'host'))
+    delete wantedOrigins.console
   if (JSON.stringify(m.origins) !== JSON.stringify(wantedOrigins))
     throw new Error('Foreign stand origin')
   for (const [name, key, target] of [

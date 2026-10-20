@@ -9,7 +9,13 @@ import {
 import { invitationOAuthCarrierKey } from './invitation-oauth-store'
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
+import {
+  assertInvitationSurface,
+  invitationNamespace,
+  invitationSurfaceData,
+} from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
+import type { ProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 import type { VaultRecord } from './session-vault.types'
 import { VAULT_TTL_SECONDS } from './vault-constants'
@@ -28,6 +34,12 @@ local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
 if current.version ~= tonumber(ARGV[1]) or current.expiresAt <= now then return 0 end
 if next.expiresAt ~= current.expiresAt or next.origin ~= current.origin then return 0 end
 if session.ownerKey ~= KEYS[1] or session.deadline <= now then return 0 end
+if session.vaultKey and session.vaultKey ~= KEYS[3] then return 0 end
+if session.frontend ~= current.frontend or session.audience ~= current.audience
+  or session.placementFingerprint ~= current.placementFingerprint then return 0 end
+if current.frontend == 'admin' and (not session.vaultKey or session.entry.audience ~= current.audience) then return 0 end
+if next.frontend ~= current.frontend or next.audience ~= current.audience
+  or next.placementFingerprint ~= current.placementFingerprint then return 0 end
 local matched = false
 for _, flow in ipairs(next.flows) do
   if flow.binding.flowId == session.flowId and flow.state == 'completing_signin' then
@@ -70,13 +82,14 @@ redis.call('DEL', KEYS[2])
 return 1
 `
 
-function stagingKey(sessionId: string): string {
+function stagingKey(sessionId: string, context?: ProductWebContext): string {
   if (!/^[A-Za-z0-9_-]{43}$/.test(sessionId)) throw new ContextRequestError(400, 'BAD_REQUEST')
-  return `web:invitation:staged-session:v1:${sessionId}`
+  return `${invitationNamespace('staged-session', context)}:${sessionId}`
 }
 
 /** Staged credentials are inaccessible through the ordinary session vault until publication. */
 export async function stageInvitationSession(input: {
+  context?: ProductWebContext
   ownerHash: string
   flowId: string
   attemptId: string
@@ -99,7 +112,9 @@ export async function stageInvitationSession(input: {
       throw new ContextRequestError(409, 'INVITE_FLOW_CHANGED')
   }
   const record = {
-    ownerKey: invitationOwnerKey(input.ownerHash),
+    ...invitationSurfaceData(input.context),
+    vaultKey: `${input.context?.namespace ?? 'web:session:v1'}:${sessionId}`,
+    ownerKey: invitationOwnerKey(input.ownerHash, input.context),
     flowId: input.flowId,
     attemptId: input.attemptId,
     deadline: input.deadline,
@@ -109,7 +124,7 @@ export async function stageInvitationSession(input: {
   await withInvitationStorage(async () => {
     const result = await (
       await getWebRedisClient()
-    ).set(stagingKey(sessionId), JSON.stringify(record), {
+    ).set(stagingKey(sessionId, input.context), JSON.stringify(record), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: input.deadline },
     })
@@ -124,18 +139,20 @@ export async function publishInvitationSession(
   expectedVersion: number,
   next: InvitationOwnerRecord,
   sessionId: string,
-  oauthAttemptId?: string
+  oauthAttemptId?: string,
+  context?: ProductWebContext
 ): Promise<boolean> {
   const parsed = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
+  assertInvitationSurface(parsed, context)
   return withInvitationStorage(async () => {
     const result = await (
       await getWebRedisClient()
     ).eval(PUBLISH, {
       keys: [
-        invitationOwnerKey(ownerHash),
-        stagingKey(sessionId),
-        `web:session:v1:${sessionId}`,
-        ...(oauthAttemptId ? [invitationOAuthCarrierKey(oauthAttemptId)] : []),
+        invitationOwnerKey(ownerHash, context),
+        stagingKey(sessionId, context),
+        `${context?.namespace ?? 'web:session:v1'}:${sessionId}`,
+        ...(oauthAttemptId ? [invitationOAuthCarrierKey(oauthAttemptId, context)] : []),
       ],
       arguments: [
         String(expectedVersion),
@@ -151,7 +168,8 @@ export async function publishInvitationSession(
 /** Failure cleanup only removes this owner's unpublished staging, never a published session. */
 export async function discardInvitationSession(
   ownerHash: string,
-  sessionId: string
+  sessionId: string,
+  context?: ProductWebContext
 ): Promise<void> {
   await withInvitationStorage(async () => {
     await (
@@ -163,7 +181,10 @@ export async function discardInvitationSession(
       if cjson.decode(raw).ownerKey ~= ARGV[1] then return 0 end
       return redis.call('DEL', KEYS[1])
     `,
-      { keys: [stagingKey(sessionId)], arguments: [invitationOwnerKey(ownerHash)] }
+      {
+        keys: [stagingKey(sessionId, context)],
+        arguments: [invitationOwnerKey(ownerHash, context)],
+      }
     )
   })
 }

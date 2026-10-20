@@ -21,6 +21,8 @@ export async function preview(m, profile = 'default') {
     'organization-roles',
     'organization-creation',
     'member-api-keys',
+    'product-admin-three-host',
+    'product-admin-console-path',
   ]
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_START
   profiles.push('notification-work')
@@ -91,7 +93,12 @@ export async function preview(m, profile = 'default') {
       const { organizationFixture } = await import('./organization-fixture.mjs')
       await organizationFixture(m, api)
     }
-    if (profile === 'organization-roles') await organizationRolesFixture(m, api)
+    if (
+      ['organization-roles', 'product-admin-three-host', 'product-admin-console-path'].includes(
+        profile
+      )
+    )
+      await organizationRolesFixture(m, api)
     if (profile === 'member-api-keys') {
       const { memberApiKeysFixture } = await import('./member-api-keys-fixture.mjs')
       await memberApiKeysFixture(m, api)
@@ -205,8 +212,16 @@ export async function preview(m, profile = 'default') {
       `Stand: ${m.id}\nBranch: ${m.branch}\nSource: ${m.sourceHash}\nURL: ${m.origins.product}${m.localePrefix}`
     )
     for (const a of m.accounts) console.log(`${a.role}: ${a.email}\nPassword: ${a.password}`)
-    if (profile === 'organization-roles')
-      for (const line of organizationRolesAddresses(m, m.localePrefix, m.origins.product))
+    if (
+      ['organization-roles', 'product-admin-three-host', 'product-admin-console-path'].includes(
+        profile
+      )
+    )
+      for (const line of organizationRolesAddresses(
+        m,
+        m.localePrefix,
+        m.origins.staff ?? m.origins.product
+      ))
         console.log(line)
     if (profile === 'member-api-keys')
       console.log(

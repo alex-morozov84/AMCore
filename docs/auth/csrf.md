@@ -40,6 +40,12 @@ surfaces.
 
 ## Second layer on cookie POST routes
 
+Bundled web requests additionally carry a confidential server-side frontend proof.
+For proved requests the selected frontend origin must match exactly. The staff
+BFF rejects mutations without a matching Origin or Referer before cookie/vault
+work; site native-client compatibility does not weaken this staff check.
+See [product-admin placement](../product-admin/placement-and-sessions.md).
+
 AMCore adds a narrow `Origin` / `Referer` check on the cookie-auth POST endpoints.
 
 - Trusted origins come from `CORS_ORIGIN`.
@@ -103,6 +109,12 @@ OAuth has its own CSRF class: login CSRF / session swapping. A one-time server-s
 `state` value is not enough unless it is also bound to the browser that initiated
 the flow. AMCore therefore binds OAuth login/link state to a short-lived browser
 cookie in addition to the server-side state record.
+
+The final web completion document has no auth side effects. Both site and admin
+completion POSTs additionally require exact Host and a non-null Origin before
+credential/recovery/cleanup work. The document alone uses strict-origin so native
+forms preserve Origin without disclosing the ticket in Referer; POST responses and
+other secret routes keep no-referrer. See [OAuth completion](oauth.md#how-oauth-login-works).
 
 ## Static analysis (CodeQL) false positives
 

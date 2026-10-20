@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto'
 
 import type { Prisma } from '../../generated/prisma/client.js'
+import type { BrowserFrontendContext } from '../frontend-context/frontend-placement.js'
+import { frontendTokenData } from '../frontend-context/frontend-token.js'
 
 import { type IntentRole, invitationRoleCreate } from './invitation-role-intent.js'
 
@@ -8,6 +10,7 @@ import { type IntentRole, invitationRoleCreate } from './invitation-role-intent.
 export async function issueInvitation(
   tx: Prisma.TransactionClient,
   input: {
+    frontend: BrowserFrontendContext
     organizationId: string
     email: string
     emailCanonical: string
@@ -19,6 +22,7 @@ export async function issueInvitation(
 ): Promise<{ id: string; generation: number; token: string }> {
   const token = randomBytes(32).toString('base64url')
   const data = {
+    ...frontendTokenData(input.frontend),
     tokenHash: createHash('sha256').update(token).digest('hex'),
     issuedAt: input.now,
     expiresAt: new Date(input.now.getTime() + 7 * 86_400_000),

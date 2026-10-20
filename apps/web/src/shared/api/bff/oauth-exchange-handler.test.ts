@@ -1,12 +1,18 @@
 // @vitest-environment node
 import { cookies } from 'next/headers'
-import { AuthErrorCode, DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  AuthErrorCode,
+  coerceSupportedLocale,
+  DEFAULT_LOCALE,
+  localizedFrontendUrl,
+} from '@amcore/shared'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { publishInvitedOAuth } from './invitation-oauth-exchange'
 import { recoverPublishedInvitedOAuth } from './invitation-oauth-recovery'
 import { mintSession } from './mint-session'
 import { handleOAuthExchange } from './oauth-exchange-handler'
+import { resolveProductWebContext } from './product-web-context.server'
 import { callUpstreamOAuthExchange, fetchCurrentUser, UpstreamOAuthError } from './upstream-oauth'
 
 vi.mock('server-only', () => ({}))
@@ -41,28 +47,34 @@ function makeRequest(pathAndQuery: string): Request {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
+  vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-test-context-key-with-at-least-32>')
   vi.mocked(recoverPublishedInvitedOAuth).mockResolvedValue(null)
 })
 
+afterEach(() => vi.unstubAllEnvs())
+
+async function runExchange(request: Request, locale: string) {
+  request.headers.set('host', 'app.example.test')
+  const context = resolveProductWebContext(new Headers({ host: 'app.example.test' }), 'site-auth')
+  return handleOAuthExchange(
+    request,
+    {
+      ticket: new URL(request.url).searchParams.get('ticket')!,
+      locale: coerceSupportedLocale(locale),
+    },
+    context
+  )
+}
+
 describe('handleOAuthExchange — failure paths redirect to login with an error code, never throw', () => {
-  it('redirects when the ticket query param is missing', async () => {
-    mockRefreshCookie('rt-1')
-
-    const response = await handleOAuthExchange(makeRequest('en/auth/callback'), 'en')
-
-    expect(response.status).toBe(307)
-    const location = new URL(response.headers.get('location')!)
-    expect(location.pathname).toBe('/en/login')
-    expect(location.searchParams.get('oauthError')).toBe(AuthErrorCode.OAUTH_TICKET_INVALID)
-    expect(callUpstreamOAuthExchange).not.toHaveBeenCalled()
-  })
-
   it('redirects when the temporary refresh_token cookie is missing', async () => {
     mockRefreshCookie(undefined)
 
-    const response = await handleOAuthExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
+    const response = await runExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
 
-    expect(response.status).toBe(307)
+    expect(response.status).toBe(303)
     expect(callUpstreamOAuthExchange).not.toHaveBeenCalled()
   })
 
@@ -70,9 +82,9 @@ describe('handleOAuthExchange — failure paths redirect to login with an error 
     mockRefreshCookie('rt-1')
     vi.mocked(callUpstreamOAuthExchange).mockRejectedValue(new UpstreamOAuthError(401, {}))
 
-    const response = await handleOAuthExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
+    const response = await runExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
 
-    expect(response.status).toBe(307)
+    expect(response.status).toBe(303)
     expect(response.cookies.get('refresh_token')?.value).toBe('')
   })
 
@@ -81,9 +93,9 @@ describe('handleOAuthExchange — failure paths redirect to login with an error 
     vi.mocked(callUpstreamOAuthExchange).mockResolvedValue({ accessToken: 'at-1' })
     vi.mocked(fetchCurrentUser).mockResolvedValue(null)
 
-    const response = await handleOAuthExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
+    const response = await runExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
 
-    expect(response.status).toBe(307)
+    expect(response.status).toBe(303)
     const location = new URL(response.headers.get('location')!)
     expect(location.pathname).toBe('/en/login')
   })
@@ -94,9 +106,9 @@ describe('handleOAuthExchange — failure paths redirect to login with an error 
     vi.mocked(fetchCurrentUser).mockResolvedValue({ id: 'u1' } as never)
     vi.mocked(mintSession).mockRejectedValueOnce(new Error('ECONNREFUSED'))
 
-    const response = await handleOAuthExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
+    const response = await runExchange(makeRequest('en/auth/callback?ticket=t1'), 'en')
 
-    expect(response.status).toBe(307)
+    expect(response.status).toBe(303)
     const location = new URL(response.headers.get('location')!)
     expect(location.pathname).toBe('/en/login')
     expect(location.searchParams.get('oauthError')).toBe(AuthErrorCode.OAUTH_TICKET_INVALID)
@@ -111,9 +123,9 @@ describe('handleOAuthExchange — success', () => {
     vi.mocked(callUpstreamOAuthExchange).mockResolvedValue({ accessToken: 'at-1' })
     vi.mocked(fetchCurrentUser).mockResolvedValue({ id: 'u1' } as never)
 
-    const response = await handleOAuthExchange(makeRequest('ru/auth/callback?ticket=t1'), 'ru')
+    const response = await runExchange(makeRequest('ru/auth/callback?ticket=t1'), 'ru')
 
-    expect(response.status).toBe(307)
+    expect(response.status).toBe(303)
     const location = new URL(response.headers.get('location')!)
     expect(location.pathname).toBe('/ru')
     expect(response.cookies.get('amcore_session')?.value).toBe('sess-1')
@@ -145,7 +157,7 @@ for (const recovered of [true, false]) {
           sessionId: 'sess-invited',
         } as never)
       }
-      const response = await handleOAuthExchange(
+      const response = await runExchange(
         new Request(`${origin}/auth/callback?ticket=t1`),
         DEFAULT_LOCALE
       )

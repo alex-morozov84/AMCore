@@ -15,6 +15,7 @@ import type {
   UpdateProfileInput,
   UserResponse,
 } from '@amcore/shared'
+import { frontendAuthPath } from '@amcore/shared'
 import {
   AuthErrorCode,
   coerceSupportedLocale,
@@ -29,6 +30,11 @@ import { EmailService } from '../../infrastructure/email/index.js'
 import { StorageService } from '../../infrastructure/storage/index.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
+import {
+  type BrowserFrontendContext,
+  resolveFrontendPlacement,
+} from '../frontend-context/frontend-placement.js'
+import { assertTokenFrontend } from '../frontend-context/frontend-token.js'
 import {
   type InvitationHandoffProof,
   lockInvitationAuthAttempt,
@@ -58,6 +64,7 @@ export interface AuthResult {
 }
 
 export interface RequestInfo {
+  frontend?: BrowserFrontendContext
   handoff?: InvitationHandoffProof
   invitationCredential?: string
   userAgent?: string
@@ -109,7 +116,7 @@ export class AuthService {
         requestInfo
       )
     }
-    if (!this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
+    if (requestInfo.frontend?.frontend === 'admin' || !this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
       throw new AppException('Public signup is disabled', 403, AuthErrorCode.PUBLIC_SIGNUP_DISABLED)
     const email = this.emailIdentity.normalizeForStorage(input.email)
     const emailCanonical = this.emailIdentity.canonicalize(input.email)
@@ -162,7 +169,7 @@ export class AuthService {
       sid: session.id,
     })
 
-    await this.sendRegistrationVerification(user)
+    await this.sendRegistrationVerification(user, requestInfo.frontend)
     return { user: this.mapUserToResponse(user), accessToken, refreshToken }
   }
 
@@ -180,6 +187,7 @@ export class AuthService {
           await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
           if (requestInfo.handoff) await lockInvitationAuthAttempt(tx, requestInfo.handoff)
           const hint = await invitationCredentialHint(tx, { continuation: credential })
+          assertTokenFrontend(hint.invite, requestInfo.frontend)
           await lockInvitationSignupEmail(tx, hint.invite.emailCanonical)
           const { invite, expiresAt } = await this.invitation.lockValid(tx, {
             continuation: credential,
@@ -226,7 +234,7 @@ export class AuthService {
       systemRole: created.user.systemRole,
       sid: created.session.id,
     })
-    await this.sendRegistrationVerification(created.user)
+    await this.sendRegistrationVerification(created.user, requestInfo.frontend)
     return {
       user: this.mapUserToResponse(created.user),
       accessToken,
@@ -234,20 +242,26 @@ export class AuthService {
     }
   }
 
-  private async sendRegistrationVerification(user: User): Promise<void> {
+  private async sendRegistrationVerification(
+    user: User,
+    frontend?: BrowserFrontendContext
+  ): Promise<void> {
     // Generate verification token synchronously so the row is committed
     // before HTTP 201 returns. Calling resendVerificationEmail here would
     // race with any immediately-following user action that creates a token
     // (its first step invalidates all existing user tokens), so we build
     // the URL in-band and only the email *send* stays non-blocking.
     const { token: verificationToken } = await this.tokenManager.generateEmailVerificationToken(
-      user.id
+      user.id,
+      frontend
     )
     const userLocale = coerceSupportedLocale(user.locale)
     const verificationUrl = localizedFrontendUrl(
-      this.env.get('FRONTEND_URL'),
+      frontend?.frontend === 'admin'
+        ? resolveFrontendPlacement(this.env).admin
+        : this.env.get('FRONTEND_URL'),
       userLocale,
-      'verify-email',
+      frontendAuthPath(frontend?.frontend ?? 'site', '/verify-email'),
       {
         token: verificationToken,
       }
@@ -564,20 +578,22 @@ export class AuthService {
   }
 
   /** Send password reset email (silent fail for unknown emails) */
-  async forgotPassword(email: string): Promise<void> {
+  async forgotPassword(email: string, frontend?: BrowserFrontendContext): Promise<void> {
     const emailCanonical = this.emailIdentity.canonicalize(email)
     await this.checkRateLimit(`forgot:${emailCanonical}`, 3)
 
     const user = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!user) return // Silent fail — prevent email enumeration
 
-    const { token } = await this.tokenManager.generatePasswordResetToken(user.id)
+    const { token } = await this.tokenManager.generatePasswordResetToken(user.id, frontend)
 
     const userLocale = coerceSupportedLocale(user.locale)
     const resetUrl = localizedFrontendUrl(
-      this.env.get('FRONTEND_URL'),
+      frontend?.frontend === 'admin'
+        ? resolveFrontendPlacement(this.env).admin
+        : this.env.get('FRONTEND_URL'),
       userLocale,
-      'reset-password',
+      frontendAuthPath(frontend?.frontend ?? 'site', '/reset-password'),
       {
         token,
       }
@@ -606,10 +622,17 @@ export class AuthService {
   }
 
   /** Reset password using token */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+    frontend?: BrowserFrontendContext
+  ): Promise<void> {
     // Early resolve + reject for a plainly invalid/expired/used token (saves an argon2
     // hash on garbage). NOT the single-use guard — that is the atomic CAS below.
-    const { id: resetTokenId, userId } = await this.tokenManager.verifyPasswordResetToken(token)
+    const { id: resetTokenId, userId } = await this.tokenManager.verifyPasswordResetToken(
+      token,
+      frontend
+    )
 
     const passwordHash = await argon2.hash(newPassword)
     const changedAt = new Date()
@@ -677,8 +700,11 @@ export class AuthService {
   }
 
   /** Verify email address using token */
-  async verifyEmail(token: string): Promise<void> {
-    const { userId, tokenHash } = await this.tokenManager.verifyEmailVerificationToken(token)
+  async verifyEmail(token: string, frontend?: BrowserFrontendContext): Promise<void> {
+    const { userId, tokenHash } = await this.tokenManager.verifyEmailVerificationToken(
+      token,
+      frontend
+    )
 
     await this.prisma.$transaction(async (tx) => {
       await tx.emailVerificationToken.update({
@@ -698,20 +724,22 @@ export class AuthService {
   }
 
   /** Resend verification email (silent fail if already verified) */
-  async resendVerificationEmail(email: string): Promise<void> {
+  async resendVerificationEmail(email: string, frontend?: BrowserFrontendContext): Promise<void> {
     const emailCanonical = this.emailIdentity.canonicalize(email)
     await this.checkRateLimit(`resend-verification:${emailCanonical}`, 3)
 
     const user = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!user || user.emailVerified) return // Silent fail
 
-    const { token } = await this.tokenManager.generateEmailVerificationToken(user.id)
+    const { token } = await this.tokenManager.generateEmailVerificationToken(user.id, frontend)
 
     const userLocale = coerceSupportedLocale(user.locale)
     const verificationUrl = localizedFrontendUrl(
-      this.env.get('FRONTEND_URL'),
+      frontend?.frontend === 'admin'
+        ? resolveFrontendPlacement(this.env).admin
+        : this.env.get('FRONTEND_URL'),
       userLocale,
-      'verify-email',
+      frontendAuthPath(frontend?.frontend ?? 'site', '/verify-email'),
       {
         token,
       }

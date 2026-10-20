@@ -9,9 +9,13 @@ import { activeTarget } from '../support/managed-target.mjs'
 export async function openProvisioningMail(
   page: Page,
   email: string,
-  route: 'invite/accept' | 'verify-email'
+  route: 'invite/accept' | 'verify-email',
+  selectedOrigin?: string
 ) {
   const m = activeTarget()
+  const origin = selectedOrigin ?? m.origins.product
+  if (![m.origins.product, m.origins.staff].includes(origin))
+    throw new Error('Unowned mail destination')
   let content = ''
   await expect
     .poll(
@@ -51,7 +55,7 @@ export async function openProvisioningMail(
       .map((candidate) => new URL(candidate.replaceAll('&amp;', '&')))
       .find(
         (candidate) =>
-          candidate.origin === m.origins.product &&
+          candidate.origin === origin &&
           candidate.pathname.endsWith(`/${route}`) &&
           candidate.searchParams.size === 1 &&
           candidate.searchParams.has('token')

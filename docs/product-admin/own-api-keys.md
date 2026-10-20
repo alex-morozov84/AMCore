@@ -1,5 +1,8 @@
 # Manage your own API keys
 
+Addresses below use default path placement. For a separate host or custom alias,
+see [placement and sessions](placement-and-sessions.md).
+
 Use **My API keys** to give your integration a personal, organization-bound key.
 You must sign in. You can inspect and revoke your own keys after losing membership.
 The first ready creation form requires current full team administration.

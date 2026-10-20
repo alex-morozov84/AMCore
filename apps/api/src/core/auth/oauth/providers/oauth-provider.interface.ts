@@ -13,7 +13,11 @@ export interface OAuthProvider {
   getAuthorizationURL(state: string, codeVerifier: string): Promise<URL>
 
   /** Exchange authorization code for tokens */
-  exchangeCode(code: string, codeVerifier: string): Promise<OAuthTokens>
+  exchangeCode(
+    code: string,
+    codeVerifier: string,
+    options?: { legacyWithoutPkce?: boolean }
+  ): Promise<OAuthTokens>
 
   /** Fetch normalized user profile */
   getUserProfile(tokens: OAuthTokens): Promise<OAuthUserProfile>

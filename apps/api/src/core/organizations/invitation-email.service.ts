@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
-import { coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
+import { coerceSupportedLocale, localizedFrontendUrl, productAdminPath } from '@amcore/shared'
 
 import { EnvService } from '../../env/env.service.js'
 import { EmailService } from '../../infrastructure/email/index.js'
+import {
+  type BrowserFrontendContext,
+  resolveFrontendPlacement,
+} from '../frontend-context/frontend-placement.js'
 
 /** Ephemeral issuance-time display snapshot; never persisted or queued with its secret. */
 export type InvitationMailSnapshot = {
@@ -26,6 +30,13 @@ export class InvitationEmailService {
     private readonly logger: PinoLogger
   ) {}
 
+  destination(): BrowserFrontendContext {
+    return {
+      frontend: 'admin' as const,
+      placementFingerprint: resolveFrontendPlacement(this.env).placementFingerprint,
+    }
+  }
+
   async dispatch(mail: InvitationMailSnapshot): Promise<void> {
     const locale = coerceSupportedLocale(mail.locale)
     await this.email.sendOrgInviteEmail(mail.email, {
@@ -36,9 +47,14 @@ export class InvitationEmailService {
       hasAccount: mail.hasAccount,
       expiresInDays: 7,
       locale,
-      acceptUrl: localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'invite/accept', {
-        token: mail.token,
-      }),
+      acceptUrl: localizedFrontendUrl(
+        resolveFrontendPlacement(this.env).admin,
+        locale,
+        productAdminPath('/invite/accept'),
+        {
+          token: mail.token,
+        }
+      ),
     })
   }
 

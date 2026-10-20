@@ -37,7 +37,8 @@ export function invitationLocalOrigin(
 
 export function invitationCookiePolicy(
   requestUrl: string,
-  env: InvitationCookieEnvironment = process.env
+  env: InvitationCookieEnvironment = process.env,
+  frontend: 'site' | 'admin' = 'site'
 ) {
   const origin = new URL(requestUrl).origin
   const localOrigin = invitationLocalOrigin(env)
@@ -45,7 +46,14 @@ export function invitationCookiePolicy(
   if (!secure && origin !== localOrigin) throw new Error('Invitation requests require HTTPS')
   return {
     origin,
-    name: secure ? HTTPS_COOKIE : LOCAL_COOKIE,
+    name:
+      frontend === 'admin'
+        ? secure
+          ? '__Host-amcore_admin_invite_browser'
+          : 'amcore_admin_invite_browser_local'
+        : secure
+          ? HTTPS_COOKIE
+          : LOCAL_COOKIE,
     options: { secure, httpOnly: true, sameSite: 'lax' as const, path: '/' },
   }
 }

@@ -11,6 +11,7 @@ import { readInvitationOAuthCarrier } from './invitation-oauth-store'
 import { withInvitationOwnerLease } from './invitation-owner-lease'
 import { captureInvitationRequest } from './invitation-request-snapshot'
 import { productContextDeps } from './product-context-deps'
+import type { ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
@@ -20,11 +21,12 @@ export async function publishInvitedOAuth(
   ticket: string,
   exchange: OAuthExchangeResponse,
   refreshToken: string,
-  user: UserResponse
+  user: UserResponse,
+  context?: ProductWebContext
 ) {
   const correlation = exchange.invitation
   if (!correlation) throw invitationFlowChanged()
-  const carrier = await readInvitationOAuthCarrier(correlation.attemptId)
+  const carrier = await readInvitationOAuthCarrier(correlation.attemptId, context)
   if (
     !carrier ||
     carrier.status !== 'started' ||
@@ -36,42 +38,51 @@ export async function publishInvitedOAuth(
   return withinContextDeadline(
     request.signal,
     (signal) =>
-      withInvitationOwnerLease(carrier.ownerHash, signal, async () => {
-        const deps = productContextDeps(request.headers)
-        const snapshot = await captureInvitationRequest(request, carrier.flowId, deps)
-        const flow = invitationOAuthFlow(
-          snapshot.owner,
-          carrier,
-          snapshot.ownerHash,
-          snapshot.session?.binding ?? null,
-          Date.now()
-        )
-        if (!flow.attempt) throw invitationFlowChanged()
-        try {
-          const published = await publishInvitedCredentials({
-            snapshot,
-            attempt: flow.attempt,
-            signal,
-            credentials: { data: { accessToken: exchange.accessToken, user }, refreshToken },
-            oauth: {
-              carrier,
-              ticketHash: createHash('sha256').update(ticket).digest('hex'),
-              backendSessionId: correlation.backendSessionId,
-            },
-          })
-          signal.throwIfAborted()
-          return { ...published, flowId: carrier.flowId, locale: flow.locale }
-        } catch (error) {
-          await recoverFailedInvitationAuth({
-            request,
-            snapshot,
-            attempt: flow.attempt,
-            error,
-            store: deps.store,
-          }).catch(() => undefined)
-          throw error
-        }
-      }),
+      withInvitationOwnerLease(
+        carrier.ownerHash,
+        signal,
+        async () => {
+          const deps = productContextDeps(
+            request.headers,
+            context?.frontend === 'admin' ? 'admin-invite' : 'legacy-invite'
+          )
+          const snapshot = await captureInvitationRequest(request, carrier.flowId, deps)
+          const flow = invitationOAuthFlow(
+            snapshot.owner,
+            carrier,
+            snapshot.ownerHash,
+            snapshot.session?.binding ?? null,
+            Date.now()
+          )
+          if (!flow.attempt) throw invitationFlowChanged()
+          try {
+            const published = await publishInvitedCredentials({
+              snapshot,
+              attempt: flow.attempt,
+              signal,
+              credentials: { data: { accessToken: exchange.accessToken, user }, refreshToken },
+              oauth: {
+                carrier,
+                ticketHash: createHash('sha256').update(ticket).digest('hex'),
+                backendSessionId: correlation.backendSessionId,
+              },
+            })
+            signal.throwIfAborted()
+            return { ...published, flowId: carrier.flowId, locale: flow.locale }
+          } catch (error) {
+            await recoverFailedInvitationAuth({
+              request,
+              snapshot,
+              attempt: flow.attempt,
+              error,
+              store: deps.store,
+            }).catch(() => undefined)
+            throw error
+          }
+        },
+        undefined,
+        context
+      ),
     15000
   )
 }

@@ -1,7 +1,10 @@
 # Manage and accept organization invitations
 
+Addresses below use default path placement. For a separate host or custom alias,
+see [placement and sessions](placement-and-sessions.md).
+
 The reference pages include an **Invitations** section at
-`/organizations/[id]/invites` (`/en` or `/ru` prefix in multilingual builds).
+`/manage/organizations/[id]/invites` (`/en` or `/ru` prefix in multilingual builds).
 Open Organizations, select an organization, then Invitations. Management requires
 current membership and unrestricted `manage:TeamAccess`; a platform super-admin
 without that organization access cannot manage its invitations.

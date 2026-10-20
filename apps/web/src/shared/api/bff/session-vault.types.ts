@@ -6,6 +6,8 @@ import type { UserResponse } from '@amcore/shared'
  * cookie) that keys this entry — see ADR-068.
  */
 export interface VaultRecord {
+  /** Missing is accepted only for legacy product records. */
+  audience?: 'product' | 'staff' | 'console'
   refreshToken: string
   accessToken: string
   /** Epoch milliseconds. */

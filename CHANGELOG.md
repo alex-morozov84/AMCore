@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- External web sign-in completes through a same-origin form with automatic
+  continuation and a no-JavaScript Continue button, preserving Strict cookies
+  and the validated return page without exposing its code through Referer.
+
+- Product navigation keeps icons and tooltips when collapsed. Working pages fill
+  the available width, and product administration places its website link at
+  the bottom of the sidebar. Dashboard appears first. Active sessions use the
+  shared table surface and a destructive-colored revoke-other-sessions control
+  with confirmation.
+
 ### Fixed
 
 - Redis health checks no longer report a false `value mismatch` when several probes overlap.
@@ -19,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Storybook and Playwright use the same axe-core accessibility engine version.
 
 ### Added
+
+- Configurable product administration path alias or separate HTTPS hostname,
+  with shared website login in path mode and independent staff sessions in host
+  mode. Login, recovery, invitation links and OAuth callbacks follow the selected
+  frontend; inaccessible pages offer safe list, website and logout recovery.
 
 - My API keys settings with personal creation, catalogue scope selection, one-time secret handling, session checks and owner-wide inventory/revocation. Ordinary member issuance remains available through the API and headless hooks.
 

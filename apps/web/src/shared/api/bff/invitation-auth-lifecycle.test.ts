@@ -13,7 +13,11 @@ import type { VaultEntry } from './session-vault.types'
 
 vi.mock('server-only', () => ({}))
 vi.mock('./invitation-owner-store', () => ({
-  invitationOwnerStore: { get: vi.fn(), compareAndSet: vi.fn() },
+  invitationOwnerStore: {
+    get: vi.fn(),
+    compareAndSet: vi.fn(),
+    retireStaleForOrdinaryAuth: vi.fn(),
+  },
 }))
 vi.mock('./invitation-request-authority', () => ({ invitationRequestAuthority: vi.fn() }))
 vi.mock('./invitation-owner-lease', () => ({
@@ -46,6 +50,7 @@ describe('ordinary authentication invitation lifecycle', () => {
     await cancelInvitedOAuthForOrdinaryStart(request(false))
     expect(invitationRequestAuthority).not.toHaveBeenCalled()
     expect(invitationOwnerStore.get).not.toHaveBeenCalled()
+    expect(invitationOwnerStore.retireStaleForOrdinaryAuth).not.toHaveBeenCalled()
   })
 
   it('rejects an uncorrelated OAuth result while the owner has a pending attempt', async () => {
@@ -66,15 +71,27 @@ describe('ordinary authentication invitation lifecycle', () => {
     expect(next.epoch).toBe(1)
     expect(next.pendingOAuthAttemptId).toBeNull()
     expect(next.sessionBinding).toBe(
-      contextSessionBinding('s'.repeat(43), {
-        userSnapshot: { id: 'example-user' },
-      } as VaultEntry)
+      contextSessionBinding(
+        's'.repeat(43),
+        {
+          userSnapshot: { id: 'example-user' },
+        } as VaultEntry,
+        1
+      )
     )
   })
 
   it('does not publish a replacement authority after a failed CAS', async () => {
     vi.mocked(invitationOwnerStore.compareAndSet).mockResolvedValue(false)
     await expect(retireFlowsForOrdinaryAuth(request(), null)).rejects.toThrow()
+  })
+  it('does not publish or read a flow after stale-owner retirement fails', async () => {
+    vi.mocked(invitationOwnerStore.retireStaleForOrdinaryAuth).mockRejectedValue(
+      new Error('unavailable')
+    )
+    await expect(retireFlowsForOrdinaryAuth(request(), null)).rejects.toThrow('unavailable')
+    expect(invitationOwnerStore.get).not.toHaveBeenCalled()
+    expect(invitationOwnerStore.compareAndSet).not.toHaveBeenCalled()
   })
   it('rejects a pending invited attempt discovered inside the ordinary OAuth publication lease', async () => {
     vi.mocked(invitationOwnerStore.get).mockResolvedValue({

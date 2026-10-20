@@ -17,6 +17,8 @@ describe('TokenManagerService', () => {
   const userId = 'user-123'
 
   const mockResetToken: PasswordResetToken = {
+    frontendDestination: 'site',
+    placementFingerprint: null,
     id: 'token-123',
     userId,
     tokenHash: 'hash',
@@ -27,6 +29,8 @@ describe('TokenManagerService', () => {
   }
 
   const mockVerificationToken: EmailVerificationToken = {
+    frontendDestination: 'site',
+    placementFingerprint: null,
     id: 'token-456',
     userId,
     tokenHash: 'hash',

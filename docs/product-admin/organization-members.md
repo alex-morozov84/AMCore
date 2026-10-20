@@ -1,6 +1,6 @@
 # Organization members and role assignment
 
-Open `/organizations/[id]/members` (with the locale prefix in multi-locale builds)
+Open `/manage/organizations/[id]/members` (with the locale prefix in multi-locale builds)
 from the **Members** navigation tab on the organization overview. Overview keeps
 the Organization and Your access cards; Members shows the member list. Both
 sections retain the organization heading and route-backed navigation, supporting
@@ -321,3 +321,6 @@ Inspection bounds authority refresh at5seconds and its exact-user read at20secon
 The named server entry exports `removeOrganizationMember(orgId,userId,{expectedMemberId},input)`;
 input has `expectedSession`, `headers` and optional `signal`, as for other context operations.
 It returns the typed acknowledgment envelope. Keep it server-only and supply the mutation Origin check in the route adapter.
+
+The address above uses default path placement. For the staff-host address or a
+custom alias, see [placement and sessions](placement-and-sessions.md).

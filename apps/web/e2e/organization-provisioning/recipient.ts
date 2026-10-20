@@ -12,12 +12,13 @@ export async function acceptAdministrator(
   browser: Browser,
   email: string,
   organization: string,
-  messages: Messages
+  messages: Messages,
+  origin?: string
 ): Promise<string> {
   const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block' })
   try {
     const page = await context.newPage()
-    await openProvisioningMail(page, email, 'invite/accept')
+    await openProvisioningMail(page, email, 'invite/accept', origin)
     const consent = messages.invitationRecipient
     await expect(page.getByRole('heading', { name: consent.signInTitle })).toBeVisible()
     await page.getByRole('tab', { name: messages.auth.register, exact: true }).click()
@@ -34,7 +35,7 @@ export async function acceptAdministrator(
       }).trim()
     ).toBe('0')
     const verification = await context.newPage()
-    await openProvisioningMail(verification, email, 'verify-email')
+    await openProvisioningMail(verification, email, 'verify-email', origin)
     await expect(
       verification.getByText(messages.auth.verifyEmailSuccess, { exact: true })
     ).toBeVisible()

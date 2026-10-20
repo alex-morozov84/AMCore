@@ -28,13 +28,24 @@ import { invitationCanonicalOrigin } from './invitation-render-request'
 import { invitationRequestAuthority } from './invitation-request-authority'
 import { invitationIncomingSession } from './invitation-request-snapshot'
 import { invitationRoute } from './invitation-route'
+import { invitationPagePath } from './invitation-surface'
 import { invitationBackend } from './invitation-upstream'
+import type { ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
-function redirect(request: Request, locale: SupportedLocale, path: string) {
+function redirect(
+  request: Request,
+  locale: SupportedLocale,
+  path: string,
+  context?: ProductWebContext
+) {
   const response = NextResponse.redirect(
-    localizedFrontendUrl(invitationCanonicalOrigin(request.headers, request.url), locale, path),
+    localizedFrontendUrl(
+      context?.origin ?? invitationCanonicalOrigin(request.headers, request.url),
+      locale,
+      invitationPagePath(path, context)
+    ),
     303
   )
   response.headers.set('cache-control', 'private, no-store')
@@ -62,14 +73,18 @@ export async function invitationIngress(
     withinContextDeadline(
       request.signal,
       async (signal) => {
-        const authority = invitationRequestAuthority(request, false)
+        const authority = invitationRequestAuthority(request, false, deps.webContext)
         const query = new URL(request.url).searchParams
         if (query.size !== 1 || query.getAll('token').length !== 1)
           throw new ContextRequestError(400, 'BAD_REQUEST')
         const body = invitationAdmissionSchema.parse({ token: query.get('token') })
         const session = await invitationIncomingSession(deps)
         const existing = authority.ownerHash
-          ? await invitationOwnerStore.get(authority.ownerHash, authority.policy.origin)
+          ? await invitationOwnerStore.get(
+              authority.ownerHash,
+              authority.policy.origin,
+              deps.webContext
+            )
           : null
         if (!existing) {
           const proof = randomBytes(32).toString('base64url')
@@ -80,11 +95,13 @@ export async function invitationIngress(
             Date.now()
           )
           signal.throwIfAborted()
-          if (!(await invitationOwnerStore.create(hash, owner))) throw invitationFlowChanged()
+          if (!(await invitationOwnerStore.create(hash, owner, deps.webContext)))
+            throw invitationFlowChanged()
           const admission = await invitationBackend(
             '/auth/invites/continuations',
             invitationAdmissionResponseSchema,
             {
+              context: deps.webContext,
               source: request.headers,
               signal,
               method: 'POST',
@@ -98,7 +115,8 @@ export async function invitationIngress(
             authority.policy.origin,
             locale,
             admission.data,
-            Date.now()
+            Date.now(),
+            deps.webContext
           )
           signal.throwIfAborted()
           destination = `invite/bootstrap/${pendingId}`
@@ -110,44 +128,53 @@ export async function invitationIngress(
           }
           return {}
         }
-        return withInvitationOwnerLease(authority.ownerHash!, signal, async () => {
-          const owner = await invitationOwnerStore.get(
-            authority.ownerHash!,
-            authority.policy.origin
-          )
-          if (!owner || owner.sessionBinding !== (session?.binding ?? null))
-            throw invitationFlowChanged()
-          const admission = await invitationBackend(
-            '/auth/invites/continuations',
-            invitationAdmissionResponseSchema,
-            {
-              source: request.headers,
-              signal,
-              method: 'POST',
-              expectedStatus: 201,
-              body,
-            }
-          )
-          const admitted = admitInvitationFlow(
-            owner,
-            admission.data,
-            locale,
-            session?.binding ?? null,
-            Date.now()
-          )
-          signal.throwIfAborted()
-          if (
-            !(await invitationOwnerStore.compareAndSet(
+        return withInvitationOwnerLease(
+          authority.ownerHash!,
+          signal,
+          async () => {
+            const owner = await invitationOwnerStore.get(
               authority.ownerHash!,
-              owner.version,
-              admitted.owner
-            ))
-          )
-            throw invitationFlowChanged()
-          signal.throwIfAborted()
-          destination = `invite/flow/${admitted.flow.binding.flowId}`
-          return {}
-        })
+              authority.policy.origin,
+              deps.webContext
+            )
+            if (!owner || owner.sessionBinding !== (session?.binding ?? null))
+              throw invitationFlowChanged()
+            const admission = await invitationBackend(
+              '/auth/invites/continuations',
+              invitationAdmissionResponseSchema,
+              {
+                context: deps.webContext,
+                source: request.headers,
+                signal,
+                method: 'POST',
+                expectedStatus: 201,
+                body,
+              }
+            )
+            const admitted = admitInvitationFlow(
+              owner,
+              admission.data,
+              locale,
+              session?.binding ?? null,
+              Date.now()
+            )
+            signal.throwIfAborted()
+            if (
+              !(await invitationOwnerStore.compareAndSet(
+                authority.ownerHash!,
+                owner.version,
+                admitted.owner,
+                deps.webContext
+              ))
+            )
+              throw invitationFlowChanged()
+            signal.throwIfAborted()
+            destination = `invite/flow/${admitted.flow.binding.flowId}`
+            return {}
+          },
+          undefined,
+          deps.webContext
+        )
       },
       10000
     )
@@ -156,9 +183,10 @@ export async function invitationIngress(
     return redirect(
       request,
       locale,
-      result.status >= 500 ? 'invite/unusable?reason=unavailable' : 'invite/unusable'
+      result.status >= 500 ? 'invite/unusable?reason=unavailable' : 'invite/unusable',
+      deps.webContext
     )
-  const response = redirect(request, locale, destination)
+  const response = redirect(request, locale, destination, deps.webContext)
   if (cookie)
     response.cookies.set(cookie.name, cookie.proof, {
       ...cookie.options,
@@ -180,40 +208,61 @@ export async function invitationBootstrap(
       request.signal,
       async (signal) => {
         if (new URL(request.url).search) throw new ContextRequestError(400, 'BAD_REQUEST')
-        const authority = invitationRequestAuthority(request, false)
+        const authority = invitationRequestAuthority(request, false, deps.webContext)
         if (!authority.ownerHash) throw invitationFlowChanged()
-        return withInvitationOwnerLease(authority.ownerHash, signal, async () => {
-          const [owner, pending, session] = await Promise.all([
-            invitationOwnerStore.get(authority.ownerHash!, authority.policy.origin),
-            readInvitationBootstrap(pendingId, authority.ownerHash!, authority.policy.origin),
-            invitationIncomingSession(deps),
-          ])
-          if (!owner || !pending || pending.locale !== locale) throw invitationFlowChanged()
-          const admitted = admitInvitationFlow(
-            owner,
-            pending.admission,
-            locale,
-            session?.binding ?? null,
-            Date.now()
-          )
-          signal.throwIfAborted()
-          if (
-            !(await attachInvitationBootstrap(
-              pendingId,
-              authority.ownerHash!,
-              owner.version,
-              admitted.owner,
-              admitted.flow.binding.flowId
-            ))
-          )
-            throw invitationFlowChanged()
-          signal.throwIfAborted()
-          destination = `invite/flow/${admitted.flow.binding.flowId}`
-          return {}
-        })
+        return withInvitationOwnerLease(
+          authority.ownerHash,
+          signal,
+          async () => {
+            const [owner, pending, session] = await Promise.all([
+              invitationOwnerStore.get(
+                authority.ownerHash!,
+                authority.policy.origin,
+                deps.webContext
+              ),
+              readInvitationBootstrap(
+                pendingId,
+                authority.ownerHash!,
+                authority.policy.origin,
+                deps.webContext
+              ),
+              invitationIncomingSession(deps),
+            ])
+            if (!owner || !pending || pending.locale !== locale) throw invitationFlowChanged()
+            const admitted = admitInvitationFlow(
+              owner,
+              pending.admission,
+              locale,
+              session?.binding ?? null,
+              Date.now()
+            )
+            signal.throwIfAborted()
+            if (
+              !(await attachInvitationBootstrap(
+                pendingId,
+                authority.ownerHash!,
+                owner.version,
+                admitted.owner,
+                admitted.flow.binding.flowId,
+                deps.webContext
+              ))
+            )
+              throw invitationFlowChanged()
+            signal.throwIfAborted()
+            destination = `invite/flow/${admitted.flow.binding.flowId}`
+            return {}
+          },
+          undefined,
+          deps.webContext
+        )
       },
       10000
     )
   )
-  return redirect(request, locale, result.ok && destination ? destination : 'invite/unusable')
+  return redirect(
+    request,
+    locale,
+    result.ok && destination ? destination : 'invite/unusable',
+    deps.webContext
+  )
 }

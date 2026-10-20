@@ -8,6 +8,12 @@ authentication, assets or Operations Console routes.
 
 ## Ordinary placement
 
+For the bundled administration area, configure the
+[shared placement source and matching physical subtree](placement-and-sessions.md).
+Its default path is `/manage`; host mode exposes the same pages at the staff host root.
+The adapter examples below apply to custom organization integrations, not a second
+source of deployment placement. Keep their custom login gate and API family aligned.
+
 Change `organizationAccessPlacement` once as shown in the
 [entry guide](README.md#connect-the-ready-pages). `organizationsPath` is a
 locale-neutral, nonroot absolute path with literal `[A-Za-z0-9_-]+` segments;
@@ -17,9 +23,8 @@ hashes, encoded paths, dot/empty segments, backslashes and external URLs are
 unsupported. This bounded adapter does not validate all route or deployment
 collisions. Use the explicit page API for other destinations.
 
-Move the existing `(organization-access)/organizations/` directory to
-`(organization-access)/manage/organizations/`. Keep its ancestor layout and error
-boundary; route groups do not contribute URL segments. Supply actual physical
+For a custom integration, wire your chosen physical pages and retain their
+ancestor layout and error boundary; route groups do not contribute URL segments. Supply actual physical
 pages; a placement descriptor does not create routes.
 
 The list page stays a thin server entry:
@@ -59,7 +64,8 @@ The dashboard layout reads the same `index.config` placement for home and import
 its Organizations menu from `index.client`. The organization Frame uses the same
 source. A separate composition can pass one shared `placement` object to Frame,
 Mount and NavigationEntry; pass data across the server/client boundary, not href
-functions. Existing root placement and compatibility exports remain available.
+functions. Custom placement and compatibility exports remain available. The bundled default
+uses `productAdminPath()` for organizations, home, own keys and login.
 
 The nested members route moves with the selected route. Its thin page renders
 `OrganizationMembersMount` from the same `index.server` entry, after awaiting
@@ -69,6 +75,15 @@ An explicitly composed `OrganizationAccessClient` can supply `membersHref` or
 omit it when that downstream does not mount the reference members page.
 
 ## Explicit nonhierarchical destinations
+
+The bundled admin routes supply `deniedContent` to ready organization/member/
+invitation/role/key mounts. It renders the shared local unavailable recovery
+without retaining protected organization details. Keep this application-owned
+slot separate from domain data/permission checks. Custom consumers can supply
+their own recovery; the default headless lifecycle still hides refused data.
+Use the fixed-shop variant without the list action when choosing another
+organization is not a supported journey. The selected logout action must remain
+usable even when profile or organization reads are refused.
 
 `OrganizationAccessClient` from `@/_pages/organization-access` retains its explicit
 props: `admission`, `input`, `explicitList`, `contextHref`, `pageHref`, `listHref`,
@@ -81,8 +96,8 @@ selected-page presentation only from a fresh server context read with the same
 expected admission binding. They do not authorize client commands. The reference
 mount supplies these values so tab navigation does not flash a generic heading;
 subsequent authority failures hide protected data.
-If customizing login links here, align your own server gate too; the ordinary
-mount's server login destination remains `/login`.
+For custom login links, align the mount's `loginHref` and page-level server
+gate with the selected frontend. The bundled default uses its configured admin login.
 
 ## A headless block inside CRM
 

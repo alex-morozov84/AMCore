@@ -333,3 +333,25 @@ for rollback; old single-role writers are incompatible with the new schema.
 Both active initial and additional administrator invitations are managed through that operator workflow. Ordinary manager create/reissue/revoke targeting either type return `409 PROVISIONING_MANAGED`; unmarked invitations and replay of already committed ordinary commands keep their current contracts.
 
 For a managed initial or additional administrator invitation, an existing member without canonical ADMIN receives `409 PROVISIONING_ADMIN_CONFLICT` (initial) or `409 ADMIN_MEMBER_ASSIGNMENT_REQUIRED` (additional) before claim. A platform operator can use the separate [explicit member assignment](../product-admin/organization-administration.md); acceptance itself never performs this promotion. An existing ADMIN still receives a consent step; acceptance records the original grant without duplicating it. Ordinary `already_access` continues preserving roles. Initial completion survives invitation retention and never restores later removed access.
+
+## Frontend destination and session isolation
+
+Existing invitation rows and already-issued root links stay site-owned. All new
+organization invitation writers, including management, initial setup, provisioning
+and administrator recovery, issue admin-bound rows with the current placement
+fingerprint. The email CTA uses the matching public admin origin/path and locale.
+Registration and mailbox verification happen before membership acceptance, even
+with public signup closed. Login alone grants no organization access.
+
+The BFF keeps new admin owner/bootstrap/OAuth/verification/staging journals in v2
+namespaces, with their own browser proofs and placement/audience fences. Legacy
+site journals retain v1 bindings. Shared-path ordinary auth retires both journals;
+separate staff-host auth touches only its own. Flow/selector IDs never substitute
+for the correct owner proof or choose a vault by themselves. An ambiguous match
+fails closed. Atomic publication checks both journal metadata and target vault.
+
+A placement change cannot resume old admin flows. Ordinary auth may atomically
+retire them while preserving deadlines and cleanup journals; it does not publish
+old credentials or extend their TTL. Keep legacy storage until its maximum
+lifetime has drained. See [placement and sessions](../product-admin/placement-and-sessions.md)
+for canonical URLs, unavailable-page recovery and coordinated upgrades.

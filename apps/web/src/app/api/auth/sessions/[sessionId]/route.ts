@@ -1,3 +1,4 @@
+import { productWebRoute } from '@/shared/api/bff/product-web-route'
 import { handleDeleteSession } from '@/shared/api/bff/sessions-handler'
 
 export async function DELETE(
@@ -5,5 +6,7 @@ export async function DELETE(
   context: { params: Promise<{ sessionId: string }> }
 ) {
   const { sessionId } = await context.params
-  return handleDeleteSession(request, sessionId)
+  return productWebRoute(request, 'product-data', (selected) =>
+    handleDeleteSession(request, sessionId, selected)
+  )
 }

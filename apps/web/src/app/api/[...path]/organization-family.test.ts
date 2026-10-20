@@ -11,12 +11,17 @@ vi.mock('@/shared/api/bff/ensure-fresh-session', () => ({ ensureFreshSession: vi
 vi.mock('@/shared/api/bff/session-vault-store', () => ({ redisVaultStore: {} }))
 vi.mock('@/shared/api/bff/session-lock', () => ({ redisVaultLock: {} }))
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 
 describe('composed generic organization aliases close before authentication', () => {
   it.each(['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'] as const)(
     '%s cannot bypass the typed boundary',
     async (method) => {
+      vi.stubEnv('FRONTEND_URL', 'https://web.test')
+      vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-context-key-at-least-32-characters>')
       const fetch = vi.fn()
       vi.stubGlobal('fetch', fetch)
       vi.mocked(cookies).mockClear()
@@ -32,9 +37,9 @@ describe('composed generic organization aliases close before authentication', ()
         ['other', '..', 'organizations', 'org-a'],
       ]) {
         const response = await route[method](
-          new Request('http://web.test/api/alias', {
+          new Request('https://web.test/api/alias', {
             method,
-            headers: { origin: 'http://foreign.test' },
+            headers: { host: 'web.test', origin: 'http://foreign.test' },
           }),
           { params: Promise.resolve({ path }) }
         )

@@ -1,0 +1,21 @@
+import { OrganizationInvitationsMount } from '@/_app/organization-access/index.server'
+import { ProductAdminRecovery, requireProductAdmin } from '@/_app/product-admin'
+
+export const dynamic = 'force-dynamic'
+export default async function Invitations({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const { id } = await params
+  await requireProductAdmin({ page: 'invites', orgId: id }, await searchParams)
+  return (
+    <OrganizationInvitationsMount
+      deniedContent={<ProductAdminRecovery />}
+      id={id}
+      searchParams={searchParams}
+    />
+  )
+}

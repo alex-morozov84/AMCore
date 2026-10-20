@@ -4,5 +4,7 @@ import type { ConsoleVaultRecord } from './session-vault.types'
 
 import 'server-only'
 
-export const redisConsoleVaultStore =
-  createRedisVaultStore<ConsoleVaultRecord>('web:console-session:v1')
+export const redisConsoleVaultStore = createRedisVaultStore<ConsoleVaultRecord>(
+  'web:console-session:v1',
+  'console'
+)

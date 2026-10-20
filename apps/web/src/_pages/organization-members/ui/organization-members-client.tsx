@@ -16,6 +16,7 @@ import { OrganizationSectionNav } from '@/widgets/organization-nav'
 import { memberListHref, type MemberListView } from '../model/member-list-navigation'
 
 export function OrganizationMembersClient({
+  deniedContent,
   admission,
   organizationId,
   initialOrganizationName,
@@ -26,6 +27,7 @@ export function OrganizationMembersClient({
   listHref,
   query,
 }: {
+  deniedContent?: React.ReactNode
   admission: ProductAccessBootstrap
   organizationId: string
   initialOrganizationName?: string
@@ -46,6 +48,12 @@ export function OrganizationMembersClient({
     access.data && 'canManageTeamAccess' in access.data.data && access.data.data.canManageTeamAccess
   const identity = `${admission.binding}:${organizationId}`
   const expectedAccessLoss = removedIdentity === identity && access.state.status === 'denied'
+  if (
+    ((access.state.status === 'denied' && !expectedAccessLoss) ||
+      (access.state.status === 'ready' && !allowed)) &&
+    deniedContent
+  )
+    return deniedContent
   return (
     <section className="space-y-6">
       <BackLink href={listHref ?? backHref}>{t('allOrganizations')}</BackLink>

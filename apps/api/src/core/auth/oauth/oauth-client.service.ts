@@ -83,4 +83,8 @@ export class OAuthClientService {
   clientSecretPost(): ClientAuth {
     return client.ClientSecretPost()
   }
+
+  enableNonRepudiationChecks(config: Configuration): void {
+    client.enableNonRepudiationChecks(config)
+  }
 }

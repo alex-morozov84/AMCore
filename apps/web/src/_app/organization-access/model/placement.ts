@@ -1,15 +1,19 @@
+import { productAdminPath } from '@amcore/shared'
+
 export interface OrganizationAccessPlacement {
   readonly organizationsPath: string
   readonly ownApiKeysPath?: string
   readonly homeHref: string
+  readonly loginHref?: string
 }
 
 /** Application-owned destinations: change once, then wire matching physical routes. */
 export const organizationAccessPlacement: OrganizationAccessPlacement = Object.freeze(
   normalizePlacement({
-    organizationsPath: '/organizations',
-    homeHref: '/',
-    ownApiKeysPath: '/settings/api-keys',
+    organizationsPath: productAdminPath('/organizations'),
+    loginHref: productAdminPath('/login'),
+    homeHref: productAdminPath(),
+    ownApiKeysPath: productAdminPath('/settings/api-keys'),
   })
 )
 
@@ -29,6 +33,9 @@ function placementPath(value: string, field: string, allowRoot: boolean) {
 
 function normalizePlacement(placement: OrganizationAccessPlacement): OrganizationAccessPlacement {
   return {
+    ...(placement.loginHref && {
+      loginHref: placementPath(placement.loginHref, 'loginHref', false),
+    }),
     ...(placement.ownApiKeysPath && {
       ownApiKeysPath: placementPath(placement.ownApiKeysPath, 'ownApiKeysPath', false),
     }),

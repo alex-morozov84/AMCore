@@ -91,6 +91,8 @@ x-app-env: &app-env
   EMAIL_FROM: ${EMAIL_FROM:-noreply@amcore.com}
   SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@amcore.com}
   FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3002}
+  PRODUCT_ADMIN_ORIGIN: ${PRODUCT_ADMIN_ORIGIN:-}
+  WEB_FRONTEND_CONTEXT_KEY: ${WEB_FRONTEND_CONTEXT_KEY:-}
   JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-min-32-characters-change-me}
   # Storage: local by default; set STORAGE_DRIVER=s3 + the vars below for real S3.
   STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
@@ -315,6 +317,9 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_URL: ${API_URL:-http://api:5002}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3002}
+      PRODUCT_ADMIN_ORIGIN: ${PRODUCT_ADMIN_ORIGIN:-}
+      WEB_FRONTEND_CONTEXT_KEY: ${WEB_FRONTEND_CONTEXT_KEY:-}
       # BFF session vault (ADR-068) — required for authenticated flows, not
       # just the API. Same COMPOSE_REDIS_URL override as `x-app-env` above.
       REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}

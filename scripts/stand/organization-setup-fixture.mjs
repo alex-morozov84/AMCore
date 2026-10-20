@@ -2,7 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export const isOrganizationMailFixture = (m) =>
-  ['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)
+  ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
+    m.fixtureProfile
+  )
 
 export function assertOrganizationSetupFixture(m) {
   if (m.fixtureProfile === 'organization-shop' && (m.purpose !== 'e2e' || m.mocked))

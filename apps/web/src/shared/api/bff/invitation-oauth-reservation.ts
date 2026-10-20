@@ -34,49 +34,56 @@ export function invitationOAuthReservation(
         const first = await captureInvitationRequest(request, flowId, deps, true)
         const input = invitationFlowExpectedSchema.parse(await readContextJson(request.body, 2048))
         if (input.binding.flowId !== flowId) throw invitationFlowChanged()
-        return withInvitationOwnerLease(first.ownerHash, signal, async () => {
-          const snapshot = await captureInvitationRequest(request, flowId, deps, true)
-          const reserved = reserveInvitationAuth(
-            snapshot.owner,
-            input.binding,
-            snapshot.session?.binding ?? null,
-            'oauth',
-            allowed,
-            Date.now()
-          )
-          const carrier: InvitationOAuthCarrier = {
-            attemptId: reserved.attempt.id,
-            ownerHash: snapshot.ownerHash,
-            origin: snapshot.owner.origin,
-            flowId,
-            reservedRevision: reserved.flow.binding.flowRevision,
-            expectedSessionBinding: null,
-            ownerEpoch: snapshot.owner.epoch,
-            provider: allowed,
-            ...snapshot.flow.intent,
-            fence: reserved.attempt.fence,
-            createdAt: reserved.attempt.createdAt,
-            expiresAt: reserved.attempt.expiresAt,
-            status: 'reserved',
-            ticketHash: null,
-            backendSessionId: null,
-          }
-          signal.throwIfAborted()
-          if (
-            !(await reserveInvitationOAuthCarrier(
-              snapshot.ownerHash,
-              snapshot.owner.version,
-              reserved.owner,
-              carrier
-            ))
-          )
-            throw invitationFlowChanged()
-          signal.throwIfAborted()
-          return invitationFlowOAuthResponseSchema.parse({
-            binding: reserved.flow.binding,
-            authorizeHref: `/api/auth/oauth/${allowed}?invitationAttempt=${reserved.attempt.id}`,
-          })
-        })
+        return withInvitationOwnerLease(
+          first.ownerHash,
+          signal,
+          async () => {
+            const snapshot = await captureInvitationRequest(request, flowId, deps, true)
+            const reserved = reserveInvitationAuth(
+              snapshot.owner,
+              input.binding,
+              snapshot.session?.binding ?? null,
+              'oauth',
+              allowed,
+              Date.now()
+            )
+            const carrier: InvitationOAuthCarrier = {
+              attemptId: reserved.attempt.id,
+              ownerHash: snapshot.ownerHash,
+              origin: snapshot.owner.origin,
+              flowId,
+              reservedRevision: reserved.flow.binding.flowRevision,
+              expectedSessionBinding: null,
+              ownerEpoch: snapshot.owner.epoch,
+              provider: allowed,
+              ...snapshot.flow.intent,
+              fence: reserved.attempt.fence,
+              createdAt: reserved.attempt.createdAt,
+              expiresAt: reserved.attempt.expiresAt,
+              status: 'reserved',
+              ticketHash: null,
+              backendSessionId: null,
+            }
+            signal.throwIfAborted()
+            if (
+              !(await reserveInvitationOAuthCarrier(
+                snapshot.ownerHash,
+                snapshot.owner.version,
+                reserved.owner,
+                carrier,
+                deps.webContext
+              ))
+            )
+              throw invitationFlowChanged()
+            signal.throwIfAborted()
+            return invitationFlowOAuthResponseSchema.parse({
+              binding: reserved.flow.binding,
+              authorizeHref: `${deps.webContext?.frontend === 'admin' ? '/api/product-admin/auth' : '/api/auth'}/oauth/${allowed}?invitationAttempt=${reserved.attempt.id}`,
+            })
+          },
+          undefined,
+          deps.webContext
+        )
       },
       15000
     )

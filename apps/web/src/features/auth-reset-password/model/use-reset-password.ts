@@ -4,7 +4,7 @@ import type { UseFormSetError } from 'react-hook-form'
 import { resetPasswordSchema } from '@amcore/shared'
 import type { z } from 'zod'
 
-import { authApi } from '@/shared/api'
+import { type AuthActionBase, authActions } from '@/shared/api/auth-api'
 import { useFormMutation } from '@/shared/hooks'
 
 // The form only ever collects the new password — `token` comes from the
@@ -15,9 +15,13 @@ import { useFormMutation } from '@/shared/hooks'
 export const newPasswordSchema = resetPasswordSchema.pick({ password: true })
 export type NewPasswordInput = z.infer<typeof newPasswordSchema>
 
-export function useResetPassword(setError?: UseFormSetError<NewPasswordInput>) {
+export function useResetPassword(
+  setError?: UseFormSetError<NewPasswordInput>,
+  actionBase: AuthActionBase = '/auth'
+) {
   return useFormMutation({
-    mutationFn: (data: { password: string; token: string }) => authApi.resetPassword(data),
+    mutationFn: (data: { password: string; token: string }) =>
+      authActions(actionBase).resetPassword(data),
     setError,
   })
 }

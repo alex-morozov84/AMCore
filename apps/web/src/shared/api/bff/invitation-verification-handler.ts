@@ -35,6 +35,7 @@ export async function observeInvitationVerification(
     '/auth/me',
     z.strictObject({ user: userResponseSchema.nullable() }),
     {
+      context: deps.webContext,
       source: request.headers,
       signal,
       method: 'GET',
@@ -48,6 +49,7 @@ export async function observeInvitationVerification(
     '/auth/invites/continuations/inspect',
     invitationInspectResponseSchema,
     {
+      context: deps.webContext,
       source: request.headers,
       signal,
       method: 'POST',
@@ -75,20 +77,26 @@ export function invitationVerificationHandler(
         const first = await captureInvitationRequest(request, flowId, deps, true)
         const input = invitationFlowExpectedSchema.parse(await readContextJson(request.body, 2048))
         if (input.binding.flowId !== flowId) throw invitationFlowChanged()
-        return withInvitationOwnerLease(first.ownerHash, signal, async () => {
-          const snapshot = await captureInvitationRequest(request, flowId, deps, true)
-          if (!snapshot.session) throw new ContextRequestError(401, 'UNAUTHORIZED')
-          const flow = expectedInvitationFlow(
-            snapshot.owner,
-            input.binding,
-            snapshot.session.binding,
-            Date.now()
-          )
-          if (flow.state !== 'active' || (flow.handoff && !flow.handoff.confirmed))
-            throw invitationFlowChanged()
-          const data = await observeInvitationVerification(request, snapshot, deps, signal)
-          return invitationFlowVerificationResponseSchema.parse({ binding: flow.binding, data })
-        })
+        return withInvitationOwnerLease(
+          first.ownerHash,
+          signal,
+          async () => {
+            const snapshot = await captureInvitationRequest(request, flowId, deps, true)
+            if (!snapshot.session) throw new ContextRequestError(401, 'UNAUTHORIZED')
+            const flow = expectedInvitationFlow(
+              snapshot.owner,
+              input.binding,
+              snapshot.session.binding,
+              Date.now()
+            )
+            if (flow.state !== 'active' || (flow.handoff && !flow.handoff.confirmed))
+              throw invitationFlowChanged()
+            const data = await observeInvitationVerification(request, snapshot, deps, signal)
+            return invitationFlowVerificationResponseSchema.parse({ binding: flow.binding, data })
+          },
+          undefined,
+          deps.webContext
+        )
       },
       10000
     )

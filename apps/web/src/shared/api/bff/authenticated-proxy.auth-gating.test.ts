@@ -27,10 +27,14 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
     (method) => {
       it.each([
         ['auth', 'login'],
+        ['auth', 'logins'],
+        ['auth', 'login', 'extra'],
+        ['auth', 'oauth', 'providers'],
         ['auth', 'register'],
         ['auth', 'refresh'],
         ['auth', 'step-up'],
         ['auth', 'oauth', 'exchange'],
+        ['auth', 'oauth', 'complete'],
         ['organizations', 'OrgID', 'switch'],
         ['Organizations', 'x/y', 'SWITCH'],
         ['Auth', 'LOGIN'],
@@ -56,8 +60,6 @@ describe('proxyToBackend — session/CSRF gating and auth-failure classification
 
   it.each([
     ['auth', 'me'],
-    ['auth', 'logins'],
-    ['auth', 'login', 'extra'],
     ['organizations', 'id', 'switching'],
   ])('does not broaden denial to %j', async (...segments) => {
     mockCookieStore(undefined)

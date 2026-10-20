@@ -3,6 +3,7 @@ import { authFailureResponse } from '@/shared/api/bff/auth-failure-response'
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { isTrustedOrigin } from '@/shared/api/bff/origin-guard'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { isConsoleHost } from '@/shared/lib/console-host-guard'
 
 import { isTrustedConsoleOrigin } from './origin-guard'
 import { getConsoleSessionEntry } from './session'
@@ -27,11 +28,13 @@ export type ConsoleTokenResolution = { token: string } | { failure: Response }
  * generic proxy.
  */
 export async function resolveConsoleAccessToken(request: Request): Promise<ConsoleTokenResolution> {
+  if (!isConsoleHost(request.headers.get('host')))
+    return { failure: apiErrorResponse(request, { statusCode: 404, message: 'Not found' }) }
   try {
     const entry =
       ADMIN_CONSOLE_CONFIG.mode === 'host'
         ? await getConsoleSessionEntry()
-        : await getOptionalSessionEntry()
+        : await getOptionalSessionEntry('site-auth')
     if (!entry) {
       return {
         failure: apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' }),

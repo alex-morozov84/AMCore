@@ -1,19 +1,23 @@
 import { cookies } from 'next/headers'
 
 import type { ContextExecutorDeps } from './context-executor'
-import { SESSION_COOKIE_NAME } from './session-cookie'
-import { redisVaultLock } from './session-lock'
-import { redisVaultStore } from './session-vault-store'
+import { type ProductRouteKind, resolveProductWebContext } from './product-web-context.server'
 import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
 
-export function productContextDeps(source: Headers): ContextExecutorDeps {
+export function productContextDeps(
+  source: Headers,
+  kind: ProductRouteKind = 'product-data'
+): ContextExecutorDeps {
+  const context = resolveProductWebContext(source, kind)
   return {
-    readSessionId: async () => (await cookies()).get(SESSION_COOKIE_NAME)?.value,
+    webContext: context,
+    expectedAudience: context.audience,
+    readSessionId: async () => (await cookies()).get(context.cookieName)?.value,
     apiBase: process.env.API_URL ?? 'http://localhost:5002',
-    store: redisVaultStore,
-    lock: redisVaultLock,
-    upstreamRefresh: createUpstreamRefresh(source),
+    store: context.store,
+    lock: context.lock,
+    upstreamRefresh: createUpstreamRefresh(source, context),
   }
 }

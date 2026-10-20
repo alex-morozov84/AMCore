@@ -38,10 +38,11 @@ describe('GitHubProvider', () => {
       expect(url.searchParams.get('state')).toBe('state-abc')
     })
 
-    it('should not include code_challenge (GitHub has no PKCE)', async () => {
+    it('includes S256 challenge for new authorization starts', async () => {
       const url = await provider.getAuthorizationURL('state', 'verifier')
 
-      expect(url.searchParams.has('code_challenge')).toBe(false)
+      expect(url.searchParams.get('code_challenge')).toHaveLength(43)
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256')
     })
   })
 

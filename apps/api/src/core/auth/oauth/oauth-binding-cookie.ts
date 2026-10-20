@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express'
 
+import type { FrontendDestination } from '@amcore/shared'
+
 /**
  * OAuth browser-binding cookie (login-CSRF / session-swap defense, RFC 6749
  * §10.12 / RFC 6819 §5.3.5). The raw nonce is the double-submit value; only its
@@ -48,7 +50,8 @@ export function setOAuthBindingCookie(
   provider: string,
   nonce: string,
   isProduction: boolean,
-  maxAgeUnit?: 'milliseconds' | 'seconds'
+  maxAgeUnit?: 'milliseconds' | 'seconds',
+  frontend: FrontendDestination = 'site'
 ): void {
   const seconds = maxAgeUnit === 'seconds' || (maxAgeUnit === undefined && 'raw' in res)
   const maxAge = seconds ? MAX_AGE_MS / 1000 : MAX_AGE_MS
@@ -69,7 +72,7 @@ export function setOAuthBindingCookie(
     // from the HTTPS *transport* rule but still accepts the `Secure` *attribute*,
     // so dev works; a plain-HTTP non-local callback simply cannot run Apple,
     // which matches Apple's HTTPS return-URL requirement.
-    res.cookie(APPLE_COOKIE, nonce, {
+    res.cookie(frontend === 'admin' ? 'amcore_admin_oauth_state_apple' : APPLE_COOKIE, nonce, {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
@@ -79,7 +82,7 @@ export function setOAuthBindingCookie(
     return
   }
 
-  res.cookie(DEFAULT_COOKIE, nonce, {
+  res.cookie(frontend === 'admin' ? 'amcore_admin_oauth_state' : DEFAULT_COOKIE, nonce, {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'lax',
@@ -88,17 +91,31 @@ export function setOAuthBindingCookie(
   })
 }
 
-export function readOAuthBindingNonce(req: Request, provider: string): string | undefined {
+export function readOAuthBindingNonce(
+  req: Request,
+  provider: string,
+  frontend: FrontendDestination = 'site'
+): string | undefined {
   const cookies = req.cookies as Record<string, string | undefined> | undefined
+  if (frontend === 'admin')
+    return cookies?.[
+      isFormPostProvider(provider) ? 'amcore_admin_oauth_state_apple' : 'amcore_admin_oauth_state'
+    ]
   return isFormPostProvider(provider) ? cookies?.[APPLE_COOKIE] : cookies?.[DEFAULT_COOKIE]
 }
 
-export function clearOAuthBindingCookie(res: Response, provider: string): void {
+export function clearOAuthBindingCookie(
+  res: Response,
+  provider: string,
+  frontend: FrontendDestination = 'site'
+): void {
   // clearCookie must use the same path the cookie was set with, or the browser
   // keeps it.
   if (isFormPostProvider(provider)) {
-    res.clearCookie(APPLE_COOKIE, { path: APPLE_CALLBACK_PATH })
+    res.clearCookie(frontend === 'admin' ? 'amcore_admin_oauth_state_apple' : APPLE_COOKIE, {
+      path: APPLE_CALLBACK_PATH,
+    })
     return
   }
-  res.clearCookie(DEFAULT_COOKIE, { path: '/' })
+  res.clearCookie(frontend === 'admin' ? 'amcore_admin_oauth_state' : DEFAULT_COOKIE, { path: '/' })
 }

@@ -32,7 +32,7 @@ export async function OwnApiKeysMount({
       isInvalidRefreshError(error) ||
       (error instanceof ContextRequestError && error.status === 401)
     )
-      return redirectToLogin()
+      return redirectToLogin(placement.loginHref ?? '/login')
     throw error
   }
   const search = await searchParams

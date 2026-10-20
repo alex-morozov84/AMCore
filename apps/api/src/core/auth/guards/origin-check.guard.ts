@@ -5,6 +5,8 @@ import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions/index.js'
 import { EnvService } from '../../../env/env.service.js'
+import { browserFrontendContext } from '../../frontend-context/frontend-context.service.js'
+import { resolveFrontendPlacement } from '../../frontend-context/frontend-placement.js'
 
 @Injectable()
 export class OriginCheckGuard implements CanActivate {
@@ -14,8 +16,14 @@ export class OriginCheckGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>()
     const origin = this.resolveOrigin(request)
 
-    if (origin === null) return true
-    if (this.env.get('CORS_ORIGIN').includes(origin)) return true
+    const frontend = browserFrontendContext(request)
+    if (frontend) {
+      const expected = resolveFrontendPlacement(this.env)[frontend.frontend]
+      if (origin === expected) return true
+    } else {
+      if (origin === null) return true
+      if (this.env.get('CORS_ORIGIN').includes(origin)) return true
+    }
 
     throw new AppException(
       'Request origin rejected',

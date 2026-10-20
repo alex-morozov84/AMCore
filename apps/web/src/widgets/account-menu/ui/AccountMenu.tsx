@@ -25,11 +25,15 @@ import { ProfileDialog } from './ProfileDialog'
  * Profile (opens the profile dialog) and Log out. It is a ready block with no knowledge of the
  * shell: the application places it, a downstream can move, restyle or replace it.
  */
-export function AccountMenu() {
+export function AccountMenu({
+  logoutOptions,
+}: {
+  logoutOptions?: { submit(): Promise<unknown>; loginHref: string }
+} = {}) {
   const t = useTranslations('account')
   const tAuth = useTranslations('auth')
   const { data, isPending } = useCurrentUser()
-  const logout = useLogout()
+  const logout = useLogout(logoutOptions)
   const [profileOpen, setProfileOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const user = data?.user

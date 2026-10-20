@@ -11,6 +11,12 @@ import type { InvitationOwnerRecord } from './invitation-vault-record'
 import 'server-only'
 
 export const invitationOAuthCarrierSchema = z.strictObject({
+  frontend: z.literal('admin').optional(),
+  audience: z.enum(['product', 'staff']).optional(),
+  placementFingerprint: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   attemptId: invitationFlowIdSchema,
   ownerHash: z.string().regex(/^[a-f0-9]{64}$/),
   origin: z.url(),
@@ -43,6 +49,9 @@ export function invitationOAuthFlow(
 ) {
   const flow = owner.flows.find((candidate) => candidate.binding.flowId === carrier.flowId)
   if (
+    carrier.frontend !== owner.frontend ||
+    carrier.audience !== owner.audience ||
+    carrier.placementFingerprint !== owner.placementFingerprint ||
     carrier.ownerHash !== ownerHash ||
     carrier.origin !== owner.origin ||
     carrier.expiresAt <= now ||

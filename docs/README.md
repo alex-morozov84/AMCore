@@ -215,3 +215,5 @@ there, not here.
 - Add an audited action → [Operations · Add an audited action](operations/audit-log.md#add-an-audited-action)
 - Add a metric → [Operations · Add a metric](operations/observability.md#add-a-metric)
 - Add or change an alert, dashboard panel, runbook, or receiver → [Operations · Change or extend observability](operations/observability.md#change-or-extend-observability)
+
+[Place product administration and isolate host sessions](product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.

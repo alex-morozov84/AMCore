@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 
+import type { AuthActionBase } from '@/shared/api/auth-api'
 import { useLocalizedForm } from '@/shared/hooks'
 import { cn } from '@/shared/lib/utils'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
@@ -31,6 +32,9 @@ interface ResetPasswordFormProps {
    * the page is opened without one — a mistyped/stale link, not a
    * validation failure the form itself can recover from. */
   token?: string
+  actionBase?: AuthActionBase
+  loginHref?: string
+  forgotPasswordHref?: string
 }
 
 /**
@@ -40,7 +44,12 @@ interface ResetPasswordFormProps {
  * `/login`) rather than navigating there automatically: the backend
  * deletes every session on reset, so there is nothing to resume mid-flow.
  */
-export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
+export function ResetPasswordForm({
+  token,
+  actionBase = '/auth',
+  loginHref = '/login',
+  forgotPasswordHref = '/forgot-password',
+}: ResetPasswordFormProps) {
   const passwordT = useTranslations('common')
   const t = useTranslations('auth')
   const tErrors = useTranslations('errors')
@@ -50,13 +59,13 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     defaultValues: { password: '' },
   })
 
-  const { mutate, isPending, error } = useResetPassword(form.setError)
+  const { mutate, isPending, error } = useResetPassword(form.setError, actionBase)
 
   if (!token) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">{tErrors('TOKEN_INVALID')}</p>
-        <RouteProgressLink href="/forgot-password" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href={forgotPasswordHref} className={cn(buttonVariants(), 'w-full')}>
           {t('requestNewLink')}
         </RouteProgressLink>
       </div>
@@ -67,7 +76,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{t('resetPasswordSuccess')}</p>
-        <RouteProgressLink href="/login" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href={loginHref} className={cn(buttonVariants(), 'w-full')}>
           {t('login')}
         </RouteProgressLink>
       </div>

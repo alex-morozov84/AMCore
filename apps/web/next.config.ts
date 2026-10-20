@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { PRODUCT_ADMIN_CONFIG, SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { HTML_LIMITED_BOTS } from './src/shared/lib/seo/html-limited-bots'
@@ -158,6 +158,25 @@ const nextConfig: NextConfig = {
         source: SUPPORTED_LOCALES.length > 1 ? '/:locale/verify-email' : '/verify-email',
         headers: invitationPrivacyHeaders,
       },
+      ...['/reset-password'].map((suffix) => ({
+        source: `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}${suffix}`,
+        headers: invitationPrivacyHeaders,
+      })),
+      ...['/invite/:path*', '/verify-email', '/reset-password'].map((suffix) => ({
+        source: `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}/${PRODUCT_ADMIN_CONFIG.alias}${suffix}`,
+        headers: invitationPrivacyHeaders,
+      })),
+      // Native completion forms need exact Origin; expose only origin in Referer.
+      ...['/auth/callback', `/${PRODUCT_ADMIN_CONFIG.alias}/auth/callback`].map((suffix) => ({
+        source: `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}${suffix}`,
+        headers: invitationPrivacyHeaders.map((header) =>
+          header.key === 'Referrer-Policy' ? { ...header, value: 'strict-origin' } : header
+        ),
+      })),
+      ...['/api/auth/oauth/complete', '/api/product-admin/auth/oauth/complete'].map((source) => ({
+        source,
+        headers: invitationPrivacyHeaders,
+      })),
       ...[
         '/api/invitation-flows/:path*',
         '/api/invitation-operations/:path*',

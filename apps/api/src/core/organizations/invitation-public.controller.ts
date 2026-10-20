@@ -25,6 +25,8 @@ import {
   OrganizationContextBoundary,
   RequestContextPolicy,
 } from '../auth/organization-context/request-context-policy.js'
+import { ApiFrontendContext } from '../frontend-context/frontend-context.openapi.js'
+import { browserFrontendContext } from '../frontend-context/frontend-context.service.js'
 import { invitationHandoffProof } from '../invitations/invitation-auth-handoff.js'
 import { InvitationContinuationService } from '../invitations/invitation-continuation.service.js'
 import { InvitationRequestGuard } from '../invitations/invitation-request.guard.js'
@@ -36,6 +38,7 @@ import {
   InvitedRegisterDto,
 } from './dto/invitation-recipient.dto.js'
 
+@ApiFrontendContext()
 @ApiTags('auth')
 @ApiBadRequestResponse({ description: 'Invalid, expired or superseded invitation' })
 @ApiConflictResponse({ description: 'Existing account or authentication attempt' })
@@ -105,6 +108,7 @@ export class InvitationPublicController {
       userAgent: req.headers['user-agent'],
       ipAddress: resolveSessionIpAddress(req, this.env),
       acceptedLocale: negotiateLocale(req),
+      frontend: browserFrontendContext(req),
     })
     res.cookie('refresh_token', result.refreshToken, {
       httpOnly: true,

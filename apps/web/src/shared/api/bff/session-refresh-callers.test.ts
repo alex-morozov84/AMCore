@@ -32,6 +32,8 @@ vi.mock('./ensure-fresh-session', () => ({
 }))
 
 beforeEach(() => {
+  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-test-context-key-at-least-32-characters>')
   vi.stubEnv('WEB_TRUSTED_CLIENT_IP_HEADER', 'x-real-ip')
   vi.mocked(cookies).mockResolvedValue({ get: () => ({ value: 'vault-id' }) } as never)
 })
@@ -44,6 +46,7 @@ it.each(['product DAL', 'authenticated proxy', 'own sessions'])(
   '%s refresh supplies current visitor headers',
   async (caller) => {
     const source = new Headers({
+      host: 'app.example.test',
       'user-agent': caller,
       'x-real-ip': '8.8.8.8',
       [AMCORE_CLIENT_IP_HEADER]: '1.1.1.1',

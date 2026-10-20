@@ -1,4 +1,5 @@
 // Schemas public API
+export * from './frontend-context'
 
 // Auth schemas
 export {

@@ -1,8 +1,9 @@
 # Organization foundation UI and headless composition
 
 In multi-locale builds, the product sidebar's Organizations entry opens
-`/[locale]/organizations`. A single-locale fork uses `/organizations` and
-`/organizations/[id]` after the standard project initializer moves the routes.
+`/[locale]/manage/organizations` in default path mode. A single-locale fork omits
+the locale segment. Separate-host mode exposes `/organizations` at the staff host.
+See [placement and sessions](../product-admin/placement-and-sessions.md) before moving routes.
 An empty successful list offers explicit organization creation when deployment policy
 allows it; otherwise it explains invitation access. Registration never creates a
 membership. One membership opens its overview automatically only after creation

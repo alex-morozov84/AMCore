@@ -5,7 +5,9 @@ import { z } from 'zod'
 
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
+import { assertInvitationSurface, invitationNamespace } from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
+import type { ProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 
 import 'server-only'
@@ -31,6 +33,8 @@ if pending.ownerKey ~= KEYS[2] or pending.origin ~= owner.origin then return 0 e
 if pending.deadline <= now or owner.expiresAt <= now then return 0 end
 if owner.version ~= tonumber(ARGV[1]) then return 0 end
 if next.origin ~= owner.origin or next.expiresAt ~= owner.expiresAt then return 0 end
+if next.frontend ~= owner.frontend or next.audience ~= owner.audience
+  or next.placementFingerprint ~= owner.placementFingerprint then return 0 end
 local found = false
 for _, flow in ipairs(next.flows) do
   if flow.binding.flowId == ARGV[3] and flow.credential == pending.admission.credential
@@ -43,8 +47,8 @@ redis.call('DEL', KEYS[1])
 return 1
 `
 
-function pendingKey(id: string): string {
-  return `web:invitation:bootstrap:v1:${invitationFlowIdSchema.parse(id)}`
+function pendingKey(id: string, context?: ProductWebContext): string {
+  return `${invitationNamespace('bootstrap', context)}:${invitationFlowIdSchema.parse(id)}`
 }
 
 /** Only the admitted continuation is retained: the raw email token never enters storage. */
@@ -53,11 +57,12 @@ export async function saveInvitationBootstrap(
   origin: string,
   locale: string,
   admission: z.infer<typeof invitationAdmissionResponseSchema>,
-  now: number
+  now: number,
+  context?: ProductWebContext
 ): Promise<string> {
   const id = randomBytes(16).toString('base64url')
   const pending = pendingSchema.parse({
-    ownerKey: invitationOwnerKey(ownerHash),
+    ownerKey: invitationOwnerKey(ownerHash, context),
     origin,
     locale,
     admission,
@@ -66,7 +71,7 @@ export async function saveInvitationBootstrap(
   await withInvitationStorage(async () => {
     const result = await (
       await getWebRedisClient()
-    ).set(pendingKey(id), JSON.stringify(pending), {
+    ).set(pendingKey(id, context), JSON.stringify(pending), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: pending.deadline },
     })
@@ -79,13 +84,14 @@ export async function saveInvitationBootstrap(
 export async function readInvitationBootstrap(
   id: string,
   currentOwnerHash: string,
-  origin: string
+  origin: string,
+  context?: ProductWebContext
 ): Promise<PendingBootstrap | null> {
   return withInvitationStorage(async () => {
-    const raw = await (await getWebRedisClient()).get(pendingKey(id))
+    const raw = await (await getWebRedisClient()).get(pendingKey(id, context))
     if (!raw) return null
     const pending = pendingSchema.parse(JSON.parse(raw))
-    return pending.ownerKey === invitationOwnerKey(currentOwnerHash) &&
+    return pending.ownerKey === invitationOwnerKey(currentOwnerHash, context) &&
       pending.origin === origin &&
       pending.deadline > Date.now()
       ? pending
@@ -99,14 +105,16 @@ export async function attachInvitationBootstrap(
   currentOwnerHash: string,
   expectedVersion: number,
   next: InvitationOwnerRecord,
-  flowId: string
+  flowId: string,
+  context?: ProductWebContext
 ): Promise<boolean> {
   const parsed = invitationOwnerRecordSchema.parse({ ...next, version: expectedVersion + 1 })
+  assertInvitationSurface(parsed, context)
   return withInvitationStorage(async () => {
     const result = await (
       await getWebRedisClient()
     ).eval(ATTACH, {
-      keys: [pendingKey(id), invitationOwnerKey(currentOwnerHash)],
+      keys: [pendingKey(id, context), invitationOwnerKey(currentOwnerHash, context)],
       arguments: [
         String(expectedVersion),
         JSON.stringify(parsed),

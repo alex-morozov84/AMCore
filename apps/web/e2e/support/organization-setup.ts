@@ -22,7 +22,11 @@ export function setupCommand(
 }
 function invoke(script: string, input: unknown) {
   const m = activeTarget()
-  if (!['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile ?? ''))
+  if (
+    !['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
+      m.fixtureProfile ?? ''
+    )
+  )
     throw new Error('Use the organization-setup fixture')
   try {
     const output = execFileSync(

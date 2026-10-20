@@ -20,12 +20,20 @@ export async function recoverFailedInvitationAuth(input: {
   const knownRejection = input.error instanceof InvitationBackendError && input.error.knownRejection
   const aborted =
     !knownRejection &&
-    (await abortInvitationAuth(input.request.headers, {
-      attemptId: attempt.id,
-      cleanupKey: attempt.cleanupKey,
-    })) === 'aborted'
+    (await abortInvitationAuth(
+      input.request.headers,
+      {
+        attemptId: attempt.id,
+        cleanupKey: attempt.cleanupKey,
+      },
+      snapshot.webContext
+    )) === 'aborted'
   if (!knownRejection && !aborted) return
-  const owner = await invitationOwnerStore.get(snapshot.ownerHash, snapshot.owner.origin)
+  const owner = await invitationOwnerStore.get(
+    snapshot.ownerHash,
+    snapshot.owner.origin,
+    snapshot.webContext
+  )
   const flow = owner?.flows.find(
     (candidate) => candidate.binding.flowId === snapshot.flow.binding.flowId
   )
@@ -42,13 +50,15 @@ export async function recoverFailedInvitationAuth(input: {
       await invitationOwnerStore.compareAndSet(
         snapshot.ownerHash,
         owner.version,
-        retireInvitationFlows(owner, snapshot.session?.binding ?? null)
+        retireInvitationFlows(owner, snapshot.session?.binding ?? null),
+        snapshot.webContext
       )
     )
       await input.store.delete(flow.handoff.newSessionId)
     return
   }
   await releaseRejectedInvitationAuth({
+    webContext: snapshot.webContext,
     ownerHash: snapshot.ownerHash,
     origin: snapshot.owner.origin,
     flowId: snapshot.flow.binding.flowId,

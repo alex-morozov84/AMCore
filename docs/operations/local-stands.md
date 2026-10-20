@@ -431,6 +431,49 @@ from successful disposal.
 
 ## Origins, local HTTPS and transport
 
+### Product administration host rehearsal
+
+Use `pnpm stand preview --id product-admin-preview --profile product-admin-three-host`
+for separate website, staff and Console hosts. The copy-only fixture sets admin
+placement to host mode and renders its matching edge mapping before the build.
+`product-admin-console-path` retains Console on the website while isolating staff.
+Neither profile changes the authoring placement source or bypasses authorization.
+
+The `product-admin-real-stack` E2E lane targets the staff origin, with the other
+exact owned origins available to same-browser checks. Its default fixture is
+`product-admin-three-host`; `product-admin-console-path` and
+`product-admin-closed-signup` are explicit alternatives. The closed-signup fixture
+uses the isolated mail collector and step-free reports to avoid saving email-link
+secrets. It is not an owner-preview dataset. Keep provider simulation and actual
+provider-registration evidence separate.
+
+For OAuth callback checks, select the E2E-only `product-admin-oauth` fixture
+with the staff lane. It mounts a read-only API transport fixture and generates a
+client signing key in the disposable snapshot. The fixture covers Apple signed identity tokens and Google/GitHub GET callbacks.
+The real provider adapters and application auth path still run. This fixture cannot be used for owner previews;
+it does not prove live Apple registration or an external Apple account login.
+
+For path administration OAuth, use
+`pnpm stand e2e --lane real-stack --fixture product-admin-oauth-path -- product-admin-oauth-path.spec.ts`.
+This copy-only fixture uses the existing Console-host HTTPS rehearsal and requires
+an enabled Console. It keeps product administration in path mode and verifies
+its shared website session. That fixture prerequisite does not apply to product
+administration in deployed applications.
+
+Staff transport remains HTTPS when Console is disabled or uses path mode.
+Origins use different hostnames, not merely different ports. See
+[placement and sessions](../product-admin/placement-and-sessions.md) for canonical
+addresses and the difference between physical routes and public URLs.
+
+For a bounded nginx TLS ingress check, use
+`pnpm stand e2e --lane product-admin-real-stack --fixture product-admin-three-host --edge nginx -- product-admin-edge.spec.ts`.
+This flag runs the dedicated wire probe instead of the browser suite. It creates
+an owned nginx container with generated snippets, checks nginx configuration,
+and uses loopback TLS requests with the configured public Host. It does not
+replace browser auth or deployment on your own proxy.
+
+### Browser trust
+
 Each Docker stand has unique `.localhost` hostnames: cookies do not isolate by
 port. Product HTTP preview is the default.
 

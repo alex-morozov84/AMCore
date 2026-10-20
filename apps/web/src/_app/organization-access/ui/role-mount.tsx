@@ -14,20 +14,23 @@ import {
 import 'server-only'
 
 export async function OrganizationRoleMount({
+  deniedContent,
   id,
   roleId,
   placement = organizationAccessPlacement,
 }: {
+  deniedContent?: React.ReactNode
   id: string
   roleId: string
   placement?: OrganizationAccessPlacement
 }) {
   if (!roleIdSchema.safeParse(roleId).success) notFound()
-  const loaded = await loadManagedOrganization(id)
+  const loaded = await loadManagedOrganization(id, placement.loginHref ?? '/login', roleId)
   if (!loaded.ok) return <PrimaryUnavailableFallback reason="upstream" />
   const hrefs = organizationAccessHrefs(placement)
   return (
     <OrganizationRoleClient
+      deniedContent={deniedContent}
       admission={loaded.admission}
       organizationId={id}
       roleId={roleId}

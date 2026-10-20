@@ -1,11 +1,11 @@
 import { invitationFlowIdSchema } from '@amcore/shared'
 
 import { withinContextDeadline } from '@/shared/api/bff/context-deadline'
+import { invitationContextDeps } from '@/shared/api/bff/invitation-context-deps'
 import {
   assertInvitationReadCurrent,
   captureInvitationRequest,
 } from '@/shared/api/bff/invitation-request-snapshot'
-import { productContextDeps } from '@/shared/api/bff/product-context-deps'
 
 import 'server-only'
 
@@ -18,7 +18,7 @@ export function readInvitationRecipientAdmission(request: Request, flowId: strin
       const snapshot = await captureInvitationRequest(
         request,
         id,
-        productContextDeps(request.headers)
+        await invitationContextDeps(request, { flowId })
       )
       await assertInvitationReadCurrent(snapshot)
       signal.throwIfAborted()

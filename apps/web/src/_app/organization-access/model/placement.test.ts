@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { organizationAccessHrefs, organizationAccessPlacement } from './placement'
 
 describe('ordinary organization placement', () => {
-  it('preserves root defaults and explicit list escape', () => {
+  it('uses canonical admin defaults and explicit list escape', () => {
     const hrefs = organizationAccessHrefs(organizationAccessPlacement)
-    expect(hrefs.menuHref).toBe('/organizations')
-    expect(hrefs.listHref).toBe('/organizations?view=list')
-    expect(hrefs.homeHref).toBe('/')
-    expect(hrefs.contextHref('org_1')).toBe('/organizations/org_1')
+    expect(hrefs.menuHref).toBe('/manage/organizations')
+    expect(hrefs.listHref).toBe('/manage/organizations?view=list')
+    expect(hrefs.homeHref).toBe('/manage')
+    expect(hrefs.contextHref('org_1')).toBe('/manage/organizations/org_1')
   })
   it('derives every destination from a normalized custom path', () => {
     const hrefs = organizationAccessHrefs({

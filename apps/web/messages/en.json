@@ -1,4 +1,19 @@
 {
+  "productAdmin": {
+    "visitSite": "Go to website",
+    "unavailableTitle": "Page unavailable",
+    "unavailableHelp": "Check your account or ask an administrator to send you an invitation.",
+    "allOrganizations": "All organizations",
+    "sharedLogout": "Logging out also logs you out of the website.",
+    "separateLogout": "Logging out here keeps you logged in to the website.",
+    "linkedTitle": "Sign-in method connected",
+    "linkedHelp": "You can return to administration.",
+    "linkFailedTitle": "Could not confirm the connection",
+    "linkFailedHelp": "Return to administration and check your account before trying again.",
+    "returnToAdmin": "Return to administration",
+    "returnToLogin": "Return to sign in",
+    "loginTitle": "Sign in"
+  },
   "errors": {
     "STATE_CHANGED": "This work changed. Refresh it and confirm the action again.",
     "ALREADY_IN_STATE": "The queue is already in the requested state.",
@@ -40,9 +55,10 @@
     "CONTEXT_SESSION_CHANGED": "Your session changed. Reload the page to continue.",
     "UNAUTHORIZED": "Please sign in to continue.",
     "OAUTH_STATE_INVALID": "The sign-in attempt expired. Please try again.",
-    "OAUTH_PROVIDER_ERROR": "The sign-in provider returned an error. Please try again.",
-    "OAUTH_EMAIL_REQUIRED": "The provider did not share an email address, which is required to sign in.",
-    "OAUTH_PROVIDER_NOT_CONFIGURED": "This sign-in method is not available.",
+    "OAUTH_PROVIDER_ERROR": "Could not sign in with this service. Try again or use your password.",
+    "OAUTH_EMAIL_REQUIRED": "The service did not share your email address. Allow access to your email or choose another sign-in method.",
+    "OAUTH_EMAIL_UNVERIFIED": "This sign-in method has not confirmed your email address. Use another sign-in method or your password.",
+    "OAUTH_PROVIDER_NOT_CONFIGURED": "This sign-in method is currently unavailable. Choose another method.",
     "OAUTH_ACCOUNT_ALREADY_LINKED": "That account is already linked to another user.",
     "OAUTH_TICKET_INVALID": "The sign-in link expired. Please try again.",
     "STEP_UP_REQUIRED": "Please confirm your password to continue.",
@@ -1375,7 +1391,12 @@
     "resendingVerification": "Sending…",
     "resendVerificationSuccess": "If the account exists and isn't verified yet, we've sent a new verification link.",
     "publicSignupClosed": "Public registration is closed. Sign in to an existing account, or open your invitation email to create an invited account.",
-    "signupPolicyUnavailable": "Registration availability could not be checked. Try again later or sign in to an existing account."
+    "signupPolicyUnavailable": "Registration availability could not be checked. Try again later or sign in to an existing account.",
+    "oauthCompletion": {
+      "title": "Completing sign-in…",
+      "help": "If you are not redirected, select Continue.",
+      "continue": "Continue"
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
