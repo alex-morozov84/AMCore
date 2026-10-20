@@ -5,6 +5,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { consoleApi } from '@/shared/api/console-api'
+import { LogSearchTargetProvider } from '@/shared/lib/log-search-context'
+import { logSearchHref, type LogSearchTarget } from '@/shared/lib/log-search-link'
 
 // Local behavior fixture stays usable after locale scaffolding removes a catalogue.
 const messages = {
@@ -137,7 +139,7 @@ const job: WorkJob = {
 
 let queryClient: QueryClient
 
-function view(current = work) {
+function view(current = work, target: LogSearchTarget | null = null) {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const capture = vi.fn()
   render(
@@ -145,12 +147,18 @@ function view(current = work) {
       locale={DEFAULT_LOCALE}
       timeZone="UTC"
       messages={{
-        console: { backgroundWork: messages.console.backgroundWork },
+        console: {
+          backgroundWork: messages.console.backgroundWork,
+          logSearchLink: 'Find in logs',
+          overviewPublicOpenNewTab: '(opens in a new tab)',
+        },
         errors: messages.errors,
       }}
     >
       <QueryClientProvider client={queryClient}>
-        <WorkJobs work={current} blocked={false} onCapture={capture} />
+        <LogSearchTargetProvider target={target}>
+          <WorkJobs work={current} blocked={false} onCapture={capture} />
+        </LogSearchTargetProvider>
       </QueryClientProvider>
     </NextIntlClientProvider>
   )
@@ -273,6 +281,28 @@ describe('native registered job selection', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Failed' })).not.toBeInTheDocument()
     expect(screen.getAllByText(/not observed/).length).toBeGreaterThan(0)
+  })
+})
+
+describe('find in logs', () => {
+  const target: LogSearchTarget = { kind: 'grafana-loki', baseUrl: 'http://localhost:3002/' }
+
+  it('links each job id to the log search, beside the selection control and not inside it', async () => {
+    view(work, target)
+    const link = await screen.findByRole('link', { name: /Find in logs/ })
+    expect(link).toHaveAttribute('href', logSearchHref(target, 'job_1'))
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link.closest('label')).toBeNull()
+    const checkbox = screen.getByRole('checkbox', { name: 'job_1' })
+    fireEvent.click(link)
+    expect(checkbox).not.toBeChecked()
+  })
+
+  it('shows no link when the log-search address is not configured', async () => {
+    view()
+    await screen.findByRole('checkbox', { name: 'job_1' })
+    expect(screen.queryByRole('link', { name: /Find in logs/ })).not.toBeInTheDocument()
   })
 })
 

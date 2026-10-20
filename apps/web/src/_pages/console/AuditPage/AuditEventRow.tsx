@@ -1,6 +1,7 @@
 import { type AdminAuditResponse, AUDIT_ACTIONS } from '@amcore/shared'
 import { Filter } from 'lucide-react'
 
+import { LogSearchLink } from '@/shared/ui/console-detail/LogSearchLink'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import { auditActionLabel, type AuditCopy } from './audit-copy'
@@ -95,6 +96,21 @@ export function AuditEventRow({ item, baseHref, query, copy }: RowProps) {
             copied={copy.copied}
             failed={copy.copyFailed}
           />
+        </p>
+      )}
+      {item.requestId && (
+        <p className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 text-xs text-muted-foreground">
+          <span className="shrink-0">{copy.requestId}:</span>{' '}
+          <span className="truncate font-console-mono" title={item.requestId}>
+            {item.requestId}
+          </span>
+          <CopyAuditId
+            id={item.requestId}
+            label={copy.copyId}
+            copied={copy.copied}
+            failed={copy.copyFailed}
+          />
+          <LogSearchLink id={item.requestId} className="ml-2 text-xs" />
         </p>
       )}
     </li>

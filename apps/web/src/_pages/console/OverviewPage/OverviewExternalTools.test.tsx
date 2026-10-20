@@ -17,6 +17,7 @@ const text: Record<string, string> = {
   externalToolsToolNotConfigured: '{tool}: not configured.',
   externalToolsHowTo: 'How to connect',
   externalToolsRecovery: 'Recovery instructions',
+  externalToolsLogLinksNotConfigured: 'Log links on jobs and audit events: not configured.',
   overviewPublicOpenNewTab: '(opens in a new tab)',
 }
 const t = ((key: string, values?: Record<string, string>) =>
@@ -24,8 +25,10 @@ const t = ((key: string, values?: Record<string, string>) =>
 
 const none: ConsoleExternalLinks = { metrics: null, logs: null, alerts: null }
 
-function renderCard(links: ConsoleExternalLinks) {
-  return render(<OverviewExternalTools links={links} t={t} />)
+function renderCard(links: ConsoleExternalLinks, logSearchConfigured = false) {
+  return render(
+    <OverviewExternalTools links={links} logSearchConfigured={logSearchConfigured} t={t} />
+  )
 }
 
 describe('OverviewExternalTools', () => {
@@ -55,11 +58,14 @@ describe('OverviewExternalTools', () => {
   })
 
   it('shows all three links and no how-to link when everything is configured', () => {
-    renderCard({
-      metrics: 'https://grafana.example.com/d/x',
-      logs: 'https://grafana.example.com/explore',
-      alerts: 'https://alerts.example.com/',
-    })
+    renderCard(
+      {
+        metrics: 'https://grafana.example.com/d/x',
+        logs: 'https://grafana.example.com/explore',
+        alerts: 'https://alerts.example.com/',
+      },
+      true
+    )
     expect(screen.getAllByRole('link')).toHaveLength(4)
     expect(screen.queryByRole('link', { name: /How to connect/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/not configured/)).not.toBeInTheDocument()
@@ -81,5 +87,25 @@ describe('OverviewExternalTools', () => {
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
       expect(within(link).getByText(/opens in a new tab/)).toHaveClass('sr-only')
     }
+  })
+
+  describe('log links on jobs and audit events', () => {
+    const withLogs: ConsoleExternalLinks = { ...none, logs: 'https://grafana.example.com/' }
+    const note = 'Log links on jobs and audit events: not configured.'
+
+    it('says they are not configured when the Logs link is set but the log-search address is not', () => {
+      renderCard(withLogs)
+      expect(screen.getByText(note)).toBeInTheDocument()
+    })
+
+    it('says nothing once the log-search address is set', () => {
+      renderCard(withLogs, true)
+      expect(screen.queryByText(note)).not.toBeInTheDocument()
+    })
+
+    it('adds no second line when no external tool is configured at all', () => {
+      renderCard(none)
+      expect(screen.queryByText(note)).not.toBeInTheDocument()
+    })
   })
 })
