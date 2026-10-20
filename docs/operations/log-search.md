@@ -149,6 +149,8 @@ creation, loses the rotated part; this needs a log volume far above normal start
 
 Treat Alloy as a secret-visible, host-privileged component.
 
+Tested on a live stack: that Grafana cannot reach Postgres, Redis or the API; that Loki and Alloy publish no port; that a line of another Compose project is not stored; that no raw email address or secret is in stored lines. Not tested: the read-only root filesystem and dropped capabilities were set and inspected, not attacked.
+
 - It reads Docker's log files for **every** container on the host, including each container's
   `config.v2.json`, which holds its environment variables and therefore secrets. It runs as root
   because those files are root-owned. A line is sent only if it carries the Compose service label
@@ -162,7 +164,7 @@ Treat Alloy as a secret-visible, host-privileged component.
   stack's files and secrets, and both share the host's disk, so a second stack doubles the exposure
   and the disk use.
 - It has a read-only root filesystem, no capabilities, `no-new-privileges`, no published port, no
-  Docker socket and a network that cannot reach anything but Loki. Besides Docker's log
+  Docker socket and a network that cannot reach anything but Loki (and your Prometheus, if you attach one). Besides Docker's log
   directory it mounts its own state volume and, read-only, the Loki volume for the disk alerts. Keep
   it that way: do not attach it to another network and do not mount more host paths.
 - Loki has no authentication. It publishes no port, and only Alloy and the overlay's Grafana share its
