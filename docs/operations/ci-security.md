@@ -575,7 +575,12 @@ Dependabot handles patch/minor npm + action bumps and (per repo, see
 [_Strict security setup_](#strict-security-setup-after-forking)) opens security
 PRs — but it does not surface **semver-major** npm updates (ignored in
 `dependabot.yml`), Docker base-image **digest drift**, or newer **curl-pinned CLI
-tool** releases. The `dependency-freshness.yml` workflow closes that visibility
+tool** releases. It also does not bump the root `packageManager` pnpm pin or the
+Node.js major selectors; the report has a **Toolchain** section for both (pnpm
+versus the registry; Node majors versus the LTS, Current and next-LTS schedule).
+Move the pnpm pin in one PR: root manifest, both Dockerfiles, the stand installer and
+`docker/migrator` together (`scripts/lib/toolchain-pins.test.mjs` checks they agree).
+The `dependency-freshness.yml` workflow closes that visibility
 gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
 `dependency-freshness`, edited in place) listing all three. It opens no PRs and is

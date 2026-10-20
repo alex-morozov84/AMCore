@@ -556,7 +556,7 @@ a cold api+web build downloads a few hundred MB once, later builds download clos
 to nothing. Integrity checking is unchanged — `--frozen-lockfile` still verifies
 every package against the lockfile hashes.
 
-pnpm 11 reads these settings from `pnpm_config_*` variables; `npm_config_*` and
+pnpm 12 reads these settings from `pnpm_config_*` variables; `npm_config_*` and
 `PNPM_STORE_DIR` are ignored, which silently disables the cache mount. Check
 `Content-addressable store is at: /pnpm/store/v11` in the build log if a build
 downloads everything again.
