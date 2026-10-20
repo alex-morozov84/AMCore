@@ -33,7 +33,7 @@ investigation reference; the screen has no event-ID search field.
 
 Each event can also show a **Request ID**: the ID of the request that caused the event, with a copy
 icon. It is a search aid. The caller of the API can choose it, so it does not prove who made the
-request, and an event may have none. With [Find in logs links](configuration.md#find-in-logs-links)
+request (the actor column says who acted), and an event may have none. With [Find in logs links](configuration.md#find-in-logs-links)
 configured, **Find in logs** beside the request ID and beside a task ID in the details opens the
 log lines of that request or task.
 

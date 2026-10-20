@@ -259,7 +259,7 @@ to the tool. Single sign-on between the Console and these tools is not provided.
 
 ### Find in logs links
 
-With the [log-search overlay](../operations/log-search.md) running, the Console can open the log
+Start the [log-search overlay](../operations/log-search.md#install) first. Then the Console can open the log
 search for one ID with a **Find in logs** link. Set one more variable in the web service
 environment, in the same way as the three above:
 
@@ -267,12 +267,14 @@ environment, in the same way as the three above:
 ADMIN_CONSOLE_LOGS_GRAFANA_URL=http://localhost:3002
 ```
 
-| Question                      | Answer                                                                                                                                               |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| What value do I set?          | The address of the Grafana from the overlay. It follows the address rules above. A path is allowed (`https://host.example.com/grafana`).             |
-| Which value with the overlay? | `http://localhost:3002`. The overlay's Grafana listens on `127.0.0.1` of the Docker host, so the link works only while **your** SSH tunnel is open.  |
-| Can I use my own Grafana?     | Yes, if it has a Loki data source with the uid `amcore-loki` that reads the overlay's Loki. Without that data source the link opens an empty search. |
-| What if it is empty?          | No **Find in logs** links appear and nothing else changes. When **Logs** is set, the card says "Log links on jobs and audit events: not configured." |
+| Question                                 | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What value do I set?                     | The address of the Grafana from the overlay. It follows the address rules above. A path is allowed (`https://host.example.com/grafana`).                                                                                                                                                                                                                                                                                                                                          |
+| Which value with the overlay?            | `http://localhost:3002`. The overlay's Grafana listens on `127.0.0.1` of the Docker host, so the link works only while **your** SSH tunnel is open.                                                                                                                                                                                                                                                                                                                               |
+| Do I also need `ADMIN_CONSOLE_LOGS_URL`? | No. That variable only sets the plain **Logs** link on the Overview card. The two are independent.                                                                                                                                                                                                                                                                                                                                                                                |
+| Can I use my own Grafana?                | Yes, if its Loki data source has the **uid** `amcore-loki` (the name does not matter) and reads the overlay's Loki. A Grafana on another host cannot reach that Loki: it publishes no port. Either attach your Grafana to the overlay's `logs` network, which lets it read all logs, like the Prometheus in [Alerts](../operations/log-search.md#alerts), or use a [managed Loki](../operations/log-search.md#use-a-managed-loki-instead). A different uid opens an empty search. |
+| Can the address use plain `http`?        | Only for `localhost` and `127.0.0.1`. For any other host use `https`, for example behind a reverse proxy.                                                                                                                                                                                                                                                                                                                                                                         |
+| What if it is empty?                     | No **Find in logs** links appear and nothing else changes. When **Logs** is set, the card says "Log links on jobs and audit events: not configured."                                                                                                                                                                                                                                                                                                                              |
 
 Where the links appear:
 
@@ -286,6 +288,8 @@ Each link opens Grafana in a new tab and runs `{service=~"api|worker"} |= "<ID>"
 7 days, the default retention of the overlay. If your retention is longer, widen the time range in
 Grafana. What a search finds:
 
+- The link searches the `api` and `worker` services. The `web` service has its own lines; search
+  them by hand ([Find a request](../operations/log-search.md#find-a-request)).
 - A queued job: the API line that queued it and the worker lines of its run.
 - A notification delivery or an AI run: only the lines that the worker logged with that ID. Many
   deliveries log only failures, so an empty result does not mean the delivery did not happen.
@@ -293,6 +297,16 @@ Grafana. What a search finds:
   choose; it does not prove who made the request.
 - An ID older than the retention, or a line that was never logged: no result. Grafana then shows an
   empty list; check [what is lost and kept](../operations/log-search.md#what-fails-and-what-is-lost).
+
+If a link does not work, check in this order:
+
+1. **Connection error.** The SSH tunnel to the Grafana is not open, or it uses another port than the
+   address. The overlay's Grafana is not running (`docker compose ps logs-grafana`). The address has a
+   typo. The `web` container was restarted, not recreated, after you set the variable.
+2. **Grafana asks for a login.** Sign in with its own user; the Console sends no credentials.
+3. **An empty list.** The ID is older than the retention (7 days by default), the line was never
+   logged, or the data source uid is not `amcore-loki`. Check the pipeline with a fresh request
+   ([Find a request](../operations/log-search.md#find-a-request)).
 
 The Console only builds the address. It sends no token or session, and Grafana asks for its own login.
 A set but unusable value stops the web service at start-up with the variable's name, like the
