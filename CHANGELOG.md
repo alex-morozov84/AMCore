@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The API Docker image no longer carries source code, tests, Prisma files, tool configs or source
-  maps, and test-only modules (`*.testkit.ts`) no longer compile into `dist`. CI now checks the
-  image contents.
+- The API Docker image no longer carries the API package source, tests, Prisma schemas/migrations,
+  tool configs or source maps. Test-only modules (`*.testkit.ts`) no longer compile into `dist`.
+  CI now checks the image contents.
 
 - Redis health checks no longer report a false `value mismatch` when several probes overlap.
   Each probe now uses its own short-lived key, so `/health`, `/health/startup` and `/health/ready`
