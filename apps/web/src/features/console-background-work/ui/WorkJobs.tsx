@@ -11,6 +11,7 @@ import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { LogSearchLink } from '@/shared/ui/console-detail/LogSearchLink'
 import { DebouncedSearchField } from '@/shared/ui/debounced-search-field'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/shared/ui/empty'
 import { FilterButtons } from '@/shared/ui/filter-buttons'
@@ -190,23 +191,26 @@ export function WorkJobs({
         <ul className="space-y-3" aria-busy={page.isFetching}>
           {rows.map((row) => (
             <li key={row.identity.incarnation} className="space-y-2 rounded-md border p-3">
-              <label className="flex items-center gap-2">
-                <Checkbox
-                  disabled={blocked || accessLost || row.source === 'PG_evidence'}
-                  checked={selected.some((item) => item.identity.id === row.identity.id)}
-                  onCheckedChange={(checked) =>
-                    setSelected((current) =>
-                      checked
-                        ? [
-                            ...current.filter((item) => item.identity.id !== row.identity.id),
-                            structuredClone(row),
-                          ]
-                        : current.filter((item) => item.identity.id !== row.identity.id)
-                    )
-                  }
-                />
-                <span className="break-all font-console-mono text-sm">{row.identity.id}</span>
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <label className="flex items-center gap-2">
+                  <Checkbox
+                    disabled={blocked || accessLost || row.source === 'PG_evidence'}
+                    checked={selected.some((item) => item.identity.id === row.identity.id)}
+                    onCheckedChange={(checked) =>
+                      setSelected((current) =>
+                        checked
+                          ? [
+                              ...current.filter((item) => item.identity.id !== row.identity.id),
+                              structuredClone(row),
+                            ]
+                          : current.filter((item) => item.identity.id !== row.identity.id)
+                      )
+                    }
+                  />
+                  <span className="break-all font-console-mono text-sm">{row.identity.id}</span>
+                </label>
+                <LogSearchLink id={row.identity.id} />
+              </div>
               {row.source === 'PG_evidence' && (
                 <p className="break-all font-console-mono text-xs">
                   {t('incarnation', { id: row.identity.incarnation })}

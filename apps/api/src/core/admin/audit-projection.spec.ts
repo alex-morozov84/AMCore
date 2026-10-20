@@ -2,6 +2,7 @@ import { projectAuditRow } from './audit-projection'
 
 const row = {
   id: 'c1',
+  requestId: 'req-55' as string | null,
   createdAt: new Date('2026-09-23T00:00:00.000Z'),
   actorType: 'USER' as const,
   actorId: 'user1',
@@ -139,4 +140,17 @@ describe('audit read projection', () => {
     expect(item.actorIdentity).toEqual({ status: 'not_found' })
     expect(item.targetIdentity).toEqual({ status: 'not_found' })
   })
+
+  it('returns a well-formed request ID as a search key', () => {
+    expect(projectAuditRow(row, new Map(), new Map()).requestId).toBe('req-55')
+  })
+
+  it.each([null, '', 'a b', 'x"y', 'é', 'x'.repeat(129)])(
+    'leaves out the request ID %j instead of failing',
+    (requestId) => {
+      const item = projectAuditRow({ ...row, requestId }, new Map(), new Map())
+      expect(item.requestId).toBeUndefined()
+      expect(item).not.toHaveProperty('requestId', requestId)
+    }
+  )
 })

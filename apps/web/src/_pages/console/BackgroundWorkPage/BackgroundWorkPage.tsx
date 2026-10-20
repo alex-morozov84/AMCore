@@ -4,6 +4,7 @@ import { BackgroundWorkControls } from '@/features/console-background-work'
 import { fetchConsoleBackgroundWork } from '@/shared/api/console/background-work'
 import { fetchConsoleQueues } from '@/shared/api/console/queues'
 import { resolvePrimary } from '@/shared/api/server'
+import { LogSearchNote } from '@/shared/ui/console-detail/LogSearchLink'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import { QueueSummaryLive } from './QueueSummaryLive'
@@ -36,6 +37,7 @@ export async function BackgroundWorkPage({
         <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t('scope')}</p>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t('boardPointer')}</p>
+        <LogSearchNote />
       </header>
       {outcome.status === 'unavailable' ? (
         <>

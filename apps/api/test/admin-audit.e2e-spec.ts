@@ -112,10 +112,17 @@ describe('Admin audit browser (e2e)', () => {
     const createdAt = new Date(Date.now() - 60_000)
     const action = 'admin.audit_probe.created'
     const hostile = 'private/' + 'x'.repeat(1_000)
-    for (const id of ['a-event', hostile, 'z-event']) {
+    // z-event carries a well-formed request ID, a-event a malformed one, the hostile row none.
+    const requestIds = new Map<string, string | null>([
+      ['a-event', 'not a valid id "x"'],
+      [hostile, null],
+      ['z-event', 'req-55'],
+    ])
+    for (const [id, requestId] of requestIds) {
       await prisma.auditLog.create({
         data: {
           id,
+          requestId,
           createdAt,
           actorType: 'USER',
           actorId: operatorId,
@@ -143,6 +150,11 @@ describe('Admin audit browser (e2e)', () => {
         email: 'audit-operator@example.com',
       })
       collected.push(response.body.items[0].id as string | null)
+      // A well-formed request ID is returned as a search key; any other value is left out.
+      expect(response.body.items[0].requestId).toBe(
+        response.body.items[0].id === 'z-event' ? 'req-55' : undefined
+      )
+      expect(JSON.stringify(response.body)).not.toContain('not a valid id')
       expect(response.body.hasMore).toBe(page < 2)
       expect((response.body.nextCursor ?? '').length).toBeLessThanOrEqual(512)
       if (response.body.nextCursor) params.set('cursor', response.body.nextCursor as string)

@@ -6,11 +6,17 @@ import type { ConsoleExternalLinks } from '@/shared/lib/console-external-links'
 
 import { OverviewExternalTools } from './OverviewExternalTools'
 
-function StoryCard({ links }: { links: ConsoleExternalLinks }) {
+function StoryCard({
+  links,
+  logSearchConfigured = false,
+}: {
+  links: ConsoleExternalLinks
+  logSearchConfigured?: boolean
+}) {
   const t = useTranslations('console')
   return (
     <div className="max-w-xl p-4">
-      <OverviewExternalTools links={links} t={t} />
+      <OverviewExternalTools links={links} logSearchConfigured={logSearchConfigured} t={t} />
     </div>
   )
 }
@@ -49,5 +55,15 @@ export const AllConfigured: Story = {
       logs: 'https://grafana.example.com/explore',
       alerts: 'https://alerts.example.com/',
     },
+  },
+}
+
+export const LogLinksNotConfigured: Story = {
+  args: { links: { metrics: null, logs: 'https://grafana.example.com/', alerts: null } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(
+      canvas.getByText('Log links on jobs and audit events: not configured.')
+    ).toBeVisible()
   },
 }

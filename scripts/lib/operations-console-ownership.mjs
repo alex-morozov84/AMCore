@@ -35,6 +35,7 @@ export const operationsConsoleOwnership = defineOwnershipManifest({
     'ADMIN_CONSOLE_METRICS_URL',
     'ADMIN_CONSOLE_LOGS_URL',
     'ADMIN_CONSOLE_ALERTS_URL',
+    'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
     '__Host-amcore_console_session',
     'web:console-session:v1',
     'test:e2e:console-real-stack',

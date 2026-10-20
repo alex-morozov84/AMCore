@@ -3,6 +3,8 @@ import { Suspense } from 'react'
 import { cookies } from 'next/headers'
 
 import { getConsoleAwareUser } from '@/shared/api/console/access-token'
+import { getConsoleLogSearchTarget } from '@/shared/lib/console-log-search-target'
+import { LogSearchTargetProvider } from '@/shared/lib/log-search-context'
 import { requireSuperAdmin } from '@/shared/lib/require-super-admin'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 import { SIDEBAR_COOKIE_NAME } from '@/shared/ui/sidebar-cookie'
@@ -23,7 +25,9 @@ export async function ConsolePageFrame({ children, fallback }: ConsolePageFrameP
   const user = await getConsoleAwareUser()
   return (
     <ConsoleShell user={user} defaultSidebarOpen={defaultSidebarOpen}>
-      <Suspense fallback={fallback}>{children}</Suspense>
+      <LogSearchTargetProvider target={getConsoleLogSearchTarget()}>
+        <Suspense fallback={fallback}>{children}</Suspense>
+      </LogSearchTargetProvider>
     </ConsoleShell>
   )
 }

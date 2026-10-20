@@ -250,8 +250,9 @@ The response is a deliberately small projection: time, action, safe IDs and
 types, category, selected coded outcome fields, and bounded **current**
 user/organization names plus user email or organization slug. Current identity
 may differ from the identity at event time. A missing present-day record leaves
-only its ID; this does not prove when or why the record disappeared. Raw
-`metadata`, `ip`, `requestId`, credential material, free text, stored names,
+only its ID; this does not prove when or why the record disappeared. The `requestId` is returned only when it is a well-formed correlation ID (the bounded search
+key of the [log-search guide](log-search.md)); any other stored value is left out. Raw
+`metadata`, `ip`, credential material, free text, stored names,
 scopes and session IDs are never returned. An unsafe old ID is displayed as
 unavailable, but its event stays in chronological order.
 

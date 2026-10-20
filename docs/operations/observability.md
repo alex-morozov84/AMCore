@@ -32,7 +32,7 @@ request's ID and this line links the later request to it. See
 [Request correlation](../backend/background-work.md#request-correlation).
 
 **Finding a request.** Take the ID from the `X-Correlation-Id` response header, from
-an error body's `correlationId`, or from the audit record's `requestId`. The web
+an error body's `correlationId`, or from the audit record's `requestId` (the admin audit API returns it). The web
 server also sends its own ID outbound as `X-Correlation-Id`, so a request made through
 the web app carries the web server's ID end to end.
 

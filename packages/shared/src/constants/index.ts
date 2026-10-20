@@ -4,6 +4,7 @@ export {
   type CapabilityId,
   type CapabilityPresetId,
 } from './capability-catalogue'
+export { CORRELATION_ID_PATTERN, isCorrelationId } from './correlation-id'
 export {
   isOrganizationContextId,
   ORGANIZATION_CONTEXT_FAMILY,

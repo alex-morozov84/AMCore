@@ -65,7 +65,7 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
 ## Find a request
 
 Every response of an API route (under `/api/v1`) carries the request's ID in `X-Correlation-Id`. Error bodies carry it as
-`correlationId` and audit records as `requestId`. Send your own with `X-Request-ID` to know it in
+`correlationId` and audit records as `requestId` (the admin audit API returns it). Send your own with `X-Request-ID` to know it in
 advance. An accepted ID is one value of 1 to 128 characters from `A-Z a-z 0-9 . _ : -` (for example
 `req-55`); anything else is replaced by a generated UUID. See
 [Observability](observability.md#structured-logs). The ID is a search aid, not proof of identity.
@@ -267,6 +267,18 @@ Loki, Alloy and Grafana are pinned by digest in `docker/compose/logs.yml`; Loki 
 second time in `.github/workflows/ci.yml`, and the observability contract checks that they match. To
 upgrade, change both, then check `loki -verify-config` and `alloy validate` (CI runs both), the metric
 names used by the alert rules, and a search for a known request.
+
+<!-- AMCORE_CONSOLE_LOG_LINKS_START -->
+
+## Open the logs from the Operations Console
+
+If you run the Operations Console, it can show a **Find in logs** link beside job, request and
+delivery IDs. Set `ADMIN_CONSOLE_LOGS_GRAFANA_URL=http://localhost:3002` in the `web` service
+environment and recreate it (`$COMPOSE_LOGS up -d web`, with `COMPOSE_LOGS` as defined in the
+[runbook](runbooks/log-shipping.md)). The link opens this Grafana while your
+SSH tunnel is open. See [Find in logs links](../operations-console/configuration.md#find-in-logs-links).
+
+<!-- AMCORE_CONSOLE_LOG_LINKS_END -->
 
 ## Turn it off
 

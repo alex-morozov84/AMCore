@@ -896,7 +896,7 @@ describe('OpenAPI success surface (e2e)', () => {
     const ref = response.content?.['application/json']?.schema?.$ref
     expect(ref).toBeDefined()
     const visited = new Set<string>()
-    const forbidden = new Set(['metadata', 'ip', 'requestId', 'emailHash', 'pinoEvent'])
+    const forbidden = new Set(['metadata', 'ip', 'emailHash', 'pinoEvent'])
     const missingRefs: string[] = []
     const forbiddenKeys: string[] = []
     const detailFields = new Set<string>()

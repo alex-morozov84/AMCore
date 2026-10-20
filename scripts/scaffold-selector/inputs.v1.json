@@ -111,6 +111,7 @@
           "docs/operations/ci-security.md",
           "docs/operations/deployment.md",
           "docs/operations/geoip-setup.md",
+          "docs/operations/log-search.md",
           "docs/operations/observability.md",
           "docs/operations/runbooks/queues.md",
           "docs/operations/runbooks/storage.md",

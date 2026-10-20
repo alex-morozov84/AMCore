@@ -9,6 +9,7 @@ import { auditSummary } from './audit-summary'
 import { auditRowFilter } from './audit-url'
 import { AuditCommandDetails } from './AuditCommandDetails'
 import { AuditReference } from './AuditReference'
+import { AuditRequestId } from './AuditRequestId'
 import { AuditTimestamp } from './AuditTimestamp'
 import { CopyAuditId } from './CopyAuditId'
 
@@ -88,6 +89,11 @@ export function AuditEventTable({
                         failed={copy.copyFailed}
                       />
                     </p>
+                  )}
+                  {item.requestId && (
+                    <div className="mt-1">
+                      <AuditRequestId requestId={item.requestId} copy={copy} />
+                    </div>
                   )}
                 </TableCell>
                 <TableCell className="whitespace-normal">
