@@ -50,28 +50,6 @@ updates:
         update-types:
           - 'patch'
           - 'minor'
-      # axe-core 4.14.0 adds a stricter label-content-name-mismatch check that fails
-      # Storybook stories (UserSessionsCard, AccountMenu): buttons whose aria-label
-      # does not contain their visible text. Merge only after fixing those labels.
-      axe-core:
-        applies-to: version-updates
-        patterns:
-          - 'axe-core'
-          - '@axe-core/*'
-        update-types:
-          - 'patch'
-          - 'minor'
-      # Next 16.4 changed useRouter() internals and the Storybook Next.js mock
-      # (@storybook/nextjs-vite 10.6.2) throws on every story. Fixed upstream but not
-      # released; merge once a Storybook release with the fix (10.6.3 or later) is in.
-      next:
-        applies-to: version-updates
-        patterns:
-          - 'next'
-          - '@next/*'
-        update-types:
-          - 'patch'
-          - 'minor'
       npm-non-major:
         applies-to: version-updates
         patterns:
