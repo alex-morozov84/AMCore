@@ -274,7 +274,8 @@ names used by the alert rules, and a search for a known request.
 
 If you run the Operations Console, it can show a **Find in logs** link beside job, request and
 delivery IDs. Set `ADMIN_CONSOLE_LOGS_GRAFANA_URL=http://localhost:3002` in the `web` service
-environment and recreate it (`docker compose up -d web`). The link opens this Grafana while your
+environment and recreate it (`$COMPOSE_LOGS up -d web`, with `COMPOSE_LOGS` as defined in the
+[runbook](runbooks/log-shipping.md)). The link opens this Grafana while your
 SSH tunnel is open. See [Find in logs links](../operations-console/configuration.md#find-in-logs-links).
 
 <!-- AMCORE_CONSOLE_LOG_LINKS_END -->
