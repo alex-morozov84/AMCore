@@ -65,7 +65,7 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
 ## Find a request
 
 Every response of an API route (under `/api/v1`) carries the request's ID in `X-Correlation-Id`. Error bodies carry it as
-`correlationId` and audit records as `requestId`. Send your own with `X-Request-ID` to know it in
+`correlationId` and audit records as `requestId` (the admin audit API returns it). Send your own with `X-Request-ID` to know it in
 advance. An accepted ID is one value of 1 to 128 characters from `A-Z a-z 0-9 . _ : -` (for example
 `req-55`); anything else is replaced by a generated UUID. See
 [Observability](observability.md#structured-logs). The ID is a search aid, not proof of identity.
