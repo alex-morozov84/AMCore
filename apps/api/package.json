@@ -4,6 +4,10 @@
   "private": true,
   "description": "AMCore API Server",
   "license": "MIT",
+  "files": [
+    "dist",
+    "!dist/**/*.map"
+  ],
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "nest start --watch",

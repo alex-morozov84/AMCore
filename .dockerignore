@@ -51,7 +51,7 @@ tmp/
 temp/
 
 # Managed local runtimes and source snapshots
-.amcore/
+**/.amcore/
 .worktrees/
 playwright-report*/
 test-results*/

@@ -5,6 +5,7 @@
     "dist",
     "**/*.spec.ts",
     "**/*.test.ts",
+    "**/*.testkit.ts",
     "**/__tests__/*",
     "**/__mocks__/*"
   ],

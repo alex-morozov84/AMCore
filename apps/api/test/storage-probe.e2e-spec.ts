@@ -11,7 +11,7 @@ import { StorageProbeService } from '../src/infrastructure/storage/storage-probe
 import { e2eContainerLabels } from './e2e-owned-containers'
 import { SEAWEEDFS_IMAGE } from './support/s3-backends'
 
-import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.fixture'
+import { storageProbeSettingsFixture } from '@/infrastructure/storage/storage-probe-settings.testkit'
 
 // Test-only S3-compatible implementation (shared pin in support/s3-backends.ts).
 const bucket = 't023-canary'

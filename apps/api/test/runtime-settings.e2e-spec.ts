@@ -8,7 +8,7 @@ import { type RequestPrincipal, storageProbeSettingResponseSchema } from '@amcor
 import { AuditLogService } from '../src/core/audit'
 import { Prisma } from '../src/generated/prisma/client'
 import type { SettingDefinition } from '../src/infrastructure/settings/setting-definition'
-import { testDefinition } from '../src/infrastructure/settings/setting-definition.fixture'
+import { testDefinition } from '../src/infrastructure/settings/setting-definition.testkit'
 import { SettingRegistry } from '../src/infrastructure/settings/setting-registry'
 import { SettingRepository } from '../src/infrastructure/settings/setting-repository'
 import { SettingWriter } from '../src/infrastructure/settings/setting-writer'

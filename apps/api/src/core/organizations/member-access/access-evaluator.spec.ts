@@ -2,8 +2,8 @@ import { Action, type MemberAccess, Subject } from '@amcore/shared'
 
 import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults'
 
+import { input, ORG_ID, readAll, rule, USER_ID } from './access.testkit'
 import { explainAccess } from './access-evaluator'
-import { input, ORG_ID, readAll, rule, USER_ID } from './access-fixtures'
 
 const item = (access: MemberAccess, key: string) => access.items.find((entry) => entry.key === key)!
 const granted = (access: MemberAccess) =>

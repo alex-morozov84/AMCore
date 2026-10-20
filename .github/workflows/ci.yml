@@ -624,6 +624,30 @@ jobs:
             echo "npm/npx absent, node OK"
           '
 
+      # The runner ships only compiled output. `files` in apps/api/package.json is the
+      # allowlist; this step is the contract test for it. It also checks the paths the
+      # app reads at runtime, so over-trimming fails here rather than at first boot.
+      - name: Verify the runner image holds only runtime files
+        run: |
+          docker run --rm "$AMCORE_API_IMAGE" sh -c '
+            cd /app
+            for required in package.json dist/main.js dist/build-identity.json dist/cli; do
+              test -e "$required" || { echo "missing from runner image: $required"; exit 1; }
+            done
+            for forbidden in src test prisma recipes scripts .amcore Dockerfile .swcrc tsconfig.json; do
+              test ! -e "$forbidden" || { echo "unexpected in runner image: $forbidden"; exit 1; }
+            done
+            stray="$(find . -path ./node_modules -prune -o -type f \( \
+              -name "*.spec.*" -o -name "*.e2e-spec.*" -o -name "*.test.*" -o -name "*.testkit.*" \
+              -o -name "*.map" -o -name "*.ts" -o -name "*.tsbuildinfo" \) -print)"
+            if [ -n "$stray" ]; then
+              echo "test, source or map files in runner image:"
+              echo "$stray" | head -20
+              exit 1
+            fi
+            echo "runner image holds only runtime files"
+          '
+
       - name: Scan the built runner image with Trivy
         run: |
           trivy image \
