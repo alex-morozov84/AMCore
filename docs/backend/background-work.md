@@ -347,7 +347,7 @@ worker lines of the same job.
 - A duplicate add returns the first job and keeps the first request's ID. The
   producer logs `job.enqueued` with `jobId`, `incarnation` and `duplicate: true`,
   so the later request is still findable and linked to that job.
-- A manual retry from the Operations Console reuses the stored envelope, so the
+- A manual retry of a failed job reuses the stored envelope, so the
   retried worker lines carry the original request's ID. The command's audit record
   holds the operator's own `requestId`, the `jobId` and the `incarnation`.
 
@@ -365,7 +365,7 @@ Plan every envelope change around that.
 
 To drain before a rollback, count jobs that carry the new key in every queue state:
 waiting, prioritized, active, retrying with backoff, and delayed (a delay can be up
-to 30 days). The Console queue board shows the counts. A job you do not wait for fails
+to 30 days). The queue board (`/api/v1/admin/queues`, off in production until `ENABLE_BULL_BOARD=true`; see [deployment](../operations/deployment.md)) shows the counts. A job you do not wait for fails
 terminally on the old worker.
 
 With the shipped Compose topology, `api` and `worker` run from one image. Recreate the

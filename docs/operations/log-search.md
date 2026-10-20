@@ -59,6 +59,7 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
    Then browse to `http://localhost:3002` and sign in as `admin` with the password from step 1.
 
 4. Choose **Explore**, keep the **AMCore Loki** data source and run `{service=~"api|worker|web"}`.
+   Switch the query editor to **Code** (next to **Builder**) before you paste a query, and turn **Live** off; Builder rewrites a pasted query.
    You should see recent lines of all three services.
 
 ## Find a request
@@ -84,7 +85,7 @@ took about 0.2 s and the `json` form about 0.6 s.
 **Did this request start a worker job?** Look for a `job.enqueued` line with the request's ID. If it
 is there, the worker's `Job finished` line for that `jobId` carries the same ID. If the API logged
 `Email sent (direct, not queued)` instead, no worker was involved. If `job.enqueued` appears but no worker line ever follows, the job is waiting or the `worker` service
-is down: check `ps worker` and the queue board in the Operations Console. If neither appears, the work was
+is down: check `ps worker` and the queue board (`/api/v1/admin/queues`, off in production until `ENABLE_BULL_BOARD=true`; see [deployment](deployment.md)). If neither appears, the work was
 not started as a job by this request; it may be a notification (wake job), which you search by
 `deliveryId`.
 
@@ -100,7 +101,7 @@ Limits of the link between a request and its jobs:
   few lines of its own; a few carry `runId`.
 - A duplicate add keeps the first request's ID. Its `job.enqueued` line with `duplicate: true`
   links the later request to the same `jobId`.
-- A manual retry from the Operations Console runs under the original request's ID. The command's
+- A manual retry of a failed job runs under the original request's ID. The command's
   audit record holds the operator's own `requestId`.
 
 ## Give a colleague access
