@@ -6,7 +6,8 @@
 // The collector can read EVERY container's files and `config.v2.json` under the mounted
 // directory, which hold container environment variables including secrets. Two controls keep
 // that from mattering: Alloy sits on a network with no route out except to Loki, and the
-// allowlist below drops everything that is not api, worker or web before anything is sent.
+// allowlist below drops everything that is not api, worker or web of THIS Compose project
+// before anything is sent.
 
 // 1. Find the log files Docker writes for every container on the host.
 local.file_match "containers" {
@@ -19,9 +20,12 @@ loki.source.file "containers" {
   forward_to = [loki.process.app.receiver]
 }
 
-// 2. Unwrap Docker's envelope, keep only the three application services, label by service.
-//    The overlay sets the json-file `labels` option on those services only, so a line without
-//    `attrs` (Postgres, Redis, any other project) has an empty `service` label and is dropped.
+// 2. Unwrap Docker's envelope, keep only the three application services of this project, label
+//    by service. The overlay sets the json-file `labels` option on those services only, so a
+//    line without `attrs` (Postgres, Redis) has an empty `service` label and is dropped. Another
+//    Compose project on the same host may also have api/worker/web with the `labels` option;
+//    its lines carry a different project name and are dropped too. The project name comes from
+//    the COMPOSE_PROJECT_NAME that Compose passes in (docker/compose/logs.yml).
 loki.process "app" {
   forward_to = [loki.write.default.receiver]
 
@@ -43,6 +47,10 @@ loki.process "app" {
     selector = "{service!~\"api|worker|web\"}"
     action   = "drop"
   }
+  stage.match {
+    selector = "{compose_project!=\"" + sys.env("LOGS_COMPOSE_PROJECT") + "\"}"
+    action   = "drop"
+  }
   stage.timestamp {
     source = "ts"
     format = "RFC3339Nano"
@@ -50,6 +58,11 @@ loki.process "app" {
   // The stored line is the application's own JSON record, without Docker's envelope.
   stage.output {
     source = "line"
+  }
+  // `filename` (the container's log path, new on every re-creation) would add a stream per
+  // deploy; the service and project labels already say where a line came from.
+  stage.label_drop {
+    values = ["filename"]
   }
   stage.replace {
     expression = "(\\n$)"

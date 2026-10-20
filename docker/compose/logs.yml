@@ -16,7 +16,8 @@
 #   - alloy: reads the json-file logs read-only and sends them to Loki. No published port, no
 #     Docker socket, and no route to anything but Loki.
 #   - logs-grafana: the only way in. Authenticated, published on 127.0.0.1 only; reach it
-#     from an operator machine through an SSH tunnel.
+#     from an operator machine through an SSH tunnel. It shares the `logs` network with Loki
+#     and its own `logs-edge` network for the port; it is not on the application network.
 #
 # Security invariant (see the guide): Alloy can read every container's log files and
 # `config.v2.json`, which hold container environment variables including secrets. It is
@@ -24,7 +25,10 @@
 # root filesystem, no capabilities, no published port, no network except `logs`, which is
 # `internal: true`. Run as root only because Docker's files are root-owned.
 #
-# Do not attach another service to the `logs` network or publish Loki: it has no authentication.
+# Loki has no authentication, so whatever joins the `logs` network can read every stored log
+# line and reach Alloy's HTTP UI. Only Alloy and logs-grafana belong there. The one exception
+# the guide allows is the operator's own Prometheus, attached for scraping only; treat it like
+# Grafana, because it can then read all logs. Never publish Loki.
 
 x-app-logging: &app-logging
   driver: json-file
@@ -84,6 +88,10 @@ services:
     # Docker's log files are root-owned (640): the collector reads them as uid 0 and holds no
     # capability beyond that.
     user: '0:0'
+    # Lines of any other Compose project on this host are dropped; Compose always provides the
+    # project name for interpolation.
+    environment:
+      LOGS_COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME}
     volumes:
       - ./docker/log-search/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -132,8 +140,10 @@ services:
     volumes:
       - ./docker/log-search/grafana/provisioning:/etc/grafana/provisioning:ro
       - logs_grafana_data:/var/lib/grafana
+    # `logs-edge` carries only the published port. Grafana is not on the application's `default`
+    # network, so it cannot reach postgres, redis or api.
     networks:
-      - default
+      - logs-edge
       - logs
     depends_on:
       loki:
@@ -144,6 +154,8 @@ networks:
   # No route to the outside: Alloy, which can read secrets, can only reach Loki.
   logs:
     internal: true
+  # Grafana's published port needs a network with a route; nothing else joins it.
+  logs-edge:
 
 volumes:
   loki_data:

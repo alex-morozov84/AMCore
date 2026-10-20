@@ -23,7 +23,8 @@ export COMPOSE_LOGS="docker compose -f docker-compose.yml -f docker/compose/prod
 
 1. The `alloy` container stopped or is restarting.
 2. Prometheus cannot reach `alloy:12345`: it is not attached to the overlay's internal `logs`
-   network (Alloy publishes no host port).
+   network (Alloy publishes no host port). Attaching it lets that Prometheus read all stored
+   logs from Loki ([Alerts](../log-search.md#alerts)).
 3. The Alloy configuration no longer parses after an edit.
 
 **Diagnostic steps:**
@@ -36,7 +37,8 @@ export COMPOSE_LOGS="docker compose -f docker-compose.yml -f docker/compose/prod
    ```
 
 2. If it restarts, the log names the faulty line of `docker/log-search/alloy/config.alloy`.
-3. If it runs, confirm Prometheus shares the `logs` network with it.
+3. If it runs, confirm Prometheus shares the `logs` network with it. Attach only a Prometheus you
+   control, because it can read all logs there.
 
 **Resolution:** fix the configuration or network, then `$COMPOSE_LOGS up -d alloy`. Alloy resumes
 from its stored positions, so lines still inside Docker's rotation window are sent without gaps or
@@ -154,6 +156,12 @@ down](#log-store-down)) and Loki refusing lines ([Store refusing lines](#store-r
 | `per_stream_rate_limit`       | One service floods above `per_stream_rate_limit`          | Same; raise only with the volume size in mind                        |
 | `greater_than_max_sample_age` | Lines older than `reject_old_samples_max_age` (retention) | Expected after a very long outage; those lines are outside retention |
 | `max_label_names_per_series`  | A pipeline change added too many labels                   | Revert the label change                                              |
+| `stream_limit`                | More than `max_global_streams_per_user` (1000) streams    | Find the label that grew (see Streams below); revert the pipeline    |
+
+Streams: each distinct set of labels is one stream. The overlay's labels are `service`,
+`compose_project` and `stream` (plus the `service_name` that Loki adds from `service`), so the
+count stays small. A pipeline change that adds a label with many values, such as the container
+log path or an ID, multiplies the streams.
 
 Limits live in `docker/log-search/loki/loki.yml` under `limits_config`.
 

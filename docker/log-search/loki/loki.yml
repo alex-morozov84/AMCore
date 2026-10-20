@@ -2,9 +2,10 @@
 # (docker/compose/logs.yml, docs/operations/log-search.md).
 #
 # One node, filesystem storage, no authentication: the overlay publishes no Loki port and
-# only the overlay's own Grafana and Alloy share Loki's internal network. Do not publish
-# Loki or attach another service to that network without putting an authenticating
-# reverse proxy in front (Loki has no built-in authentication).
+# only the overlay's own Grafana and Alloy share Loki's internal network. Anything else on that
+# network reads all logs. The one allowed addition is the operator's own Prometheus, for
+# scraping; it can then read every stored line, so treat it like Grafana. Do not publish Loki
+# without an authenticating reverse proxy in front (Loki has no built-in authentication).
 #
 # `${VAR:-default}` is expanded by Loki itself (`-config.expand-env=true`).
 

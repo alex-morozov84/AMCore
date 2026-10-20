@@ -152,14 +152,23 @@ Treat Alloy as a secret-visible, host-privileged component.
 - It reads Docker's log files for **every** container on the host, including each container's
   `config.v2.json`, which holds its environment variables and therefore secrets. It runs as root
   because those files are root-owned. A line is sent only if it carries the Compose service label
-  that the overlay sets on `api`, `worker` and `web`; everything else, such as Postgres and Redis,
-  is dropped inside Alloy.
+  that the overlay sets on `api`, `worker` and `web` **and** the name of this Compose project;
+  everything else is dropped inside Alloy. That covers Postgres and Redis, and also another
+  Compose project on the same host with its own `api`, `worker` or `web`. Two stacks with this
+  overlay on one host therefore each store only their own lines.
 - It has a read-only root filesystem, no capabilities, `no-new-privileges`, no published port, no
   Docker socket and a network that cannot reach anything but Loki. Keep it that way: do not attach it
   to another network and do not mount more host paths.
-- Loki has no authentication. It publishes no port and only Alloy and the overlay's Grafana share its
-  network. Do not publish it. Grafana is the only way in: it needs the admin password and listens on
-  `127.0.0.1` only.
+- Loki has no authentication. It publishes no port, and only Alloy and the overlay's Grafana share its
+  `logs` network. Anything else on that network can read **all** stored logs from Loki and open
+  Alloy's HTTP UI. Do not publish Loki and do not attach other services to the network. The only
+  addition this guide allows is your own Prometheus for scraping (see [Alerts](#alerts)).
+- Grafana is the only way in for people: it needs the admin password and listens on `127.0.0.1`
+  only. It sits on the `logs` network and on its own `logs-edge` network for the published port. It
+  is not on the application's network, so it cannot reach Postgres, Redis or the API. Do not add
+  the application's database as a Grafana data source and do not attach Grafana to that network:
+  Grafana proxies queries and holds data source credentials, so it should be able to reach logs
+  only. Every Grafana user, including a Viewer, reads all stored logs.
 - Docker's documentation says the files of its logging drivers are meant for the Docker daemon and
   that external tools should avoid them. This reference reads them read-only because the alternative,
   the Docker API, needs a root-equivalent socket in a container. Rotation was tested (see above). No
@@ -178,16 +187,23 @@ Treat Alloy as a secret-visible, host-privileged component.
 down, shipping retrying, entries dropped, store refusing lines, flush failing, disk low (15%) and disk
 critical (5%). Their runbooks are in [log-shipping](runbooks/log-shipping.md).
 
-This overlay does not ship a Prometheus. Load the rules in your own Prometheus that can reach the
-overlay's `logs` network, and copy the scrape jobs from `docker/log-search/prometheus/scrape-logs.yml`.
-Until you do, nobody is notified; check the pipeline by hand after changes.
+This overlay does not ship a Prometheus. To get the alerts, load the rules into a Prometheus that you
+run, attach that Prometheus to the overlay's `logs` network, and copy the scrape jobs from
+`docker/log-search/prometheus/scrape-logs.yml`. **That Prometheus can then read all stored logs from
+Loki and open Alloy's HTTP UI, not only the metrics.** Treat it like the log Grafana: attach only a
+Prometheus whose access you control, and attach nothing else. If you cannot accept that, do not
+attach it; check the pipeline by hand instead. Until you do one or the other, nobody is notified.
 
 ## Use a managed Loki instead
 
 Skip `loki` and `logs-grafana`, point Alloy at your endpoint by changing the `url` of `loki.write` in
 `docker/log-search/alloy/config.alloy` and adding the endpoint's authentication block, and give Alloy
-network access to that endpoint. This variant was not run; check it against Alloy's `loki.write`
-reference and keep the secret-visible invariant above.
+network access to that endpoint. **Limit Alloy's egress to that endpoint** (a host firewall or an
+egress proxy). Alloy reads every container's files and secrets, and the overlay's only barrier
+against sending them elsewhere is a network with no route out; the `logs` network stops being
+`internal` for this variant, so without that limit the "no route out" control no longer holds.
+This variant was not run; check it against Alloy's `loki.write` reference and keep the
+secret-visible invariant above.
 
 ## Upgrade the pinned images
 

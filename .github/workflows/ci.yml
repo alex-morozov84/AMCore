@@ -979,7 +979,7 @@ jobs:
             -v "$PWD/docker/log-search/loki/loki.yml:/etc/loki/loki.yml:ro" \
             "$LOKI_IMAGE" \
             -config.file=/etc/loki/loki.yml -config.expand-env=true -verify-config
-          docker run --rm \
+          docker run --rm -e LOGS_COMPOSE_PROJECT=ci \
             -v "$PWD/docker/log-search/alloy/config.alloy:/etc/alloy/config.alloy:ro" \
             "$ALLOY_IMAGE" \
             validate /etc/alloy/config.alloy
