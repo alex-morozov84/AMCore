@@ -59,10 +59,12 @@ describe('catalogue', () => {
 })
 
 /**
- * The guard that makes "a new job registers once" true: a periodic job cannot bypass the catalogue,
- * because the scheduler decorators may only be reached through `@ScheduledJob(definition)`.
+ * A fast source scan for the obvious mistakes (a raw decorator, a definition used twice). It reads
+ * text, so an alias or an odd spacing can slip past it; the authoritative proof is the process-role
+ * e2e, which runs Nest's own scheduler explorer on the real worker/all/web graphs and compares what
+ * it registers with the catalogue (`test/process-role.e2e-spec.ts`).
  */
-describe('registration guard', () => {
+describe('registration guard (source scan)', () => {
   const files = sources(SRC).filter((file) => !file.endsWith('scheduled-job.ts'))
 
   it('finds no raw @Cron or @Interval outside the ScheduledJob decorator', () => {
