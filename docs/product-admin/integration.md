@@ -77,13 +77,17 @@ omit it when that downstream does not mount the reference members page.
 ## Explicit nonhierarchical destinations
 
 The bundled admin routes supply `deniedContent` to ready organization/member/
-invitation/role/key mounts. It renders the shared local unavailable recovery
+invitation/role mounts. It renders the shared local unavailable recovery
 without retaining protected organization details. Keep this application-owned
 slot separate from domain data/permission checks. Custom consumers can supply
 their own recovery; the default headless lifecycle still hides refused data.
 Use the fixed-shop variant without the list action when choosing another
 organization is not a supported journey. The selected logout action must remain
 usable even when profile or organization reads are refused.
+
+Own-key mounts retain the [personal key inventory](./own-api-keys.md), including
+inspection of keys after organization access is lost. They do not accept the
+organization `deniedContent` slot.
 
 `OrganizationAccessClient` from `@/_pages/organization-access` retains its explicit
 props: `admission`, `input`, `explicitList`, `contextHref`, `pageHref`, `listHref`,

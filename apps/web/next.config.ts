@@ -173,7 +173,15 @@ const nextConfig: NextConfig = {
           header.key === 'Referrer-Policy' ? { ...header, value: 'strict-origin' } : header
         ),
       })),
-      ...['/api/auth/oauth/complete', '/api/product-admin/auth/oauth/complete'].map((source) => ({
+      // Later scoped rules must override the global policy on the public wire.
+      ...[
+        '/api/auth/oauth/:provider/callback',
+        '/api/product-admin/auth/oauth/:provider/callback',
+        `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}/organizations/:path*`,
+        `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}/settings/api-keys`,
+        '/api/auth/oauth/complete',
+        '/api/product-admin/auth/oauth/complete',
+      ].map((source) => ({
         source,
         headers: invitationPrivacyHeaders,
       })),

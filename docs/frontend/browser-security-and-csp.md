@@ -359,8 +359,9 @@ propagation.
   requirements for TLS, forwarded headers, and CSP nonce propagation.
 
 Product administration keeps its own host session only when configured on a
-separate hostname. Its public login and secret-bearing reset, verification, invite
-and provider callback responses remain private/no-referrer/noindex. The final
+separate hostname. Its public login remains private/noindex and uses the baseline
+strict-origin-when-cross-origin referrer policy. Secret-bearing reset, verification,
+invite and provider callback responses use private/no-referrer/noindex. The final
 OAuth completion GET document alone uses strict-origin: a native same-origin form
 retains exact Origin but Referer carries no ticket/path. Completion POST responses
 and redirects retain no-referrer. Preserve the path-scoped next.config.ts override,

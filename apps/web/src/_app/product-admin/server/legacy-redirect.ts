@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import {
   coerceSupportedLocale,
+  inviteListQuerySchema,
   isOrganizationContextId,
   localizedFrontendUrl,
   ownKeyQuerySchema,
@@ -69,6 +70,13 @@ export function legacyAdminRedirect(
     if (parsed.success)
       for (const [key, value] of Object.entries(parsed.data))
         if (key !== 'limit' && value !== undefined) url.searchParams.set(key, String(value))
+  } else if (page === 'invites') {
+    for (const key of ['page', 'search', 'status'] as const) {
+      if (raw.getAll(key).length !== 1) continue
+      const parsed = inviteListQuerySchema.shape[key].safeParse(raw.get(key))
+      if (parsed.success && parsed.data !== undefined)
+        url.searchParams.set(key, String(parsed.data))
+    }
   } else {
     const pageValue = raw.get('page')
     if (raw.getAll('page').length === 1 && /^[1-9]\d{0,4}$/.test(pageValue ?? ''))
