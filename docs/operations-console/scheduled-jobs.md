@@ -92,7 +92,9 @@ the latest completed pass.
 3. **Result not recorded.** Check whether a worker restarted around the start time.
    A nightly job that never finishes can also hold its lock for up to 30 minutes.
 4. **No worker has reported these jobs yet** (banner). Start a worker, or check
-   its database connection. The page shows the jobs of the code catalogue, so the
+   its database connection. Also check `DATABASE_POOL_MAX`: with a pool of one a
+   worker records nothing, not even its first report, so a new installation stays
+   in this state until the pool is at least two. The page shows the jobs of the code catalogue, so the
    absence of rows is never a sign of "no jobs".
 5. **Turned off.** The job is switched off by configuration. Change the setting
    in the [environment](../operations/geoip-setup.md) if it should run.
@@ -120,8 +122,10 @@ connection pool has a free connection and does not make a request wait for one.
 After repeated failed writes a worker keeps only failures and partly done runs
 for five minutes. The row's note says when observations were lost under load.
 Recording needs a database pool of at least two connections
-(`DATABASE_POOL_MAX`); with a pool of one it is switched off, existing records
-stay and age normally. A read failure of this page shows an error, never an empty
+(`DATABASE_POOL_MAX`); with a pool of one it is switched off. Existing records
+stay and age normally: a job that last succeeded before the change keeps that
+success and becomes **Overdue** when its next success is due, because nothing newer
+can be recorded. A read failure of this page shows an error, never an empty
 list.
 
 Each job's schedule time zone is the one the worker's process uses (GeoIP is
