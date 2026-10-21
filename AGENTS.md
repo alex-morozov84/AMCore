@@ -228,6 +228,10 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   `docs/backend/architecture-and-conventions.md` → _Adding an environment variable_.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
+- **Periodic jobs:** declare a timer job once in the scheduled-jobs catalogue and decorate
+  it with `@ScheduledJob`, never a raw `@Cron` or `@Interval` (a test fails otherwise). The
+  task returns an explicit result; a resolved promise is not success. See
+  `docs/backend/scheduled-jobs.md`.
 - **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
   Next routing plumbing only (thin), application composition lives in `_app/`, page composition lives in `_pages/`,
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.

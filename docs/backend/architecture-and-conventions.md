@@ -229,7 +229,10 @@ The same image runs as `web`, `worker`, or `all`. Composition lives in
 the **right** list — a misplaced processor runs in the wrong process:
 
 - **Business HTTP module** (controllers) → `webImports`.
-- **`@Processor` / `@Cron`** → a **worker-only** module → `workerImports`. NestJS
+- **`@Processor` / `@Cron`** → a **worker-only** module → `workerImports`. A periodic
+  job is declared once in the scheduled-jobs catalogue and uses `@ScheduledJob`, never a
+  raw `@Cron` or `@Interval` (a test fails otherwise): see
+  [Scheduled jobs](scheduled-jobs.md). NestJS
   starts a `Worker` for _any_ `@Processor` in the graph, so a processor that leaks
   into `web` via a transitive import will also run there. Keep the producer (the
   service that _enqueues_) separate from the consumer (the processor). Email is the

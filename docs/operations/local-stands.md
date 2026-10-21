@@ -262,6 +262,11 @@ For AI run control acceptance, use `pnpm stand preview --id ai-run-control
 runs through the owner API: queued, transient retryable, permanent failure,
 recent cancellation and cancellation older than 30 days. It uses the mock model.
 Repeated preview keeps the owner's changes.
+For the Console Scheduled jobs screen, use `pnpm stand preview --id scheduled-jobs
+--profile scheduled-jobs`. The running worker records its frequent jobs itself; the profile
+adds a result history to the daily jobs, which otherwise show "No runs yet" until 02:00:
+cleanup partly done and overdue, notification cleanup failed and overdue, invitation cleanup
+with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the owner's changes.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared

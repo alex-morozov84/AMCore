@@ -756,7 +756,11 @@ on **every** worker replica and is _not_ lock-guarded — that is intentional
 (`SingletonCronRunner` is fail-closed on a Redis hiccup, exactly when recovery is
 needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed and
-BullMQ workers consume one shared queue. Add worker replicas freely.
+BullMQ workers consume one shared queue. Add worker replicas freely. Each process
+records the result of its scheduled jobs for the Console
+Scheduled jobs screen of the optional Console. Recording is
+best-effort, takes at most one pooled connection and is skipped when
+`DATABASE_POOL_MAX` is 1.
 
 ### Graceful shutdown
 
