@@ -398,7 +398,7 @@ orphan purge, the end of an e2e run, the bind-race retry and `closeout`) records
 latest result the same way.
 
 A lease covers startup, admission, tests and cleanup. Competing mutation commands
-refuse. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
+refuse. Cancellation during the initial source copy also cleans that run's owned allocation. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
 descendants after their direct parent exits, before removing resources. Console
 wrappers stop interrupted preparation groups with proved TERM/KILL escalation,
 without waiting for inherited streams to close. After startup they forward

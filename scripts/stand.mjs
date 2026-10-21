@@ -143,7 +143,10 @@ async function execute() {
         action === 'preview'
           ? value('--profile', 'default')
           : (fixture ??
-              (lane === 'product-admin-real-stack' ? 'product-admin-three-host' : undefined))
+              (lane === 'product-admin-real-stack' ? 'product-admin-three-host' : undefined)),
+        (allocated) => {
+          m = allocated
+        }
       )
     if (lane !== 'mocked') await boot(m, !existing)
     if (interrupted) throw new Error('Interrupted startup')

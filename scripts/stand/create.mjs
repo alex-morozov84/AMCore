@@ -14,7 +14,7 @@ import {
   prepareOrganizationSetupSource,
 } from './organization-setup-fixture.mjs'
 
-export async function create(id, purpose, topology, mocked = false, fixtureProfile) {
+export async function create(id, purpose, topology, mocked = false, fixtureProfile, onAllocated) {
   const choices = await projectChoices(root)
   const pathOAuth = fixtureProfile === 'product-admin-oauth-path'
   if (pathOAuth && !choices.consoleEnabled)
@@ -91,6 +91,8 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   }
   assertOrganizationSetupFixture(m)
   await save(m)
+  // Retain cleanup ownership before snapshot preparation can fail or be interrupted.
+  onAllocated?.(m)
   m.sourceHash = await snapshot(root, m.snapshot)
   await prepareOrganizationSetupSource(m)
   // AMCORE_CONSOLE_HOST_SNAPSHOT_START
