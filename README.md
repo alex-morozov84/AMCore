@@ -229,7 +229,7 @@ signup, Console-disabled installations and recovery after lost responses.
 ## Quick Start
 
 ```bash
-# Prerequisites: Node.js 24.15+, pnpm 11+, Docker (Compose v2.20.2+)
+# Prerequisites: Node.js 24.15+, pnpm 12.14+, Docker (Compose v2.20.2+)
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore

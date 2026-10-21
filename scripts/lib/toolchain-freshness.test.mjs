@@ -1,0 +1,169 @@
+import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { test } from 'node:test'
+import { renderToolchain, toolchainFreshness } from './toolchain-freshness.mjs'
+
+const repoRoot = new URL('../..', import.meta.url).pathname
+
+const versions = Object.fromEntries(
+  ['11.1.2', '11.28.6', '12.14.0', '13.0.0-rc.1'].map((v) => [v, {}])
+)
+const schedule = {
+  v22: { start: '2024-04-24', lts: '2024-10-29', maintenance: '2025-10-21', end: '2027-04-30' },
+  v24: { start: '2025-05-06', lts: '2025-10-28', maintenance: '2026-10-20', end: '2028-04-30' },
+  v25: { start: '2025-10-15', maintenance: '2026-04-01', end: '2026-06-01' },
+  v26: { start: '2026-04-22', lts: '2026-10-28', maintenance: '2027-10-20', end: '2029-04-30' },
+  v28: { start: '2027-04-21', lts: '2027-10-26', maintenance: '2028-10-20', end: '2030-04-30' },
+}
+// Fixed clock: v26 is Current, v24 is LTS, v25 has ended.
+const NOW = new Date('2026-10-21T00:00:00Z')
+const index = [
+  { version: 'v26.1.0', lts: false },
+  { version: 'v25.9.0', lts: false },
+  { version: 'v24.18.0', lts: 'Krypton' },
+]
+
+const answers = {
+  'https://registry.npmjs.org/pnpm': { 'dist-tags': { latest: '13.0.0-rc.1' }, versions },
+  'https://nodejs.org/dist/index.json': index,
+  'https://raw.githubusercontent.com/nodejs/Release/main/schedule.json': schedule,
+}
+const respond =
+  (overrides = {}) =>
+  async (url) => {
+    const body = { ...answers, ...overrides }[url]
+    if (body instanceof Error) throw body
+    if (typeof body === 'number') return { ok: false, status: body }
+    return { ok: true, json: async () => body }
+  }
+
+test('pnpm row keeps the raw registry latest next to the stable and same-major signals', async () => {
+  const [pnpm] = await toolchainFreshness(repoRoot, respond(), NOW)
+  assert.equal(pnpm.stable, '12.14.0')
+  assert.equal(pnpm.registryLatest, '13.0.0-rc.1')
+  assert.equal(pnpm.sameMajor, pnpm.current.startsWith('12.') ? '12.14.0' : '11.28.6')
+  assert.match(renderToolchain([pnpm]).join('\n'), /registry latest 13\.0\.0-rc\.1/)
+})
+
+test('node rows list every selector with its sources and the LTS, Current and next-LTS signals', async () => {
+  const rows = await toolchainFreshness(repoRoot, respond(), NOW)
+  const node = rows.filter((row) => row.selector)
+  assert.ok(node.length >= 1)
+  assert.ok(node.every((row) => row.sources.length > 0))
+  assert.equal(node[0].signal.lts, '24.18.0')
+  assert.equal(node[0].signal.current, '26.1.0')
+  assert.match(node[0].signal.nextLts, /v26 on 2026-10-28/)
+  assert.match(renderToolchain(rows).join('\n'), /engines\.node\) \| >=24/)
+})
+
+const phaseOf = async (index, now) =>
+  (
+    await toolchainFreshness(
+      repoRoot,
+      respond({ 'https://nodejs.org/dist/index.json': index }),
+      now
+    )
+  ).find((row) => row.selector).signal
+
+test('an ended non-LTS line is never reported as Current', async () => {
+  const signal = await phaseOf([{ version: 'v25.9.0', lts: false }, index[2]], NOW)
+  assert.equal(signal.current, undefined)
+})
+
+test('a line that became LTS no longer reports its older releases as Current', async () => {
+  const lts = [{ version: 'v26.12.0', lts: 'Next' }, { version: 'v26.11.0', lts: false }, index[2]]
+  const before = await phaseOf(lts, new Date('2026-10-21T00:00:00Z'))
+  assert.equal(before.current, '26.12.0')
+  const after = await phaseOf(lts, new Date('2026-11-01T00:00:00Z'))
+  assert.equal(after.current, undefined)
+  assert.equal(after.lts, '26.12.0')
+})
+
+test('selectors get a status from the schedule phase, not from the major number', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'toolchain-freshness-'))
+  try {
+    writeFileSync(join(root, 'package.json'), '{"engines":{"node":">=24"}}')
+    writeFileSync(join(root, '.nvmrc'), '24\n')
+    mkdirSync(join(root, '.github/workflows'), { recursive: true })
+    writeFileSync(
+      join(root, '.github/workflows/ci.yml'),
+      'node-version: 22\nnode-version: 25\nnode-version: 26\nnode-version: 99\n'
+    )
+    for (const app of ['api', 'web']) mkdirSync(join(root, 'apps', app), { recursive: true })
+    writeFileSync(join(root, 'apps/api/Dockerfile'), 'FROM node:24-slim\n')
+    writeFileSync(join(root, 'apps/web/Dockerfile'), 'FROM node:24-alpine\n')
+    const text = renderToolchain(await toolchainFreshness(root, respond(), NOW)).join('\n')
+    const line = (selector) => text.split('\n').find((l) => l.includes(`Node.js ${selector} `))
+    assert.match(line(24), /✅ latest LTS/)
+    assert.match(line(22), /⚠️ older supported line/)
+    assert.match(line(25), /⚠️ end of life/)
+    assert.match(line(26), /ℹ️ Current line/)
+    assert.match(line(99), /⚠️ no schedule data/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+for (const [label, overrides] of [
+  ['an HTTP error', { 'https://registry.npmjs.org/pnpm': 503 }],
+  ['a thrown timeout', { 'https://registry.npmjs.org/pnpm': new Error('timed out') }],
+  ['missing metadata', { 'https://registry.npmjs.org/pnpm': {} }],
+])
+  test(`a failed pnpm probe (${label}) keeps the local pin and reports unknown`, async () => {
+    const [pnpm, ...rest] = await toolchainFreshness(repoRoot, respond(overrides), NOW)
+    assert.ok(pnpm.current && pnpm.error)
+    assert.match(renderToolchain([pnpm]).join('\n'), /unknown:/)
+    assert.ok(
+      rest.some((row) => row.signal),
+      'node rows survive a pnpm probe failure'
+    )
+  })
+
+test('a failed node probe keeps the local selectors and reports unknown', async () => {
+  const rows = await toolchainFreshness(
+    repoRoot,
+    respond({ 'https://nodejs.org/dist/index.json': 'not-an-array' })
+  )
+  const node = rows.filter((row) => row.selector)
+  assert.ok(node.every((row) => row.error && row.sources))
+  assert.match(renderToolchain(rows).join('\n'), /unknown:/)
+})
+
+test('a missing or invalid local pin degrades to a row, not an exception', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'toolchain-freshness-'))
+  try {
+    writeFileSync(join(root, 'package.json'), '{"packageManager":"yarn@4.0.0"}')
+    const [pnpm] = await toolchainFreshness(root, respond(), NOW)
+    assert.match(pnpm.error, /no pnpm pin/)
+    mkdirSync(join(root, '.github/workflows'), { recursive: true })
+    const rows = await toolchainFreshness(root, respond(), NOW)
+    assert.match(rows[1].error, /could not read local pins/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+for (const [label, manifest] of [
+  ['absent', undefined],
+  ['malformed', '{not json'],
+])
+  test(`an ${label} package.json keeps the readable Node selector rows`, async () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolchain-freshness-'))
+    try {
+      if (manifest) writeFileSync(join(root, 'package.json'), manifest)
+      writeFileSync(join(root, '.nvmrc'), '24\n')
+      mkdirSync(join(root, '.github/workflows'), { recursive: true })
+      for (const app of ['api', 'web']) mkdirSync(join(root, 'apps', app), { recursive: true })
+      writeFileSync(join(root, 'apps/api/Dockerfile'), '')
+      writeFileSync(join(root, 'apps/web/Dockerfile'), '')
+      const rows = await toolchainFreshness(root, respond(), NOW)
+      assert.match(rows[0].error, /could not read package\.json/)
+      assert.ok(rows.some((row) => row.selector === '24' && row.signal))
+      assert.match(rows.at(-1).error, /could not read package\.json/)
+      assert.match(renderToolchain(rows).join('\n'), /unknown: could not read package\.json/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })

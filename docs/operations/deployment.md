@@ -321,7 +321,7 @@ Malformed external `next-action` requests are outside this recovery mechanism.
 
 The API and web Docker build stages enforce a frozen pnpm lockfile for both the
 explicit dependency installation and any automatic installation before a script.
-pnpm 11 can recheck dependencies after source files are copied into a cached
+pnpm can recheck dependencies after source files are copied into a cached
 install layer. That recheck must preserve the checked-in dependency versions;
 manifest/lockfile disagreement fails the build instead of resolving new versions.
 Dependency changes require updating and reviewing `pnpm-lock.yaml` first.

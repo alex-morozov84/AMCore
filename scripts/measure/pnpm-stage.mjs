@@ -12,6 +12,8 @@ export function runPnpm(root, args) {
   const result = spawnSync('pnpm', args, {
     cwd: root,
     encoding: 'utf8',
+    // Web tests print large next-intl warnings; the 1 MiB default would kill a passing run.
+    maxBuffer: 256 * 1024 * 1024,
     env: { ...process.env, CI: 'true' },
   })
   return {

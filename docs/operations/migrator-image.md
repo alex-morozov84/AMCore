@@ -199,11 +199,13 @@ both lock resolutions, installer pin and the isolated workspace policy.
 4. For isolated dotenv or transitive updates, refresh that graph without changing
    an unaffected root lock merely to produce a matching diff.
 5. Update the isolated installer version and integrity together. Review major
-   versions and prereleases manually.
+   versions and prereleases manually. The installer version must equal the root
+   `packageManager` pnpm version; `scripts/lib/toolchain-pins.test.mjs` fails on drift.
 
 Dependabot has a separate weekly non-major entry for `/docker/migrator`.
 One-sided Prisma update proposals fail the version guard until reconciled.
-Dependency freshness reports isolated dependencies and the installer separately;
+Dependency freshness reports isolated dependencies and the installer separately
+(and the root pnpm pin in its Toolchain section);
 the root recursive outdated command does not cover this directory.
 The weekly recursive OSV scan includes the separate lockfile.
 

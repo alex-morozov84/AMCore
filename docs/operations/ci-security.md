@@ -575,14 +575,29 @@ Dependabot handles patch/minor npm + action bumps and (per repo, see
 [_Strict security setup_](#strict-security-setup-after-forking)) opens security
 PRs — but it does not surface **semver-major** npm updates (ignored in
 `dependabot.yml`), Docker base-image **digest drift**, or newer **curl-pinned CLI
-tool** releases. The `dependency-freshness.yml` workflow closes that visibility
+tool** releases. It also does not bump the root `packageManager` pnpm pin or the
+Node.js major selectors; the report has a **Toolchain** section for both (pnpm
+versus the registry; Node majors versus the LTS, Current and next-LTS schedule).
+Move the pnpm pin in one PR: root manifest, both Dockerfiles, the stand installer and
+`docker/migrator` together (`scripts/lib/toolchain-pins.test.mjs` checks they agree).
+The `dependency-freshness.yml` workflow closes that visibility
 gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
-`dependency-freshness`, edited in place) listing all three. It opens no PRs and is
+`dependency-freshness`, edited in place) listing all four categories (semver-major npm updates, Docker digest
+drift, curl-pinned tool releases and the toolchain). It opens no PRs and is
 a report only — triage each item and bump deliberately. For semver-major updates,
 use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
+
+pnpm 12 re-checks every lockfile entry against `minimumReleaseAge` (24 hours by
+default) during `pnpm install --frozen-lockfile`. A lockfile that holds a version
+published less than 24 hours ago therefore fails the install step with
+`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, even though the lockfile matches the
+manifests. This happens when Dependabot or a contributor adds a very fresh package.
+Wait until the package is 24 hours old and rerun the failed job. Do not set
+`trustLockfile`, lower `minimumReleaseAge` or add an exclusion to make the job pass:
+each one switches off the protection against freshly published malicious versions.
 
 The report also has a **Dependabot health** section. GitHub kills a Dependabot
 update job after a fixed 55 minutes (it cannot be extended) and a killed job opens
