@@ -82,6 +82,11 @@ test('path-mode Scheduled jobs reads history only when opened and keeps the narr
   await expect(cleanup).toBeVisible()
   await expectNoAxeViolations(page)
 
+  // An opened history follows the page: a manual refresh reads it again.
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect.poll(() => historyReads.length).toBe(2)
+  await expect(page.getByText('No runs recorded yet.')).toBeVisible()
+
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByRole('table', { name: 'Scheduled jobs' })).toBeHidden()
   await expect(page.getByRole('list', { name: 'Scheduled jobs' })).toBeVisible()
