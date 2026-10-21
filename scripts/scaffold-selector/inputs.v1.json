@@ -211,6 +211,7 @@
           "scripts/stand.mjs",
           "scripts/e2e-ci.mjs",
           "scripts/e2e-ci-plan.mjs",
+          "scripts/product-admin-e2e-plan.mjs",
           "docs/operations/local-stands.md"
         ]
       },

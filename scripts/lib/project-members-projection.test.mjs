@@ -44,13 +44,13 @@ for (const [name, flags] of scenarios) {
       const prefix = flags.mode === 'single' ? '' : '[locale]/'
       assert.ok(
         exists(
-          `apps/web/src/app/${prefix}(organization-access)/organizations/[id]/members/page.tsx`
+          `apps/web/src/app/${prefix}(product-admin)/manage/(protected)/organizations/[id]/members/page.tsx`
         )
       )
       assert.ok(exists('apps/web/src/app/api/product-access/organizations/[id]/members/route.ts'))
       assert.ok(
         exists(
-          `apps/web/src/app/${prefix}(organization-access)/organizations/[id]/invites/page.tsx`
+          `apps/web/src/app/${prefix}(product-admin)/manage/(protected)/organizations/[id]/invites/page.tsx`
         )
       )
       for (const route of [

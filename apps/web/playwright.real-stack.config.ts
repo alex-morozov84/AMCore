@@ -19,6 +19,9 @@ export default defineConfig({
   ...(activeTarget().fixtureProfile === 'organization-setup'
     ? { testMatch: '**/organization-initial-setup.spec.ts' }
     : {}),
+  ...(activeTarget().fixtureProfile !== 'product-admin-oauth-path'
+    ? { testIgnore: '**/product-admin-oauth-path.spec.ts' }
+    : {}),
   fullyParallel: false,
   // Fixture writes include live ownership/marker checks; browser assertions keep their own limits.
   timeout: 120_000,

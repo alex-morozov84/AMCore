@@ -1,5 +1,7 @@
 import ts from 'typescript'
 
+import { registerLocaleAdminRouteOperations } from './project-locale-admin-route-operations.mjs'
+
 import { registerInvitationRouteOperation } from './project-locale-invitation-route-operation.mjs'
 
 import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
@@ -126,6 +128,7 @@ function callbackRoute(model, _params, ctx) {
 
 export function registerLocaleRouteOperations(registry) {
   registerInvitationRouteOperation(registry)
+  registerLocaleAdminRouteOperations(registry)
   registry.define('locale.auth-page', {
     paramsSchema: localeParams,
     deriveSemanticWrites: () => [

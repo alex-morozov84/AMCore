@@ -1,4 +1,4 @@
-import { productAdminPath } from '@amcore/shared'
+import { DEFAULT_LOCALE, productAdminPath } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { appleBrowserFixture } from '../product-admin-real-stack/apple-browser-fixture'
@@ -32,7 +32,9 @@ for (const provider of ['apple', 'google', 'github'] as const) {
         provider === 'apple'
           ? await appleBrowserFixture(context, product, email)
           : await getBrowserFixture(context, product, email, provider, 'admin')
-      await page.goto(`${product}/api/product-admin/auth/oauth/${provider}?locale=en`)
+      await page.goto(
+        `${product}/api/product-admin/auth/oauth/${provider}?locale=${DEFAULT_LOCALE}`
+      )
       try {
         await page.waitForURL(
           (url) =>

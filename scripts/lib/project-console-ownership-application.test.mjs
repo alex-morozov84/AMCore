@@ -64,7 +64,7 @@ test('disabled projection applies once and passes the residual scan', () =>
       assert.equal(existsSync(path.join(root, file)), true, file)
     const productAdmin = readFileSync(path.join(root, 'docs/product-admin/README.md'), 'utf8')
     assert.doesNotMatch(productAdmin, /operations-console\/README\.md/)
-    assert.match(productAdmin, /organizationAccessPlacement/)
+    assert.match(productAdmin, /placement-and-sessions/)
     const establishment = readFileSync(
       path.join(root, 'docs/product-admin/organization-establishment.md'),
       'utf8'

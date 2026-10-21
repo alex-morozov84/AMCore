@@ -1,3 +1,4 @@
+import { productAdminE2ePlans } from './product-admin-e2e-plan.mjs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { ciLanes } from './e2e-ci-plan.mjs'
@@ -29,6 +30,9 @@ async function browserLane(lane) {
   if (lane === 'setup-console')
     args.splice(5, 1, 'console-real-stack', '--fixture', 'organization-setup')
   // AMCORE_CONSOLE_CI_COMMAND_END
+  const staffPlan = productAdminE2ePlans[lane]
+  if (staffPlan)
+    args.splice(5, 1, staffPlan.lane, '--fixture', staffPlan.fixture, '--', ...staffPlan.files)
   let status = 0
   try {
     await run(process.execPath, args, {

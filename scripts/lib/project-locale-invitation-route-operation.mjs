@@ -70,7 +70,10 @@ function invitationRoute(model, _params, ctx) {
     const bootstrap = findUniqueNode(
       model,
       (node) =>
-        ts.isCallExpression(node) && node.expression.getText() === 'invitationHandlers.bootstrap',
+        ts.isCallExpression(node) &&
+        ['invitationHandlers.bootstrap', 'invitationHandlers.adminBootstrap'].includes(
+          node.expression.getText()
+        ),
       ctx,
       fn
     )

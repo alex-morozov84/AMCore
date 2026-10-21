@@ -7,7 +7,7 @@ import { directory, save } from './state.mjs'
 import { supervise } from './supervisor.mjs'
 import { mockEnvironment } from './mock-environment.mjs'
 import { allocateControlSocket } from './control-socket.mjs'
-import { groupArguments } from './test-inventory.mjs'
+import { groupArguments, profileInventory } from './test-inventory.mjs'
 
 export async function test(m, lane, token, extra = [], group) {
   const mocked = lane === 'mocked'
@@ -42,6 +42,7 @@ export async function test(m, lane, token, extra = [], group) {
         AMCORE_STAND_TOKEN: token,
       }),
     }
+    if (!group) await profileInventory(m, lane, options, extra)
     const filters = group ? await groupArguments(m, group, options) : []
     await run(
       'pnpm',

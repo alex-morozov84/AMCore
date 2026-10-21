@@ -1,8 +1,10 @@
 import { absent, claim, localeParams } from './project-locale-ast-helpers.mjs'
 import {
   dropLocalePushOption,
+  dropAdminLoginLocale,
   rewriteDal,
   rewriteOAuth,
+  rewriteSelectedRedirect,
 } from './project-locale-navigation-core.mjs'
 import {
   removeConsoleLocaleSwitcher,
@@ -12,6 +14,22 @@ import {
 } from './project-locale-navigation-ui.mjs'
 
 const definitions = [
+  [
+    'locale.navigation-admin-login',
+    {
+      paramsSchema: localeParams,
+      deriveSemanticWrites: () => [absent('ts:admin-login:locale-navigation-option')],
+      adapter: dropAdminLoginLocale,
+    },
+  ],
+  [
+    'locale.navigation-selected-redirect',
+    {
+      paramsSchema: localeParams,
+      deriveSemanticWrites: () => [claim('ts:selected-redirect:source', 'next/navigation')],
+      adapter: rewriteSelectedRedirect,
+    },
+  ],
   [
     'locale.navigation-call',
     {

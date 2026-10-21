@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { acceptAdministrator } from '../organization-provisioning/recipient'
@@ -18,11 +19,11 @@ test('closed signup still admits invited registration and real email proof befor
   if (!staff || target.fixtureProfile !== 'product-admin-closed-signup')
     throw new Error('Closed staff fixture required')
   const messages = JSON.parse(
-    readFileSync(join(target.snapshot, 'apps/web/messages/en.json'), 'utf8')
+    readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
   )
   const operator = 'staff-owner@e2e.amcore.test'
   const recipient = 'staff-invited@e2e.amcore.test'
-  const prepared = setupCommand('prepare-account', { email: operator, locale: 'en' })
+  const prepared = setupCommand('prepare-account', { email: operator, locale: DEFAULT_LOCALE })
   const context = await browser.newContext({
     baseURL: product,
     ignoreHTTPSErrors: true,

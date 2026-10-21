@@ -19,6 +19,8 @@ const entry = (path, key) => ({
 })
 
 export const operationsConsoleStandSeams = [
+  entry('scripts/stand/product-admin-source.mjs', 'STAFF_EDGE'),
+  entry('scripts/product-admin-e2e-plan.mjs', 'STAFF_CI'),
   entry('apps/web/playwright.real-stack.config.ts', 'PROVISIONING_TEST_DIR'),
   entry('scripts/stand/config.mjs', 'ESTABLISHMENT_POLICY'),
   entry('scripts/stand/setup-command.mjs', 'ESTABLISHMENT_DIAGNOSTICS'),

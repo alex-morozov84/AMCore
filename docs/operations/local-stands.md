@@ -452,6 +452,11 @@ with the staff lane. It mounts a read-only API transport fixture and generates a
 client signing key in the disposable snapshot. The fixture covers Apple signed identity tokens and Google/GitHub GET callbacks.
 The real provider adapters and application auth path still run. This fixture cannot be used for owner previews;
 it does not prove live Apple registration or an external Apple account login.
+The staff Playwright configuration selects only the scenarios supported by the
+chosen fixture. CI uses the same declared groups through
+`node scripts/e2e-ci.mjs staff-oauth`; required inventory checks reject missing
+or duplicated host specs. The full Web E2E aggregate includes the applicable
+groups, rather than relying on a separate optional job.
 
 For path administration OAuth, use
 `pnpm stand e2e --lane real-stack --fixture product-admin-oauth-path -- product-admin-oauth-path.spec.ts`.
