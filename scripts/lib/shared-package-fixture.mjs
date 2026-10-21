@@ -1,4 +1,12 @@
-import { cpSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
@@ -12,7 +20,21 @@ export function copyShared(directory) {
   const manifest = JSON.parse(readFileSync(manifestPath))
   manifest.packageManager = JSON.parse(readFileSync(join(root, 'package.json'))).packageManager
   writeFileSync(manifestPath, JSON.stringify(manifest))
-  symlinkSync(join(source, 'node_modules'), join(directory, 'node_modules'))
+  linkDependencies(source, directory)
+}
+
+// pnpm shell launchers contain relative paths that break through a directory symlink.
+// Link package entrypoints directly so this external fixture keeps real CLI resolution.
+function linkDependencies(source, directory) {
+  const installed = join(source, 'node_modules')
+  const local = join(directory, 'node_modules')
+  mkdirSync(join(local, '.bin'), { recursive: true })
+  for (const entry of readdirSync(installed)) {
+    if (entry !== '.bin') symlinkSync(join(installed, entry), join(local, entry))
+  }
+  const compilerRoot = join(installed, 'tsdown')
+  const compiler = JSON.parse(readFileSync(join(compilerRoot, 'package.json')))
+  symlinkSync(realpathSync(join(compilerRoot, compiler.bin.tsdown)), join(local, '.bin', 'tsdown'))
 }
 
 // Exercise the manifest command: the compiler binary alone does not prove package wiring.
