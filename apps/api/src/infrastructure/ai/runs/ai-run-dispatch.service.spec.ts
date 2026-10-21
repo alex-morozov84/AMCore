@@ -162,7 +162,11 @@ describe('AiRunDispatchService', () => {
       executor.execute.mockRejectedValue(new Error('boom'))
       repository.claimDueBatch.mockResolvedValueOnce([claim('run-1')]).mockResolvedValue([])
 
-      await expect(service.drainDueBatches()).resolves.toBeUndefined()
+      // The lane failure is counted, not hidden: the recovery job records the pass as partial.
+      await expect(service.drainDueBatches()).resolves.toEqual({
+        status: 'completed',
+        isolatedFailures: 1,
+      })
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'ai.run.lane_failed' }),

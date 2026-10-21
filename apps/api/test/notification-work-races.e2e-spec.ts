@@ -24,7 +24,7 @@ import {
   type Prisma,
   PrismaClient,
 } from '../src/generated/prisma/client'
-import type { SingletonCronRunner } from '../src/infrastructure/schedule/singleton-cron.runner'
+import type { ScheduledJobExecutor } from '../src/infrastructure/schedule/scheduled-job.executor'
 import type { PrismaService } from '../src/prisma'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
@@ -73,7 +73,7 @@ describe('Notification real PostgreSQL interleavings', () => {
     return new NotificationDeliveryRepository(client, new NotificationShutdownLatch(noopPinoLogger))
   }
   function retention(client: PrismaService = db as PrismaService) {
-    return new NotificationRetentionService(client, {} as SingletonCronRunner, noopPinoLogger)
+    return new NotificationRetentionService(client, {} as ScheduledJobExecutor, noopPinoLogger)
   }
   async function fixture(
     data: Partial<Prisma.NotificationDeliveryUncheckedCreateInput> = {},

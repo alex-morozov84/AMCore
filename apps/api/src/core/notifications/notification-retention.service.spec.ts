@@ -6,7 +6,8 @@ import type { PrismaService } from '../../prisma'
 import { NotificationRetentionService } from './notification-retention.service'
 
 import type { Prisma, PrismaClient } from '@/generated/prisma/client'
-import type { SingletonCronRunner } from '@/infrastructure/schedule/singleton-cron.runner'
+import { fakeJobs } from '@/infrastructure/schedule/scheduled-job.test-support'
+import { NOTIFICATION_RETENTION_JOB } from '@/infrastructure/schedule/scheduled-jobs.catalogue'
 
 const sqlText = (sql: Prisma.Sql | TemplateStringsArray): string =>
   ('strings' in sql ? sql.strings : sql).join('')
@@ -14,7 +15,7 @@ const sqlText = (sql: Prisma.Sql | TemplateStringsArray): string =>
 describe('NotificationRetentionService', () => {
   let service: NotificationRetentionService
   let prisma: DeepMockProxy<PrismaClient>
-  let singletonCron: jest.Mocked<Pick<SingletonCronRunner, 'run'>>
+  let scheduled: ReturnType<typeof fakeJobs>
   let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(() => {
@@ -26,11 +27,7 @@ describe('NotificationRetentionService', () => {
       if (typeof callback !== 'function') throw new Error('Expected interactive transaction')
       return callback(prisma)
     }) as PrismaClient['$transaction'])
-    singletonCron = {
-      run: jest.fn().mockImplementation(async (_opts, task: () => Promise<void>) => {
-        await task()
-      }),
-    } as jest.Mocked<Pick<SingletonCronRunner, 'run'>>
+    scheduled = fakeJobs()
     mockLogger = {
       setContext: jest.fn(),
       info: jest.fn(),
@@ -40,7 +37,7 @@ describe('NotificationRetentionService', () => {
     } as unknown as jest.Mocked<PinoLogger>
     service = new NotificationRetentionService(
       prisma as unknown as PrismaService,
-      singletonCron as unknown as SingletonCronRunner,
+      scheduled.jobs,
       mockLogger
     )
   })
@@ -100,19 +97,16 @@ describe('NotificationRetentionService', () => {
   })
 
   describe('scheduledRetention', () => {
-    it('runs under the retention lock and logs completion', async () => {
+    it('runs as the recorded retention job and logs completion', async () => {
       prisma.$executeRaw.mockResolvedValue(0)
 
       await service.scheduledRetention()
 
-      expect(singletonCron.run).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'notification.retention',
-          lockKey: expect.any(String),
-          ttlMs: expect.any(Number),
-        }),
-        expect.any(Function)
+      expect(scheduled.run).toHaveBeenCalledWith(NOTIFICATION_RETENTION_JOB, expect.any(Function))
+      expect(NOTIFICATION_RETENTION_JOB.lock).toEqual(
+        expect.objectContaining({ key: expect.any(String), ttlMs: expect.any(Number) })
       )
+      expect(scheduled.results[0]).toEqual(expect.objectContaining({ outcome: 'success' }))
       expect(prisma.$executeRaw).toHaveBeenCalled()
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'notification.retention_complete' }),
@@ -120,8 +114,8 @@ describe('NotificationRetentionService', () => {
       )
     })
 
-    it('does not sweep when the runner skips the task (lock lost / Redis down)', async () => {
-      singletonCron.run.mockResolvedValueOnce(undefined)
+    it('does not sweep when the executor skips the task (lock lost / Redis down)', async () => {
+      scheduled.run.mockResolvedValueOnce(undefined)
 
       await service.scheduledRetention()
 

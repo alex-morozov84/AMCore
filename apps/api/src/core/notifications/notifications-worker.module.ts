@@ -1,6 +1,7 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common'
 
 import { bindWorkHandlers } from '../../infrastructure/background-work/registration.js'
+import { ScheduledJobsModule } from '../../infrastructure/schedule/scheduled-jobs.module.js'
 import { SingletonCronRunner } from '../../infrastructure/schedule/singleton-cron.runner.js'
 import { PrismaModule } from '../../prisma/index.js'
 
@@ -47,6 +48,7 @@ export class ConfiguredNotificationsWorkerModule {
       module: ConfiguredNotificationsWorkerModule,
       imports: [
         PrismaModule,
+        ScheduledJobsModule,
         core,
         NotificationExecutionModule,
         ...channels.map((channel) => channel.worker(core)),

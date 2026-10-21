@@ -29,6 +29,7 @@ import {
   type ProviderAttempt,
   ProviderEvidenceStore,
 } from '../src/infrastructure/background-work/provider-evidence.store'
+import { ScheduledJobExecutor } from '../src/infrastructure/schedule/scheduled-job.executor'
 import { PrismaService } from '../src/prisma'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
@@ -79,6 +80,11 @@ describe('Background-work ADMIN ledger', () => {
         PgOutcomeBuffer,
         ImportWorkAdapter,
         BackgroundControlMaintenance,
+        // Recording is not under test here: the stand-in runs the tick exactly as the scheduler would.
+        {
+          provide: ScheduledJobExecutor,
+          useValue: { run: (_job: unknown, task: () => Promise<unknown>) => task() },
+        },
       ],
     }).compile()
     await module.init()

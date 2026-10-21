@@ -15,7 +15,7 @@ import {
   type Prisma,
   PrismaClient,
 } from '../src/generated/prisma/client'
-import type { SingletonCronRunner } from '../src/infrastructure/schedule/singleton-cron.runner'
+import type { ScheduledJobExecutor } from '../src/infrastructure/schedule/scheduled-job.executor'
 import type { PrismaService } from '../src/prisma'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
@@ -48,7 +48,7 @@ describe('Notification retention and safe history', () => {
     ).id
     retention = new NotificationRetentionService(
       db as PrismaService,
-      {} as SingletonCronRunner,
+      {} as ScheduledJobExecutor,
       noopPinoLogger
     )
     control = new NotificationWorkControl({

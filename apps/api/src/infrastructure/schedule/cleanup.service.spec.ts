@@ -5,7 +5,8 @@ import type { InvitationRetentionService } from '../../core/invitations/invitati
 import type { PrismaService } from '../../prisma'
 
 import { CleanupService } from './cleanup.service'
-import type { SingletonCronRunner } from './singleton-cron.runner'
+import { fakeJobs } from './scheduled-job.test-support'
+import { CLEANUP_JOB } from './scheduled-jobs.catalogue'
 
 import type { PrismaClient } from '@/generated/prisma/client'
 
@@ -13,19 +14,15 @@ describe('CleanupService', () => {
   let retention: jest.Mocked<Pick<InvitationRetentionService, 'prune'>>
   let service: CleanupService
   let prisma: DeepMockProxy<PrismaClient>
-  let singletonCron: jest.Mocked<Pick<SingletonCronRunner, 'run'>>
+  let scheduled: ReturnType<typeof fakeJobs>
   let mockLogger: jest.Mocked<PinoLogger>
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
     retention = { prune: jest.fn().mockResolvedValue({ count: 0 }) }
     // Default: behave like the lock was won — execute the task immediately so the
-    // sweep runs. The lock orchestration itself is covered in the runner's spec.
-    singletonCron = {
-      run: jest.fn().mockImplementation(async (_opts, task: () => Promise<void>) => {
-        await task()
-      }),
-    } as jest.Mocked<Pick<SingletonCronRunner, 'run'>>
+    // sweep runs. The lock orchestration itself is covered in the executor's spec.
+    scheduled = fakeJobs()
     mockLogger = {
       setContext: jest.fn(),
       info: jest.fn(),
@@ -35,7 +32,7 @@ describe('CleanupService', () => {
     } as unknown as jest.Mocked<PinoLogger>
     service = new CleanupService(
       prisma as unknown as PrismaService,
-      singletonCron as unknown as SingletonCronRunner,
+      scheduled.jobs,
       mockLogger,
       retention as unknown as InvitationRetentionService
     )
@@ -152,20 +149,17 @@ describe('CleanupService', () => {
     })
   })
 
-  describe('scheduledCleanup (delegates to the singleton-cron runner — EQS-05)', () => {
-    it('runs the sweep under the cleanup lock key/ttl and logs completion', async () => {
+  describe('scheduledCleanup (delegates to the scheduled-job executor — EQS-05)', () => {
+    it('runs the sweep as the recorded cleanup job and logs completion', async () => {
       zeroAll()
 
       await service.scheduledCleanup()
 
-      expect(singletonCron.run).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'schedule.cleanup',
-          lockKey: expect.any(String),
-          ttlMs: expect.any(Number),
-        }),
-        expect.any(Function)
+      expect(scheduled.run).toHaveBeenCalledWith(CLEANUP_JOB, expect.any(Function))
+      expect(CLEANUP_JOB.lock).toEqual(
+        expect.objectContaining({ key: expect.any(String), ttlMs: expect.any(Number) })
       )
+      expect(scheduled.results[0]).toEqual(expect.objectContaining({ outcome: 'success' }))
       // default runner mock executes the task → the sweep ran + completion logged
       expect(prisma.session.deleteMany).toHaveBeenCalled()
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -174,9 +168,27 @@ describe('CleanupService', () => {
       )
     })
 
-    it('does not run the sweep when the runner skips the task (lock lost / Redis down)', async () => {
-      // Runner did not invoke the task (skip / fail-closed paths are its own spec).
-      singletonCron.run.mockResolvedValueOnce(undefined)
+    it('records a partial result when one bucket fails and a failed one when all do', async () => {
+      zeroAll()
+      prisma.session.deleteMany.mockRejectedValue(new Error('db'))
+      await service.scheduledCleanup()
+      expect(scheduled.results[0]).toEqual(
+        expect.objectContaining({ outcome: 'partial', code: 'bucket_failed' })
+      )
+
+      prisma.passwordResetToken.deleteMany.mockRejectedValue(new Error('db'))
+      prisma.emailVerificationToken.deleteMany.mockRejectedValue(new Error('db'))
+      prisma.apiKey.deleteMany.mockRejectedValue(new Error('db'))
+      retention.prune.mockRejectedValue(new Error('db'))
+      await service.scheduledCleanup()
+      expect(scheduled.results[1]).toEqual(
+        expect.objectContaining({ outcome: 'failed', code: 'all_buckets_failed' })
+      )
+    })
+
+    it('does not run the sweep when the executor skips the task (lock lost / Redis down)', async () => {
+      // Executor did not invoke the task (skip / fail-closed paths are its own spec).
+      scheduled.run.mockResolvedValueOnce(undefined)
 
       await service.scheduledCleanup()
 
