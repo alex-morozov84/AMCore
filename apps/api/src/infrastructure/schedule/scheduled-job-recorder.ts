@@ -113,12 +113,35 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
   }
 
   finish(definition: ScheduledJobDefinition, run: ScheduledRun, result: ScheduledJobResult): void {
-    const cadence = cadenceOf(definition)
     const endMono = performance.now()
     const durationMs = Math.max(0, Math.round(endMono - run.startMono))
+    this.enqueue(this.evidenceOf(definition, run, result, endMono, durationMs))
+    // Only a run whose start was accepted gets its row closed; the summary above is separate.
+    if (cadenceOf(definition) !== 'daily' || !run.tracked || 'skipped' in result) return
+    this.pending.finishRun({
+      jobId: definition.id,
+      runId: run.runId,
+      outcome: result.outcome,
+      startMono: run.startMono,
+      endMono,
+      durationMs,
+      code: result.code ?? null,
+      summary: result.summary ?? null,
+      clock: run.clock,
+    })
+    this.flush.kick('event')
+  }
+
+  private evidenceOf(
+    definition: ScheduledJobDefinition,
+    run: ScheduledRun,
+    result: ScheduledJobResult,
+    endMono: number,
+    durationMs: number
+  ): Evidence {
     const base = {
       jobId: definition.id,
-      cadence,
+      cadence: cadenceOf(definition),
       runId: run.runId,
       startMono: run.startMono,
       endMono,
@@ -127,41 +150,23 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
       nextFireAt: this.nextFire(definition),
       clock: run.clock,
     }
-    if ('skipped' in result) {
-      this.enqueue({
+    if ('skipped' in result)
+      return {
         ...base,
         kind: 'skip',
         code: null,
         summary: null,
         skipReason: result.skipped,
         dueAt: null,
-      })
-      return
-    }
-    const outcome = result.outcome
-    const code = result.code ?? null
-    const summary = result.summary ?? null
-    this.enqueue({
+      }
+    const { outcome } = result
+    return {
       ...base,
       kind: outcome === 'failed' ? 'failure' : outcome,
-      code,
-      summary,
+      code: result.code ?? null,
+      summary: result.summary ?? null,
       skipReason: null,
       dueAt: outcome === 'success' ? run.dueAt : null,
-    })
-    if (cadence === 'daily' && run.tracked) {
-      this.pending.finishRun({
-        jobId: definition.id,
-        runId: run.runId,
-        outcome,
-        startMono: run.startMono,
-        endMono,
-        durationMs,
-        code,
-        summary,
-        clock: run.clock,
-      })
-      this.flush.kick('event')
     }
   }
 

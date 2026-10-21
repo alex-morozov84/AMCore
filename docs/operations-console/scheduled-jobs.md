@@ -40,14 +40,14 @@ run is not tracked.
 They answer different questions, so a job can show both **Partly done** and
 **Overdue**.
 
-| Last result             | Meaning                                                                                                                 |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Success**             | The run finished and did its work. Doing nothing because nothing was due also counts.                                   |
-| **Partly done**         | The run reached its end but some steps failed. The note names them. A partly done run does not count as a success.      |
-| **Failed**              | The run stopped with an error, or every one of its steps failed. The note gives a short reason, never an error message. |
-| **Running**             | A daily job's run started recently and has not finished.                                                                |
-| **Result not recorded** | A run started, but nobody recorded its end. The worker may have stopped. This is not a failure and not a success.       |
-| **No runs yet**         | No run has been recorded since a worker first reported the job.                                                         |
+| Last result             | Meaning                                                                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Success**             | The run finished and did its work. Doing nothing because nothing was due also counts.                                               |
+| **Partly done**         | The run reached its end but some steps failed. The note names them. A partly done run does not count as a success.                  |
+| **Failed**              | The run stopped with an error, or every one of its steps failed. The note gives a short reason, never an error message.             |
+| **Running**             | A daily job's run started less than 30 minutes ago and has not finished.                                                            |
+| **Result not recorded** | A run started, but nobody recorded its end within 30 minutes. The worker may have stopped. This is not a failure and not a success. |
+| **No runs yet**         | No run has been recorded since a worker first reported the job.                                                                     |
 
 | Freshness      | Meaning                                                                                                                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -56,7 +56,8 @@ They answer different questions, so a job can show both **Partly done** and
 | **Not known**  | Nobody has reported the job, so there is nothing to judge.                                                                                                                                                          |
 | **Turned off** | A worker reported the job as turned off by configuration, for example GeoIP when `GEOIP_ENABLED` is `false`. The note says why.                                                                                     |
 
-**Overdue** means no fresh confirmation was recorded. It does not prove the
+**Overdue** means no fresh confirmation was recorded. It can sit beside a last result
+of **Success**: that success is older than the one that was due. It does not prove the
 job stopped: a pass that takes unusually long also shows it.
 
 A **skipped** run appears as a note (**Last skipped run: …**) only when it is newer
@@ -91,7 +92,8 @@ the latest completed pass.
    it did not start.
 3. **Result not recorded.** Check whether a worker restarted around the start time.
    A nightly job that never finishes can also hold its lock for up to 30 minutes.
-4. **No worker has reported these jobs yet** (banner). Start a worker, or check
+4. **No worker has reported these jobs yet** (banner, shown only when no job has any
+   report; a job that reported once keeps its row and shows no banner). Start a worker, or check
    its database connection. Also check `DATABASE_POOL_MAX`: with a pool of one a
    worker records nothing, not even its first report, so a new installation stays
    in this state until the pool is at least two. The page shows the jobs of the code catalogue, so the

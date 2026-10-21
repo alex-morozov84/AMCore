@@ -29,6 +29,13 @@ worker-only module (see [Register in the correct process role](architecture-and-
    export const REPORT_POLL_JOB = frequent('report-poll', EVERY_MIN, 60_000)
    ```
 
+   `daily(id, cronExpression, options)` and `frequent(id, schedule, periodMs)` are
+   helpers private to that catalogue file, next to the `EVERY_30S` and `EVERY_MIN`
+   schedule constants. For `frequent`, the third argument is the period in
+   milliseconds; the helper derives the stale threshold from it. A cron job runs in
+   the process time zone unless the `daily` options give a `timeZone`; the screen
+   shows the zone the worker reported.
+
    The `id` is a lowercase slug and never changes meaning. A `singleton` job needs a
    `lock`; a `per-replica` job must not have one. Keep `lock.ttlMs` at most the
    job's `graceMs` (the helper sets 30 minutes).
@@ -52,23 +59,31 @@ worker-only module (see [Register in the correct process role](architecture-and-
    with a different shape builds the result itself.
 
    Inject `ScheduledJobExecutor` (import `ScheduledJobsModule` in the module that
-   provides the service). A resolved promise is **not** success: the task must say
+   provides the service). For a `singleton` job the executor takes the Redis lock
+   described by `lock`; your service takes no lock itself. If the lock service cannot
+   be asked, the executor records a `lock_unavailable` skip and does not run the task;
+   losing the race to another replica is normal and is not recorded. A resolved promise is **not** success: the task must say
    what happened.
 
-The job now appears on the screen. Add a name and purpose under
-`console.scheduledJobs.jobs.<id>` in `apps/web/messages/*.json` (without them the
-screen shows the id). A downstream fork with the Console removed needs no change.
+The job now appears on the screen. Add `name` and `purpose` under
+`console.scheduledJobs.jobs.<id>` in `apps/web/messages/en.json` and every other
+catalogue; an id with hyphens is used as it is, for example `"report-cleanup": { "name": ..., "purpose": ... }`
+(without them the screen shows the id). A downstream fork with the Console removed needs no change.
 
 ## Choose the result
 
-| Return                    | When                                                                                                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `succeeded(summary?)`     | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                        |
-| `partial(code, summary?)` | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                              |
-| `failed(code, summary?)`  | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary. |
-| `skippedFor(reason)`      | Frequent jobs only: `not_ready`, `shutdown` or `busy`. A skip never makes a job look fresh. Daily jobs must not return a skip.                                     |
+| Return                    | When                                                                                                                                                                                                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `succeeded(summary?)`     | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                                                                                                                                                                      |
+| `partial(code, summary?)` | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                                                                                                                                                                            |
+| `failed(code, summary?)`  | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary.                                                                                                                                               |
+| `skippedFor(reason)`      | Frequent jobs only: `not_ready` (the work cannot start yet, for example the application is still starting), `shutdown` (the process is stopping) or `busy` (another pass or every lane is already taken). The job decides which applies. A skip never makes a job look fresh. Daily jobs must not return a skip. |
 
-A thrown error is recorded as `failed` and then rethrown to the scheduler as before.
+`return failed('code')` ends the run normally: nothing is rethrown. A thrown error is
+recorded as `failed` and then rethrown to the scheduler as before, so choose one of
+the two. After some steps committed and a later one aborted the loop, return
+`failed('code', { counts: { committed: 3 }, codes: [] })` unless the scheduler should
+also see the error.
 Its code is the error class name only when the name is on a closed list (database,
 timeout and standard JavaScript error classes); any other name is recorded as
 `unexpected`, because a name chosen by a library or by input could carry content.
@@ -91,7 +106,8 @@ shared logic directly, as `POST /admin/cleanup` and the GeoIP startup/CLI path d
   longer runs keeps its last rows. The screen shows the latest 20.
   A success moves the due time to the next planned run. Failed, partial and
   skipped runs never move it. A job is `Overdue` when its due time plus
-  `graceMs` has passed with no newer success.
+  `graceMs` has passed with no newer success. A run still open after `graceMs` is
+  shown as `Result not recorded`.
 - **Frequent jobs** keep one summary. A job is `Overdue` when no **successful**
   completed pass was recorded within `staleAfterMs`, which the helper sets to
   `max(10 × period, 5 minutes)`. A job whose every pass fails or is partial becomes
