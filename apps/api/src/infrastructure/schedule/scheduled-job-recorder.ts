@@ -13,11 +13,25 @@ import {
   type ScheduledJobResult,
 } from './scheduled-job.js'
 import { errorName, FlushControl } from './scheduled-job-flush.js'
-import { type Evidence, type Lane, PendingEvidence } from './scheduled-job-pending.js'
-import { register, type Registration } from './scheduled-job-registration.sql.js'
-import { writeSnapshot } from './scheduled-job-writer.js'
+import {
+  type Anchor,
+  type Evidence,
+  type Lane,
+  PendingEvidence,
+  type RunClock,
+} from './scheduled-job-pending.js'
+import type { Registration } from './scheduled-job-registration.sql.js'
+import { writeRegistration, writeSnapshot } from './scheduled-job-writer.js'
+
+/** A clock anchor older than this is replaced by the next sample, for runs that begin after it. */
+const ANCHOR_MAX_AGE_MS = 60 * 60_000
 
 export class ScheduledRun {
+  /** Shared by every event of this run, so its key stays the same across start, finish and retry. */
+  readonly clock: RunClock = { anchor: null }
+  /** False when the recorder refused to track the run (degraded or over its limits). */
+  tracked = true
+
   constructor(
     readonly runId: string,
     readonly startMono: number,
@@ -29,14 +43,18 @@ export class ScheduledRun {
 /**
  * Per-process recorder of scheduled-job evidence. `begin` and `finish` never wait for the
  * database: they update bounded in-memory state, and one single-flight writer persists it. A
- * lost write loses an observation, never a job run.
+ * lost write loses an observation, never a job run. Registration of the catalogue travels the same
+ * path as evidence, so it is admitted, bounded and retried like any other write.
  */
 @Injectable()
 export class ScheduledJobRecorder implements OnModuleDestroy {
   private readonly pending = new PendingEvidence()
   private readonly definitions = new Map<string, ScheduledJobDefinition>()
+  private registration: Registration[] | null = null
+  private anchor: Anchor | null = null
   private readonly flush = new FlushControl({
-    hasPending: (lane) => this.pending.has(lane),
+    hasPending: (lane) =>
+      (lane === 'event' && this.registration !== null) || this.pending.has(lane),
     admitted: () => this.admitted(),
     write: (lane) => this.writeLane(lane),
     onDegraded: (reason) =>
@@ -54,50 +72,43 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
     this.logger.setContext(ScheduledJobRecorder.name)
   }
 
-  /** Registers this process's catalogue once at start. Failure is logged; recording continues without it. */
-  async registerJobs(
+  /**
+   * Reports this process's catalogue. It only queues the report: the write happens in the
+   * background when a connection is free, is retried with the same backoff as evidence, and is
+   * skipped for a pool of one connection. Application start never waits for it.
+   */
+  registerJobs(
     definitions: ScheduledJobDefinition[],
     disabled: (definition: ScheduledJobDefinition) => string | null
-  ): Promise<void> {
+  ): void {
     for (const definition of definitions) this.definitions.set(definition.id, definition)
-    const items: Registration[] = definitions.map((definition) => ({
+    this.registration = definitions.map((definition) => ({
       jobId: definition.id,
       configVersion: configVersionOf(definition),
       scheduleTimeZone: this.zoneOf(definition),
       disabledReason: disabled(definition),
       nextFireAt: this.nextFire(definition),
     }))
-    try {
-      await this.prisma.$transaction(
-        async (tx) => {
-          const [clock] = await tx.$queryRaw<{ now: Date }[]>`
-            SELECT set_config('statement_timeout', '5000', true),
-                   set_config('lock_timeout', '2000', true), clock_timestamp() AS now`
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('scheduled_job_run'))`
-          await register(tx, items, (clock?.now ?? new Date()).toISOString())
-        },
-        { maxWait: 2000, timeout: 10_000 }
-      )
-    } catch (error) {
-      this.logger.warn(
-        { event: 'schedule.registration_failed', error: errorName(error) },
-        'Scheduled job registration failed; evidence is recorded only for jobs already registered'
-      )
-    }
+    this.flush.kick('event')
   }
 
   begin(definition: ScheduledJobDefinition): ScheduledRun {
     const run = new ScheduledRun(randomUUID(), performance.now(), this.nextFire(definition))
-    if (cadenceOf(definition) === 'daily') {
-      const maxRuntimeMs = definition.graceMs
-      this.pending.startRun({
-        jobId: definition.id,
-        runId: run.runId,
-        startMono: run.startMono,
-        maxRuntimeMs,
-      })
-      this.flush.kick('event')
+    if (cadenceOf(definition) !== 'daily') return run
+    if (this.flush.degraded) {
+      // While degraded no new run is tracked: a success could not be kept anyway.
+      run.tracked = false
+      this.pending.drop(definition.id, 'event')
+      return run
     }
+    run.tracked = this.pending.startRun({
+      jobId: definition.id,
+      runId: run.runId,
+      startMono: run.startMono,
+      maxRuntimeMs: definition.graceMs,
+      clock: run.clock,
+    })
+    if (run.tracked) this.flush.kick('event')
     return run
   }
 
@@ -114,6 +125,7 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
       durationMs,
       configVersion: configVersionOf(definition),
       nextFireAt: this.nextFire(definition),
+      clock: run.clock,
     }
     if ('skipped' in result) {
       this.enqueue({
@@ -137,15 +149,17 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
       skipReason: null,
       dueAt: outcome === 'success' ? run.dueAt : null,
     })
-    if (cadence === 'daily') {
+    if (cadence === 'daily' && run.tracked) {
       this.pending.finishRun({
         jobId: definition.id,
         runId: run.runId,
         outcome,
+        startMono: run.startMono,
         endMono,
         durationMs,
         code,
         summary,
+        clock: run.clock,
       })
       this.flush.kick('event')
     }
@@ -153,18 +167,19 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
 
   /** A skip decided before any run began, for example when the Redis lock could not be asked. */
   skip(definition: ScheduledJobDefinition, reason: 'lock_unavailable'): void {
-    this.finish(definition, new ScheduledRun(randomUUID(), performance.now(), null), {
-      skipped: reason,
-    })
+    const run = new ScheduledRun(randomUUID(), performance.now(), null)
+    run.tracked = false
+    this.finish(definition, run, { skipped: reason })
   }
 
   private enqueue(evidence: Evidence): void {
+    const lane: Lane = evidence.cadence === 'daily' ? 'event' : 'frequent'
     if (this.flush.degraded && (evidence.kind === 'success' || evidence.kind === 'skip')) {
-      this.pending.drop(evidence.jobId, evidence.cadence === 'daily' ? 'event' : 'frequent')
+      this.pending.drop(evidence.jobId, lane)
       return
     }
     this.pending.put(evidence)
-    this.flush.kick(evidence.cadence === 'daily' ? 'event' : 'frequent')
+    this.flush.kick(lane)
   }
 
   private admitted(): boolean {
@@ -172,15 +187,43 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
     return pool.max >= 2 && pool.waiting === 0 && (pool.idle >= 1 || pool.total < pool.max)
   }
 
-  /** Takes one lane's snapshot and writes it; on failure the snapshot goes back for the next try. */
+  /**
+   * One flush attempt for a lane: the catalogue first, if it is still unreported (an evidence
+   * UPDATE finds no row before that), then the lane's snapshot. A failed snapshot goes back to
+   * the pending state and the failure is rethrown for the flush control to back off.
+   */
   private async writeLane(lane: Lane): Promise<void> {
+    await this.ensureRegistered()
+    if (!this.pending.has(lane)) return
     const snapshot = this.pending.take(lane)
     try {
-      await writeSnapshot(this.prisma, snapshot, [...this.definitions.keys()])
+      await writeSnapshot(this.prisma, snapshot, [...this.definitions.keys()], {
+        adopt: (sample) => this.adopt(sample),
+      })
     } catch (error) {
       this.pending.restore(snapshot)
       throw error
     }
+  }
+
+  private async ensureRegistered(): Promise<void> {
+    const items = this.registration
+    if (!items) return
+    try {
+      await writeRegistration(this.prisma, items)
+      if (this.registration === items) this.registration = null
+    } catch (error) {
+      this.logger.warn(
+        { event: 'schedule.registration_failed', error: errorName(error) },
+        'Scheduled job registration failed; it is retried while evidence waits'
+      )
+      throw error
+    }
+  }
+
+  private adopt(sample: Anchor): Anchor {
+    if (!this.anchor || sample.mono - this.anchor.mono > ANCHOR_MAX_AGE_MS) this.anchor = sample
+    return this.anchor
   }
 
   private nextFire(definition: ScheduledJobDefinition): Date | null {

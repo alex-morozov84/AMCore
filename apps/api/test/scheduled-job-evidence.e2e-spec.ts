@@ -4,9 +4,11 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 
 import { PrismaClient } from '../src/generated/prisma/client'
-import type { Evidence } from '../src/infrastructure/schedule/scheduled-job-pending'
 import {
+  type Anchor,
+  type Evidence,
   PendingEvidence,
+  type RunClock,
   type Snapshot,
 } from '../src/infrastructure/schedule/scheduled-job-pending'
 import { register } from '../src/infrastructure/schedule/scheduled-job-registration.sql'
@@ -26,24 +28,40 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
   let db: PrismaClient
   let service: PrismaService
   let mono = 1000
+  // One anchor for the whole process, as the recorder keeps; every event of a run shares its clock.
+  let anchor: Anchor | null = null
+  const anchors = { adopt: (sample: Anchor): Anchor => (anchor ??= sample) }
+  const clocks = new Map<string, RunClock>()
+  const clockOf = (runId: string): RunClock => {
+    const known = clocks.get(runId)
+    if (known) return known
+    const made: RunClock = { anchor: null }
+    clocks.set(runId, made)
+    return made
+  }
+  const startMonos = new Map<string, number>()
 
   const catalogue = ['cleanup', 'invitation-retention', 'notification-recovery']
-  const evidence = (over: Partial<Evidence> = {}): Evidence => ({
-    kind: 'success',
-    jobId: 'cleanup',
-    cadence: 'daily',
-    runId: randomUUID(),
-    startMono: (mono += 10),
-    endMono: mono + 5,
-    durationMs: 5,
-    code: null,
-    summary: null,
-    skipReason: null,
-    dueAt: new Date('2030-01-01T02:00:00.000Z'),
-    configVersion: 'v1',
-    nextFireAt: new Date('2030-01-01T02:00:00.000Z'),
-    ...over,
-  })
+  const evidence = (over: Partial<Evidence> = {}): Evidence => {
+    const runId = over.runId ?? randomUUID()
+    return {
+      kind: 'success',
+      jobId: 'cleanup',
+      cadence: 'daily',
+      runId,
+      clock: clockOf(runId),
+      startMono: (mono += 10),
+      endMono: mono + 5,
+      durationMs: 5,
+      code: null,
+      summary: null,
+      skipReason: null,
+      dueAt: new Date('2030-01-01T02:00:00.000Z'),
+      configVersion: 'v1',
+      nextFireAt: new Date('2030-01-01T02:00:00.000Z'),
+      ...over,
+    }
+  }
   const snapshot = (over: Partial<Snapshot> = {}): Snapshot => ({
     lane: 'event',
     evidence: [],
@@ -53,7 +71,7 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
     ...over,
   })
   const write = (over: Partial<Snapshot>): Promise<void> =>
-    writeSnapshot(service, snapshot(over), catalogue)
+    writeSnapshot(service, snapshot(over), catalogue, anchors)
 
   const summary = (jobId: string) => db.scheduledJobSummary.findUniqueOrThrow({ where: { jobId } })
   const counts = async (jobId: string) => {
@@ -192,20 +210,27 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
   })
 
   describe('run history caps', () => {
-    const start = (runId = randomUUID()) => ({
-      jobId: 'cleanup',
-      runId,
-      startMono: (mono += 10),
-      maxRuntimeMs: 30 * 60_000,
-    })
+    const start = (runId = randomUUID()) => {
+      const startMono = (mono += 10)
+      startMonos.set(runId, startMono)
+      return {
+        jobId: 'cleanup',
+        runId,
+        startMono,
+        maxRuntimeMs: 30 * 60_000,
+        clock: clockOf(runId),
+      }
+    }
     const finish = (runId: string, outcome: 'success' | 'failed' = 'success') => ({
       jobId: 'cleanup',
       runId,
       outcome,
+      startMono: startMonos.get(runId) ?? 0,
       endMono: (mono += 10),
       durationMs: 5,
       code: null,
       summary: null,
+      clock: clockOf(runId),
     })
 
     it('tracks a run from start to finish and closes only its own row', async () => {
@@ -273,6 +298,14 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
       const row = await db.scheduledJobRun.findUniqueOrThrow({ where: { runId: slow } })
       expect(row.outcome).toBe('failed')
       expect(row.finishedAt).not.toBeNull()
+    })
+
+    it('counts a finish that has no run row as a lost observation and still writes the summary', async () => {
+      const runId = randomUUID()
+      await write({ finishes: [finish(runId)], evidence: [evidence({ runId })] })
+      expect((await summary('cleanup')).droppedEvents).toBe(1)
+      expect((await summary('cleanup')).successRunId).toBe(runId)
+      expect(await db.scheduledJobRun.count({ where: { runId } })).toBe(0)
     })
 
     it('changes only the row of the finished run even when several are abandoned', async () => {
@@ -384,7 +417,15 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
       await Promise.allSettled(
         runs.flatMap((runId) => [
           write({
-            starts: [{ jobId: 'cleanup', runId, startMono: (mono += 10), maxRuntimeMs: 1_800_000 }],
+            starts: [
+              {
+                jobId: 'cleanup',
+                runId,
+                startMono: (startMonos.set(runId, (mono += 10)), mono),
+                maxRuntimeMs: 1_800_000,
+                clock: clockOf(runId),
+              },
+            ],
           }),
         ])
       )
@@ -396,10 +437,12 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
                 jobId: 'cleanup',
                 runId,
                 outcome: 'success',
+                startMono: startMonos.get(runId) ?? 0,
                 endMono: (mono += 10),
                 durationMs: 1,
                 code: null,
                 summary: null,
+                clock: clockOf(runId),
               },
             ],
           })
@@ -415,9 +458,9 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
       const pending = new PendingEvidence()
       pending.put(evidence({ jobId: 'cleanup', cadence: 'daily' }))
       pending.put(evidence({ jobId: 'notification-recovery', cadence: 'frequent' }))
-      await writeSnapshot(service, pending.take('event'), catalogue)
+      await writeSnapshot(service, pending.take('event'), catalogue, anchors)
       expect((await summary('notification-recovery')).successRunId).toBeNull()
-      await writeSnapshot(service, pending.take('frequent'), catalogue)
+      await writeSnapshot(service, pending.take('frequent'), catalogue, anchors)
       expect((await summary('notification-recovery')).successRunId).not.toBeNull()
     })
   })

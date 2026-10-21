@@ -62,8 +62,16 @@ export class FlushControl {
   }
 
   private async flush(lane: Lane): Promise<void> {
-    if (this.writing || !this.host.hasPending(lane)) {
-      if (this.writing && this.host.hasPending(lane)) this.schedule(lane, MIN_INTERVAL_MS.event)
+    if (!this.host.hasPending(lane)) return
+    // The deadline is checked here, right before writing, so a timer set earlier (while another
+    // write was in flight, or before a retry deadline moved) can never write sooner than allowed.
+    const early = this.nextAllowed[lane] - Date.now()
+    if (early > 0) {
+      this.schedule(lane, early)
+      return
+    }
+    if (this.writing) {
+      this.schedule(lane, MIN_INTERVAL_MS.event)
       return
     }
     if (!this.host.admitted()) {

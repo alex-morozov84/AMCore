@@ -1,4 +1,5 @@
 import { failed, partial, succeeded } from './scheduled-job'
+import { PendingEvidence } from './scheduled-job-pending'
 import { ScheduledJobRecorder } from './scheduled-job-recorder'
 import { CLEANUP_JOB, NOTIFICATION_RECOVERY_JOB } from './scheduled-jobs.catalogue'
 
@@ -197,5 +198,133 @@ describe('failure handling', () => {
     instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), succeeded())
     await advance(1000)
     expect(tx.mock.calls.length).toBe(calls)
+  })
+})
+
+describe('write deadlines hold even for timers set earlier', () => {
+  it('writes the frequent lane no sooner than a minute after the previous write finished', async () => {
+    const starts: number[] = []
+    const { instance, tx, writes } = recorder()
+    tx.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          starts.push(Date.now())
+          writes.push({ resolve: () => resolve(), reject: () => undefined })
+        })
+    )
+    const tick = () =>
+      instance.finish(
+        NOTIFICATION_RECOVERY_JOB,
+        instance.begin(NOTIFICATION_RECOVERY_JOB),
+        succeeded()
+      )
+    tick()
+    await advance(0)
+    expect(starts).toHaveLength(1)
+    // New evidence arrives while the first write is still in flight, then the write settles late.
+    tick()
+    await advance(5000)
+    tick()
+    writes[0]?.resolve()
+    const settledAt = Date.now()
+    await advance(0)
+    await advance(10 * 60_000)
+    writes.splice(0).forEach((write) => write.resolve())
+    await advance(10 * 60_000)
+    for (const second of starts.slice(1)) expect(second - settledAt).toBeGreaterThanOrEqual(60_000)
+  })
+
+  it('does not let an earlier timer bypass a retry deadline that moved later', async () => {
+    const { instance, tx, writes } = recorder()
+    instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), failed('x'))
+    await advance(0)
+    expect(tx).toHaveBeenCalledTimes(1)
+    // More evidence while the write is in flight arms a timer that keeps re-arming every second.
+    instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), failed('y'))
+    await advance(500)
+    // The write fails: the retry deadline is now 5 s away, later than that earlier timer.
+    writes.splice(0).forEach((write) => write.reject(new Error('db down')))
+    await advance(0)
+    await advance(3000)
+    expect(tx).toHaveBeenCalledTimes(1)
+    await advance(3000)
+    expect(tx).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('registration travels the managed write path', () => {
+  const registerAll = (instance: ScheduledJobRecorder) =>
+    instance.registerJobs([CLEANUP_JOB, NOTIFICATION_RECOVERY_JOB], () => null)
+
+  it('is queued without waiting and is never written with a pool of one connection', async () => {
+    const { instance, tx } = recorder({ max: 1, total: 1, idle: 1 })
+    registerAll(instance)
+    await advance(10 * 60_000)
+    expect(tx).not.toHaveBeenCalled()
+  })
+
+  it('is written once, through the same single-flight writer, when a connection is free', async () => {
+    const { instance, tx, writes, max } = recorder()
+    registerAll(instance)
+    instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), succeeded())
+    await advance(0)
+    expect(tx).toHaveBeenCalledTimes(1) // registration first; evidence waits behind it
+    writes.splice(0).forEach((write) => write.resolve())
+    await advance(2000)
+    expect(tx.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(max()).toBe(1)
+  })
+
+  it('is retried after a transient failure and keeps waiting evidence until then', async () => {
+    const { instance, tx, writes } = recorder()
+    registerAll(instance)
+    instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), succeeded())
+    await advance(0)
+    writes.splice(0).forEach((write) => write.reject(new Error('db down')))
+    await advance(0)
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'schedule.registration_failed' }),
+      expect.any(String)
+    )
+    await advance(6000)
+    expect(tx.mock.calls.length).toBe(2) // the second attempt registers again, evidence still queued
+    writes.splice(0).forEach((write) => write.resolve())
+    await advance(2000)
+    expect(tx.mock.calls.length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('memory stays bounded while the database is hung', () => {
+  const pendingOf = (instance: ScheduledJobRecorder) =>
+    (instance as unknown as { pending: PendingEvidence }).pending
+
+  it('keeps a thousand finished daily runs inside the record limit', async () => {
+    const { instance } = recorder()
+    for (let index = 0; index < 1000; index += 1) {
+      const run = instance.begin(CLEANUP_JOB)
+      instance.finish(CLEANUP_JOB, run, succeeded())
+      await advance(10)
+    }
+    const snapshot = pendingOf(instance).take('event')
+    expect(snapshot.starts.length).toBeLessThanOrEqual(PendingEvidence.RECORDS_PER_JOB)
+    expect(snapshot.finishes.length).toBeLessThanOrEqual(PendingEvidence.RECORDS_PER_JOB)
+  })
+
+  it('does not track a run begun while recording is degraded, nor record its finish', async () => {
+    const { instance, writes } = recorder()
+    for (let round = 0; round < 6; round += 1) {
+      instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), failed('x'))
+      await advance(70_000)
+      writes.splice(0).forEach((write) => write.reject(new Error('db down')))
+      await advance(0)
+    }
+    pendingOf(instance).take('event')
+    const run = instance.begin(CLEANUP_JOB)
+    expect(run.tracked).toBe(false)
+    instance.finish(CLEANUP_JOB, run, succeeded())
+    const snapshot = pendingOf(instance).take('event')
+    expect(snapshot.starts).toHaveLength(0)
+    expect(snapshot.finishes).toHaveLength(0)
+    expect(snapshot.dropped.get('cleanup')).toBeGreaterThan(0)
   })
 })

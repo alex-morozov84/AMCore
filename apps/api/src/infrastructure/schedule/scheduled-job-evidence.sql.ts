@@ -1,6 +1,6 @@
 import { Prisma } from '../../generated/prisma/client.js'
 
-import type { Evidence, EvidenceKind } from './scheduled-job-pending.js'
+import type { Evidence, EvidenceKind, RunClock } from './scheduled-job-pending.js'
 
 /** Column prefixes are a closed set, so they are safe to splice into SQL as identifiers. */
 const KINDS: Record<EvidenceKind, string> = {
@@ -10,7 +10,8 @@ const KINDS: Record<EvidenceKind, string> = {
   skip: 'skip',
 }
 
-export type ToDbTime = (mono: number) => string
+/** Converts a monotonic time to database time with the anchor of the run it belongs to. */
+export type ToDbTime = (mono: number, clock: RunClock) => string
 
 const TABLE = Prisma.raw('core.scheduled_job_summaries')
 
@@ -26,9 +27,9 @@ export function mergeKind(kind: EvidenceKind, items: Evidence[], toDb: ToDbTime)
   const runId = Prisma.raw(`"${KINDS[kind]}RunId"`)
   const col = (name: string): Prisma.Sql => Prisma.raw(`"${KINDS[kind]}${name}"`)
   const jobs = items.map((item) => item.jobId)
-  const starts = items.map((item) => toDb(item.startMono))
+  const starts = items.map((item) => toDb(item.startMono, item.clock))
   const runs = items.map((item) => item.runId)
-  const ends = items.map((item) => toDb(item.endMono))
+  const ends = items.map((item) => toDb(item.endMono, item.clock))
   const durations = items.map((item) => item.durationMs)
   const codes = items.map((item) => item.code)
   const summaries = items.map((item) => json(item.summary))

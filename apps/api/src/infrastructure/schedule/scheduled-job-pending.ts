@@ -4,7 +4,24 @@ import type { ScheduledJobCadence } from './scheduled-job.js'
 
 export type EvidenceKind = 'success' | 'partial' | 'failure' | 'skip'
 
-/** One finished attempt. `startMono` / `endMono` are process-monotonic; the store converts them to DB time. */
+/**
+ * A point where the process monotonic clock met the database clock. Every event of one run
+ * converts its monotonic times with the same anchor, so the run keeps one canonical key
+ * (`startedAt`, `runId`) across its start, its finish and any retry, however long each clock read took.
+ */
+export interface Anchor {
+  /** Database time in ms. */
+  db: number
+  /** Process monotonic time (ms) when that database time was read. */
+  mono: number
+}
+
+/** Shared by reference by every event of one run; filled by the first write that needs it. */
+export interface RunClock {
+  anchor: Anchor | null
+}
+
+/** One finished attempt. `startMono` / `endMono` are process-monotonic; the writer converts them. */
 export interface Evidence {
   kind: EvidenceKind
   jobId: string
@@ -21,6 +38,7 @@ export interface Evidence {
   configVersion: string
   /** Display only: the next planned fire when the run ended. */
   nextFireAt: Date | null
+  clock: RunClock
 }
 
 export interface RunStart {
@@ -29,6 +47,7 @@ export interface RunStart {
   startMono: number
   /** Open runs older than this are reported as abandoned. */
   maxRuntimeMs: number
+  clock: RunClock
 }
 
 export interface RunFinish {
@@ -39,6 +58,9 @@ export interface RunFinish {
   durationMs: number
   code: string | null
   summary: ScheduledSummary | null
+  /** The start time of the run, so the finish can be keyed like its start. */
+  startMono: number
+  clock: RunClock
 }
 
 export type Lane = 'frequent' | 'event'
@@ -59,17 +81,28 @@ export function isNewer(a: Pick<Evidence, 'startMono' | 'runId'>, b: typeof a): 
 
 const laneOf = (cadence: ScheduledJobCadence): Lane => (cadence === 'daily' ? 'event' : 'frequent')
 
+interface RunRecord {
+  jobId: string
+  start?: RunStart
+  finish?: RunFinish
+}
+
 /**
  * Not-yet-written evidence. Its size is bounded by the number of jobs, not by the number of
- * ticks: one slot per job and kind, and at most `OPEN_RUNS_PER_JOB` unfinished runs per job.
- * Merging keeps the newest evidence of each kind, so a failure never displaces a success.
+ * ticks: one slot per job and kind, and at most `RECORDS_PER_JOB` run records per job (which
+ * includes everything restored after a failed write). A run can be tracked only while the job has
+ * fewer than `OPEN_RUNS_PER_JOB` unfinished tracked runs, and a finish is accepted only for a run
+ * whose start was accepted. Merging keeps the newest evidence of each kind, so a failure never
+ * displaces a success.
  */
 export class PendingEvidence {
   static readonly OPEN_RUNS_PER_JOB = 3
+  static readonly RECORDS_PER_JOB = 10
 
   private evidence = new Map<string, Evidence>()
-  private starts = new Map<string, RunStart>()
-  private finishes = new Map<string, RunFinish>()
+  private records = new Map<string, RunRecord>()
+  /** Tracked, unfinished runs (pending or already written), so a finish knows its start was accepted. */
+  private open = new Map<string, { jobId: string; startMono: number; maxRuntimeMs: number }>()
   private dropped = new Map<string, { lane: Lane; count: number }>()
 
   put(next: Evidence): void {
@@ -78,19 +111,38 @@ export class PendingEvidence {
     if (!current || isNewer(next, current)) this.evidence.set(key, next)
   }
 
-  /** False when this job already has the maximum number of unfinished runs in flight. */
+  /** False when the run is not tracked; the refusal is counted and the job is unaffected. */
   startRun(start: RunStart): boolean {
-    const open = [...this.starts.values()].filter((item) => item.jobId === start.jobId).length
-    if (open >= PendingEvidence.OPEN_RUNS_PER_JOB) {
+    this.expireOpen(start.jobId, start.startMono)
+    const open = [...this.open.values()].filter((item) => item.jobId === start.jobId).length
+    if (open >= PendingEvidence.OPEN_RUNS_PER_JOB || !this.room(start.jobId)) {
       this.drop(start.jobId, 'event')
       return false
     }
-    this.starts.set(start.runId, start)
+    this.records.set(start.runId, { jobId: start.jobId, start })
+    this.open.set(start.runId, {
+      jobId: start.jobId,
+      startMono: start.startMono,
+      maxRuntimeMs: start.maxRuntimeMs,
+    })
     return true
   }
 
-  finishRun(finish: RunFinish): void {
-    this.finishes.set(finish.runId, finish)
+  /** False when the start was never accepted: there is nothing to close and nothing to record. */
+  finishRun(finish: RunFinish): boolean {
+    if (!this.open.has(finish.runId)) return false
+    this.open.delete(finish.runId)
+    const record = this.records.get(finish.runId)
+    if (record) {
+      record.finish = finish
+      return true
+    }
+    if (!this.room(finish.jobId)) {
+      this.drop(finish.jobId, 'event')
+      return false
+    }
+    this.records.set(finish.runId, { jobId: finish.jobId, finish })
+    return true
   }
 
   drop(jobId: string, lane: Lane, count = 1): void {
@@ -101,7 +153,7 @@ export class PendingEvidence {
   has(lane: Lane): boolean {
     return (
       [...this.evidence.values()].some((item) => laneOf(item.cadence) === lane) ||
-      (lane === 'event' && (this.starts.size > 0 || this.finishes.size > 0)) ||
+      (lane === 'event' && this.records.size > 0) ||
       [...this.dropped.values()].some((item) => item.lane === lane)
     )
   }
@@ -120,27 +172,64 @@ export class PendingEvidence {
       dropped.set(jobId, item.count)
       this.dropped.delete(jobId)
     }
-    const snapshot: Snapshot = {
-      lane,
-      evidence,
-      starts: lane === 'event' ? [...this.starts.values()] : [],
-      finishes: lane === 'event' ? [...this.finishes.values()] : [],
-      dropped,
-    }
+    const starts: RunStart[] = []
+    const finishes: RunFinish[] = []
     if (lane === 'event') {
-      this.starts.clear()
-      this.finishes.clear()
+      for (const record of this.records.values()) {
+        if (record.start) starts.push(record.start)
+        if (record.finish) finishes.push(record.finish)
+      }
+      this.records.clear()
     }
-    return snapshot
+    return { lane, evidence, starts, finishes, dropped }
   }
 
-  /** A failed write returns its snapshot; entries that were superseded meanwhile lose to the newer ones. */
+  /**
+   * A failed write returns its snapshot. Evidence is merged by key order. Run records go back only
+   * while the job has room, so a long outage can never grow the queue; what does not fit is counted
+   * as a lost observation.
+   */
   restore(snapshot: Snapshot): void {
     for (const item of snapshot.evidence) this.put(item)
-    for (const start of snapshot.starts)
-      if (!this.starts.has(start.runId)) this.starts.set(start.runId, start)
+    for (const start of snapshot.starts) this.restoreRecord(start.jobId, start.runId, { start })
     for (const finish of snapshot.finishes)
-      if (!this.finishes.has(finish.runId)) this.finishes.set(finish.runId, finish)
+      this.restoreRecord(finish.jobId, finish.runId, { finish })
     for (const [jobId, count] of snapshot.dropped) this.drop(jobId, snapshot.lane, count)
+  }
+
+  private restoreRecord(
+    jobId: string,
+    runId: string,
+    part: { start?: RunStart; finish?: RunFinish }
+  ): void {
+    const record = this.records.get(runId)
+    if (record) {
+      record.start ??= part.start
+      record.finish ??= part.finish
+      return
+    }
+    if (!this.room(jobId)) {
+      this.drop(jobId, 'event')
+      return
+    }
+    this.records.set(runId, { jobId, ...part })
+  }
+
+  /** True when a record fits; evicts the oldest finished record of the job when the job is full. */
+  private room(jobId: string): boolean {
+    const own = [...this.records.entries()].filter(([, record]) => record.jobId === jobId)
+    if (own.length < PendingEvidence.RECORDS_PER_JOB) return true
+    const evictable = own.find(([, record]) => record.finish !== undefined)
+    if (!evictable) return false
+    this.records.delete(evictable[0])
+    this.drop(jobId, 'event')
+    return true
+  }
+
+  /** A tracked run older than its maximum runtime is treated as abandoned and frees its slot. */
+  private expireOpen(jobId: string, now: number): void {
+    for (const [runId, item] of this.open) {
+      if (item.jobId === jobId && now - item.startMono > item.maxRuntimeMs) this.open.delete(runId)
+    }
   }
 }

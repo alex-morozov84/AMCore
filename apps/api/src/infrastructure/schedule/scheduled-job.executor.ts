@@ -56,10 +56,30 @@ export class ScheduledJobExecutor {
   }
 }
 
-/** A safe, bounded code from an error class: never a message, never user data. */
+/**
+ * The error classes a job may report by name. The list is closed on purpose: a name outside it is
+ * reported as `unexpected`, because a class name chosen by a library or by user input could carry
+ * content. A job that needs a domain code returns `failed('its_code')` itself.
+ */
+export const SAFE_ERROR_CODES: ReadonlySet<string> = new Set([
+  'PrismaClientKnownRequestError',
+  'PrismaClientUnknownRequestError',
+  'PrismaClientInitializationError',
+  'PrismaClientValidationError',
+  'PrismaClientRustPanicError',
+  'DatabaseError',
+  'TimeoutError',
+  'AbortError',
+  'TypeError',
+  'RangeError',
+  'ReferenceError',
+  'SyntaxError',
+  'AppException',
+  'HttpException',
+])
+
+/** A code from a closed list: never a message and never an arbitrary name. */
 export function errorCode(error: unknown): string {
   const name = error instanceof Error ? error.name : ''
-  if (!name || name === 'Error') return 'unexpected'
-  const code = name.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 48)
-  return /^[a-zA-Z]/.test(code) ? code : `e_${code}`.slice(0, 48)
+  return SAFE_ERROR_CODES.has(name) ? name : 'unexpected'
 }

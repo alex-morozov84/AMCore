@@ -1,4 +1,10 @@
-import { type Evidence, isNewer, PendingEvidence } from './scheduled-job-pending'
+import {
+  type Evidence,
+  isNewer,
+  PendingEvidence,
+  type RunFinish,
+  type RunStart,
+} from './scheduled-job-pending'
 
 const evidence = (over: Partial<Evidence> = {}): Evidence => ({
   kind: 'success',
@@ -14,6 +20,27 @@ const evidence = (over: Partial<Evidence> = {}): Evidence => ({
   dueAt: null,
   configVersion: 'v1',
   nextFireAt: null,
+  clock: { anchor: null },
+  ...over,
+})
+const start = (runId: string, over: Partial<RunStart> = {}): RunStart => ({
+  jobId: 'cleanup',
+  runId,
+  startMono: 1,
+  maxRuntimeMs: 1_800_000,
+  clock: { anchor: null },
+  ...over,
+})
+const finish = (runId: string, over: Partial<RunFinish> = {}): RunFinish => ({
+  jobId: 'cleanup',
+  runId,
+  outcome: 'success',
+  startMono: 1,
+  endMono: 2,
+  durationMs: 1,
+  code: null,
+  summary: null,
+  clock: { anchor: null },
   ...over,
 })
 
@@ -25,7 +52,7 @@ describe('isNewer', () => {
   })
 })
 
-describe('PendingEvidence', () => {
+describe('evidence', () => {
   it('keeps the newest evidence of each kind and never lets a failure displace a success', () => {
     const pending = new PendingEvidence()
     pending.put(evidence({ kind: 'success', runId: 'ok', startMono: 100 }))
@@ -61,42 +88,6 @@ describe('PendingEvidence', () => {
     ])
   })
 
-  it('restores an unsuccessful write’s starts, finishes and dropped counts', () => {
-    const pending = new PendingEvidence()
-    pending.startRun({ jobId: 'cleanup', runId: 'r1', startMono: 1, maxRuntimeMs: 1000 })
-    pending.finishRun({
-      jobId: 'cleanup',
-      runId: 'r1',
-      outcome: 'success',
-      endMono: 2,
-      durationMs: 1,
-      code: null,
-      summary: null,
-    })
-    pending.drop('cleanup', 'event', 2)
-    const snapshot = pending.take('event')
-    expect(pending.has('event')).toBe(false)
-    pending.restore(snapshot)
-    const again = pending.take('event')
-    expect(again.starts).toHaveLength(1)
-    expect(again.finishes).toHaveLength(1)
-    expect(again.dropped.get('cleanup')).toBe(2)
-  })
-
-  it('tracks at most three unfinished runs per job and counts the refusal', () => {
-    const pending = new PendingEvidence()
-    const start = (runId: string) => ({ jobId: 'cleanup', runId, startMono: 1, maxRuntimeMs: 1 })
-    expect([
-      pending.startRun(start('1')),
-      pending.startRun(start('2')),
-      pending.startRun(start('3')),
-    ]).toEqual([true, true, true])
-    expect(pending.startRun(start('4'))).toBe(false)
-    const snapshot = pending.take('event')
-    expect(snapshot.starts).toHaveLength(3)
-    expect(snapshot.dropped.get('cleanup')).toBe(1)
-  })
-
   it('keeps its size bounded by the number of jobs, not by the number of ticks', () => {
     const pending = new PendingEvidence()
     for (let tick = 0; tick < 5000; tick += 1)
@@ -109,5 +100,94 @@ describe('PendingEvidence', () => {
         })
       )
     expect(pending.take('frequent').evidence).toHaveLength(1)
+  })
+})
+
+describe('run records', () => {
+  it('tracks at most three unfinished runs per job and counts the refusal', () => {
+    const pending = new PendingEvidence()
+    expect(['1', '2', '3'].map((id) => pending.startRun(start(id)))).toEqual([true, true, true])
+    expect(pending.startRun(start('4'))).toBe(false)
+    const snapshot = pending.take('event')
+    expect(snapshot.starts).toHaveLength(3)
+    expect(snapshot.dropped.get('cleanup')).toBe(1)
+  })
+
+  it('accepts a finish only for a run whose start was accepted, and ignores the rest', () => {
+    const pending = new PendingEvidence()
+    expect(pending.finishRun(finish('never-started'))).toBe(false)
+    expect(pending.has('event')).toBe(false)
+    for (const id of ['1', '2', '3']) pending.startRun(start(id))
+    expect(pending.startRun(start('refused'))).toBe(false)
+    expect(pending.finishRun(finish('refused'))).toBe(false)
+    expect(pending.take('event').finishes).toHaveLength(0)
+  })
+
+  it('accepts a finish for a run whose start was already written', () => {
+    const pending = new PendingEvidence()
+    pending.startRun(start('r1'))
+    pending.take('event')
+    expect(pending.finishRun(finish('r1'))).toBe(true)
+    expect(pending.take('event').finishes.map((item) => item.runId)).toEqual(['r1'])
+  })
+
+  it('keeps a thousand start/finish pairs of one job inside its record limit while nothing is written', () => {
+    const pending = new PendingEvidence()
+    for (let run = 0; run < 1000; run += 1) {
+      pending.startRun(start(`run-${run}`, { startMono: run }))
+      pending.finishRun(finish(`run-${run}`, { startMono: run, endMono: run + 1 }))
+    }
+    const snapshot = pending.take('event')
+    expect(snapshot.starts.length).toBeLessThanOrEqual(PendingEvidence.RECORDS_PER_JOB)
+    expect(snapshot.finishes.length).toBeLessThanOrEqual(PendingEvidence.RECORDS_PER_JOB)
+    expect(snapshot.dropped.get('cleanup')).toBeGreaterThan(0)
+  })
+
+  it('never grows past the record limit when a failed write is restored over newer starts', () => {
+    const pending = new PendingEvidence()
+    for (const id of ['a', 'b', 'c']) pending.startRun(start(id))
+    const inFlight = pending.take('event')
+    for (const id of ['d', 'e', 'f']) pending.startRun(start(id))
+    pending.restore(inFlight)
+    // Three tracked runs per job at most: only the first three starts were ever accepted.
+    expect(pending.take('event').starts.length).toBeLessThanOrEqual(PendingEvidence.RECORDS_PER_JOB)
+  })
+
+  it('restores records up to the limit and counts what does not fit', () => {
+    const pending = new PendingEvidence()
+    const ids = Array.from({ length: 12 }, (_, index) => `r${index}`)
+    const inFlight = {
+      lane: 'event' as const,
+      evidence: [],
+      starts: ids.map((id) => start(id)),
+      finishes: [],
+      dropped: new Map<string, number>(),
+    }
+    pending.restore(inFlight)
+    const after = pending.take('event')
+    expect(after.starts).toHaveLength(PendingEvidence.RECORDS_PER_JOB)
+    expect(after.dropped.get('cleanup')).toBe(2)
+  })
+
+  it('restores starts, finishes and dropped counts of a failed write', () => {
+    const pending = new PendingEvidence()
+    pending.startRun(start('r1'))
+    pending.finishRun(finish('r1'))
+    pending.drop('cleanup', 'event', 2)
+    const snapshot = pending.take('event')
+    expect(pending.has('event')).toBe(false)
+    pending.restore(snapshot)
+    const again = pending.take('event')
+    expect(again.starts).toHaveLength(1)
+    expect(again.finishes).toHaveLength(1)
+    expect(again.dropped.get('cleanup')).toBe(2)
+  })
+
+  it('frees the slot of a tracked run that outlived its maximum runtime', () => {
+    const pending = new PendingEvidence()
+    for (const id of ['1', '2', '3'])
+      pending.startRun(start(id, { startMono: 0, maxRuntimeMs: 10 }))
+    expect(pending.startRun(start('late', { startMono: 5 }))).toBe(false)
+    expect(pending.startRun(start('later', { startMono: 100 }))).toBe(true)
   })
 })

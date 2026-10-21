@@ -181,7 +181,7 @@ describe('toScheduledJob — result axis', () => {
     const job = toScheduledJob(
       daily,
       row(),
-      { startedAt: new Date(NOW.getTime() - 5 * 60_000), abandoned: false },
+      { startedAt: new Date(NOW.getTime() - 5 * 60_000), runId: 'u', abandoned: false },
       NOW
     )
     expect(job.result).toMatchObject({ state: 'running' })
@@ -191,7 +191,7 @@ describe('toScheduledJob — result axis', () => {
     const job = toScheduledJob(
       daily,
       row({ success: succeededAt(ago(74), ago(50)) }),
-      { startedAt: ago(3), abandoned: false },
+      { startedAt: ago(3), runId: 'u', abandoned: false },
       NOW
     )
     expect(job.result).toEqual({ state: 'unknown', startedAt: ago(3).toISOString() })
@@ -201,10 +201,29 @@ describe('toScheduledJob — result axis', () => {
     const job = toScheduledJob(
       daily,
       row({ success: succeededAt(ago(2), ahead(22)) }),
-      { startedAt: ago(30), abandoned: true },
+      { startedAt: ago(30), runId: 'u', abandoned: true },
       NOW
     )
     expect(job.result.state).toBe('success')
+  })
+
+  it('orders an unfinished run and a recorded outcome of the same start time by run id', () => {
+    const at = ago(3)
+    const outcome = (runId: string) => row({ success: { ...succeededAt(at, ahead(21)), runId } })
+    const unfinished = (runId: string) => ({ startedAt: at, runId, abandoned: true })
+    expect(toScheduledJob(daily, outcome('a'), unfinished('b'), NOW).result.state).toBe('unknown')
+    expect(toScheduledJob(daily, outcome('b'), unfinished('a'), NOW).result.state).toBe('success')
+  })
+
+  it('orders a skip and the result beside it of the same start time by run id', () => {
+    const at = ago(1)
+    const withSkip = (successRunId: string, skipRunId: string) =>
+      row({
+        success: { ...succeededAt(at, ahead(23)), runId: successRunId },
+        skip: { startedAt: at, runId: skipRunId, reason: 'busy' },
+      })
+    expect(toScheduledJob(frequent, withSkip('a', 'b'), undefined, NOW).skip).not.toBeNull()
+    expect(toScheduledJob(frequent, withSkip('b', 'a'), undefined, NOW).skip).toBeNull()
   })
 
   it('shows a skip only when it is newer than the shown result', () => {
@@ -250,7 +269,12 @@ describe('toScheduledJob — frequent freshness', () => {
   })
 
   it('does not track a current run for a frequent job', () => {
-    const job = toScheduledJob(frequent, row(), { startedAt: ago(1), abandoned: false }, NOW)
+    const job = toScheduledJob(
+      frequent,
+      row(),
+      { startedAt: ago(1), runId: 'u', abandoned: false },
+      NOW
+    )
     expect(job.result.state).toBe('none')
   })
 })

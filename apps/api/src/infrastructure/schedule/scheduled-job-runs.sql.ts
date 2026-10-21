@@ -88,19 +88,21 @@ export async function startRun(
 
 /**
  * Closes only its own run (open, or abandoned and now known to have ended), then trims terminal
- * rows. A missing row is a no-op: the summary snapshot is written separately by key.
+ * rows. Resolves `false` when there was no such row (nothing changed there; the summary snapshot
+ * is written separately by key), so the caller can count the lost observation.
  */
 export async function finishRun(
   tx: Prisma.TransactionClient,
   finish: RunFinish,
   finishedAt: string,
   dbNow: string
-): Promise<void> {
+): Promise<boolean> {
   const summary = finish.summary === null ? null : JSON.stringify(finish.summary)
-  await tx.$executeRaw`
+  const updated = await tx.$executeRaw`
     UPDATE core.scheduled_job_runs SET
       outcome = ${finish.outcome}, "finishedAt" = ${finishedAt}::timestamptz,
       "durationMs" = ${finish.durationMs}, code = ${finish.code}, summary = ${summary}::jsonb
     WHERE "runId" = ${finish.runId}::uuid AND (outcome IS NULL OR outcome = 'unknown')`
   await trimJob(tx, finish.jobId, dbNow)
+  return updated > 0
 }

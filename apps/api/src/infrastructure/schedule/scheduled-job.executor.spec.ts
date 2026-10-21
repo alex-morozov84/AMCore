@@ -1,5 +1,5 @@
 import { failed, partial, skippedFor, succeeded } from './scheduled-job'
-import { errorCode, ScheduledJobExecutor } from './scheduled-job.executor'
+import { errorCode, SAFE_ERROR_CODES, ScheduledJobExecutor } from './scheduled-job.executor'
 import type { ScheduledJobRecorder } from './scheduled-job-recorder'
 import { CLEANUP_JOB, NOTIFICATION_RECOVERY_JOB } from './scheduled-jobs.catalogue'
 import type { SingletonCronRunner, SingletonRun } from './singleton-cron.runner'
@@ -58,8 +58,8 @@ describe('ScheduledJobExecutor', () => {
   })
 
   it('records a thrown task as failed with a safe code, and rethrows for the runner to log', async () => {
-    class DatabaseDown extends Error {
-      override name = 'DatabaseDown'
+    class DatabaseError extends Error {
+      override name = 'DatabaseError'
     }
     let rethrown: unknown
     singleton.run.mockImplementation(async (_o: unknown, task: () => Promise<unknown>) => {
@@ -71,12 +71,12 @@ describe('ScheduledJobExecutor', () => {
       return { status: 'failed', error: rethrown }
     })
     await executor.run(CLEANUP_JOB, async () => {
-      throw new DatabaseDown('db')
+      throw new DatabaseError('db')
     })
-    expect(rethrown).toBeInstanceOf(DatabaseDown)
+    expect(rethrown).toBeInstanceOf(DatabaseError)
     expect(recorder.finish).toHaveBeenCalledWith(CLEANUP_JOB, run, {
       outcome: 'failed',
-      code: 'DatabaseDown',
+      code: 'DatabaseError',
     })
   })
 
@@ -95,15 +95,28 @@ describe('ScheduledJobExecutor', () => {
 })
 
 describe('errorCode', () => {
-  it('never exposes a message and keeps a bounded identifier', () => {
+  const named = (name: string): Error => Object.assign(new Error('secret message'), { name })
+
+  it('reports only an error class from the closed list, and never a message', () => {
+    expect(errorCode(named('PrismaClientKnownRequestError'))).toBe('PrismaClientKnownRequestError')
+    expect(errorCode(named('TypeError'))).toBe('TypeError')
     expect(errorCode(new Error('secret'))).toBe('unexpected')
     expect(errorCode('text')).toBe('unexpected')
-    class PrismaClientKnownRequestError extends Error {
-      override name = 'PrismaClientKnownRequestError'
-    }
-    expect(errorCode(new PrismaClientKnownRequestError('x'))).toBe('PrismaClientKnownRequestError')
-    const odd = new Error('x')
-    odd.name = '3rd party! error'
-    expect(errorCode(odd)).toBe('e_3rd_party__error')
+  })
+
+  it('does not carry a name that was chosen by a library or by user input into the evidence', () => {
+    for (const name of [
+      'reader@example.invalid',
+      '3rd party! error',
+      "Robert'); DROP TABLE users;--",
+      'UnknownDomainError',
+      '',
+    ])
+      expect(errorCode(named(name))).toBe('unexpected')
+    expect(SAFE_ERROR_CODES.has('reader@example.invalid')).toBe(false)
+  })
+
+  it('keeps every allowed code a safe, bounded identifier', () => {
+    for (const code of SAFE_ERROR_CODES) expect(code).toMatch(/^[A-Za-z][A-Za-z0-9]{0,47}$/)
   })
 })

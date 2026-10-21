@@ -70,9 +70,9 @@ export class AdminScheduledJobsService {
       // At most 3 open + 7 abandoned rows per job (table caps), so this read is bounded.
       this.prisma.scheduledJobRun.findMany({
         where: { OR: [{ outcome: null }, { outcome: 'unknown' }] },
-        orderBy: { startedAt: 'desc' },
+        orderBy: [{ startedAt: 'desc' }, { runId: 'desc' }],
         take: 1000,
-        select: { jobId: true, startedAt: true, outcome: true },
+        select: { jobId: true, runId: true, startedAt: true, outcome: true },
       }),
     ])
     const byJob = new Map(rows.map((row) => [row.jobId, toRow(row)]))
@@ -81,6 +81,7 @@ export class AdminScheduledJobsService {
       if (!latestUnfinished.has(run.jobId))
         latestUnfinished.set(run.jobId, {
           startedAt: run.startedAt,
+          runId: run.runId,
           abandoned: run.outcome === 'unknown',
         })
     }

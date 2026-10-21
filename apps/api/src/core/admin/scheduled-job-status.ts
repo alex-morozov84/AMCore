@@ -41,8 +41,17 @@ export interface Snapshot {
 /** The newest run of a daily job that has no recorded end. */
 export interface UnfinishedRun {
   startedAt: Date
+  runId: string
   abandoned: boolean
 }
+
+/** The order of runs everywhere: start time, then run id, the same key the writer merges by. */
+interface RunKey {
+  at: number
+  runId: string
+}
+const isAfter = (a: RunKey, b: RunKey): boolean =>
+  a.at > b.at || (a.at === b.at && a.runId > b.runId)
 
 const iso = (date: Date): string => date.toISOString()
 
@@ -84,28 +93,35 @@ function latestOutcome(row: SummaryRow): Settled | null {
   return candidates[0] ?? null
 }
 
-/** Axis 2. A run is `running` only while inside its maximum runtime, `unknown` once it is not. */
+/**
+ * Axis 2. A run is `running` only while inside its maximum runtime, `unknown` once it is not. The
+ * key of the run that is shown comes with it, so a skip can be compared by the same order.
+ */
 function resultOf(
   definition: ScheduledJobDefinition,
   row: SummaryRow | undefined,
   unfinished: UnfinishedRun | undefined,
   now: Date
-): ScheduledResult {
+): { result: ScheduledResult; key: RunKey | null } {
   const outcome = row ? latestOutcome(row) : null
+  const outcomeKey = outcome ? { at: outcome.startedAt.getTime(), runId: outcome.runId } : null
   if (unfinished && cadenceOf(definition) === 'daily') {
-    const live =
-      !unfinished.abandoned && now.getTime() - unfinished.startedAt.getTime() <= definition.graceMs
-    if (live) return { state: 'running', startedAt: iso(unfinished.startedAt) }
-    if (!outcome || unfinished.startedAt.getTime() > outcome.startedAt.getTime())
-      return { state: 'unknown', startedAt: iso(unfinished.startedAt) }
+    const key = { at: unfinished.startedAt.getTime(), runId: unfinished.runId }
+    const live = !unfinished.abandoned && now.getTime() - key.at <= definition.graceMs
+    if (live) return { result: { state: 'running', startedAt: iso(unfinished.startedAt) }, key }
+    if (!outcomeKey || isAfter(key, outcomeKey))
+      return { result: { state: 'unknown', startedAt: iso(unfinished.startedAt) }, key }
   }
-  if (!outcome) return { state: 'none' }
+  if (!outcome || !outcomeKey) return { result: { state: 'none' }, key: null }
   return {
-    state: outcome.kind,
-    startedAt: iso(outcome.startedAt),
-    durationMs: outcome.snapshot.durationMs ?? 0,
-    code: outcome.snapshot.code,
-    summary: outcome.snapshot.summary,
+    result: {
+      state: outcome.kind,
+      startedAt: iso(outcome.startedAt),
+      durationMs: outcome.snapshot.durationMs ?? 0,
+      code: outcome.snapshot.code,
+      summary: outcome.snapshot.summary,
+    },
+    key: outcomeKey,
   }
 }
 
@@ -129,15 +145,15 @@ function freshnessOf(
   return { state: now.getTime() > dueAt.getTime() ? 'stale' : 'fresh', dueAt: iso(dueAt) }
 }
 
-/** Shown only when newer than the result it would sit beside. */
+/** Shown only when newer, by the run key, than the result it would sit beside. */
 function skipOf(
   row: SummaryRow | undefined,
-  result: ScheduledResult
+  shown: RunKey | null
 ): { at: string; reason: ScheduledSkipReason } | null {
   const skip = row?.skip
   if (!skip?.startedAt || !skip.reason) return null
-  const shown = 'startedAt' in result ? Date.parse(result.startedAt) : Number.NEGATIVE_INFINITY
-  if (skip.startedAt.getTime() <= shown) return null
+  const key = { at: skip.startedAt.getTime(), runId: skip.runId ?? '' }
+  if (shown && !isAfter(key, shown)) return null
   return { at: iso(skip.startedAt), reason: skip.reason as ScheduledSkipReason }
 }
 
@@ -148,7 +164,7 @@ export function toScheduledJob(
   now: Date
 ): ScheduledJob {
   const config = configOf(row)
-  const result = resultOf(definition, row, unfinished, now)
+  const { result, key } = resultOf(definition, row, unfinished, now)
   return {
     id: definition.id,
     family: definition.family,
@@ -156,7 +172,7 @@ export function toScheduledJob(
     schedule: definition.schedule,
     config,
     result,
-    skip: skipOf(row, result),
+    skip: skipOf(row, key),
     freshness: freshnessOf(definition, row, config, now),
     lastSuccess: row?.success.startedAt
       ? {

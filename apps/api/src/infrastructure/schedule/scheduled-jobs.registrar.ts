@@ -30,7 +30,7 @@ export class ScheduledJobsRegistrar implements OnApplicationBootstrap {
 
   private async registerWhenMounted(): Promise<void> {
     await this.waitForScheduler()
-    await this.recorder.registerJobs([...SCHEDULED_JOBS], (definition) =>
+    this.recorder.registerJobs([...SCHEDULED_JOBS], (definition) =>
       definition.disabledReason ? definition.disabledReason(this.env) : null
     )
   }
