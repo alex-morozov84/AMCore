@@ -229,6 +229,12 @@ After `preview`, provide the printed localized URL, login/password for each role
 source hash and the concrete scenario to inspect. Accounts are registered through
 the real API, roles are assigned only to those accounts, and browser login/access
 is verified. Keep the stand running until acceptance or explicitly scoped cleanup.
+The [custom administration example](../product-admin/adoption.md#connect-the-chosen-interface)
+can prepare a copy-only adapter for the existing `organization` profile.
+Run its `--preview` generator only after single-locale/no-Console initialization.
+The adapter records provenance before writing and preserves later owner changes.
+It does not introduce a global preview profile.
+
 `--profile user` prepares only USER; `--profile organization` additionally creates
 an organization owned by USER with its organization ADMIN membership.
 `--profile organization-roles` instead seeds a large reproducible dataset for the role editor: three

@@ -274,8 +274,10 @@ The account menu and avatar editor have the same kind of fixture:
 
 The executable `scripts/fixtures/organization-members-headless.mjs` includes an inline member-key panel using the same controller and explicit revoke confirmation. It creates a
 separate disposable consumer with a list and inline editor instead of the ready
-table/dialog. `--projected` also selects single-Russian routing, Console disabled
-and Storybook disabled in that fixture. It prints the managed real-stack browser
+table/dialog. By default it preserves the source's selected project choices.
+Run it after identity and project initialization. On pristine upstream source only,
+`--projected` demonstrates single-Russian routing with Console, Storybook and
+route progress disabled before consumer injection. It prints the managed real-stack browser
 command; no standalone sample product route is added to the starter. See the
 [members contract](organization-members.md) for permissions, complete-set/byte
 limits, truthful self-edit warnings and safe recovery.
@@ -344,8 +346,12 @@ node scripts/fixtures/organization-shop-headless.mjs
 node scripts/fixtures/organization-shop-headless.mjs --projected
 ```
 
-The projected example mounts `/shop-team` without a locale prefix; the default
-example mounts it under each supported locale. It keeps the generic backend
+The generator preserves the source's selected project choices. Single-locale
+sources mount `/shop-team`; multi-locale sources prefix it with each selected locale.
+The example wraps the same custom member consumer in cosmic presentation, using
+local CSS and product-owned semantic token values. See the
+[adoption guide](adoption.md) for initialization, `--preview`, safe local data and
+[your own appearance](adoption.md#your-own-appearance). It keeps the generic backend
 organization API and compiled setup command when the frontend Console is removed.
 Its `organization-shop` test fixture enables buyer registration and disables
 self-service organization creation; it proves that a signed-in buyer cannot create a company.

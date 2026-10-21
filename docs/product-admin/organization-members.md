@@ -209,7 +209,7 @@ entry. Downstream projects may replace page composition, routes, tables, dialogs
 and visual styling, or omit ready UI while retaining headless consumers and typed
 BFF routes. Shared primitives remain available with the Operations Console disabled.
 No headless module imports Console discovery, ready widgets or a shell. Use the
-existing semantic tokens and translation catalogues rather than a second theme.
+existing semantic tokens and translation catalogues rather than a competing theme mechanism.
 
 Search/read identity includes session binding, organization, target, committed
 search and page. Retire stale async success, failure and cleanup when identities
@@ -328,3 +328,7 @@ It returns the typed acknowledgment envelope. Keep it server-only and supply the
 
 The address above uses default path placement. For the staff-host address or a
 custom alias, see [placement and sessions](placement-and-sessions.md).
+
+For a distinct visual style, change product-owned JSX, CSS and semantic token values.
+See [Your own appearance](adoption.md#your-own-appearance) for portal, contrast and
+state requirements. Headless operations do not require the ready page's visual design.

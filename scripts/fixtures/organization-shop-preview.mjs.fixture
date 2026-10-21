@@ -1,0 +1,90 @@
+import { createHash } from 'node:crypto'
+
+import { sql } from './ownership.mjs'
+import { save } from './state.mjs'
+
+const organization = 'shop-staff-fixture'
+const id = (m, label) => `c${createHash('sha256').update(`${m.uuid}:shop:${label}`).digest('hex').slice(0, 24)}`
+
+export async function organizationFixture(m) {
+  if (m.purpose !== 'preview' || m.fixtureProfile !== 'organization' || m.consoleEnabled !== false)
+    throw new Error('Shop adapter requires the no-Console organization preview')
+  const owner = m.accounts.find((a) => a.role === 'USER')
+  if (owner?.email !== 'demo.user@preview.amcore.test') throw new Error('Unexpected shop preview owner')
+  const templates = await sql(m, `SELECT name FROM core.roles WHERE "isSystem"=true AND "organizationId" IS NULL AND name IN ('ADMIN','MEMBER') ORDER BY name;`)
+  if (templates.trim() !== 'ADMIN\nMEMBER') throw new Error('Unexpected system-role templates')
+  const expected = { version: 1, uuid: m.uuid, worktree: m.worktree, organization, ownerId: owner.id }
+  const units = seedUnits(m, owner)
+  if (!m.shopTeamExample) {
+    for (const unit of units) {
+      const state = await sql(m, unit.state, unit.vars)
+      if (state.trim() !== '0|0') throw new Error('Unrecorded shop demo identity; refusing adoption')
+    }
+    m.shopTeamExample = { ...expected, units: [], complete: false }
+    await save(m)
+  }
+  const record = m.shopTeamExample
+  if (Object.entries(expected).some(([key, value]) => record[key] !== value) || !Array.isArray(record.units))
+    throw new Error('Shop preview provenance changed')
+  if (!record.complete) {
+    for (const unit of units) {
+      const state = (await sql(m, unit.state, unit.vars)).trim()
+      if (record.units.includes(unit.name)) {
+        if (state !== unit.complete) throw new Error('Interrupted shop seed changed; refusing reset')
+        continue
+      }
+      if (state === '0|0') await sql(m, unit.write, unit.vars)
+      else if (state !== unit.complete) throw new Error('Partial or foreign shop seed identity')
+      if ((await sql(m, unit.state, unit.vars)).trim() !== unit.complete) throw new Error('Shop seed ownership mismatch')
+      record.units.push(unit.name)
+      await save(m)
+    }
+    record.complete = true
+    m.organization = { id: organization, userId: owner.id, role: 'ADMIN' }
+    await save(m)
+  }
+  if (m.organization?.id !== organization || m.organization.userId !== owner.id)
+    throw new Error('Shop organization record changed')
+  const authority = await sql(m, `SELECT count(*) FROM core.org_members om
+    JOIN core.member_roles mr ON mr."memberId"=om.id JOIN core.roles r ON r.id=mr."roleId"
+    WHERE om.id=:'member' AND om."userId"=:'owner' AND om."organizationId"=:'org'
+      AND r.name='ADMIN' AND r."isSystem"=true AND r."organizationId" IS NULL;`,
+  { member: id(m, 'owner-member'), owner: owner.id, org: organization })
+  if (authority.trim() !== '1') throw new Error('Owner authority changed; use another trusted administrator. No access was restored')
+  // Completed reruns deliberately do not inspect/restore edited staff, assignments or keys.
+}
+
+function seedUnits(m, owner) {
+  const vars = { org: organization, owner: owner.id, member: id(m, 'owner-member'), link: id(m, 'owner-role'), slug: `shop-staff-${m.uuid}` }
+  const ownerState = `SELECT
+    (SELECT count(*) FROM core.organizations WHERE id=:'org' AND slug=:'slug')+
+    (SELECT count(*) FROM core.org_members WHERE id=:'member' AND "userId"=:'owner' AND "organizationId"=:'org')+
+    (SELECT count(*) FROM core.member_roles mr JOIN core.roles r ON r.id=mr."roleId" WHERE mr.id=:'link' AND mr."memberId"=:'member' AND r.name='ADMIN' AND r."isSystem"=true AND r."organizationId" IS NULL),
+    (SELECT count(*) FROM core.organizations WHERE id=:'org' OR slug=:'slug')+
+    (SELECT count(*) FROM core.org_members WHERE id=:'member' OR ("userId"=:'owner' AND "organizationId"=:'org'))+
+    (SELECT count(*) FROM core.member_roles WHERE id=:'link' OR "memberId"=:'member');`
+  const first = { name: 'owner', vars, state: ownerState, complete: '3|3', write: `
+    INSERT INTO core.organizations(id,name,slug,"updatedAt") VALUES (:'org','Shop staff',:'slug',now());
+    INSERT INTO core.org_members(id,"userId","organizationId") VALUES (:'member',:'owner',:'org');
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;` }
+  return [first, ...['anna', 'boris'].map((label) => staffUnit(m, label))]
+}
+
+function staffUnit(m, label) {
+  const vars = { org: organization, user: id(m, `${label}-user`), email: `${label}-${m.uuid}@preview.amcore.test`, name: label === 'anna' ? 'Анна' : 'Борис',
+    member: id(m, `${label}-member`), link: id(m, `${label}-role`), key: id(m, `${label}-key`) }
+  return { name: label, vars, complete: '4|4', state: `SELECT
+    (SELECT count(*) FROM core.users WHERE id=:'user' AND email=:'email' AND "emailCanonical"=:'email')+
+    (SELECT count(*) FROM core.org_members WHERE id=:'member' AND "userId"=:'user' AND "organizationId"=:'org')+
+    (SELECT count(*) FROM core.member_roles mr JOIN core.roles r ON r.id=mr."roleId" WHERE mr.id=:'link' AND mr."memberId"=:'member' AND r.name='MEMBER' AND r."isSystem"=true AND r."organizationId" IS NULL)+
+    (SELECT count(*) FROM core.api_keys WHERE id=:'key' AND "userId"=:'user' AND "organizationId"=:'org' AND "keyHash"='preview-not-an-authenticating-verifier'),
+    (SELECT count(*) FROM core.users WHERE id=:'user' OR email=:'email')+
+    (SELECT count(*) FROM core.org_members WHERE id=:'member' OR ("userId"=:'user' AND "organizationId"=:'org'))+
+    (SELECT count(*) FROM core.member_roles WHERE id=:'link' OR "memberId"=:'member')+
+    (SELECT count(*) FROM core.api_keys WHERE id=:'key');`, write: `
+    INSERT INTO core.users(id,email,"emailCanonical",name,"updatedAt") VALUES (:'user',:'email',:'email',:'name',now());
+    INSERT INTO core.org_members(id,"userId","organizationId") VALUES (:'member',:'user',:'org');
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='MEMBER' AND "isSystem"=true AND "organizationId" IS NULL;
+    INSERT INTO core.api_keys(id,name,"shortToken","keyHash",salt,scopes,"userId","organizationId")
+      VALUES (:'key','Sample integration',:'key','preview-not-an-authenticating-verifier','preview-salt',ARRAY['read:Organization'],:'user',:'org');` }
+}

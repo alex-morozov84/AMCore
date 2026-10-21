@@ -1,11 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { localizedFrontendUrl, DEFAULT_LOCALE } from '@amcore/shared'
+
+import { DEFAULT_LOCALE,localizedFrontendUrl } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
+
 import { expectNoAxeViolations } from '../shared/axe'
+import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget } from '../support/managed-target.mjs'
+
 import { directApi } from './credential-containment.helpers'
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
+
+// Applies in local, CI, failure and retry; HTML contains only safe assertions.
+test.use({ trace: 'off', screenshot: 'off', video: 'off' })
+test.afterEach(async ({ context }, info) => {
+  for (const page of context.pages()) await closeCredentialPage(page, info)
+})
 
 test('alternate inline invitation composer uses public headless API through the real BFF', async ({ page, context }) => {
   const target = activeTarget()

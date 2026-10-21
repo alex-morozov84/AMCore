@@ -1,0 +1,76 @@
+.station {
+  min-height: 100dvh;
+  padding: clamp(1rem, 4vw, 4rem);
+  color: var(--foreground);
+  background-color: var(--background);
+  background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+
+.missionHeading {
+  max-width: 76rem;
+  margin: 0 auto 2rem;
+  padding-left: 1.25rem;
+  border-left: 0.25rem solid var(--primary);
+}
+
+.stationName {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: clamp(1.5rem, 4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stationDescription {
+  margin-top: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.station > section {
+  max-width: 76rem;
+  margin-inline: auto;
+}
+
+.station [data-example-region='heading'] {
+  padding: 1.5rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.25rem 1.5rem 0.25rem 0.25rem;
+}
+
+.station [data-example-region='members'],
+.station [data-example-region='editor'],
+.station [data-example-region='removal'] {
+  padding: 1.5rem;
+  color: var(--card-foreground);
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.25rem 1.5rem 0.25rem 0.25rem;
+}
+
+.station [data-example-region='keys'] {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.station [data-slot='button'] {
+  min-height: 2.75rem;
+  padding-inline: 1rem;
+  border-radius: 0.25rem;
+}
+
+.station h2 {
+  font-family: var(--font-geist-mono), monospace;
+  line-height: 1.5;
+}
+
+@media (width <= 40rem) {
+  .station [data-example-region='members'],
+  .station [data-example-region='editor'],
+  .station [data-example-region='removal'] {
+    padding: 1rem;
+  }
+}

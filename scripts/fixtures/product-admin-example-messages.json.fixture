@@ -1,0 +1,20 @@
+{
+  "en": {
+    "station": "Orbital station",
+    "stationDescription": "Team access · independent product interface",
+    "bounded": "This small example shows the first page. Use the ready pages for full search and pagination.",
+    "chooseMember": "Select a member to inspect their roles and API keys.",
+    "signIn": "Sign in",
+    "reload": "The account changed. Reload the page",
+    "roleSampleLimit": "This small example edits only unused custom roles without advanced rules or full control. Use the ready role editor for other roles."
+  },
+  "ru": {
+    "station": "Орбитальная станция",
+    "stationDescription": "Доступ команды · собственный интерфейс продукта",
+    "bounded": "Этот небольшой пример показывает первую страницу. Полный поиск и выбор страниц доступны в готовых экранах.",
+    "chooseMember": "Выберите участника, чтобы проверить его роли и API-ключи.",
+    "signIn": "Войти",
+    "reload": "Аккаунт изменился. Перезагрузить страницу",
+    "roleSampleLimit": "Этот небольшой пример изменяет только неиспользуемые собственные роли без сложных правил и полного контроля. Для остальных ролей используйте готовый редактор."
+  }
+}

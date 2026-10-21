@@ -6,6 +6,10 @@ a module's ordinary destinations, menu insertion and physical routes. A custom
 headless consumer imports its public entity contract and shared primitives, never
 ready pages or shell. The server entry is explicit and cannot enter client code.
 
+Initialize product identity and selected project choices before generating custom
+consumers. The [adoption guide](adoption.md) describes this sequence and the
+boundary between product-owned JSX/CSS/tokens and reusable headless operations.
+
 ## Ownership and dependencies
 
 | Surface                                               | Responsibility and removal boundary                                                                                      |

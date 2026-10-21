@@ -1,0 +1,100 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+
+import {
+  type MemberRemovalTarget,
+  type OrganizationAccessController,
+  useMemberRemoval,
+} from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { Checkbox } from '@/shared/ui/checkbox'
+
+export function InlineRemoval({
+  controller,
+  target,
+  visible,
+  sameSession,
+  onCancel,
+  onLock,
+  onSelfRemoved,
+}: {
+  controller: OrganizationAccessController
+  target: MemberRemovalTarget
+  visible: boolean
+  sameSession: boolean
+  onCancel: () => void
+  onLock: (locked: boolean) => void
+  onSelfRemoved: () => void
+}) {
+  const t = useTranslations('memberRemoval')
+  const [ack, setAck] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const removal = useMemberRemoval(controller, target, () => {
+    setConfirmed(true)
+    onSelfRemoved()
+  })
+  const unknown = removal.outcome?.status === 'unknown'
+  const locked =
+    removal.pending || removal.checking || (unknown && removal.inspection?.status !== 'different')
+  useEffect(() => {
+    onLock(locked)
+    return () => onLock(false)
+  }, [locked, onLock])
+  const reviewable = !unknown || removal.inspection?.status === 'same'
+  return (
+    <section
+      className="space-y-3 rounded-lg border p-4"
+      data-example-region="removal"
+      data-testid="custom-headless-removal"
+    >
+      {visible && sameSession && <h2 className="font-semibold">{target.email}</h2>}
+      {sameSession && confirmed && <p role="status">{t('success')}</p>}
+      {sameSession && unknown && <p role="status">{t('unknown')}</p>}
+      {sameSession && removal.inspection && <p role="status">{t(removal.inspection.status)}</p>}
+      {sameSession && removal.outcome?.status === 'rejected' && (
+        <ApiErrorAlert error={removal.outcome.error} />
+      )}
+      {visible && !confirmed && reviewable && (
+        <>
+          <h2 className="font-semibold">{t('title')}</h2>
+          <p>{t('memberIdentity', { name: target.name ?? target.email, email: target.email })}</p>
+          <label className="flex items-start gap-2">
+            <Checkbox
+              checked={ack}
+              disabled={removal.pending || removal.checking}
+              onCheckedChange={(checked) => setAck(Boolean(checked))}
+            />
+            {t('warning')}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" disabled={locked} onClick={onCancel}>
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!ack || !removal.canRemove}
+              onClick={() => {
+                setAck(false)
+                void removal.remove()
+              }}
+            >
+              {t('confirm')}
+            </Button>
+          </div>
+        </>
+      )}
+      {sameSession && removal.outcome && (
+        <Button
+          variant="outline"
+          disabled={removal.pending || removal.checking || Boolean(removal.retryAt)}
+          onClick={() => void removal.inspect()}
+        >
+          {t('check')}
+        </Button>
+      )}
+    </section>
+  )
+}

@@ -1,0 +1,107 @@
+'use client'
+
+import { useState } from 'react'
+import { useTranslations } from 'next-intl'
+
+import {
+  type MemberRemovalTarget,
+  type OrganizationAccessController,
+  useMemberApiKeys,
+} from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { Empty, EmptyTitle } from '@/shared/ui/empty'
+import { Skeleton } from '@/shared/ui/skeleton'
+
+export function InlineKeys({
+  controller,
+  target,
+  visible,
+  sameSession,
+}: {
+  controller: OrganizationAccessController
+  target: MemberRemovalTarget
+  visible: boolean
+  sameSession: boolean
+}) {
+  const t = useTranslations('memberApiKeys')
+  const keys = useMemberApiKeys(controller, target.userId, {
+    expectedMemberId: target.memberId,
+    page: 1,
+    limit: 20,
+    status: 'all',
+  })
+  const [confirm, setConfirm] = useState(false)
+  const [notice, setNotice] = useState<string>()
+  const [unknown, setUnknown] = useState(false)
+  const available = visible && keys.available
+  async function revoke() {
+    if (!available || keys.busy || unknown) return
+    const result = await keys.revoke()
+    if (result.status === 'committed')
+      setNotice(
+        result.followup === 'ready'
+          ? t('result', { count: result.result.affectedCount })
+          : t('refreshFailed')
+      )
+    else if (result.status === 'unknown' || result.status === 'rejected') {
+      setNotice(t(result.status))
+      setUnknown(true)
+    }
+  }
+  return (
+    <section data-testid="custom-headless-member-keys" data-example-region="keys" className="space-y-3">
+      {sameSession && notice && <p role="status">{notice}</p>}
+      {visible && (
+        <>
+          <h2 className="font-semibold">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground">{t('explanation')}</p>
+          <ApiErrorAlert error={keys.error} />
+          {keys.pending && <Skeleton className="h-12 w-full" />}
+          {available && !keys.data?.data.length && (
+            <Empty>
+              <EmptyTitle>{t('empty')}</EmptyTitle>
+            </Empty>
+          )}
+          {available && keys.data?.data.map((key) => <p key={key.id}>{key.name}</p>)}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={
+                !available ||
+                keys.busy ||
+                unknown ||
+                !keys.data?.revocableCount ||
+                keys.data.revocableCount > 1000
+              }
+              onClick={() => setConfirm(true)}
+            >
+              {t('revokeAll')}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={keys.busy || Boolean(keys.retryAt)}
+              onClick={async () => {
+                const fresh = await keys.refresh().catch(() => undefined)
+                if (fresh) setUnknown(false)
+              }}
+            >
+              {t('check')}
+            </Button>
+          </div>
+          <ConfirmDialog
+            open={confirm && available}
+            onOpenChange={setConfirm}
+            title={t('confirmAll')}
+            description={t('allWarning')}
+            confirmLabel={t('confirm')}
+            cancelLabel={t('cancel')}
+            variant="destructive"
+            onConfirm={() => void revoke()}
+          />
+        </>
+      )}
+    </section>
+  )
+}

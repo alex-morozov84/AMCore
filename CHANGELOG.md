@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Product-administration adoption guide with shop, CRM/ERP and SaaS recipes,
+  clean fork initialization and a cosmic custom interface using public headless operations.
+
 ### Changed
 
 - External web sign-in completes through a same-origin form with automatic
@@ -20,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with confirmation.
 
 ### Fixed
+
+- Headless administration examples preserve initialized project choices, replace
+  existing mounts and keep unknown results locked until explicit safe recovery.
 
 - The API Docker image no longer carries the API package source, tests, Prisma schemas/migrations,
   tool configs or source maps. Test-only modules (`*.testkit.ts`) no longer compile into `dist`.

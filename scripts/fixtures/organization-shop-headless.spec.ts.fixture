@@ -1,55 +1,353 @@
-import { readFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
 
-test('fixed internal shop hides company navigation; staff manage roles while buyers and removed staff fail server admission', async ({ page, context }) => {
+test.use({ trace: 'off', screenshot: 'off', video: 'off' })
+test.afterEach(async ({ context }, info) => {
+  for (const page of context.pages()) await closeCredentialPage(page, info)
+})
+async function safeApi(path: string, body?: object, token?: string) {
+  try {
+    return await directApi(path, body, token)
+  } catch {
+    throw new Error('Shop fixture request failed; credential diagnostics omitted')
+  }
+}
+const id = () => `c${randomUUID().replaceAll('-', '').slice(0, 24)}`
+const count = (query: string, vars: Record<string, string>) =>
+  Number(guardedSql(query, vars).trim())
+async function keyStatus(secret: string, organizationId: string) {
+  try {
+    return (
+      await fetch(
+        `http://127.0.0.1:${activeTarget().ports.api}/api/v1/organizations/${organizationId}`,
+        {
+          headers: { authorization: `Bearer ${secret}` },
+          redirect: 'error',
+        }
+      )
+    ).status
+  } catch {
+    throw new Error('Shop key probe failed; credential diagnostics omitted')
+  }
+}
+
+test('cosmic fixed-company composition preserves tenant, command and key boundaries without Console', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(240000)
   const target = activeTarget()
-  // Frontend Console removal must retain the guarded backend route.
-  const setupApi = await fetch(`http://127.0.0.1:${target.ports.api}/api/v1/admin/organization-establishment/status`)
-  expect(setupApi.status).toBe(401)
-  const email = uniqueEmail('shop-staff')
-  const buyerEmail = uniqueEmail('shop-buyer')
-  const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
-  expect(register.status()).toBe(201)
-  const actor = (await register.json()).user
-  const bootstrap = await context.request.get('/api/product-access/bootstrap')
-  const { binding } = await bootstrap.json()
-  const deniedCreation = await context.request.post('/api/product-access/organizations', {
-    headers: { origin: target.origins.product, 'X-AMCore-Context-Session': binding },
-    data: { name: 'Buyer company', operationId: crypto.randomUUID() },
+  const catalogues = JSON.parse(
+    readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
+  )
+  const t = catalogues.organizationMembers
+  const removal = catalogues.memberRemoval
+  const keys = catalogues.memberApiKeys
+  const org = 'shop-staff-fixture'
+  expect(
+    readFileSync(join(target.snapshot, 'PROJECT_CONTEXT.md'), 'utf8').includes(
+      '**admin_console:** disabled'
+    )
+  ).toBe(true)
+  expect(existsSync(join(target.snapshot, 'apps/web/src/app/admin'))).toBe(false)
+  expect(existsSync(join(target.snapshot, 'apps/web/src/app/[locale]'))).toBe(false)
+  expect(
+    (
+      await fetch(
+        `http://127.0.0.1:${target.ports.api}/api/v1/admin/organization-establishment/status`
+      )
+    ).status
+  ).toBe(401)
+  const email = uniqueEmail('shop-owner')
+  const registered = await context.request.post('/api/auth/register', {
+    headers: { origin: target.origins.product },
+    data: { email, password: TEST_PASSWORD },
   })
-  expect(deniedCreation.status()).toBe(403)
-  expect(guardedSql('SELECT count(*) FROM core.organizations;').trim()).toBe('0')
-  await directApi('auth/register', { email: buyerEmail, password: TEST_PASSWORD })
-  guardedSql(`INSERT INTO core.organizations (id,name,slug,"updatedAt") VALUES ('shop-staff-fixture','Hidden internal shop','hidden-internal-shop',NOW());
-    INSERT INTO core.org_members (id,"userId","organizationId") VALUES ('shop-owner-membership', :'id', 'shop-staff-fixture');
-    INSERT INTO core.member_roles (id,"memberId","roleId") SELECT 'shop-owner-admin', 'shop-owner-membership', id FROM core.roles WHERE name = 'ADMIN' AND "organizationId" IS NULL;`, { id: actor.id })
-  const path = new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'shop-team')).pathname
-  const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')).organizationMembers
+  expect(registered.status()).toBe(201)
+  const owner = (await registered.json()).user
+  const { binding } = await (await context.request.get('/api/product-access/bootstrap')).json()
+  const headers = { origin: target.origins.product, 'X-AMCore-Context-Session': binding }
+  expect(
+    (
+      await context.request.post('/api/product-access/organizations', {
+        headers,
+        data: { name: 'Buyer company', operationId: randomUUID() },
+      })
+    ).status()
+  ).toBe(403)
+  expect(
+    count('SELECT count(*) FROM core.org_members WHERE "userId"=:\'user\';', { user: owner.id })
+  ).toBe(0)
+  const colleague = await safeApi('auth/register', {
+    email: uniqueEmail('shop-colleague'),
+    password: TEST_PASSWORD,
+  })
+  const replacement = await safeApi('auth/register', {
+    email: uniqueEmail('shop-replacement'),
+    password: TEST_PASSWORD,
+  })
+  const buyer = await safeApi('auth/register', {
+    email: uniqueEmail('shop-buyer'),
+    password: TEST_PASSWORD,
+  })
+  const foreign = `foreign-${randomUUID()}`
+  const member = id()
+  const ownerMember = id()
+  const buyerMember = id()
+  guardedSql(
+    `INSERT INTO core.organizations(id,name,slug,"updatedAt") VALUES (:'org','Hidden shop staff',:'org',now()),(:'foreign','Other company',:'foreign',now());
+    INSERT INTO core.org_members(id,"userId","organizationId") VALUES (:'owner_member',:'owner',:'org'),(:'member',:'colleague',:'org'),(:'replacement_member',:'replacement',:'org'),(:'buyer_member',:'buyer',:'foreign');
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'owner_link',:'owner_member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'replacement_link',:'replacement_member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'buyer_link',:'buyer_member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;`,
+    {
+      org,
+      foreign,
+      owner: owner.id,
+      colleague: colleague.user.id,
+      replacement: replacement.user.id,
+      buyer: buyer.user.id,
+      member,
+      owner_member: ownerMember,
+      buyer_member: buyerMember,
+      replacement_member: id(),
+      owner_link: id(),
+      link: id(),
+      replacement_link: id(),
+      buyer_link: id(),
+    }
+  )
+  const firstKey = await safeApi(
+    'api-keys',
+    { name: 'Shop export', organizationId: org, scopes: ['read:Organization'] },
+    colleague.accessToken
+  )
+  expect(await keyStatus(firstKey.key, org)).toBe(200)
+  const path = new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, 'shop-team'))
+    .pathname
   await page.goto(path)
   await expect(page.getByTestId('shop-team')).toBeVisible()
-  await expect(page.getByText('Hidden internal shop', { exact: true })).toHaveCount(0)
+  await expect(
+    page.getByText(catalogues.productAdminExample.station, { exact: true })
+  ).toBeVisible()
   expect(await page.getByRole('link').count()).toBe(0)
-  await page.getByRole('button', { name: email, exact: true }).click()
-  await page.getByRole('checkbox', { name: 'MEMBER', exact: true }).check()
-  await page.getByRole('checkbox', { name: t.selfWarning }).check()
-  await page.getByRole('button', { name: t.save, exact: true }).click()
-  await expect(page.getByText(t.saved, { exact: true })).toBeVisible()
-  await expectNoAxeViolations(page)
-  const loginBuyer = await context.request.post('/api/auth/login', { headers: { origin: target.origins.product }, data: { email: buyerEmail, password: TEST_PASSWORD } })
-  expect(loginBuyer.status()).toBe(200)
+  await expect(page.getByText('Hidden shop staff', { exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: catalogues.ownApiKeys.create, exact: true })
+  ).toHaveCount(0)
+  const row = page.getByRole('listitem').filter({ hasText: colleague.user.email })
+  await row.getByRole('button', { name: colleague.user.email, exact: true }).click()
+  const editor = page.locator('[data-example-region="editor"]')
+  await expect(editor).toBeFocused()
+  await expect(editor.getByRole('checkbox', { name: 'ADMIN', exact: true })).toBeChecked()
+  const mainRefresh = page.getByRole('button', { name: t.refresh, exact: true })
+  let primaryFault = false
+  let rolesFault = false
+  let loseReply = false
+  let patches = 0
+  await page.route('**/api/product-access/**', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const roleRead = url.pathname.endsWith(`/members/${colleague.user.id}/roles`)
+    if (
+      request.method() === 'GET' &&
+      ((primaryFault && url.pathname.endsWith('/members')) || (rolesFault && roleRead))
+    ) {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          statusCode: 503,
+          errorCode: 'ROLE_READ_UNAVAILABLE',
+          message: 'Controlled fixture failure',
+        }),
+      })
+    } else if (request.method() === 'PATCH' && roleRead) {
+      patches++
+      if (loseReply) {
+        await route.fetch()
+        await route.abort('failed')
+      } else await route.continue()
+    } else await route.continue()
+  })
+  primaryFault = true
+  await mainRefresh.click()
+  await expect(row).toHaveCount(0)
+  await expect(editor.getByRole('checkbox')).toHaveCount(0)
+  primaryFault = false
+  await mainRefresh.click()
+  await expect(row).toBeVisible()
+  await expect(editor.getByRole('checkbox', { name: 'ADMIN', exact: true })).toBeVisible()
+  rolesFault = true
+  await mainRefresh.click()
+  await expect(row).toBeVisible()
+  await expect(editor.getByRole('checkbox')).toHaveCount(0)
+  rolesFault = false
+  await mainRefresh.click()
+  await expect(editor.getByRole('checkbox', { name: 'MEMBER', exact: true })).toBeVisible()
+
+  // The write commits while its follow-up role read fails; recovery must only read.
+  await editor.getByRole('checkbox', { name: 'MEMBER', exact: true }).check()
+  rolesFault = true
+  await editor.getByRole('button', { name: t.save, exact: true }).click()
+  await expect(page.getByText(t.savedUnavailable, { exact: true })).toBeVisible()
+  expect(patches).toBe(1)
+  const roleAudit = JSON.parse(
+    guardedSql(
+      `SELECT json_build_object('actor',"actorId",'target',"targetId",'metadata',metadata) FROM core.audit_log WHERE action='org.member_roles_changed' AND "organizationId"=:'org' AND "targetId"=:'user' ORDER BY "createdAt" DESC LIMIT 1;`,
+      { org, user: colleague.user.id }
+    ).trim()
+  )
+  expect(roleAudit).toMatchObject({
+    actor: owner.id,
+    target: colleague.user.id,
+    metadata: {
+      actorCredentialType: 'jwt',
+      memberId: member,
+      addedCount: 1,
+      removedCount: 0,
+      source: 'replace',
+    },
+  })
+  rolesFault = false
+  await mainRefresh.click()
+  await expect(editor.getByRole('checkbox', { name: 'MEMBER', exact: true })).toBeChecked()
+  expect(patches).toBe(1)
+  loseReply = true
+  await editor.getByRole('checkbox', { name: 'VIEWER', exact: true }).check()
+  await editor.getByRole('button', { name: t.save, exact: true }).click()
+  await expect(page.getByText(t.unknown, { exact: true })).toBeVisible()
+  await expect(editor.getByRole('button', { name: t.save, exact: true })).toBeDisabled()
+  expect(patches).toBe(2)
+  loseReply = false
+  await editor.getByRole('button', { name: t.cancel, exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: t.reset, exact: true }).click()
+  await expect(editor.getByRole('checkbox', { name: 'VIEWER', exact: true })).toBeChecked()
+  expect(patches).toBe(2)
+
+  const before = count(
+    "SELECT count(*) FROM core.audit_log WHERE \"organizationId\" IN (:'org',:'foreign');",
+    { org, foreign }
+  )
+  for (const url of [
+    `/api/product-access/organizations/${foreign}/members`,
+    `/api/product-access/organizations/${org}/members/${buyer.user.id}/api-keys?expectedMemberId=${buyerMember}`,
+  ])
+    expect([403, 404].includes((await context.request.get(url, { headers })).status())).toBe(true)
+  expect(
+    [403, 404].includes(
+      (
+        await context.request.patch(
+          `/api/product-access/organizations/${org}/members/${buyer.user.id}/roles`,
+          { headers, data: { expectedMemberId: buyerMember, expectedAclVersion: 0, roleIds: [] } }
+        )
+      ).status()
+    )
+  ).toBe(true)
+  expect(
+    count("SELECT count(*) FROM core.audit_log WHERE \"organizationId\" IN (:'org',:'foreign');", {
+      org,
+      foreign,
+    })
+  ).toBe(before)
+  expect(
+    count("SELECT count(*) FROM core.org_members WHERE id=:'member';", { member: buyerMember })
+  ).toBe(1)
+
+  const keyPanel = page.getByTestId('custom-headless-member-keys')
+  await expect(keyPanel.getByText('Shop export', { exact: true })).toBeVisible()
+  await keyPanel.getByRole('button', { name: keys.revokeAll, exact: true }).click()
+  await expect(page.getByRole('alertdialog')).toContainText(keys.allWarning)
+  for (const dark of [false, true]) {
+    await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light', reducedMotion: 'reduce' })
+    await page.setViewportSize({ width: 375, height: 900 })
+    await expectNoAxeViolations(page)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: keys.confirm, exact: true })
+    .click()
+  expect(await keyStatus(firstKey.key, org)).toBe(401)
+  const removalKey = await safeApi(
+    'api-keys',
+    { name: 'Removal export', organizationId: org, scopes: ['read:Organization'] },
+    colleague.accessToken
+  )
+  expect(await keyStatus(removalKey.key, org)).toBe(200)
+  await keyPanel.getByRole('button', { name: keys.check, exact: true }).click()
+  await row.getByRole('button', { name: removal.action, exact: true }).click()
+  const inline = page.getByTestId('custom-headless-removal')
+  let deletes = 0
+  page.on('request', (request) => {
+    if (request.method() === 'DELETE' && request.url().includes('/members/')) deletes++
+  })
+  await inline.getByRole('button', { name: removal.cancel, exact: true }).click()
+  expect(deletes).toBe(0)
+  await row.getByRole('button', { name: removal.action, exact: true }).click()
+  // The server commits once, but the reply is lost. Recovery must inspect, never replay.
+  const deletePattern = '**/api/product-access/organizations/*/members/*?expectedMemberId=*'
+  await page.route(deletePattern, async (route) => {
+    if (route.request().method() !== 'DELETE') return route.continue()
+    await route.fetch()
+    await route.abort('failed')
+  })
+  await inline.getByRole('checkbox', { name: removal.warning, exact: true }).check()
+  await inline.getByRole('button', { name: removal.confirm, exact: true }).click()
+  await expect(inline.getByText(removal.unknown, { exact: true })).toBeVisible()
+  await expect(inline.getByRole('button', { name: removal.confirm, exact: true })).toHaveCount(0)
+  await inline.getByRole('button', { name: removal.check, exact: true }).click()
+  await expect(inline.getByText(removal.different, { exact: true })).toBeVisible()
+  await page.unroute(deletePattern)
+  expect(deletes).toBe(1)
+  expect(await keyStatus(removalKey.key, org)).toBe(401)
+  expect(count("SELECT count(*) FROM core.org_members WHERE id=:'member';", { member })).toBe(0)
+  const removalAudit = JSON.parse(
+    guardedSql(
+      `SELECT metadata FROM core.audit_log WHERE action='organization.member_removed' AND "organizationId"=:'org' AND "targetId"=:'user';`,
+      { org, user: colleague.user.id }
+    ).trim()
+  )
+  expect(removalAudit).toMatchObject({
+    memberId: member,
+    selectedKeyCount: 1,
+    revokedKeyCount: 1,
+    reason: 'membership_removed',
+  })
+  expect(
+    count(
+      'SELECT count(*) FROM core.api_keys WHERE "userId"=:\'user\' AND "organizationId"=:\'org\' AND "keyHash" IS NULL AND salt IS NULL AND "revokedAt" IS NOT NULL;',
+      { user: colleague.user.id, org }
+    )
+  ).toBe(2)
+
+  const self = page.getByRole('listitem').filter({ hasText: email })
+  await self.getByRole('button', { name: removal.action, exact: true }).click()
+  await inline.getByRole('checkbox', { name: removal.warning, exact: true }).check()
+  await inline.getByRole('button', { name: removal.confirm, exact: true }).click()
+  await expect(inline.getByText(removal.success, { exact: true })).toBeVisible()
+  await expect(page.getByRole('listitem')).toHaveCount(0)
+  await expect(editor.getByRole('checkbox')).toHaveCount(0)
   expect((await page.goto(path))?.status()).toBe(404)
-  await expect(page.getByTestId('shop-team')).toHaveCount(0)
-  await context.request.post('/api/auth/login', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
-  guardedSql('DELETE FROM core.org_members WHERE id = \'shop-owner-membership\';')
+  expect(
+    (
+      await context.request.post('/api/auth/login', {
+        headers: { origin: target.origins.product },
+        data: { email: buyer.user.email, password: TEST_PASSWORD },
+      })
+    ).status()
+  ).toBe(200)
   expect((await page.goto(path))?.status()).toBe(404)
-  await expect(page.getByTestId('shop-team')).toHaveCount(0)
 })

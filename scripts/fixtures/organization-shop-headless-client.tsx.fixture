@@ -1,0 +1,21 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+import type { ProductAccessBootstrap } from '@amcore/shared'
+
+import { CustomMembers } from './custom-members'
+
+import styles from './shop-team.module.css'
+
+export function ShopTeam({ admission, id }: { admission: ProductAccessBootstrap; id: string }) {
+  const t = useTranslations('productAdminExample')
+  return (
+    <main className={styles.station} data-testid="shop-team">
+      <div className={styles.missionHeading}>
+        <p className={styles.stationName}>{t('station')}</p>
+        <p className={styles.stationDescription}>{t('stationDescription')}</p>
+      </div>
+      <CustomMembers admission={admission} organizationId={id} />
+    </main>
+  )
+}

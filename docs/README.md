@@ -27,6 +27,7 @@ find for something, that page is under-documented; please open an issue.
 
 ## Find the right guide
 
+[Add product administration to your product](product-admin/adoption.md) — shop, CRM/ERP and SaaS recipes, initialization and your own interface.
 [Create a company or prepare its first administrator](product-admin/organization-establishment.md) — policies, Console/CLI/API setup and recovery.
 [Create an organization and invite its administrator](product-admin/organization-provisioning.md) — Console, protected API, mail readiness and recovery.
 
