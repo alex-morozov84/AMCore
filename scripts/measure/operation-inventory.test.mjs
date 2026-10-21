@@ -15,7 +15,9 @@ describe('operation inventory against the real plans', () => {
       // Own-key settings add a page move and two pathname edits in three locale
       // recipes (+9), plus three story deletions in two Storybook-off recipes
       // (+6): 15 additional operations/facts/claims. No new provider or manifest.
-      { name: 'measured operations', expected: 747, actual: inventory.operations.length },
+      // Scheduled jobs add a Console feature root, the shared poll policy and cooldown hook (one with a
+      // test), a stand fixture and a path-mode e2e spec: +6 operations/facts, +8 claims.
+      { name: 'measured operations', expected: 753, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -34,17 +36,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1023,
+        expected: 1029,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1751,
+        expected: 1759,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 727,
+        expected: 733,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])
