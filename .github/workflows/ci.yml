@@ -573,6 +573,7 @@ jobs:
       COMPOSE_PROFILES: local-infra
       COMPOSE_PROJECT_NAME: amcore-smoke
       WEB_FRONTEND_CONTEXT_KEY: ci-fake-frontend-context-key-never-a-real-secret
+      FRONTEND_URL: http://127.0.0.1:3000
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
