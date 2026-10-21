@@ -16,7 +16,8 @@ block is built from a public headless operation, so a downstream can move, resty
 | `widgets/app-shell`     | `headerEnd` slot                                    | The shell renders whatever the application passes; it never imports the account blocks                                                                                                                                        |
 | Application composition | `(dashboard)/layout.tsx` and the organization frame | One placement per shell composition (two today): each passes `<AccountMenu />` into `headerEnd`                                                                                                                               |
 
-The header holds the locale switcher next to the account menu (the sidebar has no footer). **Log out is now in the account menu**: if you
+The header holds the locale switcher next to the account menu. Product administration
+places its website link in the sidebar footer. **Log out is now in the account menu**: if you
 remove the menu, provide your own logout control (`useLogout` from `features/auth-logout`).
 
 ## The headless operation
@@ -85,3 +86,7 @@ The database stores the avatar's object key; the API computes `avatarUrl` on eve
 - The avatar image loads without a CSP violation from the configured public files origin.
 - Log out works from the menu; no other logout control remains in the product shell.
 - The fixture above runs green after any change to the shared operation.
+
+For shared path login versus independent staff-host login and logout, see
+[placement and sessions](placement-and-sessions.md). Avatar files can use a separate
+API origin; configure its CSP public-files origin and valid TLS.

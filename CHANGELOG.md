@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- External web sign-in completes through a same-origin form with automatic
+  continuation and a no-JavaScript Continue button, preserving Strict cookies
+  and the validated return page without exposing its code through Referer.
+
+- Product navigation keeps icons and tooltips when collapsed. Working pages fill
+  the available width, and product administration places its website link at
+  the bottom of the sidebar. Dashboard appears first. Active sessions use the
+  shared table surface and a destructive-colored revoke-other-sessions control
+  with confirmation.
+
 ### Fixed
 
 - The API Docker image no longer carries the API package source, tests, Prisma schemas/migrations,
@@ -26,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Configurable product administration path alias or separate HTTPS hostname,
+  with shared website login in path mode and independent staff sessions in host
+  mode. Login, recovery, invitation links and OAuth callbacks follow the selected
+  frontend; inaccessible pages offer safe list, website and logout recovery.
 - The Operations Console links job, delivery, run and audit request IDs to the log search: **Find in logs** in Background work and Audit opens Grafana with the last 7 days of lines for that ID. It needs the new optional `ADMIN_CONSOLE_LOGS_GRAFANA_URL` (the Grafana of the log-search overlay); without it nothing changes. Audit events now return their `requestId` when it is a well-formed correlation ID. See [Find in logs links](docs/operations-console/configuration.md#find-in-logs-links).
 
 - My API keys settings with personal creation, catalogue scope selection, one-time secret handling, session checks and owner-wide inventory/revocation. Ordinary member issuance remains available through the API and headless hooks.

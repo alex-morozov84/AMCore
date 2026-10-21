@@ -120,6 +120,8 @@ for (const locale of SUPPORTED_LOCALES) {
       })
       .check()
     await submit.click()
+    // Preflight verifies the session and organization before dispatching the command.
+    await expect.poll(() => posts, { timeout: 15000 }).toBe(1)
     await expect(dialog.getByText(t.unknown, { exact: true })).toBeVisible()
     await dialog.getByRole('button', { name: t.close, exact: true }).click()
     await page.getByRole('button', { name: t.openResult, exact: true }).click()

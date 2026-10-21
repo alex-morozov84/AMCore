@@ -1,8 +1,7 @@
 import type { UserResponse } from '@amcore/shared'
 
-import { getOptionalSession } from '@/shared/api/bff/dal'
+import { getOptionalSession, getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import type { TokenResolver } from '@/shared/api/server'
-import { getBackendAccessToken } from '@/shared/api/server/access-token'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { getConsoleAccessToken, getConsoleSessionEntry } from './session'
@@ -15,8 +14,10 @@ import 'server-only'
  * call into `apps/api` — never falls back across modes, and never touches
  * the product session in host mode.
  */
-export const getConsoleAwareAccessToken: TokenResolver = () =>
-  ADMIN_CONSOLE_CONFIG.mode === 'host' ? getConsoleAccessToken() : getBackendAccessToken()
+export const getConsoleAwareAccessToken: TokenResolver = async () =>
+  ADMIN_CONSOLE_CONFIG.mode === 'host'
+    ? getConsoleAccessToken()
+    : ((await getOptionalSessionEntry('site-auth'))?.accessToken ?? null)
 
 /**
  * The signed-in operator's identity, for chrome only (initials, name) —
@@ -28,5 +29,5 @@ export async function getConsoleAwareUser(): Promise<UserResponse | null> {
   if (ADMIN_CONSOLE_CONFIG.mode === 'host') {
     return (await getConsoleSessionEntry())?.userSnapshot ?? null
   }
-  return (await getOptionalSession())?.user ?? null
+  return (await getOptionalSession('site-auth'))?.user ?? null
 }

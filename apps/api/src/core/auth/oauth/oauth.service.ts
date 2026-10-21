@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
+import type { ProductAdminReturn } from '@amcore/shared'
 import type {
   InvitationOAuthCorrelation,
   OAuthUserProfile,
@@ -15,6 +16,8 @@ import { EnvService } from '../../../env/env.service.js'
 import type { OAuthProvider, Prisma, User } from '../../../generated/prisma/client.js'
 import { StorageService } from '../../../infrastructure/storage/index.js'
 import { PrismaService } from '../../../prisma/index.js'
+import type { BrowserFrontendContext } from '../../frontend-context/frontend-placement.js'
+import { assertTokenFrontend } from '../../frontend-context/frontend-token.js'
 import {
   type InvitationHandoffProof,
   lockInvitationAuthAttempt,
@@ -39,6 +42,7 @@ import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
 interface LoginCallbackResult {
   mode: 'login'
+  returnTo?: ProductAdminReturn
   invitation?: InvitationOAuthCorrelation
   user: UserResponse
   refreshToken: string
@@ -79,9 +83,11 @@ export class OAuthService {
   async getAuthorizationURL(
     providerName: string,
     locale?: SupportedLocale,
-    invited?: { credential: string; attemptId: string; handoff: InvitationHandoffProof }
+    invited?: { credential: string; attemptId: string; handoff: InvitationHandoffProof },
+    frontend?: BrowserFrontendContext,
+    returnTo?: ProductAdminReturn
   ): Promise<{ url: string; browserNonce: string }> {
-    const provider = this.providerFactory.get(providerName)
+    const provider = this.providerFactory.get(providerName, frontend?.frontend ?? 'site')
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
     const browserNonce = generateOAuthStateNonce()
@@ -98,6 +104,7 @@ export class OAuthService {
           const { invite, expiresAt } = await this.invitationAuthority.lockValid(tx, {
             continuation: invited.credential,
           })
+          assertTokenFrontend(invite, frontend)
           return {
             correlation: {
               attemptId: invited.attemptId,
@@ -116,6 +123,14 @@ export class OAuthService {
       provider: providerName,
       codeVerifier,
       mode: 'login',
+      pkceMethod: 'S256',
+      ...(frontend
+        ? {
+            ...frontend,
+            callbackUri: this.providerFactory.callbackUri(providerName, frontend.frontend),
+            returnTo,
+          }
+        : {}),
       ...(invitation ? { invitation } : {}),
       browserNonceHash: hashOAuthStateNonce(browserNonce),
       ...(locale ? { locale } : {}),
@@ -127,9 +142,10 @@ export class OAuthService {
 
   async getLinkAuthorizationURL(
     providerName: string,
-    userId: string
+    userId: string,
+    frontend?: BrowserFrontendContext
   ): Promise<{ url: string; browserNonce: string }> {
-    const provider = this.providerFactory.get(providerName)
+    const provider = this.providerFactory.get(providerName, frontend?.frontend ?? 'site')
     const state = randomBytes(32).toString('base64url')
     const codeVerifier = randomBytes(32).toString('base64url')
     const browserNonce = generateOAuthStateNonce()
@@ -138,6 +154,13 @@ export class OAuthService {
       provider: providerName,
       codeVerifier,
       mode: 'link',
+      pkceMethod: 'S256',
+      ...(frontend
+        ? {
+            ...frontend,
+            callbackUri: this.providerFactory.callbackUri(providerName, frontend.frontend),
+          }
+        : {}),
       userId,
       browserNonceHash: hashOAuthStateNonce(browserNonce),
     })
@@ -152,7 +175,8 @@ export class OAuthService {
     state: string,
     browserNonce: string | undefined,
     requestInfo: RequestInfo,
-    firstLoginName?: string | null
+    firstLoginName?: string | null,
+    frontend?: BrowserFrontendContext
   ): Promise<CallbackResult> {
     const stateData = await this.stateService.consume(state)
     if (!stateData || stateData.provider !== providerName) {
@@ -168,8 +192,25 @@ export class OAuthService {
     // missing/mismatched binding is indistinguishable from a bad state.
     this.assertBrowserBinding(browserNonce, stateData.browserNonceHash)
 
-    const provider = this.providerFactory.get(providerName)
-    const tokens = await provider.exchangeCode(code, stateData.codeVerifier)
+    const expectedFrontend = stateData.frontend ?? 'site'
+    if (
+      expectedFrontend !== (frontend?.frontend ?? 'site') ||
+      (stateData.frontend &&
+        (!frontend ||
+          stateData.placementFingerprint !== frontend.placementFingerprint ||
+          stateData.callbackUri !==
+            this.providerFactory.callbackUri(providerName, expectedFrontend)))
+    )
+      throw new AppException(
+        'Invalid OAuth state',
+        HttpStatus.BAD_REQUEST,
+        AuthErrorCode.OAUTH_STATE_INVALID
+      )
+    const provider = this.providerFactory.get(providerName, expectedFrontend)
+    const tokens =
+      providerName === 'github' && stateData.pkceMethod !== 'S256'
+        ? await provider.exchangeCode(code, stateData.codeVerifier, { legacyWithoutPkce: true })
+        : await provider.exchangeCode(code, stateData.codeVerifier)
     const profile = await provider.getUserProfile(tokens)
 
     // Apple sends the display name only in the first-login `form_post` `user`
@@ -192,6 +233,8 @@ export class OAuthService {
         AuthErrorCode.OAUTH_EMAIL_REQUIRED
       )
     }
+
+    if (stateData.invitation && !profile.emailVerified) throw invalidInvitation()
 
     const { user, accountCreated, session, refreshToken } = await this.prisma.$transaction(
       async (tx) => {
@@ -229,7 +272,8 @@ export class OAuthService {
           providerName,
           stateData.locale,
           !!stateData.invitation,
-          existingUser?.id
+          existingUser?.id,
+          expectedFrontend === 'admin'
         )
         if (stateData.invitation && user.emailCanonical !== emailCanonical)
           throw invalidInvitation()
@@ -273,6 +317,7 @@ export class OAuthService {
 
     return {
       mode: 'login',
+      ...(stateData.returnTo ? { returnTo: stateData.returnTo } : {}),
       user: this.mapUserToResponse(user),
       refreshToken,
       sessionId: session.id,
@@ -341,7 +386,8 @@ export class OAuthService {
     providerName: string,
     locale?: SupportedLocale,
     invited = false,
-    expectedUserId?: string
+    expectedUserId?: string,
+    signInOnly = false
   ): Promise<{ user: User; accountCreated: boolean }> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
@@ -366,6 +412,14 @@ export class OAuthService {
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
     const userByEmail = await tx.user.findUnique({ where: { emailCanonical } })
     if (userByEmail) {
+      // An email claim is not proof of ownership. Existing provider-ID links above
+      // remain valid; creating a new link by email requires verified ownership.
+      if (!profile.emailVerified)
+        throw new AppException(
+          'Provider email is not verified',
+          403,
+          AuthErrorCode.OAUTH_EMAIL_UNVERIFIED
+        )
       if (userByEmail.id !== expectedUserId)
         throw new AppException(
           'Identity changed during sign-in',
@@ -380,7 +434,7 @@ export class OAuthService {
       }
     }
 
-    if (!invited && !this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED'))
+    if (!invited && (signInOnly || !this.env.get('AUTH_PUBLIC_SIGNUP_ENABLED')))
       throw new AppException('Public signup is disabled', 403, AuthErrorCode.PUBLIC_SIGNUP_DISABLED)
     return { user: await this.createOAuthUser(tx, profile, provider, locale), accountCreated: true }
   }

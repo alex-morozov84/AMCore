@@ -1,3 +1,4 @@
+import { productAdminCiLanes } from './product-admin-e2e-plan.mjs'
 import { existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
@@ -6,7 +7,15 @@ export function specFiles(root, directory = 'apps/web/e2e/real-stack') {
   const base = join(root, directory)
   if (!existsSync(base)) throw new Error(`Missing E2E directory: ${directory}`)
   return readdirSync(base, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && specPattern.test(entry.name))
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        specPattern.test(entry.name) &&
+        !(
+          directory === 'apps/web/e2e/real-stack' &&
+          entry.name === 'product-admin-oauth-path.spec.ts'
+        )
+    )
     .map((entry) => relative(join(root, 'apps/web'), join(entry.parentPath, entry.name)))
     .sort()
 }
@@ -25,5 +34,5 @@ export function ciLanes(root) {
   if (existsSync(join(root, 'scripts/run-console-session-e2e.mjs')))
     lanes.push('host', 'setup-console')
   // AMCORE_CONSOLE_CI_LANES_END
-  return lanes
+  return [...lanes, ...productAdminCiLanes(root)]
 }

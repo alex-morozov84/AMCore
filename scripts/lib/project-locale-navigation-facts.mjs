@@ -1,13 +1,21 @@
 import { localeContent } from './project-locale-fact-helpers.mjs'
 
 const facts = {
+  'locale.navigation-admin-login': ['apps/web/src/_app/product-admin/ui/login-form.tsx'],
+  'locale.navigation-selected-redirect': [
+    'apps/web/src/_app/auth-completion/index.tsx',
+    'apps/web/src/_app/product-admin/server/admission.ts',
+    'apps/web/src/_app/product-admin/server/login-page.tsx',
+  ],
   'locale.navigation-call': [
     'apps/web/src/features/auth-login/model/use-login.ts',
     'apps/web/src/features/auth-register/model/use-register.ts',
   ],
   'locale.navigation-dal': ['apps/web/src/shared/api/bff/dal.ts'],
-  'locale.navigation-oauth': ['apps/web/src/shared/api/bff/oauth-exchange-handler.ts'],
-  'locale.navigation-switcher': ['apps/web/src/widgets/app-shell/ui/AppShell.tsx'],
+  'locale.navigation-switcher': [
+    'apps/web/src/widgets/app-shell/ui/AppShell.tsx',
+    'apps/web/src/_pages/auth/AuthFrame.tsx',
+  ],
   // Same removal shape as locale.navigation-switcher, applied to the
   // console shell's own switcher instead of the product AppShell's.
   'locale.navigation-console-switcher': ['apps/web/src/widgets/console-shell/ui/ConsoleShell.tsx'],
@@ -30,7 +38,6 @@ const facts = {
 
 export function buildLocaleNavigationFacts(locale) {
   const tests = [
-    ['apps/web/src/shared/api/bff/oauth-exchange-handler.test.ts', 'oauth'],
     ['apps/web/src/test/eslint-guards.test.ts', 'eslint'],
     ['apps/web/src/shared/api/bff/dal.gating.test.ts', 'gating'],
     ['apps/web/src/shared/api/bff/dal.optional-session.test.ts', 'optional'],

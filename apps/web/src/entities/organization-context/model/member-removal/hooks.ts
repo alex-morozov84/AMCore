@@ -25,7 +25,8 @@ export type RemovalInspection =
 /** State outlives confirmation/list rows, but never its actor/organization owner. */
 export function useMemberRemoval(
   controller: OrganizationAccessController,
-  target?: MemberRemovalTarget
+  target?: MemberRemovalTarget,
+  onAcknowledged?: () => void
 ) {
   const orgId = controller.organizationId
   const identity = JSON.stringify([controller.binding, orgId, target?.userId, target?.memberId])
@@ -99,7 +100,18 @@ export function useMemberRemoval(
     try {
       const result = await controller.execute(
         target.memberId,
-        (signal) => removeMember(controller.binding, orgId, target.userId, target.memberId, signal),
+        async (signal) => {
+          const result = await removeMember(
+            controller.binding,
+            orgId,
+            target.userId,
+            target.memberId,
+            signal
+          )
+          // Preserve confirmed self-removal feedback before the authority refresh denies access.
+          if (lease.current === identity && controller.current(epoch)) onAcknowledged?.()
+          return result
+        },
         { timeoutMs: 20000, rejectionCodes: memberRemovalRejectionCodes }
       )
       if (lease.current !== identity || !controller.current(epoch))

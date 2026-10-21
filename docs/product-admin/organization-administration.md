@@ -348,3 +348,7 @@ Headless clients must protect their own saved retry input similarly.
 Status, attention, receipts, application logs, mail and notifications exclude the
 reason. Validation does not remove sensitive content automatically. Enter ticket
 references or operational justification without secrets or personal information.
+
+New invitation emails target the configured product administration area. Existing
+root links retain their site flow. See [placement and sessions](placement-and-sessions.md)
+for addresses, host isolation and recovery; this does not change membership policy.

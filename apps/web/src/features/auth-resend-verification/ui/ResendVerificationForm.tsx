@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { type ResendVerificationInput, resendVerificationSchema } from '@amcore/shared'
 
+import type { AuthActionBase } from '@/shared/api/auth-api'
 import { useLocalizedForm } from '@/shared/hooks'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -18,7 +19,9 @@ import { useResendVerification } from '../model/use-resend-verification'
  * verified, and the frontend's own translated copy carries that outcome,
  * never the backend's response `message`.
  */
-export function ResendVerificationForm() {
+export function ResendVerificationForm({
+  actionBase = '/auth',
+}: { actionBase?: AuthActionBase } = {}) {
   const t = useTranslations('auth')
   const [submitted, setSubmitted] = useState(false)
 
@@ -26,7 +29,7 @@ export function ResendVerificationForm() {
     defaultValues: { email: '' },
   })
 
-  const { mutate, isPending, error } = useResendVerification(form.setError)
+  const { mutate, isPending, error } = useResendVerification(form.setError, actionBase)
 
   if (submitted) {
     return <p className="text-sm text-muted-foreground">{t('resendVerificationSuccess')}</p>

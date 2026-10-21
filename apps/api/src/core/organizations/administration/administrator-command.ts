@@ -15,6 +15,7 @@ import type {
 } from '../../../generated/prisma/client.js'
 import { acquireXactLock } from '../../../prisma/advisory-lock.js'
 import type { AuditLogService } from '../../audit/index.js'
+import type { BrowserFrontendContext } from '../../frontend-context/frontend-placement.js'
 import { issueInvitation } from '../../invitations/invitation-issuance.js'
 import { lockInvitationRoles } from '../../invitations/invitation-role-intent.js'
 import {
@@ -53,6 +54,7 @@ export type AdministratorCommand =
   | { kind: 'cancel'; id: string; input: AdministratorInvitationCancel }
 
 type Dependencies = {
+  frontend: BrowserFrontendContext
   operator: SetupOperator
   limiter: ProvisioningLimiterService
   audit: AuditLogService
@@ -239,6 +241,7 @@ export async function administratorCommand(
         data: { revokedAt: now, revokedById: actorId },
       })
     const issued = await issueInvitation(tx, {
+      frontend: deps.frontend,
       organizationId: orgId,
       email: email!,
       emailCanonical: email!,

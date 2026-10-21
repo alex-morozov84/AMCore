@@ -3,10 +3,15 @@ import { AuthErrorCode, type OrganizationContextFamily } from '@amcore/shared'
 
 import { apiErrorResponse } from './api-error-response'
 import { authFailureResponse } from './auth-failure-response'
-import { isCredentialRoute } from './credential-route'
+import { isControlPlaneRoute, isCredentialRoute } from './credential-route'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isClosedOrganizationFamily } from './organization-family'
 import { isTrustedOrigin } from './origin-guard'
+import {
+  frontendApiHeaders,
+  isProductMutationTrusted,
+  type ProductWebContext,
+} from './product-web-context.server'
 import { forwardRequestHeaders, forwardResponseHeaders } from './proxy-headers'
 import { isQueueBoardRoute } from './queue-board-route'
 import { SESSION_COOKIE_NAME } from './session-cookie'
@@ -30,10 +35,12 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 export async function proxyToBackend(
   request: Request,
   pathSegments: string[],
-  organizationFamilies: readonly OrganizationContextFamily[] = []
+  organizationFamilies: readonly OrganizationContextFamily[] = [],
+  context?: ProductWebContext
 ): Promise<Response> {
   const upstreamUrl = buildUpstreamUrl(pathSegments, request)
   if (
+    (context?.audience === 'staff' && isControlPlaneRoute(upstreamUrl)) ||
     isCredentialRoute(upstreamUrl) ||
     isQueueBoardRoute(upstreamUrl) ||
     isClosedOrganizationFamily(upstreamUrl, organizationFamilies, API_URL)
@@ -41,7 +48,12 @@ export async function proxyToBackend(
     return apiErrorResponse(request, { statusCode: 404, message: 'Not found' })
   }
 
-  if (!SAFE_METHODS.has(request.method) && !isTrustedOrigin(request)) {
+  if (
+    !SAFE_METHODS.has(request.method) &&
+    !(context?.audience === 'staff'
+      ? isProductMutationTrusted(request, context)
+      : isTrustedOrigin(request))
+  ) {
     return apiErrorResponse(request, {
       statusCode: 403,
       message: 'Request origin rejected',
@@ -49,7 +61,7 @@ export async function proxyToBackend(
     })
   }
 
-  const sessionId = (await cookies()).get(SESSION_COOKIE_NAME)?.value
+  const sessionId = (await cookies()).get(context?.cookieName ?? SESSION_COOKIE_NAME)?.value
   if (!sessionId) {
     return apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' })
   }
@@ -57,9 +69,10 @@ export async function proxyToBackend(
   let accessToken: string
   try {
     const session = await ensureFreshSession(sessionId, {
-      store: redisVaultStore,
-      lock: redisVaultLock,
-      upstreamRefresh: createUpstreamRefresh(request.headers),
+      store: context?.store ?? redisVaultStore,
+      expectedAudience: context?.audience,
+      lock: context?.lock ?? redisVaultLock,
+      upstreamRefresh: createUpstreamRefresh(request.headers, context),
     })
     accessToken = session.accessToken
   } catch (error) {
@@ -71,7 +84,12 @@ export async function proxyToBackend(
 
   const upstreamResponse = await fetch(upstreamUrl.toString(), {
     method: request.method,
-    headers: forwardRequestHeaders(request.headers, accessToken, trustedClientIp),
+    headers: context
+      ? frontendApiHeaders(
+          context,
+          forwardRequestHeaders(request.headers, accessToken, trustedClientIp)
+        )
+      : forwardRequestHeaders(request.headers, accessToken, trustedClientIp),
     body: hasBody ? request.body : undefined,
     // Required by Node's fetch (undici) whenever `body` is a stream.
     ...(hasBody ? { duplex: 'half' } : {}),

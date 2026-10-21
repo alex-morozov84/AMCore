@@ -10,7 +10,11 @@ import {
   readInvitationBootstrap,
   saveInvitationBootstrap,
 } from './invitation-bootstrap-store'
-import { admitInvitationFlow, newInvitationOwner } from './invitation-flow-authority'
+import {
+  admitInvitationFlow,
+  currentInvitationFlow,
+  newInvitationOwner,
+} from './invitation-flow-authority'
 import {
   invitationOwnerHash,
   invitationOwnerKey,
@@ -22,6 +26,7 @@ import {
   stageInvitationSession,
 } from './invitation-session-publication'
 import type { InvitationOwnerRecord } from './invitation-vault-record'
+import { resolveProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 import type { VaultRecord } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
@@ -35,6 +40,73 @@ beforeAll(async () => {
 afterAll(async () => {
   if (container) await (await getWebRedisClient()).close()
   await container?.stop()
+  vi.unstubAllEnvs()
+})
+
+describe('ordinary auth after placement change', () => {
+  function context() {
+    vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
+    vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
+    vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-frontend-context-key-at-least-32>')
+    return resolveProductWebContext(new Headers({ host: 'app.example.test' }), 'admin-invite')
+  }
+
+  it('retires stale credentials atomically without renewing their expiry or admitting an old flow', async () => {
+    const selected = context()
+    const old = { ...selected, placementFingerprint: 'a'.repeat(64) }
+    const { hash, initial } = await stagedPublication()
+    await invitationOwnerStore.create(hash, initial, old)
+    const key = invitationOwnerKey(hash, old)
+    const redis = await getWebRedisClient()
+    const ttl = await redis.pTTL(key)
+    await expect(invitationOwnerStore.get(hash, initial.origin, selected)).rejects.toThrow()
+    await invitationOwnerStore.retireStaleForOrdinaryAuth(hash, initial.origin, selected)
+    const retired = (await invitationOwnerStore.get(hash, initial.origin, selected))!
+    expect(retired.version).toBe(initial.version + 1)
+    expect(retired.epoch).toBe(initial.epoch + 1)
+    expect(retired.expiresAt).toBe(initial.expiresAt)
+    expect(retired.pendingOAuthAttemptId).toBeNull()
+    expect(retired.flows.every((flow) => flow.state === 'retired')).toBe(true)
+    expect(retired.flows[0]!.attempt).toEqual(initial.flows[0]!.attempt)
+    expect(() =>
+      currentInvitationFlow(retired, initial.flows[0]!.binding.flowId, null, Date.now())
+    ).toThrow()
+    expect(await redis.pTTL(key)).toBeLessThanOrEqual(ttl)
+    const staleWrite = {
+      ...initial,
+      frontend: 'admin' as const,
+      audience: old.audience,
+      placementFingerprint: old.placementFingerprint,
+    }
+    expect(await invitationOwnerStore.compareAndSet(hash, initial.version, staleWrite, old)).toBe(
+      false
+    )
+    await invitationOwnerStore.retireStaleForOrdinaryAuth(hash, initial.origin, selected)
+    expect((await invitationOwnerStore.get(hash, initial.origin, selected))!.version).toBe(
+      retired.version
+    )
+  })
+
+  it('does not retire another origin, audience, or the legacy journal', async () => {
+    const selected = context()
+    const old = { ...selected, placementFingerprint: 'a'.repeat(64) }
+    const hash = invitationOwnerHash(randomUUID())
+    const record = newInvitationOwner(selected.origin, null, Date.now())
+    await invitationOwnerStore.create(hash, record, old)
+    await invitationOwnerStore.retireStaleForOrdinaryAuth(
+      hash,
+      'https://other.example.test',
+      selected
+    )
+    await expect(
+      invitationOwnerStore.retireStaleForOrdinaryAuth(hash, selected.origin, {
+        ...selected,
+        audience: 'staff',
+      })
+    ).rejects.toThrow()
+    await invitationOwnerStore.retireStaleForOrdinaryAuth(hash, selected.origin)
+    expect((await invitationOwnerStore.get(hash, selected.origin, old))!.version).toBe(1)
+  })
 })
 
 function owner(): InvitationOwnerRecord {

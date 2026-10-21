@@ -19,17 +19,21 @@ import {
   captureInvitationRequest,
 } from './invitation-request-snapshot'
 import { invitationRoute } from './invitation-route'
+import { invitationPagePath } from './invitation-surface'
 import { observeInvitationVerification } from './invitation-verification-handler'
 import {
   consumeInvitationVerificationSelector,
   createInvitationVerificationSelector,
   readInvitationVerificationSelector,
 } from './invitation-verification-store'
+import type { ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
-function pathname(origin: string, locale: string, path: string) {
-  const url = new URL(localizedFrontendUrl(origin, locale as SupportedLocale, path))
+function pathname(origin: string, locale: string, path: string, context?: ProductWebContext) {
+  const url = new URL(
+    localizedFrontendUrl(origin, locale as SupportedLocale, invitationPagePath(path, context))
+  )
   return url.pathname + url.search
 }
 
@@ -46,35 +50,45 @@ export function invitationVerificationReturnLink(
         const first = await captureInvitationRequest(request, flowId, deps, true)
         const input = invitationFlowExpectedSchema.parse(await readContextJson(request.body, 2048))
         if (input.binding.flowId !== flowId) throw invitationFlowChanged()
-        return withInvitationOwnerLease(first.ownerHash, signal, async () => {
-          const snapshot = await captureInvitationRequest(request, flowId, deps, true)
-          if (!snapshot.session) throw new ContextRequestError(401, 'UNAUTHORIZED')
-          const flow = expectedInvitationFlow(
-            snapshot.owner,
-            input.binding,
-            snapshot.session.binding,
-            Date.now()
-          )
-          if (flow.state !== 'active' || (flow.handoff && !flow.handoff.confirmed))
-            throw invitationFlowChanged()
-          await observeInvitationVerification(request, snapshot, deps, signal)
-          const id = await createInvitationVerificationSelector({
-            ownerHash: snapshot.ownerHash,
-            origin: snapshot.owner.origin,
-            binding: flow.binding,
-            ownerEpoch: snapshot.owner.epoch,
-            expiresAt: Math.min(Date.now() + 1800000, flow.expiresAt, snapshot.owner.expiresAt),
-          })
-          await assertInvitationReadCurrent(snapshot)
-          signal.throwIfAborted()
-          return invitationVerificationReturnLinkSchema.parse({
-            verifyHref: pathname(
-              snapshot.owner.origin,
-              flow.locale,
-              `verify-email?inviteReturn=${id}`
-            ),
-          })
-        })
+        return withInvitationOwnerLease(
+          first.ownerHash,
+          signal,
+          async () => {
+            const snapshot = await captureInvitationRequest(request, flowId, deps, true)
+            if (!snapshot.session) throw new ContextRequestError(401, 'UNAUTHORIZED')
+            const flow = expectedInvitationFlow(
+              snapshot.owner,
+              input.binding,
+              snapshot.session.binding,
+              Date.now()
+            )
+            if (flow.state !== 'active' || (flow.handoff && !flow.handoff.confirmed))
+              throw invitationFlowChanged()
+            await observeInvitationVerification(request, snapshot, deps, signal)
+            const id = await createInvitationVerificationSelector(
+              {
+                ownerHash: snapshot.ownerHash,
+                origin: snapshot.owner.origin,
+                binding: flow.binding,
+                ownerEpoch: snapshot.owner.epoch,
+                expiresAt: Math.min(Date.now() + 1800000, flow.expiresAt, snapshot.owner.expiresAt),
+              },
+              deps.webContext
+            )
+            await assertInvitationReadCurrent(snapshot)
+            signal.throwIfAborted()
+            return invitationVerificationReturnLinkSchema.parse({
+              verifyHref: pathname(
+                snapshot.owner.origin,
+                flow.locale,
+                `verify-email?inviteReturn=${id}`,
+                deps.webContext
+              ),
+            })
+          },
+          undefined,
+          deps.webContext
+        )
       },
       10000
     )
@@ -91,55 +105,64 @@ export function invitationVerificationReturn(
       request.signal,
       async (signal) => {
         if (new URL(request.url).search) throw new ContextRequestError(400, 'BAD_REQUEST')
-        const authority = invitationRequestAuthority(request, true)
+        const authority = invitationRequestAuthority(request, true, deps.webContext)
         if (!authority.ownerHash) throw invitationFlowChanged()
         const input = invitationVerificationReturnInputSchema.parse(
           await readContextJson(request.body, 2048)
         )
-        return withInvitationOwnerLease(authority.ownerHash, signal, async () => {
-          const record = await readInvitationVerificationSelector(
-            selectorId,
-            authority.ownerHash!,
-            authority.policy.origin
-          )
-          if (!record || record.binding.sessionBinding !== input.expectedSessionBinding)
-            throw invitationFlowChanged()
-          const snapshot = await captureInvitationRequest(
-            request,
-            record.binding.flowId,
-            deps,
-            true
-          )
-          if (!snapshot.session || snapshot.session.binding !== input.expectedSessionBinding)
-            throw invitationFlowChanged()
-          expectedInvitationFlow(
-            snapshot.owner,
-            record.binding,
-            snapshot.session.binding,
-            Date.now()
-          )
-          if (
-            !(await consumeInvitationVerificationSelector(
+        return withInvitationOwnerLease(
+          authority.ownerHash,
+          signal,
+          async () => {
+            const record = await readInvitationVerificationSelector(
               selectorId,
-              snapshot.ownerHash,
-              snapshot.owner.version,
-              record
-            ))
-          )
-            throw invitationFlowChanged()
-          const data = await observeInvitationVerification(request, snapshot, deps, signal)
-          if (!data.user.emailVerified || data.inspection.state === 'verify_email')
-            throw invitationFlowChanged()
-          signal.throwIfAborted()
-          return invitationVerificationReturnResponseSchema.parse({
-            binding: snapshot.flow.binding,
-            destination: pathname(
-              snapshot.owner.origin,
-              snapshot.flow.locale,
-              `invite/flow/${snapshot.flow.binding.flowId}`
-            ),
-          })
-        })
+              authority.ownerHash!,
+              authority.policy.origin,
+              deps.webContext
+            )
+            if (!record || record.binding.sessionBinding !== input.expectedSessionBinding)
+              throw invitationFlowChanged()
+            const snapshot = await captureInvitationRequest(
+              request,
+              record.binding.flowId,
+              deps,
+              true
+            )
+            if (!snapshot.session || snapshot.session.binding !== input.expectedSessionBinding)
+              throw invitationFlowChanged()
+            expectedInvitationFlow(
+              snapshot.owner,
+              record.binding,
+              snapshot.session.binding,
+              Date.now()
+            )
+            if (
+              !(await consumeInvitationVerificationSelector(
+                selectorId,
+                snapshot.ownerHash,
+                snapshot.owner.version,
+                record,
+                deps.webContext
+              ))
+            )
+              throw invitationFlowChanged()
+            const data = await observeInvitationVerification(request, snapshot, deps, signal)
+            if (!data.user.emailVerified || data.inspection.state === 'verify_email')
+              throw invitationFlowChanged()
+            signal.throwIfAborted()
+            return invitationVerificationReturnResponseSchema.parse({
+              binding: snapshot.flow.binding,
+              destination: pathname(
+                snapshot.owner.origin,
+                snapshot.flow.locale,
+                `invite/flow/${snapshot.flow.binding.flowId}`,
+                deps.webContext
+              ),
+            })
+          },
+          undefined,
+          deps.webContext
+        )
       },
       10000
     )

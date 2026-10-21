@@ -1,4 +1,4 @@
-import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
+import { AMCORE_CLIENT_IP_HEADER, WEB_FRONTEND_HEADERS } from '@amcore/shared'
 
 // Re-exported so existing local imports (`./proxy-headers`) keep working;
 // `apps/api`'s throttler guard imports the same shared constant directly
@@ -13,6 +13,7 @@ export { AMCORE_CLIENT_IP_HEADER }
 // `CORS_ORIGIN`, which is API-owned and may legitimately differ from the
 // web origin (round 2 finding).
 const STRIP_REQUEST_HEADERS = new Set([
+  ...Object.values(WEB_FRONTEND_HEADERS),
   'host',
   'connection',
   'cookie',

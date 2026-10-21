@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { invitationFlowChanged } from './invitation-flow-authority'
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
+import { invitationNamespace } from './invitation-surface'
+import type { ProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 
 import 'server-only'
@@ -18,11 +20,14 @@ const selectorSchema = z.strictObject({
   expiresAt: z.number().int(),
 })
 type Selector = z.infer<typeof selectorSchema>
-function key(id: string) {
-  return `web:invitation:verification-return:v1:${invitationFlowIdSchema.parse(id)}`
+function key(id: string, context?: ProductWebContext) {
+  return `${invitationNamespace('verification-return', context)}:${invitationFlowIdSchema.parse(id)}`
 }
 
-export async function createInvitationVerificationSelector(input: Selector) {
+export async function createInvitationVerificationSelector(
+  input: Selector,
+  context?: ProductWebContext
+) {
   const record = selectorSchema.parse(input)
   if (
     !record.binding.sessionBinding ||
@@ -34,7 +39,7 @@ export async function createInvitationVerificationSelector(input: Selector) {
   await withInvitationStorage(async () => {
     const saved = await (
       await getWebRedisClient()
-    ).set(key(id), JSON.stringify(record), {
+    ).set(key(id, context), JSON.stringify(record), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: record.expiresAt },
     })
@@ -46,10 +51,11 @@ export async function createInvitationVerificationSelector(input: Selector) {
 export async function readInvitationVerificationSelector(
   id: string,
   ownerHash: string,
-  origin: string
+  origin: string,
+  context?: ProductWebContext
 ) {
   return withInvitationStorage(async () => {
-    const raw = await (await getWebRedisClient()).get(key(id))
+    const raw = await (await getWebRedisClient()).get(key(id, context))
     if (!raw) return null
     const record = selectorSchema.parse(JSON.parse(raw))
     return record.ownerHash === ownerHash &&
@@ -65,7 +71,8 @@ export async function consumeInvitationVerificationSelector(
   id: string,
   ownerHash: string,
   version: number,
-  record: Selector
+  record: Selector,
+  context?: ProductWebContext
 ) {
   return withInvitationStorage(
     async () =>
@@ -93,7 +100,7 @@ export async function consumeInvitationVerificationSelector(
     return 0
   `,
         {
-          keys: [key(id), invitationOwnerKey(ownerHash)],
+          keys: [key(id, context), invitationOwnerKey(ownerHash, context)],
           arguments: [JSON.stringify(selectorSchema.parse(record)), String(version), ownerHash],
         }
       )) === 1

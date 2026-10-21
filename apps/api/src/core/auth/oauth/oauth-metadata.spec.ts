@@ -58,7 +58,8 @@ it.each(['google', 'apple'])(
       'state',
       provider === 'apple' ? 'post-binding' : 'get-binding',
       { userAgent: 'OAuth browser', ipAddress: '81.2.69.142' },
-      provider === 'apple' ? null : undefined
+      provider === 'apple' ? null : undefined,
+      undefined
     )
     expect(issue).toHaveBeenCalledTimes(1)
     expect(res.cookie).toHaveBeenCalledWith(

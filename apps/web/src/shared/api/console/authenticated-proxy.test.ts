@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('./origin-guard', () => ({ isTrustedConsoleOrigin: vi.fn() }))
@@ -20,13 +20,19 @@ const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'hos
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 function request(method = 'PATCH'): Request {
-  return new Request('https://console.example.test/api/console/users/u1/role', { method })
+  const host = mutableConfig.mode === 'host' ? 'console.example.test' : 'app.example.test'
+  return new Request(`https://${host}/api/console/users/u1/role`, { method, headers: { host } })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
+  vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
+  vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
   mutableConfig.mode = originalMode
 })
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe('isConsoleRequestOriginTrusted', () => {
   it('uses the strict console-host check in host mode', () => {

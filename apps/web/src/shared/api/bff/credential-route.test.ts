@@ -10,6 +10,9 @@ describe('effective credential pathname', () => {
     'auth/login',
     'auth/register',
     'auth/refresh',
+    'auth/logins',
+    'auth/login/extra',
+    'auth/oauth/providers',
     'auth/step-up',
     'auth/oauth/exchange',
     'organizations/OrgID/switch',
@@ -32,12 +35,9 @@ describe('effective credential pathname', () => {
 
   it.each([
     'auth/me',
-    'auth/logins',
-    'auth/login/extra',
     'organizations/id/switching',
     'organizations/id/extra/switch',
     'organizations//switch',
-    'auth/oauth/providers',
     'api-keys',
   ])('preserves unrelated effective pathname %s', (path) => {
     expect(isCredentialRoute(new URL(`http://api/api/v1/${path}?route=auth/login`))).toBe(false)

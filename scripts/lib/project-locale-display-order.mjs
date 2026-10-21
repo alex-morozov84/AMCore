@@ -1,4 +1,19 @@
+import { E2E_ROUTE_SURFACES } from './project-locale-e2e-route-surfaces.mjs'
+import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
+import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
+
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/_app/product-admin/ui/login-form.tsx',
+  'apps/web/src/_app/auth-completion/index.tsx',
+  'apps/web/src/_app/product-admin/server/admission.ts',
+  'apps/web/src/_app/product-admin/server/login-page.tsx',
+  ...E2E_ROUTE_SURFACES.map(([path]) => path),
+  ...E2E_UI_SURFACES.map(({ path }) => path),
+  ...[...LOCALE_PURE_MOVES, ...LOCALE_REWRITTEN_MOVES].flatMap((relative) => [
+    `apps/web/src/app/[locale]/${relative}`,
+    `apps/web/src/app/${relative}`,
+  ]),
+  'apps/web/src/_pages/auth/AuthFrame.tsx',
   'apps/web/src/features/console-organization-provisioning/ui/organization-provisioning.stories.tsx',
   'apps/web/src/features/console-organization-provisioning/ui/provisioning-management.stories.tsx',
   'apps/web/src/features/console-organization-administration/ui/organization-administration.stories.tsx',

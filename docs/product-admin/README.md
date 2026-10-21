@@ -8,7 +8,7 @@ The Members page also provides [confirmed removal with permanent key revocation]
 This product surface is independent of the [Operations Console](../operations-console/README.md), which is restricted to
 platform super-administrators. An organization role does not grant Console access.
 
-The default pages are `/organizations` and `/organizations/[id]`, with `/en` or
+The default path-mode pages are `/manage/organizations` and `/manage/organizations/[id]`, with `/en` or
 `/ru` prefixes in multi-locale builds. The selector displays memberships, opens a
 single membership automatically, and paginates multiple memberships in groups of 20. **All organizations** returns to `?view=list`, preserving list access even
 with one membership. The overview confirms organization, account and team-access
@@ -32,34 +32,19 @@ recovery takes priority over automatic opening of a single membership.
 
 ## Connect the ready pages
 
-Application composition owns one placement in
-`apps/web/src/_app/organization-access/model/placement.ts`:
+Choose the public path alias or separate admin host with the
+[placement and sessions guide](placement-and-sessions.md). Path mode shares the
+website session; host mode isolates staff login. The default login is
+`/ru/manage/login`; a separate admin host exposes `/ru/login`.
 
-```ts
-export const organizationAccessPlacement: OrganizationAccessPlacement = Object.freeze(
-  normalizePlacement({
-    organizationsPath: '/manage/organizations',
-    homeHref: '/',
-  })
-)
-```
+The ready routes, menus, recovery, invitations and email destinations use that
+source placement. The sidebar keeps icons when collapsed and places the website
+link at the bottom. The header retains the
+[account menu with profile and avatar editing](account-menu-and-profile.md).
 
-Wire the matching physical Next list and `[id]` routes. The mount, both product
-menus, pagination, selected links, explicit-list return and shell/empty-list home
-links use this placement automatically. No href builders or router callbacks are
-required. The Sessions route remains independent at `/settings/sessions`.
-Server admission and the standard client missing-session link both use `/login`.
-Placement does not relocate login or implement a return-after-login journey.
-
-The shell header shows an [account menu with profile and avatar editing](account-menu-and-profile.md),
-built on public headless operations.
-
-See [integration](integration.md) for route/layout/error wiring, a custom-shell
-ready mount, explicit nonhierarchical routes and a CRM headless block. Configure
-brand and project initialization choices **before** moving downstream routes.
-`--admin-console` affects only the Operations Console; it does not remove or
-configure product administration. This is an editable source integration recipe,
-not an initializer option or automatic host/path deployment system.
+See [integration](integration.md) for custom-shell, nonhierarchical and headless
+composition. `--admin-console` affects only the Operations Console. Product admin
+placement uses its own checked source and physical routes, with no new initializer flag.
 
 ## Authority, state and customization
 
@@ -72,8 +57,8 @@ Pending, denied, missing-session, changed-session and transport-error states hid
 old organization data. Missing session offers sign-in; a changed login offers
 Reload. Refresh rereads current context; infrastructure errors are not empty lists.
 An already admitted request or committed write may finish after a permission
-change. This foundation does not supply emergency session revocation or independent
-staff sessions. See the [API contract](../auth/organization-context.md) and
+change. This foundation does not supply emergency session revocation. Independent staff
+sessions require the separate-host placement described above. See the [API contract](../auth/organization-context.md) and
 [ordered UI lifecycle](../frontend/organization-context.md).
 
 Ready UI is ordinary editable JSX using semantic tokens, shared primitives and

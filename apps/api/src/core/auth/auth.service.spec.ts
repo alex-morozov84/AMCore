@@ -362,7 +362,10 @@ describe('AuthService', () => {
         await authService.register(registerInput, requestInfo)
 
         expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledTimes(1)
-        expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledWith(mockUser.id)
+        expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledWith(
+          mockUser.id,
+          undefined
+        )
       })
 
       it('does not call resendVerificationEmail from register()', async () => {
@@ -854,7 +857,10 @@ describe('AuthService', () => {
 
       await authService.forgotPassword(mockUser.email)
 
-      expect(mockTokenManager.generatePasswordResetToken).toHaveBeenCalledWith(mockUser.id)
+      expect(mockTokenManager.generatePasswordResetToken).toHaveBeenCalledWith(
+        mockUser.id,
+        undefined
+      )
       expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({

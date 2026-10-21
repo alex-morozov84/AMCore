@@ -15,6 +15,7 @@ import { OrganizationRoles } from '@/widgets/organization-roles'
 import { roleListHref, type RoleListView } from '../model/role-list-navigation'
 
 export function OrganizationRolesClient({
+  deniedContent,
   admission,
   organizationId,
   initialOrganizationName,
@@ -22,6 +23,7 @@ export function OrganizationRolesClient({
   listHref,
   query,
 }: {
+  deniedContent?: React.ReactNode
   admission: ProductAccessBootstrap
   organizationId: string
   initialOrganizationName?: string
@@ -47,6 +49,11 @@ export function OrganizationRolesClient({
       : access.initialPending
         ? initialOrganizationName
         : undefined
+  if (
+    (access.state.status === 'denied' || (access.state.status === 'ready' && !allowed)) &&
+    deniedContent
+  )
+    return deniedContent
   return (
     <section className="space-y-6">
       <BackLink href={listHref}>{t('backToOrganizations')}</BackLink>

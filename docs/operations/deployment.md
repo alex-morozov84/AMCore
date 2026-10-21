@@ -6,6 +6,14 @@ production.
 The [migration image guide](migrator-image.md) covers the independent Prisma CLI
 image, its frozen dependency graph, maintenance and security reports.
 
+For product administration, deploy the same checked placement source in API/web
+and its generated edge mapping. Configure exact canonical origins and the shared
+confidential hop key; keep the standalone web server private. See
+[placement and sessions](../product-admin/placement-and-sessions.md) for alias/host
+configuration, cookies, callback registration and coordinated upgrade/rollback.
+Native development defaults to web port3002; Compose publishes3000. Override both
+`FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` to the actual Compose browser origin.
+
 The API Dockerfile refreshes `perl-base` from Debian security repositories in
 build/migrator and runner targets. The pinned Node base still includes an older
 package; remove this explicit refresh only after a base update includes the fixes

@@ -7,13 +7,19 @@ import {
 } from './invitation-oauth-carrier'
 import { invitationOwnerKey } from './invitation-owner-store'
 import { withInvitationStorage } from './invitation-storage'
+import {
+  assertInvitationSurface,
+  invitationNamespace,
+  invitationSurfaceData,
+} from './invitation-surface'
 import { type InvitationOwnerRecord, invitationOwnerRecordSchema } from './invitation-vault-record'
+import type { ProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 
 import 'server-only'
 
-export function invitationOAuthCarrierKey(id: string) {
-  return `web:invitation:oauth-attempt:v1:${invitationFlowIdSchema.parse(id)}`
+export function invitationOAuthCarrierKey(id: string, context?: ProductWebContext) {
+  return `${invitationNamespace('oauth-attempt', context)}:${invitationFlowIdSchema.parse(id)}`
 }
 const RESERVE = `
 local raw = redis.call('GET', KEYS[1])
@@ -23,6 +29,10 @@ local next = cjson.decode(ARGV[2])
 local carrier = cjson.decode(ARGV[3])
 local time = redis.call('TIME')
 local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+if owner.frontend ~= next.frontend or owner.audience ~= next.audience
+  or owner.placementFingerprint ~= next.placementFingerprint then return 0 end
+if owner.frontend ~= carrier.frontend or owner.audience ~= carrier.audience
+  or owner.placementFingerprint ~= carrier.placementFingerprint then return 0 end
 if owner.version ~= tonumber(ARGV[1]) or owner.expiresAt <= now or carrier.expiresAt <= now then return 0 end
 if owner.pendingOAuthAttemptId ~= cjson.null or owner.sessionBinding ~= cjson.null then return 0 end
 if next.expiresAt ~= owner.expiresAt or next.origin ~= owner.origin or carrier.origin ~= owner.origin then return 0 end
@@ -46,28 +56,38 @@ export async function reserveInvitationOAuthCarrier(
   ownerHash: string,
   version: number,
   next: InvitationOwnerRecord,
-  carrier: InvitationOAuthCarrier
+  carrier: InvitationOAuthCarrier,
+  context?: ProductWebContext
 ): Promise<boolean> {
   const record = invitationOwnerRecordSchema.parse({ ...next, version: version + 1 })
-  const parsed = invitationOAuthCarrierSchema.parse(carrier)
+  const parsed = invitationOAuthCarrierSchema.parse({
+    ...carrier,
+    ...invitationSurfaceData(context),
+  })
+  assertInvitationSurface(record, context)
   if (parsed.ownerHash !== ownerHash || parsed.status !== 'reserved') throw invitationFlowChanged()
   return withInvitationStorage(
     async () =>
       (await (
         await getWebRedisClient()
       ).eval(RESERVE, {
-        keys: [invitationOwnerKey(ownerHash), invitationOAuthCarrierKey(parsed.attemptId)],
+        keys: [
+          invitationOwnerKey(ownerHash, context),
+          invitationOAuthCarrierKey(parsed.attemptId, context),
+        ],
         arguments: [String(version), JSON.stringify(record), JSON.stringify(parsed)],
       })) === 1
   )
 }
 export async function readInvitationOAuthCarrier(
-  attemptId: string
+  attemptId: string,
+  context?: ProductWebContext
 ): Promise<InvitationOAuthCarrier | null> {
   return withInvitationStorage(async () => {
-    const raw = await (await getWebRedisClient()).get(invitationOAuthCarrierKey(attemptId))
+    const raw = await (await getWebRedisClient()).get(invitationOAuthCarrierKey(attemptId, context))
     if (!raw) return null
     const carrier = invitationOAuthCarrierSchema.parse(JSON.parse(raw))
+    assertInvitationSurface(carrier, context)
     return carrier.expiresAt > Date.now() ? carrier : null
   })
 }
@@ -77,9 +97,12 @@ export async function startInvitationOAuthCarrier(
   ownerHash: string,
   version: number,
   next: InvitationOwnerRecord,
-  carrier: InvitationOAuthCarrier
+  carrier: InvitationOAuthCarrier,
+  context?: ProductWebContext
 ): Promise<boolean> {
   const record = invitationOwnerRecordSchema.parse({ ...next, version: version + 1 })
+  assertInvitationSurface(record, context)
+  assertInvitationSurface(carrier, context)
   return withInvitationStorage(
     async () =>
       (await (
@@ -94,6 +117,10 @@ export async function startInvitationOAuthCarrier(
     local next = cjson.decode(ARGV[2])
     local time = redis.call('TIME')
     local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+    if owner.frontend ~= next.frontend or owner.audience ~= next.audience
+      or owner.placementFingerprint ~= next.placementFingerprint then return 0 end
+    if owner.frontend ~= carrier.frontend or owner.audience ~= carrier.audience
+      or owner.placementFingerprint ~= carrier.placementFingerprint then return 0 end
     if owner.version ~= tonumber(ARGV[1]) or owner.expiresAt <= now then return 0 end
     if carrier.status ~= 'reserved' or carrier.createdAt + 60000 <= now or carrier.expiresAt <= now then return 0 end
     if carrier.ownerHash ~= ARGV[3] or carrier.fence ~= ARGV[4] or carrier.ownerEpoch ~= owner.epoch then return 0 end
@@ -104,7 +131,10 @@ export async function startInvitationOAuthCarrier(
     return 1
   `,
         {
-          keys: [invitationOwnerKey(ownerHash), invitationOAuthCarrierKey(carrier.attemptId)],
+          keys: [
+            invitationOwnerKey(ownerHash, context),
+            invitationOAuthCarrierKey(carrier.attemptId, context),
+          ],
           arguments: [String(version), JSON.stringify(record), ownerHash, carrier.fence],
         }
       )) === 1

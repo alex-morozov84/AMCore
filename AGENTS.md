@@ -228,6 +228,10 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   `docs/backend/architecture-and-conventions.md` → _Adding an environment variable_.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
+- **Product administration placement:** before changing its alias, route subtree,
+  hosts or session selection, read
+  `docs/product-admin/placement-and-sessions.md`. Source configuration, physical
+  routes, generated edge mapping and API/web placement must stay aligned.
 - **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
   Next routing plumbing only (thin), application composition lives in `_app/`, page composition lives in `_pages/`,
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.

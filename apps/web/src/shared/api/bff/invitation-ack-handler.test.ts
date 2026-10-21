@@ -148,7 +148,8 @@ describe('explicit invited sign-in acknowledgment', () => {
             handoff: expect.objectContaining({ confirmed: true }),
           }),
         ],
-      })
+      }),
+      undefined
     )
     const body = await response.json()
     expect(body).toEqual({

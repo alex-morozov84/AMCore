@@ -7,10 +7,11 @@ export async function revokeBackendSession(refreshToken: string): Promise<void> 
   try {
     const response = await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: 'POST',
+      signal: AbortSignal.timeout(5000),
       headers: { Cookie: `refresh_token=${refreshToken}` },
     })
     if (!response.ok) console.error(`[bff] backend logout returned status ${response.status}`)
-  } catch (error) {
-    console.error('[bff] backend logout failed', error)
+  } catch {
+    console.error('[bff] backend logout failed', { category: 'transport' })
   }
 }

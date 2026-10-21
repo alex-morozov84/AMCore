@@ -239,6 +239,9 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
 
           // Headers
           'req.headers.authorization',
+          'req.headers["x-amcore-web-context-key"]',
+          'headers["x-amcore-web-context-key"]',
+          'WEB_FRONTEND_CONTEXT_KEY',
           'req.headers.cookie',
           'res.headers["set-cookie"]',
           'res.headers.location',

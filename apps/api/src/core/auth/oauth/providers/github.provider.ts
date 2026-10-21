@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { HttpStatus } from '@nestjs/common'
 
 import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
@@ -23,7 +25,7 @@ interface GitHubEmail {
 
 /**
  * GitHub OAuth 2.0 provider.
- * GitHub does not support PKCE or OIDC — uses custom token + userinfo endpoints.
+ * GitHub supports S256 PKCE; profile data uses its REST endpoints, not OIDC.
  * Requires separate /user/emails call to get verified primary email.
  */
 export class GitHubProvider implements OAuthProvider {
@@ -31,16 +33,25 @@ export class GitHubProvider implements OAuthProvider {
 
   constructor(private readonly config: OAuthProviderConfig) {}
 
-  getAuthorizationURL(state: string, _codeVerifier: string): Promise<URL> {
+  getAuthorizationURL(state: string, codeVerifier: string): Promise<URL> {
     const url = new URL('https://github.com/login/oauth/authorize')
     url.searchParams.set('client_id', this.config.clientId)
     url.searchParams.set('redirect_uri', this.config.redirectUri)
     url.searchParams.set('scope', 'read:user user:email')
     url.searchParams.set('state', state)
+    url.searchParams.set(
+      'code_challenge',
+      createHash('sha256').update(codeVerifier).digest('base64url')
+    )
+    url.searchParams.set('code_challenge_method', 'S256')
     return Promise.resolve(url)
   }
 
-  async exchangeCode(code: string, _codeVerifier: string): Promise<OAuthTokens> {
+  async exchangeCode(
+    code: string,
+    codeVerifier: string,
+    options?: { legacyWithoutPkce?: boolean }
+  ): Promise<OAuthTokens> {
     const res = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -49,6 +60,7 @@ export class GitHubProvider implements OAuthProvider {
         client_secret: this.config.clientSecret,
         code,
         redirect_uri: this.config.redirectUri,
+        ...(options?.legacyWithoutPkce ? {} : { code_verifier: codeVerifier }),
       }),
     })
 

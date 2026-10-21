@@ -1,4 +1,12 @@
 export const E2E_UI_PROFILES = Object.freeze({
+  productAdmin: [
+    ["'Page unavailable'", "'Страница недоступна'"],
+    ["'Sign in'", "'Вход'"],
+    ["'Sign out'", "'Выйти'"],
+    ["'Completing sign-in…'", "'Завершаем вход…'"],
+    ["'Continue'", "'Продолжить'"],
+    ['/continue with apple/i', '/продолжить с apple/i'],
+  ],
   backgroundWork: [
     ["'Background queues'", "'Фоновые очереди'"],
     ["'Background work'", "'Фоновые задачи'"],
@@ -130,6 +138,36 @@ const surface = (path, namespaces, expectedReferences) => ({
 })
 
 export const E2E_UI_SURFACES = Object.freeze([
+  surface(
+    'apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts',
+    ['auth', 'productAdmin'],
+    2
+  ),
+  surface(
+    'apps/web/e2e/product-admin-real-stack/product-admin-denied-loss.spec.ts',
+    ['auth', 'productAdmin'],
+    5
+  ),
+  surface(
+    'apps/web/e2e/product-admin-real-stack/product-admin-host.spec.ts',
+    ['auth', 'productAdmin'],
+    7
+  ),
+  surface(
+    'apps/web/e2e/product-admin-real-stack/product-admin-oauth-get.spec.ts',
+    ['auth', 'productAdmin'],
+    2
+  ),
+  surface(
+    'apps/web/e2e/product-admin-real-stack/product-admin-oauth-surfaces.spec.ts',
+    ['auth', 'productAdmin'],
+    1
+  ),
+  surface(
+    'apps/web/e2e/product-admin-real-stack/product-admin-oauth.spec.ts',
+    ['auth', 'productAdmin'],
+    3
+  ),
   surface('apps/web/e2e/shared/background-work-journey.ts', ['backgroundWork'], 50),
   surface('apps/web/e2e/shared/background-work-intercepted-journeys.ts', ['backgroundWork'], 26),
   surface('apps/web/e2e/real-stack/admin-background-work.spec.ts', ['backgroundWork'], 4),

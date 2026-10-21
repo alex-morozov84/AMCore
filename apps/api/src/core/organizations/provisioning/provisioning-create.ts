@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { ProvisioningCreate, ProvisioningReceipt } from '@amcore/shared'
 
 import type { Prisma } from '../../../generated/prisma/client.js'
+import type { BrowserFrontendContext } from '../../frontend-context/frontend-placement.js'
 import { issueInvitation } from '../../invitations/invitation-issuance.js'
 import { lockInvitationRoles } from '../../invitations/invitation-role-intent.js'
 import { canonicalAdmin } from '../canonical-admin.js'
@@ -31,7 +32,8 @@ export async function createProvisioning(
   input: ProvisioningCreate,
   operator: SetupOperator,
   limiter: ProvisioningLimiterService,
-  assertMailReady: () => void
+  assertMailReady: () => void,
+  frontend: BrowserFrontendContext
 ): Promise<{ receipt: ProvisioningReceipt; mail: ProvisioningMail | null }> {
   await lockProvisioningCreation(tx, input.operationId)
   const previous = await tx.organizationProvisioning.findUnique({
@@ -63,6 +65,7 @@ export async function createProvisioning(
     },
   })
   const invite = await issueInvitation(tx, {
+    frontend,
     organizationId: orgId,
     email: input.firstAdminEmail,
     emailCanonical: input.firstAdminEmail,

@@ -8,8 +8,9 @@ import {
 
 const operationFor = (relative) => {
   if (relative === 'layout.tsx') return 'locale.root-layout'
-  if (relative === '(auth)/layout.tsx') return 'locale.auth-layout'
-  if (relative === 'auth/callback/route.ts') return 'locale.oauth-callback-route'
+  if (relative.endsWith('auth/callback/page.tsx')) return 'locale.completion-page'
+  if (relative.endsWith('/route.ts') && !relative.includes('/invite/'))
+    return 'locale.legacy-admin-route'
   if (relative.includes('/invite/')) return 'locale.invitation-route'
   return 'locale.auth-page'
 }

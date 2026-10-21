@@ -19,10 +19,12 @@ import {
 import 'server-only'
 
 export async function OrganizationInvitationsMount({
+  deniedContent,
   id,
   searchParams = Promise.resolve({}),
   placement = organizationAccessPlacement,
 }: {
+  deniedContent?: React.ReactNode
   id: string
   searchParams?: Promise<Record<string, string | string[] | undefined>>
   placement?: OrganizationAccessPlacement
@@ -43,7 +45,7 @@ export async function OrganizationInvitationsMount({
       error instanceof SessionNotFoundError ||
       (error instanceof ContextRequestError && error.status === 401)
     )
-      return redirectToLogin()
+      return redirectToLogin(placement.loginHref ?? '/login')
     if (error instanceof ContextRequestError && [403, 404].includes(error.status)) notFound()
     if (error instanceof ContextRequestError && [429, 503, 504].includes(error.status))
       return <PrimaryUnavailableFallback reason="upstream" />
@@ -60,6 +62,7 @@ export async function OrganizationInvitationsMount({
   const hrefs = organizationAccessHrefs(placement)
   return (
     <OrganizationInvitationsClient
+      deniedContent={deniedContent}
       admission={admission}
       organizationId={id}
       initialOrganizationName={initialOrganizationName}

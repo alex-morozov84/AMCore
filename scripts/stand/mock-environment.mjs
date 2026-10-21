@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto'
+
 export function mockEnvironment(m) {
   return {
     NODE_ENV: 'development',
@@ -5,9 +7,14 @@ export function mockEnvironment(m) {
     API_URL: 'http://api.mocked.invalid',
     REDIS_URL: 'redis://redis.mocked.invalid:6379',
     WEB_TRUSTED_ORIGINS: m.origins.product,
-    WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:') ? m.origins.product : '',
+    WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:')
+      ? m.origins.product
+      : '',
     NEXT_PUBLIC_API_URL: m.origins.product,
     FRONTEND_URL: m.origins.product,
+    WEB_FRONTEND_CONTEXT_KEY: createHmac('sha256', m.jwtSecret)
+      .update('amcore-web-context-v1')
+      .digest('hex'),
     // AMCORE_CONSOLE_MOCK_ENV_START
     ADMIN_CONSOLE_HOSTNAME: m.topology === 'host' ? m.hostnames.console : '',
     ADMIN_CONSOLE_ORIGIN:

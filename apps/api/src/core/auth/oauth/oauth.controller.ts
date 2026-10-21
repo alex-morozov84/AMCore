@@ -10,9 +10,17 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
-import { ApiCookieAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  ApiCookieAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import type { Request, Response } from 'express'
 
+import { frontendAuthPath, parseProductAdminReturn } from '@amcore/shared'
 import {
   AuthErrorCode,
   AuthType,
@@ -27,6 +35,9 @@ import { AppException, NotFoundException } from '../../../common/exceptions/inde
 import { SchemaResponse } from '../../../common/schemas/schema-response.js'
 import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip.js'
 import { EnvService } from '../../../env/env.service.js'
+import { ApiFrontendContext } from '../../frontend-context/frontend-context.openapi.js'
+import { browserFrontendContext } from '../../frontend-context/frontend-context.service.js'
+import { resolveFrontendPlacement } from '../../frontend-context/frontend-placement.js'
 import { invitationHandoffProof } from '../../invitations/invitation-auth-handoff.js'
 import { invalidInvitation } from '../../invitations/invitation-locks.js'
 import { Auth } from '../decorators/auth.decorator.js'
@@ -52,6 +63,7 @@ import {
 import { OAuthLoginTicketService } from './oauth-login-ticket.service.js'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
+@ApiFrontendContext()
 @ApiTags('oauth')
 @Controller('auth/oauth')
 export class OAuthController {
@@ -87,6 +99,13 @@ export class OAuthController {
   @ApiHeader({ name: 'X-Invitation-Auth-Attempt-Id', required: false })
   @ApiHeader({ name: 'X-Invitation-Handoff-Key', required: false })
   @ApiOperation({ summary: 'Start OAuth login with optional server-bound invitation correlation' })
+  @ApiQuery({
+    name: 'returnTo',
+    required: false,
+    type: String,
+    description:
+      'JSON-encoded finite product-admin destination. Only trusted frontend-bound state retains it; arbitrary URLs are not accepted.',
+  })
   @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
   async authorize(
     @Param('provider') provider: string,
@@ -98,9 +117,18 @@ export class OAuthController {
     const { url, browserNonce } = await this.oauthService.getAuthorizationURL(
       provider,
       negotiateLocale(req),
-      this.invitedStart(req)
+      this.invitedStart(req),
+      browserFrontendContext(req),
+      parseProductAdminReturn(req.query.returnTo)
     )
-    setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
+    setOAuthBindingCookie(
+      res,
+      provider,
+      browserNonce,
+      this.isProduction,
+      undefined,
+      browserFrontendContext(req)?.frontend
+    )
     res.status(HttpStatus.FOUND).redirect(url)
   }
 
@@ -111,10 +139,22 @@ export class OAuthController {
   async link(
     @Param('provider') provider: string,
     @CurrentUser('sub') userId: string,
-    @Res() res: Response
+    @Res() res: Response,
+    @Req() req?: Request
   ): Promise<void> {
-    const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(provider, userId)
-    setOAuthBindingCookie(res, provider, browserNonce, this.isProduction)
+    const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(
+      provider,
+      userId,
+      browserFrontendContext(req)
+    )
+    setOAuthBindingCookie(
+      res,
+      provider,
+      browserNonce,
+      this.isProduction,
+      undefined,
+      browserFrontendContext(req)?.frontend
+    )
     res.status(HttpStatus.FOUND).redirect(url)
   }
 
@@ -186,7 +226,8 @@ export class OAuthController {
       )
     }
 
-    const browserNonce = readOAuthBindingNonce(req, provider)
+    const frontend = browserFrontendContext(req)
+    const browserNonce = readOAuthBindingNonce(req, provider, frontend?.frontend)
     const result = await this.oauthService.handleCallback(
       provider,
       code,
@@ -196,11 +237,12 @@ export class OAuthController {
         userAgent: req.headers['user-agent'],
         ipAddress: resolveSessionIpAddress(req, this.env),
       },
-      firstLoginName
+      firstLoginName,
+      frontend
     )
 
     // One-time binding nonce: clear it once the callback succeeds.
-    clearOAuthBindingCookie(res, provider)
+    clearOAuthBindingCookie(res, provider, frontend?.frontend)
 
     // Locale-prefixed like every other server-generated link: the browser
     // arriving here may have no locale cookie yet (a fresh OAuth sign-in), so
@@ -222,19 +264,42 @@ export class OAuthController {
         email: result.accessClaims.email,
         systemRole: result.accessClaims.systemRole,
         sessionId: result.sessionId,
+        ...(frontend
+          ? {
+              ...frontend,
+              callbackUri: this.providerFactory.callbackUri(provider, frontend.frontend),
+            }
+          : {}),
+        ...(result.returnTo ? { returnTo: result.returnTo } : {}),
         ...(result.invitation ? { invitation: result.invitation } : {}),
       })
 
       res.status(HttpStatus.FOUND).redirect(
-        localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'auth/callback', {
-          ticket,
-        })
+        localizedFrontendUrl(
+          frontend?.frontend === 'admin'
+            ? resolveFrontendPlacement(this.env).admin
+            : this.env.get('FRONTEND_URL'),
+          locale,
+          frontendAuthPath(frontend?.frontend ?? 'site', '/auth/callback'),
+          {
+            ticket,
+          }
+        )
       )
     } else {
       res.status(HttpStatus.FOUND).redirect(
-        localizedFrontendUrl(this.env.get('FRONTEND_URL'), locale, 'settings/linked-accounts', {
-          linked: provider,
-        })
+        localizedFrontendUrl(
+          frontend?.frontend === 'admin'
+            ? resolveFrontendPlacement(this.env).admin
+            : this.env.get('FRONTEND_URL'),
+          locale,
+          frontend?.frontend === 'admin'
+            ? frontendAuthPath('admin', '/auth/linked')
+            : 'settings/linked-accounts',
+          {
+            linked: provider,
+          }
+        )
       )
     }
   }
@@ -271,6 +336,14 @@ export class OAuthController {
       throw this.invalidExchange()
     }
 
+    const frontend = browserFrontendContext(req)
+    if (
+      (claims.frontend ?? 'site') !== (frontend?.frontend ?? 'site') ||
+      (claims.frontend &&
+        (!frontend || claims.placementFingerprint !== frontend.placementFingerprint))
+    )
+      throw this.invalidExchange()
+
     if (session.id !== claims.sessionId || session.userId !== claims.userId) {
       throw this.invalidExchange()
     }
@@ -294,7 +367,11 @@ export class OAuthController {
       sid: claims.sessionId,
     })
 
-    return { accessToken, ...(claims.invitation ? { invitation: claims.invitation } : {}) }
+    return {
+      accessToken,
+      ...(claims.returnTo ? { returnTo: claims.returnTo } : {}),
+      ...(claims.invitation ? { invitation: claims.invitation } : {}),
+    }
   }
 
   private invitedStart(req: Request):

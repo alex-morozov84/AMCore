@@ -63,6 +63,7 @@ function setup() {
   }
   const audit = { record: jest.fn(async () => undefined) }
   const mail = {
+    destination: jest.fn(() => ({ frontend: 'admin', placementFingerprint: 'a'.repeat(64) })),
     dispatch: jest.fn(async (_mail: unknown): Promise<void> => undefined),
     reportOutcome: jest.fn(),
   }

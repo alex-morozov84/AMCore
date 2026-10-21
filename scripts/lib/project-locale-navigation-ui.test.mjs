@@ -23,7 +23,7 @@ test('plain pathname projection keeps external imports in one sorted group', () 
     ).after
     assert.match(
       projected,
-      /import \{ usePathname \} from 'next\/navigation'\nimport \{ useTranslations \} from 'next-intl'\n\nimport /
+      /import \{ usePathname \} from 'next\/navigation'\nimport \{ useTranslations \} from 'next-intl'\n(?:import [^\n]+ from '[^@][^']*'\n)*\nimport /
     )
     assert.doesNotMatch(projected, /@\/i18n\/navigation/)
   }

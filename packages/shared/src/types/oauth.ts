@@ -16,4 +16,6 @@ export interface OAuthTokens {
   refreshToken?: string
   idToken?: string
   expiresIn?: number
+  /** Server-internal; created only after ID-token signature and claims validation. */
+  verifiedIdentity?: Pick<OAuthUserProfile, 'providerId' | 'email' | 'emailVerified'>
 }

@@ -9,7 +9,10 @@ vi.mock('@/shared/lib/server-logger', () => ({ logServerError: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-context-key-at-least-32-characters>')
 })
+
+afterEach(() => vi.unstubAllEnvs())
 
 const context = {
   routerKind: 'App Router',

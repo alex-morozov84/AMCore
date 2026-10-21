@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { productAdminPath } from '@amcore/shared'
 
 import { VerifyEmailPage } from '@/_pages/auth'
 import { invitationFlowClient } from '@/entities/invitation-flow'
@@ -13,9 +14,11 @@ import { Spinner } from '@/shared/ui/spinner'
 export function VerificationReturn({
   selectorId,
   sessionBinding,
+  admin = false,
 }: {
   selectorId: string
   sessionBinding: string | null
+  admin?: boolean
 }) {
   const t = useTranslations('invitationRecipient')
   const started = useRef(false)
@@ -48,7 +51,12 @@ export function VerificationReturn({
       </div>
     )
   return (
-    <RouteProgressLink href={`/invite/flow/${result.flowId}`} className={buttonVariants()}>
+    <RouteProgressLink
+      href={
+        admin ? productAdminPath(`/invite/flow/${result.flowId}`) : `/invite/flow/${result.flowId}`
+      }
+      className={buttonVariants()}
+    >
       {t('returnToInvitation')}
     </RouteProgressLink>
   )
@@ -59,17 +67,22 @@ export function InvitationVerificationClient({
   selectorId,
   sessionBinding,
   successContent,
+  admin = false,
 }: {
   token?: string
   selectorId: string
   sessionBinding: string | null
   successContent?: ReactNode
+  admin?: boolean
 }) {
   const t = useTranslations('invitationRecipient')
   const help = (
     <div className="space-y-4 text-center">
       <p className="text-sm text-muted-foreground">{t('verificationHelp')}</p>
-      <RouteProgressLink href="/resend-verification" className={buttonVariants()}>
+      <RouteProgressLink
+        href={admin ? productAdminPath('/resend-verification') : '/resend-verification'}
+        className={buttonVariants()}
+      >
         {t('resendVerification')}
       </RouteProgressLink>
       <p className="text-sm text-muted-foreground">{t('verificationReopen')}</p>
@@ -78,10 +91,18 @@ export function InvitationVerificationClient({
   return (
     <VerifyEmailPage
       token={token}
+      actionBase={admin ? '/product-admin/auth' : '/auth'}
+      loginHref={admin ? productAdminPath('/login') : '/login'}
+      homeHref={admin ? productAdminPath('/organizations') : '/'}
+      resendHref={admin ? productAdminPath('/resend-verification') : '/resend-verification'}
       withoutTokenContent={help}
       successContent={
         successContent ?? (
-          <VerificationReturn selectorId={selectorId} sessionBinding={sessionBinding} />
+          <VerificationReturn
+            selectorId={selectorId}
+            sessionBinding={sessionBinding}
+            admin={admin}
+          />
         )
       }
     />

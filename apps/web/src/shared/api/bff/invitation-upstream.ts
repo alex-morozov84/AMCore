@@ -4,6 +4,7 @@ import { parseRetryAfterSeconds } from '../retry-after'
 import { classifyThrown } from '../server/classify'
 
 import { readContextJson } from './context-body-budget'
+import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import { extractCookieValue } from './set-cookie'
 
@@ -24,6 +25,7 @@ export class InvitationBackendError extends Error {
 }
 
 type RequestOptions = {
+  context?: ProductWebContext
   source: Headers
   signal: AbortSignal
   method: 'GET' | 'POST' | 'DELETE'
@@ -41,7 +43,10 @@ async function fetchInvitationResponse(
   path: string,
   options: Omit<RequestOptions, 'expectedStatus'>
 ): Promise<Response> {
-  const headers = new Headers(sessionMetadataHeaders(options.source))
+  const headers = new Headers({
+    ...sessionMetadataHeaders(options.source),
+    ...options.context?.apiHeaders,
+  })
   const language = options.source.get('accept-language')
   if (language) headers.set('accept-language', language)
   if (options.body !== undefined) headers.set('content-type', 'application/json')

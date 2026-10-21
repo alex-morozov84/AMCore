@@ -6,6 +6,7 @@ import { revokeBackendSession } from './backend-session-revocation'
 import { type CurrentVaultSession, getCurrentVaultSession } from './current-session'
 import { retireFlowsForOrdinaryAuth } from './invitation-auth-lifecycle'
 import { isTrustedOrigin } from './origin-guard'
+import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultStore } from './session-vault-store'
 
@@ -31,8 +32,15 @@ import 'server-only'
  * frontend would have to explain for an action that, from where the
  * browser sits, unambiguously succeeded.
  */
-export async function handleLogout(request: Request): Promise<NextResponse> {
-  if (!isTrustedOrigin(request)) {
+export async function handleLogout(
+  request: Request,
+  context?: ProductWebContext
+): Promise<NextResponse> {
+  if (
+    !(context?.frontend === 'admin'
+      ? isProductMutationTrusted(request, context)
+      : isTrustedOrigin(request))
+  ) {
     return apiErrorResponse(request, {
       statusCode: 403,
       message: 'Request origin rejected',
@@ -40,36 +48,36 @@ export async function handleLogout(request: Request): Promise<NextResponse> {
     })
   }
 
-  const current = await readCurrentSessionSafely()
+  const current = await readCurrentSessionSafely(context)
   if (current) {
     await Promise.all([
       revokeBackendSession(current.entry.refreshToken),
-      deleteVaultEntry(current.sessionId),
+      deleteVaultEntry(current.sessionId, context),
     ])
   }
 
   const response = NextResponse.json({ message: 'Logged out' }, { status: 200 })
   try {
-    await retireFlowsForOrdinaryAuth(request, null)
+    await retireFlowsForOrdinaryAuth(request, null, undefined, context)
   } catch {
     // Without the owner proof, a journal that could not be retired cannot authorize this browser.
-    response.cookies.set('__Host-amcore_invite_browser', '', {
-      secure: true,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    })
-    response.cookies.set('amcore_invite_browser_local', '', {
-      secure: false,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    })
+    const scopes = context?.audience === 'staff' ? ['admin'] : ['site', 'admin']
+    for (const scope of scopes) {
+      const stem = scope === 'admin' ? 'amcore_admin_invite_browser' : 'amcore_invite_browser'
+      for (const secure of [true, false])
+        response.cookies.set(secure ? `__Host-${stem}` : `${stem}_local`, '', {
+          secure,
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 0,
+        })
+    }
     console.error('[bff] invitation retirement unavailable during logout')
   }
-  response.cookies.delete(SESSION_COOKIE_NAME)
+  if (context?.audience === 'staff')
+    response.cookies.set(context.cookieName, '', { ...context.cookieOptions, maxAge: 0 })
+  else response.cookies.delete(context?.cookieName ?? SESSION_COOKIE_NAME)
   return response
 }
 
@@ -81,21 +89,25 @@ export async function handleLogout(request: Request): Promise<NextResponse> {
  * attempt. A vault read failure means there's nothing to clean up
  * server-side anyway; still log it distinctly from the two cleanup calls.
  */
-async function readCurrentSessionSafely(): Promise<CurrentVaultSession | null> {
+async function readCurrentSessionSafely(
+  context?: ProductWebContext
+): Promise<CurrentVaultSession | null> {
   try {
-    return await getCurrentVaultSession()
-  } catch (error) {
-    console.error('[bff] reading the current session failed during logout', error)
+    return context
+      ? await getCurrentVaultSession(context.store, context.cookieName)
+      : await getCurrentVaultSession()
+  } catch {
+    console.error('[bff] reading the current session failed during logout')
     return null
   }
 }
 
-async function deleteVaultEntry(sessionId: string): Promise<void> {
+async function deleteVaultEntry(sessionId: string, context?: ProductWebContext): Promise<void> {
   try {
-    await redisVaultStore.delete(sessionId)
-  } catch (error) {
+    await (context?.store ?? redisVaultStore).delete(sessionId)
+  } catch {
     // TTL is the last-resort cleanup if this itself fails — the browser
     // cookie is still cleared either way (see handleLogout).
-    console.error('[bff] vault delete failed during logout', error)
+    console.error('[bff] vault delete failed during logout')
   }
 }

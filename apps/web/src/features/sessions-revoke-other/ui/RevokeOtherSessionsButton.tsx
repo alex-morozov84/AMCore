@@ -16,7 +16,7 @@ export function RevokeOtherSessionsButton() {
 
   return (
     <>
-      <Button variant="outline" size="sm" disabled={isPending} onClick={() => setOpen(true)}>
+      <Button variant="destructive" size="sm" disabled={isPending} onClick={() => setOpen(true)}>
         {t('revokeOthers')}
       </Button>
       <ConfirmDialog

@@ -11,6 +11,7 @@ import { MediaModule } from '../../infrastructure/media/index.js'
 import { PrismaModule } from '../../prisma/index.js'
 import { ApiKeysModule } from '../api-keys/api-keys.module.js'
 import { AuditModule } from '../audit/index.js'
+import { FrontendContextModule } from '../frontend-context/frontend-context.module.js'
 import { InvitationAuthorityModule } from '../invitations/invitation-authority.module.js'
 import { NotificationsModule } from '../notifications/notifications.module.js'
 
@@ -51,6 +52,7 @@ import { UserCacheService } from './user-cache.service.js'
 
 @Module({
   imports: [
+    FrontendContextModule,
     PrismaModule,
     InvitationAuthorityModule,
     PassportModule,

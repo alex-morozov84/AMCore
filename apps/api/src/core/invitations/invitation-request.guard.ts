@@ -6,6 +6,7 @@ import { AuthErrorCode } from '@amcore/shared'
 import { invitationJsonLimit } from '../../bootstrap/invitation-request-boundary.js'
 import { AppException } from '../../common/exceptions/index.js'
 import { GcraRedisLimiter } from '../../infrastructure/throttling/gcra-redis-limiter.service.js'
+import { browserFrontendContext } from '../frontend-context/frontend-context.service.js'
 
 import { InvitationContinuationService } from './invitation-continuation.service.js'
 import { invitationSecretHash } from './invitation-credential.js'
@@ -39,6 +40,14 @@ export class InvitationRequestGuard implements CanActivate {
     )
       throw new AppException('This operation requires an empty body', 400, 'VALIDATION_ERROR')
     const credential = req.headers['x-invitation-continuation']
+    const frontend = browserFrontendContext(req)
+    if (frontend) {
+      const token = (req.body as { token?: unknown } | undefined)?.token
+      if (typeof credential === 'string')
+        await this.continuation.assertFrontend({ continuation: credential }, frontend)
+      else if (typeof token === 'string')
+        await this.continuation.assertFrontend({ token }, frontend)
+    }
     const keys: { key: string; rate: number; per: number }[] = []
     if (typeof credential === 'string')
       keys.push({

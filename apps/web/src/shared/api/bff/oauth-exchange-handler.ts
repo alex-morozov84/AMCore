@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { productAdminReturnPath } from '@amcore/shared'
 import {
   AuthErrorCode,
   coerceSupportedLocale,
@@ -7,11 +8,15 @@ import {
   type OAuthExchangeResponse,
 } from '@amcore/shared'
 
+import { revokeBackendSession } from './backend-session-revocation'
 import { assertOrdinaryOAuthAllowed, retireFlowsForOrdinaryAuth } from './invitation-auth-lifecycle'
 import { publishInvitedOAuth } from './invitation-oauth-exchange'
 import { recoverPublishedInvitedOAuth } from './invitation-oauth-recovery'
 import { invitationCanonicalOrigin } from './invitation-render-request'
+import { invitationPagePath } from './invitation-surface'
 import { mintSession } from './mint-session'
+import type { OAuthCompletionInput } from './oauth-completion-input'
+import type { ProductWebContext } from './product-web-context.server'
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from './session-cookie'
 import { redisVaultStore } from './session-vault-store'
 import { callUpstreamOAuthExchange, fetchCurrentUser, UpstreamOAuthError } from './upstream-oauth'
@@ -21,126 +26,183 @@ import 'server-only'
 const REFRESH_COOKIE_NAME = 'refresh_token'
 const OAUTH_ERROR_QUERY_PARAM = 'oauthError'
 
-/**
- * `/{locale}/auth/callback` — the browser lands here after
- * `oauth-provider-proxy.ts`'s callback leg relayed a successful login
- * redirect. This request now carries the frontend-host-scoped
- * `refresh_token` cookie the backend minted (see that module's doc), which
- * is exactly what `POST /auth/oauth/exchange` requires to bind the ticket
- * to the right session.
- *
- * Exchanges the ticket, fetches the user profile, mints the vault entry,
- * sets `amcore_session`, and — critically — clears the temporary
- * `refresh_token` cookie: the browser must not keep holding it once
- * consumed (ADR-068's "browser never holds a backend token in any form"
- * applies here too, just with a brief, unavoidable exception for this one
- * hop while the OAuth dance is in flight).
+/** Server-only exchange after exact-Origin admission and bounded native form parsing.
+ * The GET completion document does not call this operation or access credentials.
+ * Invitation publication/recovery keeps the established atomic protocol.
  */
-export async function handleOAuthExchange(request: Request, locale: string): Promise<NextResponse> {
-  const query = new URL(request.url).searchParams
-  const ticket =
-    query.getAll('ticket').length === 1 && query.size === 1 ? query.get('ticket') : null
-  if (ticket && ticket.length > 4096) return failureRedirect(request, locale)
+export async function handleOAuthExchange(
+  request: Request,
+  { ticket, locale }: OAuthCompletionInput,
+  context: ProductWebContext
+): Promise<NextResponse> {
+  const refreshCookie =
+    context?.frontend === 'admin' ? '__Host-amcore_admin_oauth_refresh' : REFRESH_COOKIE_NAME
   if (ticket) {
-    const recovered = await recoverPublishedInvitedOAuth(request, ticket).catch(() => null)
+    const recovered = await recoverPublishedInvitedOAuth(request, ticket, context).catch(() => null)
     if (recovered) {
       const response = NextResponse.redirect(
         localizedFrontendUrl(
-          invitationCanonicalOrigin(request.headers, request.url),
+          context?.origin ?? invitationCanonicalOrigin(request.headers, request.url),
           coerceSupportedLocale(recovered.locale),
-          `invite/flow/${recovered.flowId}`
+          invitationPagePath(`invite/flow/${recovered.flowId}`, context)
         ),
         303
       )
-      response.cookies.delete(REFRESH_COOKIE_NAME)
+      clearTransientCookie(response, context)
       response.headers.set('cache-control', 'private, no-store')
       response.headers.set('referrer-policy', 'no-referrer')
       response.headers.set('x-robots-tag', 'noindex, nofollow')
       return response
     }
   }
-  const refreshToken = (await cookies()).get(REFRESH_COOKIE_NAME)?.value
+  const refreshToken = (await cookies()).get(refreshCookie)?.value
 
   if (!ticket || !refreshToken) {
-    return failureRedirect(request, locale)
+    return failureRedirect(request, locale, undefined, context)
   }
 
   let exchange: OAuthExchangeResponse
   try {
-    exchange = await callUpstreamOAuthExchange(ticket, refreshToken, request.headers)
+    exchange = await callUpstreamOAuthExchange(
+      ticket,
+      refreshToken,
+      request.headers,
+      undefined,
+      context
+    )
   } catch (error) {
-    return failureRedirect(request, locale, error)
+    return failureRedirect(request, locale, error, context)
   }
 
   let user
   try {
-    user = await fetchCurrentUser(exchange.accessToken, request.headers)
+    user = await fetchCurrentUser(exchange.accessToken, request.headers, undefined, context)
   } catch (error) {
-    return failureRedirect(request, locale, error)
+    if (!exchange.invitation) await revokeBackendSession(refreshToken)
+    return failureRedirect(request, locale, error, context)
   }
   if (!user) {
-    return failureRedirect(request, locale)
+    if (!exchange.invitation) await revokeBackendSession(refreshToken)
+    return failureRedirect(request, locale, undefined, context)
   }
 
   if (exchange.invitation) {
     try {
-      const published = await publishInvitedOAuth(request, ticket, exchange, refreshToken, user)
+      const published = await publishInvitedOAuth(
+        request,
+        ticket,
+        exchange,
+        refreshToken,
+        user,
+        context
+      )
       const response = NextResponse.redirect(
         localizedFrontendUrl(
-          invitationCanonicalOrigin(request.headers, request.url),
+          context?.origin ?? invitationCanonicalOrigin(request.headers, request.url),
           coerceSupportedLocale(published.locale),
-          `invite/flow/${published.flowId}`
+          invitationPagePath(`invite/flow/${published.flowId}`, context)
         ),
         303
       )
-      response.cookies.set(SESSION_COOKIE_NAME, published.sessionId, sessionCookieOptions())
-      response.cookies.delete(REFRESH_COOKIE_NAME)
+      response.cookies.set(
+        context?.cookieName ?? SESSION_COOKIE_NAME,
+        published.sessionId,
+        context?.cookieOptions ?? sessionCookieOptions()
+      )
+      clearTransientCookie(response, context)
       response.headers.set('cache-control', 'private, no-store')
       response.headers.set('referrer-policy', 'no-referrer')
       response.headers.set('x-robots-tag', 'noindex, nofollow')
       return response
     } catch (error) {
-      return failureRedirect(request, locale, error)
+      return failureRedirect(request, locale, error, context)
     }
   }
 
   let sessionId: string
   try {
-    await assertOrdinaryOAuthAllowed(request)
-    ;({ sessionId } = await mintSession({ accessToken: exchange.accessToken, refreshToken, user }))
+    await assertOrdinaryOAuthAllowed(request, context)
+    ;({ sessionId } = await mintSession(
+      { accessToken: exchange.accessToken, refreshToken, user },
+      context?.store
+    ))
     try {
       await retireFlowsForOrdinaryAuth(
         request,
         { sessionId, actorId: user.id },
-        { rejectPendingHandoff: true }
+        { rejectPendingHandoff: true },
+        context
       )
     } catch (error) {
-      await redisVaultStore.delete(sessionId).catch(() => undefined)
+      await (context?.store ?? redisVaultStore).delete(sessionId).catch(() => undefined)
       throw error
     }
   } catch (error) {
-    return failureRedirect(request, locale, error)
+    await revokeBackendSession(refreshToken)
+    return failureRedirect(request, locale, error, context)
   }
 
-  const response = NextResponse.redirect(new URL(`/${locale}`, request.url))
-  response.cookies.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions())
-  response.cookies.delete(REFRESH_COOKIE_NAME)
+  const target = context
+    ? localizedFrontendUrl(
+        context.origin,
+        exchange.returnTo?.locale ?? coerceSupportedLocale(locale),
+        exchange.returnTo ? productAdminReturnPath(exchange.returnTo) : context.entryPath
+      )
+    : new URL(`/${locale}`, request.url)
+  const response = NextResponse.redirect(target, 303)
+  response.cookies.set(
+    context?.cookieName ?? SESSION_COOKIE_NAME,
+    sessionId,
+    context?.cookieOptions ?? sessionCookieOptions()
+  )
+  clearTransientCookie(response, context)
+  response.headers.set('cache-control', 'private, no-store')
+  response.headers.set('referrer-policy', 'no-referrer')
+  response.headers.set('x-robots-tag', 'noindex, nofollow')
   return response
 }
 
-function failureRedirect(request: Request, locale: string, error?: unknown): NextResponse {
+function failureRedirect(
+  request: Request,
+  locale: string,
+  error?: unknown,
+  context?: ProductWebContext
+): NextResponse {
   if (error) {
     const status = error instanceof UpstreamOAuthError ? error.status : undefined
     console.error('[bff] OAuth exchange failed', { status: status ?? 503 })
   }
 
-  const url = new URL(`/${locale}/login`, request.url)
+  const url = context
+    ? new URL(
+        localizedFrontendUrl(context.origin, coerceSupportedLocale(locale), context.loginPath)
+      )
+    : new URL(`/${locale}/login`, request.url)
   url.searchParams.set(OAUTH_ERROR_QUERY_PARAM, AuthErrorCode.OAUTH_TICKET_INVALID)
 
-  const response = NextResponse.redirect(url)
+  const response = NextResponse.redirect(url, 303)
   response.headers.set('cache-control', 'private, no-store')
   response.headers.set('referrer-policy', 'no-referrer')
   response.headers.set('x-robots-tag', 'noindex, nofollow')
-  response.cookies.delete(REFRESH_COOKIE_NAME)
+  clearTransientCookie(response, context)
   return response
+}
+
+function clearTransientCookie(response: NextResponse, context?: ProductWebContext) {
+  if (context?.frontend === 'admin')
+    response.cookies.set('__Host-amcore_admin_oauth_refresh', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 0,
+    })
+  else
+    response.cookies.set(REFRESH_COOKIE_NAME, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 0,
+    })
 }

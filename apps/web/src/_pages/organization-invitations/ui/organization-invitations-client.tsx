@@ -17,6 +17,7 @@ import { invitationListHref, type InvitationListView } from '../model/list-navig
 
 /** Ready page uses ordinary destinations; custom designs consume the entity without this page. */
 export function OrganizationInvitationsClient({
+  deniedContent,
   admission,
   organizationId,
   initialOrganizationName,
@@ -28,6 +29,7 @@ export function OrganizationInvitationsClient({
   rolesHref,
   invalidQuery = false,
 }: {
+  deniedContent?: React.ReactNode
   admission: ProductAccessBootstrap
   organizationId: string
   initialOrganizationName?: string
@@ -53,6 +55,7 @@ export function OrganizationInvitationsClient({
     access.data &&
     'canManageTeamAccess' in access.data.data &&
     !access.data.data.canManageTeamAccess
+  if ((access.state.status === 'denied' || permissionDenied) && deniedContent) return deniedContent
   return (
     <section className="space-y-6">
       <BackLink href={listHref}>{t('allOrganizations')}</BackLink>

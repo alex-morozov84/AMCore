@@ -8,10 +8,8 @@ import { redirect } from '@/i18n/navigation'
 
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isInvalidRefreshError, SessionNotFoundError, SessionRefreshUnsafeError } from './errors'
-import { SESSION_COOKIE_NAME } from './session-cookie'
-import { redisVaultLock } from './session-lock'
+import { type ProductRouteKind, resolveProductWebContext } from './product-web-context.server'
 import type { VaultEntry } from './session-vault.types'
-import { redisVaultStore } from './session-vault-store'
 import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
@@ -41,32 +39,39 @@ export interface DalSession {
  * that also calls `getOptionalSession`/`requireSession` — `cache()` dedupes
  * both to this one call per request.
  */
-export const getOptionalSessionEntry = cache(async (): Promise<VaultEntry | null> => {
-  const sessionId = (await cookies()).get(SESSION_COOKIE_NAME)?.value
-  if (!sessionId) return null
+export const getOptionalSessionEntry = cache(
+  async (kind: ProductRouteKind = 'product-data'): Promise<VaultEntry | null> => {
+    const source = await headers()
+    const context = resolveProductWebContext(source, kind)
+    const sessionId = (await cookies()).get(context.cookieName)?.value
+    if (!sessionId) return null
 
-  try {
-    return await ensureFreshSession(sessionId, {
-      store: redisVaultStore,
-      lock: redisVaultLock,
-      upstreamRefresh: createUpstreamRefresh(await headers()),
-    })
-  } catch (error) {
-    if (
-      error instanceof SessionNotFoundError ||
-      error instanceof SessionRefreshUnsafeError ||
-      isInvalidRefreshError(error)
-    ) {
-      return null
+    try {
+      return await ensureFreshSession(sessionId, {
+        store: context.store,
+        expectedAudience: context.audience,
+        lock: context.lock,
+        upstreamRefresh: createUpstreamRefresh(source, context),
+      })
+    } catch (error) {
+      if (
+        error instanceof SessionNotFoundError ||
+        error instanceof SessionRefreshUnsafeError ||
+        isInvalidRefreshError(error)
+      ) {
+        return null
+      }
+      throw error
     }
-    throw error
   }
-})
+)
 
-export const getOptionalSession = cache(async (): Promise<DalSession | null> => {
-  const entry = await getOptionalSessionEntry()
-  return entry ? { user: entry.userSnapshot } : null
-})
+export const getOptionalSession = cache(
+  async (kind: ProductRouteKind = 'product-data'): Promise<DalSession | null> => {
+    const entry = await getOptionalSessionEntry(kind)
+    return entry ? { user: entry.userSnapshot } : null
+  }
+)
 
 /**
  * The real gate for protected pages — call this in the page itself, not
@@ -88,8 +93,8 @@ export const requireSession = cache(async (): Promise<DalSession> => {
 })
 
 /** Shared missing-session navigation; performs no credential or authority work. */
-export async function redirectToLogin(): Promise<never> {
-  return redirect({ href: '/login', locale: await getLocale() })
+export async function redirectToLogin(href = '/login'): Promise<never> {
+  return redirect({ href, locale: await getLocale() })
 }
 
 /**

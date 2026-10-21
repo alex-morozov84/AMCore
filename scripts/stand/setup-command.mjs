@@ -18,7 +18,9 @@ export async function executeSetupCommand(m, input) {
   if (
     !previewDiagnostics &&
     (m.purpose !== 'e2e' ||
-      !['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile))
+      !['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
+        m.fixtureProfile
+      ))
   )
     throw new Error('Wrong setup fixture')
   if (m.fixtureProfile === 'organization-provisioning' && input.command !== 'prepare-account')

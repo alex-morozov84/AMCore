@@ -234,12 +234,14 @@ signup, Console-disabled installations and recovery after lost responses.
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
 cp .env.example .env          # COMPOSE_PROFILES=local-infra is the default
+# Use the same confidential web-to-API proof in both processes.
+export WEB_FRONTEND_CONTEXT_KEY="$(openssl rand -hex 32)"
 ```
 
 **Option A — full stack in Docker** (bundled Postgres + Redis, schema migrated for you):
 
 ```bash
-docker compose up             # one-shot `migrate` runs, then API + web start
+FRONTEND_URL=http://localhost:3000 WEB_TRUSTED_ORIGINS=http://localhost:3000 docker compose up
 # API: http://localhost:5002 · Swagger: http://localhost:5002/docs · Web: http://localhost:3000
 ```
 
@@ -339,3 +341,5 @@ Full operations index: [`docs/operations/`](docs/operations/README.md).
 ## License
 
 [MIT](LICENSE)
+
+[Place product administration and isolate host sessions](docs/product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.

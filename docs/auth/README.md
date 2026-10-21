@@ -56,8 +56,10 @@ opaque httpOnly cookie for `apps/web`; Next Route Handlers keep the backend
 tokens in a Redis session vault and attach `Authorization: Bearer ...`
 server-side. The only short exception is the OAuth callback handoff described in
 [OAuth](./oauth.md), where a temporary httpOnly `refresh_token` cookie is relayed
-onto the frontend origin and immediately consumed/deleted by
-`/{locale}/auth/callback`. Generic forwarding of JWT issuance, including
+onto the selected frontend origin. The localized completion document submits
+its native form to a dedicated same-origin POST handler, which consumes/deletes
+the temporary cookie. The GET document itself never exchanges or publishes a
+session. Generic forwarding of JWT issuance, including
 organization switch, is denied; see
 [Credential containment](../frontend/api-consumption.md#credential-containment).
 

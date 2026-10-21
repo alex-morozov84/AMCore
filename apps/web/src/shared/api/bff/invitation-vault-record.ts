@@ -46,6 +46,12 @@ export const invitationVaultFlowSchema = z.strictObject({
   handoff: handoffJournalSchema.nullable(),
 })
 export const invitationOwnerRecordSchema = z.strictObject({
+  frontend: z.literal('admin').optional(),
+  audience: z.enum(['product', 'staff']).optional(),
+  placementFingerprint: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   version: z.number().int().positive(),
   origin: z.url(),
   expiresAt: z.number().int(),

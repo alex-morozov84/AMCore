@@ -109,7 +109,8 @@ describe('dedicated invited credential commands', () => {
             binding: expect.objectContaining({ flowRevision: 2 }),
           }),
         ],
-      })
+      }),
+      undefined
     )
     expect(invitationBackend).toHaveBeenCalledWith(
       '/auth/login',

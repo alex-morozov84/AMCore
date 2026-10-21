@@ -35,7 +35,7 @@ A dedicated route is needed when:
   `/auth/sessions*` needs the raw `refresh_token` cookie to identify the
   caller's own session, which the generic proxy never sees.
 - **The caller has no session at all.** The generic proxy requires an
-  existing `amcore_session` cookie and 401s without one — unusable for
+  existing server-selected product or staff session and 401s without one — unusable for
   login/register (nothing to be a session of yet) or the four email-link
   auth actions (`forgot-password`, `reset-password`, `verify-email`,
   `resend-verification` — a user resetting a forgotten password isn't
@@ -46,6 +46,13 @@ A dedicated route is needed when:
   response verbatim, mints nothing — none of them authenticate anyone).
 
 ## Credential containment
+
+The actual hostname and literal server entry select the session context before
+any cookie/vault read. Dedicated admin auth routes use `/api/product-admin/auth/*`;
+the generic proxy closes the rest of the auth namespace except the explicit
+current-user/avatar/session paths. See
+[placement and sessions](../product-admin/placement-and-sessions.md) for context,
+hop-proof, hostname and compatibility rules.
 
 The generic proxy returns 404 for these effective upstream paths under `/api/v1`:
 
@@ -66,9 +73,11 @@ Canonical `/api/auth/login` and `/api/auth/register` select dedicated handlers
 and return `{ user }` plus an opaque session cookie. Unsupported methods belong
 to that selected handler and do not fall back to the generic proxy. Canonical
 `/api/auth/oauth/exchange` selects the OAuth provider route: POST returns 405;
-it is not a browser exchange endpoint. The locale OAuth callback performs the
-exchange server-side. Its existing temporary HttpOnly `refresh_token` cookie
-handoff is consumed and cleared; see [OAuth](../auth/oauth.md).
+it is not a browser exchange endpoint. The localized callback is a public
+completion document without session effects. Its native form posts to the literal
+site/admin `/api/.../oauth/complete` endpoint. That exact-Origin-admitted handler
+performs the server-side exchange and clears the temporary Strict/HttpOnly cookie;
+see [OAuth](../auth/oauth.md).
 
 Direct backend APIs remain available to authorized clients and server code.
 There is no generic browser organization-switch endpoint. The product executor

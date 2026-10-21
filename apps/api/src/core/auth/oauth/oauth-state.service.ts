@@ -1,6 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import type { InvitationOAuthCorrelation, SupportedLocale } from '@amcore/shared'
+import type {
+  FrontendDestination,
+  InvitationOAuthCorrelation,
+  ProductAdminReturn,
+  SupportedLocale,
+} from '@amcore/shared'
 
 import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
 
@@ -12,6 +17,11 @@ export interface OAuthInvitationState {
   expiresAt: string
 }
 export interface OAuthStateData {
+  frontend?: FrontendDestination
+  placementFingerprint?: string
+  callbackUri?: string
+  returnTo?: ProductAdminReturn
+  pkceMethod?: 'S256'
   invitation?: OAuthInvitationState
   provider: string
   codeVerifier: string

@@ -1,0 +1,21 @@
+import { setRequestLocale } from 'next-intl/server'
+
+import {
+  adminInvitationPlacement,
+  InvitationRecipientMount,
+} from '@/_app/invitation-flow/index.server'
+import { resolveLocaleParam } from '@/i18n/params'
+import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
+
+export const dynamic = 'force-dynamic'
+export const metadata = noindexMetadata
+
+export default async function Invitation({
+  params,
+}: {
+  params: Promise<{ locale: string; flowId: string }>
+}) {
+  const [locale, { flowId }] = await Promise.all([resolveLocaleParam(params), params])
+  setRequestLocale(locale)
+  return <InvitationRecipientMount flowId={flowId} placement={adminInvitationPlacement} />
+}

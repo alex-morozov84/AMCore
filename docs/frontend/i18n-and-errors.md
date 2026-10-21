@@ -220,3 +220,8 @@ page would redirect to itself forever in production while working fine under
 
 None of them can tell you a translation is _wrong_ — only that it is missing.
 Reviewing the actual wording is still a human job.
+
+Frontend email/OAuth destinations also carry the selected site/admin surface.
+Continue to build locale-aware URLs through the shared helper; use the configured
+public admin path/origin rather than concatenating the physical route prefix. See
+[placement and sessions](../product-admin/placement-and-sessions.md).

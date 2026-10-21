@@ -27,6 +27,7 @@ function makeMockClient(overrides: Partial<OAuthClientService> = {}): OAuthClien
     buildAuthorizationUrl: jest.fn().mockReturnValue(new URL('https://appleid.apple.com/auth')),
     authorizationCodeGrant: jest.fn(),
     fetchUserInfo: jest.fn(),
+    enableNonRepudiationChecks: jest.fn(),
     skipStateCheck,
     skipSubjectCheck,
     ...overrides,
@@ -97,6 +98,11 @@ describe('AppleProvider', () => {
           access_token: 'apple-token',
           id_token: 'apple-id-token',
           expires_in: 3600,
+          claims: () => ({
+            sub: 'apple-user-123',
+            email: 'user@example.com',
+            email_verified: true,
+          }),
         }),
       })
       const provider = new AppleProvider(providerConfig, oauthClient)
@@ -106,53 +112,77 @@ describe('AppleProvider', () => {
       expect(oauthClient.authorizationCodeGrant).toHaveBeenCalledWith(mockConfig, expect.any(URL), {
         pkceCodeVerifier: 'verifier-xyz',
         expectedState: skipStateCheck,
+        idTokenExpected: true,
       })
       expect(result).toEqual({
         accessToken: 'apple-token',
         idToken: 'apple-id-token',
         expiresIn: 3600,
+        verifiedIdentity: {
+          providerId: 'apple-user-123',
+          email: 'user@example.com',
+          emailVerified: true,
+        },
       })
     })
   })
 
-  describe('getUserProfile', () => {
-    it('should return normalized OAuthUserProfile from OIDC userinfo', async () => {
-      const oauthClient = makeMockClient({
-        fetchUserInfo: jest.fn().mockResolvedValue({
-          sub: 'apple-user-123',
-          email: 'user@privaterelay.appleid.com',
-          email_verified: true,
-        }),
-      })
+  describe('verified identity profile', () => {
+    it('requires verified exchange claims and never calls UserInfo', async () => {
+      const oauthClient = makeMockClient()
       const provider = new AppleProvider(providerConfig, oauthClient)
-
-      const result = await provider.getUserProfile({ accessToken: 'token' })
-
+      expect(() => provider.getUserProfile({ accessToken: 'unverified' })).toThrow(
+        'Verified Apple identity required'
+      )
+      const result = await provider.getUserProfile({
+        accessToken: '',
+        verifiedIdentity: {
+          providerId: 'apple-user-123',
+          email: 'user@example.com',
+          emailVerified: true,
+        },
+      })
       expect(result).toEqual({
         providerId: 'apple-user-123',
         provider: 'apple',
-        email: 'user@privaterelay.appleid.com',
+        email: 'user@example.com',
         emailVerified: true,
         displayName: null,
         avatarSourceUrl: null,
       })
+      expect(oauthClient.fetchUserInfo).not.toHaveBeenCalled()
     })
 
-    it('should always return null for displayName (name sent only on first login)', async () => {
-      const oauthClient = makeMockClient({
-        fetchUserInfo: jest.fn().mockResolvedValue({
-          sub: 'apple-user-123',
-          email: 'user@example.com',
-          email_verified: true,
-          name: 'Should Be Ignored',
-        }),
-      })
-      const provider = new AppleProvider(providerConfig, oauthClient)
+    it.each([false, 'false', undefined])(
+      'does not treat %p as a verified email',
+      async (verified) => {
+        const oauthClient = makeMockClient({
+          authorizationCodeGrant: jest.fn().mockResolvedValue({
+            access_token: 'token',
+            id_token: 'verified-token',
+            claims: () => ({ sub: 'subject', email: 'user@example.com', email_verified: verified }),
+          }),
+        })
+        const provider = new AppleProvider(providerConfig, oauthClient)
+        const tokens = await provider.exchangeCode('code', 'verifier')
+        expect(tokens.verifiedIdentity?.emailVerified).toBe(false)
+        expect(oauthClient.enableNonRepudiationChecks).toHaveBeenCalledWith(mockConfig)
+      }
+    )
 
-      const result = await provider.getUserProfile({ accessToken: 'token' })
-
-      expect(result.displayName).toBeNull()
-      expect(result.avatarSourceUrl).toBeNull()
-    })
+    it.each([undefined, {}, { sub: 3 }, { sub: 'subject', email_verified: 1 }])(
+      'rejects absent or malformed verified claims: %p',
+      async (claims) => {
+        const oauthClient = makeMockClient({
+          authorizationCodeGrant: jest.fn().mockResolvedValue({
+            access_token: 'token',
+            claims: () => claims,
+          }),
+        })
+        await expect(
+          new AppleProvider(providerConfig, oauthClient).exchangeCode('code', 'verifier')
+        ).rejects.toThrow()
+      }
+    )
   })
 })

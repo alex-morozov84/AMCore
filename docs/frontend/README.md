@@ -69,3 +69,5 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
   [Operations Console](../operations-console/README.md)
 
 [My API keys](../product-admin/own-api-keys.md) — create a personal integration key, save its secret once, and inspect or revoke your keys across organizations.
+
+[Place product administration and isolate host sessions](../product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.

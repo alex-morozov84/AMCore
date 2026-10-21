@@ -9,6 +9,7 @@ import { useSessions } from '@/entities/user'
 import { RevokeSessionMenuItem } from '@/features/sessions-revoke'
 import { formatSessionLocation, parseSessionDevice } from '@/shared/lib/format-session'
 import { useClampPage } from '@/shared/lib/use-clamp-page'
+import { DataTableSurface } from '@/shared/ui/data-table-surface'
 import { PaginationButtons } from '@/shared/ui/pagination'
 import { RowActionsMenu } from '@/shared/ui/row-actions-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
@@ -108,11 +109,11 @@ export function SessionsTable() {
 
   return (
     <div className="space-y-4">
-      <div aria-busy={isFetching} className="overflow-hidden rounded-md border">
+      <DataTableSurface aria-busy={isFetching}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="border-line-soft hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder ? null : <table.FlexRender header={header} />}
@@ -130,7 +131,7 @@ export function SessionsTable() {
               </TableRow>
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="border-line-soft">
                   {row.getAllCells().map((cell) => (
                     <TableCell key={cell.id}>
                       <table.FlexRender cell={cell} />
@@ -147,7 +148,7 @@ export function SessionsTable() {
             )}
           </TableBody>
         </Table>
-      </div>
+      </DataTableSurface>
 
       {data?.data.some((session) => session.location !== null) && (
         <p className="text-xs text-muted-foreground">

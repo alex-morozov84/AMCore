@@ -17,6 +17,7 @@ import {
   validateExpectedContextSession,
 } from './context-session'
 import type { EnsureFreshSessionDeps } from './ensure-fresh-session'
+import { frontendApiHeaders, type ProductWebContext } from './product-web-context.server'
 import { forwardRequestHeaders } from './proxy-headers'
 import { resolveTrustedClientIp } from './trusted-client-ip'
 
@@ -55,6 +56,8 @@ export type ContextOperation<T> = ContextOperationBase &
   )
 
 export interface ContextExecutorDeps extends EnsureFreshSessionDeps {
+  webContext?: ProductWebContext
+  bindingVersion?: 1 | 2
   readSessionId: () => Promise<string | undefined>
   apiBase: string
   fetch?: typeof fetch
@@ -105,6 +108,9 @@ export async function executeContextOperation<T>(
         session.accessToken,
         resolveTrustedClientIp(input.headers)
       )
+      if (deps.webContext) {
+        for (const [key, value] of frontendApiHeaders(deps.webContext)) headers.set(key, value)
+      }
       if (operation.organizationId)
         headers.set('x-amcore-organization-id', operation.organizationId)
       if (operation.body !== undefined) headers.set('content-type', 'application/json')

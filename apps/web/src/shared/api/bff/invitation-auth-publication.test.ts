@@ -60,6 +60,7 @@ describe('server-only credential publication orchestration', () => {
       4,
       expect.anything(),
       's'.repeat(43),
+      undefined,
       undefined
     )
     expect(discardInvitationSession).not.toHaveBeenCalled()
@@ -79,7 +80,7 @@ describe('server-only credential publication orchestration', () => {
   it('discards only staged credentials on a stale owner CAS and returns no cookie', async () => {
     vi.mocked(publishInvitationSession).mockResolvedValue(false)
     await expect(publishInvitedCredentials(input())).rejects.toThrow()
-    expect(discardInvitationSession).toHaveBeenCalledWith('a'.repeat(64), 's'.repeat(43))
+    expect(discardInvitationSession).toHaveBeenCalledWith('a'.repeat(64), 's'.repeat(43), undefined)
   })
   it('does not stage credentials without the API refresh cookie or after cancellation', async () => {
     const missing = input()

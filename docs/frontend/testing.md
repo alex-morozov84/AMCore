@@ -91,6 +91,13 @@ within a stand. Unique emails do not isolate those mechanisms.
 Run one lane with `node scripts/e2e-ci.mjs path-standard` (also `safety`, `mocked`,
 `path-disruptive` and `host` when applicable). New ordinary specs automatically join
 `path-standard`; runtime-settings/background-work specs join `path-disruptive`.
+Product-administration specs use declared fixture groups from
+`scripts/product-admin-e2e-plan.mjs`. The required Web E2E aggregate includes
+`staff-oauth` and the applicable retained integration profiles. Each spec belongs
+to one profile; missing declared files fail inventory checks. Signed path OAuth
+uses its dedicated fixture, outside ordinary path groups. These fixtures prove
+application transport and verified identity handling, not live provider registration.
+
 The separate `setup-cli` lane proves closed-registration installation with the
 compiled command and an actual captured recovery email. It always applies.
 <!-- AMCORE_CONSOLE_ESTABLISHMENT_TESTING_START -->

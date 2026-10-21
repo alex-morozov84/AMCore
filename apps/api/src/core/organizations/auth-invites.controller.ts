@@ -35,6 +35,7 @@ import {
   OrganizationContextBoundary,
   RequestContextPolicy,
 } from '../auth/organization-context/request-context-policy.js'
+import { ApiFrontendContext } from '../frontend-context/frontend-context.openapi.js'
 import { InvitationContinuationService } from '../invitations/invitation-continuation.service.js'
 import { InvitationRequestGuard } from '../invitations/invitation-request.guard.js'
 
@@ -47,6 +48,7 @@ import {
 import { parseInvitationOperationId } from './invitation-operation.js'
 import { InviteAcceptService } from './invite-accept.service.js'
 
+@ApiFrontendContext()
 @ApiTags('auth')
 @ApiBearerAuth()
 @ApiBadRequestResponse({ description: 'Invalid/expired invitation or account mismatch' })

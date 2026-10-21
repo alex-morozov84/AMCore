@@ -376,3 +376,7 @@ and backups in your downstream privacy policy. Routine erasure must not silently
 reopen setup or allow an old operation to grant access again. Exceptional deletion
 of completion history is outside ordinary recovery. This domain mechanism is separate
 from the optional [Redis HTTP response cache](../operations/idempotency.md).
+
+New invitation emails target the configured product administration area. Existing
+root links retain their site flow. See [placement and sessions](placement-and-sessions.md)
+for addresses, host isolation and recovery; this does not change membership policy.

@@ -17,7 +17,7 @@ export function activeTarget() {
 }
 export function testOptions() {
   const m = activeTarget()
-  let baseURL = m.origins.product
+  let baseURL = m.lane === 'product-admin-real-stack' ? m.origins.staff : m.origins.product
   // AMCORE_CONSOLE_TARGET_ORIGIN_START
   if (m.lane === 'console-real-stack') baseURL = m.origins.console
   // AMCORE_CONSOLE_TARGET_ORIGIN_END
@@ -39,7 +39,13 @@ export function outputPaths() {
 export function standReporters(m, dir) {
   // HTML/blob reports record built-in page.goto step URLs even when trace/video are off.
   // The rendered-mail fixture visits one-use secrets; keep only step-free console results.
-  return ['organization-setup', 'organization-provisioning'].includes(m.fixtureProfile)
+  return [
+    'organization-setup',
+    'organization-provisioning',
+    'product-admin-closed-signup',
+    'product-admin-oauth',
+    'product-admin-oauth-path',
+  ].includes(m.fixtureProfile)
     ? [['list', { printSteps: false }]]
     : [['list'], ['html', { open: 'never', outputFolder: `${dir}/report` }]]
 }

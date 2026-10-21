@@ -5,6 +5,7 @@ import {
   SessionRefreshUnsafeError,
 } from './errors'
 import { startLockRenewal } from './lock-renewal'
+import { hasSessionAudience, type SessionAudience } from './session-audience'
 import type {
   UpstreamRefreshFn,
   UpstreamRefreshResult,
@@ -27,6 +28,7 @@ const LOCK_RENEWAL_INTERVAL_MS = 4 * 1000
 const UPSTREAM_REFRESH_CEILING_MS = 30 * 1000
 
 export interface EnsureFreshSessionDeps<TRecord extends VaultRecord = VaultRecord> {
+  expectedAudience?: SessionAudience
   store: VaultStore<TRecord>
   lock: VaultLock
   upstreamRefresh: UpstreamRefreshFn
@@ -55,7 +57,8 @@ export async function ensureFreshSession<TRecord extends VaultRecord = VaultReco
 ): Promise<TRecord & Pick<VaultEntry, 'version'>> {
   const now = deps.now ?? Date.now
   const entry = await deps.store.get(sessionId)
-  if (!entry) throw new SessionNotFoundError(sessionId)
+  if (!entry || (deps.expectedAudience && !hasSessionAudience(entry, deps.expectedAudience)))
+    throw new SessionNotFoundError('unavailable')
   if (isFresh(entry, now())) return entry
 
   return refreshUnderLock(sessionId, deps, now)
@@ -74,7 +77,8 @@ async function refreshUnderLock<TRecord extends VaultRecord>(
     // refreshed while this one waited. Skipping this check is exactly the
     // "lock only around refresh, no vault" design ADR-068 rejected.
     const reRead = await deps.store.get(sessionId)
-    if (!reRead) throw new SessionNotFoundError(sessionId)
+    if (!reRead || (deps.expectedAudience && !hasSessionAudience(reRead, deps.expectedAudience)))
+      throw new SessionNotFoundError('unavailable')
     if (isFresh(reRead, now())) return reRead
 
     return await performRefresh(sessionId, reRead, token, deps)

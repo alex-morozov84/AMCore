@@ -7,6 +7,7 @@ import {
 } from '@amcore/shared'
 
 import type { OrganizationProvisioning, Prisma } from '../../../generated/prisma/client.js'
+import type { BrowserFrontendContext } from '../../frontend-context/frontend-placement.js'
 import { issueInvitation } from '../../invitations/invitation-issuance.js'
 import { lockInvitationRoles } from '../../invitations/invitation-role-intent.js'
 import { clearedProvisioningMail } from '../../invitations/provisioning-settlement.js'
@@ -41,7 +42,8 @@ export async function recoverProvisioning(
   command: ProvisioningCommand,
   operator: SetupOperator,
   limiter: ProvisioningLimiterService,
-  assertMailReady: () => void
+  assertMailReady: () => void,
+  frontend: BrowserFrontendContext
 ): Promise<{
   receipt: { operationId: string; organizationId: string; revision: number }
   mail: ProvisioningMail | null
@@ -138,6 +140,7 @@ export async function recoverProvisioning(
         data: { revokedAt: now, revokedById: actorId },
       })
     const issued = await issueInvitation(tx, {
+      frontend,
       organizationId: orgId,
       email,
       emailCanonical: email,

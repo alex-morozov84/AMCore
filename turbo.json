@@ -14,6 +14,11 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/typecheck-native.mjs",
         "$TURBO_ROOT$/scripts/lib/native-typecheck*.mjs",
+        "$TURBO_ROOT$/scripts/check-product-admin-placement.mjs",
+        "$TURBO_ROOT$/scripts/render-product-admin-edge.mjs",
+        "$TURBO_ROOT$/scripts/lib/product-admin*.mjs",
+        "$TURBO_ROOT$/docker/caddy/product-admin.generated.caddy",
+        "$TURBO_ROOT$/docker/nginx/product-admin*.conf",
         "$TURBO_ROOT$/packages/typescript-config/**",
         "$TURBO_ROOT$/pnpm-lock.yaml"
       ]

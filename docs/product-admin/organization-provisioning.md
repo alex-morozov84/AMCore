@@ -438,3 +438,7 @@ and an expired unresolved creation retains only its operation reference. An acco
 change clears the former journal from the next admitted UI. The same actor can recover
 their input after fresh login, but old callbacks retire and every action uses current
 server authority and the new session binding. Reload never submits automatically.
+
+New invitation emails target the configured product administration area. Existing
+root links retain their site flow. See [placement and sessions](placement-and-sessions.md)
+for addresses, host isolation and recovery; this does not change membership policy.
