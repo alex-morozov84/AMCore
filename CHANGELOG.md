@@ -90,6 +90,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgrade the API to Nest 12.2.0 with a coherent Fastify 5.12.7 dependency graph and updated Helmet/multipart plugins.
+
+- BullMQ updates no longer require a manual version approval when all pinned Lua source and compiled hashes remain unchanged. Changed scripts still block worker startup.
+
 - Package migrations in an independent non-root Prisma CLI image with an isolated
   frozen dependency graph, version guards, dedicated upkeep and image reports.
   API build-tool security risks remain separate from final-image minimization.

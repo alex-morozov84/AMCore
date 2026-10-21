@@ -4,9 +4,10 @@
 // through addJobWithPriority, and the parent-dependency block moved into
 // moveChildBackToParentDependencies. Neither is reachable from idempotent-command.lua.ts, which
 // denies PRIORITY_RETRY_UNSUPPORTED and RELATED_JOB, so its narrowed copy needs no change.
+// 6.3.15 -> 6.3.16: all pinned sources and compiled scripts are byte-identical.
 export const SCRIPT_PROVENANCE = {
   package: 'bullmq',
-  version: '6.3.15',
+  version: '6.3.16',
   license: 'MIT',
   scripts: {
     'pause-7': {

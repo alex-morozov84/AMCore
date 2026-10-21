@@ -11,7 +11,7 @@ import {
 describe('Pinned BullMQ source guard', () => {
   const nativeRequire = createRequire(resolve(process.cwd(), 'package.json'))
   const installed: ScriptSourceReader = {
-    version: '6.3.15',
+    version: '99.0.0',
     source: (path) =>
       readFileSync(nativeRequire.resolve(`bullmq/dist/cjs/commands/${path}`), 'utf8'),
     compiled: (name) => {
@@ -46,9 +46,7 @@ describe('Pinned BullMQ source guard', () => {
     ).toThrow('BULLMQ_COMPILED_CHANGED:pause-7')
   })
 
-  it('refuses a version change', () => {
-    expect(() => verifyScriptProvenance({ ...installed, version: '6.3.12' })).toThrow(
-      'BULLMQ_VERSION_UNSUPPORTED'
-    )
+  it('accepts a version change when all pinned sources and compiled scripts match', () => {
+    expect(() => verifyScriptProvenance({ ...installed, version: '99.0.0' })).not.toThrow()
   })
 })
