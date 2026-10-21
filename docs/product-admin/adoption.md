@@ -174,6 +174,9 @@ failed primary/secondary reads, one-time key concealment and irreversible remova
 The invitation-management response proves issuance; the dedicated mail fixture proves
 rendered mail and explicit consent. The three-host fixture proves session separation.
 
+Show the current status of retained [member-key records](member-api-keys.md).
+Revoking a key disables authentication; it does not imply deleting its inventory row.
+
 Render cached resource data only when its `available` flag is true. Preserve a dirty
 draft separately from the current snapshot and revision. A committed write with a failed
 refresh remains committed. An unknown outcome requires inspection; refreshing must not
