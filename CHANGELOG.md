@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Dependency installs explicitly enforce the strict 24-hour release-age floor.
+- Root workspace installs explicitly enforce the strict 24-hour release-age floor
+  and refuse registry packages with unknown publication times.
   Ordinary npm Dependabot updates use a three-day cooldown; a trusted controller
   retries eligible failed-install CI runs once after 25 hours.
 

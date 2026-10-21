@@ -1,4 +1,5 @@
 const delay = 25 * 60 * 60 * 1000
+const rerunWindow = 30 * 24 * 60 * 60 * 1000
 const aggregates = new Set([
   'Test',
   'API E2E',
@@ -31,7 +32,8 @@ export function eligibleRun(pr, run, repository, now) {
     run.conclusion === 'failure' &&
     run.run_attempt === 1 &&
     Number.isFinite(age) &&
-    age >= delay
+    age >= delay &&
+    age < rerunWindow
   )
 }
 
@@ -59,7 +61,7 @@ export function installationFailure(jobs) {
 }
 
 // Only trusted-main code calls this module. No PR content, logs or artifacts are loaded.
-export async function retryDependabot({ github, context, core, now = Date.now() }) {
+export async function retryDependabot({ github, context, core, now = Date.now }) {
   const repo = context.repo
   const repository = `${repo.owner}/${repo.repo}`
   const pulls = await github.paginate(github.rest.pulls.list, {
@@ -71,9 +73,14 @@ export async function retryDependabot({ github, context, core, now = Date.now() 
   let count = 0
   for (const pr of pulls) {
     if (pr.user?.login !== 'dependabot[bot]' || pr.head?.repo?.full_name !== repository) continue
-    if (await retryPull(github, repo, pr, repository, now)) {
-      core.info(`Requested one full CI retry for PR #${pr.number}`)
-      count++
+    try {
+      if (await retryPull(github, repo, pr, repository, now)) {
+        core.info(`Requested one full CI retry for PR #${pr.number}`)
+        count++
+      }
+    } catch (error) {
+      if (![404, 409, 422].includes(error.status)) throw error
+      core.warning(`Skipped PR #${pr.number}: GitHub rejected this candidate (${error.status})`)
     }
   }
   core.info(`Requested ${count} CI retries`)
@@ -95,7 +102,7 @@ async function retryPull(github, repo, listed, repository, now) {
   const parameters = { ...repo, pull_number: listed.number }
   const { data: pr } = await github.rest.pulls.get(parameters)
   const run = await latestRun(github, repo, pr)
-  if (!run || !eligibleRun(pr, run, repository, now)) return false
+  if (!run || !eligibleRun(pr, run, repository, now())) return false
   const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
     ...repo,
     run_id: run.id,
@@ -105,7 +112,7 @@ async function retryPull(github, repo, listed, repository, now) {
   if (!installationFailure(jobs)) return false
   const { data: current } = await github.rest.pulls.get(parameters)
   const latest = await latestRun(github, repo, current)
-  if (!latest || latest.id !== run.id || !eligibleRun(current, latest, repository, now))
+  if (!latest || latest.id !== run.id || !eligibleRun(current, latest, repository, now()))
     return false
   // A full rerun preserves the current-attempt plan and all shard evidence together.
   await github.rest.actions.reRunWorkflow({ ...repo, run_id: run.id })

@@ -591,13 +591,18 @@ intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
 
 The root workspace explicitly sets `minimumReleaseAge: 1440` and
-`minimumReleaseAgeStrict: true`. The isolated migrator also uses strict mode with
-the same default 24-hour floor. Strict mode prevents fresh resolution from
+`minimumReleaseAgeStrict: true`. It also sets
+`minimumReleaseAgeIgnoreMissingTime: false`: a registry entry without a publication
+time fails with `ERR_PNPM_MISSING_TIME`. Fix the registry metadata or mirror;
+waiting alone cannot establish an unknown publication time. The isolated migrator
+retains its separate strict/default-age policy; this change does not tighten its
+missing-time setting. Strict mode prevents fresh resolution from
 persisting age exceptions. pnpm 12 re-checks every lockfile entry during `pnpm install --frozen-lockfile`. A lockfile that holds a version
 published less than 24 hours ago therefore fails the install step with
 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, even though the lockfile matches the
 manifests. This happens when Dependabot or a contributor adds a very fresh package.
-Wait until the package is 24 hours old and rerun the failed job. Do not set
+Wait until every offending package is 24 hours old, then rerun the complete CI
+workflow with **Re-run all jobs**. Do not rerun individual or only failed jobs. Do not set
 `trustLockfile`, lower `minimumReleaseAge` or add an exclusion to make the job pass:
 each one switches off the protection against freshly published malicious versions.
 
@@ -612,7 +617,8 @@ the 24-hour rule. An urgent exception needs a separate maintainer decision.
 Schedules can be delayed. It retries the `CI` workflow once when all these hold:
 
 - The open PR belongs to `dependabot[bot]`, stays in this repository and targets `main`.
-- Its latest applicable PR run failed on the first attempt at least 25 hours ago.
+- Its latest applicable PR run failed on the first attempt at least 25 hours ago
+  and less than 30 days ago (the GitHub rerun window).
 - The run's head and base match the current PR. No newer run has replaced it.
 - A step named `Install dependencies` failed. No executed test/build job failed
   after installation, and no job was cancelled or remains running.
@@ -627,11 +633,16 @@ The controller loads only trusted `main` code, installs no dependencies and read
 no PR code, caches or artifacts. Only its job has `actions: write`; PR build jobs
 keep their existing permissions. Controller runs serialize. A changed head/base,
 a newer run, or any prior manual/automatic attempt makes the run ineligible.
+It checks the age window again immediately before requesting the retry.
+A candidate-specific GitHub refusal (404, 409 or 422) produces a warning and does
+not stop other PRs. Permission, rate-limit and service errors still fail the controller.
 It never approves or merges a PR.
 
 If the repeat fails, inspect the new failure and fix it normally. Human/fork PRs
-and stale-base runs need manual triage or rebase. Rerun the complete CI workflow
-when current-attempt shard evidence must be regenerated. The controller becomes
+and stale-base runs need manual triage or rebase. Always use **Re-run all jobs**
+for a manual CI retry so every shard belongs to the new attempt. Runs at least
+30 days old cannot be rerun: update or rebase the PR branch to create a new
+current-head/base CI run, then inspect that run. The controller becomes
 active only after this workflow reaches `main`; local mocked tests do not prove
 hosted scheduling or rerun activation.
 

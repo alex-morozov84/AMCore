@@ -32,6 +32,8 @@ test('retry eligibility rejects unsafe identity, stale context, early and repeat
     { conclusion: 'cancelled' },
     { run_attempt: 2 },
     { created_at: 'invalid' },
+    { created_at: '2026-09-21T12:00:00Z' },
+    { created_at: '2026-09-20T12:00:00Z' },
     { created_at: '2026-10-20T11:00:01Z' },
     { event: 'push' },
     { path: '.github/workflows/other.yml' },
@@ -124,8 +126,91 @@ for (const [name, options, expected] of [
       github,
       context: { repo: { owner: 'owner', repo: 'repo' } },
       core: { info() {} },
-      now,
+      now: () => now,
     })
     assert.equal(count, expected)
     assert.deepEqual(github.calls, expected ? [{ owner: 'owner', repo: 'repo', run_id: 10 }] : [])
+  })
+
+test('controller rechecks the upper age boundary immediately before the request', async () => {
+  const github = client()
+  let reads = 0
+  const count = await retryDependabot({
+    github,
+    context: { repo: { owner: 'owner', repo: 'repo' } },
+    core: { info() {} },
+    now: () => (++reads === 1 ? now : Date.parse(run.created_at) + 30 * 86400000),
+  })
+  assert.equal(reads, 2)
+  assert.equal(count, 0)
+  assert.deepEqual(github.calls, [])
+})
+
+for (const status of ['expired', 404, 409, 422, 403, 429, 500])
+  test(`candidate refusal isolation: HTTP ${status}`, async () => {
+    const warnings = [],
+      calls = []
+    let current
+    const pulls = {
+      list() {},
+      async get({ pull_number }) {
+        current = pull_number
+        return { data: { ...pr, number: pull_number } }
+      },
+    }
+    const actions = {
+      listWorkflowRuns() {},
+      listJobsForWorkflowRunAttempt() {},
+      async reRunWorkflow({ run_id }) {
+        calls.push(run_id)
+        if (run_id === 1) throw Object.assign(new Error('API refusal'), { status })
+      },
+    }
+    const github = {
+      rest: { pulls, actions },
+      async paginate(endpoint) {
+        if (endpoint === pulls.list)
+          return [
+            { ...pr, number: 1 },
+            { ...pr, number: 2 },
+          ]
+        if (endpoint === actions.listWorkflowRuns) {
+          if (current === 1)
+            return [
+              {
+                ...run,
+                id: 1,
+                ...(status === 'expired' ? { created_at: '2026-09-20T12:00:00Z' } : {}),
+              },
+            ]
+          return [{ ...run, id: 2, pull_requests: [{ ...run.pull_requests[0], number: 2 }] }]
+        }
+        return [job]
+      },
+    }
+    const execute = () =>
+      retryDependabot({
+        github,
+        context: { repo: { owner: 'owner', repo: 'repo' } },
+        core: {
+          info() {},
+          warning(message) {
+            warnings.push(message)
+          },
+        },
+        now: () => now,
+      })
+    if (status === 'expired') {
+      assert.equal(await execute(), 1)
+      assert.deepEqual(calls, [2])
+      assert.deepEqual(warnings, [])
+    } else if ([404, 409, 422].includes(status)) {
+      assert.equal(await execute(), 1)
+      assert.deepEqual(calls, [1, 2])
+      assert.equal(warnings.length, 1)
+    } else {
+      await assert.rejects(execute, (error) => error.status === status)
+      assert.deepEqual(calls, [1])
+      assert.deepEqual(warnings, [])
+    }
   })
