@@ -98,3 +98,34 @@ test('source change during recovery, non-bind errors and a final attempt still f
   )
   assert.equal(starts, 3)
 })
+
+test('interrupted replacement preparation retains the new allocation for outer cleanup', async () => {
+  const m = stand()
+  await assert.rejects(
+    () =>
+      boot(m, true, {
+        start: async () => {
+          throw bindFailure()
+        },
+        cleanup: async (old) => {
+          assert.equal(old.uuid, 'old-uuid')
+        },
+        create: async (id, purpose, topology, mocked, profile, onAllocated) => {
+          onAllocated({
+            id,
+            purpose,
+            uuid: 'new-uuid',
+            state: 'allocated',
+            snapshot: '/new-source',
+          })
+          throw new Error('snapshot interrupted')
+        },
+      }),
+    /snapshot interrupted/
+  )
+  assert.equal(m.uuid, 'new-uuid')
+  assert.equal(m.state, 'allocated')
+  assert.equal(m.snapshot, '/new-source')
+  assert.equal(m.images, undefined)
+  assert.equal(m.builds, undefined)
+})

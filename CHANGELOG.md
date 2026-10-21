@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Root workspace installs explicitly enforce the strict 24-hour release-age floor
+  and refuse registry packages with unknown publication times.
+  Ordinary npm Dependabot updates use a three-day cooldown; a trusted controller
+  retries eligible failed-install CI runs once after 25 hours.
+
 - External web sign-in completes through a same-origin form with automatic
   continuation and a no-JavaScript Continue button, preserving Strict cookies
   and the validated return page without exposing its code through Referer.
@@ -20,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with confirmation.
 
 ### Fixed
+
+- Docker E2E runs retain cleanup ownership during the initial source copy and
+  replacement allocation, so early interruption no longer loses the allocated stand.
 
 - The API Docker image no longer carries the API package source, tests, Prisma schemas/migrations,
   tool configs or source maps. Test-only modules (`*.testkit.ts`) no longer compile into `dist`.
