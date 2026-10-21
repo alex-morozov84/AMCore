@@ -2,9 +2,9 @@
 
 A scheduled job is a method that runs on a timer in the `worker` or `all` process
 role, such as a nightly cleanup or a recovery pass that runs every 30 seconds.
-Register it once and the optional Console Scheduled jobs screen
-(`docs/operations-console/scheduled-jobs.md`) shows its schedule, last result and freshness. You write no page, controller,
-table or permission.
+Register it once and the optional Operations Console shows its schedule, last result
+and freshness on its Scheduled jobs screen. You write no page, controller, table or
+permission.
 
 Use this guide to add a job or to change how one reports its result. Queue work
 (BullMQ) is separate: see [Registering background work](background-work.md).
@@ -42,12 +42,14 @@ worker-only module (see [Register in the correct process role](architecture-and-
    ```ts
    @ScheduledJob(REPORT_JOB)
    async scheduledCleanup(): Promise<void> {
-     await this.jobs.run(REPORT_JOB, async () => {
-       const result = await this.cleanup()
-       return result.failed.length === 0 ? succeeded({ counts: result.counts, codes: [] }) : partial('step_failed', { counts: result.counts, codes: result.failed })
-     })
+     await this.jobs.run(REPORT_JOB, async () => bucketOutcome(await this.cleanup()))
    }
    ```
+
+   `bucketOutcome()` (in `scheduled-job-outcome.ts`) is for a job that runs independent
+   steps and collects their failures instead of throwing: no failed step is
+   `success`, some failed steps are `partial`, every step failed is `failed`. A job
+   with a different shape builds the result itself.
 
    Inject `ScheduledJobExecutor` (import `ScheduledJobsModule` in the module that
    provides the service). A resolved promise is **not** success: the task must say
@@ -59,15 +61,18 @@ screen shows the id). A downstream fork with the Console removed needs no change
 
 ## Choose the result
 
-| Return                    | When                                                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `succeeded(summary?)`     | The run reached its end and did its work. Doing nothing because nothing was due is success.                                    |
-| `partial(code, summary?)` | The run reached its end, but some independent steps failed (buckets, lanes). The job continued after the failure.              |
-| `failed(code, summary?)`  | The run stopped because of an error. If earlier steps had already committed, put their count in the summary.                   |
-| `skippedFor(reason)`      | Frequent jobs only: `not_ready`, `shutdown` or `busy`. A skip never makes a job look fresh. Daily jobs must not return a skip. |
+| Return                    | When                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `succeeded(summary?)`     | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                        |
+| `partial(code, summary?)` | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                              |
+| `failed(code, summary?)`  | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary. |
+| `skippedFor(reason)`      | Frequent jobs only: `not_ready`, `shutdown` or `busy`. A skip never makes a job look fresh. Daily jobs must not return a skip.                                     |
 
-A thrown error is recorded as `failed` with the error class name as code, then
-rethrown to the scheduler as before. The summary holds **counters and codes only**
+A thrown error is recorded as `failed` and then rethrown to the scheduler as before.
+Its code is the error class name only when the name is on a closed list (database,
+timeout and standard JavaScript error classes); any other name is recorded as
+`unexpected`, because a name chosen by a library or by input could carry content.
+Return `failed('your_code')` yourself when the Console should show a specific reason. The summary holds **counters and codes only**
 (at most 16 keys, 512 bytes): never an error message, row content or user data.
 A resolved result that does not describe the real outcome is a defect: classify
 inside the job, at the place that knows, not around it.
@@ -80,39 +85,60 @@ shared logic directly, as `POST /admin/cleanup` and the GeoIP startup/CLI path d
 - A worker reports the job when its process starts. Each result is merged by the
   start time and run id of the run, so concurrent replicas cannot mix the fields
   of two runs.
-- **Daily jobs** keep run history (latest 30 runs for 30 days; the screen shows 20).
+- **Daily jobs** keep run history: at most 30 finished runs per job and none older
+  than 30 days, plus up to 3 unfinished and 7 abandoned ones. Old rows are removed
+  when that job records its next run, not by a separate timer, so a job that no
+  longer runs keeps its last rows. The screen shows the latest 20.
   A success moves the due time to the next planned run. Failed, partial and
   skipped runs never move it. A job is `Overdue` when its due time plus
   `graceMs` has passed with no newer success.
-- **Frequent jobs** keep one summary. A job is `Overdue` when no completed pass
-  was recorded within `staleAfterMs`, which the helper sets to
-  `max(10 × period, 5 minutes)`. Their current run is not tracked.
-- Writing is best-effort and bounded: one write at a time, never waiting for the
-  database before a job starts, never more than one connection of
-  `DATABASE_POOL_MAX`, and it needs a pool of at least 2. A lost write loses an
-  observation, never a run. After five failed writes only failures and partial
-  results are kept for five minutes.
-- Limits per job: 3 unfinished runs, 7 abandoned runs and 30 finished runs; at most
-  2560 run rows and 64 jobs in total. Rows of ids that are no longer in the
-  catalogue are removed when a worker starts.
+- **Frequent jobs** keep one summary. A job is `Overdue` when no **successful**
+  completed pass was recorded within `staleAfterMs`, which the helper sets to
+  `max(10 × period, 5 minutes)`. A job whose every pass fails or is partial becomes
+  `Overdue` too. Their current run is not tracked.
+- Writing is best-effort and bounded. `begin` and `finish` only update bounded
+  in-memory state and return at once, so a slow or unreachable database cannot hold
+  a job at its start or its end. One background writer does one write at a time
+  (the event lane at most once a second, the summary lane at most once a minute).
+  It starts a write only when the pool has an idle connection or can open one
+  without making a request wait, and it needs `DATABASE_POOL_MAX` of at least 2.
+  Memory is bounded: at most 3 tracked unfinished runs and 10 run records per job,
+  and the newest evidence of each kind per job. A lost write loses an observation,
+  never a run. After five failed writes only failures and partial results are kept
+  for five minutes.
+- Table limits: at most 64 jobs in the catalogue and 2560 run rows in total. Rows of ids
+  that are no longer in the catalogue are removed when a worker starts.
 
-Changing a job's schedule, grace or stale threshold changes its config version:
-the success recorded under the old schedule stays visible but is no longer
-judged by the new rule.
+Changing a job's schedule, grace or stale threshold changes its config version.
+For a daily job, the success recorded under the old schedule stays visible but no
+longer sets the due time, which restarts from the new version. A frequent job has no
+due time: its last successful pass is judged by the new threshold, even though it ran
+under the old one.
 
 ## Test it
 
-- `scheduled-jobs.catalogue.spec.ts` fails when a `@Cron` or `@Interval` bypasses
-  the catalogue, when a catalogue entry is not used exactly once, or when a lock
-  or threshold is inconsistent. Run it after adding a job.
+- `scheduled-jobs.catalogue.spec.ts` is a fast source scan: it fails on a raw
+  `@Cron` or `@Interval`, a catalogue entry used other than once, or an inconsistent
+  lock or threshold. Run it after adding a job. It reads text, so the authoritative
+  guard is `apps/api/test/process-role.e2e-spec.ts`: it runs Nest's own scheduler
+  explorer on the real `web`, `worker` and `all` graphs and requires the registered
+  jobs to equal the catalogue (each once, with the declared schedule) in worker and
+  all, and no scheduler in web.
+- `scheduled-job.runtime.spec.ts` shows on the real scheduler that the decorator keeps
+  the tick times and the overlap behaviour and that the next planned fire can be read
+  when a run starts.
 - Unit-test each branch of your result mapping at the place where you classify,
   with `fakeJobs()` from `scheduled-job.test-support.ts`.
 - For the write path itself (merge order, caps, concurrency) the PostgreSQL suite is
-  `apps/api/test/scheduled-job-evidence.e2e-spec.ts`.
+  `apps/api/test/scheduled-job-evidence.e2e-spec.ts`; the tables under the
+  production `migrator` and `runtime` roles are in
+  `apps/api/test/scheduled-job-roles.e2e-spec.ts`.
+- To measure the recorder's cost against the connection pool, run the on-demand
+  `apps/api/test/measure/scheduled-job-overhead.measure.ts` (its header gives the
+  command). It is not part of the regular suites.
 
 ## Related
 
-- `docs/operations-console/scheduled-jobs.md`: what operators see (present when the optional Console is).
 - [Deployment](../operations/deployment.md): process roles and why recovery jobs
   run on every replica without a Redis lock.
 - [GeoIP setup](../operations/geoip-setup.md): the updater is one such job.

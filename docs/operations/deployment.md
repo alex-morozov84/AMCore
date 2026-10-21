@@ -759,7 +759,8 @@ drain disjoint rows without double-sending. The throttler is Redis-backed and
 BullMQ workers consume one shared queue. Add worker replicas freely. Each process
 records the result of its scheduled jobs for the Console
 Scheduled jobs screen of the optional Console. Recording is
-best-effort, takes at most one pooled connection and is skipped when
+best-effort: one background write at a time, started only when the pool has a
+free connection and no request is waiting for one, and skipped when
 `DATABASE_POOL_MAX` is 1.
 
 ### Graceful shutdown
