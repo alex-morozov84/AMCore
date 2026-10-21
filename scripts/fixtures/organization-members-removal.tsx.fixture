@@ -50,7 +50,7 @@ export function InlineRemoval({
       data-example-region="removal"
       data-testid="custom-headless-removal"
     >
-      {visible && sameSession && <h2 className="font-semibold">{target.email}</h2>}
+      {visible && sameSession && <h2 className="break-all font-semibold">{target.email}</h2>}
       {sameSession && confirmed && <p role="status">{t('success')}</p>}
       {sameSession && unknown && <p role="status">{t('unknown')}</p>}
       {sameSession && removal.inspection && <p role="status">{t(removal.inspection.status)}</p>}
@@ -60,7 +60,9 @@ export function InlineRemoval({
       {visible && !confirmed && reviewable && (
         <>
           <h2 className="font-semibold">{t('title')}</h2>
-          <p>{t('memberIdentity', { name: target.name ?? target.email, email: target.email })}</p>
+          <p className="break-all">
+            {t('memberIdentity', { name: target.name ?? target.email, email: target.email })}
+          </p>
           <label className="flex items-start gap-2">
             <Checkbox
               checked={ack}

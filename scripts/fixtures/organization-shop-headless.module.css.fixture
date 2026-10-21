@@ -40,6 +40,11 @@
   border-radius: 0.25rem 1.5rem 0.25rem 0.25rem;
 }
 
+.station [data-example-region] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .station [data-example-region='members'],
 .station [data-example-region='editor'],
 .station [data-example-region='removal'] {
@@ -57,6 +62,10 @@
 }
 
 .station [data-slot='button'] {
+  max-width: 100%;
+  height: auto;
+  overflow-wrap: anywhere;
+  white-space: normal;
   min-height: 2.75rem;
   padding-inline: 1rem;
   border-radius: 0.25rem;
