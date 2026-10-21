@@ -45,8 +45,8 @@
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",
     "@clack/prompts": "^1.8.1",
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@eslint/js": "10.0.1",
     "eslint": "10.13.0",
     "husky": "^9.1.7",
