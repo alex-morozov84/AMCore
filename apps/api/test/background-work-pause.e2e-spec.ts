@@ -1001,7 +1001,9 @@ describe('Managed queue pause/resume — real BullMQ/Redis', () => {
     const attemptId = uuidv7()
     const digest = 'a'.repeat(64)
     const scope = 'b'.repeat(64)
-    const now = Date.now()
+    // The Lua horizon check uses Redis TIME; sample the same clock at its boundary.
+    const [seconds, microseconds] = await redis.time()
+    const now = Number(seconds) * 1000 + Math.floor(Number(microseconds) / 1000)
     const bodyKey = `${key}:am-request:${incarnation}`
     await redis.hset(
       key,

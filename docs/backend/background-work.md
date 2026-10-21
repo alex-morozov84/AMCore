@@ -430,3 +430,15 @@ It also checks process-role inventory, observation and read-only Bull Board.
 No application database or owner preview is used. Keep downstream conformance
 tests alongside the registered handler and business authority; do not add a
 separate administrative API or UI to make a registration manageable.
+
+### BullMQ dependency updates
+
+Startup verifies the source and compiled hashes of the upstream Lua scripts used
+by managed controls, including their transitive includes. A package version change
+alone does not block startup. Dependabot updates can pass when those scripts stay
+identical and the remaining CI checks pass.
+
+A changed source or compiled script blocks startup before workers start. Review
+the upstream change against the application-owned Lua variants before updating
+`apps/api/src/infrastructure/background-work/scripts/script-provenance.ts`.
+Its version records the last manually reviewed release; it is not an allowlist.
