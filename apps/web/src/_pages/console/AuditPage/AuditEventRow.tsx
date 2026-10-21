@@ -8,6 +8,7 @@ import { auditSummary } from './audit-summary'
 import { auditRowFilter } from './audit-url'
 import { AuditCommandDetails } from './AuditCommandDetails'
 import { AuditReference } from './AuditReference'
+import { AuditRequestId } from './AuditRequestId'
 import { AuditTimestamp } from './AuditTimestamp'
 import { CopyAuditId } from './CopyAuditId'
 
@@ -97,6 +98,7 @@ export function AuditEventRow({ item, baseHref, query, copy }: RowProps) {
           />
         </p>
       )}
+      {item.requestId && <AuditRequestId requestId={item.requestId} copy={copy} />}
     </li>
   )
 }

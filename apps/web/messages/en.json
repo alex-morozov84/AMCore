@@ -265,6 +265,8 @@
       "target": "Target",
       "organization": "Organization",
       "eventId": "Event ID",
+      "requestId": "Request ID",
+      "requestIdHint": "A request ID is a search aid. The caller can choose it, so it does not prove who made the request.",
       "types": {
         "USER": "User",
         "API_KEY": "API key",
@@ -684,6 +686,9 @@
     "externalToolsToolNotConfigured": "{tool}: not configured.",
     "externalToolsHowTo": "How to connect",
     "externalToolsRecovery": "Recovery instructions",
+    "externalToolsLogLinksNotConfigured": "Log links on jobs and audit events: not configured.",
+    "logSearchLink": "Find in logs",
+    "logSearchNote": "“Find in logs” opens Grafana in a new tab and searches the last 7 days. With the shipped log setup it works while your SSH tunnel to Grafana is open.",
     "overviewFilesTitle": "File storage",
     "overviewFilesHealthy": "Working",
     "overviewFilesFailed": "Check failed",

@@ -85,7 +85,11 @@ function GuideLinks({ showHowTo, t }: ToolProps & { showHowTo: boolean }) {
  * Plain text, not a disabled button, says what is missing: a disabled control is skipped by the
  * keyboard and hides its reason. The addresses arrive already normalized by the server.
  */
-export function OverviewExternalTools({ links, t }: ToolProps & { links: ConsoleExternalLinks }) {
+export function OverviewExternalTools({
+  links,
+  logSearchConfigured,
+  t,
+}: ToolProps & { links: ConsoleExternalLinks; logSearchConfigured: boolean }) {
   const configured = CONSOLE_EXTERNAL_TOOLS.flatMap((tool) => {
     const href = links[tool]
     return href === null ? [] : [{ tool, href }]
@@ -103,6 +107,11 @@ export function OverviewExternalTools({ links, t }: ToolProps & { links: Console
         <p className="mt-3 text-sm text-muted-foreground">{t('externalToolsNone')}</p>
       )}
       {configured.length > 0 && missing.length > 0 && <UnconfiguredTools tools={missing} t={t} />}
+      {links.logs !== null && !logSearchConfigured && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {t('externalToolsLogLinksNotConfigured')}
+        </p>
+      )}
       <GuideLinks showHowTo={missing.length > 0} t={t} />
     </section>
   )

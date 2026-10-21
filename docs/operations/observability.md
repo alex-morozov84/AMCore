@@ -9,10 +9,32 @@ of this page describes `apps/api`.
 
 ## Structured Logs
 
-`apps/api`'s application logs are structured Pino JSON in production and
-carry a `correlationId` on every record. The value is read from
-`X-Request-ID` / `X-Correlation-ID` when present, otherwise AMCore generates
-one per request.
+`apps/api`'s application logs are structured Pino JSON in production. Every
+record written while a request runs, and every worker line of a job that a request started,
+carries a `correlationId`; jobs started outside a request carry none (see below).
+
+**Where the ID comes from.** The API reads `X-Request-ID`, then `X-Correlation-ID`,
+and accepts the first value that is a single string of 1–128 characters from
+`A-Za-z0-9._:-`. A repeated, oversized or oddly encoded header is ignored without
+being logged, and AMCore generates a UUID. Every response of an API route (under `/api/v1`) returns the ID in
+`X-Correlation-Id`, error bodies carry it as `correlationId`, and audit records store
+it as `requestId`. The ID is a search aid: a client chooses it, so it never proves
+who made a request and must not be used for authorization or integrity.
+
+**Worker lines.** A job started during a request stores that request's ID, so the
+worker's lines for that job carry the same `correlationId` plus `workId` and `jobId`.
+Idempotent and wake runs add an `invocationId` inside the handler; a queued email does
+not. A job started outside a request, and every wake job
+(notifications, AI runs), has no request ID; search those by `jobId`, `deliveryId` or
+`runId`. When the API adds a job it logs one `job.enqueued` line with `jobId`,
+`incarnation` and `duplicate`; for a duplicate add the job keeps the first
+request's ID and this line links the later request to it. See
+[Request correlation](../backend/background-work.md#request-correlation).
+
+**Finding a request.** Take the ID from the `X-Correlation-Id` response header, from
+an error body's `correlationId`, or from the audit record's `requestId` (the admin audit API returns it). The web
+server also sends its own ID outbound as `X-Correlation-Id`, so a request made through
+the web app carries the web server's ID end to end.
 
 HTTP request logs include bounded request metadata — method, route, status, user
 id when authenticated, user agent, and an **anonymized client IP**. IPv4 keeps
@@ -34,8 +56,8 @@ Invitation continuation and handoff headers, OAuth authorization code/state and
 login tickets are also redacted. Response `Set-Cookie` and `Location` values are
 redacted because authentication cookies and redirects may carry credentials.
 
-Email addresses in enqueue and direct-send log lines
-are redacted via `redactEmail()` (`a***@example.com` — domain kept, since
+Email addresses in enqueue, direct-send and provider log lines (Resend and the
+mock provider) are redacted via `redactEmail()` (`a***@example.com` — domain kept, since
 delivery/bounce triage is overwhelmingly domain-level) rather than the
 `logging.config.ts` redact list: Pino's own redaction fully replaces a value
 with `[Redacted]`, which would destroy the domain. A stable `userId` pseudonym
@@ -46,36 +68,26 @@ terminal events expose only bounded job ID, template and attempt information,
 without recipient, payload or raw provider exception. Auth's own
 `User registered`/`User logged in` log lines already carry `userId` and drop
 the raw `email` field entirely — no pseudonym gap to fill there, so no
-redaction is needed, only the surplus field's removal.
+redaction is needed, only the surplus field's removal. An email subject can carry
+user or organization names, so no log line includes it.
 
-## Log Shipping (Non-Goal)
+## Log Search and Shipping
 
-AMCore deliberately does not ship a log-shipping/aggregation layer. Structured
-Pino JSON goes to each container's stdout only; `docker/compose/prod.yml`'s
-shared `x-logging` block rotates it via Docker's own `local` driver
-(`COMPOSE_LOG_DRIVER`, default `local` — the only other accepted value is
-`json-file`; anything else, e.g. `syslog`/`journald`, uses different option
-names entirely and fails at container **start**, not at `compose config`
-time) at `COMPOSE_LOG_MAX_SIZE`/`COMPOSE_LOG_MAX_FILE` (default `20m` × `5`
-files per container — see `.env.example`). This bounds disk usage
-automatically; it does not make history searchable.
+By default AMCore ships no log pipeline: structured Pino JSON goes to each container's stdout and
+`docker/compose/prod.yml`'s shared `x-logging` block rotates it with Docker's own `local` driver
+(`COMPOSE_LOG_DRIVER`, default `local`; the only other accepted value is `json-file`, because other
+drivers use different option names and fail at container **start**, not at `compose config` time)
+at `COMPOSE_LOG_MAX_SIZE` × `COMPOSE_LOG_MAX_FILE` (default `20m` × `5` files per container, see
+`.env.example`). That bounds disk use; it does not make history searchable. Once a line rolls past
+the window it is gone, and `local`'s files are for the Docker daemon and `docker logs` only, not for
+an external shipper.
 
-The direct consequence under the shipped default (`local` driver): once a log
-line rolls past that 20MB×5 window, it is gone. There is no documented way to
-search historical logs, and no way to correlate a `correlationId` across the
-`api` and `worker` processes once either has rotated past the point where a
-given request's lines lived — `local`'s own files are for the Docker daemon
-and `docker logs`/`docker compose logs` only, not for an external shipper to
-read directly (see `.env.example`'s own comment and the file's `x-logging`
-comment). Switching `COMPOSE_LOG_DRIVER` to `json-file` is the documented
-escape hatch when an external tool needs the raw files directly, but AMCore
-does not itself ship or configure that tool, a shipping pipeline, or a
-searchable log store — a fork needing durable, searchable, cross-process log
-history is expected to add a real shipper (Vector, Fluent Bit, a platform's
-own log-shipping sidecar) reading from `json-file` on top of this, the same
-way this repo ships an exemplary metrics/alerting/dashboard surface but
-expects a fork to wire its own paging integration (see
-[Alerting](#alerting) below).
+For durable, searchable, cross-process history, apply the opt-in
+[log-search reference overlay](log-search.md): it switches `api`, `worker` and `web` to `json-file`,
+ships their lines with Grafana Alloy to a single-node Loki, and serves them through an authenticated
+Grafana on `127.0.0.1`. Nothing in the application depends on it. Its alerts and runbooks are in
+`prometheus/optional/amcore-log-shipping.yml` and [log-shipping](runbooks/log-shipping.md). High
+availability, backups and a standalone monitoring host are not part of it.
 
 ## Web Server Logs
 

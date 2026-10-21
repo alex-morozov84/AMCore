@@ -265,6 +265,8 @@
       "target": "Объект",
       "organization": "Организация",
       "eventId": "ID события",
+      "requestId": "ID запроса",
+      "requestIdHint": "ID запроса нужен для поиска. Его может задать сам вызывающий, поэтому он не доказывает, кто сделал запрос.",
       "types": {
         "USER": "Пользователь",
         "API_KEY": "API-ключ",
@@ -684,6 +686,9 @@
     "externalToolsToolNotConfigured": "{tool}: не настроены.",
     "externalToolsHowTo": "Как подключить",
     "externalToolsRecovery": "Инструкции по восстановлению",
+    "externalToolsLogLinksNotConfigured": "Ссылки на логи у заданий и событий аудита: не настроены.",
+    "logSearchLink": "Найти в логах",
+    "logSearchNote": "«Найти в логах» открывает Grafana в новой вкладке и ищет за последние 7 дней. В поставляемой схеме логов ссылка работает, пока открыт ваш SSH-туннель к Grafana.",
     "overviewFilesTitle": "Файловое хранилище",
     "overviewFilesHealthy": "Работает",
     "overviewFilesFailed": "Проверка не прошла",

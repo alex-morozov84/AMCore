@@ -1,6 +1,10 @@
 import type { ExecutionContext } from '@nestjs/common'
 
-import { createMockContext, type MockContext, mockContextToPrisma } from '../../auth/test-context'
+import {
+  createMockContext,
+  type MockContext,
+  mockContextToPrisma,
+} from '../../auth/auth-context.testkit'
 import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
 import { ApiKeysService } from '../api-keys.service'
 

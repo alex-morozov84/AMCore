@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { canonicalValue, decodeSetting, encodeSetting, immutable } from './setting-codec'
-import { testDefinition } from './setting-definition.fixture'
+import { testDefinition } from './setting-definition.testkit'
 import { SettingRegistry } from './setting-registry'
 
 describe('ordinary typed setting definitions', () => {

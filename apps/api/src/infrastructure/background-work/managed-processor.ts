@@ -1,28 +1,65 @@
 import { getQueueToken, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq'
-import { Inject, type Type } from '@nestjs/common'
+import { Inject, Optional, type Type } from '@nestjs/common'
 import { ModuleRef } from '@nestjs/core'
 import type { Job, Queue } from 'bullmq'
 import { DelayedError, UnrecoverableError } from 'bullmq'
+import { ClsService } from 'nestjs-cls'
+import { PinoLogger } from 'nestjs-pino'
 
 import { workReasonSchema } from '@amcore/shared'
 
+import { jobRunEvent } from './job-run-log.js'
 import type { WorkDefinition, WorkHandler } from './work-definition.js'
 import { WorkExecutionService } from './work-execution.service.js'
+import { workerLogStore } from './worker-log-context.js'
 
 /** One generated host per definition; business modules export handlers, never raw processors. */
 export function managedProcessor(definition: WorkDefinition): Type<WorkerHost> {
   const queueName = definition.queue?.name
   if (!queueName) throw new Error('MISSING_QUEUE_DEFINITION')
+  const queueLabel: string = queueName
   class ManagedProcessor extends WorkerHost {
     constructor(
       @Inject(getQueueToken(queueName)) private readonly queue: Queue,
       @Inject(WorkExecutionService) private readonly execution: WorkExecutionService,
-      @Inject(ModuleRef) private readonly modules: ModuleRef
+      @Inject(ModuleRef) private readonly modules: ModuleRef,
+      @Optional() @Inject(ClsService) private readonly cls?: ClsService,
+      @Optional() @Inject(PinoLogger) private readonly logger?: PinoLogger
     ) {
       super()
     }
 
-    async process(job: Job, token?: string): Promise<void> {
+    /** Runs each job in its own log context: request ID (if any), work ID and job ID. */
+    process(job: Job, token?: string): Promise<void> {
+      // The application always provides CLS; a processor built by hand without it still runs.
+      if (!this.cls) return this.reported(job, token)
+      return this.cls.runWith(workerLogStore(definition.id, job), () => this.reported(job, token))
+    }
+
+    /** Logs one `job.finished` line inside the job's log context, then rethrows any failure. */
+    private async reported(job: Job, token?: string): Promise<void> {
+      const started = performance.now()
+      const finish = (error?: unknown): void => {
+        const event = jobRunEvent(
+          queueLabel,
+          job.name,
+          error,
+          Math.round(performance.now() - started)
+        )
+        if (event.outcome === 'completed' || event.outcome === 'delayed')
+          this.logger?.info(event, 'Job finished')
+        else this.logger?.warn(event, 'Job did not finish')
+      }
+      try {
+        await this.run(job, token)
+      } catch (error) {
+        finish(error)
+        throw error
+      }
+      finish()
+    }
+
+    private async run(job: Job, token?: string): Promise<void> {
       if (this.execution.discardSecret(definition, job)) return
       const current = definition.jobs[job.name]?.wireVersion
       const version =

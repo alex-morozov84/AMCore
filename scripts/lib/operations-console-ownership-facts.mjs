@@ -34,7 +34,12 @@ const sharedModules = [
   module('apps/web/src/shared/lib/admin-console-startup.ts', ['admin-console-startup.test.ts']),
   module('apps/web/src/shared/lib/console-docs-links.ts', ['console-docs-links.test.ts']),
   module('apps/web/src/shared/lib/console-external-links.ts', ['console-external-links.test.ts']),
+  module('apps/web/src/shared/lib/console-log-search-target.ts', [
+    'console-log-search-target.test.ts',
+  ]),
   module('apps/web/src/shared/lib/console-host-guard.ts', ['console-host-guard.test.ts']),
+  module('apps/web/src/shared/lib/log-search-context.tsx'),
+  module('apps/web/src/shared/lib/log-search-link.ts', ['log-search-link.test.ts']),
   module('apps/web/src/shared/lib/console-public-api-path.ts', ['console-public-api-path.test.ts']),
   module('apps/web/src/shared/lib/console-public-href.ts', ['console-public-href.test.ts']),
   module('apps/web/src/shared/lib/console-detail-url.ts'),

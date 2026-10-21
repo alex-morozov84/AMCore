@@ -5,8 +5,8 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { NotFoundException } from '../../common/exceptions'
 import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
 
+import { createMockContext, type MockContext, mockContextToPrisma } from './auth-context.testkit'
 import { SessionService } from './session.service'
-import { createMockContext, type MockContext, mockContextToPrisma } from './test-context'
 import { TokenService } from './token.service'
 
 import { type Session, SystemRole, type User } from '@/generated/prisma/client'

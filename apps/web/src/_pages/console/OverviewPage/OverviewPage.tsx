@@ -3,6 +3,7 @@ import { getFormatter, getTranslations } from 'next-intl/server'
 import { fetchConsoleOverview } from '@/shared/api/console/overview'
 import { resolvePrimary } from '@/shared/api/server'
 import { getConsoleExternalLinks } from '@/shared/lib/console-external-links'
+import { getConsoleLogSearchTarget } from '@/shared/lib/console-log-search-target'
 import {
   DEPLOYMENT_VERSION,
   deploymentVersionResponseSchema,
@@ -42,7 +43,11 @@ export async function OverviewPage() {
         {outcome.status === 'available' && <OverviewRefresh />}
       </header>
       {/* Read per request, beside the API outcome: the links do not depend on the snapshot. */}
-      <OverviewExternalTools links={getConsoleExternalLinks()} t={t} />
+      <OverviewExternalTools
+        links={getConsoleExternalLinks()}
+        logSearchConfigured={getConsoleLogSearchTarget() !== null}
+        t={t}
+      />
       {outcome.status === 'unavailable' ? (
         <>
           <OverviewWebIdentity artifactId={artifactId} t={t} />

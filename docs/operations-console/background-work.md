@@ -426,6 +426,14 @@ delivery or processing finished. An unknown outcome may already have produced
 an effect; repeating it may create a duplicate. A result that was not saved is
 reported separately from a confirmed absence of an effect.
 
+### Find in logs
+
+When the operator configured [Find in logs links](configuration.md#find-in-logs-links), each job
+card shows **Find in logs** beside the job ID (a notification delivery or an AI run shows its own
+ID there). It opens Grafana in a new tab with the last 7 days of lines that mention that ID. The
+section's note says so once. Without the setting there is no link. Selecting the card is separate:
+the link does not select or change anything.
+
 ### Action confirmations
 
 Confirmations explain retry, cancellation, cleanup, pause and resume separately.

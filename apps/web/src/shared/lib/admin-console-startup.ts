@@ -1,5 +1,6 @@
 import { getConsoleOrigin, validateAdminConsoleStartup } from './admin-console-config'
 import { assertConsoleExternalLinks } from './console-external-links'
+import { assertConsoleLogSearchTarget } from './console-log-search-target'
 import { productAdminOrigins } from './product-admin-config.server'
 
 import 'server-only'
@@ -16,6 +17,7 @@ export function validateAdminConsoleStartupOrExit(): void {
         throw new Error('Separate Console requires a different hostname, regardless of port')
     }
     assertConsoleExternalLinks()
+    assertConsoleLogSearchTarget()
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Invalid Operations Console configuration'

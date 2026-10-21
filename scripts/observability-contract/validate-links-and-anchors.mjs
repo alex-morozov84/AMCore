@@ -60,6 +60,7 @@ export function runAgainstRealRepo({
   alertFiles = [
     'docs/operations/prometheus/amcore-alerts.yml',
     'docs/operations/prometheus/optional/amcore-slo-burn-rate.yml',
+    'docs/operations/prometheus/optional/amcore-log-shipping.yml',
   ],
   markdownPaths = [
     'docs/operations/runbooks/http.md',
@@ -70,6 +71,7 @@ export function runAgainstRealRepo({
     'docs/operations/runbooks/realtime.md',
     'docs/operations/runbooks/node-runtime.md',
     'docs/operations/runbooks/metrics-collector-health.md',
+    'docs/operations/runbooks/log-shipping.md',
     'docker/monitoring/grafana/dashboards/README.md',
   ],
 } = {}) {

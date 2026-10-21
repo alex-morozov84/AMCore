@@ -8,6 +8,7 @@ import {
   serializedJsonBytes,
 } from '@amcore/shared'
 
+import { input, ORDER_UPDATE, orderCapabilities, orderPresetRule, rule } from './access.testkit'
 import { AccessOperationBudget, AccessUnavailableError } from './access-budget'
 import {
   type AccessCapability,
@@ -15,7 +16,6 @@ import {
   countItemSpecs,
 } from './access-capabilities'
 import { explainAccess } from './access-evaluator'
-import { input, ORDER_UPDATE, orderCapabilities, orderPresetRule, rule } from './access-fixtures'
 import { assertResponseWithinCap } from './member-access.service'
 
 const capability = (id: string, fields = 0): AccessCapability => ({

@@ -1,0 +1,209 @@
+# AMCore — promtool unit tests for the optional log-shipping alerts. Each alert has a firing case
+# on a constructed bad series and a healthy case that stays silent; the disk alerts also prove
+# the 15% / 5% boundaries and that the two tiers are separate alerts.
+
+rule_files:
+  - ../amcore-log-shipping.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: collector down fires after 5m, healthy collector stays silent
+    interval: 1m
+    input_series:
+      - series: 'up{job="amcore-log-collector"}'
+        values: '1x5 0x10'
+      - series: 'up{job="amcore-loki"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AMCoreLogCollectorDown
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: AMCoreLogCollectorDown
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              job: amcore-log-collector
+            exp_annotations:
+              summary: 'The log collector (Alloy) is down or not scraped'
+              description: 'Application logs are not reaching Loki. They stay in Docker files only until the rotation window passes (COMPOSE_LOG_MAX_SIZE x COMPOSE_LOG_MAX_FILE per service).'
+              runbook_path: docs/operations/runbooks/log-shipping.md#collector-down
+      - eval_time: 14m
+        alertname: AMCoreLogStoreDown
+        exp_alerts: []
+
+  - name: an absent collector target counts as down
+    interval: 1m
+    input_series:
+      - series: 'up{job="amcore-loki"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreLogCollectorDown
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              job: amcore-log-collector
+            exp_annotations:
+              summary: 'The log collector (Alloy) is down or not scraped'
+              description: 'Application logs are not reaching Loki. They stay in Docker files only until the rotation window passes (COMPOSE_LOG_MAX_SIZE x COMPOSE_LOG_MAX_FILE per service).'
+              runbook_path: docs/operations/runbooks/log-shipping.md#collector-down
+
+  - name: log store down fires after 5m
+    interval: 1m
+    input_series:
+      - series: 'up{job="amcore-loki"}'
+        values: '1x5 0x10'
+      - series: 'up{job="amcore-log-collector"}'
+        values: '1x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AMCoreLogStoreDown
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: AMCoreLogStoreDown
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              job: amcore-loki
+            exp_annotations:
+              summary: 'The log store (Loki) is down or not scraped'
+              description: 'Logs cannot be searched and the collector cannot deliver. Alloy retries; lines are safe only while they remain inside the Docker rotation window.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#log-store-down
+
+  - name: retrying fires after 10m of retries, silent when no batch is retried
+    interval: 1m
+    input_series:
+      - series: 'loki_write_batch_retries_total{job="amcore-log-collector",host="loki:3100"}'
+        values: '0x5 0+2x25'
+      - series: 'loki_write_batch_retries_total{job="healthy-copy",host="loki:3100"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreLogShippingRetrying
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: AMCoreLogShippingRetrying
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'The collector keeps retrying to send logs to Loki'
+              description: 'Alloy has been retrying batches for 10 minutes. Delivery is delayed and lines that rotate out of Docker files meanwhile are lost. Check Loki readiness and the collector logs.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#shipping-retrying
+
+  - name: a healthy collector never retries
+    interval: 1m
+    input_series:
+      - series: 'loki_write_batch_retries_total{job="amcore-log-collector",host="loki:3100"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: AMCoreLogShippingRetrying
+        exp_alerts: []
+
+  - name: dropped entries fire after 10m of drops
+    interval: 1m
+    input_series:
+      - series: 'loki_write_dropped_entries_total{job="amcore-log-collector",host="loki:3100",reason="ingester_error"}'
+        values: '0x5 0+3x25'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: AMCoreLogEntriesDropped
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: AMCoreLogEntriesDropped
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'The collector is dropping log entries'
+              description: 'Alloy gave up on entries after repeated send failures. Those lines are lost from the store unless they are still in a Docker file.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#entries-dropped
+
+  - name: refused lines fire with the reason, silent when nothing is discarded
+    interval: 1m
+    input_series:
+      - series: 'loki_discarded_samples_total{job="amcore-loki",reason="rate_limited",tenant="fake"}'
+        values: '0+5x30'
+      - series: 'loki_discarded_samples_total{job="amcore-loki",reason="greater_than_max_sample_age",tenant="fake"}'
+        values: '7x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: AMCoreLogStoreRefusingLines
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              reason: rate_limited
+            exp_annotations:
+              summary: 'Loki is refusing log lines (rate_limited)'
+              description: 'Loki discards lines that break its limits: rate or stream limits, or samples older than the retention window.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#store-refusing-lines
+
+  - name: flush failures page after 10m, silent when flushes succeed
+    interval: 1m
+    input_series:
+      - series: 'loki_ingester_chunks_flush_failures_total{job="amcore-loki"}'
+        values: '0x5 0+4x25'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AMCoreLogStoreFlushFailing
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: AMCoreLogStoreFlushFailing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'Loki cannot write log chunks to its volume'
+              description: 'Chunk flushes are failing, so lines held in memory are dropped after a few retries. This usually means a full or unwritable volume. Free space or fix permissions now.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#store-flush-failing
+
+  - name: healthy flushes never page
+    interval: 1m
+    input_series:
+      - series: 'loki_ingester_chunks_flush_failures_total{job="amcore-loki"}'
+        values: '3x30'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: AMCoreLogStoreFlushFailing
+        exp_alerts: []
+
+  - name: disk tiers are separate alerts at 15% and 5%
+    interval: 1m
+    input_series:
+      # 100 bytes in total: 20 free for 10m (healthy), 12 free for 20m (low), 3 free after (critical).
+      - series: 'node_filesystem_size_bytes{job="amcore-log-collector-disk",mountpoint="/loki-data"}'
+        values: '100x60'
+      - series: 'node_filesystem_avail_bytes{job="amcore-log-collector-disk",mountpoint="/loki-data"}'
+        values: '20x10 12x20 3x30'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: AMCoreLogStoreDiskLow
+        exp_alerts: []
+      - eval_time: 29m
+        alertname: AMCoreLogStoreDiskLow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              job: amcore-log-collector-disk
+              mountpoint: /loki-data
+            exp_annotations:
+              summary: 'Less than 15% of the log store volume is free'
+              description: 'The volume that holds Loki data is running out of space. Lower LOGS_RETENTION_PERIOD, grow the volume, or reduce the volume of logs. On Docker Desktop and OrbStack the figure is the VM disk.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#disk-low
+      - eval_time: 29m
+        alertname: AMCoreLogStoreDiskCritical
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: AMCoreLogStoreDiskCritical
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: amcore-log-collector-disk
+              mountpoint: /loki-data
+            exp_annotations:
+              summary: 'Less than 5% of the log store volume is free'
+              description: 'Loki will fail to write soon. Free space now; a full volume also stops the collector from delivering.'
+              runbook_path: docs/operations/runbooks/log-shipping.md#disk-low

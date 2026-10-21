@@ -4,12 +4,13 @@ import { Inject, Injectable, Optional } from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import { UnrecoverableError } from 'bullmq'
 import type { Redis } from 'ioredis'
+import { ClsService } from 'nestjs-cls'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 
 import { readBoundedJob } from './bounded-job-reader.js'
 import { managedJobKey } from './managed-job-key.js'
-import { parseManagedJob } from './managed-job-profile.js'
+import { managedEnvelopeSchema, parseManagedJob } from './managed-job-profile.js'
 import { startIdempotentInvocation } from './scripts/idempotent-start.js'
 import { reportManagedInvocation } from './scripts/invocation-report.js'
 import {
@@ -37,15 +38,6 @@ export interface ProviderWindowExecution {
   ): Promise<void>
 }
 
-const envelopeSchema = z.strictObject({
-  protocolVersion: z.literal(1),
-  incarnation: z.uuidv7(),
-  jobVersion: z.number().int().positive(),
-  executionPolicyVersion: z.number().int().positive(),
-  createdAt: z.number().int().nonnegative(),
-  payload: z.unknown(),
-})
-
 /** Shared execution entry; policy-local admission precedes every business handler. */
 @Injectable()
 export class WorkExecutionService {
@@ -53,7 +45,10 @@ export class WorkExecutionService {
     private readonly readiness: WorkReadiness,
     @Optional()
     @Inject(PROVIDER_WINDOW_EXECUTION)
-    private readonly providerWindow?: ProviderWindowExecution
+    private readonly providerWindow?: ProviderWindowExecution,
+    @Optional()
+    @Inject(ClsService)
+    private readonly cls?: ClsService
   ) {}
 
   discardSecret(definition: WorkDefinition, job: Job): boolean {
@@ -81,7 +76,7 @@ export class WorkExecutionService {
       (!job.data || typeof job.data !== 'object' || !('protocolVersion' in job.data))
     )
       await this.providerWindow.prepareLegacy(definition, queue, job, token)
-    const envelope = envelopeSchema.safeParse(job.data)
+    const envelope = managedEnvelopeSchema.safeParse(job.data)
     if (!envelope.success) {
       if (
         definition.kind === 'wake' &&
@@ -122,7 +117,7 @@ export class WorkExecutionService {
     queue: Queue,
     job: Job,
     token: string,
-    envelope: z.infer<typeof envelopeSchema>,
+    envelope: z.infer<typeof managedEnvelopeSchema>,
     payload: unknown,
     handler: WorkHandler
   ): Promise<void> {
@@ -181,6 +176,8 @@ export class WorkExecutionService {
     incarnation: string,
     invocationId: string
   ): WorkInvocation {
+    // Every log line of the handler run carries the invocation; the processor set the rest.
+    this.cls?.set('invocationId', invocationId)
     return {
       workId: definition.id,
       jobId: job.id!,

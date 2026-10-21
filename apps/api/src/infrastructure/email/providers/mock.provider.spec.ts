@@ -75,12 +75,15 @@ describe('MockEmailProvider', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'test@example.com',
+          to: 't***@example.com',
           hasHtml: true,
           hasText: true,
         }),
         'Email sent (MOCK)'
       )
+      const logged = JSON.stringify(mockLogger.info.mock.calls)
+      expect(logged).not.toContain('test@example.com')
+      expect(logged).not.toContain('Secret')
       expect(mockLogger.debug).not.toHaveBeenCalled()
     })
   })

@@ -2,6 +2,8 @@ import { BullModule, getQueueToken } from '@nestjs/bullmq'
 import { type DynamicModule, Global, Module, type Provider } from '@nestjs/common'
 import { DiscoveryModule } from '@nestjs/core'
 import type { Queue } from 'bullmq'
+import { ClsService } from 'nestjs-cls'
+import { PinoLogger } from 'nestjs-pino'
 
 import { EnvModule } from '../../env/env.module.js'
 import { EnvService } from '../../env/env.service.js'
@@ -13,6 +15,7 @@ import { ControlConnection } from './control-connection.js'
 import { managedProcessor } from './managed-processor.js'
 import { ManagedProducer } from './managed-producer.js'
 import { PgOutcomeBuffer } from './pg-outcome-buffer.js'
+import { createProducerObserver } from './producer-observer.js'
 import { ProviderEvidenceStore } from './provider-evidence.store.js'
 import { MANAGED_PRODUCERS, validateWorkRegistrations, WORK_REGISTRATIONS } from './registration.js'
 import { MANAGED_WORKERS, type ManagedWorkerBinding, WorkCoordinator } from './work-coordinator.js'
@@ -152,9 +155,9 @@ function producerProvider(definition: WorkDefinition): Extract<Provider, { provi
     }
   return {
     provide: definition.tokens.producer,
-    inject: [getQueueToken(definition.queue.name), WorkReadiness],
-    useFactory: (queue: Queue, readiness: WorkReadiness) =>
-      new ManagedProducer(definition, queue, readiness),
+    inject: [getQueueToken(definition.queue.name), WorkReadiness, PinoLogger, ClsService],
+    useFactory: (queue: Queue, readiness: WorkReadiness, logger: PinoLogger, cls: ClsService) =>
+      new ManagedProducer(definition, queue, readiness, createProducerObserver(logger, cls)),
   }
 }
 

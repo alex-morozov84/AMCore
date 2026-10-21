@@ -138,7 +138,8 @@ jobs:
           echo "    export COMPOSE_WEB_IMAGE=ghcr.io/.../web@<web digest>"
           echo "    docker compose -f docker-compose.yml -f docker/compose/prod.yml pull"
           echo "    docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate"
-          echo "    docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api worker web"
+          echo "    docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps worker"
+          echo "    docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api web"
           echo "  '"
           echo "Never rebuild here — pull the exact digests captured by the build job above."
 

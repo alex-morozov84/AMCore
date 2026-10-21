@@ -40,6 +40,14 @@ describe('separate Console hostname startup invariant', () => {
     expect(process.stderr.write).toHaveBeenCalledWith(expect.stringContaining('different hostname'))
   })
 
+  it('retains log-search validation with three distinct hostnames', () => {
+    vi.stubEnv('ADMIN_CONSOLE_LOGS_GRAFANA_URL', 'https://user:password@example.test')
+    expect(() => validateAdminConsoleStartupOrExit()).toThrow('startup refused')
+    expect(process.stderr.write).toHaveBeenCalledWith(
+      expect.stringContaining('ADMIN_CONSOLE_LOGS_GRAFANA_URL')
+    )
+  })
+
   it('accepts three distinct hostnames with one shared TLS port', () => {
     expect(() => validateAdminConsoleStartupOrExit()).not.toThrow()
     expect(process.exit).not.toHaveBeenCalled()

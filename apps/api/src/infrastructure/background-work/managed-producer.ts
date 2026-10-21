@@ -7,6 +7,7 @@ import { createUuidV7 as uuidv7 } from '@amcore/shared'
 import { DEFAULT_JOB_OPTIONS } from '../queue/interfaces/job-options.interface.js'
 
 import { managedJobKey } from './managed-job-key.js'
+import type { ProducerObserver } from './producer-observer.js'
 import { initializeManagedQueue } from './scripts/initialize-queue.js'
 import type { WorkDefinition } from './work-definition.js'
 import { canonicalWire, parseWorkPayload } from './work-payload.js'
@@ -41,6 +42,7 @@ export interface ManagedEnvelope {
   readonly jobVersion: number
   readonly executionPolicyVersion: number
   readonly createdAt: number
+  readonly correlationId?: string
   readonly payload: unknown
 }
 
@@ -49,7 +51,8 @@ export class ManagedProducer<D extends WorkDefinition> {
   constructor(
     private readonly definition: D,
     private readonly queue: Queue,
-    private readonly readiness: WorkReadiness
+    private readonly readiness: WorkReadiness,
+    private readonly observer?: ProducerObserver
   ) {}
 
   async add<K extends keyof D['jobs'] & string>(
@@ -62,12 +65,17 @@ export class ManagedProducer<D extends WorkDefinition> {
     if (!binding || !this.definition.queue?.enabled) throw new Error('WORK_UNAVAILABLE')
     const parsedOptions = optionsSchema.parse(options)
     if (parsedOptions.jobId) managedJobKey(this.queue, parsedOptions.jobId)
+    // Wake jobs are hints over database rows and may coalesce many requests, so none owns the job.
+    const correlationId =
+      this.definition.kind === 'wake' ? undefined : this.observer?.correlationId()
     const envelope: ManagedEnvelope = {
       protocolVersion: 1,
       incarnation: uuidv7(),
       jobVersion: binding.wireVersion,
       executionPolicyVersion: binding.replay.policyVersion,
       createdAt: Date.now(),
+      // Key order and omission follow managedEnvelopeSchema (see its comment).
+      ...(correlationId ? { correlationId } : {}),
       payload: canonicalWire(binding, payload),
     }
     if (Buffer.byteLength(JSON.stringify(envelope), 'utf8') > 32768)
@@ -104,6 +112,14 @@ export class ManagedProducer<D extends WorkDefinition> {
       !z.uuid().safeParse(identity.incarnation).success
     )
       throw new Error('METADATA_UNAVAILABLE')
+    this.observer?.enqueued({
+      queue: this.queue.name,
+      workId: this.definition.id,
+      jobName,
+      jobId: job.id!,
+      incarnation: identity.incarnation,
+      duplicate: identity.incarnation !== envelope.incarnation,
+    })
     return { jobId: job.id!, incarnation: identity.incarnation }
   }
 }

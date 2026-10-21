@@ -39,6 +39,17 @@ copying JavaScript without its package boundary changes Node's interpretation.
 The standard Dockerfile preserves that boundary and includes the native checker
 script in the builder stage. Migrations remain a separate one-shot deployment
 step. See [deployment](../operations/deployment.md).
+
+The runner packages compiled `dist`, `package.json`, the package README and
+production dependencies. The Dockerfile also creates writable upload and GeoIP
+directories. The `files` list in the API `package.json` controls what `pnpm deploy`
+copies from the API package. Source, tests, Prisma schemas/migrations, tool configs
+and API source maps stay out. Add any new API package asset read at run time to
+that list. Dependency packages retain their own assets and packaging rules.
+The CI step "Verify the runner image holds only runtime files" checks required
+entrypoints and build identity. Outside `node_modules`, it rejects the listed
+source/tool directories and spec, test, `*.testkit.*`, `*.map` and `*.ts` files.
+
 The [migration image](../operations/migrator-image.md) uses its own frozen CLI
 graph; it does not inherit this API build or move client generation to rollout.
 
@@ -103,6 +114,12 @@ API units retain Jest's CommonJS transformation. E2E retains Jest's ESM
 transformation and isolated Testcontainers workers. Their configs are ESM;
 `jest-swc.config.cjs` deliberately remains CommonJS. Keep decorator metadata and
 relative `.js` mapping in both paths. Email retains Vitest.
+
+A module that only tests import (a fixture, a fake, a corpus) is named
+`*.testkit.ts`. The production build excludes that suffix, as it does `*.spec.ts`,
+`*.test.ts` and `*-spec.ts`: keep the list in `.swcrc` and `tsconfig.build.json`
+in step. Do not add test-only code to a name the build does not exclude, or it
+ships in `dist`.
 
 Run affected unit, schema/type-negative, compiled-command and E2E contracts after
 changing module or compiler configuration. Full API E2E, all repeated extension

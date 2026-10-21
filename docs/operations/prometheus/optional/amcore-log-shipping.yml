@@ -1,0 +1,104 @@
+# AMCore — optional alerts for the log-search reference overlay (docker/compose/logs.yml,
+# docs/operations/log-search.md). They watch the log pipeline itself — Alloy and Loki —
+# not application behavior.
+#
+# OFF BY DEFAULT, like the SLO burn-rate rules: this directory is not part of
+# docker/monitoring/prometheus/prometheus.yml's default `rule_files` glob. Load it in a
+# Prometheus that also scrapes the two targets in docker/log-search/prometheus/scrape-logs.yml.
+#
+# The application does not depend on the pipeline: if Alloy or Loki stops, stdout and Docker's
+# rotated files keep the lines until the rotation window passes. These alerts exist so that
+# window is not missed silently.
+#
+# Metric names come from the pinned Alloy and Loki versions in docker/compose/logs.yml; a version
+# bump re-checks them (docs/operations/log-search.md, "Upgrading the pinned images").
+groups:
+  - name: amcore-log-shipping
+    rules:
+      - alert: AMCoreLogCollectorDown
+        expr: up{job="amcore-log-collector"} == 0 or absent(up{job="amcore-log-collector"})
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'The log collector (Alloy) is down or not scraped'
+          description: 'Application logs are not reaching Loki. They stay in Docker files only until the rotation window passes (COMPOSE_LOG_MAX_SIZE x COMPOSE_LOG_MAX_FILE per service).'
+          runbook_path: docs/operations/runbooks/log-shipping.md#collector-down
+
+      - alert: AMCoreLogStoreDown
+        expr: up{job="amcore-loki"} == 0 or absent(up{job="amcore-loki"})
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'The log store (Loki) is down or not scraped'
+          description: 'Logs cannot be searched and the collector cannot deliver. Alloy retries; lines are safe only while they remain inside the Docker rotation window.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#log-store-down
+
+      - alert: AMCoreLogShippingRetrying
+        # Alloy retries a batch when Loki is unreachable, not ready or answers with an error. A
+        # healthy pipeline never retries. The collector's read counters cannot be used here:
+        # Alloy reads every container's files and drops the other services' lines afterwards.
+        expr: sum(rate(loki_write_batch_retries_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'The collector keeps retrying to send logs to Loki'
+          description: 'Alloy has been retrying batches for 10 minutes. Delivery is delayed and lines that rotate out of Docker files meanwhile are lost. Check Loki readiness and the collector logs.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#shipping-retrying
+
+      - alert: AMCoreLogEntriesDropped
+        expr: sum(rate(loki_write_dropped_entries_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'The collector is dropping log entries'
+          description: 'Alloy gave up on entries after repeated send failures. Those lines are lost from the store unless they are still in a Docker file.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#entries-dropped
+
+      - alert: AMCoreLogStoreRefusingLines
+        expr: sum by (reason) (rate(loki_discarded_samples_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Loki is refusing log lines ({{ $labels.reason }})'
+          description: 'Loki discards lines that break its limits: rate or stream limits, or samples older than the retention window.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#store-refusing-lines
+
+      - alert: AMCoreLogStoreFlushFailing
+        # Loki keeps recent lines in memory and writes chunks to the volume. When the write fails
+        # (full volume, wrong permissions) it retries a few times and then drops the chunk, while
+        # the collector still sees successful pushes. This is the direct signal for that loss.
+        expr: sum(rate(loki_ingester_chunks_flush_failures_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Loki cannot write log chunks to its volume'
+          description: 'Chunk flushes are failing, so lines held in memory are dropped after a few retries. This usually means a full or unwritable volume. Free space or fix permissions now.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#store-flush-failing
+
+      - alert: AMCoreLogStoreDiskLow
+        # Loki has no size-based retention: retention period and ingestion limits bound growth,
+        # and this alert covers the case where they were set too generously for the volume.
+        expr: node_filesystem_avail_bytes{job="amcore-log-collector-disk",mountpoint="/loki-data"} / node_filesystem_size_bytes{job="amcore-log-collector-disk",mountpoint="/loki-data"} < 0.15
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Less than 15% of the log store volume is free'
+          description: 'The volume that holds Loki data is running out of space. Lower LOGS_RETENTION_PERIOD, grow the volume, or reduce the volume of logs. On Docker Desktop and OrbStack the figure is the VM disk.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#disk-low
+
+      - alert: AMCoreLogStoreDiskCritical
+        expr: node_filesystem_avail_bytes{job="amcore-log-collector-disk",mountpoint="/loki-data"} / node_filesystem_size_bytes{job="amcore-log-collector-disk",mountpoint="/loki-data"} < 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Less than 5% of the log store volume is free'
+          description: 'Loki will fail to write soon. Free space now; a full volume also stops the collector from delivering.'
+          runbook_path: docs/operations/runbooks/log-shipping.md#disk-low

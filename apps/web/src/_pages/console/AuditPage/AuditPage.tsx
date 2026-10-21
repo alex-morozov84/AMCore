@@ -4,6 +4,7 @@ import type { AdminAuditQuery } from '@amcore/shared'
 
 import { getConsoleAuditHref } from '@/shared/lib/console-public-href'
 import { ConsoleRestorePosition } from '@/shared/ui/console-detail/ConsoleRestorePosition'
+import { LogSearchNote } from '@/shared/ui/console-detail/LogSearchLink'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import { resolveAuditWindow } from './audit-date-window'
@@ -42,6 +43,8 @@ export async function AuditPage({ query }: AuditPageProps) {
       <div>
         <h1 className="text-3xl font-semibold">{copy.title}</h1>
         <p className="text-muted-foreground">{copy.description}</p>
+        <LogSearchNote />
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{copy.requestIdHint}</p>
       </div>
       <>
         <div className="space-y-1 rounded-lg border border-border bg-card p-3 text-sm">

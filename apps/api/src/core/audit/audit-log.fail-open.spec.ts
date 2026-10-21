@@ -1,7 +1,7 @@
 import type { ClsService } from 'nestjs-cls'
 import type { PinoLogger } from 'nestjs-pino'
 
-import { createMockContext, mockContextToPrisma } from '../auth/test-context'
+import { createMockContext, mockContextToPrisma } from '../auth/auth-context.testkit'
 
 import { AuditLogService } from './audit-log.service'
 

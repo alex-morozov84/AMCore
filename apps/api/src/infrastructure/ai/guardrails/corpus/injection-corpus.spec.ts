@@ -3,7 +3,7 @@ import type { GuardResult } from '../guardrail.types'
 import { scanInput } from '../input-guard'
 import { scanOutput } from '../output-guard'
 
-import { INPUT_CORPUS, OUTPUT_CORPUS } from './injection-corpus'
+import { INPUT_CORPUS, OUTPUT_CORPUS } from './injection-corpus.testkit'
 
 /** Every bounded category code either guard may emit — for the content-free membership invariant. */
 const BOUNDED = new Set<string>([

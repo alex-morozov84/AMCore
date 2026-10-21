@@ -13,6 +13,8 @@ vi.mock('@/shared/ui/route-progress-link', () => ({
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin/audit' }))
 
 import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
+import { LogSearchTargetProvider } from '@/shared/lib/log-search-context'
+import { logSearchHref, type LogSearchTarget } from '@/shared/lib/log-search-link'
 
 import type { AuditCopy } from './audit-copy'
 import { AuditEventRow } from './AuditEventRow'
@@ -33,6 +35,7 @@ const copy = {
   filterTarget: 'Filter target',
   filterOrganization: 'Filter organization',
   filterAction: 'Filter action',
+  requestId: 'Request ID',
   copyId: 'Copy ID',
   copied: 'Copied',
   copyFailed: 'Could not copy',
@@ -76,11 +79,21 @@ const item: AdminAuditResponse['items'][number] = {
   summary: {},
 }
 
-function renderRow(value = item) {
+function renderRow(value = item, target: LogSearchTarget | null = null) {
   return render(
-    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
+    <NextIntlClientProvider
+      locale={DEFAULT_LOCALE}
+      messages={{
+        console: {
+          logSearchLink: 'Find in logs',
+          overviewPublicOpenNewTab: '(opens in a new tab)',
+        },
+      }}
+    >
       <ConsoleTimeZoneProvider>
-        <AuditEventRow item={value} baseHref="/admin/audit" query={{ limit: 25 }} copy={copy} />
+        <LogSearchTargetProvider target={target}>
+          <AuditEventRow item={value} baseHref="/admin/audit" query={{ limit: 25 }} copy={copy} />
+        </LogSearchTargetProvider>
       </ConsoleTimeZoneProvider>
     </NextIntlClientProvider>
   )
@@ -120,6 +133,47 @@ describe('Audit event row', () => {
     expect(
       screen.getByRole('button', { name: 'Copy ID: owner-retry', hidden: true })
     ).toBeInTheDocument()
+  })
+
+  it('links only the task ID of the command details to the log search', () => {
+    const target: LogSearchTarget = { kind: 'grafana-loki', baseUrl: 'http://localhost:3002/' }
+    renderRow(
+      {
+        ...item,
+        action: 'background_work.command_outcome',
+        commandDetails: {
+          commandId: '019a1234-1234-7123-8123-123456789012',
+          workId: 'fixture-import',
+          jobId: 'owner-retry',
+          operation: 'retry',
+          outcome: 'applied',
+        },
+      },
+      target
+    )
+    const links = screen.getAllByRole('link', { name: /Find in logs/, hidden: true })
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute('href', logSearchHref(target, 'owner-retry'))
+  })
+
+  it('shows the request ID with copy and a log-search link, only when the event has one', () => {
+    const target: LogSearchTarget = { kind: 'grafana-loki', baseUrl: 'http://localhost:3002/' }
+    const { unmount } = renderRow({ ...item, requestId: 'req-55' }, target)
+    expect(screen.getByText('Request ID:')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy ID: req-55' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Find in logs/ })).toHaveAttribute(
+      'href',
+      logSearchHref(target, 'req-55')
+    )
+    unmount()
+    renderRow(item, target)
+    expect(screen.queryByText('Request ID:')).not.toBeInTheDocument()
+  })
+
+  it('shows the request ID without a link when no log-search address is configured', () => {
+    renderRow({ ...item, requestId: 'req-55' })
+    expect(screen.getByText('req-55')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Find in logs/ })).not.toBeInTheDocument()
   })
 
   it('copies a displayed ID and reports success', async () => {

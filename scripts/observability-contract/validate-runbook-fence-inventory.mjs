@@ -27,6 +27,7 @@ export function runAgainstRealRepo({
     'docs/operations/runbooks/realtime.md',
     'docs/operations/runbooks/node-runtime.md',
     'docs/operations/runbooks/metrics-collector-health.md',
+    'docs/operations/runbooks/log-shipping.md',
   ],
 } = {}) {
   const fences = runbookPaths.flatMap((p) => extractAllFences(p))

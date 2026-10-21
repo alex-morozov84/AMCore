@@ -1,5 +1,6 @@
 import type { AdminAuditResponse } from '@amcore/shared'
 
+import { LogSearchLink } from '@/shared/ui/console-detail/LogSearchLink'
 import { Disclosure } from '@/shared/ui/disclosure'
 
 import type { AuditCopy } from './audit-copy'
@@ -36,6 +37,7 @@ export function AuditCommandDetails({ details, copy }: { details: Details; copy:
                   failed={copy.copyFailed}
                 />
               )}
+              {key === 'jobId' && <LogSearchLink id={String(value)} className="ml-2" />}
             </dd>
           </div>
         ))}

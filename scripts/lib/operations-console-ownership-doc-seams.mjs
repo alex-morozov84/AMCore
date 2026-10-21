@@ -297,6 +297,16 @@ export const operationsConsoleDocSeams = [
     )
   ),
   entry(
+    'console.log-links-guide',
+    'docs/operations/log-search.md',
+    block('<!-- AMCORE_CONSOLE_LOG_LINKS_START -->', '<!-- AMCORE_CONSOLE_LOG_LINKS_END -->'),
+    [
+      'AMCORE_CONSOLE_LOG_LINKS_START',
+      'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
+      '../operations-console/configuration.md',
+    ]
+  ),
+  entry(
     'console.ai-run-runbook',
     'docs/operations/runbooks/queues.md',
     block(

@@ -7,9 +7,9 @@ import { AppException } from '../../../common/exceptions'
 import type { PrismaService } from '../../../prisma'
 import { CapabilityRegistry } from '../capability-registry.service'
 
+import { ORDER_UPDATE } from './access.testkit'
 import { AccessUnavailableError } from './access-budget'
 import type { AccessCapability } from './access-capabilities'
-import { ORDER_UPDATE } from './access-fixtures'
 import type { loadAccess } from './access-loader'
 import { MemberAccessService } from './member-access.service'
 

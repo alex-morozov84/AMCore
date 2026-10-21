@@ -9,7 +9,7 @@ import {
   type CorpusOutputFamily,
   INPUT_CORPUS,
   OUTPUT_CORPUS,
-} from './injection-corpus'
+} from './injection-corpus.testkit'
 
 /**
  * Aggregate regression gate over the Arc D corpus (Track C — ADR-054 / ADR-055, Arc D.5).

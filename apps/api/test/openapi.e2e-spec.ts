@@ -401,6 +401,24 @@ describe('OpenAPI success surface (e2e)', () => {
       for (const status of ['400', '413', '415']) expect(operation.responses[status]).toBeDefined()
   })
 
+  it('documents the X-Correlation-Id response header on every response', () => {
+    expect(document.components?.headers?.CorrelationId).toBeDefined()
+    const missing = Object.entries(document.paths).flatMap(([path, item]) =>
+      HTTP_METHODS.flatMap((method) =>
+        Object.entries(item?.[method]?.responses ?? {})
+          .filter(
+            ([, response]) =>
+              !!response &&
+              !('$ref' in response) &&
+              (response.headers?.['X-Correlation-Id'] as { $ref?: string } | undefined)?.$ref !==
+                '#/components/headers/CorrelationId'
+          )
+          .map(([status]) => `${method.toUpperCase()} ${path} ${status}`)
+      )
+    )
+    expect(missing).toEqual([])
+  })
+
   it('documents TeamAccess/record-field failures and permission assignment branches', () => {
     const orgOperations = Object.entries(document.paths).filter(([path]) =>
       path.startsWith('/organizations')
@@ -905,7 +923,7 @@ describe('OpenAPI success surface (e2e)', () => {
     const ref = response.content?.['application/json']?.schema?.$ref
     expect(ref).toBeDefined()
     const visited = new Set<string>()
-    const forbidden = new Set(['metadata', 'ip', 'requestId', 'emailHash', 'pinoEvent'])
+    const forbidden = new Set(['metadata', 'ip', 'emailHash', 'pinoEvent'])
     const missingRefs: string[] = []
     const forbiddenKeys: string[] = []
     const detailFields = new Set<string>()
