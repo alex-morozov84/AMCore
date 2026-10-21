@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { ScheduledJob } from '@amcore/shared'
+import type { ScheduledJob, ScheduledSummary } from '@amcore/shared'
 
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 
@@ -156,4 +156,41 @@ export function JobNotes({ job }: { job: ScheduledJob }) {
   const shown = notes.filter(Boolean)
   if (shown.length === 0) return null
   return <div className="space-y-1 text-xs text-muted-foreground">{shown}</div>
+}
+
+/** The safe counters and codes of one run, in words: what was cleaned and what went wrong. */
+export function RunSummary({
+  code,
+  summary,
+}: {
+  code: string | null
+  summary: ScheduledSummary | null
+}) {
+  const t = useTranslations('console.scheduledJobs.history')
+  const bucket = useTranslations('console.scheduledJobs.buckets')
+  const locale = useLocale()
+  const codeLabel = useCodeLabel()
+  const counts = Object.entries(summary?.counts ?? {})
+  const codes = summary?.codes ?? []
+  const number = new Intl.NumberFormat(locale)
+  return (
+    <>
+      {counts.length > 0 && (
+        <p className="text-muted-foreground">
+          {counts
+            .map(([key, value]) => {
+              const label = key as Parameters<typeof bucket.has>[0]
+              return `${bucket.has(label) ? bucket(label) : key}: ${number.format(value)}`
+            })
+            .join(`; `)}
+        </p>
+      )}
+      {codes.length > 0 && (
+        <p className="text-muted-foreground">
+          {t('details')} {codes.map(codeLabel).join(', ')}
+        </p>
+      )}
+      {code && <p className="text-muted-foreground">{codeLabel(code)}</p>}
+    </>
+  )
 }

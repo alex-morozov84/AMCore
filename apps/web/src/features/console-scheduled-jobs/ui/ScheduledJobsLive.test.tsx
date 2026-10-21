@@ -32,6 +32,7 @@ function state(overrides: Partial<ReturnType<typeof useScheduledJobs>> = {}) {
   vi.mocked(useScheduledJobs).mockReturnValue({
     data: response([succeededJob, partialJob, unknownJob, disabledJob, frequentJob]),
     instance: 'i',
+    reportAccessLoss: vi.fn(),
     denied: false,
     auto: true,
     setAuto,

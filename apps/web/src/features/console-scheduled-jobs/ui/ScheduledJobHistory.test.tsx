@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { consoleApi } from '@/shared/api/console-api'
 import { ApiRequestError } from '@/shared/api/http-client'
 
+import { ScheduledJobsScopeProvider } from './scheduled-jobs-context'
 import { scheduledJobsMessages } from './scheduled-jobs-test-messages'
 import { ScheduledJobHistory } from './ScheduledJobHistory'
 
@@ -19,6 +20,7 @@ vi.mock('@/shared/ui/api-error-alert', () => ({
 }))
 
 const runs = vi.mocked(consoleApi.getScheduledJobRuns)
+const onAccessLoss = vi.fn()
 const run = (over: Partial<ScheduledRun> = {}): ScheduledRun => ({
   runId: '00000000-0000-4000-8000-000000000001',
   startedAt: '2026-10-21T02:00:00.000Z',
@@ -34,7 +36,9 @@ function view() {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={scheduledJobsMessages}>
-        <ScheduledJobHistory jobId="cleanup" instance="i" />
+        <ScheduledJobsScopeProvider value={{ instance: 'i', onAccessLoss }}>
+          <ScheduledJobHistory jobId="cleanup" />
+        </ScheduledJobsScopeProvider>
       </NextIntlClientProvider>
     </QueryClientProvider>
   )
@@ -115,6 +119,39 @@ describe('run history', () => {
     view()
     open()
     expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText('No runs recorded yet.')).not.toBeInTheDocument()
+  })
+
+  it('shows the safe counters and codes of a run, in words, with the failure', async () => {
+    runs.mockResolvedValue({
+      jobId: 'cleanup',
+      checkedAt: '2026-10-21T09:20:00.000Z',
+      truncated: false,
+      runs: [
+        run({
+          state: 'partial',
+          summary: {
+            counts: { expiredSessions: 12, isolatedFailures: 1 },
+            codes: ['expiredSessions'],
+          },
+        }),
+      ],
+    })
+    view()
+    open()
+    expect(
+      await screen.findByText('expired sessions: 12; parts that failed: 1')
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Details:/)).toBeInTheDocument()
+    expect(screen.queryByText('isolatedFailures')).not.toBeInTheDocument()
+  })
+
+  it('reports a refused history to the page owner and shows nothing of it', async () => {
+    runs.mockRejectedValue(new ApiRequestError(403, undefined))
+    view()
+    open()
+    await waitFor(() => expect(onAccessLoss).toHaveBeenCalled())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByText('No runs recorded yet.')).not.toBeInTheDocument()
   })
 })

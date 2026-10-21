@@ -16,7 +16,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function JobCard({ job, instance }: { job: ScheduledJob; instance: string }) {
+function JobCard({ job }: { job: ScheduledJob }) {
   const t = useTranslations('console.scheduledJobs')
   const duration = 'durationMs' in job.result ? job.result.durationMs : null
   return (
@@ -42,7 +42,7 @@ function JobCard({ job, instance }: { job: ScheduledJob; instance: string }) {
       <div className="mt-3">
         <JobNotes job={job} />
         {job.cadence === 'daily' && job.config.state === 'enabled' && (
-          <ScheduledJobHistory jobId={job.id} instance={instance} />
+          <ScheduledJobHistory jobId={job.id} />
         )}
       </div>
     </li>
@@ -50,12 +50,12 @@ function JobCard({ job, instance }: { job: ScheduledJob; instance: string }) {
 }
 
 /** Mobile presentation (below md): one card per job, same fields as the table. */
-export function ScheduledJobCards({ jobs, instance }: { jobs: ScheduledJob[]; instance: string }) {
+export function ScheduledJobCards({ jobs }: { jobs: ScheduledJob[] }) {
   const t = useTranslations('console.scheduledJobs')
   return (
     <ul aria-label={t('tableLabel')} className="flex flex-col gap-3 md:hidden">
       {jobs.map((job) => (
-        <JobCard key={job.id} job={job} instance={instance} />
+        <JobCard key={job.id} job={job} />
       ))}
     </ul>
   )

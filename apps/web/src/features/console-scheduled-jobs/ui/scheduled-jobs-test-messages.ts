@@ -105,6 +105,7 @@ export const scheduledJobsMessages = {
         finishedAttempts: 'delivery attempts',
         telegramLinkTokens: 'Telegram link tokens',
         telegramUpdateReceipts: 'Telegram update receipts',
+        isolatedFailures: 'parts that failed',
       },
       codes: {
         bucket_failed: 'Some steps did not finish',
@@ -123,6 +124,8 @@ export const scheduledJobsMessages = {
         truncated: 'Showing the latest {count} runs.',
         to: '->',
         dot: '.',
+        staleLead: 'The latest refresh failed. Showing runs read at',
+        details: 'Details:',
       },
       jobs: {
         cleanup: {

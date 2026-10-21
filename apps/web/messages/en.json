@@ -1165,7 +1165,8 @@
         "unreadNotifications": "unread notifications",
         "finishedAttempts": "delivery attempts",
         "telegramLinkTokens": "Telegram link tokens",
-        "telegramUpdateReceipts": "Telegram update receipts"
+        "telegramUpdateReceipts": "Telegram update receipts",
+        "isolatedFailures": "parts that failed"
       },
       "codes": {
         "bucket_failed": "Some steps did not finish",
@@ -1174,7 +1175,9 @@
         "maintenance_deferred": "Postponed to the next run",
         "invalid_result": "Unexpected result",
         "unexpected": "Unexpected error",
-        "download_failed": "The download failed"
+        "download_failed": "The download failed",
+        "already_current": "Already up to date",
+        "updated": "Updated"
       },
       "history": {
         "title": "Run history",
@@ -1183,7 +1186,9 @@
         "unknownRun": "The end of this run was not recorded.",
         "truncated": "Showing the latest {count} runs.",
         "to": "→",
-        "dot": "·"
+        "dot": "·",
+        "staleLead": "The latest refresh failed. Showing runs read at",
+        "details": "Details:"
       },
       "jobs": {
         "cleanup": {

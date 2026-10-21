@@ -1165,7 +1165,8 @@
         "unreadNotifications": "непрочитанные уведомления",
         "finishedAttempts": "попытки доставки",
         "telegramLinkTokens": "токены привязки Telegram",
-        "telegramUpdateReceipts": "квитанции обновлений Telegram"
+        "telegramUpdateReceipts": "квитанции обновлений Telegram",
+        "isolatedFailures": "части, которые не удались"
       },
       "codes": {
         "bucket_failed": "Не все шаги завершились",
@@ -1174,7 +1175,9 @@
         "maintenance_deferred": "Отложено до следующего запуска",
         "invalid_result": "Неожиданный результат",
         "unexpected": "Непредвиденная ошибка",
-        "download_failed": "Не удалось скачать"
+        "download_failed": "Не удалось скачать",
+        "already_current": "Уже актуально",
+        "updated": "Обновлено"
       },
       "history": {
         "title": "История запусков",
@@ -1183,7 +1186,9 @@
         "unknownRun": "Завершение этого запуска не записано.",
         "truncated": "Показаны последние запусков: {count}.",
         "to": "→",
-        "dot": "·"
+        "dot": "·",
+        "staleLead": "Последнее обновление не удалось. Показаны запуски, прочитанные в",
+        "details": "Подробности:"
       },
       "jobs": {
         "cleanup": {

@@ -50,14 +50,21 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
   const online = useSyncExternalStore(onlineStore.subscribe, onlineStore.get, () => true)
   const manualInFlight = useRef(false)
   const handled = useRef({ data: initialUpdatedAt, error: 0 })
+  const accessLost = useRef(false)
+  const owns = useCallback(
+    (key: readonly unknown[]) =>
+      key[0] === 'console' && key[1] === 'scheduled-jobs' && key.includes(instance),
+    [instance]
+  )
 
   const admitted = isAdmitted({ auto, denied, visible, online, now, floors })
 
   const query = useQuery<ScheduledJobsResponse>({
-    queryKey,
+    // After access loss the observer must not rebuild the private cache from the server snapshot.
+    queryKey: denied ? [...queryKey, 'denied'] : queryKey,
     queryFn: async ({ signal }) =>
       scheduledJobsResponseSchema.parse(await consoleApi.getScheduledJobs(signal)),
-    initialData: initial,
+    initialData: denied ? undefined : initial,
     initialDataUpdatedAt: initialUpdatedAt,
     staleTime: 10_000,
     gcTime: 0,
@@ -70,6 +77,21 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
   })
 
   useCooldownTicks(floors, setNow)
+
+  /**
+   * The one access-loss path, for the list and every history: hide rows and histories at once,
+   * cancel what is in flight, drop the private cache and ask the Console frame to re-admit once.
+   */
+  const reportAccessLoss = useCallback(() => {
+    if (accessLost.current) return
+    accessLost.current = true
+    setDenied(true)
+    const predicate = (candidate: { queryKey: readonly unknown[] }): boolean =>
+      owns(candidate.queryKey)
+    void queryClient.cancelQueries({ predicate })
+    queryClient.removeQueries({ predicate })
+    router.refresh()
+  }, [owns, queryClient, router])
 
   // Every transition that leaves automatic fetching unadmitted cancels queued or in-flight
   // AUTOMATIC work. A manual fetch survives, except after access loss.
@@ -84,6 +106,11 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     setNow(Date.now())
     setStreak(0)
     setFloors(NO_FLOORS)
+    // Opened histories follow the page: only mounted (opened) ones refetch, closed ones have no observer.
+    void queryClient.invalidateQueries({
+      queryKey: ['console', 'scheduled-jobs', 'runs', instance],
+      refetchType: 'active',
+    })
   }, [query.dataUpdatedAt])
 
   // Failure: access loss ends the display; anything else backs off and honours Retry-After.
@@ -91,9 +118,7 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     if (!query.errorUpdatedAt || query.errorUpdatedAt === handled.current.error) return
     handled.current.error = query.errorUpdatedAt
     if (isAccessLoss(query.error)) {
-      setDenied(true)
-      queryClient.removeQueries({ queryKey, exact: true })
-      router.refresh()
+      reportAccessLoss()
       return
     }
     const at = Date.now()
@@ -115,8 +140,9 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
   }, [denied, floors, query])
 
   return {
-    data: denied ? null : query.data,
+    data: denied ? null : (query.data ?? null),
     instance,
+    reportAccessLoss,
     denied,
     auto,
     setAuto,

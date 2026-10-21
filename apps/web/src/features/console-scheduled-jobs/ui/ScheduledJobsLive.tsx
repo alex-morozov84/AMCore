@@ -8,6 +8,7 @@ import { InfoTooltip } from '@/shared/ui/info-tooltip'
 
 import { useScheduledJobs } from '../model/use-scheduled-jobs'
 
+import { ScheduledJobsScopeProvider } from './scheduled-jobs-context'
 import { ScheduledJobCards } from './ScheduledJobCards'
 import { ScheduledJobsControls } from './ScheduledJobsControls'
 import { ScheduledJobsTable } from './ScheduledJobsTable'
@@ -57,8 +58,12 @@ export function ScheduledJobsLive({
           <p className="text-sm text-muted-foreground">{t('noJobs')}</p>
         ) : (
           <>
-            <ScheduledJobsTable jobs={data.jobs} instance={live.instance} />
-            <ScheduledJobCards jobs={data.jobs} instance={live.instance} />
+            <ScheduledJobsScopeProvider
+              value={{ instance: live.instance, onAccessLoss: live.reportAccessLoss }}
+            >
+              <ScheduledJobsTable jobs={data.jobs} />
+              <ScheduledJobCards jobs={data.jobs} />
+            </ScheduledJobsScopeProvider>
             {data.jobs.some((job) => job.cadence === 'frequent') && (
               <p className="text-xs text-muted-foreground">{t('frequentFootnote')}</p>
             )}

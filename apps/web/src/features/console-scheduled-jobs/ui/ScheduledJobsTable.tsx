@@ -10,7 +10,7 @@ import { JobDuration, JobLastSuccess, JobName, JobNotes, JobSchedule } from './j
 import { JobFreshness, JobResult } from './job-status'
 import { ScheduledJobHistory } from './ScheduledJobHistory'
 
-function Row({ job, instance }: { job: ScheduledJob; instance: string }) {
+function Row({ job }: { job: ScheduledJob }) {
   const duration = 'durationMs' in job.result ? job.result.durationMs : null
   return (
     <Fragment>
@@ -42,7 +42,7 @@ function Row({ job, instance }: { job: ScheduledJob; instance: string }) {
         <TableCell colSpan={6} className="pt-0 pb-4 whitespace-normal">
           <JobNotes job={job} />
           {job.cadence === 'daily' && job.config.state === 'enabled' && (
-            <ScheduledJobHistory jobId={job.id} instance={instance} />
+            <ScheduledJobHistory jobId={job.id} />
           )}
         </TableCell>
       </TableRow>
@@ -51,7 +51,7 @@ function Row({ job, instance }: { job: ScheduledJob; instance: string }) {
 }
 
 /** Desktop presentation (md and up). Hidden with `display: none` below, so assistive tech reads one list. */
-export function ScheduledJobsTable({ jobs, instance }: { jobs: ScheduledJob[]; instance: string }) {
+export function ScheduledJobsTable({ jobs }: { jobs: ScheduledJob[] }) {
   const t = useTranslations('console.scheduledJobs')
   return (
     <div className="hidden rounded-lg border bg-surface-elevated shadow-md md:block">
@@ -68,7 +68,7 @@ export function ScheduledJobsTable({ jobs, instance }: { jobs: ScheduledJob[]; i
         </TableHeader>
         <TableBody>
           {jobs.map((job) => (
-            <Row key={job.id} job={job} instance={instance} />
+            <Row key={job.id} job={job} />
           ))}
         </TableBody>
       </Table>
