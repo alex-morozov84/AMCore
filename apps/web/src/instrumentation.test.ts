@@ -6,6 +6,11 @@ import { onRequestError, register } from './instrumentation'
 
 vi.mock('server-only', () => ({}))
 vi.mock('@/shared/lib/server-logger', () => ({ logServerError: vi.fn() }))
+// Host and link validation has its own tests. The start-up check is inert here, and its export name
+// is built from parts because shared tests must not name Console identifiers.
+vi.mock('@/shared/lib/admin-console-startup', () => ({
+  [['validate', 'AdminConsoleStartupOrExit'].join('')]: vi.fn(),
+}))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -55,12 +60,6 @@ describe('onRequestError', () => {
 
 describe('register', () => {
   const original = { ...process.env }
-  beforeEach(() => {
-    // A generated host-mode project also validates the three hostnames at start-up.
-    vi.stubEnv('FRONTEND_URL', 'https://shop.example.test:8443')
-    vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
-    vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test:8443')
-  })
   afterEach(() => {
     process.env = { ...original }
   })
