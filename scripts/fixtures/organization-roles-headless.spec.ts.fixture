@@ -1,9 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { DEFAULT_LOCALE, localizedFrontendUrl, productAdminPath } from '@amcore/shared'
 
-import en from '../../messages/en.json'
-import ru from '../../messages/ru.json'
-
-const labels = (DEFAULT_LOCALE === 'ru' ? ru : en).organizationRoles
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -19,13 +18,26 @@ test.afterEach(async ({ context }, info) => {
   for (const page of context.pages()) await closeCredentialPage(page, info)
 })
 
-test('a different custom UI manages roles through the public headless API, real BFF and no ready widget', async ({ page, context }) => {
+test('a different custom UI manages roles through the public headless API, real BFF and no ready widget', async ({
+  page,
+  context,
+}) => {
   const target = activeTarget()
+  const labels = JSON.parse(
+    readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
+  ).organizationRoles
   const email = uniqueEmail('custom-roles')
-  const register = await context.request.post('/api/auth/register', { headers: { origin: target.origins.product }, data: { email, password: TEST_PASSWORD } })
+  const register = await context.request.post('/api/auth/register', {
+    headers: { origin: target.origins.product },
+    data: { email, password: TEST_PASSWORD },
+  })
   expect(register.status()).toBe(201)
   const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
-  const org = await directApi('organizations', { name: 'Custom roles composition' }, login.accessToken)
+  const org = await directApi(
+    'organizations',
+    { name: 'Custom roles composition' },
+    login.accessToken
+  )
   const authorized: string[] = []
   const traffic: string[] = []
   page.on('request', (request) => {
@@ -33,35 +45,69 @@ test('a different custom UI manages roles through the public headless API, real 
     if (request.headers()['authorization']) authorized.push(request.url())
     traffic.push(`${request.method()} ${new URL(request.url()).pathname}`)
   })
-  const rolesUrl = new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, productAdminPath(`/organizations/${org.id}/roles`))).pathname
+  const rolesUrl = new URL(
+    localizedFrontendUrl(
+      target.origins.product,
+      DEFAULT_LOCALE,
+      productAdminPath(`/organizations/${org.id}/roles`)
+    )
+  ).pathname
   await page.goto(rolesUrl)
   await expect(page.getByTestId('custom-headless-roles')).toBeVisible()
   // List: built-in roles with this organization's holder counts (the creator holds ADMIN).
-  const admin = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: 'ADMIN', exact: true }) })
+  const admin = page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('button', { name: 'ADMIN', exact: true }) })
   await expect(admin).toContainText(DEFAULT_LOCALE === 'ru' ? '1 человек' : '1 person')
   // Create -> 201 -> the new role's snapshot opens.
   await page.getByLabel(labels.nameLabel).fill('Fixture role')
-  const created = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/role-definitions'))
+  const created = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().endsWith('/role-definitions')
+  )
   await page.getByRole('button', { name: labels.create }).click()
   expect((await created).status()).toBe(201)
   await expect(page.getByTestId('custom-headless-editor')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Fixture role' })).toBeVisible()
   // Save a catalogue preset -> 200, and the follow-up refresh must REREAD the persisted state.
-  await page.getByRole('group', { name: 'organization.read', exact: true }).getByRole('checkbox', { name: labels.levels.all, exact: true }).check()
-  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/role-definitions/'))
+  await page
+    .getByRole('group', { name: 'organization.read', exact: true })
+    .getByRole('checkbox', { name: labels.levels.all, exact: true })
+    .check()
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === 'PATCH' && r.url().includes('/role-definitions/')
+  )
   const before = traffic.length
   await page.getByRole('button', { name: labels.save }).click()
   expect((await saved).status()).toBe(200)
   await expect(page.getByText(labels.saved, { exact: true })).toBeVisible()
-  await expect.poll(() => traffic.slice(before).filter((t) => t.startsWith('GET ') && t.includes('/role-definitions/')).length).toBeGreaterThan(0)
+  await expect
+    .poll(
+      () =>
+        traffic
+          .slice(before)
+          .filter((t) => t.startsWith('GET ') && t.includes('/role-definitions/')).length
+    )
+    .toBeGreaterThan(0)
   // Server-derived proof: a full reload and a fresh read show the persisted preset.
   await page.reload()
   await page.getByRole('button', { name: 'Fixture role', exact: true }).click()
-  await expect(page.getByRole('group', { name: 'organization.read', exact: true }).getByRole('checkbox', { name: labels.levels.all, exact: true })).toBeChecked()
+  await expect(
+    page
+      .getByRole('group', { name: 'organization.read', exact: true })
+      .getByRole('checkbox', { name: labels.levels.all, exact: true })
+  ).toBeChecked()
   // Graceful degradation: when the role read fails the stale snapshot is hidden and commands are gone.
   await page.route('**/api/product-access/organizations/*/role-definitions/*', (route) =>
     route.request().method() === 'GET'
-      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ statusCode: 503, errorCode: 'ROLE_READ_UNAVAILABLE', message: 'x' }) })
+      ? route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            statusCode: 503,
+            errorCode: 'ROLE_READ_UNAVAILABLE',
+            message: 'x',
+          }),
+        })
       : route.continue()
   )
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
@@ -73,11 +119,20 @@ test('a different custom UI manages roles through the public headless API, real 
   await page.unroute('**/api/product-access/organizations/*/role-definitions/*')
   await page.getByRole('button', { name: labels.reload }).click()
   await expect(page.getByRole('heading', { name: 'Fixture role' })).toBeVisible()
-  await expect(page.getByRole('group', { name: 'organization.read', exact: true }).getByRole('checkbox', { name: labels.levels.all, exact: true })).toBeChecked()
+  await expect(
+    page
+      .getByRole('group', { name: 'organization.read', exact: true })
+      .getByRole('checkbox', { name: labels.levels.all, exact: true })
+  ).toBeChecked()
   // Delete -> 200 and the list no longer shows the role.
-  const deleted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/deletion'))
+  const deleted = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().endsWith('/deletion')
+  )
   await page.getByRole('button', { name: labels.delete, exact: true }).click()
-  await page.getByRole('alertdialog').getByRole('button', { name: labels.deleteConfirm, exact: true }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: labels.deleteConfirm, exact: true })
+    .click()
   expect((await deleted).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Fixture role', exact: true })).toHaveCount(0)
   // The browser never held or sent a bearer credential to the same-origin BFF.
