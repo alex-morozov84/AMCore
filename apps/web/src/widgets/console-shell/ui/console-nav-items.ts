@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   Building2Icon,
+  CalendarClockIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
@@ -15,6 +16,7 @@ import {
   getConsoleBackgroundWorkHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
+  getConsoleScheduledJobsHref,
   getConsoleUsersHref,
 } from '@/shared/lib/console-public-href'
 
@@ -34,6 +36,12 @@ export function useConsoleNavItems(): ConsoleNavItem[] {
       href: getConsoleBackgroundWorkHref(),
       label: t('backgroundWork.title'),
       icon: ListChecksIcon,
+      prefetch: false,
+    },
+    {
+      href: getConsoleScheduledJobsHref(),
+      label: t('scheduledJobs.title'),
+      icon: CalendarClockIcon,
       prefetch: false,
     },
     { href: getConsoleUsersHref(), label: t('users'), icon: UsersIcon },

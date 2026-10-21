@@ -9,6 +9,7 @@ import {
   getConsoleOverviewHref,
   getConsoleQueueBoardBasePath,
   getConsoleQueueBoardHref,
+  getConsoleScheduledJobsHref,
   getConsoleUserDetailHref,
   getConsoleUsersHref,
   parseConsoleReturnHref,
@@ -141,6 +142,16 @@ describe('getConsoleBackgroundWorkHref', () => {
     expect(getConsoleBackgroundWorkHref()).toBe('/operations/background-work')
     mutableConfig.mode = 'host'
     expect(getConsoleBackgroundWorkHref()).toBe('/background-work')
+  })
+})
+
+describe('getConsoleScheduledJobsHref', () => {
+  it('follows the topology rule in every mode, next to Background work', () => {
+    mutableConfig.mode = 'path'
+    mutableConfig.slug = 'operations'
+    expect(getConsoleScheduledJobsHref()).toBe('/operations/scheduled-jobs')
+    mutableConfig.mode = 'host'
+    expect(getConsoleScheduledJobsHref()).toBe('/scheduled-jobs')
   })
 })
 
