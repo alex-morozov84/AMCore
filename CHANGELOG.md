@@ -207,6 +207,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Update follow-redirects to 1.16.1 to prevent credential header leaks during
+  cross-origin redirects (CVE-2026-111755 and CVE-2026-111756).
+
 - Member removal atomically revokes organization keys; rejoining requires new credentials.
   All/remove refuses above 1000 keys, with bounded operator maintenance recovery.
 
