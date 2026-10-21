@@ -97,7 +97,11 @@ describe('handleOAuthExchange — failure paths redirect to login with an error 
 
     expect(response.status).toBe(303)
     const location = new URL(response.headers.get('location')!)
-    expect(location.pathname).toBe('/en/login')
+    expect(location.pathname).toBe(
+      new URL(
+        localizedFrontendUrl('https://app.example.test', coerceSupportedLocale('en'), '/login')
+      ).pathname
+    )
   })
 
   it('redirects, clears the temp cookie, and never sets amcore_session when mintSession throws (e.g. Redis down)', async () => {
@@ -110,7 +114,11 @@ describe('handleOAuthExchange — failure paths redirect to login with an error 
 
     expect(response.status).toBe(303)
     const location = new URL(response.headers.get('location')!)
-    expect(location.pathname).toBe('/en/login')
+    expect(location.pathname).toBe(
+      new URL(
+        localizedFrontendUrl('https://app.example.test', coerceSupportedLocale('en'), '/login')
+      ).pathname
+    )
     expect(location.searchParams.get('oauthError')).toBe(AuthErrorCode.OAUTH_TICKET_INVALID)
     expect(response.cookies.get('refresh_token')?.value).toBe('')
     expect(response.cookies.get('amcore_session')).toBeUndefined()
@@ -127,7 +135,10 @@ describe('handleOAuthExchange — success', () => {
 
     expect(response.status).toBe(303)
     const location = new URL(response.headers.get('location')!)
-    expect(location.pathname).toBe('/ru')
+    expect(location.pathname).toBe(
+      new URL(localizedFrontendUrl('https://app.example.test', coerceSupportedLocale('ru')))
+        .pathname
+    )
     expect(response.cookies.get('amcore_session')?.value).toBe('sess-1')
     expect(response.cookies.get('refresh_token')?.value).toBe('')
   })

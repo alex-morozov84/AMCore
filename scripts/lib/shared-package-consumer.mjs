@@ -101,7 +101,13 @@ export function verifyMaps(packageRoot) {
     assert.equal(map.sources.length > 0, true)
     assert.equal(map.sources.length, map.sourcesContent.length)
     assert.equal(
-      map.sourcesContent.every((source) => typeof source === 'string' && source.length > 0),
+      map.sourcesContent.every(
+        (source, index) =>
+          (typeof source === 'string' && source.length > 0) ||
+          // Rolldown's JSON loader emits this source without embedded content.
+          // Keep the exception exact; every TypeScript source still needs content.
+          (source === '' && map.sources[index] === '../src/config/product-admin.json')
+      ),
       true
     )
   }

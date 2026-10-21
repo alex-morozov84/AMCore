@@ -65,7 +65,7 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
   const consoleEntries = redisKeys('web:console-session:v1')
   expect(productEntries).not.toHaveLength(0)
   expect(consoleEntries).not.toHaveLength(0)
-  expect(redisEntry(productEntries[0])).not.toHaveProperty('audience')
+  expect(redisEntry(productEntries[0])).toMatchObject({ audience: 'product' })
   expect(redisEntry(consoleEntries[0])).toMatchObject({ audience: 'console' })
 
   const productSessionAttempt = await consolePage.request.get(

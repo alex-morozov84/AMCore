@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type * as Shared from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const settings = vi.hoisted(() => ({ mode: 'path' as 'path' | 'host' }))
@@ -28,9 +29,12 @@ beforeEach(() => {
 })
 const redirect = (query: string, method = 'GET') =>
   legacyAdminRedirect(
-    new Request(`https://shop.example/ru/organizations/org_review/invites?${query}`, { method }),
+    new Request(
+      `https://shop.example/${DEFAULT_LOCALE}/organizations/org_review/invites?${query}`,
+      { method }
+    ),
     'invites',
-    { locale: 'ru', id: 'org_review' }
+    { locale: DEFAULT_LOCALE, id: 'org_review' }
   )
 
 describe.each(['path', 'host'] as const)('%s invitation compatibility', (mode) => {
@@ -42,7 +46,13 @@ describe.each(['path', 'host'] as const)('%s invitation compatibility', (mode) =
       const target = new URL(response.headers.get('location')!)
       expect(target.origin).toBe(mode === 'host' ? 'https://staff.example' : 'https://shop.example')
       expect(target.pathname).toBe(
-        `/ru${mode === 'path' ? '/manage' : ''}/organizations/org_review/invites`
+        new URL(
+          localizedFrontendUrl(
+            'https://shop.example',
+            DEFAULT_LOCALE,
+            `${mode === 'path' ? '/manage' : ''}/organizations/org_review/invites`
+          )
+        ).pathname
       )
       expect(Object.fromEntries(target.searchParams)).toEqual({
         page: '2',

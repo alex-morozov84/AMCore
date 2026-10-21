@@ -308,6 +308,10 @@ or while an unknown outcome remains unresolved. An inspection reporting a differ
 deliberately selecting a fresh target; changing rows alone does not resolve an unknown outcome.
 Render your own warning and confirmation before calling `remove()`; the hook does not toast or navigate.
 
+The optional third argument, `onAcknowledged`, reports a validated removal reply before
+authority refresh. Use it to retain self-removal feedback when refresh removes access.
+It does not grant access or confirm a lost reply; continue to use `outcome` for follow-up state.
+
 | Hook field/action                     | Meaning                                                                                                                                                           |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pending`, `busy`, `canRemove`        | Bounded command/follow-up state; use canRemove to enable a fresh confirmed action                                                                                 |

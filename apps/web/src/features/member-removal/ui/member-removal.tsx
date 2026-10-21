@@ -34,7 +34,11 @@ export function MemberRemoval({
   onLock: (locked: boolean) => void
 }) {
   const t = useTranslations('memberRemoval')
-  const removal = useMemberRemoval(controller, target)
+  const removal = useMemberRemoval(
+    controller,
+    target,
+    target.userId === actorId ? onSelfRemoved : undefined
+  )
   const outcome = removal.outcome
   useEffect(() => {
     onLock(
@@ -53,8 +57,7 @@ export function MemberRemoval({
     const result = await removal.remove()
     if (!result || result.status === 'retired' || result.status === 'busy') return
     if (result.status === 'committed') {
-      if (target.userId === actorId) onSelfRemoved?.()
-      else toast.add({ type: 'success', title: t('success') })
+      if (target.userId !== actorId) toast.add({ type: 'success', title: t('success') })
     }
     heading.current?.focus()
   }

@@ -174,5 +174,7 @@ test('disabled Console removes its product-admin link while keeping integration 
   assert.match(after, /# Product administration foundation/)
   assert.match(after, /signed-in members/)
   assert.match(after, /## Connect the ready pages/)
-  assert.match(after, /organizationAccessPlacement/)
+  assert.match(after, /placement-and-sessions\.md/)
+  assert.match(after, /Path mode shares the/)
+  assert.match(after, /host mode isolates staff login/)
 })
