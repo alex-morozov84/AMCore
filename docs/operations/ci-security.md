@@ -583,7 +583,8 @@ Move the pnpm pin in one PR: root manifest, both Dockerfiles, the stand installe
 The `dependency-freshness.yml` workflow closes that visibility
 gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
-`dependency-freshness`, edited in place) listing all three. It opens no PRs and is
+`dependency-freshness`, edited in place) listing all four categories (semver-major npm updates, Docker digest
+drift, curl-pinned tool releases and the toolchain). It opens no PRs and is
 a report only — triage each item and bump deliberately. For semver-major updates,
 use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
