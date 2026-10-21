@@ -590,6 +590,15 @@ use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
 
+pnpm 12 re-checks every lockfile entry against `minimumReleaseAge` (24 hours by
+default) during `pnpm install --frozen-lockfile`. A lockfile that holds a version
+published less than 24 hours ago therefore fails the install step with
+`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, even though the lockfile matches the
+manifests. This happens when Dependabot or a contributor adds a very fresh package.
+Wait until the package is 24 hours old and rerun the failed job. Do not set
+`trustLockfile`, lower `minimumReleaseAge` or add an exclusion to make the job pass:
+each one switches off the protection against freshly published malicious versions.
+
 The report also has a **Dependabot health** section. GitHub kills a Dependabot
 update job after a fixed 55 minutes (it cannot be extended) and a killed job opens
 **no PR**, so the only symptom is silence. The section warns when the latest

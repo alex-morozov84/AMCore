@@ -98,7 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migrator installer. The API image now uses plain `pnpm deploy`: the production bundle follows
   the frozen lockfile instead of re-resolving it (409 packages instead of 539, no extra optional
   peers). `engines.pnpm` is `>=12.14.0`. The weekly dependency-freshness report now covers pnpm
-  and Node.js, and a test keeps every pnpm pin aligned.
+  and Node.js, and a test keeps every pnpm pin aligned. pnpm 12 also checks the age of packages
+  already in the lockfile, so a frozen install fails until a package is 24 hours old; rerun the
+  job later (see the CI security guide).
 - Package migrations in an independent non-root Prisma CLI image with an isolated
   frozen dependency graph, version guards, dedicated upkeep and image reports.
   API build-tool security risks remain separate from final-image minimization.
