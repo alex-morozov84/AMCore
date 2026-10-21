@@ -26,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Managed stand cancellation retains cleanup ownership during the initial source
-  copy and replacement allocation, so an early interruption cannot skip cleanup.
+- Docker E2E runs retain cleanup ownership during the initial source copy and
+  replacement allocation, so early interruption no longer loses the allocated stand.
 
 - The API Docker image no longer carries the API package source, tests, Prisma schemas/migrations,
   tool configs or source maps. Test-only modules (`*.testkit.ts`) no longer compile into `dist`.
