@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Dependency installs explicitly enforce the strict 24-hour release-age floor.
+  Ordinary npm Dependabot updates use a three-day cooldown; a trusted controller
+  retries eligible failed-install CI runs once after 25 hours.
+
 - External web sign-in completes through a same-origin form with automatic
   continuation and a no-JavaScript Continue button, preserving Strict cookies
   and the validated return page without exposing its code through Referer.

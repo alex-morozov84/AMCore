@@ -5,6 +5,8 @@ version: 2
 updates:
   - package-ecosystem: 'npm'
     directory: '/'
+    cooldown:
+      default-days: 3
     # Twice a week (Mon, Thu 06:00 UTC): a job prepares one update per outdated
     # package and GitHub kills it after 55 minutes, so a smaller backlog per run
     # keeps it inside the limit. A killed job opens no PR.
@@ -73,6 +75,8 @@ updates:
 
   - package-ecosystem: 'npm'
     directory: '/docker/migrator'
+    cooldown:
+      default-days: 3
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 5

@@ -590,14 +590,50 @@ use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
 
-pnpm 12 re-checks every lockfile entry against `minimumReleaseAge` (24 hours by
-default) during `pnpm install --frozen-lockfile`. A lockfile that holds a version
+The root workspace explicitly sets `minimumReleaseAge: 1440` and
+`minimumReleaseAgeStrict: true`. The isolated migrator also uses strict mode with
+the same default 24-hour floor. Strict mode prevents fresh resolution from
+persisting age exceptions. pnpm 12 re-checks every lockfile entry during `pnpm install --frozen-lockfile`. A lockfile that holds a version
 published less than 24 hours ago therefore fails the install step with
 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, even though the lockfile matches the
 manifests. This happens when Dependabot or a contributor adds a very fresh package.
 Wait until the package is 24 hours old and rerun the failed job. Do not set
 `trustLockfile`, lower `minimumReleaseAge` or add an exclusion to make the job pass:
 each one switches off the protection against freshly published malicious versions.
+
+Both npm entries in `dependabot.yml` explicitly set a three-day cooldown for
+ordinary version updates. Groups, schedules and major-version ignores still apply.
+Security updates can open immediately; installing their packages still follows
+the 24-hour rule. An urgent exception needs a separate maintainer decision.
+
+### One delayed Dependabot CI retry
+
+`dependabot-retry.yml` checks hourly at minute 17, or manually from `main`.
+Schedules can be delayed. It retries the `CI` workflow once when all these hold:
+
+- The open PR belongs to `dependabot[bot]`, stays in this repository and targets `main`.
+- Its latest applicable PR run failed on the first attempt at least 25 hours ago.
+- The run's head and base match the current PR. No newer run has replaced it.
+- A step named `Install dependencies` failed. No executed test/build job failed
+  after installation, and no job was cancelled or remains running.
+
+The controller reads GitHub job metadata. It does not diagnose package ages from
+logs, so a network-related install failure may also receive this one retry.
+It repeats the whole workflow to keep API/scaffold plans and shard evidence in
+the same attempt. Successful jobs therefore run again too. The installation
+checks the real policy again; no lock, age exclusion or permissions are changed.
+
+The controller loads only trusted `main` code, installs no dependencies and reads
+no PR code, caches or artifacts. Only its job has `actions: write`; PR build jobs
+keep their existing permissions. Controller runs serialize. A changed head/base,
+a newer run, or any prior manual/automatic attempt makes the run ineligible.
+It never approves or merges a PR.
+
+If the repeat fails, inspect the new failure and fix it normally. Human/fork PRs
+and stale-base runs need manual triage or rebase. Rerun the complete CI workflow
+when current-attempt shard evidence must be regenerated. The controller becomes
+active only after this workflow reaches `main`; local mocked tests do not prove
+hosted scheduling or rerun activation.
 
 The report also has a **Dependabot health** section. GitHub kills a Dependabot
 update job after a fixed 55 minutes (it cannot be extended) and a killed job opens
