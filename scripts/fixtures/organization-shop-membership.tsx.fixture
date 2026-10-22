@@ -1,0 +1,127 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+
+import {
+  type MemberRemovalTarget,
+  type OrganizationAccessController,
+  useMemberRemoval,
+} from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { toast } from '@/shared/ui/toast'
+
+import styles from './shop-team.module.css'
+
+export function ShopMembership({
+  controller,
+  target,
+  visible,
+  sameSession,
+  onLock,
+  onRemoved,
+  onAcknowledged,
+}: {
+  controller: OrganizationAccessController
+  target: MemberRemovalTarget
+  visible: boolean
+  sameSession: boolean
+  onLock: (locked: boolean) => void
+  onRemoved: () => void
+  onAcknowledged: () => void
+}) {
+  const t = useTranslations('memberRemoval')
+  const e = useTranslations('productAdminExample')
+  const [ack, setAck] = useState(false)
+  const [open, setOpen] = useState(false)
+  const removal = useMemberRemoval(controller, target, onAcknowledged)
+  const outcome = removal.outcome
+  const unknown = outcome?.status === 'unknown'
+  const locked =
+    open ||
+    removal.pending ||
+    removal.checking ||
+    (unknown && !['different', 'unavailable'].includes(removal.inspection?.status ?? ''))
+  useEffect(() => {
+    onLock(locked)
+    return () => onLock(false)
+  }, [locked, onLock])
+  async function remove() {
+    setAck(false)
+    const result = await removal.remove()
+    if (result?.status === 'committed' && result.followup === 'ready') {
+      toast.add({ type: 'success', title: t('success') })
+      onRemoved()
+    }
+  }
+  return (
+    <section className={styles.membership} data-testid="custom-headless-removal">
+      {sameSession && outcome?.status === 'committed' && (
+        <p role="status">
+          {t('success')}
+          {outcome.followup !== 'ready' && ` ${t('refreshFailed')}`}
+        </p>
+      )}
+      {sameSession && unknown && <p role="status">{t('unknown')}</p>}
+      {sameSession && removal.inspection && <p role="status">{t(removal.inspection.status)}</p>}
+      {sameSession && outcome?.status === 'rejected' && <ApiErrorAlert error={outcome.error} />}
+      {sameSession &&
+        unknown &&
+        ['different', 'unavailable'].includes(removal.inspection?.status ?? '') && (
+          <Button variant="outline" onClick={onRemoved}>
+            {e('back')}
+          </Button>
+        )}
+      {visible && outcome?.status !== 'committed' && (
+        <>
+          <h2>{t('title')}</h2>
+          <p>{t('warning')}</p>
+          <Button
+            variant="outline"
+            disabled={locked || !removal.canRemove || unknown}
+            onClick={() => setOpen(true)}
+          >
+            {t('title')}
+          </Button>
+        </>
+      )}
+      {sameSession && outcome && (
+        <Button
+          variant="outline"
+          disabled={removal.pending || removal.checking || Boolean(removal.retryAt)}
+          onClick={() => void removal.inspect()}
+        >
+          {t('check')}
+        </Button>
+      )}
+      <ConfirmDialog
+        open={open && visible}
+        onOpenChange={(value) => {
+          setOpen(value)
+          setAck(false)
+        }}
+        title={t('title')}
+        description={
+          <span className="block space-y-4">
+            <span className="block break-all">
+              {t('memberIdentity', { name: target.name ?? target.email, email: target.email })}
+            </span>
+            <label className="flex items-start gap-2">
+              <Checkbox checked={ack} onCheckedChange={(value) => setAck(Boolean(value))} />
+              {t('warning')}
+            </label>
+          </span>
+        }
+        confirmLabel={t('confirm')}
+        cancelLabel={t('cancel')}
+        variant="destructive"
+        disabled={!ack || !removal.canRemove}
+        scrollable
+        onConfirm={() => void remove()}
+      />
+    </section>
+  )
+}

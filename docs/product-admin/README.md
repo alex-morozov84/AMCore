@@ -30,6 +30,10 @@ policies, trusted first-ADMIN setup, the production command, Console controls an
 recovery. Registration alone never creates staff membership. Unresolved creation
 recovery takes priority over automatic opening of a single membership.
 
+For a complete fork setup, three product recipes and custom visual styling, use
+[Add product administration to your product](adoption.md). Initialize identity and
+project choices before generating consumers.
+
 ## Connect the ready pages
 
 Choose the public path alias or separate admin host with the

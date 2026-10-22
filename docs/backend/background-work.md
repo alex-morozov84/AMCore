@@ -7,6 +7,9 @@ managed producers, worker bindings, safe diagnostics and supported administrativ
 commands from this collection. Do not add a parallel queue list or per-work
 administrative controller.
 
+Work that runs on a timer in the worker (a nightly cleanup, a recovery poll) is not a queue
+registration: see [Scheduled jobs](scheduled-jobs.md).
+
 Read `PROJECT_CONTEXT.md` before extending a checkout. When
 `admin_console: disabled`, keep backend registrations, handlers, policies, API and
 audit integration. Do not create Console pages, frontend Route Handlers/BFF,

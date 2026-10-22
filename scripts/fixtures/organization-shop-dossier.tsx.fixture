@@ -1,0 +1,65 @@
+'use client'
+
+import type { ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
+
+import type { MemberRemovalTarget } from '@/entities/organization-context'
+import { Button } from '@/shared/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/shared/ui/tabs'
+
+import styles from './shop-team.module.css'
+
+export type ShopSection = 'roles' | 'keys' | 'membership'
+export function ShopDossier({
+  visible,
+  target,
+  section,
+  locked,
+  back,
+  change,
+  children,
+}: {
+  visible: boolean
+  children: ReactNode
+  target: MemberRemovalTarget
+  section: ShopSection
+  locked: boolean
+  back: () => void
+  change: (section: ShopSection) => void
+}) {
+  const t = useTranslations('productAdminExample')
+  return (
+    <Tabs value={section} onValueChange={(value) => change(value as ShopSection)}>
+      <header className={styles.dossier} hidden={!visible}>
+        <Button variant="ghost" disabled={locked} onClick={back}>
+          {t('back')}
+        </Button>
+        <div className={styles.identity}>
+          <span className={styles.identitySeal} aria-hidden="true">
+            {(target.name ?? target.email).slice(0, 2).toLocaleUpperCase()}
+          </span>
+          <div>
+            <p className={styles.eyebrow}>{t('dossier')}</p>
+            <h1 id="shop-dossier-heading" tabIndex={-1}>
+              {target.name ?? target.email}
+            </h1>
+            <p className={styles.email}>{target.email}</p>
+          </div>
+        </div>
+        <TabsList className={styles.sections}>
+          {(['roles', 'keys', 'membership'] as const).map((value) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              disabled={locked}
+              aria-controls={`shop-section-${value}`}
+            >
+              {t(value)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </header>
+      {children}
+    </Tabs>
+  )
+}

@@ -12,6 +12,7 @@ import { ApiRequestError } from '@/shared/api/http-client'
 
 import { MemberRemoval } from './member-removal'
 import { messages } from './member-removal-test-messages'
+import { RemovalNotice } from './removal-notice'
 vi.mock('@/entities/organization-context', () => ({ useMemberRemoval: vi.fn() }))
 vi.mock('@/shared/ui/toast', () => ({ toast: { add: vi.fn() } }))
 vi.mock('@/shared/ui/route-progress-link', () => ({
@@ -162,3 +163,33 @@ it('disables unknown-result inspection during the server cooldown', () => {
   fireEvent.click(check)
   expect(inspect).not.toHaveBeenCalled()
 })
+
+it.each(['ready', 'error', 'denied'] as const)(
+  'other-member completed notice follows refresh %s',
+  (followup) => {
+    const removal: ReturnType<typeof useMemberRemoval> = {
+      outcome: { status: 'committed', result: { removed: true }, followup },
+      retryAt: undefined,
+      inspection: undefined,
+      pending: false,
+      checking: false,
+      busy: false,
+      canRemove: false,
+      remove,
+      inspect,
+    }
+    const { container } = render(
+      <NextIntlClientProvider locale={DEFAULT_LOCALE} timeZone="UTC" messages={messages}>
+        <RemovalNotice
+          removal={removal}
+          target={{ userId: 'other', memberId: 'other', email: 'other@example.test' }}
+          self={false}
+          onReview={() => undefined}
+        />
+      </NextIntlClientProvider>
+    )
+    expect(container.querySelector('[data-testid="member-removal-notice"]') !== null).toBe(
+      followup !== 'ready'
+    )
+  }
+)

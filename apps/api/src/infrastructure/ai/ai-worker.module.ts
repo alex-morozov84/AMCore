@@ -4,6 +4,7 @@ import { AiRealtimeModule } from '../../core/ai/realtime/ai-realtime.module.js'
 import { AuditModule } from '../../core/audit/index.js'
 import { PrismaModule } from '../../prisma/index.js'
 import { bindWorkHandlers } from '../background-work/registration.js'
+import { ScheduledJobsModule } from '../schedule/scheduled-jobs.module.js'
 
 import { AiCatalogModule } from './ai-catalog.module.js'
 import { AiGatewayModule } from './ai-gateway.module.js'
@@ -53,6 +54,7 @@ import { AiToolsModule } from './tools/ai-tools.module.js'
     AiRealtimeModule,
     AiToolsModule,
     AuditModule,
+    ScheduledJobsModule,
   ],
   providers: [
     AiRunRepository,

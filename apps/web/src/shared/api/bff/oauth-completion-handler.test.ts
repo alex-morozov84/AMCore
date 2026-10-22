@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { NextResponse } from 'next/server'
 import type * as Shared from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const settings = vi.hoisted(() => ({ mode: 'path' as 'path' | 'host' }))
@@ -27,14 +28,16 @@ beforeEach(() => {
   vi.stubEnv('FRONTEND_URL', site)
   vi.stubEnv('PRODUCT_ADMIN_ORIGIN', '')
   vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-test-frontend-context-key-at-least-32>')
-  vi.mocked(handleOAuthExchange).mockResolvedValue(NextResponse.redirect(`${site}/en`, 303))
+  vi.mocked(handleOAuthExchange).mockResolvedValue(
+    NextResponse.redirect(localizedFrontendUrl(site, DEFAULT_LOCALE), 303)
+  )
 })
 afterEach(() => vi.unstubAllEnvs())
 
 function request({
   origin = site,
   host = new URL(site).host,
-  body = 'ticket=t1&locale=en',
+  body = `ticket=t1&locale=${DEFAULT_LOCALE}`,
   method = 'POST',
   media = 'application/x-www-form-urlencoded',
   query = '',
@@ -83,15 +86,15 @@ describe('completion admission precedes recovery, credential access and publicat
     }
   )
   it.each([
-    ['ticket=t1&ticket=t2&locale=en', 400],
-    ['ticket=t1&locale=en&locale=ru', 400],
-    ['ticket=t1&locale=en&frontend=admin', 400],
+    [`ticket=t1&ticket=t2&locale=${DEFAULT_LOCALE}`, 400],
+    [`ticket=t1&locale=${DEFAULT_LOCALE}&locale=${DEFAULT_LOCALE}`, 400],
+    [`ticket=t1&locale=${DEFAULT_LOCALE}&frontend=admin`, 400],
     ['ticket=t1&locale=de', 400],
-    ['ticket=&locale=en', 400],
-    ['locale=en', 400],
-    ['ticket=%FF&locale=en', 400],
-    [`ticket=${'t'.repeat(4097)}&locale=en`, 400],
-    [`ticket=${'t'.repeat(8192)}&locale=en`, 413],
+    [`ticket=&locale=${DEFAULT_LOCALE}`, 400],
+    [`locale=${DEFAULT_LOCALE}`, 400],
+    [`ticket=%FF&locale=${DEFAULT_LOCALE}`, 400],
+    [`ticket=${'t'.repeat(4097)}&locale=${DEFAULT_LOCALE}`, 400],
+    [`ticket=${'t'.repeat(8192)}&locale=${DEFAULT_LOCALE}`, 413],
   ])('rejects invalid bounded form %#', async (body, status) => {
     const response = await handleOAuthCompletion(request({ body }), 'site-auth')
     expect(response.status).toBe(status)
@@ -112,7 +115,7 @@ describe('completion admission precedes recovery, credential access and publicat
     expect(handleOAuthExchange).not.toHaveBeenCalled()
   })
   it('bounds streamed bytes even when Content-Length claims an empty body', async () => {
-    const incoming = request({ body: `ticket=${'t'.repeat(8192)}&locale=en` })
+    const incoming = request({ body: `ticket=${'t'.repeat(8192)}&locale=${DEFAULT_LOCALE}` })
     incoming.headers.set('content-length', '0')
     expect((await handleOAuthCompletion(incoming, 'site-auth')).status).toBe(413)
     expect(handleOAuthExchange).not.toHaveBeenCalled()
@@ -154,7 +157,7 @@ describe('completion admission precedes recovery, credential access and publicat
     expect(response.status).toBe(303)
     expect(handleOAuthExchange).toHaveBeenCalledWith(
       expect.any(Request),
-      { ticket: 't1', locale: 'en' },
+      { ticket: 't1', locale: DEFAULT_LOCALE },
       expect.objectContaining({ frontend: 'site', audience: 'product', origin: site })
     )
   })

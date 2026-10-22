@@ -23,9 +23,9 @@ function cloneManifest(change) {
 test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
   const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
-  // Provisioning owns two feature roots and a browser-scenario root.
+  // Provisioning owns two feature roots and a browser-scenario root; Scheduled jobs owns one feature root.
   // Nested files inherit ownership without individual registration.
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 22)
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 23)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -62,13 +62,15 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
     {
       name: 'console closed-root files',
       // Exact Console inventory, including provisioning, administrator management
-      // and their route, story and browser proof files.
-      expected: 444,
+      // and their route, story and browser proof files, and the Scheduled jobs page, feature,
+      // BFF routes, server API modules and operator guide.
+      expected: 474,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {
       name: 'console dead shared modules',
-      expected: 17,
+      // The shared poll policy and cooldown hook are used only by Console panels.
+      expected: 19,
       actual: projection.deadSharedModules.size,
     },
     {

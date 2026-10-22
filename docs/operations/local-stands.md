@@ -229,6 +229,12 @@ After `preview`, provide the printed localized URL, login/password for each role
 source hash and the concrete scenario to inspect. Accounts are registered through
 the real API, roles are assigned only to those accounts, and browser login/access
 is verified. Keep the stand running until acceptance or explicitly scoped cleanup.
+The [custom administration example](../product-admin/adoption.md#connect-the-chosen-interface)
+can prepare a copy-only adapter for the existing `organization` profile.
+Run its `--preview` generator only after single-locale/no-Console initialization.
+The adapter records provenance before writing and preserves later owner changes.
+It does not introduce a global preview profile.
+
 `--profile user` prepares only USER; `--profile organization` additionally creates
 an organization owned by USER with its organization ADMIN membership.
 `--profile organization-roles` instead seeds a large reproducible dataset for the role editor: three
@@ -262,6 +268,11 @@ For AI run control acceptance, use `pnpm stand preview --id ai-run-control
 runs through the owner API: queued, transient retryable, permanent failure,
 recent cancellation and cancellation older than 30 days. It uses the mock model.
 Repeated preview keeps the owner's changes.
+For the Console Scheduled jobs screen, use `pnpm stand preview --id scheduled-jobs
+--profile scheduled-jobs`. The running worker records its frequent jobs itself; the profile
+adds a result history to the daily jobs, which otherwise show "No runs yet" until 02:00:
+cleanup partly done and overdue, notification cleanup failed and overdue, invitation cleanup
+with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the owner's changes.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared

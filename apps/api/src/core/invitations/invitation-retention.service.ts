@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 
 import type { OrganizationAdministratorInvitation, Prisma } from '../../generated/prisma/client.js'
+import {
+  errorCode,
+  ScheduledJobExecutor,
+} from '../../infrastructure/schedule/scheduled-job.executor.js'
+import { failed, ScheduledJob, succeeded } from '../../infrastructure/schedule/scheduled-job.js'
+import { INVITATION_RETENTION_JOB } from '../../infrastructure/schedule/scheduled-jobs.catalogue.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { invitationClock, lockInvitation, lockInvitationOrg } from './invitation-locks.js'
@@ -11,7 +16,10 @@ import { clearedProvisioningMail, lockMarkedProvisioning } from './provisioning-
 const RETENTION_MS = 30 * 86400000
 @Injectable()
 export class InvitationRetentionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: ScheduledJobExecutor
+  ) {}
 
   async prune(kind: 'pending' | 'terminal'): Promise<{ count: number }> {
     const candidates = await this.prisma.$queryRaw<{ id: string; organizationId: string }[]>`
@@ -70,13 +78,31 @@ export class InvitationRetentionService {
     return { count }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  /**
+   * Runs on every replica (no Redis lock; the steps are idempotent bounded deletes under DB locks).
+   * A thrown error is a failed pass; the steps that completed before it are counted, not hidden.
+   */
+  @ScheduledJob(INVITATION_RETENTION_JOB)
   async pruneAuxiliary(): Promise<void> {
+    await this.jobs.run(INVITATION_RETENTION_JOB, async () => {
+      let steps = 0
+      try {
+        await this.pruneAuxiliaryRows(() => (steps += 1))
+      } catch (error) {
+        return failed(errorCode(error), { counts: { stepsCompleted: steps }, codes: [] })
+      }
+      return succeeded({ counts: { stepsCompleted: steps }, codes: [] })
+    })
+  }
+
+  private async pruneAuxiliaryRows(onStep: () => void): Promise<void> {
     const now = await invitationClock(this.prisma)
     await this.pruneRows('invitationOperation', {
       completedAt: { lte: new Date(now.getTime() - RETENTION_MS) },
     })
+    onStep()
     await this.pruneRows('invitationContinuation', { expiresAt: { lte: now } })
+    onStep()
     const terminal = await this.prisma.organizationAdministratorInvitation.findMany({
       where: {
         OR: [
@@ -107,6 +133,7 @@ export class InvitationRetentionService {
           },
         })
       })
+    onStep()
     const ids = await this.prisma.invitationAuthHandoff.findMany({
       where: {
         status: { in: ['confirmed', 'aborted'] },
@@ -123,6 +150,7 @@ export class InvitationRetentionService {
         createdAt: { lte: new Date(now.getTime() - 86400000) },
       },
     })
+    onStep()
   }
 
   private async pruneRows(
