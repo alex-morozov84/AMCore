@@ -3,7 +3,8 @@
 A module that talks to an outside service can register itself so that the Console
 [Integrations](../operations-console/integrations.md) page shows it. You write a reader
 that reports what is already known, add one line to the composition list, and add copy.
-You change nothing in the page, the controller or the frontend.
+You change nothing in the page, the controller or the frontend code; only the message
+catalogues in `apps/web/messages` get new keys.
 
 Use this for services such as a payment provider or a CRM sync. It reports state. It does
 not edit settings and it does not run checks when the page is read.
@@ -84,7 +85,7 @@ You need a module that already owns the service your reader uses. In the example
    }
    ```
 
-3. **Add copy (optional).** Add no keys and the page falls back: the registered `name`, a
+3. **Add copy.** For a bilingual product the keys are required. Without them the page falls back to the registered `name`, a
    readable form of each fact key (`open tickets: 4`) and no line for the failure code. To
    localize, add keys under `console.integrations` in `apps/web/messages/en.json` and in
    every other catalogue (`apps/web/messages/ru.json` in the upstream layout):
@@ -106,7 +107,8 @@ You need a module that already owns the service your reader uses. In the example
    }
    ```
 
-Restart the API. The integration appears on the page. A test runs this exact example:
+The composition list is read by the Console module at startup; you do not call
+`IntegrationsModule.register(...)` yourself (tests do). Restart the API. The integration appears on the page. A test runs this exact example:
 `apps/api/src/core/admin/integrations/integrations-guide-example.spec.ts`.
 
 To remove an integration your product does not need, delete its entry from the composition
@@ -209,7 +211,7 @@ interface IntegrationProbePort {
 }
 ```
 
-In v1 the shipped email test (`EmailTestProbe`) is the only port of its kind. A second
+The shipped email test (`EmailTestProbe`) is the first port of this kind. A further
 integration that uses the same kind registers a port that **delegates to the same admission
 and send code** (`EmailTestStore`, `EmailTestProbe`) and supplies only what differs. Do not
 reimplement the admission. List the port in `providers` (and `exports`, like the reader) of
@@ -264,6 +266,7 @@ and read the list. Assert that your reading passes the schema and that it contai
 secret. Two assertions that are worth copying:
 
 ```ts
+// POLICY, attemptId, store and port are your own test fixtures
 // the reading shows no secret
 const text = JSON.stringify(await registry.list('operator'))
 expect(text).not.toContain(process.env.CRM_API_KEY!)

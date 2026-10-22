@@ -17,8 +17,8 @@ the locale prefix (for example `/en/admin/integrations`).
 ## What you see
 
 One row per integration (one card per integration on a narrow screen). **Data read**
-above the rows is the time the server read them. **Refresh** and **Auto-refresh**
-reload that data every 30 seconds while the tab is visible and online. They never start
+above the rows is the time the server read them. **Refresh** reloads that data at once. **Auto-refresh** does it every 30 seconds while the
+tab is visible and online. They never start
 a check and never send an email. Labels in this guide are the English ones; the Russian
 Console shows translations of the same texts.
 
@@ -112,13 +112,13 @@ result of an attempt as saved on the server.
 
 ### Results
 
-| Result              | What happened                                                                                                                  | Next step                                                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Accepted**        | The provider took the message. This does not prove that it reached an inbox.                                                   | If users still get no mail, check spam folders and the provider's delivery log.                                                                            |
-| **Simulated**       | The mock provider is in use. Nothing was sent.                                                                                 | Configure a real provider for production.                                                                                                                  |
-| **Refused**         | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected.                  | Check the provider key and the sender address in the mail settings.                                                                                        |
-| **Outcome unknown** | The provider may or may not have accepted the message: no answer in time, a lost connection, or a limit or quota was reported. | Wait a minute and reopen the result. Do not assume the email was not sent. Start a new test only if you need one (it must also pass the one-minute limit). |
-| **Did not start**   | The test stopped before anything was sent (for example the audit record could not be written).                                 | Start a new test.                                                                                                                                          |
+| Result              | What happened                                                                                                                  | Next step                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Accepted**        | The provider took the message. This does not prove that it reached an inbox.                                                   | If users still get no mail, check spam folders, the provider's delivery log and **Background work** (queued email and invitations are not covered by this test).                                                               |
+| **Simulated**       | The mock provider is in use. Nothing was sent.                                                                                 | Configure a real provider for production.                                                                                                                                                                                      |
+| **Refused**         | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected.                  | Check the provider key and the sender address in the mail settings.                                                                                                                                                            |
+| **Outcome unknown** | The provider may or may not have accepted the message: no answer in time, a lost connection, or a limit or quota was reported. | Reopen the result once the provider log shows what happened (the Console result itself stays as stored). Do not assume the email was not sent. Start a new test only if you need one (it must also pass the one-minute limit). |
+| **Did not start**   | The test stopped before anything was sent (for example the audit record could not be written).                                 | Start a new test.                                                                                                                                                                                                              |
 
 **Outcome unknown** does not change by itself: a late answer from the provider is not
 applied. To learn what really happened, read the provider's own log. For **Refused** with
@@ -153,8 +153,7 @@ the attempt ends with **The hourly limit for test emails is reached.** Try again
 | **The check could not start. Nothing was sent.**                       | Redis or the audit record was unavailable _before_ the send. |
 
 A request refused at the start (the hourly limit, the cooldown, another test in flight) is not
-counted. A test that was reserved but did not start (**Did not start**, which includes
-**Another test is being sent.** caused by a slow connection on the same server) is counted
+counted. A test that was reserved but did not start (**Did not start**) is counted
 toward the per-minute and hourly limits.
 
 ### Limits
@@ -211,7 +210,7 @@ must not vouch for new settings.
 
 Each test writes **Test email requested** before anything is sent; if that record cannot
 be written, the email is not sent. When the server stored a final result it also writes
-**Test email finished** with that stored outcome (a result that arrived after the time limit
+**Test email finished** (action `integration.email_test_settled`) with that stored outcome (a result that arrived after the time limit
 is recorded as unknown). A test that did not start, or whose result could not be stored, may
 have no finished record, so do not expect every request to have a pair. Neither record
 contains an email address. Find
