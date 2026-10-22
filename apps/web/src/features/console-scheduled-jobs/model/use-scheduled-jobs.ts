@@ -18,6 +18,8 @@ import {
 } from '@/shared/lib/console-poll-policy'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
+import { useHistoryCooldown } from './use-history-cooldown'
+
 const visibleStore = {
   subscribe: (onChange: () => void) => focusManager.subscribe(onChange),
   get: () => focusManager.isFocused(),
@@ -51,9 +53,6 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
   const manualInFlight = useRef(false)
   const handled = useRef({ data: initialUpdatedAt, error: 0 })
   const accessLost = useRef(false)
-  const [historyFloors, setHistoryFloors] = useState<PollFloors>(NO_FLOORS)
-  const historyFloorsRef = useRef<PollFloors>(NO_FLOORS)
-  const historyStreak = useRef(0)
   const manualRefresh = useRef(false)
   const owns = useCallback(
     (key: readonly unknown[]) =>
@@ -96,6 +95,7 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     queryClient.removeQueries({ predicate })
     router.refresh()
   }, [owns, queryClient, router])
+  const history = useHistoryCooldown(reportAccessLoss)
 
   // Every transition that leaves automatic fetching unadmitted cancels queued or in-flight
   // AUTOMATIC work. A manual fetch survives, except after access loss.
@@ -115,9 +115,7 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     // backoff unless the operator pressed Refresh.
     const wasManual = manualRefresh.current
     manualRefresh.current = false
-    const floors = historyFloorsRef.current
-    const at = Date.now()
-    if (at < floors.retryAfterUntil || (!wasManual && at < floors.backoffUntil)) return
+    if (!history.mayRefetch(wasManual)) return
     void queryClient.invalidateQueries({
       queryKey: ['console', 'scheduled-jobs', 'runs', instance],
       refetchType: 'active',
@@ -139,31 +137,6 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     setFloors(floorsAfterFailure(at, next, retryAfterSecondsOf(query.error)))
   }, [query.errorUpdatedAt])
 
-  const reportHistoryFailure = useCallback(
-    (error: unknown) => {
-      if (isAccessLoss(error)) {
-        reportAccessLoss()
-        return
-      }
-      historyStreak.current += 1
-      const floors = floorsAfterFailure(
-        Date.now(),
-        historyStreak.current,
-        retryAfterSecondsOf(error)
-      )
-      historyFloorsRef.current = floors
-      setHistoryFloors(floors)
-    },
-    [reportAccessLoss]
-  )
-
-  const reportHistorySuccess = useCallback(() => {
-    if (historyStreak.current === 0) return
-    historyStreak.current = 0
-    historyFloorsRef.current = NO_FLOORS
-    setHistoryFloors(NO_FLOORS)
-  }, [])
-
   const refresh = useCallback(async () => {
     if (!canRefreshManually({ denied, online: onlineManager.isOnline(), now: Date.now(), floors }))
       return
@@ -180,9 +153,9 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     data: denied ? null : (query.data ?? null),
     instance,
     reportAccessLoss,
-    historyFloors,
-    reportHistoryFailure,
-    reportHistorySuccess,
+    historyFloors: history.floors,
+    reportHistoryFailure: history.reportFailure,
+    reportHistorySuccess: history.reportSuccess,
     denied,
     auto,
     setAuto,
