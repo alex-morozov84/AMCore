@@ -29,10 +29,13 @@ function outcomeNext(receipt: ProbeReceipt): Next | null {
 
 function ReceiptBody({ receipt }: { receipt: ProbeReceipt }) {
   const t = useTranslations('console.integrations.probe.operator_email_test')
+  const failures = useTranslations('console.integrations.failure')
+  const reason = receipt.class && failures.has(receipt.class) ? failures(receipt.class) : null
   const next = outcomeNext(receipt)
   return (
     <div className="space-y-2">
       <p className="font-medium">{t(`outcome.${receipt.outcome}`)}</p>
+      {reason && receipt.outcome === 'refused' && <p>{reason}</p>}
       {next && <p className="text-muted-foreground">{t(`next.${next}`)}</p>}
       <p className="text-xs text-muted-foreground">
         <ConsoleTimestamp

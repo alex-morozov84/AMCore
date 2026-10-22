@@ -14,7 +14,7 @@ import {
 } from './integration-cells'
 import { ProbeAction } from './ProbeAction'
 
-function Row({ item, now }: { item: IntegrationItem; now: number }) {
+function Row({ item, now, online }: { item: IntegrationItem; now: number; online: boolean }) {
   return (
     <TableRow>
       <TableCell className="align-top whitespace-normal">
@@ -31,7 +31,7 @@ function Row({ item, now }: { item: IntegrationItem; now: number }) {
       </TableCell>
       <TableCell className="align-top whitespace-normal">
         <div className="space-y-2">
-          <ProbeAction item={item} />
+          <ProbeAction item={item} online={online} />
           <IntegrationLinks item={item} />
         </div>
       </TableCell>
@@ -40,7 +40,15 @@ function Row({ item, now }: { item: IntegrationItem; now: number }) {
 }
 
 /** Desktop presentation (md and up). Hidden with `display: none` below, so assistive tech reads one list. */
-export function IntegrationsTable({ items, now }: { items: IntegrationItem[]; now: number }) {
+export function IntegrationsTable({
+  items,
+  now,
+  online,
+}: {
+  items: IntegrationItem[]
+  now: number
+  online: boolean
+}) {
   const t = useTranslations('console.integrations')
   return (
     <div className="hidden rounded-lg border bg-surface-elevated shadow-md md:block">
@@ -56,7 +64,7 @@ export function IntegrationsTable({ items, now }: { items: IntegrationItem[]; no
         </TableHeader>
         <TableBody>
           {items.map((item) => (
-            <Row key={item.id} item={item} now={now} />
+            <Row key={item.id} item={item} now={now} online={online} />
           ))}
         </TableBody>
       </Table>

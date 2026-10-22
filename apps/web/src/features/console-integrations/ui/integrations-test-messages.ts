@@ -1,8 +1,26 @@
 /**
- * English copy of the Integrations screen for component tests (ASCII punctuation only). A local copy on
- * purpose: a test that imports the real catalogue would need a locale seam in a single-locale fork.
+ * English copy of the Integrations screen and of its error texts for component tests (ASCII
+ * punctuation only). A local copy on purpose: a test that imports the real catalogue would need a
+ * locale seam in a single-locale fork.
  */
 export const integrationsMessages = {
+  errors: {
+    UNKNOWN_ERROR: 'Something went wrong. Please try again.',
+    INTEGRATION_PROBE_UNAVAILABLE:
+      'The check could not start. Nothing was sent. Try again in a moment.',
+    INTEGRATION_ATTEMPT_EXPIRED: 'The confirmation expired. Start the test again.',
+    INTEGRATION_ATTEMPT_MISMATCH: 'This test belongs to another operator.',
+    INTEGRATION_RECIPIENT_CHANGED:
+      'Your email address changed. Start the test again to confirm the new address.',
+    INTEGRATION_CONFIG_CHANGED: 'The email settings changed. Start the test again.',
+    INTEGRATION_NO_VERIFIED_ADDRESS:
+      'Your account has no verified email address, so a test email cannot be sent to you.',
+    INTEGRATION_MOCK_IN_PRODUCTION:
+      'Production email is only simulated, so a real test cannot run. Configure an email provider first.',
+    INTEGRATION_PROBE_COOLDOWN: 'A test was started a moment ago. Wait before starting another.',
+    INTEGRATION_PROBE_LIMIT: 'The hourly limit for test emails is reached. Try again later.',
+    INTEGRATION_PROBE_BUSY: 'Another test email is being sent. Try again in a moment.',
+  },
   console: {
     integrations: {
       title: 'Integrations',
@@ -67,7 +85,7 @@ export const integrationsMessages = {
       scope: {
         private_file_write_read_delete: 'Writes, reads and deletes a test file',
         broker_read: 'The broker answered. Workers are not tested.',
-        provider_acceptance: 'The provider accepted a direct send',
+        provider_acceptance: 'A direct send from the API server to the provider',
         configuration_only: 'Configuration only',
       },
       instance: {
@@ -91,6 +109,7 @@ export const integrationsMessages = {
         configuration_changed: 'settings changed since the last check',
         in_progress: 'a test is running',
         abandoned: 'a test did not start',
+        busy: 'a test did not start',
         audit_failed: 'a test did not start',
         lease_lost: 'a test did not start',
         redis_timeout: 'a test did not start',
@@ -138,6 +157,7 @@ export const integrationsMessages = {
             cooldown: 'A test was started a moment ago.',
             limit: 'The hourly limit is reached.',
             busy: 'Another test is being sent.',
+            offline: 'You are offline.',
           },
           confirmTitle: 'Send a test email?',
           confirmDescription:

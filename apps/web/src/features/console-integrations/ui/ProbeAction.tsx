@@ -16,19 +16,19 @@ import { ProbeResultDialog } from './ProbeResultDialog'
  * read-only "Last test" reopen. The registration supplies none of this copy: the closed probe kind
  * selects it. Refresh and reopen never send mail.
  */
-export function ProbeAction({ item }: { item: IntegrationItem }) {
+export function ProbeAction({ item, online }: { item: IntegrationItem; online: boolean }) {
   const action = item.action
   const t = useTranslations('console.integrations.probe.operator_email_test')
   const flow = useProbeFlow(item.id, action?.ownAttemptId ?? null)
   if (!action) return null
   const { phase } = flow
   const idle = phase.kind === 'idle'
-  const reason = action.unavailableReason
+  const reason = action.unavailableReason ?? (online ? null : 'offline')
   const hasLast = Boolean(action.ownAttemptId) || item.evidence.checkedAt !== null
   return (
     <div className="flex flex-col items-start gap-1">
       <Button
-        disabled={!action.available || !idle}
+        disabled={!action.available || !idle || !online}
         aria-busy={phase.kind === 'preparing'}
         onClick={() => void flow.start()}
       >

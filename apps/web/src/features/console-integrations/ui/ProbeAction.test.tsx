@@ -5,7 +5,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as SharedApi from '@/shared/api'
 import { consoleApi } from '@/shared/api/console-api'
 import { ApiNetworkError, ApiRequestError } from '@/shared/api/http-client'
 
@@ -21,18 +20,13 @@ vi.mock('@/shared/api/console-api', () => ({
     stepUp: vi.fn(),
   },
 }))
-vi.mock('@/shared/api', async (importOriginal) => ({
-  ...(await importOriginal<typeof SharedApi>()),
-  useApiError: () => (error: unknown) => ({
-    message: `error:${(error as ApiRequestError).body?.errorCode ?? 'unknown'}`,
-  }),
-}))
 vi.mock('@/shared/ui/console-detail/ConsoleTimestamp', () => ({
   ConsoleTimestamp: ({ value }: { value: string }) => <time>{value}</time>,
 }))
 
 /** The step-up dialog is mounted (closed) next to the action, so its copy must resolve too. */
 const messages = {
+  ...integrationsMessages,
   common: { cancel: 'Cancel', close: 'Close' },
   console: {
     ...integrationsMessages.console,
@@ -62,11 +56,11 @@ const receipt = (over: Partial<ProbeReceipt> = {}): ProbeReceipt => ({
 const refusal = (status: number, errorCode: string) =>
   new ApiRequestError(status, { statusCode: status, message: errorCode, errorCode } as never)
 
-function view(over: Parameters<typeof item>[0] = {}) {
+function view(over: Parameters<typeof item>[0] = {}, online = true) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
-        <ProbeAction item={item(over)} />
+        <ProbeAction item={item(over)} online={online} />
       </NextIntlClientProvider>
     </QueryClientProvider>
   )
@@ -135,7 +129,9 @@ describe('test email flow', () => {
     view()
     await click('Send test email')
     await click(await screen.findByRole('button', { name: 'Send test' }))
-    expect(await screen.findByText('error:INTEGRATION_ATTEMPT_EXPIRED')).toBeInTheDocument()
+    expect(
+      await screen.findByText('The confirmation expired. Start the test again.')
+    ).toBeInTheDocument()
     await click('Start again')
     await waitFor(() => expect(consoleApi.prepareIntegrationProbe).toHaveBeenCalledTimes(2))
   })
@@ -147,7 +143,9 @@ describe('test email flow', () => {
     view()
     await click('Send test email')
     await click(await screen.findByRole('button', { name: 'Send test' }))
-    expect(await screen.findByText('error:INTEGRATION_PROBE_COOLDOWN')).toBeInTheDocument()
+    expect(
+      await screen.findByText('A test was started a moment ago. Wait before starting another.')
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Start again' })).not.toBeInTheDocument()
   })
 
@@ -201,5 +199,68 @@ describe('availability and reopening', () => {
     view({ action: { ...emailAction, ownAttemptId: ATTEMPT } })
     await click(/Last test/)
     expect(await screen.findByText('This result is no longer stored.')).toBeInTheDocument()
+  })
+})
+
+describe('a send that may have happened (C1)', () => {
+  it('reads the same attempt when the answer says the result is not readable yet, and posts once', async () => {
+    vi.mocked(consoleApi.runIntegrationProbe).mockResolvedValue(
+      receipt({ outcome: 'in_progress', state: 'sending', settledAt: null })
+    )
+    view()
+    await click('Send test email')
+    await click(await screen.findByRole('button', { name: 'Send test' }))
+    expect(await screen.findByText(/Simulated\. The mock provider is in use/)).toBeInTheDocument()
+    expect(consoleApi.runIntegrationProbe).toHaveBeenCalledTimes(1)
+    expect(consoleApi.getIntegrationProbeReceipt).toHaveBeenCalledWith(
+      'email',
+      ATTEMPT,
+      expect.anything()
+    )
+  })
+
+  it('says nothing was sent only for a refusal that happened before sending, in real words', async () => {
+    vi.mocked(consoleApi.runIntegrationProbe).mockRejectedValue(
+      refusal(503, 'INTEGRATION_PROBE_UNAVAILABLE')
+    )
+    view()
+    await click('Send test email')
+    await click(await screen.findByRole('button', { name: 'Send test' }))
+    expect(
+      await screen.findByText('The check could not start. Nothing was sent. Try again in a moment.')
+    ).toBeInTheDocument()
+    expect(consoleApi.getIntegrationProbeReceipt).not.toHaveBeenCalled()
+  })
+
+  it('shows the safe refusal class in plain words', async () => {
+    vi.mocked(consoleApi.runIntegrationProbe).mockResolvedValue(
+      receipt({ outcome: 'refused', class: 'auth', provider: 'resend' })
+    )
+    view()
+    await click('Send test email')
+    await click(await screen.findByRole('button', { name: 'Send test' }))
+    expect(await screen.findByText('the provider did not accept the key')).toBeInTheDocument()
+    expect(screen.getByText(/Check the provider key and the sender address/)).toBeInTheDocument()
+  })
+})
+
+describe('offline (C7)', () => {
+  it('disables the test and says why, because the result could not be read back', () => {
+    view({}, false)
+    expect(screen.getByRole('button', { name: 'Send test email' })).toBeDisabled()
+    expect(screen.getByText('You are offline.')).toBeInTheDocument()
+  })
+
+  it('enables it again when the connection returns', () => {
+    const { rerender } = view({}, false)
+    expect(screen.getByRole('button', { name: 'Send test email' })).toBeDisabled()
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
+          <ProbeAction item={item({})} online />
+        </NextIntlClientProvider>
+      </QueryClientProvider>
+    )
+    expect(screen.getByRole('button', { name: 'Send test email' })).toBeEnabled()
   })
 })

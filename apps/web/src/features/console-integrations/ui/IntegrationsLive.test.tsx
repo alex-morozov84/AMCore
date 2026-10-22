@@ -103,6 +103,30 @@ describe('setup, result and age are separate facts', () => {
   })
 })
 
+describe('the scope text does not claim an acceptance that was not observed (C7)', () => {
+  it.each([
+    ['none', { result: 'none', freshness: 'none', checkedAt: null }],
+    ['simulated', { result: 'simulated', freshness: 'fresh' }],
+    ['refused', { result: 'failed', freshness: 'fresh', failure: 'auth' }],
+    ['unknown', { result: 'unknown', freshness: 'fresh' }],
+  ] as const)('for a %s email result', (_name, over) => {
+    const base = item()
+    state({
+      data: response([
+        {
+          ...base,
+          evidence: { ...base.evidence, checkedAt: '2026-10-22T11:59:00.000Z', ...over },
+        },
+      ]),
+    })
+    view()
+    expect(
+      screen.getAllByText(/A direct send from the API server to the provider/).length
+    ).toBeGreaterThan(0)
+    expect(screen.queryByText(/provider accepted a direct send/i)).not.toBeInTheDocument()
+  })
+})
+
 describe('registered integrations need no page change', () => {
   it('renders a downstream integration with its registered name and a readable fact', () => {
     view()

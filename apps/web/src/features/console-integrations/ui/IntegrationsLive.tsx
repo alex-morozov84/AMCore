@@ -50,8 +50,8 @@ export function IntegrationsLive({
           <p className="text-sm text-muted-foreground">{t('noIntegrations')}</p>
         ) : (
           <>
-            <IntegrationsTable items={data.items} now={now} />
-            <IntegrationCards items={data.items} now={now} />
+            <IntegrationsTable items={data.items} now={now} online={live.online} />
+            <IntegrationCards items={data.items} now={now} online={live.online} />
             <p className="text-xs text-muted-foreground">{t('setupNote')}</p>
           </>
         ))}

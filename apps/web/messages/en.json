@@ -1162,7 +1162,7 @@
       "scope": {
         "private_file_write_read_delete": "Writes, reads and deletes a test file",
         "broker_read": "The broker answered. Workers are not tested.",
-        "provider_acceptance": "The provider accepted a direct send",
+        "provider_acceptance": "A direct send from the API server to the provider",
         "configuration_only": "Configuration only"
       },
       "instance": {
@@ -1186,6 +1186,7 @@
         "configuration_changed": "settings changed since the last check",
         "in_progress": "a test is running",
         "abandoned": "a test did not start",
+        "busy": "a test did not start",
         "audit_failed": "a test did not start",
         "lease_lost": "a test did not start",
         "redis_timeout": "a test did not start",
@@ -1232,7 +1233,8 @@
             "mock_in_production": "Production email is only simulated.",
             "cooldown": "A test was started a moment ago.",
             "limit": "The hourly limit is reached.",
-            "busy": "Another test is being sent."
+            "busy": "Another test is being sent.",
+            "offline": "You are offline."
           },
           "confirmTitle": "Send a test email?",
           "confirmDescription": "One message goes to you at {recipient}. It uses the real provider and counts toward its limits. “Accepted” means the provider took the message, not that it reached an inbox. It checks a direct send from the API server, not the queue or invitation emails.",

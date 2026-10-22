@@ -29,7 +29,7 @@ function Field({
   )
 }
 
-function Card({ item, now }: { item: IntegrationItem; now: number }) {
+function Card({ item, now, online }: { item: IntegrationItem; now: number; online: boolean }) {
   const t = useTranslations('console.integrations')
   return (
     <li className="rounded-lg border bg-surface-elevated p-4 shadow-md">
@@ -46,7 +46,7 @@ function Card({ item, now }: { item: IntegrationItem; now: number }) {
         </Field>
       </dl>
       <div className="mt-3 space-y-2">
-        <ProbeAction item={item} />
+        <ProbeAction item={item} online={online} />
         <IntegrationLinks item={item} />
       </div>
     </li>
@@ -54,12 +54,20 @@ function Card({ item, now }: { item: IntegrationItem; now: number }) {
 }
 
 /** Mobile presentation (below md): one card per service with the same fields as the table. */
-export function IntegrationCards({ items, now }: { items: IntegrationItem[]; now: number }) {
+export function IntegrationCards({
+  items,
+  now,
+  online,
+}: {
+  items: IntegrationItem[]
+  now: number
+  online: boolean
+}) {
   const t = useTranslations('console.integrations')
   return (
     <ul aria-label={t('tableLabel')} className="flex flex-col gap-3 md:hidden">
       {items.map((item) => (
-        <Card key={item.id} item={item} now={now} />
+        <Card key={item.id} item={item} now={now} online={online} />
       ))}
     </ul>
   )
