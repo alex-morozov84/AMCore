@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -38,7 +39,7 @@ function Items() {
 }
 const inProvider = (node: React.ReactNode) =>
   render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
       {node}
     </NextIntlClientProvider>
   )

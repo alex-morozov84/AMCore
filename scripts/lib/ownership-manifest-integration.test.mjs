@@ -64,7 +64,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // Exact Console inventory, including provisioning, administrator management
       // and their route, story and browser proof files, and the Scheduled jobs page, feature,
       // BFF routes, server API modules and operator guide.
-      expected: 473,
+      expected: 474,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {
