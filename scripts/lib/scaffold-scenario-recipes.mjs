@@ -2,10 +2,13 @@
 // opt-in baseline runner. Expected generated output deliberately stays in the
 // tests: sharing expectations with the runner would make validation circular.
 
+import { ROUTE_BUDGET_STEP } from './scaffold-verification-steps.mjs'
+
 export const STORYBOOK_MANUAL_VERIFY_STEPS = [
   ['typecheck'],
   ['lint'],
   ['--filter', 'web', 'build'],
+  ROUTE_BUDGET_STEP,
   ['--filter', 'api', 'test'],
   ['--filter', 'web', 'test'],
 ]
@@ -15,11 +18,13 @@ export const ADMIN_CONSOLE_VERIFY_STEPS = [
   ['lint'],
   ['--filter', 'web', 'test'],
   ['--filter', 'web', 'build'],
+  ROUTE_BUDGET_STEP,
 ]
 
 export const ADMIN_CONSOLE_SINGLE_LOCALE_BUILD_STEPS = [
   ['--filter', 'shared', 'build'],
   ['--filter', 'web', 'build'],
+  ROUTE_BUDGET_STEP,
 ]
 
 export const SINGLE_LOCALE_EN_SCENARIO = {

@@ -165,6 +165,16 @@ export const operationsConsoleCodeSeams = [
     ['feature-import']
   ),
   seam(
+    'console.route-budgets',
+    'scripts/check-route-budgets.mjs',
+    'owned-block',
+    {
+      start: '// AMCORE_CONSOLE_ROUTE_BUDGETS_START',
+      end: '// AMCORE_CONSOLE_ROUTE_BUDGETS_END',
+    },
+    ['feature-import']
+  ),
+  seam(
     'console.context-host-doc',
     'PROJECT_CONTEXT.md',
     'structural-operation',

@@ -18,6 +18,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "check:route-budgets": "node scripts/check-route-budgets.mjs",
     "lint": "turbo lint && node scripts/lint.mjs --scope root scripts",
     "lint:fix": "turbo run lint:fix && node scripts/lint.mjs --scope root --fix scripts",
     "test": "turbo test",
