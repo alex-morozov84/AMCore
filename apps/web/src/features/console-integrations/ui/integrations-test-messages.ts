@@ -64,11 +64,6 @@ export const integrationsMessages = {
         unknown: 'Outcome unknown',
         simulated: 'Simulated',
       },
-      freshness: {
-        fresh: 'Recent',
-        stale: 'Old',
-        none: '',
-      },
       scope: {
         private_file_write_read_delete: 'Writes, reads and deletes a test file',
         broker_read: 'The broker answered. Workers are not tested.',
