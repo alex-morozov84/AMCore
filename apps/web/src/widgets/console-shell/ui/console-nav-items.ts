@@ -6,6 +6,7 @@ import {
   KeyRoundIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
+  PlugZapIcon,
   ScrollTextIcon,
   UsersIcon,
 } from 'lucide-react'
@@ -14,6 +15,7 @@ import {
   getConsoleApiKeysHref,
   getConsoleAuditHref,
   getConsoleBackgroundWorkHref,
+  getConsoleIntegrationsHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
   getConsoleScheduledJobsHref,
@@ -42,6 +44,12 @@ export function useConsoleNavItems(): ConsoleNavItem[] {
       href: getConsoleScheduledJobsHref(),
       label: t('scheduledJobs.title'),
       icon: CalendarClockIcon,
+      prefetch: false,
+    },
+    {
+      href: getConsoleIntegrationsHref(),
+      label: t('integrations.title'),
+      icon: PlugZapIcon,
       prefetch: false,
     },
     { href: getConsoleUsersHref(), label: t('users'), icon: UsersIcon },
