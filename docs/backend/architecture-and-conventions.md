@@ -239,6 +239,9 @@ the **right** list — a misplaced processor runs in the wrong process:
   reference: `EmailModule` (producer, everywhere) vs `EmailWorkerModule` (processor,
   worker only).
 - **Genuinely shared infrastructure / producers** → `coreImports`.
+- **Console-visible outside services:** a module that talks to an outside service registers
+  a reader once in the integrations composition list, and the Console Integrations page shows
+  it with no page change: see [Register an integration](integrations.md).
 
 ### Shared configured extension modules
 

@@ -12,6 +12,7 @@ their organization role.
 | [Overview](overview.md)               | Check API readiness, storage and resources; open monitoring tools; edit probe interval.     |
 | [Background work](background-work.md) | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup.  |
 | [Scheduled jobs](scheduled-jobs.md)   | Check that nightly cleanups, the GeoIP update and recovery passes keep running (view-only). |
+| [Integrations](integrations.md)       | See which outside services are set up and last confirmed; send a test email to yourself.    |
 | [Queue board](queue-board.md)         | Look at the jobs of the background queues (view-only), opened from Background work.         |
 | [Users](users.md)                     | Find users, inspect details/memberships, change system roles, and view or revoke sessions.  |
 | [Organizations](organizations.md)     | Create organizations and invite their first ADMIN; initial setup, inventory and members.    |
