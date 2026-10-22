@@ -640,7 +640,7 @@ describe('AuthController', () => {
 
       const result = await controller.forgotPassword(dto)
 
-      expect(authService.forgotPassword).toHaveBeenCalledWith('test@example.com')
+      expect(authService.forgotPassword).toHaveBeenCalledWith('test@example.com', undefined)
       expect(result.message).toContain('If an account')
     })
 
@@ -671,7 +671,11 @@ describe('AuthController', () => {
 
       await controller.resetPassword(dto)
 
-      expect(authService.resetPassword).toHaveBeenCalledWith('a'.repeat(64), 'NewPass123')
+      expect(authService.resetPassword).toHaveBeenCalledWith(
+        'a'.repeat(64),
+        'NewPass123',
+        undefined
+      )
     })
 
     it('should propagate error for invalid token', async () => {
@@ -692,7 +696,7 @@ describe('AuthController', () => {
 
       await controller.verifyEmail(dto)
 
-      expect(authService.verifyEmail).toHaveBeenCalledWith('a'.repeat(64))
+      expect(authService.verifyEmail).toHaveBeenCalledWith('a'.repeat(64), undefined)
     })
 
     it('should propagate error for invalid token', async () => {
@@ -711,7 +715,10 @@ describe('AuthController', () => {
 
       const result = await controller.resendVerification(dto)
 
-      expect(authService.resendVerificationEmail).toHaveBeenCalledWith('test@example.com')
+      expect(authService.resendVerificationEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        undefined
+      )
       expect(result.message).toContain('If the account')
     })
 

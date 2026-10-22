@@ -25,7 +25,7 @@ test(
     let verified = false
     const command = [
       'test ! -d /private/tmp',
-      'npm install -g pnpm@11.1.2',
+      'npm install -g pnpm@12.14.0',
       'apt-get update && apt-get install -y procps git',
       'git init --quiet && git add -A && git -c user.name=fixture -c user.email=fixture@example.test commit --quiet -m fixture',
       'pnpm install --frozen-lockfile',

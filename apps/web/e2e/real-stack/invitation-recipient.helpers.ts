@@ -8,7 +8,8 @@ import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { directApi } from './credential-containment.helpers'
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
 
-// Fixture replaces only a test-created invitation hash: this does not prove mail delivery.
+// Explicit legacy-site fixture: simulate a pre-placement row/link in owned test data.
+// Current admin-bound rendered-mail delivery is proved by the separate staff fixture.
 export async function inviteRecipient(email: string, existingOwnerEmail?: string) {
   const target = activeTarget()
   const ownerEmail = existingOwnerEmail ?? uniqueEmail('invitation-owner')
@@ -37,7 +38,7 @@ export async function inviteRecipient(email: string, existingOwnerEmail?: string
   const token = randomBytes(32).toString('base64url')
   const hash = createHash('sha256').update(token).digest('hex')
   const updated = guardedSql(
-    `UPDATE core.org_invites SET "tokenHash"=:'hash' WHERE "organizationId"=:'org' AND "emailCanonical"=:'email' AND "acceptedAt" IS NULL RETURNING id;`,
+    `UPDATE core.org_invites SET "tokenHash"=:'hash', "frontendDestination"='site', "placementFingerprint"=NULL WHERE "organizationId"=:'org' AND "emailCanonical"=:'email' AND "acceptedAt" IS NULL RETURNING id;`,
     { hash, org: org.id, email }
   )
   expect(updated).toContain('UPDATE 1')

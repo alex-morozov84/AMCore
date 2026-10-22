@@ -13,6 +13,7 @@ const originalEnabled = ADMIN_CONSOLE_CONFIG.enabled
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   mutableConfig.enabled = originalEnabled
   mutableConfig.mode = originalMode
   delete process.env.ADMIN_CONSOLE_ORIGIN
@@ -20,11 +21,13 @@ afterEach(() => {
 })
 
 describe('console host guard', () => {
-  it('allows every host in the generated path mode', () => {
+  it('allows only the website host in generated path mode', () => {
     mutableConfig.mode = 'path'
+    vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
 
     expect(isConsoleHost('app.example.test')).toBe(true)
-    expect(isConsoleHost('console.example.test')).toBe(true)
+    expect(isConsoleHost('console.example.test')).toBe(false)
+    expect(isConsoleHost('app.example.test:9443')).toBe(false)
   })
 
   it('rejects a product host before calling a console handler in host mode', async () => {

@@ -17,6 +17,7 @@ import { EnvService } from '../../../env/env.service.js'
 import { PrismaService } from '../../../prisma/index.js'
 import { AuditLogService } from '../../audit/index.js'
 import { EmailIdentityService } from '../../auth/email-identity.service.js'
+import { resolveFrontendPlacement } from '../../frontend-context/frontend-placement.js'
 import { InvitationEmailService } from '../invitation-email.service.js'
 import { admitSetupOperator, type SetupOperator } from '../organization-setup-admission.js'
 import { OrganizationsService } from '../organizations.service.js'
@@ -101,6 +102,10 @@ export class AdministrationService {
       }
     const result = await administratorTransaction(this.db, (tx) =>
       administratorCommand(tx, orgId, command, {
+        frontend: {
+          frontend: 'admin',
+          placementFingerprint: resolveFrontendPlacement(this.env).placementFingerprint,
+        },
         operator,
         limiter: this.limiter,
         audit: this.audit,

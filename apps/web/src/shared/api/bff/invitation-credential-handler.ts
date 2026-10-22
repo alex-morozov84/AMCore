@@ -46,69 +46,77 @@ export async function invitationCredentialHandler(
               : invitationFlowRegisterSchema.parse(raw)
           const { binding, ...body } = input
           if (binding.flowId !== flowId) throw invitationFlowChanged()
-          return withInvitationOwnerLease(first.ownerHash, signal, async () => {
-            const snapshot = await captureInvitationRequest(request, flowId, deps, true)
-            const reserved = reserveInvitationAuth(
-              snapshot.owner,
-              binding,
-              snapshot.session?.binding ?? null,
-              kind,
-              null,
-              Date.now()
-            )
-            signal.throwIfAborted()
-            if (
-              !(await invitationOwnerStore.compareAndSet(
-                snapshot.ownerHash,
-                snapshot.owner.version,
-                reserved.owner
-              ))
-            )
-              throw invitationFlowChanged()
-            try {
-              signal.throwIfAborted()
-              const credentials = await invitationBackend(
-                kind === 'login' ? '/auth/login' : '/auth/invites/register',
-                authResponseSchema,
-                {
-                  source: request.headers,
-                  signal,
-                  method: 'POST',
-                  expectedStatus: kind === 'login' ? 200 : 201,
-                  body,
-                  credential: snapshot.flow.credential,
-                  handoff: {
-                    attemptId: reserved.attempt.id,
-                    cleanupKey: reserved.attempt.cleanupKey,
-                  },
-                }
+          return withInvitationOwnerLease(
+            first.ownerHash,
+            signal,
+            async () => {
+              const snapshot = await captureInvitationRequest(request, flowId, deps, true)
+              const reserved = reserveInvitationAuth(
+                snapshot.owner,
+                binding,
+                snapshot.session?.binding ?? null,
+                kind,
+                null,
+                Date.now()
               )
-              const published = await publishInvitedCredentials({
-                snapshot,
-                attempt: reserved.attempt,
-                credentials,
-                signal,
-              })
-              // The deadline wrapper may discard a late response. It must never emit its cookie on that error.
               signal.throwIfAborted()
-              const safe = invitationFlowAuthResponseSchema.parse({
-                binding: published.binding,
-                data: { user: published.user },
-                handoff: { attemptId: published.attemptId },
-              })
-              publishedSessionId = published.sessionId
-              return safe
-            } catch (error) {
-              await recoverFailedInvitationAuth({
-                request,
-                snapshot,
-                attempt: reserved.attempt,
-                error,
-                store: deps.store,
-              }).catch(() => undefined)
-              throw error
-            }
-          })
+              if (
+                !(await invitationOwnerStore.compareAndSet(
+                  snapshot.ownerHash,
+                  snapshot.owner.version,
+                  reserved.owner,
+                  deps.webContext
+                ))
+              )
+                throw invitationFlowChanged()
+              try {
+                signal.throwIfAborted()
+                const credentials = await invitationBackend(
+                  kind === 'login' ? '/auth/login' : '/auth/invites/register',
+                  authResponseSchema,
+                  {
+                    context: deps.webContext,
+                    source: request.headers,
+                    signal,
+                    method: 'POST',
+                    expectedStatus: kind === 'login' ? 200 : 201,
+                    body,
+                    credential: snapshot.flow.credential,
+                    handoff: {
+                      attemptId: reserved.attempt.id,
+                      cleanupKey: reserved.attempt.cleanupKey,
+                    },
+                  }
+                )
+                const published = await publishInvitedCredentials({
+                  snapshot,
+                  attempt: reserved.attempt,
+                  credentials,
+                  signal,
+                })
+                // The deadline wrapper may discard a late response. It must never emit its cookie on that error.
+                signal.throwIfAborted()
+                const safe = invitationFlowAuthResponseSchema.parse({
+                  binding: published.binding,
+                  data: { user: published.user },
+                  handoff: { attemptId: published.attemptId },
+                })
+                publishedSessionId = published.sessionId
+                return safe
+              } catch (error) {
+                await recoverFailedInvitationAuth({
+                  request,
+                  snapshot,
+                  attempt: reserved.attempt,
+                  error,
+                  store: deps.store,
+                }).catch(() => undefined)
+                throw error
+              }
+            },
+            undefined,
+            deps.webContext
+          )
         },
         15000
       ),
@@ -119,6 +127,10 @@ export async function invitationCredentialHandler(
     status: response.status,
     headers: response.headers,
   })
-  result.cookies.set(SESSION_COOKIE_NAME, publishedSessionId, sessionCookieOptions())
+  result.cookies.set(
+    deps.webContext?.cookieName ?? SESSION_COOKIE_NAME,
+    publishedSessionId,
+    deps.webContext?.cookieOptions ?? sessionCookieOptions()
+  )
   return result
 }

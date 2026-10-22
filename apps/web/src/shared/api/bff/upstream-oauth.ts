@@ -6,6 +6,7 @@ import {
 } from '@amcore/shared'
 
 import { invitationBackend, InvitationBackendError } from './invitation-upstream'
+import type { ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
@@ -33,11 +34,13 @@ export function callUpstreamOAuthExchange(
   ticket: string,
   refreshToken: string,
   source = new Headers(),
-  signal = AbortSignal.timeout(15000)
+  signal = AbortSignal.timeout(15000),
+  context?: ProductWebContext
 ): Promise<OAuthExchangeResponse> {
   return containOAuth(() =>
     invitationBackend('/auth/oauth/exchange', oauthExchangeResponseSchema, {
       source,
+      context,
       signal,
       method: 'POST',
       expectedStatus: 200,
@@ -50,11 +53,13 @@ export function callUpstreamOAuthExchange(
 export async function fetchCurrentUser(
   accessToken: string,
   source = new Headers(),
-  signal = AbortSignal.timeout(10000)
+  signal = AbortSignal.timeout(10000),
+  context?: ProductWebContext
 ): Promise<UserResponse | null> {
   const data = await containOAuth(() =>
     invitationBackend('/auth/me', profileResponseSchema, {
       source,
+      context,
       signal,
       method: 'GET',
       expectedStatus: 200,

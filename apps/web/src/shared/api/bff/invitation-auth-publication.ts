@@ -35,6 +35,7 @@ export async function publishInvitedCredentials(input: {
   )
   if (input.oauth && input.oauth.backendSessionId !== backendId) throw invitationFlowChanged()
   const entry = {
+    ...(snapshot.webContext ? { audience: snapshot.webContext.audience } : {}),
     accessToken: credentials.data.accessToken,
     refreshToken: credentials.refreshToken,
     accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
@@ -44,6 +45,7 @@ export async function publishInvitedCredentials(input: {
   // OAuth reservation outlives issuance; only the API confirms its durable issuance deadline.
   const deadline = Math.min(Date.now() + 60000, attempt.expiresAt, snapshot.flow.expiresAt)
   const sessionId = await stageInvitationSession({
+    context: snapshot.webContext,
     ownerHash: snapshot.ownerHash,
     flowId: snapshot.flow.binding.flowId,
     attemptId: attempt.id,
@@ -53,7 +55,11 @@ export async function publishInvitedCredentials(input: {
   })
   try {
     signal.throwIfAborted()
-    const owner = await invitationOwnerStore.get(snapshot.ownerHash, snapshot.owner.origin)
+    const owner = await invitationOwnerStore.get(
+      snapshot.ownerHash,
+      snapshot.owner.origin,
+      snapshot.webContext
+    )
     if (!owner) throw invitationFlowChanged()
     if (input.oauth)
       invitationOAuthFlow(
@@ -69,7 +75,16 @@ export async function publishInvitedCredentials(input: {
       attempt.id,
       attempt.fence,
       snapshot.session?.binding ?? null,
-      { binding: contextSessionBinding(sessionId, entry), vaultId: sessionId, backendId, deadline },
+      {
+        binding: contextSessionBinding(
+          sessionId,
+          entry,
+          snapshot.webContext?.frontend === 'admin' ? 2 : 1
+        ),
+        vaultId: sessionId,
+        backendId,
+        deadline,
+      },
       Date.now()
     )
     if (input.oauth) {
@@ -85,7 +100,8 @@ export async function publishInvitedCredentials(input: {
         owner.version,
         next,
         sessionId,
-        input.oauth?.carrier.attemptId
+        input.oauth?.carrier.attemptId,
+        snapshot.webContext
       ))
     )
       throw invitationFlowChanged()
@@ -96,7 +112,9 @@ export async function publishInvitedCredentials(input: {
     return { sessionId, binding: flow.binding, user: credentials.data.user, attemptId: attempt.id }
   } catch (error) {
     // This cannot delete credentials that the publication transaction already promoted.
-    await discardInvitationSession(snapshot.ownerHash, sessionId).catch(() => undefined)
+    await discardInvitationSession(snapshot.ownerHash, sessionId, snapshot.webContext).catch(
+      () => undefined
+    )
     throw error
   }
 }

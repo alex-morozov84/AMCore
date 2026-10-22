@@ -110,7 +110,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     { actor: actor.id, org: first.id }
   )
   await page.getByRole('button', { name: ui.text('refresh'), exact: true }).click()
-  await expect(page.getByText(ui.text('unavailableTitle'), { exact: true })).toBeVisible()
+  await expect(page.getByText(ui.adminText('unavailableTitle'), { exact: true })).toBeVisible()
   expect(new URL(page.url()).pathname).toBe(ui.path(`/${first.id}`))
   await expect(page.getByText('Company Alpha', { exact: true })).toHaveCount(0)
 

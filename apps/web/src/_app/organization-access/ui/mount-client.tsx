@@ -13,6 +13,7 @@ import {
 } from '../model/placement'
 
 export function OrganizationAccessClientMount({
+  deniedContent,
   admission,
   placement = organizationAccessPlacement,
   id,
@@ -21,6 +22,7 @@ export function OrganizationAccessClientMount({
   initialOrganizationName,
   initialCanManageTeamAccess,
 }: {
+  deniedContent?: React.ReactNode
   admission: ProductAccessBootstrap
   placement?: OrganizationAccessPlacement
   id?: string
@@ -34,6 +36,7 @@ export function OrganizationAccessClientMount({
   const hrefs = organizationAccessHrefs(placement)
   return (
     <OrganizationAccessClient
+      deniedContent={deniedContent}
       admission={admission}
       initialOrganizationName={initialOrganizationName}
       initialCanManageTeamAccess={initialCanManageTeamAccess}
@@ -46,7 +49,7 @@ export function OrganizationAccessClientMount({
       contextHref={hrefs.contextHref}
       pageHref={hrefs.pageHref}
       listHref={hrefs.listHref}
-      loginHref="/login"
+      loginHref={placement.loginHref ?? '/login'}
       dashboardHref={hrefs.homeHref}
       onReplace={(href) => router.replace(href)}
       onReload={() => window.location.reload()}

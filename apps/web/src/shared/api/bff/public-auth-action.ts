@@ -4,12 +4,14 @@ import type { ZodType } from 'zod'
 
 import { apiErrorResponse, zodValidationErrors } from './api-error-response'
 import { isTrustedOrigin } from './origin-guard'
+import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5002'
 
 export interface PublicAuthActionOptions<TInput> {
+  context?: ProductWebContext
   schema: ZodType<TInput>
   backendPath: string
 }
@@ -34,7 +36,12 @@ export async function handlePublicAuthAction<TInput>(
   request: Request,
   options: PublicAuthActionOptions<TInput>
 ): Promise<NextResponse> {
-  if (!isTrustedOrigin(request)) {
+  const context = options.context
+  if (
+    !(context?.frontend === 'admin'
+      ? isProductMutationTrusted(request, context)
+      : isTrustedOrigin(request))
+  ) {
     return apiErrorResponse(request, {
       statusCode: 403,
       message: 'Request origin rejected',
@@ -54,7 +61,7 @@ export async function handlePublicAuthAction<TInput>(
 
   const upstreamResponse = await fetch(`${API_URL}/api/v1${options.backendPath}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...context?.apiHeaders },
     body: JSON.stringify(parsed.data),
   })
 

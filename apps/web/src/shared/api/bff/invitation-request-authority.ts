@@ -4,16 +4,25 @@ import { ContextRequestError } from './context-errors'
 import { invitationCookiePolicy, readInvitationOwner } from './invitation-cookie'
 import { invitationOwnerHash } from './invitation-owner-store'
 import { invitationCanonicalOrigin } from './invitation-render-request'
+import type { ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
 /** Select the configured public origin by actual Host; Next may expose an internal request URL. */
-export function invitationRequestAuthority(request: Request, mutation: boolean) {
-  const policy = invitationCookiePolicy(invitationCanonicalOrigin(request.headers, request.url))
+export function invitationRequestAuthority(
+  request: Request,
+  mutation: boolean,
+  context?: ProductWebContext
+) {
+  const policy = invitationCookiePolicy(
+    context?.origin ?? invitationCanonicalOrigin(request.headers, request.url),
+    process.env,
+    context?.frontend
+  )
   const trusted = (process.env.WEB_TRUSTED_ORIGINS ?? 'http://localhost:3002')
     .split(',')
     .map((origin) => origin.trim())
-  if (!trusted.includes(policy.origin)) throw new ContextRequestError(403, 'FORBIDDEN')
+  if (!context && !trusted.includes(policy.origin)) throw new ContextRequestError(403, 'FORBIDDEN')
   if (mutation && request.headers.get('origin') !== policy.origin)
     throw new ContextRequestError(403, AuthErrorCode.AUTH_ORIGIN_REJECTED)
   let proof: string | null

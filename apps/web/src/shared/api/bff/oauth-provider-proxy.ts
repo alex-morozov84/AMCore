@@ -1,7 +1,11 @@
 import { ContextRequestError } from './context-errors'
+import { getOptionalSessionEntry } from './dal'
 import { cancelInvitedOAuthForOrdinaryStart } from './invitation-auth-lifecycle'
 import { startInvitedOAuth } from './invitation-oauth-start'
 import { isFormPostProvider, relayOAuthCookies } from './oauth-cookie-relay'
+import { oauthLoginFailure } from './oauth-login-failure'
+import type { ProductWebContext } from './product-web-context.server'
+import { isProductMutationTrusted } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 
 import 'server-only'
@@ -30,18 +34,26 @@ async function fetchUpstream(
   request: Request,
   upstreamPath: string,
   proof?: Headers,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  context?: ProductWebContext
 ): Promise<Response> {
   const upstream = new URL(`${API_URL}/api/v1${upstreamPath}`)
   upstream.search = new URL(request.url).search
   upstream.searchParams.delete('invitationAttempt')
 
   const hasBody = request.method === 'POST' && request.body !== null
-  const headers = new Headers(sessionMetadataHeaders(request.headers))
+  const headers = new Headers({
+    ...sessionMetadataHeaders(request.headers),
+    ...context?.apiHeaders,
+  })
   const nonceName = upstreamPath.endsWith('/callback')
     ? upstreamPath.includes('/apple/')
-      ? 'oauth_state_apple'
-      : 'oauth_state'
+      ? context?.frontend === 'admin'
+        ? 'amcore_admin_oauth_state_apple'
+        : 'oauth_state_apple'
+      : context?.frontend === 'admin'
+        ? 'amcore_admin_oauth_state'
+        : 'oauth_state'
     : null
   const cookies = (request.headers.get('cookie') ?? '')
     .split(';')
@@ -65,7 +77,11 @@ async function fetchUpstream(
   })
 }
 
-function relayResponse(upstream: Response, provider: string): Response {
+function relayResponse(
+  upstream: Response,
+  provider: string,
+  context?: ProductWebContext
+): Response {
   const headers = new Headers()
   headers.set('cache-control', 'private, no-store')
   headers.set('referrer-policy', 'no-referrer')
@@ -74,13 +90,17 @@ function relayResponse(upstream: Response, provider: string): Response {
   if (location) headers.set('location', location)
   const contentType = upstream.headers.get('content-type')
   if (contentType) headers.set('content-type', contentType)
-  relayOAuthCookies(upstream, provider, headers)
+  relayOAuthCookies(upstream, provider, headers, context)
 
   return new Response(upstream.body, { status: upstream.status, headers })
 }
 
 /** `GET /api/auth/oauth/:provider` -> backend `GET /auth/oauth/:provider`. */
-export async function proxyOAuthAuthorize(request: Request, provider: string): Promise<Response> {
+async function authorize(
+  request: Request,
+  provider: string,
+  context?: ProductWebContext
+): Promise<Response> {
   const query = new URL(request.url).searchParams
   if (query.has('invitationAttempt')) {
     if (query.size !== 1) return new Response(null, { status: 400 })
@@ -90,9 +110,16 @@ export async function proxyOAuthAuthorize(request: Request, provider: string): P
         provider,
         query.get('invitationAttempt')!,
         (proof, signal) =>
-          fetchUpstream(request, `/auth/oauth/${encodeURIComponent(provider)}`, proof, signal)
+          fetchUpstream(
+            request,
+            `/auth/oauth/${encodeURIComponent(provider)}`,
+            proof,
+            signal,
+            context
+          ),
+        context
       )
-      return relayResponse(upstream, provider)
+      return relayResponse(upstream, provider, context)
     } catch (error) {
       return new Response(null, {
         status: error instanceof ContextRequestError ? error.status : 503,
@@ -104,9 +131,39 @@ export async function proxyOAuthAuthorize(request: Request, provider: string): P
       })
     }
   }
-  await cancelInvitedOAuthForOrdinaryStart(request)
-  const upstream = await fetchUpstream(request, `/auth/oauth/${encodeURIComponent(provider)}`)
-  return relayResponse(upstream, provider)
+  await cancelInvitedOAuthForOrdinaryStart(request, context)
+  const upstream = await fetchUpstream(
+    request,
+    `/auth/oauth/${encodeURIComponent(provider)}`,
+    undefined,
+    undefined,
+    context
+  )
+  return relayResponse(upstream, provider, context)
+}
+
+/** Document navigation failures return to the human-facing login form. */
+export async function proxyOAuthAuthorize(
+  request: Request,
+  provider: string,
+  context?: ProductWebContext
+): Promise<Response> {
+  if (
+    context?.frontend === 'admin' &&
+    ((request.headers.has('sec-fetch-dest') &&
+      request.headers.get('sec-fetch-dest') !== 'document') ||
+      /prefetch/i.test(request.headers.get('purpose') ?? request.headers.get('sec-purpose') ?? ''))
+  )
+    return new Response(null, { status: 400 })
+  try {
+    const response = await authorize(request, provider, context)
+    if (context?.frontend === 'admin' && ![302, 303].includes(response.status))
+      return oauthLoginFailure(request, provider, context, response)
+    return response
+  } catch (error) {
+    if (context?.frontend === 'admin') return oauthLoginFailure(request, provider, context)
+    throw error
+  }
 }
 
 /**
@@ -115,13 +172,51 @@ export async function proxyOAuthAuthorize(request: Request, provider: string): P
  * `response_mode=form_post`; the raw `application/x-www-form-urlencoded`
  * body is forwarded unparsed.
  */
-export async function proxyOAuthCallback(request: Request, provider: string): Promise<Response> {
-  if (request.method === 'POST' && !isFormPostProvider(provider)) {
+export async function proxyOAuthCallback(
+  request: Request,
+  provider: string,
+  context?: ProductWebContext
+): Promise<Response> {
+  if (isFormPostProvider(provider) ? request.method !== 'POST' : request.method !== 'GET') {
     return new Response(null, { status: 405 })
   }
+  try {
+    const upstream = await fetchUpstream(
+      request,
+      `/auth/oauth/${encodeURIComponent(provider)}/callback`,
+      undefined,
+      undefined,
+      context
+    )
+    if (context?.frontend === 'admin' && ![302, 303].includes(upstream.status))
+      return oauthLoginFailure(request, provider, context, upstream)
+    return relayResponse(upstream, provider, context)
+  } catch (error) {
+    if (context?.frontend === 'admin') return oauthLoginFailure(request, provider, context)
+    throw error
+  }
+}
+
+/** Link is an authenticated mutation despite the provider's GET redirect protocol. */
+export async function proxyOAuthLink(
+  request: Request,
+  provider: string,
+  context: ProductWebContext
+): Promise<Response> {
+  if (!isProductMutationTrusted(request, context))
+    throw new ContextRequestError(403, 'AUTH_ORIGIN_REJECTED')
+  if (!['google', 'github', 'apple', 'telegram'].includes(provider))
+    throw new ContextRequestError(404, 'NOT_FOUND')
+  const entry = await getOptionalSessionEntry('admin-auth')
+  if (!entry) throw new ContextRequestError(401, 'UNAUTHORIZED')
   const upstream = await fetchUpstream(
     request,
-    `/auth/oauth/${encodeURIComponent(provider)}/callback`
+    `/auth/oauth/${provider}/link`,
+    new Headers({ authorization: `Bearer ${entry.accessToken}` }),
+    undefined,
+    context
   )
-  return relayResponse(upstream, provider)
+  if (![302, 303].includes(upstream.status))
+    return oauthLoginFailure(request, provider, context, upstream)
+  return relayResponse(upstream, provider, context)
 }

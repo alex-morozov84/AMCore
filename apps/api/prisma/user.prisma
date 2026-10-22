@@ -222,6 +222,8 @@ model UserSettings {
 // -----------------------------
 
 model PasswordResetToken {
+  frontendDestination String @default("site")
+  placementFingerprint String?
   id        String    @id @default(cuid())
   userId    String
   tokenHash String    @unique // SHA-256 hash of a 64-char hex token
@@ -242,6 +244,8 @@ model PasswordResetToken {
 }
 
 model EmailVerificationToken {
+  frontendDestination String @default("site")
+  placementFingerprint String?
   id        String    @id @default(cuid())
   userId    String
   tokenHash String    @unique // SHA-256 hash of a 64-char hex token
@@ -418,6 +422,8 @@ model RolePermission {
 // Immutable requested role IDs survive role deletion. Generation fences reissue;
 // a receipt fences retries independently of the lifetime of an invitation.
 model OrgInvite {
+  frontendDestination String @default("site")
+  placementFingerprint String?
   id               String    @id @default(cuid())
   organizationId   String
   emailCanonical   String

@@ -47,6 +47,21 @@ This does not change password-login rate-limit identity, global Fastify proxy
 trust, audit IP or authorization. Historical Node UA/internal peer IP is not
 backfilled; its original visitor metadata cannot be reconstructed reliably.
 
+## Product administration placement
+
+Path placement shares the website's `amcore_session`. Separate-host placement uses
+`__Host-amcore_staff_session` and `web:staff-session:v1:*` with `audience: 'staff'`.
+Cookie, vault, lock, refresh and publication boundaries all follow server-selected
+context. A copied product cookie cannot become staff authority. Ordinary logout
+only retires the selected session; account-wide revocation and password changes
+have broader consequences. See [placement and sessions](../product-admin/placement-and-sessions.md)
+for exact addresses, configuration, legacy compatibility and safe denial recovery.
+
+The web OAuth completion document never reads or publishes a session. Its native
+same-origin POST performs the existing ticket/refresh-family exchange and clears
+the temporary Strict cookie. The opaque app session keeps its selected audience.
+See [OAuth completion](oauth.md#how-oauth-login-works) for privacy and recovery.
+
 ## Operations Console host mode
 
 The optional Operations Console host is a separate browser-session audience,

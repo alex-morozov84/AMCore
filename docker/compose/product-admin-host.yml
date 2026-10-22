@@ -1,0 +1,10 @@
+# Managed staff-host rehearsal. The sanitized snapshot supplies the exact Caddy configuration.
+services:
+  caddy:
+    volumes:
+      - ./docker/caddy/Caddyfile.product-admin-stand:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started

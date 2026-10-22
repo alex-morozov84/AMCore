@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { LoginForm } from '@/features/auth-login'
@@ -10,12 +11,18 @@ interface LoginPageProps {
   /** The raw `?oauthError=` query value — see `OAuthErrorAlert` for normalization/allowlisting. */
   oauthError?: string | string[]
   publicSignupEnabled?: boolean | null
+  loginForm?: ReactNode
+  oauthLinks?: Partial<Record<'google' | 'github' | 'apple', string>>
+  title?: ReactNode
 }
 
 export function LoginPage({
   oauthProviders,
   oauthError,
   publicSignupEnabled = true,
+  loginForm,
+  oauthLinks,
+  title,
 }: LoginPageProps) {
   const t = useTranslations('auth')
 
@@ -23,14 +30,14 @@ export function LoginPage({
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <CardTitle as="h1" className="text-2xl">
-          {t('login')}
+          {title ?? t('login')}
         </CardTitle>
         <CardDescription>{t('loginSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
         <OAuthErrorAlert code={oauthError} className="mb-4" />
-        <OAuthSection providers={oauthProviders} />
-        <LoginForm />
+        <OAuthSection providers={oauthProviders} links={oauthLinks} />
+        {loginForm ?? <LoginForm />}
         {publicSignupEnabled === true && (
           <p className="mt-4 text-center text-sm text-muted-foreground">
             {t('noAccount')}{' '}

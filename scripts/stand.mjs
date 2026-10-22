@@ -1,3 +1,4 @@
+import { productAdminProfiles } from './stand/product-admin-source.mjs'
 import { snapshot } from './stand/snapshot.mjs'
 import { refresh } from './stand/refresh.mjs'
 import { randomUUID } from 'node:crypto'
@@ -13,19 +14,35 @@ const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag)
 const lane = value('--lane', 'real-stack')
 const group = value('--ci-group')
 const fixture = value('--fixture')
+const edge = value('--edge')
+if (edge && (edge !== 'nginx' || action !== 'e2e' || lane !== 'product-admin-real-stack'))
+  throw new Error('--edge nginx requires product-admin-real-stack E2E')
 if (
   args.includes('--fixture') &&
-  (!['organization-setup', 'organization-shop', 'organization-provisioning'].includes(fixture) ||
+  (![
+    'organization-setup',
+    'organization-shop',
+    'organization-provisioning',
+    'product-admin-oauth-path',
+    ...productAdminProfiles,
+  ].includes(fixture) ||
     action !== 'e2e' ||
     lane === 'mocked')
 )
   throw new Error('Only organization fixtures on fresh Docker E2E are supported')
+if (fixture === 'product-admin-oauth-path' && lane !== 'real-stack')
+  throw new Error('Path OAuth fixture requires the real-stack lane')
 if (fixture && group)
   throw new Error('A closed-signup fixture cannot run registration-dependent CI groups')
 if (group && (lane !== 'real-stack' || !['standard', 'disruptive'].includes(group)))
   throw new Error('Invalid E2E CI group')
-const lanes = ['mocked', 'real-stack']
+const lanes = ['mocked', 'real-stack', 'product-admin-real-stack']
+if (lane === 'product-admin-real-stack' && fixture && !productAdminProfiles.includes(fixture))
+  throw new Error('Staff lane requires a staff fixture')
+if (productAdminProfiles.includes(fixture) && lane !== 'product-admin-real-stack')
+  throw new Error('Staff fixture requires the staff lane')
 let topology
+if (lane === 'product-admin-real-stack') topology = 'host'
 // AMCORE_CONSOLE_LANES_START
 lanes.push('console-real-stack')
 if (lane === 'console-real-stack') topology = 'host'
@@ -123,7 +140,13 @@ async function execute() {
         action === 'e2e' ? 'e2e' : 'preview',
         topology,
         action === 'e2e' && lane === 'mocked',
-        action === 'preview' ? value('--profile', 'default') : fixture
+        action === 'preview'
+          ? value('--profile', 'default')
+          : (fixture ??
+              (lane === 'product-admin-real-stack' ? 'product-admin-three-host' : undefined)),
+        (allocated) => {
+          m = allocated
+        }
       )
     if (lane !== 'mocked') await boot(m, !existing)
     if (interrupted) throw new Error('Interrupted startup')
@@ -132,6 +155,13 @@ async function execute() {
       if (extra.some((arg) => /^(--config|--output|--global)/.test(arg)))
         throw new Error('Managed configuration cannot be overridden')
       let handled = false
+      if (edge === 'nginx') {
+        if (extra.length && (extra.length !== 1 || extra[0] !== 'product-admin-edge.spec.ts'))
+          throw new Error('Nginx wire smoke accepts only its dedicated edge scenario')
+        const { productAdminNginxSmoke } = await import('./stand/product-admin-nginx-smoke.mjs')
+        await productAdminNginxSmoke(m)
+        handled = true
+      }
       // AMCORE_CONSOLE_PROXY_SMOKE_START
       if (args.includes('--proxy-smoke')) {
         if (lane !== 'console-real-stack') throw new Error('Proxy smoke requires host lane')

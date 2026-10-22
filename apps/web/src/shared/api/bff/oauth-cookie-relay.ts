@@ -1,3 +1,5 @@
+import type { ProductWebContext } from './product-web-context.server'
+
 import 'server-only'
 
 /**
@@ -24,12 +26,15 @@ function getSetCookieHeaders(response: Response): string[] {
 
 /** Rewrites only the `Path` attribute; every other attribute (value, flags,
  * `Max-Age`/`Expires`) is passed through unchanged. */
-function rewriteApplePath(setCookieHeader: string): string {
+function rewriteApplePath(
+  setCookieHeader: string,
+  frontendPath = APPLE_FRONTEND_CALLBACK_PATH
+): string {
   const parts = setCookieHeader.split(';')
   const rewritten = parts.map((part) => {
     const [rawKey] = part.split('=')
     if (rawKey?.trim().toLowerCase() !== 'path') return part
-    return part.replace(APPLE_BACKEND_CALLBACK_PATH, APPLE_FRONTEND_CALLBACK_PATH)
+    return part.replace(APPLE_BACKEND_CALLBACK_PATH, frontendPath)
   })
   return rewritten.join(';')
 }
@@ -41,10 +46,42 @@ function rewriteApplePath(setCookieHeader: string): string {
  * OAuth proxy legs (init sets the binding cookie, callback clears it) — see
  * `oauth-provider-proxy.ts`.
  */
-export function relayOAuthCookies(upstream: Response, provider: string, target: Headers): void {
+export function relayOAuthCookies(
+  upstream: Response,
+  provider: string,
+  target: Headers,
+  context?: ProductWebContext
+): void {
   const needsPathRewrite = FORM_POST_PROVIDERS.has(provider)
   for (const header of getSetCookieHeaders(upstream)) {
-    target.append('set-cookie', needsPathRewrite ? rewriteApplePath(header) : header)
+    if (context?.frontend === 'admin') {
+      const name = header.slice(0, header.indexOf('='))
+      if (
+        !['amcore_admin_oauth_state', 'amcore_admin_oauth_state_apple', 'refresh_token'].includes(
+          name
+        )
+      )
+        continue
+      if (/;\s*domain=/i.test(header)) continue
+      if (name === 'refresh_token') {
+        const value = header.split(';', 1)[0]!.slice('refresh_token='.length)
+        const age = /;\s*max-age=0(?:;|$)/i.test(header) ? 0 : 60
+        target.append(
+          'set-cookie',
+          `__Host-amcore_admin_oauth_refresh=${value}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${age}`
+        )
+        continue
+      }
+      const scoped = needsPathRewrite
+        ? rewriteApplePath(header, '/api/product-admin/auth/oauth/apple/callback')
+        : header
+      target.append(
+        'set-cookie',
+        context.audience === 'staff' && !/;\s*secure(?:;|$)/i.test(scoped)
+          ? `${scoped}; Secure`
+          : scoped
+      )
+    } else target.append('set-cookie', needsPathRewrite ? rewriteApplePath(header) : header)
   }
 }
 

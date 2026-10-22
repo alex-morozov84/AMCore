@@ -1,6 +1,6 @@
 # Organization members and role assignment
 
-Open `/organizations/[id]/members` (with the locale prefix in multi-locale builds)
+Open `/manage/organizations/[id]/members` (with the locale prefix in multi-locale builds)
 from the **Members** navigation tab on the organization overview. Overview keeps
 the Organization and Your access cards; Members shows the member list. Both
 sections retain the organization heading and route-backed navigation, supporting
@@ -308,6 +308,10 @@ or while an unknown outcome remains unresolved. An inspection reporting a differ
 deliberately selecting a fresh target; changing rows alone does not resolve an unknown outcome.
 Render your own warning and confirmation before calling `remove()`; the hook does not toast or navigate.
 
+The optional third argument, `onAcknowledged`, reports a validated removal reply before
+authority refresh. Use it to retain self-removal feedback when refresh removes access.
+It does not grant access or confirm a lost reply; continue to use `outcome` for follow-up state.
+
 | Hook field/action                     | Meaning                                                                                                                                                           |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pending`, `busy`, `canRemove`        | Bounded command/follow-up state; use canRemove to enable a fresh confirmed action                                                                                 |
@@ -321,3 +325,6 @@ Inspection bounds authority refresh at5seconds and its exact-user read at20secon
 The named server entry exports `removeOrganizationMember(orgId,userId,{expectedMemberId},input)`;
 input has `expectedSession`, `headers` and optional `signal`, as for other context operations.
 It returns the typed acknowledgment envelope. Keep it server-only and supply the mutation Origin check in the route adapter.
+
+The address above uses default path placement. For the staff-host address or a
+custom alias, see [placement and sessions](placement-and-sessions.md).

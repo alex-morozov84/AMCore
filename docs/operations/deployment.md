@@ -6,6 +6,14 @@ production.
 The [migration image guide](migrator-image.md) covers the independent Prisma CLI
 image, its frozen dependency graph, maintenance and security reports.
 
+For product administration, deploy the same checked placement source in API/web
+and its generated edge mapping. Configure exact canonical origins and the shared
+confidential hop key; keep the standalone web server private. See
+[placement and sessions](../product-admin/placement-and-sessions.md) for alias/host
+configuration, cookies, callback registration and coordinated upgrade/rollback.
+Native development defaults to web port3002; Compose publishes3000. Override both
+`FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` to the actual Compose browser origin.
+
 The API Dockerfile refreshes `perl-base` from Debian security repositories in
 build/migrator and runner targets. The pinned Node base still includes an older
 package; remove this explicit refresh only after a base update includes the fixes
@@ -313,7 +321,7 @@ Malformed external `next-action` requests are outside this recovery mechanism.
 
 The API and web Docker build stages enforce a frozen pnpm lockfile for both the
 explicit dependency installation and any automatic installation before a script.
-pnpm 11 can recheck dependencies after source files are copied into a cached
+pnpm can recheck dependencies after source files are copied into a cached
 install layer. That recheck must preserve the checked-in dependency versions;
 manifest/lockfile disagreement fails the build instead of resolving new versions.
 Dependency changes require updating and reviewing `pnpm-lock.yaml` first.

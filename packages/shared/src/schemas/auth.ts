@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
 
+import { productAdminReturnSchema } from './frontend-context'
 import { invitationOAuthCorrelationSchema } from './invitation-common'
 import { paginatedResponseSchema } from './pagination'
 
@@ -249,6 +250,7 @@ export type RefreshResponse = z.infer<typeof refreshResponseSchema>
 
 /** OAuth login ticket exchange response */
 export const oauthExchangeResponseSchema = z.strictObject({
+  returnTo: productAdminReturnSchema.optional(),
   accessToken: z.string(),
   invitation: invitationOAuthCorrelationSchema.optional(),
 })

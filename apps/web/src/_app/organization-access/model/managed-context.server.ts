@@ -2,7 +2,10 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { isOrganizationContextId } from '@amcore/shared'
 
-import { readOrganizationContext } from '@/entities/organization-context/index.server'
+import {
+  readOrganizationContext,
+  readRoleDefinition,
+} from '@/entities/organization-context/index.server'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import { SessionNotFoundError } from '@/shared/api/bff/errors'
@@ -16,7 +19,7 @@ import 'server-only'
  * caller may manage. Sign-in and not-found are handled here; a temporarily unavailable upstream
  * is returned so the mount can render its own fallback.
  */
-export async function loadManagedOrganization(id: string) {
+export async function loadManagedOrganization(id: string, loginHref = '/login', roleId?: string) {
   if (!isOrganizationContextId(id)) notFound()
   try {
     const admission = await safeOrganizationAdmission()
@@ -25,13 +28,18 @@ export async function loadManagedOrganization(id: string) {
       expectedSession: admission.binding,
     })
     if (!context.data.canManageTeamAccess) notFound()
+    if (roleId)
+      await readRoleDefinition(id, roleId, {
+        headers: await headers(),
+        expectedSession: admission.binding,
+      })
     return { ok: true as const, admission, organizationName: context.data.organization.name }
   } catch (error) {
     if (
       error instanceof SessionNotFoundError ||
       (error instanceof ContextRequestError && error.status === 401)
     )
-      return redirectToLogin()
+      return redirectToLogin(loginHref)
     if (error instanceof ContextRequestError && [403, 404].includes(error.status)) notFound()
     if (error instanceof ContextRequestError && [429, 503, 504].includes(error.status))
       return { ok: false as const }

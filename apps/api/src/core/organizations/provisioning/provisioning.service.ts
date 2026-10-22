@@ -11,6 +11,7 @@ import {
 import { EnvService } from '../../../env/env.service.js'
 import { PrismaService } from '../../../prisma/index.js'
 import { EmailIdentityService } from '../../auth/email-identity.service.js'
+import { resolveFrontendPlacement } from '../../frontend-context/frontend-placement.js'
 import { InvitationEmailService } from '../invitation-email.service.js'
 import { admitSetupOperator, type SetupOperator } from '../organization-setup-admission.js'
 
@@ -71,7 +72,10 @@ export class ProvisioningService {
       firstAdminEmail: this.identity.canonicalize(input.firstAdminEmail),
     })
     const result = await provisioningTransaction(this.db, (tx) =>
-      createProvisioning(tx, input, operator, this.limiter, () => this.assertMailReady())
+      createProvisioning(tx, input, operator, this.limiter, () => this.assertMailReady(), {
+        frontend: 'admin',
+        placementFingerprint: resolveFrontendPlacement(this.env).placementFingerprint,
+      })
     )
     await dispatchProvisioningMail(
       this.db,
@@ -113,7 +117,18 @@ export class ProvisioningService {
         },
       }
     const result = await provisioningTransaction(this.db, (tx) =>
-      recoverProvisioning(tx, orgId, command, operator, this.limiter, () => this.assertMailReady())
+      recoverProvisioning(
+        tx,
+        orgId,
+        command,
+        operator,
+        this.limiter,
+        () => this.assertMailReady(),
+        {
+          frontend: 'admin',
+          placementFingerprint: resolveFrontendPlacement(this.env).placementFingerprint,
+        }
+      )
     )
     await dispatchProvisioningMail(
       this.db,

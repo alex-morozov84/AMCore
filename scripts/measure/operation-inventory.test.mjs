@@ -9,15 +9,15 @@ describe('operation inventory against the real plans', () => {
 
   test('reports every stale measured exact count together', () => {
     assertExactScaffoldCounts([
+      // T060 adds relocated admin routes, completion/compatibility adapters and explicit
+      // staff CI ownership. These are combined source inventories, not new providers.
       // Two catalogue-bound role fixtures add selected-locale edits; the two
       // accessibility stories add Storybook-disabled deletions. The Console external tool links add
       // two shared modules with tests and their environment, compose and stand entries. Providers stay fixed.
       // Own-key settings add a page move and two pathname edits in three locale
       // recipes (+9), plus three story deletions in two Storybook-off recipes
       // (+6): 15 additional operations/facts/claims. No new provider or manifest.
-      // Scheduled jobs add a Console feature root, the shared poll policy and cooldown hook (one with a
-      // test), a stand fixture and a path-mode e2e spec: +6 operations/facts, +8 claims.
-      { name: 'measured operations', expected: 753, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 871, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -36,17 +36,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1029,
+        expected: 1198,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1759,
+        expected: 1969,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 733,
+        expected: 851,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

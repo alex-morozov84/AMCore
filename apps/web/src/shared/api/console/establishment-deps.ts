@@ -12,7 +12,7 @@ import { redisConsoleVaultStore } from './session-vault-store'
 import 'server-only'
 
 export function establishmentConsoleDeps(headers: Headers): ContextExecutorDeps {
-  if (ADMIN_CONSOLE_CONFIG.mode !== 'host') return productContextDeps(headers)
+  if (ADMIN_CONSOLE_CONFIG.mode !== 'host') return productContextDeps(headers, 'site-auth')
   return {
     readSessionId: async () => (await cookies()).get(CONSOLE_SESSION_COOKIE_NAME)?.value,
     apiBase: process.env.API_URL ?? 'http://localhost:5002',

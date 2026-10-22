@@ -16,6 +16,69 @@ OAuth lets users sign in with accounts they already trust — Google, GitHub, Ap
 **"Login"** — user can create an account or sign in using this provider alone.
 **"Link"** — authenticated user can connect this provider to their existing account.
 
+The table describes API/provider capability. The ordinary site login continues to
+offer Google; product administration can offer configured Google, GitHub and Apple.
+Ordinary admin login requires an existing account; invitation-bound signup can
+create an account before membership, including when public signup is closed.
+Membership and permissions are checked when the account opens a protected resource.
+
+### Separate administration callbacks
+
+Keep the same provider client/application identity for site and administration.
+Register both exact browser callback URLs in that application's allowed URLs:
+`https://shop.example.com/api/auth/oauth/google/callback` and
+`https://manage.shop.example.com/api/product-admin/auth/oauth/google/callback`.
+The existing `GOOGLE_CALLBACK_URL`, `GITHUB_CALLBACK_URL` and `APPLE_CALLBACK_URL`
+remain the website callbacks. Admin callbacks are derived from
+`PRODUCT_ADMIN_ORIGIN` and `/api/product-admin/auth/oauth/<provider>/callback`;
+there is no separate admin client ID, secret or callback override.
+GitHub.com supports multiple callback URLs in one OAuth application; see its
+[registration update](https://github.blog/changelog/2026-08-14-multiple-redirect-uris-and-token-refresh-for-oauth-apps/).
+Register exact URLs and disable wildcard matching. If a provider registration
+cannot admit both URLs, resolve that registration before exposing admin OAuth;
+do not substitute another client identity or forward cookies between hosts.
+Replace `google` with the selected provider; Apple uses POST form_post. In path
+mode both callbacks use the website origin, with the same distinct API prefixes.
+The subsequent page callback is `/ru/manage/auth/callback` in path mode, or
+`/ru/auth/callback` on the admin host. Do not register that page as the provider callback.
+
+Telegram remains link-only. Its website `TELEGRAM_CALLBACK_URL` uses
+`{FRONTEND_URL}/api/auth/oauth/telegram/callback`. Staff linking derives
+`{PRODUCT_ADMIN_ORIGIN}/api/product-admin/auth/oauth/telegram/callback` in host
+mode; path mode uses the website origin with that admin API prefix. Start linking
+from the selected signed-in account. Do not add Telegram as a standalone login.
+
+State and exchange tickets bind frontend, placement, callback, backend session and
+allowlisted return destination. Admin uses separate nonce/temporary cookies;
+Apple's cross-site POST cookie remains restricted to its exact callback path.
+GitHub sends S256 PKCE on new starts; pre-upgrade state retains its old exchange
+contract until drained. Do not transfer a product cookie/token through a redirect.
+Linking authenticates the selected account when the link starts. Telegram is
+link-only. See [placement and sessions](../product-admin/placement-and-sessions.md)
+for hostname isolation, old links and coordinated deployment.
+
+The signed Apple protocol fixture exercises the real OIDC client and provider
+against discovery without UserInfo. It checks bad signatures, issuer/audience,
+expiry and malformed claims. It does not prove browser publication or live Apple
+client registration; those checks remain distinct.
+
+### Apple identity verification
+
+Apple publishes token and signing-key endpoints, but no UserInfo endpoint.
+AMCore builds the Apple profile from the identity token returned by code exchange.
+The OAuth library requires that token and verifies its signature, issuer, client
+audience and expiry before AMCore reads its claims. Plain JWT decoding is insufficient.
+The signing algorithm follows Apple discovery and the library policy.
+
+The profile uses the verified subject and optional email. Both boolean and string
+forms of `email_verified` are normalized; the string `"false"` is unverified.
+An absent email cannot satisfy an invitation's verified-email requirement.
+The first `form_post` may also contain a display name. That name is display data,
+not proof of identity. State, browser binding, PKCE and invitation checks still apply.
+
+Sources: [Apple discovery](https://appleid.apple.com/.well-known/openid-configuration)
+and [identity verification](https://developer.apple.com/documentation/signinwithapple/verifying-a-user).
+
 ---
 
 ## How OAuth login works
@@ -81,50 +144,72 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 with a short-lived browser binding cookie, so the callback is tied both to the
 server-side flow state and to the browser that started the login/link flow.
 
-**How `apps/web`'s reference implementation adapts this (ADR-068).** The
-diagram above is this API's own contract — accurate for any client with its
-own cookie jar (a mobile app, a different frontend). `apps/web` is a BFF: for
-every other flow (login, register, an authenticated request), the browser
-never holds a backend cookie or access token in any form — only its own
-opaque `amcore_session`. OAuth has one narrow, deliberate exception to that.
-Steps 2–3 and 5–7 above involve the browser hitting this API _directly_
-(Google's `redirect_uri` is a fixed, provider-registered URL — it can't be
-redirected through anything else), and step 7's `refresh_token` cookie is
-host-only to whatever origin actually answered that request. `apps/web`
-proxies those legs through its own origin (below) precisely so that cookie
-lands scoped to the frontend instead of this API — which means, for the
-few seconds between the callback landing and step 8's exchange completing,
-the browser genuinely does hold that raw backend `refresh_token`, as a
-normal (httpOnly, host-only) cookie in its jar. It is never readable by page
-JS, it is single-purpose (bound to one just-issued, single-use ticket), and
-`apps/web`'s exchange handler deletes it as its very next step — but it is
-real, and this doc should say so rather than imply otherwise. Without this
-proxying, `apps/web`'s server — on whatever origin the _unproxied_ callback
-would have landed the cookie on — would never see it on the subsequent
-request to `/{locale}/auth/callback`, and step 8's exchange would always
-fail with `OAUTH_TICKET_INVALID`.
+**How `apps/web` adapts this (ADR-068).** The diagram above describes the
+unchanged direct/native API contract. The reference web frontend uses its own
+origin for browser requests and calls the API server-side. Provider authorization,
+state, browser binding, PKCE and token verification still execute normally.
 
-So `apps/web` proxies steps 2 and 5–7 through its own origin instead of
-linking/registering this API's URLs directly:
+OAuth has a narrow browser-cookie exception: after the provider callback, the
+browser briefly holds a backend refresh token in a host-only HttpOnly/Strict
+cookie. Site uses `refresh_token`; admin relays it as
+`__Host-amcore_admin_oauth_refresh` with Secure and a60-second lifetime. No backend
+credential enters JavaScript, rendered props, JSON, local storage or telemetry.
+The completed session uses the selected opaque app cookie instead.
 
-- `*_CALLBACK_URL` (and the provider console's redirect URI) point at
-  `{FRONTEND_URL}/api/auth/oauth/:provider/callback`, not this API.
-- `apps/web`'s `GET /api/auth/oauth/:provider` and
-  `GET|POST /api/auth/oauth/:provider/callback` forward the request to this
-  API's equivalent endpoints below with `redirect: 'manual'`, then relay the
-  response (`Location`, `Set-Cookie`, status) back to the browser unchanged —
-  except Apple's `oauth_state_apple` cookie, whose `Path` gets rewritten from
-  this API's callback path to the frontend's, since it's narrower than `/`
-  and wouldn't otherwise survive the origin change.
-- Step 8's exchange is `apps/web`'s own `/{locale}/auth/callback` Route
-  Handler calling this API server-side — the request now legitimately carries
-  the (frontend-origin-scoped) `refresh_token` cookie relayed above. It also
-  fetches `GET /auth/me` for the profile, mints its Redis session-vault
-  entry, sets its own `amcore_session` cookie, and clears the temporary
-  `refresh_token` cookie — the browser never keeps it.
+- Site `*_CALLBACK_URL` and the provider registration point to
+  `{FRONTEND_URL}/api/auth/oauth/:provider/callback`. Admin callbacks use
+  `{PRODUCT_ADMIN_ORIGIN}/api/product-admin/auth/oauth/:provider/callback` in host
+  mode; path mode uses the website origin. Keep both registrations exact.
+- Web start/callback routes proxy the API with redirects held server-side and
+  relay its navigation/browser-binding cookies. Apple is POST-only; its separate
+  SameSite=None/Secure nonce remains scoped to the exact frontend callback path.
+- The localized final `/auth/callback?ticket=...` is a public completion document,
+  at `/ru/manage/auth/callback` for path admin or `/ru/auth/callback` on staff.
+  It validates the selected frontend and bounded ticket syntax without reading
+  identity, consuming tickets, refreshing, recovering or clearing sessions.
+- The document renders a native form and “Completing sign-in…” with one Continue
+  button. A small client leaf submits once; the same button works without JS.
+  This new same-origin submission can send the Strict temporary cookie, which
+  may be withheld from the preceding cross-site redirect chain.
+- The form posts ticket and supported locale only to `/api/auth/oauth/complete`
+  or `/api/product-admin/auth/oauth/complete`. Literal routes accept POST only,
+  with an8KiB urlencoded body budget and no duplicate/unknown fields. Host and
+  exact non-null Origin, including port, are checked before any credential,
+  recovery, cleanup or upstream effect. No Referer or missing-Origin fallback.
+- The admitted server-side operation exchanges the one-use ticket with the
+  matching refresh family, fetches the profile and publishes the selected vault.
+  Every post-completion navigation is303. It clears the exact temporary cookie;
+  persistent sessions on other hosts remain intact.
+
+```text
+Provider -> BFF callback -> public completion document (no auth effects)
+                                |
+                      native same-origin POST
+                                |
+                   ticket/family check -> selected vault ->303 destination
+```
+
+Only the completion GET document uses `Referrer-Policy: strict-origin`: Referer
+contains the origin, without the ticket/path, and the native POST retains the
+exact Origin. A native form under no-referrer would send Origin null and fail.
+Completion POST responses/redirects and other secret routes keep no-referrer.
+Do not restore the default strict-origin-when-cross-origin on the document: it
+would send its full URL in same-origin Referer. Preserve nonce CSP/form-action
+self, no-store and noindex; verify these policies through the public edge.
+
+A ticket expires after60seconds. Missing cookie, expiry or definitive rejection
+returns to the selected login with a localized error; start ordinary login anew.
+Do not automatically retry an exchange after an unknown result. For ordinary login,
+open the selected login page again. If it opens your signed-in workspace, continue
+there; otherwise start a new OAuth login. Do not resubmit the old completion form.
+Invited completion
+keeps its publication/ACK and bounded current-session recovery protocol. Recovery
+requires the matching published app session, ticket hash and flow/surface; an
+invitation owner proof alone cannot reconstruct a login or double-publish it.
+See [invitation recovery](invites.md). Accepting membership remains a separate step.
 
 Source: `apps/web/src/shared/api/bff/oauth-provider-proxy.ts`,
-`oauth-cookie-relay.ts`, `oauth-exchange-handler.ts`.
+`oauth-cookie-relay.ts`, `oauth-completion-handler.ts`, `oauth-exchange-handler.ts`.
 
 ---
 
@@ -184,7 +269,7 @@ record.
 Production deployments should avoid logging query strings for OAuth callback
 routes, because callback URLs still contain short-lived login tickets.
 
-> **Note:** On login, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. This means if a user registered with their Google email and later uses "Sign in with Google", their accounts are linked automatically.
+> **Note:** On login, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. Linking an existing account by email requires the provider to verify that email. An unverified email claim cannot create that link. Ordinary admin login cannot create a new account; a validated invitation can permit it.
 
 ---
 
@@ -302,7 +387,9 @@ Backend:
 
 ### GitHub
 
-- GitHub doesn't support PKCE — uses standard OAuth 2.0
+- New GitHub.com authorization starts use S256 PKCE; legacy pending states retain
+  their earlier exchange contract until expiry. See the
+  [GitHub authorization contract](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps).
 - Scopes: `read:user user:email`
 - Email may not be in the main profile response — the backend makes a second call to `/user/emails` to find the verified primary email
 - Required env: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`
@@ -369,7 +456,7 @@ export class DiscordProvider implements OAuthProvider {
 
   async exchangeCode(code: string, codeVerifier: string): Promise<OAuthTokens> {
     // POST to the token endpoint; throw AppException(..., OAUTH_PROVIDER_ERROR) on failure.
-    // Pass codeVerifier only if the provider does PKCE (GitHub ignores it).
+    // Pass codeVerifier whenever this provider's authorization used PKCE.
     return { accessToken: '...' }
   }
 
@@ -436,7 +523,7 @@ All providers are normalized to the same profile shape before the user record is
 }
 ```
 
-The raw OAuth tokens (provider access token, refresh token) are stored in `OAuthAccount` and can be used later for provider-specific API calls (e.g., Google Calendar, GitHub repos).
+The reference login flow stores the provider identity in `OAuthAccount`. It does not populate its optional provider-token columns. Calling provider APIs later needs a separate token-storage and permission design.
 
 ### Profile pictures
 

@@ -16,9 +16,19 @@ export function validateExpectedContextSession(expected: string | undefined): vo
 }
 
 /** Login/re-login allocates a new random cookie ID; refresh and step-up retain it. */
-export function contextSessionBinding(sessionId: string, entry: VaultEntry): string {
+export function contextSessionBinding(
+  sessionId: string,
+  entry: VaultEntry,
+  version: 1 | 2 = 2
+): string {
   return createHash('sha256')
-    .update(JSON.stringify(['product-context-v1', sessionId, entry.userSnapshot.id]))
+    .update(
+      JSON.stringify(
+        version === 1
+          ? ['product-context-v1', sessionId, entry.userSnapshot.id]
+          : ['product-context-v2', entry.audience ?? 'product', sessionId, entry.userSnapshot.id]
+      )
+    )
     .digest('hex')
 }
 
@@ -27,7 +37,7 @@ export async function captureContextSession(
   deps: EnsureFreshSessionDeps,
   expected: string | undefined,
   bootstrap = false
-): Promise<{ sessionId: string; entry: VaultEntry; binding: string }> {
+): Promise<{ sessionId: string; entry: VaultEntry; binding: string; bindingVersion?: 1 | 2 }> {
   if (!bootstrap) validateExpectedContextSession(expected)
   if (!sessionId) throw new SessionNotFoundError('missing')
   const entry = await deps.store.get(sessionId)
@@ -57,7 +67,10 @@ export async function freshContextSession(
     },
   }
   const entry = await ensureFreshSession(captured.sessionId, { ...deps, store })
-  if (contextSessionBinding(captured.sessionId, entry) !== captured.binding) {
+  if (
+    contextSessionBinding(captured.sessionId, entry, captured.bindingVersion ?? 2) !==
+    captured.binding
+  ) {
     throw new ContextRequestError(409, 'CONTEXT_SESSION_CHANGED')
   }
   return entry

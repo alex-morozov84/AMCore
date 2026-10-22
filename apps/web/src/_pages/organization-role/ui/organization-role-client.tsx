@@ -20,12 +20,14 @@ import { OrganizationSectionNav } from '@/widgets/organization-nav'
 
 /** One role: loads its atomic snapshot and the capability catalogue, edits through the feature. */
 export function OrganizationRoleClient({
+  deniedContent,
   admission,
   organizationId,
   roleId,
   initialOrganizationName,
   hrefs,
 }: {
+  deniedContent?: React.ReactNode
   admission: ProductAccessBootstrap
   organizationId: string
   roleId: string
@@ -61,6 +63,7 @@ export function OrganizationRoleClient({
       : access.initialPending
         ? initialOrganizationName
         : undefined
+  if ((access.state.status === 'denied' || denied || missing) && deniedContent) return deniedContent
   return (
     <section className="space-y-6">
       <BackLink href={hrefs.roles}>{t('backToRoles')}</BackLink>

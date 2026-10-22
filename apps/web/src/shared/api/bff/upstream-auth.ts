@@ -1,3 +1,4 @@
+import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import { extractCookieValue } from './set-cookie'
 
@@ -37,7 +38,8 @@ export interface UpstreamAuthResult<TUser> {
 export async function callUpstreamAuth<TUser>(
   path: string,
   body: unknown,
-  originalRequest?: Request
+  originalRequest?: Request,
+  context?: ProductWebContext
 ): Promise<UpstreamAuthResult<TUser>> {
   const acceptLanguage = originalRequest?.headers.get('accept-language')
 
@@ -47,6 +49,7 @@ export async function callUpstreamAuth<TUser>(
       'Content-Type': 'application/json',
       ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
       ...sessionMetadataHeaders(originalRequest?.headers ?? new Headers()),
+      ...context?.apiHeaders,
     },
     body: JSON.stringify(body),
   })

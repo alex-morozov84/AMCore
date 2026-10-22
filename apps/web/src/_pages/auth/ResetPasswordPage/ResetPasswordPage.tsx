@@ -1,14 +1,18 @@
 import { useTranslations } from 'next-intl'
 
 import { ResetPasswordForm } from '@/features/auth-reset-password'
+import type { AuthActionBase } from '@/shared/api/auth-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 
 interface ResetPasswordPageProps {
   /** The `?token=` query param the route file read from the URL. */
   token?: string
+  actionBase?: AuthActionBase
+  loginHref?: string
+  forgotPasswordHref?: string
 }
 
-export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
+export function ResetPasswordPage(props: ResetPasswordPageProps) {
   const t = useTranslations('auth')
 
   return (
@@ -20,7 +24,7 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
         <CardDescription>{t('resetPasswordSubtitle')}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResetPasswordForm token={token} />
+        <ResetPasswordForm {...props} />
       </CardContent>
     </Card>
   )

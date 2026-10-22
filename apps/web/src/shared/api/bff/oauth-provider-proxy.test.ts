@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { proxyOAuthAuthorize, proxyOAuthCallback } from './oauth-provider-proxy'
 
 vi.mock('server-only', () => ({}))
+vi.mock('./dal', () => ({ getOptionalSessionEntry: vi.fn() }))
 
 function fakeUpstream(init: {
   status?: number

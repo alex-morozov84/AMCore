@@ -32,7 +32,7 @@ const roots = [
 const sharedModules = [
   module('apps/web/src/shared/lib/admin-console.generated.ts'),
   module('apps/web/src/shared/lib/admin-console-config.ts', ['admin-console-config.test.ts']),
-  module('apps/web/src/shared/lib/admin-console-startup.ts'),
+  module('apps/web/src/shared/lib/admin-console-startup.ts', ['admin-console-startup.test.ts']),
   module('apps/web/src/shared/lib/console-cooldown-ticks.ts'),
   module('apps/web/src/shared/lib/console-poll-policy.ts', ['console-poll-policy.test.ts']),
   module('apps/web/src/shared/lib/console-docs-links.ts', ['console-docs-links.test.ts']),
@@ -59,6 +59,10 @@ const sharedModules = [
 const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts'])]
 
 const verification = [
+  'apps/web/e2e/real-stack/product-admin-oauth-path.spec.ts',
+  'apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts',
+  'apps/web/e2e/product-admin-real-stack/product-admin-host.spec.ts',
+  'apps/web/e2e/product-admin-real-stack/product-admin-invitation.spec.ts',
   'apps/web/e2e/organization-setup/console-organization-setup.spec.ts',
   'apps/web/playwright.console-real-stack.config.ts',
   'docker/testing/console-session-e2e.yml',
@@ -167,4 +171,5 @@ export const operationsConsoleSurfaceRoots = [
   'scripts/stand',
   'scripts/e2e-ci-plan.mjs',
   'scripts/e2e-ci.mjs',
+  'scripts/product-admin-e2e-plan.mjs',
 ]

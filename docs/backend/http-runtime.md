@@ -84,6 +84,10 @@ Express compatibility framework.
 
 ## Dependency and upgrade checks
 
+Update Nest core and its HTTP adapters together. The current Nest 12.2.0
+Fastify adapter requires Fastify 5.12.7; keep the direct Fastify dependency aligned
+so plugins and the adapter share one resolved Fastify version.
+
 `@nestjs/platform-express`, `@bull-board/express`, `express` and `cookie-parser`
 are development controls. Their helpers live under `test/support`; the API build
 does not emit them. `@types/express` remains development-only for structural

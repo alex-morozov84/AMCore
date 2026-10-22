@@ -102,6 +102,18 @@ src/app/[locale]/(dashboard)/page.tsx               → imports and renders a _p
 src/_pages/dashboard/DashboardPage/DashboardPage.tsx → owns the actual composition
 ```
 
+### Product application shell
+
+`widgets/app-shell` uses the shared sidebar's icon-collapse mode on desktop.
+Each navigation entry supplies an icon and a localized tooltip; mobile navigation
+remains a dismissible sheet. Dashboard comes first, followed by the
+`navigationAfterDashboard` slot and active sessions. Page content fills the available width, including
+the space released when the sidebar collapses. Keep narrower widths on individual
+forms or readable text blocks when appropriate, rather than on the whole shell.
+Application composition supplies the optional `sidebarFooter` slot. Product
+administration uses it for the localized website link, with the website origin
+resolved on the server. The account menu stays in the header.
+
 ### Operations Console shell
 
 The Operations Console is a separate system-control-plane slice, not a product
@@ -476,7 +488,9 @@ The main Route Handler shapes live under
   backend `refresh_token` server-side
   (`/api/auth/{login,register,logout}`, the OAuth init/callback/exchange
   routes) — see `shared/api/bff/credential-auth-handler.ts`. OAuth briefly
-  relays a temporary HttpOnly refresh cookie, consumed by the locale callback;
+  relays a temporary HttpOnly/Strict refresh cookie. The localized callback is
+  a public document; its native form posts to the literal site/admin completion
+  Route Handler. That admitted POST consumes/deletes the temporary cookie;
   see [OAuth](../auth/oauth.md). Dedicated session list/revoke handlers attach
   the stored refresh cookie server-side as well.
 - **Public action handlers** for the four email-link auth flows

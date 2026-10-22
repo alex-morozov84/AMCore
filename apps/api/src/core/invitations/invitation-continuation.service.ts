@@ -13,6 +13,8 @@ import {
 import { AppException } from '../../common/exceptions/index.js'
 import type { OrgInvite, Prisma } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
+import type { BrowserFrontendContext } from '../frontend-context/frontend-placement.js'
+import { assertTokenFrontend } from '../frontend-context/frontend-token.js'
 
 import { checkAdministratorRecipient } from './administrator-settlement.js'
 import {
@@ -37,6 +39,15 @@ export class InvitationContinuationService {
     private readonly prisma: PrismaService,
     private readonly liveSession: InvitationLiveSessionService
   ) {}
+
+  async assertFrontend(
+    credential: InvitationCredential,
+    frontend?: BrowserFrontendContext
+  ): Promise<void> {
+    if (!frontend) return
+    const hint = await this.prisma.$transaction((tx) => invitationCredentialHint(tx, credential))
+    assertTokenFrontend(hint.invite, frontend)
+  }
 
   admit(token: string): Promise<InvitationAdmission> {
     return invitationTransaction(this.prisma, async (tx) => {

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { type ForgotPasswordInput, forgotPasswordSchema } from '@amcore/shared'
 
+import type { AuthActionBase } from '@/shared/api/auth-api'
 import { useLocalizedForm } from '@/shared/hooks'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -18,7 +19,7 @@ import { useForgotPassword } from '../model/use-forgot-password'
  * rendered (English, developer-facing prose); this is the frontend's own
  * translated copy for the same enumeration-safe outcome.
  */
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ actionBase = '/auth' }: { actionBase?: AuthActionBase } = {}) {
   const t = useTranslations('auth')
   const [submitted, setSubmitted] = useState(false)
 
@@ -26,7 +27,7 @@ export function ForgotPasswordForm() {
     defaultValues: { email: '' },
   })
 
-  const { mutate, isPending, error } = useForgotPassword(form.setError)
+  const { mutate, isPending, error } = useForgotPassword(form.setError, actionBase)
 
   if (submitted) {
     return <p className="text-sm text-muted-foreground">{t('forgotPasswordSuccess')}</p>

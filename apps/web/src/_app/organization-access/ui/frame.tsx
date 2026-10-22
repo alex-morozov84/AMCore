@@ -18,15 +18,23 @@ import 'server-only'
 export async function OrganizationAccessFrame({
   children,
   placement = organizationAccessPlacement,
+  headerEnd,
+  sessionsHref,
+  sidebarFooter,
 }: {
   children: ReactNode
   placement?: OrganizationAccessPlacement
+  headerEnd?: ReactNode
+  sessionsHref?: string
+  sidebarFooter?: ReactNode
 }) {
   const value = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value
   return (
     <AppShell
       homeHref={organizationAccessHrefs(placement).homeHref}
-      headerEnd={<AccountMenu />}
+      headerEnd={headerEnd ?? <AccountMenu />}
+      sessionsHref={sessionsHref}
+      sidebarFooter={sidebarFooter}
       defaultSidebarOpen={value === undefined ? undefined : value === 'true'}
       navigationAfterDashboard={<OrganizationNavigationEntry placement={placement} />}
     >

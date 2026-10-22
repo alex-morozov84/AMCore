@@ -30,7 +30,9 @@ vi.mock('@/shared/api/bff/invitation-request-snapshot', () => ({
   captureInvitationRequest: f.capture,
   assertInvitationReadCurrent: f.current,
 }))
-vi.mock('@/shared/api/bff/product-context-deps', () => ({ productContextDeps: () => ({}) }))
+vi.mock('@/shared/api/bff/invitation-context-deps', () => ({
+  invitationContextDeps: async () => ({}),
+}))
 vi.mock('@/shared/lib/server-logger', () => ({ logDegradation: f.degraded }))
 vi.mock('@/shared/ui/section-error-boundary', () => ({ SectionErrorBoundary: 'boundary' }))
 vi.mock('./verification-return-client', () => ({

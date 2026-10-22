@@ -12,9 +12,9 @@
   },
   "engines": {
     "node": ">=24.15.0",
-    "pnpm": ">=11.0.0"
+    "pnpm": ">=12.14.0"
   },
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@12.14.0",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
@@ -45,8 +45,8 @@
   "devDependencies": {
     "@amcore/eslint-config": "workspace:*",
     "@clack/prompts": "^1.8.1",
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@eslint/js": "10.0.1",
     "eslint": "10.13.0",
     "husky": "^9.1.7",

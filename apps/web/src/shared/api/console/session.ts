@@ -53,6 +53,7 @@ export const getConsoleSessionEntry = cache(async (): Promise<ConsoleVaultEntry 
   if (!sessionId) return null
 
   const entry = await ensureFreshSession(sessionId, {
+    expectedAudience: 'console',
     store: redisConsoleVaultStore,
     lock: redisConsoleVaultLock,
     upstreamRefresh: createUpstreamRefresh(await headers()),

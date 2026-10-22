@@ -7,6 +7,7 @@ import {
 import { rejectInvitationAuth } from './invitation-auth-transition'
 import { invitationOwnerStore } from './invitation-owner-store'
 import { invitationBackend, InvitationBackendError } from './invitation-upstream'
+import type { ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
@@ -15,7 +16,8 @@ export type InvitationCleanupOutcome = 'aborted' | 'confirmed' | 'unresolved'
 /** Cleanup has its own short deadline; a dropped browser request must not cancel revocation. */
 export async function abortInvitationAuth(
   source: Headers,
-  proof: { attemptId: string; cleanupKey: string }
+  proof: { attemptId: string; cleanupKey: string },
+  context?: ProductWebContext
 ): Promise<InvitationCleanupOutcome> {
   const attemptId = invitationFlowIdSchema.parse(proof.attemptId)
   try {
@@ -24,6 +26,7 @@ export async function abortInvitationAuth(
       invitationHandoffAbortedSchema,
       {
         source,
+        context,
         signal: AbortSignal.timeout(5000),
         method: 'POST',
         expectedStatus: 200,
@@ -45,13 +48,14 @@ export async function abortInvitationAuth(
 
 /** Call only for a known auth rejection or acknowledged cleanup, never an uncertain issuance. */
 export async function releaseRejectedInvitationAuth(input: {
+  webContext?: ProductWebContext
   ownerHash: string
   origin: string
   flowId: string
   attemptId: string
   fence: string
 }): Promise<boolean> {
-  const owner = await invitationOwnerStore.get(input.ownerHash, input.origin)
+  const owner = await invitationOwnerStore.get(input.ownerHash, input.origin, input.webContext)
   if (!owner) return false
   let next
   try {
@@ -59,5 +63,5 @@ export async function releaseRejectedInvitationAuth(input: {
   } catch {
     return false
   }
-  return invitationOwnerStore.compareAndSet(input.ownerHash, owner.version, next)
+  return invitationOwnerStore.compareAndSet(input.ownerHash, owner.version, next, input.webContext)
 }

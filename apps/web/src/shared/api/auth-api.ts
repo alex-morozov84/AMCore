@@ -27,6 +27,23 @@ interface MessageResponse {
   message: string
 }
 
+/** The application composition selects a literal endpoint family, never user input. */
+export type AuthActionBase = '/auth' | '/product-admin/auth'
+
+export function authActions(base: AuthActionBase) {
+  return {
+    login: (data: LoginInput) => apiClient.post<UserEnvelope>(`${base}/login`, data),
+    logout: () => apiClient.post<MessageResponse>(`${base}/logout`),
+    forgotPassword: (data: ForgotPasswordInput) =>
+      apiClient.post<MessageResponse>(`${base}/forgot-password`, data),
+    resetPassword: (data: ResetPasswordInput) =>
+      apiClient.post<void>(`${base}/reset-password`, data),
+    verifyEmail: (data: VerifyEmailInput) => apiClient.post<void>(`${base}/verify-email`, data),
+    resendVerification: (data: ResendVerificationInput) =>
+      apiClient.post<MessageResponse>(`${base}/resend-verification`, data),
+  }
+}
+
 /**
  * All calls go through this app's own same-origin `/api/*` Route Handlers
  * (ADR-068), never `apps/api` directly — no access token ever reaches this

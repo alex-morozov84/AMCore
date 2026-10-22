@@ -32,7 +32,11 @@ function assertOwnKeySurface(root, flags) {
   const single = flags.includes('--mode=single')
   const stories = !flags.includes('--storybook=disabled')
   const prefix = single ? '' : '[locale]/'
-  assert.ok(exists(`apps/web/src/app/${prefix}(dashboard)/settings/api-keys/page.tsx`))
+  assert.ok(
+    exists(
+      `apps/web/src/app/${prefix}(product-admin)/manage/(protected)/settings/api-keys/page.tsx`
+    )
+  )
   if (single) assert.equal(exists('apps/web/src/app/[locale]'), false)
   for (const route of ['route.ts', '[id]/route.ts', 'session/route.ts', 'organizations/route.ts'])
     assert.ok(exists(`apps/web/src/app/api/own-api-keys/${route}`), route)

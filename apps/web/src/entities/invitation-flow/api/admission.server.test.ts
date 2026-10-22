@@ -4,7 +4,9 @@ import { readInvitationRecipientAdmission } from './admission.server'
 
 const deps = vi.hoisted(() => ({ capture: vi.fn(), assertCurrent: vi.fn() }))
 vi.mock('server-only', () => ({}))
-vi.mock('@/shared/api/bff/product-context-deps', () => ({ productContextDeps: () => ({}) }))
+vi.mock('@/shared/api/bff/invitation-context-deps', () => ({
+  invitationContextDeps: async () => ({}),
+}))
 vi.mock('@/shared/api/bff/invitation-request-snapshot', () => ({
   captureInvitationRequest: deps.capture,
   assertInvitationReadCurrent: deps.assertCurrent,

@@ -4,6 +4,8 @@ import { logServerError } from '@/shared/lib/server-logger'
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { productAdminDeployment } = await import('@/shared/lib/product-admin-config.server')
+    productAdminDeployment()
     const { validateAdminConsoleStartupOrExit } = await import('@/shared/lib/admin-console-startup')
     validateAdminConsoleStartupOrExit()
     const { invitationLocalOrigin } = await import('@/shared/api/bff/invitation-cookie')

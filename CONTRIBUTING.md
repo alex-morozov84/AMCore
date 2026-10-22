@@ -248,6 +248,9 @@ Use the [backend conventions](docs/backend/architecture-and-conventions.md),
    shared-surface contributions have a declared seam/operation, and any novel
    unmarked semantics were explicitly classified.
 
+For product-admin placement changes, validate the physical routes and generated
+edge mapping as described in [placement and sessions](docs/product-admin/placement-and-sessions.md).
+
 CI runs the same checks on push; fixing any failures before opening a PR saves time.
 
 ## Changelog & releases

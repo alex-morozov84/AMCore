@@ -52,8 +52,19 @@ export function rewriteDal(model, ctx) {
   if (redirects.length !== 2)
     throw new Error(`expected two locale-aware redirects, found ${redirects.length}`)
   for (const call of redirects) {
-    const href = objectProperty(model, call.arguments[0], 'href', ctx).initializer
-    model.replaceNode(call.arguments[0], href.getText(), ctx)
+    const href = findUniqueNode(
+      model,
+      (node) =>
+        (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
+        node.name.getText() === 'href',
+      ctx,
+      call.arguments[0]
+    )
+    model.replaceNode(
+      call.arguments[0],
+      (ts.isShorthandPropertyAssignment(href) ? href.name : href.initializer).getText(),
+      ctx
+    )
   }
   const fn = uniqueFunction(model, 'redirectIfAuthenticated', ctx)
   if (fn.parameters.length !== 1)
@@ -99,4 +110,50 @@ export function rewriteOAuth(model, ctx) {
     ctx
   )
   model.replaceNode(doc, doc.getText().replace('/{locale}/auth/callback', '/auth/callback'), ctx)
+}
+
+export function rewriteSelectedRedirect(model, ctx) {
+  const headers = uniqueImport(model, 'next/headers', ctx)
+  model.replaceNode(
+    headers,
+    headers.getText() + "\nimport { redirect } from 'next/navigation'",
+    ctx
+  )
+  model.removeNode(uniqueImport(model, '@/i18n/navigation', ctx), ctx)
+  const calls = findAllNodes(
+    model,
+    (node) => ts.isCallExpression(node) && callName(node) === 'redirect'
+  )
+  if (!calls.length) throw new Error('selected redirect contract drifted')
+  for (const call of calls) {
+    const href = objectProperty(model, call.arguments[0], 'href', ctx).initializer
+    model.replaceNode(call.arguments[0], href.getText(), ctx)
+  }
+}
+
+export function dropAdminLoginLocale(model, ctx) {
+  const fn = uniqueFunction(model, 'ProductAdminLoginForm', ctx)
+  const replace = findUniqueNode(
+    model,
+    (node) => ts.isCallExpression(node) && node.expression.getText() === 'router.replace',
+    ctx,
+    fn
+  )
+  if (replace.arguments.length !== 2 || replace.arguments[0].getText() !== 'destination')
+    throw new Error('admin login navigation contract drifted')
+  const locale = objectProperty(model, replace.arguments[1], 'locale', ctx)
+  if (locale.initializer.getText() !== 'targetLocale ?? user.locale')
+    throw new Error('admin login locale contract drifted')
+  model.removeNode(replace.arguments[1], ctx)
+  const callback = replace.parent
+  if (!ts.isArrowFunction(callback) || callback.parameters.length !== 1)
+    throw new Error('admin login success callback drifted')
+  model.removeNode(callback.parameters[0], ctx)
+  const target = findUniqueNode(
+    model,
+    (node) => ts.isBindingElement(node) && node.name.getText() === 'targetLocale',
+    ctx,
+    fn.parameters[0]
+  )
+  model.removeNode(target, ctx)
 }

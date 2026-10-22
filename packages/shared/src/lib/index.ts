@@ -10,4 +10,5 @@ export {
   createInvitationOperationId,
   invitationOperationTimestamp,
 } from './invitation-operation-id'
+export * from './product-admin-paths'
 export { createUuidV7 } from './uuid-v7'

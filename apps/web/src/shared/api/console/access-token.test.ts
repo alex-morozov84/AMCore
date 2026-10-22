@@ -5,23 +5,25 @@ vi.mock('server-only', () => ({}))
 import type { UserResponse } from '@amcore/shared'
 
 import { getOptionalSession } from '@/shared/api/bff/dal'
-import { getBackendAccessToken } from '@/shared/api/server/access-token'
+import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { getConsoleAwareAccessToken, getConsoleAwareUser } from './access-token'
 import { getConsoleAccessToken, getConsoleSessionEntry } from './session'
 
-vi.mock('@/shared/api/server/access-token', () => ({ getBackendAccessToken: vi.fn() }))
 // Mocked wholesale (not just `@/i18n/navigation`) so this test never pulls in
 // `dal.ts`'s own transitive next-intl navigation import - unrelated to what
 // this test actually exercises, and unresolvable in this test environment.
-vi.mock('@/shared/api/bff/dal', () => ({ getOptionalSession: vi.fn() }))
+vi.mock('@/shared/api/bff/dal', () => ({
+  getOptionalSession: vi.fn(),
+  getOptionalSessionEntry: vi.fn(),
+}))
 vi.mock('./session', () => ({
   getConsoleAccessToken: vi.fn(),
   getConsoleSessionEntry: vi.fn(),
 }))
 
-const mockedAccessToken = vi.mocked(getBackendAccessToken)
+const mockedAccessToken = vi.mocked(getOptionalSessionEntry)
 const mockedConsoleAccessToken = vi.mocked(getConsoleAccessToken)
 const mockedOptionalSession = vi.mocked(getOptionalSession)
 const mockedConsoleSessionEntry = vi.mocked(getConsoleSessionEntry)
@@ -41,7 +43,7 @@ describe('getConsoleAwareAccessToken', () => {
 
   it('uses the product session in path mode', async () => {
     mutableConfig.mode = 'path'
-    mockedAccessToken.mockResolvedValue('product-token')
+    mockedAccessToken.mockResolvedValue({ accessToken: 'product-token' } as never)
 
     await expect(getConsoleAwareAccessToken()).resolves.toBe('product-token')
     expect(mockedConsoleAccessToken).not.toHaveBeenCalled()

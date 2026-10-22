@@ -2,24 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 
-import { getBackendAccessToken } from '@/shared/api/server/access-token'
+import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { probeConsoleAccess } from './access-probe'
 import { getConsoleAccessToken } from './session'
 
-vi.mock('@/shared/api/server/access-token', () => ({ getBackendAccessToken: vi.fn() }))
 // `./access-probe` imports `./access-token`, which also exports
 // `getConsoleAwareUser` (unused here) backed by `dal.ts` - mocked wholesale
 // so this test never pulls in `dal.ts`'s own transitive next-intl
 // navigation import, unresolvable in this test environment.
-vi.mock('@/shared/api/bff/dal', () => ({ getOptionalSession: vi.fn() }))
+vi.mock('@/shared/api/bff/dal', () => ({
+  getOptionalSession: vi.fn(),
+  getOptionalSessionEntry: vi.fn(),
+}))
 vi.mock('./session', () => ({
   getConsoleAccessToken: vi.fn(),
   getConsoleSessionEntry: vi.fn(),
 }))
 
-const mockedAccessToken = vi.mocked(getBackendAccessToken)
+const mockedAccessToken = vi.mocked(getOptionalSessionEntry)
 const mockedConsoleAccessToken = vi.mocked(getConsoleAccessToken)
 const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
@@ -44,7 +46,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('forwards only the no-content success status', async () => {
-    mockedAccessToken.mockResolvedValue('access-token')
+    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
 
     const status = await probeConsoleAccess()
@@ -53,7 +55,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it.each([401, 403])('forwards expected policy denial %i without a body', async (status) => {
-    mockedAccessToken.mockResolvedValue('access-token')
+    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })))
 
     const result = await probeConsoleAccess()
@@ -62,7 +64,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('fails closed when the policy probe is unavailable', async () => {
-    mockedAccessToken.mockResolvedValue('access-token')
+    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('unreachable')))
 
     const status = await probeConsoleAccess()
@@ -71,7 +73,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('does not disclose an unexpected upstream response', async () => {
-    mockedAccessToken.mockResolvedValue('access-token')
+    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('unexpected', { status: 500 })))
 
     const status = await probeConsoleAccess()
@@ -100,7 +102,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('preserves only an explicit upstream 503 as unavailable', async () => {
-    mockedAccessToken.mockResolvedValue('access-token')
+    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })))
 
     await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'upstream-unavailable' })

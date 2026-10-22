@@ -18,9 +18,15 @@ export interface LoginFormProps {
   adapter?: CredentialFormAdapter<LoginInput>
   initialEmail?: string
   disabled?: boolean
+  forgotPasswordHref?: string
 }
 
-export function LoginForm({ adapter, initialEmail = '', disabled = false }: LoginFormProps = {}) {
+export function LoginForm({
+  adapter,
+  initialEmail = '',
+  disabled = false,
+  forgotPasswordHref = '/forgot-password',
+}: LoginFormProps = {}) {
   const passwordT = useTranslations('common')
   const t = useTranslations('auth')
 
@@ -72,7 +78,7 @@ export function LoginForm({ adapter, initialEmail = '', disabled = false }: Logi
                 {/* `underline`, not `hover:underline` — see LoginPage's
                 identical link-in-text-block reasoning below. */}
                 <RouteProgressLink
-                  href="/forgot-password"
+                  href={forgotPasswordHref}
                   className="text-sm text-primary underline"
                 >
                   {t('forgotPassword')}

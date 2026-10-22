@@ -56,6 +56,7 @@ export function invitationReadHandler(
                 '/auth/invites/continuations/context',
                 invitationContextSchema,
                 {
+                  context: deps.webContext,
                   source: request.headers,
                   signal,
                   method: 'POST',
@@ -67,6 +68,7 @@ export function invitationReadHandler(
                 '/auth/invites/continuations/inspect',
                 invitationInspectResponseSchema,
                 {
+                  context: deps.webContext,
                   source: request.headers,
                   signal,
                   method: 'POST',

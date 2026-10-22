@@ -192,6 +192,7 @@ export class InvitationCommandService {
       if (locked) await tx.orgInvite.delete({ where: { id: locked.id } })
     }
     const row = await issueInvitation(tx, {
+      frontend: this.email.destination(),
       organizationId: orgId,
       email: dto.email,
       emailCanonical: canonical,
@@ -253,6 +254,7 @@ export class InvitationCommandService {
       throw invitationConflict(InviteErrorCode.INVITE_GENERATION_CONFLICT)
     await this.limiter.consume(orgId, invite.emailCanonical, actor.principal.sub)
     const { token } = await issueInvitation(tx, {
+      frontend: this.email.destination(),
       organizationId: orgId,
       email: invite.email,
       emailCanonical: invite.emailCanonical,

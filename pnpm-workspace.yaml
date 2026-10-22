@@ -1,6 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
 allowBuilds:
   '@nestjs/core': true
   '@parcel/watcher': true

@@ -36,6 +36,8 @@ const HELPER = 'localizedFrontendUrl('
  */
 const ALLOWLIST: Record<string, string> = {
   'env/schema/email.env.ts': 'declares the variable itself',
+  'core/frontend-context/frontend-placement.ts':
+    'validates canonical configured origins and computes their nonsecret placement fingerprint; user links still use localizedFrontendUrl',
 }
 
 /** Blank out comments so prose mentioning the variable is not a false positive. */

@@ -10,6 +10,7 @@ import { callUpstreamAuth } from './upstream-auth'
 import { createUpstreamRefresh } from './upstream-refresh'
 
 vi.mock('server-only', () => ({}))
+vi.mock('./dal', () => ({ getOptionalSessionEntry: vi.fn() }))
 
 const browserHeaders = () =>
   new Headers({

@@ -26,6 +26,7 @@ import { OrganizationAccessSkeleton } from './context-skeleton'
 export interface OrganizationAccessClientProps {
   initialOrganizationName?: string
   initialCanManageTeamAccess?: boolean
+  deniedContent?: React.ReactNode
   admission: ProductAccessBootstrap
   input: OrganizationContextInput
   explicitList: boolean
@@ -67,6 +68,7 @@ export function OrganizationAccessClient(props: OrganizationAccessClientProps) {
   const refreshDisabled =
     pending || Boolean(state.retryAt) || state.status === 'changed' || state.status === 'missing'
 
+  if (state.status === 'denied' && props.deniedContent) return props.deniedContent
   return (
     <section className="space-y-6">
       {selected && <BackLink href={props.listHref}>{t('all')}</BackLink>}

@@ -575,14 +575,76 @@ Dependabot handles patch/minor npm + action bumps and (per repo, see
 [_Strict security setup_](#strict-security-setup-after-forking)) opens security
 PRs — but it does not surface **semver-major** npm updates (ignored in
 `dependabot.yml`), Docker base-image **digest drift**, or newer **curl-pinned CLI
-tool** releases. The `dependency-freshness.yml` workflow closes that visibility
+tool** releases. It also does not bump the root `packageManager` pnpm pin or the
+Node.js major selectors; the report has a **Toolchain** section for both (pnpm
+versus the registry; Node majors versus the LTS, Current and next-LTS schedule).
+Move the pnpm pin in one PR: root manifest, both Dockerfiles, the stand installer and
+`docker/migrator` together (`scripts/lib/toolchain-pins.test.mjs` checks they agree).
+The `dependency-freshness.yml` workflow closes that visibility
 gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
-`dependency-freshness`, edited in place) listing all three. It opens no PRs and is
+`dependency-freshness`, edited in place) listing all four categories (semver-major npm updates, Docker digest
+drift, curl-pinned tool releases and the toolchain). It opens no PRs and is
 a report only — triage each item and bump deliberately. For semver-major updates,
 use a separate PR, read the upstream migration notes/changelog, record any
 intentional deferral in the product's own backlog or issue tracker, and run the
 full relevant CI before merging.
+
+The root workspace explicitly sets `minimumReleaseAge: 1440` and
+`minimumReleaseAgeStrict: true`. It also sets
+`minimumReleaseAgeIgnoreMissingTime: false`: a registry entry without a publication
+time fails with `ERR_PNPM_MISSING_TIME`. Fix the registry metadata or mirror;
+waiting alone cannot establish an unknown publication time. The isolated migrator
+retains its separate strict/default-age policy; this change does not tighten its
+missing-time setting. Strict mode prevents fresh resolution from
+persisting age exceptions. pnpm 12 re-checks every lockfile entry during `pnpm install --frozen-lockfile`. A lockfile that holds a version
+published less than 24 hours ago therefore fails the install step with
+`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, even though the lockfile matches the
+manifests. This happens when Dependabot or a contributor adds a very fresh package.
+Wait until every offending package is 24 hours old, then rerun the complete CI
+workflow with **Re-run all jobs**. Do not rerun individual or only failed jobs. Do not set
+`trustLockfile`, lower `minimumReleaseAge` or add an exclusion to make the job pass:
+each one switches off the protection against freshly published malicious versions.
+
+Both npm entries in `dependabot.yml` explicitly set a three-day cooldown for
+ordinary version updates. Groups, schedules and major-version ignores still apply.
+Security updates can open immediately; installing their packages still follows
+the 24-hour rule. An urgent exception needs a separate maintainer decision.
+
+### One delayed Dependabot CI retry
+
+`dependabot-retry.yml` checks hourly at minute 17, or manually from `main`.
+Schedules can be delayed. It retries the `CI` workflow once when all these hold:
+
+- The open PR belongs to `dependabot[bot]`, stays in this repository and targets `main`.
+- Its latest applicable PR run failed on the first attempt at least 25 hours ago
+  and less than 30 days ago (the GitHub rerun window).
+- The run's head and base match the current PR. No newer run has replaced it.
+- A step named `Install dependencies` failed. No executed test/build job failed
+  after installation, and no job was cancelled or remains running.
+
+The controller reads GitHub job metadata. It does not diagnose package ages from
+logs, so a network-related install failure may also receive this one retry.
+It repeats the whole workflow to keep API/scaffold plans and shard evidence in
+the same attempt. Successful jobs therefore run again too. The installation
+checks the real policy again; no lock, age exclusion or permissions are changed.
+
+The controller loads only trusted `main` code, installs no dependencies and reads
+no PR code, caches or artifacts. Only its job has `actions: write`; PR build jobs
+keep their existing permissions. Controller runs serialize. A changed head/base,
+a newer run, or any prior manual/automatic attempt makes the run ineligible.
+It checks the age window again immediately before requesting the retry.
+A candidate-specific GitHub refusal (404, 409 or 422) produces a warning and does
+not stop other PRs. Permission, rate-limit and service errors still fail the controller.
+It never approves or merges a PR.
+
+If the repeat fails, inspect the new failure and fix it normally. Human/fork PRs
+and stale-base runs need manual triage or rebase. Always use **Re-run all jobs**
+for a manual CI retry so every shard belongs to the new attempt. Runs at least
+30 days old cannot be rerun: update or rebase the PR branch to create a new
+current-head/base CI run, then inspect that run. The controller becomes
+active only after this workflow reaches `main`; local mocked tests do not prove
+hosted scheduling or rerun activation.
 
 The report also has a **Dependabot health** section. GitHub kills a Dependabot
 update job after a fixed 55 minutes (it cannot be extended) and a killed job opens

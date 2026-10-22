@@ -11,9 +11,8 @@ export interface ScriptSourceReader {
   compiled(name: string): string
 }
 
-/** Refuse upgrades before registering workers or dispatching controls. */
+/** Refuse changed upstream scripts before registering workers or dispatching controls. */
 export function verifyScriptProvenance(reader: ScriptSourceReader): void {
-  if (reader.version !== SCRIPT_PROVENANCE.version) throw new Error('BULLMQ_VERSION_UNSUPPORTED')
   for (const [name, script] of Object.entries(SCRIPT_PROVENANCE.scripts)) {
     for (const [path, expected] of Object.entries(script.sources))
       if (digest(reader.source(path)) !== expected) throw new Error(`BULLMQ_SOURCE_CHANGED:${path}`)

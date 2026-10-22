@@ -357,3 +357,14 @@ propagation.
   limit key.
 - `docs/operations/deployment.md` → "TLS & reverse proxy" — deployment
   requirements for TLS, forwarded headers, and CSP nonce propagation.
+
+Product administration keeps its own host session only when configured on a
+separate hostname. Its public login remains private/noindex and uses the baseline
+strict-origin-when-cross-origin referrer policy. Secret-bearing reset, verification,
+invite and provider callback responses use private/no-referrer/noindex. The final
+OAuth completion GET document alone uses strict-origin: a native same-origin form
+retains exact Origin but Referer carries no ticket/path. Completion POST responses
+and redirects retain no-referrer. Preserve the path-scoped next.config.ts override,
+including alias/single-locale projections, and verify the public wire policy.
+Nonce CSP/form-action self remains unchanged. API/web frontend proof headers are server-to-server data; never expose their key in client props or
+NEXT_PUBLIC variables. See [placement and sessions](../product-admin/placement-and-sessions.md).

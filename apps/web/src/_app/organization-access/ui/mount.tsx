@@ -15,10 +15,12 @@ import { OrganizationAccessClientMount } from './mount-client'
 import 'server-only'
 
 export async function OrganizationAccessMount({
+  deniedContent,
   id,
   searchParams,
   placement = organizationAccessPlacement,
 }: {
+  deniedContent?: React.ReactNode
   id?: string
   placement?: OrganizationAccessPlacement
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -42,7 +44,7 @@ export async function OrganizationAccessMount({
       error instanceof SessionNotFoundError ||
       (error instanceof ContextRequestError && error.status === 401)
     ) {
-      return redirectToLogin()
+      return redirectToLogin(placement.loginHref ?? '/login')
     }
     if (error instanceof ContextRequestError && [403, 404].includes(error.status)) notFound()
     throw error
@@ -55,6 +57,7 @@ export async function OrganizationAccessMount({
       : 1
   return (
     <OrganizationAccessClientMount
+      deniedContent={deniedContent}
       placement={placement}
       admission={admission}
       id={id}

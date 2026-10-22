@@ -267,6 +267,33 @@ describe('OpenAPI success surface (e2e)', () => {
   let context: E2ETestContext
   let document: OpenAPIObject
 
+  it('documents optional frontend proof and fail-closed responses without changing native auth', () => {
+    const operation = document.paths['/auth/login']!.post!
+    const headers =
+      operation.parameters?.filter((parameter) => 'in' in parameter && parameter.in === 'header') ??
+      []
+    for (const name of [
+      'X-Amcore-Web-Frontend',
+      'X-Amcore-Web-Placement',
+      'X-Amcore-Web-Context-Key',
+    ]) {
+      expect(headers).toContainEqual(expect.objectContaining({ name, required: false }))
+    }
+    expect(operation.responses['403']).toBeDefined()
+    expect(operation.responses['503']).toBeDefined()
+  })
+
+  it('documents the finite OAuth return destination under its public query name', () => {
+    const operation = document.paths['/auth/oauth/{provider}']!.get!
+    expect(operation.parameters).toContainEqual(
+      expect.objectContaining({
+        in: 'query',
+        name: 'returnTo',
+        required: false,
+      })
+    )
+  })
+
   it('documents irreversible member deletion and its failure outcomes', () => {
     const operation = document.paths['/organizations/{orgId}/members/{userId}']!.delete!
     expect(operation.description).toContain('Rejoining never restores old keys')

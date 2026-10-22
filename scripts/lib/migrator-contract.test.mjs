@@ -26,8 +26,9 @@ function edit(directory, path, change) {
   writeFileSync(file, change(readFileSync(file, 'utf8')))
 }
 
+// The pnpm 12 root lock leads with a package-manager document, so this also covers document selection.
 test('migrator version guard accepts both actual frozen graphs', () => {
-  assert.deepEqual(verifyMigrator(root), { prisma: '7.10.1', pnpm: '12.11.2' })
+  assert.deepEqual(verifyMigrator(root), { prisma: '7.10.1', pnpm: '12.14.0' })
 })
 
 for (const name of ['prisma', '@prisma/client', '@prisma/adapter-pg'])
@@ -53,6 +54,17 @@ for (const [change, message] of [
     fixture((directory) => {
       edit(directory, 'docker/migrator/pnpm-lock.yaml', change)
       assert.throws(() => verifyMigrator(directory), message)
+    })
+  })
+
+for (const [label, change] of [
+  ['missing', (text) => text.replace('apps/api:', 'apps/other:')],
+  ['duplicate', (text) => `${text}---\n${text}`],
+])
+  test(`root lock guard rejects a ${label} application document`, () => {
+    fixture((directory) => {
+      edit(directory, 'pnpm-lock.yaml', change)
+      assert.throws(() => verifyMigrator(directory), /exactly one application document/)
     })
   })
 

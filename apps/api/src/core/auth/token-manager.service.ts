@@ -7,6 +7,8 @@ import { AuthErrorCode } from '@amcore/shared'
 import { AppException } from '../../common/exceptions/index.js'
 import { EnvService } from '../../env/env.service.js'
 import { PrismaService } from '../../prisma/index.js'
+import type { BrowserFrontendContext } from '../frontend-context/frontend-placement.js'
+import { assertTokenFrontend, frontendTokenData } from '../frontend-context/frontend-token.js'
 
 export interface GeneratedToken {
   token: string // Plain token — for email link
@@ -26,7 +28,10 @@ export class TokenManagerService {
   }
 
   /** Generate password reset token (15 min expiry) */
-  async generatePasswordResetToken(userId: string): Promise<GeneratedToken> {
+  async generatePasswordResetToken(
+    userId: string,
+    frontend?: BrowserFrontendContext
+  ): Promise<GeneratedToken> {
     // Invalidate existing active tokens
     await this.invalidateUserTokens(userId, 'password-reset')
 
@@ -35,7 +40,7 @@ export class TokenManagerService {
     const expiresAt = this.getExpiry('password-reset')
 
     await this.prisma.passwordResetToken.create({
-      data: { userId, tokenHash, expiresAt },
+      data: { userId, tokenHash, expiresAt, ...frontendTokenData(frontend) },
     })
 
     this.logger.info({ userId }, 'Password reset token generated')
@@ -50,7 +55,8 @@ export class TokenManagerService {
    * is safe to embed in notification rows/logs).
    */
   async verifyPasswordResetToken(
-    token: string
+    token: string,
+    frontend?: BrowserFrontendContext
   ): Promise<{ id: string; userId: string; tokenHash: string }> {
     const tokenHash = this.hashToken(token)
 
@@ -67,6 +73,7 @@ export class TokenManagerService {
       )
     }
 
+    assertTokenFrontend(record, frontend)
     return { id: record.id, userId: record.userId, tokenHash }
   }
 
@@ -81,7 +88,10 @@ export class TokenManagerService {
   }
 
   /** Generate email verification token (48h expiry) */
-  async generateEmailVerificationToken(userId: string): Promise<GeneratedToken> {
+  async generateEmailVerificationToken(
+    userId: string,
+    frontend?: BrowserFrontendContext
+  ): Promise<GeneratedToken> {
     // Invalidate existing active tokens
     await this.invalidateUserTokens(userId, 'email-verification')
 
@@ -90,7 +100,7 @@ export class TokenManagerService {
     const expiresAt = this.getExpiry('email-verification')
 
     await this.prisma.emailVerificationToken.create({
-      data: { userId, tokenHash, expiresAt },
+      data: { userId, tokenHash, expiresAt, ...frontendTokenData(frontend) },
     })
 
     this.logger.info({ userId }, 'Email verification token generated')
@@ -100,7 +110,8 @@ export class TokenManagerService {
 
   /** Verify email verification token, return userId and tokenHash on success */
   async verifyEmailVerificationToken(
-    token: string
+    token: string,
+    frontend?: BrowserFrontendContext
   ): Promise<{ userId: string; tokenHash: string }> {
     const tokenHash = this.hashToken(token)
 
@@ -117,6 +128,7 @@ export class TokenManagerService {
       )
     }
 
+    assertTokenFrontend(record, frontend)
     return { userId: record.userId, tokenHash }
   }
 

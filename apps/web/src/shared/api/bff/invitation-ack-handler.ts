@@ -37,59 +37,76 @@ export function invitationAckHandler(
         )
         if (expected.binding.flowId !== flowId) throw invitationFlowChanged()
         const first = await captureInvitationRequest(request, flowId, deps, true)
-        return withInvitationOwnerLease(first.ownerHash, signal, async () => {
-          const snapshot = await captureInvitationRequest(request, flowId, deps, true)
-          if (!snapshot.session) throw invitationFlowChanged()
-          const flow = expectedInvitationFlow(
-            snapshot.owner,
-            expected.binding,
-            snapshot.session.binding,
-            Date.now()
-          )
-          const handoff = flow.handoff
-          if (
-            !handoff ||
-            handoff.attemptId !== id ||
-            handoff.newSessionId !== snapshot.session.sessionId ||
-            (flow.state !== 'completing_signin' && !(flow.state === 'active' && handoff.confirmed))
-          )
-            throw invitationFlowChanged()
-          signal.throwIfAborted()
-          // Do not refresh a pending SID. The API verifies the issued JWT's exact SID/actor and deadline.
-          await invitationBackend(
-            `/auth/invites/auth-handoffs/${id}/confirm`,
-            invitationHandoffConfirmedSchema,
-            {
-              source: request.headers,
-              signal,
-              method: 'POST',
-              expectedStatus: 200,
-              accessToken: snapshot.session.entry.accessToken,
-              handoff: { attemptId: id, cleanupKey: handoff.cleanupKey },
-            }
-          )
-          signal.throwIfAborted()
-          const latest = await invitationOwnerStore.get(snapshot.ownerHash, snapshot.owner.origin)
-          if (!latest || latest.epoch !== snapshot.owner.epoch) throw invitationFlowChanged()
-          const next = confirmInvitationAuth(
-            latest,
-            expected.binding,
-            snapshot.session.binding,
-            id,
-            Date.now()
-          )
-          if (
-            next !== latest &&
-            !(await invitationOwnerStore.compareAndSet(snapshot.ownerHash, latest.version, next))
-          )
-            throw invitationFlowChanged()
-          signal.throwIfAborted()
-          return invitationFlowAuthResponseSchema.parse({
-            binding: expected.binding,
-            data: { user: snapshot.session.entry.userSnapshot },
-            handoff: { attemptId: id },
-          })
-        })
+        return withInvitationOwnerLease(
+          first.ownerHash,
+          signal,
+          async () => {
+            const snapshot = await captureInvitationRequest(request, flowId, deps, true)
+            if (!snapshot.session) throw invitationFlowChanged()
+            const flow = expectedInvitationFlow(
+              snapshot.owner,
+              expected.binding,
+              snapshot.session.binding,
+              Date.now()
+            )
+            const handoff = flow.handoff
+            if (
+              !handoff ||
+              handoff.attemptId !== id ||
+              handoff.newSessionId !== snapshot.session.sessionId ||
+              (flow.state !== 'completing_signin' &&
+                !(flow.state === 'active' && handoff.confirmed))
+            )
+              throw invitationFlowChanged()
+            signal.throwIfAborted()
+            // Do not refresh a pending SID. The API verifies the issued JWT's exact SID/actor and deadline.
+            await invitationBackend(
+              `/auth/invites/auth-handoffs/${id}/confirm`,
+              invitationHandoffConfirmedSchema,
+              {
+                context: deps.webContext,
+                source: request.headers,
+                signal,
+                method: 'POST',
+                expectedStatus: 200,
+                accessToken: snapshot.session.entry.accessToken,
+                handoff: { attemptId: id, cleanupKey: handoff.cleanupKey },
+              }
+            )
+            signal.throwIfAborted()
+            const latest = await invitationOwnerStore.get(
+              snapshot.ownerHash,
+              snapshot.owner.origin,
+              deps.webContext
+            )
+            if (!latest || latest.epoch !== snapshot.owner.epoch) throw invitationFlowChanged()
+            const next = confirmInvitationAuth(
+              latest,
+              expected.binding,
+              snapshot.session.binding,
+              id,
+              Date.now()
+            )
+            if (
+              next !== latest &&
+              !(await invitationOwnerStore.compareAndSet(
+                snapshot.ownerHash,
+                latest.version,
+                next,
+                deps.webContext
+              ))
+            )
+              throw invitationFlowChanged()
+            signal.throwIfAborted()
+            return invitationFlowAuthResponseSchema.parse({
+              binding: expected.binding,
+              data: { user: snapshot.session.entry.userSnapshot },
+              handoff: { attemptId: id },
+            })
+          },
+          undefined,
+          deps.webContext
+        )
       },
       15000
     )

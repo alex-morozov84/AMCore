@@ -10,6 +10,7 @@ import { mediaEnv } from './media.env.js'
 import { oauthEnv } from './oauth.env.js'
 import { observabilityEnv } from './observability.env.js'
 import { organizationsEnv } from './organizations.env.js'
+import { productAdminEnv } from './product-admin.env.js'
 import { queueEnv } from './queue.env.js'
 import { aiRealtimeEnv, notificationsRealtimeEnv } from './realtime.env.js'
 import { redisEnv } from './redis.env.js'
@@ -34,6 +35,7 @@ export const envSections = {
   queue: queueEnv,
   auth: authEnv,
   organizations: organizationsEnv,
+  productAdmin: productAdminEnv,
   oauth: oauthEnv,
   telegram: telegramEnv,
   email: emailEnv,
@@ -57,6 +59,7 @@ export const envBaseSchema = z.object({
   ...queueEnv.shape,
   ...authEnv.shape,
   ...organizationsEnv.shape,
+  ...productAdminEnv.shape,
   ...oauthEnv.shape,
   ...telegramEnv.shape,
   ...emailEnv.shape,

@@ -11,7 +11,7 @@ import {
   useInvitationFlow,
 } from '@/entities/invitation-flow'
 import type { OAuthActionProvider } from '@/features/auth-oauth'
-import { authApi } from '@/shared/api'
+import { authActions } from '@/shared/api/auth-api'
 import { getErrorCode } from '@/shared/api/errors'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
@@ -103,7 +103,10 @@ export function RecipientClient({
     })
   const resend = () =>
     action(async () => {
-      if (auth.user) await authApi.resendVerification({ email: auth.user.email })
+      if (auth.user)
+        await authActions(placement.actionBase ?? '/auth').resendVerification({
+          email: auth.user.email,
+        })
     })
   const oauth = (provider: OAuthActionProvider) =>
     action(async () => {
@@ -125,7 +128,8 @@ export function RecipientClient({
       const selector = new URL(result.verifyHref, window.location.origin).searchParams.get(
         'inviteReturn'
       )
-      if (auth.current(captured) && selector) router.push(`/verify-email?inviteReturn=${selector}`)
+      if (auth.current(captured) && selector)
+        router.push(`${placement.verifyHref ?? '/verify-email'}?inviteReturn=${selector}`)
     })
   if (terminal) return <SettlementResult {...terminal} onLeave={leave} onOpen={open} />
   if (auth.phase === 'unusable') return <RecipientStatus state="unusable" onLeave={leave} />

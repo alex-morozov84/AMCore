@@ -228,6 +228,10 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   `docs/backend/architecture-and-conventions.md` → _Adding an environment variable_.
 - **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
   distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
+- **Product administration placement:** before changing its alias, route subtree,
+  hosts or session selection, read
+  `docs/product-admin/placement-and-sessions.md`. Source configuration, physical
+  routes, generated edge mapping and API/web placement must stay aligned.
 - **Periodic jobs:** declare a timer job once in the scheduled-jobs catalogue and decorate
   it with `@ScheduledJob`, never a raw `@Cron` or `@Interval` (a test fails otherwise). The
   task returns an explicit result; a resolved promise is not success. See

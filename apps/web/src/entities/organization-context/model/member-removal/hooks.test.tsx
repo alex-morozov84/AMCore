@@ -22,6 +22,30 @@ function setup() {
 }
 beforeEach(() => vi.resetAllMocks())
 describe('member removal state', () => {
+  it.each([true, false])(
+    'publishes only confirmed acknowledgement before refresh: %s',
+    async (ack) => {
+      const controller = createOrganizationAccessController('binding', 'org')
+      const events: string[] = []
+      controller.setAuthority(true)
+      controller.setRefresh(async () => {
+        events.push('refresh')
+        return 'denied'
+      })
+      if (ack) vi.mocked(removeMember).mockResolvedValue({ removed: true })
+      else vi.mocked(removeMember).mockRejectedValue(new Error('lost acknowledgement'))
+      const { result } = renderHook(() =>
+        useMemberRemoval(controller, target, () => {
+          events.push('acknowledged')
+        })
+      )
+      await act(async () => {
+        await result.current.remove()
+      })
+      expect(events).toEqual(ack ? ['acknowledged', 'refresh'] : ['refresh'])
+      expect(result.current.outcome?.status).toBe(ack ? 'committed' : 'unknown')
+    }
+  )
   it.each(['denied', 'error'] as const)(
     'preserves acknowledged self removal with %s follow-up',
     async (status) => {

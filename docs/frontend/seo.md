@@ -475,3 +475,7 @@ deployment (for example with the Verify block) before relying on it.
 - [Internationalisation and error localisation](./i18n-and-errors.md): locale routing and
   `localizedFrontendUrl`.
 - [Deployment](../operations/deployment.md): promoting one image and the web environment variables.
+
+Product administration remains private in both path and separate-host mode. Its
+publicly visible login form does not make it an indexable page. Keep it out of the
+public-page registry; relocation is not a reason to override the indexing policy.

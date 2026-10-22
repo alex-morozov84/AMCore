@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { useCurrentUser } from '@/entities/user'
+import type { AuthActionBase } from '@/shared/api/auth-api'
 import { cn } from '@/shared/lib/utils'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { buttonVariants } from '@/shared/ui/button'
@@ -16,6 +17,10 @@ interface VerifyEmailStatusProps {
   /** The `?token=` query param `(auth)/verify-email/page.tsx` read from the
    * emailed link. Absent when the page is opened without one. */
   token?: string
+  actionBase?: AuthActionBase
+  loginHref?: string
+  homeHref?: string
+  resendHref?: string
   withoutTokenContent?: ReactNode
   successContent?: ReactNode
 }
@@ -32,10 +37,14 @@ export function VerifyEmailStatus({
   token,
   withoutTokenContent,
   successContent,
+  actionBase,
+  loginHref = '/login',
+  homeHref = '/',
+  resendHref = '/resend-verification',
 }: VerifyEmailStatusProps) {
   const t = useTranslations('auth')
   const tErrors = useTranslations('errors')
-  const { mutate, isSuccess, isError, error } = useVerifyEmail()
+  const { mutate, isSuccess, isError, error } = useVerifyEmail(actionBase)
   const { data: currentUser } = useCurrentUser()
   const fired = useRef(false)
 
@@ -50,7 +59,7 @@ export function VerifyEmailStatus({
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">{tErrors('TOKEN_INVALID')}</p>
-        <RouteProgressLink href="/resend-verification" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href={resendHref} className={cn(buttonVariants(), 'w-full')}>
           {t('resendVerification')}
         </RouteProgressLink>
       </div>
@@ -58,7 +67,7 @@ export function VerifyEmailStatus({
   }
 
   if (isSuccess) {
-    const destination = currentUser?.user ? '/' : '/login'
+    const destination = currentUser?.user ? homeHref : loginHref
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{t('verifyEmailSuccess')}</p>
@@ -74,7 +83,7 @@ export function VerifyEmailStatus({
     return (
       <div className="space-y-4 text-center">
         <ApiErrorAlert error={error} />
-        <RouteProgressLink href="/resend-verification" className={cn(buttonVariants(), 'w-full')}>
+        <RouteProgressLink href={resendHref} className={cn(buttonVariants(), 'w-full')}>
           {t('resendVerification')}
         </RouteProgressLink>
       </div>

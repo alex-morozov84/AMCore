@@ -45,7 +45,7 @@ describe('ready content client adapter', () => {
     const props = page.mock.lastCall![0] as OrganizationAccessClientProps
     expect(props.input).toEqual({ kind: 'list', page: 3, locale: 'ru' })
     expect(props.explicitList).toBe(true)
-    expect(props.contextHref('org')).toBe('/organizations/org')
-    expect(props.loginHref).toBe('/login')
+    expect(props.contextHref('org')).toBe('/manage/organizations/org')
+    expect(props.loginHref).toBe('/manage/login')
   })
 })

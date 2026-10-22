@@ -52,6 +52,8 @@ import { EnvService } from '../../env/env.service.js'
 import type { User } from '../../generated/prisma/client.js'
 import { AVATAR_VALIDATION, FileValidationPipe } from '../../infrastructure/storage/index.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
+import { ApiFrontendContext } from '../frontend-context/frontend-context.openapi.js'
+import { browserFrontendContext } from '../frontend-context/frontend-context.service.js'
 import { invitationHandoffProof } from '../invitations/invitation-auth-handoff.js'
 
 import { AuthService } from './auth.service.js'
@@ -88,6 +90,7 @@ const AVATAR_UPLOAD_HARD_LIMIT_BYTES = 6 * 1024 * 1024
 // Sessions wire shape lives in `@amcore/shared`
 // (`sessionsListResponseSchema`). Local interface removed in OB-05.
 
+@ApiFrontendContext()
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -142,6 +145,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response
   ): Promise<AuthResponse> {
     const result = await this.authService.register(dto, {
+      frontend: browserFrontendContext(req),
       userAgent: req.headers['user-agent'],
       ipAddress: resolveSessionIpAddress(req, this.env),
       acceptedLocale: negotiateLocale(req),
@@ -447,9 +451,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Request password reset email' })
   @SchemaResponse({ type: MessageResponseDto, status: 200, description: 'Reset email dispatched' })
   async forgotPassword(
-    @Body({ schema: ForgotPasswordDto.schema }) dto: ForgotPasswordDto
+    @Body({ schema: ForgotPasswordDto.schema }) dto: ForgotPasswordDto,
+    @Req() req?: Request
   ): Promise<MessageResponse> {
-    await this.authService.forgotPassword(dto.email)
+    await this.authService.forgotPassword(dto.email, browserFrontendContext(req))
     // Always return the same message to prevent account enumeration
     return { message: 'If an account with that email exists, a password reset link has been sent.' }
   }
@@ -460,9 +465,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiNoContentResponse({ description: 'Password reset' })
   async resetPassword(
-    @Body({ schema: ResetPasswordDto.schema }) dto: ResetPasswordDto
+    @Body({ schema: ResetPasswordDto.schema }) dto: ResetPasswordDto,
+    @Req() req?: Request
   ): Promise<void> {
-    await this.authService.resetPassword(dto.token, dto.password)
+    await this.authService.resetPassword(dto.token, dto.password, browserFrontendContext(req))
   }
 
   @Post('verify-email')
@@ -470,8 +476,11 @@ export class AuthController {
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Verify email address using token from email' })
   @ApiNoContentResponse({ description: 'Email verified' })
-  async verifyEmail(@Body({ schema: VerifyEmailDto.schema }) dto: VerifyEmailDto): Promise<void> {
-    await this.authService.verifyEmail(dto.token)
+  async verifyEmail(
+    @Body({ schema: VerifyEmailDto.schema }) dto: VerifyEmailDto,
+    @Req() req?: Request
+  ): Promise<void> {
+    await this.authService.verifyEmail(dto.token, browserFrontendContext(req))
   }
 
   @Post('resend-verification')
@@ -483,9 +492,10 @@ export class AuthController {
     description: 'Verification email dispatched',
   })
   async resendVerification(
-    @Body({ schema: ResendVerificationDto.schema }) dto: ResendVerificationDto
+    @Body({ schema: ResendVerificationDto.schema }) dto: ResendVerificationDto,
+    @Req() req?: Request
   ): Promise<MessageResponse> {
-    await this.authService.resendVerificationEmail(dto.email)
+    await this.authService.resendVerificationEmail(dto.email, browserFrontendContext(req))
     // Always return the same message to prevent account enumeration
     return {
       message: 'If the account exists and is unverified, a verification link has been sent.',

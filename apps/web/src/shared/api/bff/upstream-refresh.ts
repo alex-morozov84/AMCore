@@ -1,3 +1,4 @@
+import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import type { UpstreamRefreshFn } from './session-vault.types'
 import { extractCookieValue } from './set-cookie'
@@ -22,8 +23,11 @@ const REFRESH_COOKIE_NAME = 'refresh_token'
  * can distinguish known authentication-infrastructure unavailability from an
  * unrelated implementation defect. Unexpected response shapes stay uncoded.
  */
-export function createUpstreamRefresh(source: Headers): UpstreamRefreshFn {
-  const metadata = sessionMetadataHeaders(source)
+export function createUpstreamRefresh(
+  source: Headers,
+  context?: ProductWebContext
+): UpstreamRefreshFn {
+  const metadata = { ...sessionMetadataHeaders(source), ...context?.apiHeaders }
   return async (refreshToken, signal) => {
     let response: Response
     try {

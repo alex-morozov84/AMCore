@@ -107,6 +107,10 @@ describe('OAuthService', () => {
 
     providerFactory = {
       get: jest.fn().mockReturnValue(mockProvider),
+      callbackUri: jest.fn(
+        (provider: string, frontend: string): string =>
+          `https://${frontend === 'admin' ? 'staff' : 'shop'}.example.test/api/${frontend === 'admin' ? 'product-admin/' : ''}auth/oauth/${provider}/callback`
+      ),
       getAvailableProviders: jest.fn().mockReturnValue(['google', 'github', 'apple']),
     }
 
@@ -150,7 +154,7 @@ describe('OAuthService', () => {
     it('should store state in Redis and return provider URL', async () => {
       const result = await service.getAuthorizationURL('google')
 
-      expect(providerFactory.get).toHaveBeenCalledWith('google')
+      expect(providerFactory.get).toHaveBeenCalledWith('google', 'site')
       expect(stateService.store).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -330,6 +334,19 @@ describe('OAuthService', () => {
   })
 
   describe('findOrCreateUser', () => {
+    it('does not attach an unverified email claim to an existing account', async () => {
+      mockProvider.getUserProfile.mockResolvedValue({ ...mockProfile, emailVerified: false })
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null)
+      prisma.user.findUnique.mockResolvedValue(mockUser())
+
+      await expect(
+        service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
+      ).rejects.toMatchObject({ errorCode: AuthErrorCode.OAUTH_EMAIL_UNVERIFIED })
+
+      expect(prisma.oAuthAccount.create).not.toHaveBeenCalled()
+      expect(sessionService.createSession).not.toHaveBeenCalled()
+    })
+
     it('should return existing user when OAuth account is already linked', async () => {
       const user = mockUser()
       prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: user.id, user })
@@ -693,5 +710,116 @@ describe('OAuthService', () => {
       ).rejects.toMatchObject({ errorCode: 'OAUTH_STATE_INVALID' })
       expect(invitationAuthority.lockOAuthIntent).not.toHaveBeenCalled()
     })
+  })
+  describe('selected frontend OAuth policy', () => {
+    const frontend = { frontend: 'admin' as const, placementFingerprint: 'a'.repeat(64) }
+    const callbackUri = 'https://staff.example.test/api/product-admin/auth/oauth/google/callback'
+    function state(): OAuthStateData {
+      return {
+        provider: 'google',
+        codeVerifier: 'verifier',
+        mode: 'login',
+        browserNonceHash: TEST_NONCE_HASH,
+        ...frontend,
+        callbackUri,
+        pkceMethod: 'S256',
+      }
+    }
+    it('stores selected callback, frontend and finite return with the browser-bound state', async () => {
+      const target = {
+        page: 'organizations' as const,
+        locale: 'ru' as const,
+        query: { view: 'list' as const },
+      }
+      await service.getAuthorizationURL('google', 'ru', undefined, frontend, target)
+      expect(providerFactory.get).toHaveBeenCalledWith('google', 'admin')
+      expect(stateService.store).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ ...frontend, callbackUri, returnTo: target, pkceMethod: 'S256' })
+      )
+    })
+    it.each(['frontend', 'fingerprint', 'callback', 'missing-context'] as const)(
+      'rejects changed %s before provider redemption or account work',
+      async (field) => {
+        const stored = state()
+        if (field === 'callback') stored.callbackUri = 'https://other.example.test/callback'
+        stateService.consume.mockResolvedValue(stored)
+        const supplied =
+          field === 'missing-context'
+            ? undefined
+            : {
+                frontend: field === 'frontend' ? ('site' as const) : ('admin' as const),
+                placementFingerprint:
+                  field === 'fingerprint' ? 'b'.repeat(64) : frontend.placementFingerprint,
+              }
+        await expect(
+          service.handleCallback(
+            'google',
+            'code',
+            'state',
+            TEST_NONCE,
+            requestInfo,
+            undefined,
+            supplied
+          )
+        ).rejects.toMatchObject({ errorCode: AuthErrorCode.OAUTH_STATE_INVALID })
+        expect(mockProvider.exchangeCode).not.toHaveBeenCalled()
+        expect(prisma.$transaction).not.toHaveBeenCalled()
+        expect(sessionService.createSession).not.toHaveBeenCalled()
+      }
+    )
+    it('refuses ordinary admin signup even while public site signup is enabled', async () => {
+      stateService.consume.mockResolvedValue(state())
+      await expect(
+        service.handleCallback(
+          'google',
+          'code',
+          'state',
+          TEST_NONCE,
+          requestInfo,
+          undefined,
+          frontend
+        )
+      ).rejects.toMatchObject({ errorCode: AuthErrorCode.PUBLIC_SIGNUP_DISABLED })
+      expect(prisma.user.create).not.toHaveBeenCalled()
+      expect(prisma.oAuthAccount.create).not.toHaveBeenCalled()
+      expect(sessionService.createSession).not.toHaveBeenCalled()
+    })
+    it('keeps existing admin provider login available', async () => {
+      stateService.consume.mockResolvedValue(state())
+      prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: 'user-1', user: mockUser() })
+      expect(
+        (
+          await service.handleCallback(
+            'google',
+            'code',
+            'state',
+            TEST_NONCE,
+            requestInfo,
+            undefined,
+            frontend
+          )
+        ).mode
+      ).toBe('login')
+      expect(prisma.user.create).not.toHaveBeenCalled()
+      expect(sessionService.createSession).toHaveBeenCalledTimes(1)
+    })
+    it.each([undefined, 'S256'] as const)(
+      'retains the GitHub state PKCE contract %s',
+      async (pkceMethod) => {
+        stateService.consume.mockResolvedValue({
+          provider: 'github',
+          codeVerifier: 'verifier',
+          mode: 'login',
+          browserNonceHash: TEST_NONCE_HASH,
+          pkceMethod,
+        })
+        await service.handleCallback('github', 'code', 'state', TEST_NONCE, requestInfo)
+        const expected = pkceMethod
+          ? ['code', 'verifier']
+          : ['code', 'verifier', { legacyWithoutPkce: true }]
+        expect(mockProvider.exchangeCode).toHaveBeenCalledWith(...expected)
+      }
+    )
   })
 })

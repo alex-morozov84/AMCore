@@ -1,3 +1,5 @@
+import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
+
 const one = (path, extra = {}) => ({ path, kind: 'file', cardinality: 'one', ...extra })
 const dir = (path) => ({ path, kind: 'directory', cardinality: 'one' })
 const many = (glob, extra = {}) => ({
@@ -67,33 +69,9 @@ const independentConsumers = [
   'apps/api/src/core/organizations/invite.service.ts',
 ].map(one)
 
-const topology = [
-  '(auth)/layout.tsx',
-  '(auth)/forgot-password/page.tsx',
-  '(auth)/login/page.tsx',
-  '(auth)/register/page.tsx',
-  '(auth)/resend-verification/page.tsx',
-  '(auth)/reset-password/page.tsx',
-  '(auth)/verify-email/page.tsx',
-  '(dashboard)/error.tsx',
-  '(dashboard)/layout.tsx',
-  '(dashboard)/page.tsx',
-  '(dashboard)/settings/sessions/page.tsx',
-  '(organization-access)/error.tsx',
-  '(organization-access)/layout.tsx',
-  '(organization-access)/organizations/page.tsx',
-  '(organization-access)/organizations/[id]/page.tsx',
-  '(organization-access)/organizations/[id]/members/page.tsx',
-  '(auth)/invite/accept/route.ts',
-  '(auth)/invite/bootstrap/[pendingId]/route.ts',
-  '(auth)/invite/flow/[flowId]/page.tsx',
-  '(auth)/invite/flow/[flowId]/loading.tsx',
-  '(auth)/invite/unusable/page.tsx',
-  '(organization-access)/organizations/[id]/invites/page.tsx',
-  'auth/callback/route.ts',
-  'layout.tsx',
-  'providers.tsx',
-].map((path) => one(`apps/web/src/app/[locale]/${path}`))
+const topology = [...LOCALE_PURE_MOVES, ...LOCALE_REWRITTEN_MOVES].map((path) =>
+  one(`apps/web/src/app/[locale]/${path}`)
+)
 
 export const localeOwnershipFacts = {
   roots: [dir('apps/web/src/features/locale-switcher')],

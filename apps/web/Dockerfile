@@ -1,12 +1,12 @@
 # ===========================================
 # Base — pinned runtime + package manager
 # ===========================================
-# Node 24 + pnpm 11.1.2 to match the repo's engines/packageManager (the root
+# Node 24 + pnpm 12.14.0 to match the repo's engines/packageManager (the root
 # package.json's `packageManager` drives the corepack version regardless of what
 # is prepared here, so they must agree — a Node 20 base broke pnpm 11).
 FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
 
-RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+RUN corepack enable && corepack prepare pnpm@12.14.0 --activate
 
 # pnpm store in a BuildKit cache mount shared with the api image and every other
 # build on the machine (see apps/api/Dockerfile for the rationale). Not baked
@@ -24,7 +24,7 @@ WORKDIR /app
 # install layer still caches because manifests are copied before sources.
 FROM base AS build
 
-# pnpm 11 may reinstall before scripts after COPY; every install must keep the lockfile frozen.
+# pnpm may reinstall before scripts after COPY; every install must keep the lockfile frozen.
 ENV pnpm_config_frozen_lockfile=true
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -40,6 +40,9 @@ COPY packages ./packages
 COPY apps/web ./apps/web
 # Type checking includes lint contract tests that import the shared CLI helper.
 COPY scripts ./scripts
+# Source-only deployment validation. These files never enter the standalone runner.
+COPY docker/caddy/product-admin.generated.caddy ./docker/caddy/product-admin.generated.caddy
+COPY docker/nginx/product-admin*.conf ./docker/nginx/
 
 RUN pnpm --filter @amcore/shared build
 

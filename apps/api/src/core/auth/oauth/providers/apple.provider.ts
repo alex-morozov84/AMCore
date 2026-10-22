@@ -4,6 +4,7 @@ import type { OAuthTokens, OAuthUserProfile } from '@amcore/shared'
 
 import type { OAuthClientService } from '../oauth-client.service.js'
 
+import { appleVerifiedIdentity } from './apple-identity.js'
 import type { OAuthProvider, OAuthProviderConfig } from './oauth-provider.interface.js'
 
 export interface AppleProviderConfig extends OAuthProviderConfig {
@@ -54,6 +55,7 @@ export class AppleProvider implements OAuthProvider {
         clientSecret,
         this.oauthClient.clientSecretPost()
       )
+      this.oauthClient.enableNonRepudiationChecks(this.config)
     }
     return this.config
   }
@@ -81,34 +83,25 @@ export class AppleProvider implements OAuthProvider {
     const tokens = await this.oauthClient.authorizationCodeGrant(config, callbackUrl, {
       pkceCodeVerifier: codeVerifier,
       expectedState: this.oauthClient.skipStateCheck,
+      idTokenExpected: true,
     })
 
     return {
       accessToken: tokens.access_token ?? '',
       idToken: tokens.id_token,
       expiresIn: tokens.expires_in,
+      verifiedIdentity: appleVerifiedIdentity(tokens.claims()),
     }
   }
 
-  async getUserProfile(tokens: OAuthTokens): Promise<OAuthUserProfile> {
-    const config = await this.getConfig()
-
-    // Apple validates subject via ID token — use fetchUserInfo for OIDC compliance
-    const userInfo = await this.oauthClient.fetchUserInfo(
-      config,
-      tokens.accessToken,
-      this.oauthClient.skipSubjectCheck
-    )
-
-    return {
-      providerId: String(userInfo.sub),
+  getUserProfile(tokens: OAuthTokens): Promise<OAuthUserProfile> {
+    if (!tokens.verifiedIdentity) throw new Error('Verified Apple identity required')
+    return Promise.resolve({
+      ...tokens.verifiedIdentity,
       provider: 'apple',
-      email: (userInfo.email as string) ?? null,
-      // Apple marks email as verified if it's a real Apple ID email
-      emailVerified: (userInfo.email_verified as boolean) ?? false,
-      // Name is only available on first login via form_post body (not in userinfo)
+      // Name is display data from the first form_post, never identity proof.
       displayName: null,
       avatarSourceUrl: null,
-    }
+    })
   }
 }

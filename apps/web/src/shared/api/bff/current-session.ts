@@ -20,9 +20,10 @@ export interface CurrentVaultSession {
  * (already logged out, from this function's point of view).
  */
 export async function getCurrentVaultSession(
-  store: VaultStore = redisVaultStore
+  store: VaultStore = redisVaultStore,
+  cookieName: string = SESSION_COOKIE_NAME
 ): Promise<CurrentVaultSession | null> {
-  const sessionId = (await cookies()).get(SESSION_COOKIE_NAME)?.value
+  const sessionId = (await cookies()).get(cookieName)?.value
   if (!sessionId) return null
 
   const entry = await store.get(sessionId)

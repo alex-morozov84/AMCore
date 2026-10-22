@@ -55,7 +55,13 @@ export function applyProject(root, args) {
 
 export function verifyProjectSteps(root, steps) {
   for (const args of steps) {
-    const result = spawnSync('pnpm', args, { cwd: root, encoding: 'utf8', env: { ...process.env } })
+    const result = spawnSync('pnpm', args, {
+      cwd: root,
+      encoding: 'utf8',
+      // Web tests print large next-intl warnings; the 1 MiB default would kill a passing run.
+      maxBuffer: 256 * 1024 * 1024,
+      env: { ...process.env },
+    })
     if (result.status !== 0)
       throw new Error(`pnpm ${args.join(' ')}: ${result.stdout}${result.stderr}`)
   }
