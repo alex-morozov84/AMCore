@@ -591,8 +591,8 @@ architectural structure.
   the equivalent contract for `apps/api`.
 - `AGENTS.md` → Code conventions — the condensed cross-tool version of the
   rules on this page.
-- [Bundle baseline and budget](./bundle-budget.md) — current per-route client
-  bundle measurements and the deferred CI-budget reopening path.
+- [Route bundle budgets](./bundle-budget.md) — the per-page first-load
+  JavaScript limits CI enforces after every web build.
 
 ### Organization composition capability entries
 

@@ -9,10 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CI fails a change that pushes any web page's first-load JavaScript over its
+  per-page budget (`pnpm check:route-budgets`, also run in generated scaffold
+  variants). The check fails closed when Next's build measurement is incomplete.
+
 - Product-administration adoption guide with shop, CRM/ERP and SaaS recipes,
   clean fork initialization and a cosmic custom interface using public headless operations.
 
 ### Changed
+
+- Public pages are lighter. The Operations Console's translations reach the
+  browser only on Console pages (login HTML about 46 % smaller in English and
+  50 % in Russian), and the monospace font is no longer preloaded on every page.
+- `@amcore/shared` is emitted module by module and declares `"sideEffects": false`,
+  so each page bundles only the contracts it imports (login JavaScript about 6 %
+  smaller). Shared modules must not run side effects when imported.
+- Audit action labels use keys without dots, which removes next-intl
+  `INVALID_KEY` errors from development logs; the missing label for accepted
+  background-work provider uncertainty was added.
 
 - The custom team example uses an independent crew directory and personnel dossier with separate role, key and membership sections.
 - Alerts support optional internal dismissal with an accessible focus destination. Ordinary successful member removal no longer duplicates its toast with a permanent banner.

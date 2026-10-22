@@ -241,6 +241,15 @@ export const operationsConsoleDocSeams = [
     )
   ),
   entry(
+    'console.route-budgets-doc',
+    'docs/frontend/bundle-budget.md',
+    block(
+      '<!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START -->',
+      '<!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_END -->'
+    ),
+    ['AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START']
+  ),
+  entry(
     'console.query-state-doc',
     'docs/frontend/architecture-and-conventions.md',
     block(

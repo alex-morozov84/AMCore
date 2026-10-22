@@ -629,9 +629,8 @@ there are no independent endpoint overrides. See
   layer's contract tests target.
 - [Storybook](./storybook.md) — the fifth pyramid layer added in Track 8:
   component-isolation states and its own accessibility gate.
-- [Bundle baseline and budget](./bundle-budget.md) — the per-route client
-  bundle methodology this verification loop sits alongside, and why it
-  rides on a documented baseline rather than a CI-enforced gate today.
+- [Route bundle budgets](./bundle-budget.md) — the CI check that limits each
+  page's first-load JavaScript, run after every web build.
 
 Invited-registration browser scenarios share one IP in the serial managed real-stack
 lane. Their fixture resets only `ratelimit:v1:invite-register-ip:*` and the matching

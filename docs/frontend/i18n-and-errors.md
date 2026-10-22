@@ -34,6 +34,28 @@ Keys are type-checked against `en.json`, so a typo fails `pnpm typecheck`
 instead of showing up in the browser. A key present in one catalogue but not
 another fails `src/i18n/messages.test.ts`.
 
+A key must not contain `.`: next-intl reads it as nesting and reports
+`INVALID_KEY` on every render. When a key is a data code that contains dots,
+such as an audit action, store it with `_` instead and convert the code when you
+look it up.
+
+### Which messages reach the browser
+
+The root `NextIntlClientProvider` serializes its messages into the HTML of every
+page. To keep public pages light, `src/i18n/client-messages.ts` gives it the whole
+catalogue except the namespaces listed in `src/i18n/route-scoped-namespaces.ts`.
+Server Components still read every namespace through `getTranslations`.
+
+- A client component outside a route-scoped subtree can use any other namespace;
+  nothing else is needed.
+- To make a large namespace route-scoped, add it to the list and render a nested
+  `<NextIntlClientProvider messages={await getMessages()}>` in that subtree's
+  layout. Provider props do not merge, so the nested
+  provider passes the complete catalogue itself.
+- A client component that uses a route-scoped namespace outside its subtree shows
+  raw keys. `e2e/mocked/message-payload.spec.ts` checks that login HTML carries no
+  text unique to a route-scoped namespace.
+
 Never inline user-facing text in a component, including "temporary" strings and
 placeholder copy — an ESLint rule blocks non-ASCII literals, but English
 hardcoded text is just as wrong and only review catches it.
@@ -212,7 +234,8 @@ page would redirect to itself forever in production while working fine under
 | Guard                                        | Catches                                                                      |
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | `pnpm typecheck`                             | A translation key that does not exist in `en.json`                           |
-| `src/i18n/messages.test.ts`                  | Catalogues out of sync, empty values, missing plural categories              |
+| `src/i18n/messages.test.ts`                  | Catalogues out of sync, empty values, missing plurals, `.` inside a key      |
+| `e2e/mocked/message-payload.spec.ts`         | Route-scoped messages leaking into public page HTML                          |
 | `src/shared/api/error-messages.test.ts`      | A shared error code with no translation, or an orphaned message              |
 | `apps/api/.../messages.spec.ts`              | The same, for email copy                                                     |
 | `apps/api/.../frontend-url-coverage.spec.ts` | A backend module building a link from `FRONTEND_URL` without a locale prefix |
