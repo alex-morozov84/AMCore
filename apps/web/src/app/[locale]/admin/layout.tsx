@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages } from 'next-intl/server'
 
 import { hasCanonicalConsoleHost } from '@/shared/lib/console-host-guard'
 import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
@@ -47,7 +49,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <div
       className={`${consoleHeadingFont.variable} ${consoleMonoFont.variable} font-console-heading`}
     >
-      {children}
+      {/* The root provider omits the `console` namespace (i18n/client-messages.ts).
+          Provider props do not merge, so this one passes the complete catalogue. */}
+      <NextIntlClientProvider messages={await getMessages()}>{children}</NextIntlClientProvider>
     </div>
   )
 }
