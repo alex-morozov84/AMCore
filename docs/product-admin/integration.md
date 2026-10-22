@@ -348,8 +348,9 @@ node scripts/fixtures/organization-shop-headless.mjs --projected
 
 The generator preserves the source's selected project choices. Single-locale
 sources mount `/shop-team`; multi-locale sources prefix it with each selected locale.
-The example wraps the same custom member consumer in cosmic presentation, using
-local CSS and product-owned semantic token values. See the
+The shop example independently composes the public organization-context hooks into
+a crew directory, personnel dossier and separate role, key and membership sections.
+Local CSS and product-owned semantic tokens define its appearance. See the
 [adoption guide](adoption.md) for initialization, `--preview`, safe local data and
 [your own appearance](adoption.md#your-own-appearance). It keeps the generic backend
 organization API and compiled setup command when the frontend Console is removed.
