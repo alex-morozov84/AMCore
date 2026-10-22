@@ -329,6 +329,8 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   await expect(page.getByRole('dialog').getByText('Adopter export', { exact: true })).toBeVisible()
   expect(await page.content().then((html) => html.includes(secret))).toBe(false)
   await page.keyboard.press('Escape')
+  // Ordinary removal has no retained key-reader for the membership being removed.
+  await page.reload()
   let deletes = 0
   page.on('request', (r) => {
     if (r.method() === 'DELETE' && r.url().includes('/members/')) deletes++

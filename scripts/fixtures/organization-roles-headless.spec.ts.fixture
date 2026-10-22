@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { DEFAULT_LOCALE, localizedFrontendUrl, productAdminPath } from '@amcore/shared'
-
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'

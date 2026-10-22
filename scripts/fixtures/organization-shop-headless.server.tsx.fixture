@@ -14,7 +14,7 @@ import 'server-only'
 
 // Replace with the immutable organization ID recorded during your trusted setup.
 // This value belongs to server configuration, never a URL, first membership or buyer input.
-const SHOP_ORGANIZATION_ID = 'shop-staff-fixture'
+const SHOP_ORGANIZATION_ID = 'ct063shopstaff00000000000'
 
 async function admitShop() {
   try {

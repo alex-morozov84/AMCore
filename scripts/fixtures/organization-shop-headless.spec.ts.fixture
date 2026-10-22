@@ -54,7 +54,7 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
   const t = catalogues.organizationMembers
   const removal = catalogues.memberRemoval
   const keys = catalogues.memberApiKeys
-  const org = 'shop-staff-fixture'
+  const org = 'ct063shopstaff00000000000'
   expect(
     readFileSync(join(target.snapshot, 'PROJECT_CONTEXT.md'), 'utf8').includes(
       '**admin_console:** disabled'
@@ -153,6 +153,28 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
   await expect(page.locator('#shop-dossier-heading')).toBeFocused()
   await expect(page.getByTestId('shop-directory')).toHaveCount(0)
   await expect(editor.getByRole('checkbox', { name: 'ADMIN', exact: true })).toBeChecked()
+  const example = catalogues.productAdminExample
+  await editor.getByRole('checkbox', { name: 'VIEWER', exact: true }).check()
+  await page.getByRole('tab', { name: example.keys, exact: true }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: example.stay, exact: true })
+    .click()
+  await expect(editor.getByRole('checkbox', { name: 'VIEWER', exact: true })).toBeChecked()
+  await editor.getByRole('button', { name: example.back, exact: true }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: example.discard, exact: true })
+    .click()
+  await expect(row.getByRole('button')).toBeFocused()
+  const search = page.getByRole('textbox', { name: example.search, exact: true })
+  await search.fill('no-such-shop-member')
+  await page.getByRole('button', { name: example.find, exact: true }).click()
+  await expect(page.getByText(example.emptyDirectory, { exact: true })).toBeVisible()
+  await search.fill('')
+  await page.getByRole('button', { name: example.find, exact: true }).click()
+  await row.getByRole('button').click()
+  await expect(editor.getByRole('checkbox', { name: 'VIEWER', exact: true })).not.toBeChecked()
   const mainRefresh = page.getByRole('button', { name: t.refresh, exact: true })
   let primaryFault = false
   let rolesFault = false
@@ -185,7 +207,7 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
   })
   primaryFault = true
   await mainRefresh.click()
-  await expect(row).toHaveCount(0)
+  await expect(page.locator('#shop-dossier-heading')).toBeHidden()
   await expect(editor.getByRole('checkbox')).toHaveCount(0)
   primaryFault = false
   await mainRefresh.click()

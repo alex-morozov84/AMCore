@@ -31,6 +31,7 @@ export function CustomInvitations({
   backHref?: string
   membersHref?: string
   invitationsHref?: string
+  rolesHref?: string
 }) {
   const locale = useLocale()
   const e = useTranslations('productAdminExample')

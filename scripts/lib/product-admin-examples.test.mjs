@@ -143,6 +143,17 @@ test('shop replaces effective palette blocks and preserves fonts and charts', as
     const preserved = (text) => text.split('\n').filter((line) => /--(?:chart-|font-)/.test(line))
     assert.deepEqual(preserved(css), preserved(original))
     assert.notEqual(css, original)
+    const mount = await readFile(
+      join(generated, 'apps/web/src/_app/organization-access/server/shop-team-mount.tsx'),
+      'utf8'
+    )
+    const organization = mount.match(/SHOP_ORGANIZATION_ID = '([^']+)'/)?.[1]
+    assert.match(organization, /^c[a-z0-9]{24}$/)
+    for (const name of [
+      'organization-shop-headless.spec.ts.fixture',
+      'organization-shop-preview.mjs.fixture',
+    ])
+      assert.ok((await read(`scripts/fixtures/${name}`)).includes(`'${organization}'`))
     const ui = join(generated, 'apps/web/src/_pages/shop-team/ui')
     assert.match(await readFile(join(ui, 'shop-team.tsx'), 'utf8'), /ShopOperations/)
     for (const module of ['directory', 'dossier', 'operations', 'roles', 'keys', 'membership'])

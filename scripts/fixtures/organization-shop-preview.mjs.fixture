@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { sql } from './ownership.mjs'
 import { save } from './state.mjs'
 
-const organization = 'shop-staff-fixture'
+const organization = 'ct063shopstaff00000000000'
 const id = (m, label) => `c${createHash('sha256').update(`${m.uuid}:shop:${label}`).digest('hex').slice(0, 24)}`
 
 export async function organizationFixture(m) {

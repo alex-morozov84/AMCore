@@ -391,6 +391,9 @@ entity hooks and the independent settings mount. These operations require no
 organization controller; inventory/revocation survives membership loss. Keep one
 transient page host per binding, with no credential persistence or MutationCache.
 The optional placement `ownApiKeysPath` controls the personal navigation entry.
+Omit that property from your custom placement to hide the entry. This does not
+remove the ready route or revoke API access. Remove the unwanted product-owned
+page separately; retain the shared BFF and member-key consumers you still use.
 Own-key entity, feature and widget roots belong to the product surface, independently
 of Console. Shared catalogue metadata, BFF primitives, translations and route wiring
 retain their explicit consumers when omitting a ready screen.
