@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { clearTimeout, setTimeout } from 'node:timers'
 import { setTimeout as delay } from 'node:timers/promises'
-import { label } from './fixture.mjs'
+import { label } from './docker.mjs'
+import { watchExit } from './exit.mjs'
+import { checkpoint } from './safety.mjs'
 
 export function launch(f, migration) {
   const name = `migrator-lifecycle-${f.run}-${migration.name}`
   f.containers.push(name)
-  f.journal()
+  f.journal() // Durable intent before Docker may create anything.
   const started = performance.now()
   const child = spawn(
     'docker',
@@ -21,7 +22,7 @@ export function launch(f, migration) {
       '--label',
       `${label}=${f.run}`,
       '--network',
-      f.network.getName(),
+      f.network,
       '--env',
       'DATABASE_URL',
       '--mount',
@@ -30,68 +31,47 @@ export function launch(f, migration) {
     ],
     { env: { ...process.env, DATABASE_URL: migration.url }, stdio: ['ignore', 'pipe', 'pipe'] }
   )
-  // Do not retain CLI output that could contain a connection string.
   child.stdout.resume()
   child.stderr.resume()
-  const attempt = { name, child, started }
-  const exited = new Promise((resolve) => {
-    child.once('error', (error) => {
-      attempt.error = error
-      resolve({ error, elapsed: performance.now() - started })
-    })
-    child.once('close', (code, signal) =>
-      resolve({ code, signal, elapsed: performance.now() - started })
-    )
-  })
-  return Object.assign(attempt, { exited })
+  const attempt = Object.assign(
+    watchExit(child, started, () => observeDatabase(f.observer, migration.name)),
+    { name }
+  )
+  const client = { name, pid: child.pid, closed: false }
+  f.clients.push(client)
+  f.journal()
+  void attempt.closed.then(() => {
+    client.closed = true
+  }) // No I/O in the observation window.
+  return attempt
 }
 
 export async function activeSql(f, database, attempt) {
   while (performance.now() - attempt.started < 30000) {
+    checkpoint(f)
     if (attempt.error) throw attempt.error
-    assert.equal(attempt.child.exitCode, null, 'The migrator exited before active SQL')
+    assert.equal(attempt.child.exitCode, null, 'Migrator exited before active SQL')
     const { rows } = await f.observer.query(
-      "SELECT pid FROM pg_stat_activity WHERE datname=$1 AND state='active' AND query LIKE '%pg_sleep(60)%'",
+      `SELECT pid, state, wait_event_type, wait_event FROM pg_stat_activity
+       WHERE datname=$1 AND state='active' AND wait_event_type='Timeout' AND wait_event='PgSleep'`,
       [database]
     )
-    if (rows.length) return
+    if (rows.length) {
+      assert.equal(rows.length, 1, 'Expected exactly one sleeping migration session')
+      return rows[0] // Safe fields, no query text, user or connection URL.
+    }
     await delay(25)
   }
-  throw new Error('The fixture did not observe active pg_sleep(60) before signalling')
+  throw Object.assign(new Error('No confirmed PgSleep'), { code: 'ACTIVE_SQL_TIMEOUT' })
 }
 
-export function owned(f, name) {
-  const [container] = JSON.parse(f.docker(['container', 'inspect', name]))
-  assert.equal(container.Config.Labels[label], f.run, 'Refuse a foreign container')
-  assert.ok(container.NetworkSettings.Networks[f.network.getName()], 'Unexpected container network')
-  return container
-}
-
-export async function naturalExit(attempt) {
-  const remaining = 45000 - (performance.now() - attempt.started)
-  assert.ok(remaining > 0, 'The original 45-second deadline expired')
-  let timer
-  try {
-    const exit = await Promise.race([
-      attempt.exited,
-      new Promise((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error('No natural exit within 45 seconds of attach/start')),
-          remaining
-        )
-      }),
-    ])
-    if (exit.error) throw exit.error
-    return exit
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-export async function remove(f, attempt) {
-  const container = owned(f, attempt.name)
-  // This is diagnostic disposal after verdict, never successful cancellation.
-  if (container.State.Running) f.docker(['container', 'kill', '--signal', 'KILL', container.Id])
-  f.docker(['container', 'rm', container.Id])
-  if (attempt.child.exitCode === null) await attempt.exited
+export async function observeDatabase(observer, database) {
+  const {
+    rows: [observed],
+  } = await observer.query(
+    `SELECT (SELECT count(*)::int FROM pg_stat_activity WHERE datname=$1) AS sessions,
+      (SELECT count(*)::int FROM pg_locks WHERE database=(SELECT oid FROM pg_database WHERE datname=$1)) AS locks`,
+    [database]
+  )
+  return observed
 }

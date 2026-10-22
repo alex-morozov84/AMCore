@@ -569,6 +569,7 @@ jobs:
     env:
       AMCORE_API_IMAGE: amcore-api:smoke
       AMCORE_API_MIGRATOR_IMAGE: amcore-api-migrator:smoke
+      AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-lifecycle.json
       COMPOSE_FILE: docker-compose.yml:.github/compose.boot-smoke.override.yml
       COMPOSE_PROFILES: local-infra
       COMPOSE_PROJECT_NAME: amcore-smoke
@@ -619,6 +620,10 @@ jobs:
 
       - name: Verify native migration cancellation
         run: node scripts/verify-migrator-lifecycle.mjs "$AMCORE_API_MIGRATOR_IMAGE"
+
+      - name: Recover migration verification resources
+        if: always()
+        run: node scripts/cleanup-migrator-lifecycle.mjs "$AMCORE_MIGRATOR_LIFECYCLE_JOURNAL"
 
       - name: Verify npm/npx are absent from the runner image
         run: |

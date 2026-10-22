@@ -267,12 +267,29 @@ node scripts/verify-migrator-lifecycle.mjs amcore-migrator
 ```
 
 This test creates its own PostgreSQL18 Testcontainer and network on the local Unix
-Docker engine. It uses no checkout database URL. The image architecture must match
-the engine architecture. TERM and INT each interrupt active SQL, with transactional
-and nontransactional cases. The original45-second natural-exit deadline and200ms
-session/lock observation remain fixed; diagnostic disposal cannot produce a pass.
+Docker engine. It uses no checkout database URL. The migrator joins only an internal
+fixture network; the host observer uses PostgreSQL's published port separately.
+The image architecture must match the engine architecture. TERM and INT each
+interrupt a confirmed PostgreSQL `PgSleep`, with and without an explicit transaction.
+The original45-second natural-exit deadline and200ms session/lock observation from
+the attached process's `exit` event remain fixed; diagnostic disposal cannot produce a pass.
 This command checks cancellation and transactional rollback. Dependency updates
 also require the broader CLI, roles, TLS, migration-history and recovery checks above.
+The case without an explicit transaction does not prove partial-commit recovery.
+
+The command prints a recovery journal path at startup. It records failures before
+forced disposal and retains the journal when resource cleanup fails. After an
+interrupted command has stopped, retry cleanup with its printed absolute path:
+
+```sh
+node scripts/cleanup-migrator-lifecycle.mjs /absolute/path/to/resources.json
+```
+
+Cleanup checks the recorded run label before removing each resource; it refuses
+foreign resources. CI uses a fixed runner-temporary journal path and an independent
+cleanup step, including when the verification process cannot handle a stop signal.
+Missing journals require no cleanup. A cleanup error remains a failed check;
+it cannot turn the original lifecycle failure into a pass.
 
 ## Security reports and remaining risk
 
