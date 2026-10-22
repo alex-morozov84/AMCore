@@ -17,34 +17,53 @@ import { IntegrationsModule } from './integrations.module.js'
  */
 
 // Your existing module that owns the service the reader needs (a stub for this example).
+interface CrmStatus {
+  enabled: boolean
+  lastOk: boolean
+  finishedAt: Date | null // null until the first sync has finished
+  openTickets: number
+}
 @Injectable()
 class CrmStatusService {
-  lastSyncStatus = (): {
-    enabled: boolean
-    lastOk: boolean
-    finishedAt: Date
-    openTickets: number
-  } => ({
+  status: CrmStatus = {
     enabled: true,
     lastOk: false,
     finishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
     openTickets: 4,
-  })
+  }
+  lastSyncStatus(): CrmStatus {
+    return this.status
+  }
 }
 @Module({ providers: [CrmStatusService], exports: [CrmStatusService] })
 class CrmModule {}
 
 // --- guide code starts ---
+const NOT_MEASURED: IntegrationReading['evidence'] = {
+  result: 'none',
+  freshness: 'none',
+  scope: 'configuration_only',
+  instance: 'shared',
+  checkedAt: null,
+  staleAfterSeconds: null,
+  failure: null,
+}
+
 @Injectable()
 class CrmIntegrationReader implements IntegrationReader {
   constructor(private readonly crm: CrmStatusService) {}
 
   read(): Promise<IntegrationReading> {
     const status = this.crm.lastSyncStatus() // stored, already measured; no call to the CRM
+    const configuration = status.enabled ? 'configured' : 'disabled'
+    if (!status.finishedAt) {
+      // Never measured: report the settings only, with no time.
+      return Promise.resolve({ configuration, evidence: NOT_MEASURED, facts: [], links: [] })
+    }
     const staleAfterSeconds = 900
     const stale = Date.now() - status.finishedAt.getTime() > staleAfterSeconds * 1000
     return Promise.resolve({
-      configuration: status.enabled ? 'configured' : 'disabled',
+      configuration,
       evidence: {
         result: status.lastOk ? 'ok' : 'failed',
         freshness: stale ? 'stale' : 'fresh', // the reader judges age; the page re-judges it while open
@@ -76,11 +95,16 @@ const crm: IntegrationRegistration = {
 // --- guide code ends ---
 
 describe('the registration example of the guide', () => {
-  it('shows a row for the example without any change to the page or the controller', async () => {
+  async function boot() {
     const moduleRef = await Test.createTestingModule({
       imports: [IntegrationsModule.register([crm])],
     }).compile()
     await moduleRef.init()
+    return moduleRef
+  }
+
+  it('shows a row for the example without any change to the page or the controller', async () => {
+    const moduleRef = await boot()
     const response = await moduleRef.get(IntegrationRegistry).list('operator')
     const row = integrationItemSchema.parse(response.items[0])
     expect(response.items).toHaveLength(1)
@@ -94,6 +118,23 @@ describe('the registration example of the guide', () => {
     })
     // A last failed result from yesterday stays failed and is stale; the refresh time is not used.
     expect(row.evidence).toMatchObject({ result: 'failed', freshness: 'stale', failure: 'timeout' })
+    await moduleRef.close()
+  })
+
+  it('reports a never-measured service with the settings only, and no time, on every read', async () => {
+    const moduleRef = await boot()
+    moduleRef.get(CrmStatusService, { strict: false }).status = {
+      enabled: true,
+      lastOk: false,
+      finishedAt: null,
+      openTickets: 0,
+    }
+    const registry = moduleRef.get(IntegrationRegistry)
+    const first = (await registry.list('operator')).items[0]
+    const second = (await registry.list('operator')).items[0]
+    expect(first).toMatchObject({ configuration: 'configured', facts: [], source: 'ok' })
+    expect(first?.evidence).toEqual(NOT_MEASURED)
+    expect(second?.evidence.checkedAt).toBeNull()
     await moduleRef.close()
   })
 

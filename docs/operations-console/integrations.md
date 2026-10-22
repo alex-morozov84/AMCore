@@ -19,7 +19,8 @@ the locale prefix (for example `/en/admin/integrations`).
 One row per integration (one card per integration on a narrow screen). **Data read**
 above the rows is the time the server read them. **Refresh** and **Auto-refresh**
 reload that data every 30 seconds while the tab is visible and online. They never start
-a check and never send an email.
+a check and never send an email. Labels in this guide are the English ones; the Russian
+Console shows translations of the same texts.
 
 | Column         | What it tells you                                                                                                          |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -33,17 +34,29 @@ a check and never send an email.
 
 Each row has one word for scanning. The columns beside it are the facts behind it.
 
-| Headline                      | Meaning                                                                                               |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Cannot read**               | This row could not be read now. The other rows are not affected.                                      |
-| **Off** / **Not set up**      | The module is switched off, or its required settings are missing.                                     |
-| **Set up, not verified**      | Settings exist but nothing has confirmed them. This is the normal state for AI, sign-in and Telegram. |
-| **Working (as last checked)** | The last check succeeded and is still recent. It says nothing about the time after that check.        |
-| **Last check is old**         | The last check succeeded, but longer ago than its freshness limit.                                    |
-| **Failed**                    | The last check failed. The row keeps showing it when the check is old; the age is shown beside it.    |
-| **Outcome unknown**           | A check ran and could not establish whether it worked, for example after a timeout.                   |
-| **Simulated (mock provider)** | The mock provider is in use, so nothing real was sent. It is never shown as working.                  |
-| **Test in progress**          | A test email is still running.                                                                        |
+| Headline                      | Meaning                                                                                                                                               |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cannot read**               | This row could not be read now. The other rows are not affected. Select **Refresh**; if it stays, look in the API server's logs for that integration. |
+| **Off** / **Not set up**      | The module is switched off, or its required settings are missing.                                                                                     |
+| **Set up, not verified**      | Settings exist but nothing has confirmed them. This is the normal state for AI, sign-in and Telegram.                                                 |
+| **Working (as last checked)** | The last check succeeded and is still recent. It says nothing about the time after that check.                                                        |
+| **Last check is old**         | The last check succeeded, but longer ago than its freshness limit.                                                                                    |
+| **Failed**                    | The last check failed. The row keeps showing it when the check is old; the age is shown beside it.                                                    |
+| **Outcome unknown**           | A check ran and could not establish whether it worked, for example after a timeout.                                                                   |
+| **Simulated (mock provider)** | The mock provider is in use, so nothing real was sent. It is never shown as working.                                                                  |
+| **Test in progress**          | A test email is still running.                                                                                                                        |
+
+### Words in the Last check column
+
+| Word                 | Meaning                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Confirmed**        | The last observation succeeded. Its time and where it was taken are shown beside it.                    |
+| **Failed**           | The last observation failed. The safe reason is shown beside it.                                        |
+| **Outcome unknown**  | A check ran and could not establish whether it worked.                                                  |
+| **Simulated**        | The mock provider was used. Nothing real was sent.                                                      |
+| **Not verified**     | Nothing was observed. The row shows the settings only (**Configuration only**).                         |
+| **No stored result** | The email row has no result for the current settings: none was stored, it expired, or settings changed. |
+| **…, old**           | The observation is older than its freshness limit. A failed result stays failed.                        |
 
 ### What each row proves
 
@@ -66,13 +79,22 @@ test result of the platform, which can be another operator's.
 Use it to answer one question: is the configured email provider accepting mail from this
 server right now?
 
+Words used below: the **confirmation** is the dialog in which you agree to send; an
+**attempt** is one test from its confirmation to its result; the **stored result** is the
+result of an attempt as saved on the server.
+
 ### Before you start
 
 - Your account has a verified email address. The test goes only there; you cannot enter
-  another recipient, subject or text.
+  another recipient, subject or text. Without one the button is disabled and says **Your
+  account has no verified email address.** Verify the address through the product's normal
+  email verification (the link sent when the account was created); the Console cannot do it
+  for you.
 - The email provider is not the mock provider in production. In a production deployment
-  with mock email the button is disabled and says why.
-- You can re-enter your password when asked.
+  with mock email the button is disabled and says why. Configure a real provider first; see
+  [Email](../email/README.md).
+- You can re-enter your password when asked. The Console asks when you have not entered it
+  in the last 10 minutes.
 - Your browser is online. Offline, the button is disabled and says why, because the result
   could not be read back.
 
@@ -81,22 +103,36 @@ server right now?
 1. In the **Email** row, select **Send test email**.
 2. Read the confirmation. It shows your address in masked form (for example
    `o***@example.com`). With a real provider it counts toward the provider's limits. With the mock provider (not allowed in production) nothing leaves the server and the result is **Simulated**.
-3. Select **Send test**. Enter your password if the Console asks for it.
+3. Select **Send test**. Enter your password if the Console asks for it. From this moment
+   the email cannot be cancelled. Closing the confirmation before this step sends nothing.
 4. Read the result window.
 
 ### Results
 
-| Result              | What happened                                                                                                                  | Next step                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| **Accepted**        | The provider took the message. This does not prove that it reached an inbox.                                                   | If users still get no mail, check spam folders and the provider's delivery log.                                   |
-| **Simulated**       | The mock provider is in use. Nothing was sent.                                                                                 | Configure a real provider for production.                                                                         |
-| **Refused**         | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected.                  | Check the provider key and the sender address in the mail settings.                                               |
-| **Outcome unknown** | The provider may or may not have accepted the message: no answer in time, a lost connection, or a limit or quota was reported. | Wait a minute and reopen the result. Do not assume the email was not sent. Start a new test only if you need one. |
-| **Did not start**   | The test stopped before anything was sent (for example the audit record could not be written).                                 | Start a new test.                                                                                                 |
+| Result              | What happened                                                                                                                  | Next step                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Accepted**        | The provider took the message. This does not prove that it reached an inbox.                                                   | If users still get no mail, check spam folders and the provider's delivery log.                                                                            |
+| **Simulated**       | The mock provider is in use. Nothing was sent.                                                                                 | Configure a real provider for production.                                                                                                                  |
+| **Refused**         | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected.                  | Check the provider key and the sender address in the mail settings.                                                                                        |
+| **Outcome unknown** | The provider may or may not have accepted the message: no answer in time, a lost connection, or a limit or quota was reported. | Wait a minute and reopen the result. Do not assume the email was not sent. Start a new test only if you need one (it must also pass the one-minute limit). |
+| **Did not start**   | The test stopped before anything was sent (for example the audit record could not be written).                                 | Start a new test.                                                                                                                                          |
 
 The Console never shows the provider's own error text. A reported limit or quota is
 shown as **Outcome unknown** with the note that the provider reported a limit: the
 Console cannot prove from that answer that nothing was accepted.
+
+### When the button is unavailable
+
+| Text under the button                           | Meaning                                          | What to do                                                                     |
+| ----------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| **A test was started a moment ago. (N s)**      | The one-minute limit of one operator.            | Wait N seconds. The button returns by itself; **Refresh** shows the new time.  |
+| **Another test is being sent.**                 | A test is in flight (here or on another server). | Wait, then **Refresh**. Do not try another account or server to get around it. |
+| **Your account has no verified email address.** | See Before you start.                            | Verify the address.                                                            |
+| **Production email is only simulated.**         | Production uses the mock provider.               | Configure a real provider.                                                     |
+| **You are offline.**                            | The result could not be read back.               | Restore the connection.                                                        |
+
+The hourly limit of the platform is not known in advance: the button stays available and
+the attempt ends with **The hourly limit for test emails is reached.** Try again later.
 
 ### Limits
 
@@ -126,7 +162,9 @@ guarantees.
 ### If the connection is lost
 
 If the browser loses the answer, the window says it is checking and reads the stored
-result of the same attempt. It does not send a second email.
+result of the same attempt. It does not send a second email. If you reload the page while
+a test is being sent, nothing is sent again either: open **Last test**, which reads your
+attempt.
 
 **Send test email** only asks the server for a confirmation; nothing is sent yet. While
 your earlier confirmation is still valid and your address and the mail settings are
@@ -137,7 +175,8 @@ reopened result never sends.
 ### Reopen a result
 
 **Last test** reopens your own latest attempt, or the latest result for the platform when
-you have none. It only reads. It never sends. The details of an attempt are kept for
+you have none. The platform's latest result shows the outcome and the time, never who ran
+it. It only reads. It never sends. The details of an attempt are kept for
 24 hours and the latest result for 7 days; after that the row says **No stored
 result**, which is not the same as "never checked". The same text appears if the
 provider key, sender or provider type changed after the test, because an old result

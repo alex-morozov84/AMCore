@@ -16,20 +16,36 @@ You need a module that already owns the service your reader uses. In the example
 1. **Write a reader and a module for it.** The reader is a singleton provider with
    `read(signal)`. It must be quick and free of side effects: no provider call, no email,
    no file write. Return what the module already knows, such as its configuration and the
-   result of a check it ran earlier. The module imports the module that exports the
-   service, provides the reader and exports it.
+   result of a check it ran earlier. If nothing was ever measured, report the settings only,
+   with no time, as the example does (`NOT_MEASURED`). The module imports the module that
+   exports the service, provides the reader and exports it.
 
    ```ts
+   const NOT_MEASURED: IntegrationReading['evidence'] = {
+     result: 'none',
+     freshness: 'none',
+     scope: 'configuration_only',
+     instance: 'shared',
+     checkedAt: null,
+     staleAfterSeconds: null,
+     failure: null,
+   }
+
    @Injectable()
    class CrmIntegrationReader implements IntegrationReader {
      constructor(private readonly crm: CrmStatusService) {}
 
      read(): Promise<IntegrationReading> {
        const status = this.crm.lastSyncStatus() // stored, already measured; no call to the CRM
+       const configuration = status.enabled ? 'configured' : 'disabled'
+       if (!status.finishedAt) {
+         // Never measured: report the settings only, with no time.
+         return Promise.resolve({ configuration, evidence: NOT_MEASURED, facts: [], links: [] })
+       }
        const staleAfterSeconds = 900
        const stale = Date.now() - status.finishedAt.getTime() > staleAfterSeconds * 1000
        return Promise.resolve({
-         configuration: status.enabled ? 'configured' : 'disabled',
+         configuration,
          evidence: {
            result: status.lastOk ? 'ok' : 'failed',
            freshness: stale ? 'stale' : 'fresh', // the reader judges age; the page re-judges it while open
@@ -65,18 +81,21 @@ You need a module that already owns the service your reader uses. In the example
    }
    ```
 
-3. **Add copy (optional).** The page shows the registered `name` and a readable form of
-   each fact key when it has no message. To localize, add keys to
-   `apps/web/messages/en.json` (and every other catalogue) under `console.integrations`:
-   `names.crm_sync`, `fact.open_tickets`, and `failure.<code>` for each failure code your
-   reader returns. Without them an operator sees the English name, a fact such as
-   `open tickets: 4`, and no text for the failure code.
+3. **Add copy (optional).** Add no keys and the page falls back: the registered `name`, a
+   readable form of each fact key (`open tickets: 4`) and no line for the failure code. To
+   localize, add keys under `console.integrations` in `apps/web/messages/en.json` and in
+   every other catalogue (`apps/web/messages/ru.json` in the upstream layout):
+   `names.crm_sync`, `fact.open_tickets`, and `failure.timeout` for each failure code your
+   reader returns. Once you add a key to one catalogue, add it to all of them: a mismatch
+   fails a test.
 
 Restart the API. The integration appears on the page. A test runs this exact example:
 `apps/api/src/core/admin/integrations/integrations-guide-example.spec.ts`.
 
-To remove an optional module, delete its entry from the composition list. A module that
-is not in the list has no row and is not imported by the Console.
+To remove an optional integration, delete its entry from the composition list and restart
+the API. It then has no row and the Console no longer imports `CrmIntegrationModule`. Your
+own module (`CrmModule`) is not touched and keeps working; delete the reader files and the
+messages yourself if you no longer need them.
 
 ## The reading contract
 
@@ -95,20 +114,22 @@ breaks the contract shows the row as **Cannot read** and never reaches the brows
 The pattern only keeps the shape of a fact safe. It does not decide what is safe to show:
 a 32-letter API key matches it. Never return a secret, token or address as a fact.
 
-The registry allows at most 32 integrations and gives each row 1.5 seconds, reader and
-probe action together. One failing or slow reader never hides the others.
+The registry allows at most 32 integrations and gives each row 1.5 seconds, the reader and
+the probe `action` together. `action` only reports whether the button may be used (a cheap
+read); the send itself, `run`, has its own deadline from the policy. One failing or slow
+reader never hides the others. A negative or fractional number is not a valid fact.
 
 ### Evidence
 
-| Field               | Values                                                                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `result`            | `none` (nothing observed for the current configuration), `ok`, `failed`, `unknown` (a check ran and its outcome is not established), `simulated`. |
-| `freshness`         | `none`, `fresh`, `stale`. A `failed` result stays `failed` when it is stale.                                                                      |
-| `scope`             | `private_file_write_read_delete`, `broker_read`, `provider_acceptance`, `provider_request` or `configuration_only`.                               |
-| `instance`          | `answering_instance` (only the API server that answered) or `shared`.                                                                             |
-| `checkedAt`         | The time of the observation, or `null`. Never the time the page was read.                                                                         |
-| `staleAfterSeconds` | How long the observation stays recent. The page re-judges it while it stays open.                                                                 |
-| `failure`           | A closed code, or `null`. Never an error message.                                                                                                 |
+| Field               | Values                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `result`            | `none` (nothing observed for the current configuration), `ok`, `failed`, `unknown` (a check ran and its outcome is not established), `simulated`.                                    |
+| `freshness`         | `none`, `fresh`, `stale`. A `failed` result stays `failed` when it is stale.                                                                                                         |
+| `scope`             | `private_file_write_read_delete`, `broker_read`, `provider_acceptance`, `provider_request` or `configuration_only`.                                                                  |
+| `instance`          | `answering_instance` (only the API server that answered) or `shared`.                                                                                                                |
+| `checkedAt`         | The time of the observation, or `null`. Never the time the page was read.                                                                                                            |
+| `staleAfterSeconds` | How long the observation stays recent. The page re-judges it while it stays open.                                                                                                    |
+| `failure`           | A short lowercase code (`^[a-z][a-z0-9_]{0,31}$`) of your choosing, or `null`. There is no fixed list: add a `failure.<code>` message for each code you use. Never an error message. |
 
 A configuration-only integration reports `result: 'none'` and `checkedAt: null`. Do not
 give it a time: a refresh must not make a configuration look verified. A new scope is a
@@ -120,18 +141,49 @@ A probe is an action the operator starts. v1 supports one kind, `operator_email_
 which sends a fixed message to the operator's own verified address. A registration
 cannot supply a recipient, URL, subject, text or command. To add a new kind, add it to
 `INTEGRATION_PROBE_KINDS` in `packages/shared`, with its copy, its admission strategy and
-its limits in `integration-validation.ts`. The kind selects the dialog text and the receipt
+its limits in `integration-validation.ts`. The **admission strategy** is the code that
+decides whether a test may start: cooldown, hourly cap, one test in flight, and the audit
+record before the send; for the email test it is `EmailTestStore` and `EmailTestProbe`. The
+kind selects the dialog text and the receipt
 wording. This is a reviewed change, not configuration. Pointing a new idea, for example an
 arbitrary URL, at an existing kind does not create a new kind.
 
+The probe is a field of the integration's entry in `INTEGRATIONS`:
+
+```ts
+{
+  id: 'crm_sync',
+  name: 'CRM sync',
+  module: CrmIntegrationModule,
+  reader: CrmIntegrationReader,
+  probe: {
+    id: 'crm_email_test',
+    kind: 'operator_email_test',
+    policy: { deadlineMs: 8_000, operatorCooldownSeconds: 120, platformPerHour: 10, leaseSeconds: 30 },
+    port: CrmEmailTestPort, // a provider of the module above
+  },
+}
+```
+
+The port implements this interface (`apps/api/src/core/admin/integrations/integration.types.ts`):
+
+```ts
+interface IntegrationProbePort {
+  action(actorId: string): Promise<IntegrationAction> // may the button be used now, and why not
+  prepare(actorId: string): Promise<ProbePreparation> // issue a single-use attempt id; sends nothing
+  run(actorId: string, attemptId: string, policy: IntegrationProbePolicy): Promise<ProbeReceipt>
+  receiptFor(actorId: string, attemptId: string): Promise<ProbeReceipt> // read-only recovery
+}
+```
+
 A probe registration needs every field, and startup fails without them:
 
-| Field    | Rule                                                                                                                                                          |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`     | A slug, unique for the integration.                                                                                                                           |
-| `kind`   | A member of `INTEGRATION_PROBE_KINDS`.                                                                                                                        |
-| `policy` | Whole numbers: `deadlineMs` up to 30 000; `operatorCooldownSeconds` at least 30; `platformPerHour` 1 to 60; `leaseSeconds` at least `deadlineMs / 1000 + 20`. |
-| `port`   | A provider implementing `action`, `prepare`, `run` and `receiptFor`.                                                                                          |
+| Field    | Rule                                                                                                                                                                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`     | A slug, unique for the integration.                                                                                                                                                                                                                                    |
+| `kind`   | A member of `INTEGRATION_PROBE_KINDS`.                                                                                                                                                                                                                                 |
+| `policy` | Whole numbers: `deadlineMs` up to 30 000; `operatorCooldownSeconds` at least 30; `platformPerHour` 1 to 60; `leaseSeconds` at least `deadlineMs / 1000 + 20`. These are the general bounds. Your kind has a stricter ceiling (next section); the stricter one applies. |
+| `port`   | A provider implementing `action`, `prepare`, `run` and `receiptFor`.                                                                                                                                                                                                   |
 
 ### How the policy is applied
 
@@ -154,10 +206,14 @@ defect that review and the port's own tests must catch. Use the email test as th
 Startup fails with a clear message for: a bad or duplicate id, a name over 48 characters,
 a missing reader, two registrations that share a reader, a probe with a missing field, an
 unknown probe kind, and a policy that is not made of finite whole numbers or is looser than
-its kind allows. Disabled registrations are checked too. After all modules start, the
-registry resolves each reader and each probe port, compares the instance with its declared
-class, and checks that the reader has `read` and the port has `action`, `prepare`, `run` and
-`receiptFor`.
+its kind allows. Disabled registrations are checked too.
+
+The check has two stages. When the registry is created, it validates the registrations
+above. After all modules have started, it resolves each reader and each probe port, compares
+the instance with its declared class, and checks that the reader has `read` and the port
+has `action`, `prepare`, `run` and `receiptFor`. A failure in either stage stops the API
+from starting; it does not only mark one row. A reading that breaks the schema later, when
+the page is read, only turns that row into **Cannot read**.
 
 ## Test your registration
 
@@ -172,8 +228,9 @@ pnpm --filter api test -- src/core/admin/integrations
 
 ## Rules to keep
 
-- A reader never calls the service. Run checks elsewhere and let the reader report their
-  stored result.
+- A reader never calls the service. Run the check elsewhere and let the reader report its
+  stored result: a scheduled job (see [Scheduled jobs](scheduled-jobs.md)), a worker, or your
+  service after each sync. The reader only reads what they stored.
 - Never put a key, token, URL, address or provider message into a reading, a log or an
   audit record.
 - Give every observation a real `checkedAt`. If you cannot, report `none`.
