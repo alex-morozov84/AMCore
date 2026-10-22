@@ -6,7 +6,8 @@ const state = vi.hoisted(() => ({ messages: {} as AbstractIntlMessages }))
 vi.mock('server-only', () => ({}))
 vi.mock('next-intl/server', () => ({ getMessages: async () => state.messages }))
 
-import { getClientMessages, ROUTE_SCOPED_NAMESPACES } from './client-messages'
+import { getClientMessages } from './client-messages'
+import { ROUTE_SCOPED_NAMESPACES } from './route-scoped-namespaces'
 
 describe('getClientMessages', () => {
   it.each(SUPPORTED_LOCALES)(

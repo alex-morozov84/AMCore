@@ -156,7 +156,7 @@ export const operationsConsoleCodeSeams = [
   ),
   seam(
     'console.client-messages',
-    'apps/web/src/i18n/client-messages.ts',
+    'apps/web/src/i18n/route-scoped-namespaces.ts',
     'owned-block',
     {
       start: '// AMCORE_CONSOLE_CLIENT_MESSAGES_START',
