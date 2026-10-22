@@ -98,6 +98,10 @@ permits in-memory recovery but limits recovery after reload. Accepted-operation
 proofs remain available for 30 days; recovery reports removed access without
 rejoining. See [API limits, security and recovery](../auth/invites.md).
 
+For a clean product setup and custom-consumer generation, follow the
+[adoption guide](adoption.md). Default generators preserve selected project choices;
+`--projected` is a pristine-upstream demonstration, not another initialization step.
+
 ## Reuse with your own design
 
 The ready route uses `OrganizationInvitationsMount` from

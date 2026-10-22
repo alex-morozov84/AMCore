@@ -33,6 +33,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 ## Start here
 
+- Connecting administration to a product → [Adoption recipes and custom styling](../product-admin/adoption.md)
+
 - Designing or reviewing a user journey → [Short UI/UX checklist](./ux-checklist.md)
 
 [Organization creation and initial setup](../product-admin/organization-establishment.md) — ready and headless journeys, recovery and fixed shops.

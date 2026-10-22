@@ -3,6 +3,12 @@ import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/shared/lib/utils'
 
+import { DismissibleAlert } from './alert-dismissible'
+
+type DismissalProps =
+  | { showCloseButton?: false; closeLabel?: never; dismissFocusTargetId?: never }
+  | { showCloseButton: true; closeLabel: string; dismissFocusTargetId: string }
+
 const alertVariants = cva(
   'relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current',
   {
@@ -28,8 +34,21 @@ const alertVariants = cva(
 function Alert({
   className,
   variant,
+  showCloseButton = false,
+  closeLabel,
+  dismissFocusTargetId,
   ...props
-}: React.ComponentProps<'div'> & VariantProps<typeof alertVariants>) {
+}: React.ComponentProps<'div'> & VariantProps<typeof alertVariants> & DismissalProps) {
+  if (showCloseButton)
+    return (
+      <DismissibleAlert
+        role="alert"
+        {...props}
+        className={cn(alertVariants({ variant }), className, 'pr-14')}
+        closeLabel={closeLabel!}
+        dismissFocusTargetId={dismissFocusTargetId!}
+      />
+    )
   return (
     <div
       data-slot="alert"

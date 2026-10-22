@@ -1,0 +1,341 @@
+.station {
+  min-height: 100dvh;
+  color: var(--foreground);
+  background: var(--background);
+  padding: clamp(1rem, 4vw, 4rem);
+}
+
+.frame {
+  max-width: 80rem;
+  margin-inline: auto;
+}
+
+.missionHeading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--foreground);
+}
+
+.stationName,
+.eyebrow,
+.rolePreview,
+.openDossier {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.stationName {
+  font-weight: 700;
+}
+
+.stationDescription,
+.email {
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.stationDescription {
+  font-size: 0.875rem;
+}
+
+.directoryHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 3rem 2rem;
+}
+
+.directoryHeading h1 {
+  font-size: clamp(3.5rem, 10vw, 8rem);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.06em;
+}
+
+.search {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 40rem;
+  margin-bottom: 2.5rem;
+}
+
+.directory {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 1px;
+  background: var(--border);
+  list-style: none;
+  margin-block: 2rem;
+}
+
+.personTile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
+  min-height: 21rem;
+  padding: 2rem;
+  background: var(--card);
+  color: var(--card-foreground);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.personTile:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.personTile:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: -4px;
+}
+
+.personTile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.seal,
+.identitySeal {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.seal {
+  width: 3rem;
+  height: 3rem;
+}
+
+.personName {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+
+.rolePreview {
+  color: var(--muted-foreground);
+}
+
+.openDossier {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.openDossier span {
+  font-size: 1.5rem;
+}
+
+.dossier {
+  padding-top: 2rem;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  padding-block: 3rem;
+}
+
+.identitySeal {
+  width: 8rem;
+  height: 8rem;
+  font-size: 2rem;
+}
+
+.identity h1 {
+  font-size: clamp(2.5rem, 7vw, 6rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+  overflow-wrap: anywhere;
+}
+
+.eyebrow {
+  color: var(--muted-foreground);
+  margin-bottom: 1rem;
+}
+
+.sections {
+  border-radius: 0;
+  border-block: 1px solid var(--line-strong);
+  background: transparent;
+  padding: 0;
+  gap: 0;
+}
+
+.sections [data-slot='tabs-trigger'] {
+  border-radius: 0;
+  padding: 1rem;
+}
+
+.workSection {
+  min-height: 18rem;
+  padding-block: 2.5rem;
+}
+
+.workSection:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+
+.workSection h2 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+}
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-block: 2rem;
+}
+
+.roleTile {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--card);
+  color: var(--card-foreground);
+}
+
+.roleTile:has([data-checked]) {
+  border-color: var(--ring);
+  background: var(--selection);
+  color: var(--selection-foreground);
+}
+
+.roleDescription {
+  display: block;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.actionStrip {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  margin-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.keyRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-block: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.keyStatus {
+  color: var(--muted-foreground);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.875rem;
+}
+
+.membership {
+  max-width: 44rem;
+  display: grid;
+  justify-items: start;
+  gap: 1.5rem;
+}
+
+.empty {
+  padding-block: 3rem;
+  color: var(--muted-foreground);
+}
+
+.station [data-slot='button'] {
+  border-radius: 0;
+  min-height: 2.75rem;
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  overflow-wrap: anywhere;
+  padding-block: 0.5rem;
+}
+
+.station [data-slot='input'] {
+  border-radius: 0;
+  min-height: 2.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personTile {
+    transition: none;
+  }
+}
+
+@media (width <= 60rem) {
+  .directory {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width <= 40rem) {
+  .directory,
+  .roleGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .personTile {
+    min-height: 18rem;
+    padding: 1.5rem;
+  }
+
+  .identity {
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .identitySeal {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1rem;
+  }
+
+  .identity > div {
+    min-width: 0;
+  }
+
+  .sections {
+    flex-wrap: wrap;
+  }
+
+  .sections [data-slot='tabs-trigger'] {
+    padding: 0.75rem;
+    min-width: 5rem;
+  }
+
+  .actionStrip {
+    flex-direction: column;
+  }
+}

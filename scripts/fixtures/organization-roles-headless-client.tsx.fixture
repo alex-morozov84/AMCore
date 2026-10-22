@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useLocale } from 'next-intl'
-import type { ProductAccessBootstrap } from '@amcore/shared'
+import { type ReactNode, useEffect, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import type { ProductAccessBootstrap, RoleDefinitionPreset } from '@amcore/shared'
 
 import {
   type OrganizationAccessController,
@@ -13,54 +13,136 @@ import {
   useRoleDefinitions,
 } from '@/entities/organization-context'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { Input } from '@/shared/ui/input'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+import { Skeleton } from '@/shared/ui/skeleton'
 
-// A deliberately different presentation: one flat list, a create field and an inline editor.
-// It imports ONLY the entity's public headless API, never a ready widget, page or shell.
-// Rule: `ready` is controller authority; `available` means THIS resource's current read succeeded.
-// Cached rows, the editor and every command are gated on `available`, never on `ready` alone.
-export function CustomRoles({ admission, id }: { admission: ProductAccessBootstrap; id: string }) {
+export function CustomRoles({
+  admission,
+  organizationId,
+}: {
+  admission: ProductAccessBootstrap
+  organizationId: string
+  deniedContent?: ReactNode
+  initialOrganizationName?: string
+  query?: unknown
+  listHref?: string
+  hrefs?: unknown
+}) {
   const locale = useLocale()
-  const context = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
-  const roles = useRoleDefinitions(context.controller, { page: 1, search: '' })
-  const creation = useCreateRoleDefinition(context.controller)
+  const t = useTranslations('organizationRoles')
+  const e = useTranslations('productAdminExample')
+  const access = useOrganizationContext(admission.binding, {
+    kind: 'selected',
+    id: organizationId,
+    locale,
+  })
+  const roles = useRoleDefinitions(access.controller, { page: 1, search: '' })
+  const creation = useCreateRoleDefinition(access.controller)
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<string>()
-  const [notice, setNotice] = useState('')
+  const [editorLocked, setEditorLocked] = useState(false)
+  const [notice, setNotice] = useState<string>()
+  const [error, setError] = useState<unknown>()
+  const [unknown, setUnknown] = useState(false)
+  const available = access.state.status === 'ready' && roles.available
+  const sameSession = !['missing', 'changed'].includes(access.state.status)
   async function create() {
-    const outcome = await creation.create({ name })
-    setNotice(`create:${outcome.status}`)
-    if (outcome.status === 'committed') {
+    if (!available || creation.busy || unknown || editorLocked || !name.trim()) return
+    const result = await creation.create({ name })
+    if (result.status === 'committed') {
       setName('')
-      setSelected(outcome.result.role.id)
-    }
+      setSelected(result.result.role.id)
+      setNotice(t('saved'))
+    } else if (result.status === 'unknown') {
+      setUnknown(true)
+      setNotice(t('createUnknown'))
+    } else if (result.status === 'rejected') setError(result.error)
   }
   return (
-    <section data-testid="custom-headless-roles">
-      <h1>Custom roles</h1>
-      <p role="status">{notice}</p>
-      <ApiErrorAlert error={context.state.error ?? roles.error} />
-      <input aria-label="New role name" value={name} onChange={(e) => setName(e.target.value)} />
-      <button disabled={!roles.available || creation.busy} onClick={() => void create()}>
-        Create role
-      </button>
-      {!roles.available && roles.ready && (
-        <button onClick={() => void roles.refresh().catch(() => undefined)}>Reload roles</button>
+    <section className="space-y-6" data-testid="custom-headless-roles">
+      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+      <p>{e('bounded')}</p>
+      <ApiErrorAlert error={access.state.error ?? roles.error ?? error} />
+      {sameSession && notice && <p role="status">{notice}</p>}
+      {access.state.status === 'missing' && (
+        <RouteProgressLink href="/login">{e('signIn')}</RouteProgressLink>
       )}
-      <ul>
-        {roles.available &&
-          roles.data?.data.map((role) => (
-            <li key={role.id}>
-              <button onClick={() => setSelected(role.id)}>{role.name}</button>
-              <span> holders:{role.holderCount}</span>
-            </li>
-          ))}
-      </ul>
+      {access.state.status === 'changed' && (
+        <Button onClick={() => window.location.reload()}>{e('reload')}</Button>
+      )}
+      {!available && sameSession && (
+        <Button
+          disabled={access.busy || Boolean(roles.retryAt)}
+          onClick={() => void access.refresh().catch(() => undefined)}
+        >
+          {t('retry')}
+        </Button>
+      )}
+      {available && (
+        <>
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void create()
+            }}
+          >
+            <label>
+              {t('nameLabel')}
+              <Input
+                value={name}
+                disabled={creation.busy || unknown || editorLocked}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <Button type="submit" disabled={creation.busy || unknown || editorLocked || !name.trim()}>
+              {t('create')}
+            </Button>
+          </form>
+          {unknown && (
+            <Button
+              onClick={async () => {
+                if (await roles.refresh().catch(() => undefined)) {
+                  setUnknown(false)
+                  setNotice(undefined)
+                }
+              }}
+            >
+              {t('reviewCurrent')}
+            </Button>
+          )}
+          <ul className="space-y-3">
+            {roles.data?.data.map((role) => (
+              <li key={role.id} className="flex items-center gap-3">
+                <Button
+                  variant={selected === role.id ? 'selection-soft' : 'outline'}
+                  disabled={editorLocked}
+                  onClick={() => setSelected(role.id)}
+                >
+                  {role.name}
+                </Button>
+                <span>{t('holdersCount', { count: role.holderCount })}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {selected && (
         <Editor
-          key={`${admission.binding}:${id}:${selected}`}
-          controller={context.controller}
+          key={`${admission.binding}:${organizationId}:${selected}`}
+          controller={access.controller}
           roleId={selected}
-          onGone={() => setSelected(undefined)}
+          visible={available}
+          sameSession={sameSession}
+          onLock={setEditorLocked}
+          onGone={() => {
+            setSelected(undefined)
+            setNotice(t('deletedToast'))
+          }}
         />
       )}
     </section>
@@ -70,83 +152,179 @@ export function CustomRoles({ admission, id }: { admission: ProductAccessBootstr
 function Editor({
   controller,
   roleId,
+  visible,
+  sameSession,
   onGone,
+  onLock,
 }: {
   controller: OrganizationAccessController
   roleId: string
+  visible: boolean
+  sameSession: boolean
   onGone: () => void
+  onLock: (locked: boolean) => void
 }) {
+  const t = useTranslations('organizationRoles')
+  const e = useTranslations('productAdminExample')
   const role = useRoleDefinition(controller, roleId)
   const catalogue = useCapabilityCatalogue(controller)
-  // A draft belongs to one complete identity (session, organization, role) and one snapshot revision.
-  const [draft, setDraft] = useState<{ revision: number; keys: string[] }>()
-  const [notice, setNotice] = useState('')
-  // Only a current, successful read is an authoritative snapshot; stale data is never presented.
-  const snapshot = role.available ? role.data : undefined
-  const saved = snapshot?.managedPresets?.map((p) => `${p.capabilityId}:${p.presetId}`) ?? []
-  const current = draft && draft.revision === snapshot?.aclVersion ? draft.keys : saved
-  const editable = snapshot?.editMode === 'editable'
+  const [draft, setDraft] = useState<{ revision: number; presets: RoleDefinitionPreset[] }>()
+  const [notice, setNotice] = useState<string>()
+  const [error, setError] = useState<unknown>()
+  const [unknown, setUnknown] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const [discard, setDiscard] = useState(false)
+  useEffect(() => {
+    onLock(role.busy || unknown)
+    return () => onLock(false)
+  }, [role.busy, unknown, onLock])
+  const snapshot = visible && role.available ? role.data : undefined
+  const current = draft?.presets ?? snapshot?.managedPresets ?? []
+  const revisionCurrent = !draft || draft.revision === snapshot?.aclVersion
+  const fullControl = current.some((preset) => preset.capabilityId === 'teamAccess.manage')
+  const safe =
+    snapshot?.editMode === 'editable' &&
+    snapshot.holders.total === 0 &&
+    snapshot.impact.liveInvitationCount === 0 &&
+    !snapshot.selfHeld &&
+    !snapshot.grantsFullControl &&
+    snapshot.advancedRules?.length === 0 &&
+    !fullControl
+  const editable = Boolean(safe && catalogue.available && revisionCurrent && !role.busy && !unknown)
+  async function review() {
+    if (await role.refresh().catch(() => undefined)) {
+      setDraft(undefined)
+      setUnknown(false)
+      setNotice(undefined)
+      setError(undefined)
+    }
+  }
   async function save() {
-    if (!snapshot || !editable) return
+    if (!snapshot || !editable || !draft) return
     const outcome = await role.save({
       expectedAclVersion: snapshot.aclVersion,
       name: snapshot.role.name,
       description: snapshot.role.description,
-      presets: current.map((key) => {
-        const [capabilityId, presetId] = key.split(':')
-        return { capabilityId, presetId } as never
-      }),
+      presets: current,
     })
-    setNotice(`save:${outcome.status}`)
-    if (outcome.status === 'committed') setDraft(undefined)
+    if (outcome.status === 'committed') {
+      setNotice(outcome.followup === 'ready' ? t('saved') : t('savedAccessChanged'))
+      setDraft(undefined)
+    } else if (outcome.status === 'unknown') {
+      setUnknown(true)
+      setNotice(t('saveUnknown'))
+    } else if (outcome.status === 'rejected') setError(outcome.error)
   }
   async function remove() {
-    if (!snapshot) return
+    if (!snapshot || !editable) return
     const outcome = await role.remove({
       expectedAclVersion: snapshot.aclVersion,
-      expectedLiveInvitationCount: snapshot.impact.liveInvitationCount,
+      expectedLiveInvitationCount: 0,
     })
-    setNotice(`delete:${outcome.status}`)
     if (outcome.status === 'committed') onGone()
+    else if (outcome.status === 'unknown') {
+      setUnknown(true)
+      setNotice(t('saveUnknown'))
+    } else if (outcome.status === 'rejected') setError(outcome.error)
   }
   return (
-    <section data-testid="custom-headless-editor">
-      <ApiErrorAlert error={role.error ?? catalogue.error} />
-      <p role="status">{notice}</p>
-      {!snapshot && role.ready && (
-        <button onClick={() => void role.refresh().catch(() => undefined)}>Reload role</button>
-      )}
-      {snapshot && (
+    <section className="space-y-4 rounded-lg border p-4" data-testid="custom-headless-editor">
+      {sameSession && notice && <p role="status">{notice}</p>}
+      {visible && (
         <>
-          <h2>{snapshot.role.name}</h2>
-          {catalogue.available &&
-            catalogue.data?.capabilities
-              .filter((c) => c.presets.includes('own'))
-              .map((c) => {
-                const key = `${c.id}:own`
-                return (
-                  <label key={key}>
-                    <input
-                      type="checkbox"
-                      checked={current.includes(key)}
-                      disabled={!editable || role.busy}
-                      onChange={(e) =>
-                        setDraft({
-                          revision: snapshot.aclVersion,
-                          keys: e.target.checked ? [...current, key] : current.filter((k) => k !== key),
-                        })
-                      }
-                    />
-                    {c.id}
-                  </label>
-                )
-              })}
-          <button disabled={!editable || role.busy} onClick={() => void save()}>
-            Save role
-          </button>
-          <button disabled={role.busy} onClick={() => void remove()}>
-            Delete role
-          </button>
+          <ApiErrorAlert error={role.error ?? catalogue.error ?? error} />
+          {!snapshot && role.pending && <Skeleton className="h-24 w-full" />}
+          {(!snapshot || unknown || !revisionCurrent) && (
+            <Button
+              disabled={role.busy || Boolean(role.retryAt)}
+              onClick={() => {
+                if (draft) setDiscard(true)
+                else void review()
+              }}
+            >
+              {t('reload')}
+            </Button>
+          )}
+          <ConfirmDialog
+            open={discard}
+            onOpenChange={setDiscard}
+            title={t('leaveTitle')}
+            description={t('leaveBody')}
+            confirmLabel={t('discard')}
+            cancelLabel={t('leaveStay')}
+            onConfirm={() => void review()}
+          />
+          {snapshot && (
+            <>
+              <h2 className="font-semibold">{snapshot.role.name}</h2>
+              {!safe && <p>{e('roleSampleLimit')}</p>}
+              {!revisionCurrent && <p role="status">{t('conflict')}</p>}
+              {catalogue.available &&
+                catalogue.data?.capabilities.map((capability) => (
+                  <fieldset
+                    key={capability.id}
+                    disabled={!editable && capability.id !== 'teamAccess.manage'}
+                    className="space-y-2"
+                  >
+                    <legend>{capability.id}</legend>
+                    {capability.presets.map((presetId) => (
+                      <label key={presetId} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={current.some(
+                            (p) => p.capabilityId === capability.id && p.presetId === presetId
+                          )}
+                          disabled={
+                            role.busy ||
+                            unknown ||
+                            !snapshot ||
+                            snapshot.editMode !== 'editable' ||
+                            capability.id === 'teamAccess.manage' ||
+                            !revisionCurrent
+                          }
+                          onCheckedChange={(checked) =>
+                            setDraft({
+                              revision: snapshot.aclVersion,
+                              presets: checked
+                                ? [...current, { capabilityId: capability.id, presetId }]
+                                : current.filter(
+                                    (p) =>
+                                      p.capabilityId !== capability.id || p.presetId !== presetId
+                                  ),
+                            })
+                          }
+                        />
+                        {t(`levels.${presetId}`)}
+                      </label>
+                    ))}
+                  </fieldset>
+                ))}
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={!editable || !draft} onClick={() => void save()}>
+                  {t('save')}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={role.busy || !draft}
+                  onClick={() => setDiscard(true)}
+                >
+                  {t('cancel')}
+                </Button>
+                <Button variant="outline" disabled={!editable} onClick={() => setConfirm(true)}>
+                  {t('delete')}
+                </Button>
+              </div>
+              <ConfirmDialog
+                open={confirm && editable}
+                onOpenChange={setConfirm}
+                title={t('deleteTitle')}
+                description={t('deleteNone')}
+                confirmLabel={t('deleteConfirm')}
+                cancelLabel={t('cancel')}
+                variant="destructive"
+                onConfirm={() => void remove()}
+              />
+            </>
+          )}
         </>
       )}
     </section>

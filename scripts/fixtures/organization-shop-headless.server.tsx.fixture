@@ -2,7 +2,10 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 
 import { ShopTeam } from '@/_pages/shop-team'
-import { readOrganizationBootstrap, readOrganizationContext } from '@/entities/organization-context/index.server'
+import {
+  readOrganizationBootstrap,
+  readOrganizationContext,
+} from '@/entities/organization-context/index.server'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import { SessionNotFoundError } from '@/shared/api/bff/errors'
@@ -11,17 +14,24 @@ import 'server-only'
 
 // Replace with the immutable organization ID recorded during your trusted setup.
 // This value belongs to server configuration, never a URL, first membership or buyer input.
-const SHOP_ORGANIZATION_ID = 'shop-staff-fixture'
+const SHOP_ORGANIZATION_ID = 'ct063shopstaff00000000000'
 
 async function admitShop() {
   try {
     const source = await headers()
     const admission = await readOrganizationBootstrap(source)
-    const context = await readOrganizationContext(SHOP_ORGANIZATION_ID, { headers: source, expectedSession: admission.binding })
+    const context = await readOrganizationContext(SHOP_ORGANIZATION_ID, {
+      headers: source,
+      expectedSession: admission.binding,
+    })
     if (!context.data.canManageTeamAccess) notFound()
     return admission
   } catch (error) {
-    if (error instanceof SessionNotFoundError || (error instanceof ContextRequestError && error.status === 401)) return redirectToLogin()
+    if (
+      error instanceof SessionNotFoundError ||
+      (error instanceof ContextRequestError && error.status === 401)
+    )
+      return redirectToLogin('/login')
     if (error instanceof ContextRequestError && [403, 404].includes(error.status)) notFound()
     throw error
   }

@@ -1,0 +1,172 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import type { MemberRolesResponse } from '@amcore/shared'
+
+import {
+  type MemberRemovalTarget,
+  type OrganizationAccessController,
+  useMemberRoleAssignments,
+} from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { Skeleton } from '@/shared/ui/skeleton'
+
+import styles from './shop-team.module.css'
+
+export function ShopRoles({
+  controller,
+  target,
+  actorId,
+  visible,
+  sameSession,
+  onLock,
+  onDirty,
+}: {
+  controller: OrganizationAccessController
+  target: MemberRemovalTarget
+  actorId: string
+  visible: boolean
+  sameSession: boolean
+  onDirty: (dirty: boolean) => void
+  onLock: (locked: boolean) => void
+}) {
+  const t = useTranslations('organizationMembers')
+  const roles = useMemberRoleAssignments(controller, {
+    userId: target.userId,
+    page: 1,
+    search: '',
+    section: 'available',
+  })
+  const [snapshot, setSnapshot] = useState<MemberRolesResponse>()
+  const [draft, setDraft] = useState<string[]>()
+  const [ack, setAck] = useState(false)
+  const [discard, setDiscard] = useState(false)
+  const [notice, setNotice] = useState<'saved' | 'savedUnavailable' | 'unknown'>()
+  const [error, setError] = useState<unknown>()
+  useEffect(() => {
+    onLock(roles.busy || notice === 'unknown')
+    return () => onLock(false)
+  }, [roles.busy, notice, onLock])
+  // Capture the first admitted revision; subsequent revisions require explicit review.
+  if (!snapshot && roles.available && roles.data?.member.memberId === target.memberId)
+    setSnapshot(roles.data)
+  const selected = draft ?? snapshot?.assignedRoles?.map((role) => role.id) ?? []
+  const original = snapshot?.assignedRoles?.map((role) => role.id) ?? []
+  const dirty = selected.length !== original.length || selected.some((id) => !original.includes(id))
+  useEffect(() => {
+    onDirty(dirty)
+  }, [dirty, onDirty])
+  const current =
+    roles.available &&
+    roles.data?.member.memberId === target.memberId &&
+    roles.data.aclVersion === snapshot?.aclVersion
+  const editable =
+    visible && current && snapshot?.editMode === 'editable' && !roles.busy && notice !== 'unknown'
+  async function review() {
+    const fresh = await roles.refresh().catch(() => undefined)
+    if (!fresh || fresh.member.memberId !== target.memberId) return
+    setSnapshot(fresh)
+    setDraft(undefined)
+    setAck(false)
+    setNotice(undefined)
+    setError(undefined)
+  }
+  async function save() {
+    if (!editable || !snapshot || !dirty || (target.userId === actorId && !ack)) return
+    const result = await roles.save({
+      expectedMemberId: target.memberId,
+      expectedAclVersion: snapshot.aclVersion,
+      roleIds: selected,
+    })
+    if (result.status === 'committed') {
+      setNotice(result.followup === 'ready' ? 'saved' : 'savedUnavailable')
+      setDraft(undefined)
+      setSnapshot(undefined)
+      setAck(false)
+    } else if (result.status === 'unknown') setNotice('unknown')
+    else if (result.status === 'rejected') setError(result.error)
+  }
+  return (
+    <section data-example-region="roles" className="space-y-3">
+      {sameSession && notice && <p role="status">{t(notice)}</p>}
+      {visible && (
+        <>
+          <h2 className="font-semibold">
+            {t('roles')} · {target.name ?? target.email}
+          </h2>
+          <ApiErrorAlert error={error ?? roles.error} />
+          {!roles.available && roles.pending && <Skeleton className="h-16 w-full" />}
+          {roles.available && snapshot && !current && <p role="status">{t('rolesChanged')}</p>}
+          {roles.available && snapshot?.editMode !== 'editable' && (
+            <p>{t(snapshot?.editMode === 'oversized' ? 'oversized' : 'byteOversized')}</p>
+          )}
+          <div className={styles.roleGrid}>
+            {current &&
+              roles.data?.choices.data.map((role) => (
+                <label key={role.id} htmlFor={`shop-role-${role.id}`} className={styles.roleTile}>
+                  <Checkbox
+                    id={`shop-role-${role.id}`}
+                    aria-label={role.name}
+                    checked={selected.includes(role.id)}
+                    disabled={!editable}
+                    onCheckedChange={(checked) => {
+                      setDraft(
+                        checked ? [...selected, role.id] : selected.filter((id) => id !== role.id)
+                      )
+                      setAck(false)
+                    }}
+                  />
+                  <span>
+                    <strong>{role.name}</strong>
+                    <span className={styles.roleDescription}>{role.description}</span>
+                  </span>
+                </label>
+              ))}
+          </div>
+          {current && selected.length === 0 && <p>{t('zero')}</p>}
+          {dirty && target.userId === actorId && (
+            <label className="flex items-start gap-2">
+              <Checkbox
+                checked={ack}
+                disabled={!editable}
+                onCheckedChange={(checked) => setAck(Boolean(checked))}
+              />
+              {t('selfWarning')}
+            </label>
+          )}
+          <div className={styles.actionStrip}>
+            <Button
+              variant="outline"
+              disabled={roles.busy}
+              onClick={() => {
+                if (dirty) setDiscard(true)
+                else void review()
+              }}
+            >
+              {t(dirty ? 'cancel' : 'reviewCurrent')}
+            </Button>
+            <Button
+              disabled={!editable || !dirty || (target.userId === actorId && !ack)}
+              onClick={() => void save()}
+            >
+              {t('save')}
+            </Button>
+          </div>
+          <ConfirmDialog
+            open={discard}
+            onOpenChange={setDiscard}
+            title={t('reset')}
+            description={t('rolesChanged')}
+            confirmLabel={t('reset')}
+            cancelLabel={t('cancel')}
+            onConfirm={() => void review()}
+          />
+        </>
+      )}
+    </section>
+  )
+}

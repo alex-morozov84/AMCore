@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Product-administration adoption guide with shop, CRM/ERP and SaaS recipes,
+  clean fork initialization and a cosmic custom interface using public headless operations.
+
 ### Changed
+
+- The custom team example uses an independent crew directory and personnel dossier with separate role, key and membership sections.
+- Alerts support optional internal dismissal with an accessible focus destination. Ordinary successful member removal no longer duplicates its toast with a permanent banner.
 
 - Root workspace installs explicitly enforce the strict 24-hour release-age floor
   and refuse registry packages with unknown publication times.
@@ -25,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with confirmation.
 
 ### Fixed
+
+- Headless administration examples preserve initialized project choices, replace
+  existing mounts and keep unknown results locked until explicit safe recovery.
 
 - Docker E2E runs retain cleanup ownership during the initial source copy and
   replacement allocation, so early interruption no longer loses the allocated stand.

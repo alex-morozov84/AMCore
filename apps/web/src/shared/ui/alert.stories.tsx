@@ -1,7 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { AlertCircle, Terminal } from 'lucide-react'
+import { expect, userEvent, within } from 'storybook/test'
+
+import en from '../../../messages/en.json'
+import ru from '../../../messages/ru.json'
 
 import { Alert, AlertDescription, AlertTitle } from './alert'
+
+const previewMessages = { en, ru }
 
 const meta = {
   title: 'shared/ui/Alert',
@@ -57,5 +63,66 @@ export const InformationalNote: Story = {
         Calm, permanent information that is not announced as an alert.
       </AlertDescription>
     </Alert>
+  ),
+}
+
+export const Dismissible: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const close = canvas.getByRole('button', { name: 'Close notification' })
+    close.focus()
+    await userEvent.keyboard('{Enter}')
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
+    await expect(canvas.getByRole('heading', { name: 'Team' })).toHaveFocus()
+  },
+  render: () => (
+    <section className="w-full max-w-sm space-y-4">
+      <h2 id="notification-destination" tabIndex={-1}>
+        Team
+      </h2>
+      <Alert
+        showCloseButton
+        closeLabel="Close notification"
+        dismissFocusTargetId="notification-destination"
+      >
+        <AlertTitle className="line-clamp-none">A completed informational action</AlertTitle>
+        <AlertDescription>
+          This long message wraps while leaving room for the close control. Closing returns keyboard
+          focus to Team.
+        </AlertDescription>
+      </Alert>
+    </section>
+  ),
+}
+
+export const DismissibleWithSpace: Story = {
+  ...Dismissible,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    canvas.getByRole('button', { name: 'Close notification' }).focus()
+    await userEvent.keyboard(' ')
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
+    await expect(canvas.getByRole('heading', { name: 'Team' })).toHaveFocus()
+  },
+}
+
+export const DismissiblePreview: Story = {
+  render: () => (
+    <section className="w-full max-w-sm space-y-4">
+      <h2 id="preview-alert-destination" tabIndex={-1}>
+        Список сотрудников
+      </h2>
+      <Alert
+        showCloseButton
+        closeLabel={previewMessages.ru.common.close}
+        dismissFocusTargetId="preview-alert-destination"
+      >
+        <AlertTitle>Данные обновлены</AlertTitle>
+        <AlertDescription>
+          Это пример уведомления. Нажмите крестик справа: сообщение исчезнет, а фокус вернётся к
+          заголовку.
+        </AlertDescription>
+      </Alert>
+    </section>
   ),
 }

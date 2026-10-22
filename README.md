@@ -111,6 +111,10 @@ one-time secret display and owner-wide inventory/revocation.
 Product-specific domain modules remain downstream-owned; forks can add their
 bounded areas without inheriting an unrelated sample domain.
 
+[Adopt product administration](docs/product-admin/adoption.md) covers shop,
+CRM/ERP and SaaS recipes, clean fork initialization and a custom cosmic interface
+over the same headless operations.
+
 The [capability catalogue](docs/auth/capability-catalogue.md) describes only
 implemented actions and supported permission presets. Selected organization
 context provides current-employee and actual-record access hints for UI decisions;
