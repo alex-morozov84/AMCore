@@ -454,6 +454,7 @@ export {
   BULL_BOARD_CONTEXT_MAX_HEADER_LENGTH,
   parseBoardRenderContext,
 } from './bull-board'
+export * from './integrations'
 export {
   type InvitationOAuthCorrelation,
   invitationOAuthCorrelationSchema,

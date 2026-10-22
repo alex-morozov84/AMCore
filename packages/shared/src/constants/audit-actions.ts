@@ -12,6 +12,8 @@ export const AUDIT_ACTIONS = [
   'admin.api_keys.revocation_requested',
   'admin.cleanup.executed',
   'admin.runtime_setting.changed',
+  'integration.email_test_requested',
+  'integration.email_test_settled',
   'admin.user.session_revoked',
   'admin.user.sessions_revoked',
   'admin.user.sessions_viewed',
