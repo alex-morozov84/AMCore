@@ -40,7 +40,7 @@ import { migrateTestDatabase } from '../helpers'
  *     --runTestsByPath test/measure/scheduled-job-overhead.measure.ts
  *
  * Add `--listTests` to check discovery (it must print this file). Add `--testNamePattern` to run one
- * group, and set DOCKER_HOST when the container runtime is not at /var/run/docker.sock. For example `'hung recorder connection'`. The whole file takes about 12 minutes.
+ * group, and set DOCKER_HOST when the container runtime is not at /var/run/docker.sock. For example `'recorder connection hung'`. The whole file takes about 12 minutes.
  * It uses the real PrismaService (a real pg pool), the real recorder and a real Postgres. Results
  * are printed as `MEASURE {json}` lines and appended to $MEASURE_OUT when it is set.
  *
@@ -459,6 +459,12 @@ describe('scheduled job recorder overhead', () => {
       await off.stop()
 
       const on = await stalledRig(poolMax, 65_000)
+      // The database is shared by every case: remember what an earlier case left behind, so only
+      // a success of THIS recorder after the stall counts as recovery.
+      const startedAt = new Date()
+      const earlier = await on.prisma.scheduledJobSummary.findUnique({
+        where: { jobId: NOTIFICATION_RECOVERY_JOB.id },
+      })
       let maxPoolTotal = 0
       let maxWaiting = 0
       const sampler = setInterval(() => {
@@ -476,12 +482,23 @@ describe('scheduled job recorder overhead', () => {
       // A pool of one never lets the recorder write, so there is nothing to wait for.
       const deadline = performance.now() + (poolMax >= 2 ? 120_000 : 0)
       let written = false
+      let fresh: { runId: string | null; startedAt: string | null } = {
+        runId: null,
+        startedAt: null,
+      }
       while (performance.now() < deadline && !written) {
         await recoveryLoop(on, 1000, true)
         const row = await on.prisma.scheduledJobSummary.findUnique({
           where: { jobId: NOTIFICATION_RECOVERY_JOB.id },
         })
-        written = row?.successRunId != null
+        fresh = {
+          runId: row?.successRunId ?? null,
+          startedAt: row?.successStartedAt?.toISOString() ?? null,
+        }
+        written =
+          row?.successRunId != null &&
+          row.successRunId !== earlier?.successRunId &&
+          (row.successStartedAt?.getTime() ?? 0) > startedAt.getTime()
       }
       const growth = (a: number[], b: number[]): number => {
         const p = (v: number[]): number =>
@@ -509,13 +526,19 @@ describe('scheduled job recorder overhead', () => {
         maxPoolTotal,
         maxPoolWaiting: maxWaiting,
         evidenceReachedDatabaseAfterHang: written,
+        successRunIdBefore: earlier?.successRunId ?? null,
+        successRunIdAfter: fresh.runId,
+        successStartedAtAfter: fresh.startedAt,
       })
       expect(on.counters.maxConcurrent).toBeLessThanOrEqual(1)
       expect(maxPoolTotal).toBeLessThanOrEqual(poolMax)
       if (poolMax === 1) expect(during.started).toBe(0)
       expect(onRecovery.length).toBeGreaterThan(0)
       if (poolMax === 10) expect(growth(offBusiness, onBusiness)).toBeLessThanOrEqual(10)
-      if (poolMax >= 2) expect(written).toBe(true)
+      if (poolMax >= 2) {
+        expect(during.stalled).toBe(1)
+        expect(written).toBe(true)
+      }
       await on.stop()
     },
     420_000

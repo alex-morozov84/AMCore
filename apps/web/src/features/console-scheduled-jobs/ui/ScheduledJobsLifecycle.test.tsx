@@ -217,3 +217,74 @@ describe('a refused history waits for its Retry-After', () => {
     expect(screen.getByText('Success')).toBeInTheDocument()
   })
 })
+
+describe('two open histories share one Retry-After', () => {
+  function TwoHistories() {
+    const [mountedAt] = useState(() => Date.now())
+    const live = useScheduledJobs(initial, mountedAt)
+    if (!live.data) return <p>hidden</p>
+    return (
+      <ScheduledJobsScopeProvider
+        value={{
+          instance: live.instance,
+          onAccessLoss: live.reportAccessLoss,
+          historyFloors: live.historyFloors,
+          onHistoryFailure: live.reportHistoryFailure,
+          onHistorySuccess: live.reportHistorySuccess,
+        }}
+      >
+        <ScheduledJobHistory jobId="cleanup" />
+        <ScheduledJobHistory jobId="invitation-retention" />
+      </ScheduledJobsScopeProvider>
+    )
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'],
+    })
+  })
+  afterEach(() => vi.useRealTimers())
+
+  const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(0)))
+  const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)))
+  const openAll = () => screen.getAllByText('Run history').forEach((node) => fireEvent.click(node))
+  const reads = (jobId: string) => runs.mock.calls.filter((call) => call[0] === jobId).length
+
+  it('keeps the wait of one history when the other one answers well, and resumes after it', async () => {
+    runs.mockImplementation(async (jobId: string) => {
+      if (jobId === 'cleanup') throw new ApiRequestError(429, undefined, 120)
+      return page('2026-10-22T09:00:00.000Z')
+    })
+    render(
+      <QueryClientProvider client={client}>
+        <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={scheduledJobsMessages}>
+          <TwoHistories />
+        </NextIntlClientProvider>
+      </QueryClientProvider>
+    )
+    openAll()
+    await settle()
+    expect(reads('cleanup')).toBe(1)
+    expect(reads('invitation-retention')).toBe(1)
+    // The good answer of the second history must not clear the wait of the first.
+    expect(screen.getAllByText(/Available in 1[0-2][0-9] seconds/).length).toBeGreaterThan(0)
+
+    // Closing and opening them again does not bypass the wait.
+    openAll()
+    openAll()
+    await settle()
+    expect(reads('cleanup')).toBe(1)
+
+    // A shorter refusal of the second history does not shorten it either.
+    runs.mockImplementation(async (jobId: string) => {
+      if (jobId === 'cleanup') return page('2026-10-22T09:05:00.000Z')
+      throw new ApiRequestError(429, undefined, 5)
+    })
+    await wait(6_000)
+    expect(reads('cleanup')).toBe(1)
+
+    await wait(121_000)
+    expect(reads('cleanup')).toBe(2)
+  })
+})

@@ -13,7 +13,9 @@ import {
 /**
  * The cool-down of the run histories, shared by every history on the page. `Retry-After` blocks
  * every read, including opening a history again; the exponential backoff blocks only the reads
- * that follow a page refresh on their own. Access loss is not a cool-down: it goes to the page.
+ * that follow a page refresh on their own. Several histories answer independently, so a deadline
+ * only ever moves later: a good answer or a shorter refusal from another history never shortens
+ * one that is still running. Access loss is not a cool-down: it goes to the page.
  */
 export function useHistoryCooldown(onAccessLoss: () => void) {
   const [floors, setFloors] = useState<PollFloors>(NO_FLOORS)
@@ -28,17 +30,24 @@ export function useHistoryCooldown(onAccessLoss: () => void) {
       }
       streak.current += 1
       const next = floorsAfterFailure(Date.now(), streak.current, retryAfterSecondsOf(error))
-      latest.current = next
-      setFloors(next)
+      const merged = {
+        retryAfterUntil: Math.max(latest.current.retryAfterUntil, next.retryAfterUntil),
+        backoffUntil: Math.max(latest.current.backoffUntil, next.backoffUntil),
+      }
+      latest.current = merged
+      setFloors(merged)
     },
     [onAccessLoss]
   )
 
   const reportSuccess = useCallback(() => {
-    if (streak.current === 0) return
     streak.current = 0
-    latest.current = NO_FLOORS
-    setFloors(NO_FLOORS)
+    // A good answer ends the backoff, but never a `Retry-After` another history is still serving.
+    const keep = latest.current.retryAfterUntil > Date.now() ? latest.current.retryAfterUntil : 0
+    if (latest.current.backoffUntil === 0 && latest.current.retryAfterUntil === keep) return
+    const next = { retryAfterUntil: keep, backoffUntil: 0 }
+    latest.current = next
+    setFloors(next)
   }, [])
 
   /** May the open histories be read now? A manual page refresh ignores the backoff only. */
