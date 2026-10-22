@@ -2,9 +2,12 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { AlertCircle, Terminal } from 'lucide-react'
 import { expect, userEvent, within } from 'storybook/test'
 
+import en from '../../../messages/en.json'
 import ru from '../../../messages/ru.json'
 
 import { Alert, AlertDescription, AlertTitle } from './alert'
+
+const previewMessages = { en, ru }
 
 const meta = {
   title: 'shared/ui/Alert',
@@ -111,7 +114,7 @@ export const DismissiblePreview: Story = {
       </h2>
       <Alert
         showCloseButton
-        closeLabel={ru.common.close}
+        closeLabel={previewMessages.ru.common.close}
         dismissFocusTargetId="preview-alert-destination"
       >
         <AlertTitle>Данные обновлены</AlertTitle>
