@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
 import { root } from './shared-package-fixture.mjs'
+
+function linkRootDependencies(directory) {
+  const installed = join(root, 'node_modules')
+  const local = join(directory, 'node_modules')
+  mkdirSync(local)
+  // pnpm owns task state here; link dependencies, not the directory or another run's state.
+  for (const name of readdirSync(installed))
+    if (!name.startsWith('.') || name === '.bin' || name === '.pnpm')
+      symlinkSync(join(installed, name), join(local, name))
+}
 
 test(
   'actual prepare rejects stale outputs and failed rebuild, then recovers',
@@ -15,7 +25,8 @@ test(
     // The copy intentionally links tested tools; never install into their targets.
     process.env.pnpm_config_verify_deps_before_run = 'false'
     try {
-      for (const name of ['', 'apps/api', 'packages/shared', 'packages/typescript-config'])
+      linkRootDependencies(copy.root)
+      for (const name of ['apps/api', 'packages/shared', 'packages/typescript-config'])
         symlinkSync(join(root, name, 'node_modules'), join(copy.root, name, 'node_modules'))
       const { prepare, preflight } = await import(
         pathToFileURL(join(copy.root, 'scripts/api-e2e/prepare.mjs'))

@@ -3,6 +3,8 @@ import type {
   AdminQueuesResponse,
   AdminSessionsListResponse,
   AdminUserResponse,
+  ScheduledJobsResponse,
+  ScheduledRunsResponse,
   StorageProbeSettingResponse,
   StorageProbeSettingUpdate,
   SupportedLocale,
@@ -83,6 +85,13 @@ export const consoleApi = {
   /** Live refresh of Background work; the signal cancels the browser request on unmount. */
   getBackgroundWorkQueues: (signal?: AbortSignal): Promise<AdminQueuesResponse> =>
     apiClient.get(getConsolePublicApiPath('/background-work/queues'), { signal }),
+  /** Live refresh of Scheduled jobs; the signal cancels the browser request on unmount. */
+  getScheduledJobs: (signal?: AbortSignal): Promise<ScheduledJobsResponse> =>
+    apiClient.get(getConsolePublicApiPath('/scheduled-jobs'), { signal }),
+  getScheduledJobRuns: (jobId: string, signal?: AbortSignal): Promise<ScheduledRunsResponse> =>
+    apiClient.get(getConsolePublicApiPath(`/scheduled-jobs/${encodeURIComponent(jobId)}/runs`), {
+      signal,
+    }),
   getStorageProbeSetting: (): Promise<StorageProbeSettingResponse> =>
     apiClient.get(getConsolePublicApiPath('/runtime-settings/storage-probe')),
   updateStorageProbeSetting: (

@@ -20,12 +20,10 @@ export function preflight() {
   const packageManager = JSON.parse(readFileSync(resolve(root, 'package.json'))).packageManager
   const pnpm = execFileSync('pnpm', ['--version'], { cwd: root, encoding: 'utf8' }).trim()
   if (packageManager !== `pnpm@${pnpm}`) throw new Error('Use declared pnpm version')
-  if (
-    !readFileSync(resolve(root, 'pnpm-lock.yaml')).equals(
-      readFileSync(resolve(root, 'node_modules/.pnpm/lock.yaml'))
-    )
-  )
-    throw new Error(advice)
+  // pnpm 12 may prepend a package-manager document to the root lock; node_modules keeps only the application one.
+  const wanted = readFileSync(resolve(root, 'pnpm-lock.yaml'), 'utf8')
+  const installed = readFileSync(resolve(root, 'node_modules/.pnpm/lock.yaml'), 'utf8')
+  if (wanted !== installed && !wanted.endsWith(`\n---\n${installed}`)) throw new Error(advice)
   apiRequire.resolve('express') // direct API dependency, without relying on the Jest shim
   if (
     !existsSync(resolve(api, 'src/generated/prisma/client.ts')) ||

@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AI_APPROVAL_EXPIRY_BATCH_LIMIT } from '../../../core/ai/ai-run.constants.js'
@@ -8,6 +7,15 @@ import { AuditLogService } from '../../../core/audit/index.js'
 import { Prisma } from '../../../generated/prisma/client.js'
 import { PrismaService } from '../../../prisma/index.js'
 import { MetricsService } from '../../observability/index.js'
+import { errorCode, ScheduledJobExecutor } from '../../schedule/scheduled-job.executor.js'
+import {
+  failed,
+  ScheduledJob,
+  type ScheduledJobResult,
+  skippedFor,
+  succeeded,
+} from '../../schedule/scheduled-job.js'
+import { AI_APPROVAL_EXPIRY_JOB } from '../../schedule/scheduled-jobs.catalogue.js'
 import { CUTOFF, type ShutdownLatch } from '../../worker-lifecycle/index.js'
 
 import { AI_RUN_SHUTDOWN_LATCH } from './ai-run-shutdown.js'
@@ -38,14 +46,19 @@ export class AiApprovalExpiryService {
     private readonly audit: AuditLogService,
     private readonly metrics: MetricsService,
     @Inject(AI_RUN_SHUTDOWN_LATCH) private readonly latch: ShutdownLatch,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly jobs: ScheduledJobExecutor
   ) {
     this.logger.setContext(AiApprovalExpiryService.name)
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @ScheduledJob(AI_APPROVAL_EXPIRY_JOB)
   async sweep(): Promise<void> {
-    if (this.latch.closed) return
+    await this.jobs.run(AI_APPROVAL_EXPIRY_JOB, () => this.runSweep())
+  }
+
+  private async runSweep(): Promise<ScheduledJobResult> {
+    if (this.latch.closed) return skippedFor('shutdown')
     try {
       const expired = await this.expireDue()
       if (expired > 0) {
@@ -54,6 +67,7 @@ export class AiApprovalExpiryService {
           'Terminalized stale AI approvals whose TTL/deadline elapsed'
         )
       }
+      return succeeded({ counts: { expired }, codes: [] })
     } catch (error) {
       // Never let a cron rejection escape; the next tick retries.
       this.logger.error(
@@ -63,6 +77,7 @@ export class AiApprovalExpiryService {
         },
         'AI approval expiry sweep failed'
       )
+      return failed(errorCode(error))
     }
   }
 

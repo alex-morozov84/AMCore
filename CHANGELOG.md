@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The custom team example uses an independent crew directory and personnel dossier with separate role, key and membership sections.
 - Alerts support optional internal dismissal with an accessible focus destination. Ordinary successful member removal no longer duplicates its toast with a permanent banner.
 
+- Root workspace installs explicitly enforce the strict 24-hour release-age floor
+  and refuse registry packages with unknown publication times.
+  Ordinary npm Dependabot updates use a three-day cooldown; a trusted controller
+  retries eligible failed-install CI runs once after 25 hours.
+
 - External web sign-in completes through a same-origin form with automatic
   continuation and a no-JavaScript Continue button, preserving Strict cookies
   and the validated return page without exposing its code through Referer.
@@ -31,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Headless administration examples preserve initialized project choices, replace
   existing mounts and keep unknown results locked until explicit safe recovery.
+
+- Docker E2E runs retain cleanup ownership during the initial source copy and
+  replacement allocation, so early interruption no longer loses the allocated stand.
 
 - The API Docker image no longer carries the API package source, tests, Prisma schemas/migrations,
   tool configs or source maps. Test-only modules (`*.testkit.ts`) no longer compile into `dist`.
@@ -53,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with shared website login in path mode and independent staff sessions in host
   mode. Login, recovery, invitation links and OAuth callbacks follow the selected
   frontend; inaccessible pages offer safe list, website and logout recovery.
+- The Operations Console has a **Scheduled jobs** screen. Workers now record the result of each periodic job (nightly cleanups, notification retention, the GeoIP update and the recovery passes) in two new tables, and the screen shows each job's schedule, last result and freshness separately, so a job can be "Partly done" and "Overdue" at once. Daily jobs keep at most 30 finished runs per job, none older than 30 days. Add your own job once to the catalogue with `@ScheduledJob`; a test fails if a raw `@Cron` or `@Interval` bypasses it. Recording is best-effort and bounded: a job never waits for the database to start or to finish, a write starts only when the pool has a free connection, and it needs `DATABASE_POOL_MAX` of at least 2. New read-only API: `GET /admin/background-work/scheduled-jobs` and `.../{jobId}/runs`. No new environment variable. See [Scheduled jobs](docs/operations-console/scheduled-jobs.md) and [Scheduled jobs for developers](docs/backend/scheduled-jobs.md).
 - The Operations Console links job, delivery, run and audit request IDs to the log search: **Find in logs** in Background work and Audit opens Grafana with the last 7 days of lines for that ID. It needs the new optional `ADMIN_CONSOLE_LOGS_GRAFANA_URL` (the Grafana of the log-search overlay); without it nothing changes. Audit events now return their `requestId` when it is a well-formed correlation ID. See [Find in logs links](docs/operations-console/configuration.md#find-in-logs-links).
 
 - My API keys settings with personal creation, catalogue scope selection, one-time secret handling, session checks and owner-wide inventory/revocation. Ordinary member issuance remains available through the API and headless hooks.
@@ -105,6 +114,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - BullMQ updates no longer require a manual version approval when all pinned Lua source and compiled hashes remain unchanged. Changed scripts still block worker startup.
 
+- pnpm moves to 12.14.0 across the root manifest, Docker builds, stand installer and the
+  migrator installer. The API image now uses plain `pnpm deploy`: the production bundle follows
+  the frozen lockfile instead of re-resolving it (409 packages instead of 539, no extra optional
+  peers). `engines.pnpm` is `>=12.14.0`. The weekly dependency-freshness report now covers pnpm
+  and Node.js, and a test keeps every pnpm pin aligned. pnpm 12 also checks the age of packages
+  already in the lockfile, so a frozen install fails until a package is 24 hours old; rerun the
+  job later (see the CI security guide).
 - Package migrations in an independent non-root Prisma CLI image with an isolated
   frozen dependency graph, version guards, dedicated upkeep and image reports.
   API build-tool security risks remain separate from final-image minimization.
@@ -210,6 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failures use a safe 500 with `INTERNAL_ERROR`.
 
 ### Security
+
+- Update follow-redirects to 1.16.1 to prevent credential header leaks during
+  cross-origin redirects (CVE-2026-111755 and CVE-2026-111756).
 
 - Member removal atomically revokes organization keys; rejoining requires new credentials.
   All/remove refuses above 1000 keys, with bounded operator maintenance recovery.

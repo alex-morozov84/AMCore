@@ -268,6 +268,11 @@ For AI run control acceptance, use `pnpm stand preview --id ai-run-control
 runs through the owner API: queued, transient retryable, permanent failure,
 recent cancellation and cancellation older than 30 days. It uses the mock model.
 Repeated preview keeps the owner's changes.
+For the Console Scheduled jobs screen, use `pnpm stand preview --id scheduled-jobs
+--profile scheduled-jobs`. The running worker records its frequent jobs itself; the profile
+adds a result history to the daily jobs, which otherwise show "No runs yet" until 02:00:
+cleanup partly done and overdue, notification cleanup failed and overdue, invitation cleanup
+with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the owner's changes.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared
@@ -404,7 +409,8 @@ orphan purge, the end of an e2e run, the bind-race retry and `closeout`) records
 latest result the same way.
 
 A lease covers startup, admission, tests and cleanup. Competing mutation commands
-refuse. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
+refuse. Docker E2E runs retain their allocated stand for cleanup when cancellation
+interrupts the initial source copy. SIGINT/SIGTERM stops and awaits proved-owned process groups, including
 descendants after their direct parent exits, before removing resources. Console
 wrappers stop interrupted preparation groups with proved TERM/KILL escalation,
 without waiting for inherited streams to close. After startup they forward
@@ -562,7 +568,7 @@ a cold api+web build downloads a few hundred MB once, later builds download clos
 to nothing. Integrity checking is unchanged — `--frozen-lockfile` still verifies
 every package against the lockfile hashes.
 
-pnpm 11 reads these settings from `pnpm_config_*` variables; `npm_config_*` and
+pnpm 12 reads these settings from `pnpm_config_*` variables; `npm_config_*` and
 `PNPM_STORE_DIR` are ignored, which silently disables the cache mount. Check
 `Content-addressable store is at: /pnpm/store/v11` in the build log if a build
 downloads everything again.

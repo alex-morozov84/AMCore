@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   assertConsoleExternalLinks,
@@ -82,6 +82,13 @@ describe('assertConsoleExternalLinks', () => {
 })
 
 describe('validateAdminConsoleStartupOrExit', () => {
+  // A generated host-mode project also validates the three hostnames before the external links.
+  beforeEach(() => {
+    vi.stubEnv('FRONTEND_URL', 'https://shop.example.test:8443')
+    vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
+    vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test:8443')
+  })
+
   it('stops the server and names the variable when an external tool address is unusable', async () => {
     vi.resetModules()
     vi.doMock('server-only', () => ({}))

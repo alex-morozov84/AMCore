@@ -139,6 +139,8 @@ const EXPECTED: Record<string, Expected> = {
   'get /admin/organizations/{id}': { status: '200', kind: 'json' },
   'get /admin/overview': { status: '200', kind: 'json' },
   'get /admin/background-work/queues': { status: '200', kind: 'json' },
+  'get /admin/background-work/scheduled-jobs': { status: '200', kind: 'json' },
+  'get /admin/background-work/scheduled-jobs/{jobId}/runs': { status: '200', kind: 'json' },
   'get /admin/background-work/works': { status: '200', kind: 'json' },
   'get /admin/background-work/works/{workId}/jobs': { status: '200', kind: 'json' },
   'get /admin/background-work/works/{workId}/jobs/{jobId}': { status: '200', kind: 'json' },

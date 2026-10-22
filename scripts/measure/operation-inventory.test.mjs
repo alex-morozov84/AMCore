@@ -19,7 +19,7 @@ describe('operation inventory against the real plans', () => {
       // (+6): 15 additional operations/facts/claims. No new provider or manifest.
       // The Alert catalogue fixture adds one edit in each of three single-locale
       // recipes (+3 operations/facts/claims); its Storybook deletions already exist.
-      { name: 'measured operations', expected: 868, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 874, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -38,17 +38,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1195,
+        expected: 1201,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1964,
+        expected: 1972,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 848,
+        expected: 854,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

@@ -321,7 +321,7 @@ Malformed external `next-action` requests are outside this recovery mechanism.
 
 The API and web Docker build stages enforce a frozen pnpm lockfile for both the
 explicit dependency installation and any automatic installation before a script.
-pnpm 11 can recheck dependencies after source files are copied into a cached
+pnpm can recheck dependencies after source files are copied into a cached
 install layer. That recheck must preserve the checked-in dependency versions;
 manifest/lockfile disagreement fails the build instead of resolving new versions.
 Dependency changes require updating and reviewing `pnpm-lock.yaml` first.
@@ -764,7 +764,12 @@ on **every** worker replica and is _not_ lock-guarded — that is intentional
 (`SingletonCronRunner` is fail-closed on a Redis hiccup, exactly when recovery is
 needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed and
-BullMQ workers consume one shared queue. Add worker replicas freely.
+BullMQ workers consume one shared queue. Add worker replicas freely. Each process
+records the result of its scheduled jobs for the Console
+Scheduled jobs screen of the optional Console. Recording is
+best-effort: one background write at a time, started only when the pool has a
+free connection and no request is waiting for one, and skipped when
+`DATABASE_POOL_MAX` is 1.
 
 ### Graceful shutdown
 

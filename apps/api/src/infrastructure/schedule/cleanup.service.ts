@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
 import { staleTerminalApiKeyWhere } from '../../core/api-keys/api-key-lifecycle.js'
 import { InvitationRetentionService } from '../../core/invitations/invitation-retention.service.js'
 import { PrismaService } from '../../prisma/index.js'
 
-import { SingletonCronRunner } from './singleton-cron.runner.js'
+import { ScheduledJobExecutor } from './scheduled-job.executor.js'
+import { ScheduledJob } from './scheduled-job.js'
+import { bucketOutcome } from './scheduled-job-outcome.js'
+import { CLEANUP_JOB } from './scheduled-jobs.catalogue.js'
 
 /** Record types swept by cleanup; also the identifiers used in `failures`. */
 export type CleanupRecordType =
@@ -33,13 +35,6 @@ export interface CleanupResult {
   failures: CleanupRecordType[]
 }
 
-// Distributed-lock key + TTL for the nightly sweep (EQS-05). TTL is generous
-// (30 min) so the lock comfortably outlives a slow sweep on large tables, yet
-// still auto-expires if the holder crashes — the daily cron will not re-fire
-// the same day, so there is no risk of a second run within the TTL window.
-const CLEANUP_LOCK_KEY = 'amcore:schedule:cleanup:lock'
-const CLEANUP_LOCK_TTL_MS = 30 * 60 * 1000
-
 /**
  * CleanupService
  *
@@ -47,42 +42,40 @@ const CLEANUP_LOCK_TTL_MS = 30 * 60 * 1000
  * Without this, tables grow unboundedly since tokens and sessions
  * are never deleted after expiry.
  *
- * Schedule: daily at 02:00 UTC (single instance via distributed lock — EQS-05)
- * Manual trigger: POST /admin/cleanup (SUPER_ADMIN only)
+ * Schedule: daily at 02:00 (process time zone; single instance via distributed lock — EQS-05).
+ * The lock key and TTL (30 min: comfortably outlives a slow sweep, still expires on a crash) are
+ * in `CLEANUP_JOB`. Manual trigger: POST /admin/cleanup (SUPER_ADMIN only)
  */
 @Injectable()
 export class CleanupService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly singletonCron: SingletonCronRunner,
+    private readonly jobs: ScheduledJobExecutor,
     private readonly logger: PinoLogger,
     private readonly invitationRetention: InvitationRetentionService
   ) {
     this.logger.setContext(CleanupService.name)
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  @ScheduledJob(CLEANUP_JOB)
   async scheduledCleanup(): Promise<void> {
-    // Multi-instance safety (EQS-05): every replica fires this cron at 02:00; the
-    // singleton-cron runner ensures only the lock-winner runs the sweep, the rest
-    // skip, and no error escapes as an unhandled cron rejection. The lock TTL
-    // (`CLEANUP_LOCK_TTL_MS`) outlives a slow sweep but auto-expires on a crash.
+    // Multi-instance safety (EQS-05): every replica fires this cron at 02:00; the executor holds
+    // the singleton lock so only the lock-winner runs the sweep, the rest skip, and no error
+    // escapes as an unhandled cron rejection.
     //
-    // The manual POST /admin/cleanup path is deliberately NOT lock-guarded — it
+    // The manual POST /admin/cleanup path is deliberately NOT lock-guarded and NOT recorded — it
     // is an explicit, throttled admin action, and every delete is idempotent
     // (delete-by-expiry), so a manual run overlapping a scheduled run on another
-    // instance is harmless.
-    await this.singletonCron.run(
-      { name: 'schedule.cleanup', lockKey: CLEANUP_LOCK_KEY, ttlMs: CLEANUP_LOCK_TTL_MS },
-      async () => {
-        this.logger.info('Starting scheduled cleanup')
-        const result = await this.runCleanup()
-        this.logger.info(
-          { event: 'schedule.cleanup_complete', ...result },
-          'Scheduled cleanup complete'
-        )
-      }
-    )
+    // instance is harmless. It must not count as the scheduled run.
+    await this.jobs.run(CLEANUP_JOB, async () => {
+      this.logger.info('Starting scheduled cleanup')
+      const result = await this.runCleanup()
+      this.logger.info(
+        { event: 'schedule.cleanup_complete', ...result },
+        'Scheduled cleanup complete'
+      )
+      return bucketOutcome(result)
+    })
   }
 
   /**

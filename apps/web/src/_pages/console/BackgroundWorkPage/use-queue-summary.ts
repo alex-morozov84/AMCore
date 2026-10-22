@@ -10,20 +10,20 @@ import {
 import { focusManager, onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { consoleApi } from '@/shared/api/console-api'
-import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
-
+import { useCooldownTicks } from '@/shared/lib/console-cooldown-ticks'
 import {
   canRefreshManually,
   floorsAfterFailure,
   isAccessLoss,
   isAdmitted,
-  isDegraded,
   NO_FLOORS,
   POLL_INTERVAL_MS,
   type PollFloors,
   retryAfterSecondsOf,
-} from './queue-poll-policy'
-import { useCooldownTicks } from './use-cooldown-ticks'
+} from '@/shared/lib/console-poll-policy'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
+
+import { isDegraded } from './queue-poll-policy'
 
 type PageSnapshot = AdminQueuesResponse & {
   works?: WorkSummary[]
@@ -44,7 +44,7 @@ const onlineStore = {
 
 /**
  * Live Background work summary: one TanStack Query observer for the whole screen, driven by a
- * single admission rule (see `queue-poll-policy.ts`). Automatic fetches run only while auto is
+ * single admission rule (see `@/shared/lib/console-poll-policy`). Automatic fetches run only while auto is
  * on, the tab is visible and online, access is intact and every cool-down has elapsed; losing
  * admission cancels queued or in-flight automatic work. A manual refresh joins existing work,
  * honours `Retry-After` and is never queued while offline. 401/403 hide the rows at once,

@@ -11,6 +11,9 @@ its policy supports: pause, resume, retry, cancel and cleanup. Unsupported actio
 show a reason. The [queue board](queue-board.md) remains read-only; controlled
 actions belong to the native Console.
 
+Jobs that run on a schedule, such as nightly cleanups, are on
+[Scheduled jobs](scheduled-jobs.md).
+
 Console access requires a current platform `SUPER_ADMIN`. API keys cannot read
 this screen, and an organization role does not grant access. The page is at
 `/admin/background-work` in path mode and at `/background-work` on the Console

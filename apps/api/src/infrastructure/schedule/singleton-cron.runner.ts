@@ -3,6 +3,12 @@ import { PinoLogger } from 'nestjs-pino'
 
 import { RedisLockService } from '../redis/index.js'
 
+export type SingletonRun<T> =
+  | { status: 'ran'; value: T }
+  | { status: 'failed'; error: unknown }
+  | { status: 'contended' }
+  | { status: 'lock_unavailable' }
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown'
 }
@@ -30,10 +36,14 @@ export class SingletonCronRunner {
     this.logger.setContext(SingletonCronRunner.name)
   }
 
-  async run(
+  /**
+   * Returns what happened so a caller can record it: `contended` (another replica won, normal),
+   * `lock_unavailable` (the lock could not be asked), `failed` (the task threw) or `ran`.
+   */
+  async run<T = void>(
     options: { name: string; lockKey: string; ttlMs: number },
-    task: () => Promise<void>
-  ): Promise<void> {
+    task: () => Promise<T>
+  ): Promise<SingletonRun<T>> {
     const { name, lockKey, ttlMs } = options
 
     let token: string | null
@@ -44,7 +54,7 @@ export class SingletonCronRunner {
         { event: `${name}_lock_failed`, error: errorMessage(error) },
         `${name} skipped — lock acquisition failed`
       )
-      return
+      return { status: 'lock_unavailable' }
     }
 
     if (token === null) {
@@ -52,13 +62,14 @@ export class SingletonCronRunner {
         { event: `${name}_skipped` },
         `${name} skipped — lock held by another instance`
       )
-      return
+      return { status: 'contended' }
     }
 
     try {
-      await task()
+      return { status: 'ran', value: await task() }
     } catch (error) {
       this.logger.error({ event: `${name}_failed`, error: errorMessage(error) }, `${name} failed`)
+      return { status: 'failed', error }
     } finally {
       try {
         await this.lock.release(lockKey, token)

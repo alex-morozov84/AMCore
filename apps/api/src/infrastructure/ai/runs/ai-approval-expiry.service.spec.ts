@@ -4,6 +4,7 @@ import { AiApprovalExpiryService } from './ai-approval-expiry.service'
 
 import type { AuditLogService } from '@/core/audit'
 import type { MetricsService } from '@/infrastructure/observability'
+import { fakeJobs } from '@/infrastructure/schedule/scheduled-job.test-support'
 import { ShutdownLatch } from '@/infrastructure/worker-lifecycle'
 import type { PrismaService } from '@/prisma'
 
@@ -20,6 +21,7 @@ describe('AiApprovalExpiryService', () => {
   let metrics: { incAiApproval: jest.Mock }
   let latch: ShutdownLatch
   let service: AiApprovalExpiryService
+  let scheduled: ReturnType<typeof fakeJobs>
   const logger = { setContext: jest.fn(), warn: jest.fn(), error: jest.fn() }
 
   beforeEach(() => {
@@ -33,12 +35,14 @@ describe('AiApprovalExpiryService', () => {
     audit = { record: jest.fn().mockResolvedValue(undefined) }
     metrics = { incAiApproval: jest.fn() }
     latch = new ShutdownLatch(logger as never, 'ai.run')
+    scheduled = fakeJobs()
     service = new AiApprovalExpiryService(
       prisma,
       audit as unknown as AuditLogService,
       metrics as unknown as MetricsService,
       latch,
-      logger as never
+      logger as never,
+      scheduled.jobs
     )
   })
 

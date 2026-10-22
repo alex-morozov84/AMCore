@@ -70,6 +70,13 @@ test('fresh-job receipt refuses missing, stale and changed generated outputs bef
     assert.throws(preflight, /--prepare/)
     writeFileSync(swcPath, swcOriginal)
     preflight()
+    // The installed lock must match the root lock's application document; a changed lock is stale.
+    const lockPath = join(directory, 'pnpm-lock.yaml')
+    const lockOriginal = readFileSync(lockPath)
+    writeFileSync(lockPath, Buffer.concat([lockOriginal, Buffer.from('\n# changed lock')]))
+    assert.throws(preflight, /--prepare/)
+    writeFileSync(lockPath, lockOriginal)
+    preflight()
     writeFileSync(join(directory, 'packages/shared/dist/index.js'), 'changed')
     assert.throws(preflight, /--prepare/)
     writeFileSync(join(directory, 'packages/shared/dist/index.js'), 'fixture')
