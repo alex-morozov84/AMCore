@@ -14,7 +14,8 @@ You need a module that already owns the service your reader uses. In the example
 `CrmModule`, which exports `CrmStatusService`. Your own names will differ.
 
 1. **Write a reader and a module for it.** The reader is a singleton provider with
-   `read(signal)`. It must be quick and free of side effects: no provider call, no email,
+   `read(signal)`; `signal` is an `AbortSignal` that is aborted after the 1.5-second row
+   budget, and a reader that makes no call, like this one, may ignore it. It must be quick and free of side effects: no provider call, no email,
    no file write. Return what the module already knows, such as its configuration and the
    result of a check it ran earlier. If nothing was ever measured, report the settings only,
    with no time, as the example does (`NOT_MEASURED`). The module imports the module that
@@ -37,6 +38,8 @@ You need a module that already owns the service your reader uses. In the example
 
      read(): Promise<IntegrationReading> {
        const status = this.crm.lastSyncStatus() // stored, already measured; no call to the CRM
+       // 'configured': the required settings exist; 'not_configured': they are missing;
+       // 'disabled': the integration is switched off.
        const configuration = status.enabled ? 'configured' : 'disabled'
        if (!status.finishedAt) {
          // Never measured: report the settings only, with no time.
@@ -53,7 +56,7 @@ You need a module that already owns the service your reader uses. In the example
            instance: 'shared',
            checkedAt: status.finishedAt.toISOString(),
            staleAfterSeconds,
-           failure: status.lastOk ? null : 'timeout',
+           failure: status.lastOk ? null : status.failureCode, // a short code, never a message
          },
          facts: [{ key: 'open_tickets', value: status.openTickets }],
          links: [],
@@ -87,14 +90,29 @@ You need a module that already owns the service your reader uses. In the example
    every other catalogue (`apps/web/messages/ru.json` in the upstream layout):
    `names.crm_sync`, `fact.open_tickets`, and `failure.timeout` for each failure code your
    reader returns. Once you add a key to one catalogue, add it to all of them: a mismatch
-   fails a test.
+   fails a test. For a bilingual product treat the keys as required. The catalogue is
+   nested JSON; the path below is relative to `apps/web` (the repository rule calls it
+   `messages/en.json`):
+
+   ```json
+   {
+     "console": {
+       "integrations": {
+         "names": { "crm_sync": "CRM sync" },
+         "fact": { "open_tickets": "Open tickets" },
+         "failure": { "timeout": "The CRM did not answer in time" }
+       }
+     }
+   }
+   ```
 
 Restart the API. The integration appears on the page. A test runs this exact example:
 `apps/api/src/core/admin/integrations/integrations-guide-example.spec.ts`.
 
-To remove an optional integration, delete its entry from the composition list and restart
-the API. It then has no row and the Console no longer imports `CrmIntegrationModule`. Your
-own module (`CrmModule`) is not touched and keeps working; delete the reader files and the
+To remove an integration your product does not need, delete its entry from the composition
+list and restart the API. It then has no row and the Console no longer imports
+`CrmIntegrationModule`. Your own module (`CrmModule`) is not touched; if the Console was
+the only place that imported it, import it where it belongs. Delete the reader files and the
 messages yourself if you no longer need them.
 
 ## The reading contract
@@ -102,14 +120,14 @@ messages yourself if you no longer need them.
 A reading is validated against a strict schema before it leaves the API. A reading that
 breaks the contract shows the row as **Cannot read** and never reaches the browser.
 
-| Field           | Rule                                                                                                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`            | `^[a-z][a-z0-9_]{0,31}$`, unique. Never reuse an id for a different integration.                                                                                         |
-| `name`          | 1 to 48 characters. English fallback.                                                                                                                                    |
-| `configuration` | `disabled`, `not_configured` or `configured`. `configured` means the required settings exist. It never means working.                                                    |
-| `evidence`      | What the last observation established, kept separate from configuration (below).                                                                                         |
-| `facts`         | At most 12 `{ key, value }`. The value is a non-negative integer, a boolean, or a string of up to 64 characters from `A-Z a-z 0-9 . _ space + , -`. No URL, `@` or path. |
-| `links`         | A subset of `overview`, `background_work`, `runbook`. You cannot supply a URL.                                                                                           |
+| Field           | Rule                                                                                                                                                                                                                              |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | `^[a-z][a-z0-9_]{0,31}$`, unique. Never reuse an id for a different integration.                                                                                                                                                  |
+| `name`          | 1 to 48 characters. English fallback.                                                                                                                                                                                             |
+| `configuration` | `disabled`, `not_configured` or `configured`. `configured` means the required settings exist. It never means working.                                                                                                             |
+| `evidence`      | What the last observation established, kept separate from configuration (below).                                                                                                                                                  |
+| `facts`         | At most 12 `{ key, value }`. The key is a slug like an id (`^[a-z][a-z0-9_]{0,31}$`). The value is a non-negative integer, a boolean, or a string of up to 64 characters from `A-Z a-z 0-9 . _ space + , -`. No URL, `@` or path. |
+| `links`         | A subset of `overview`, `background_work`, `runbook`. You cannot supply a URL.                                                                                                                                                    |
 
 The pattern only keeps the shape of a fact safe. It does not decide what is safe to show:
 a 32-letter API key matches it. Never return a secret, token or address as a fact.
@@ -117,7 +135,8 @@ a 32-letter API key matches it. Never return a secret, token or address as a fac
 The registry allows at most 32 integrations and gives each row 1.5 seconds, the reader and
 the probe `action` together. `action` only reports whether the button may be used (a cheap
 read); the send itself, `run`, has its own deadline from the policy. One failing or slow
-reader never hides the others. A negative or fractional number is not a valid fact.
+reader never hides the others. A negative or fractional number is not a valid fact. The
+registry does not log why a reading was rejected, so check your reading with a test.
 
 ### Evidence
 
@@ -130,6 +149,19 @@ reader never hides the others. A negative or fractional number is not a valid fa
 | `checkedAt`         | The time of the observation, or `null`. Never the time the page was read.                                                                                                            |
 | `staleAfterSeconds` | How long the observation stays recent. The page re-judges it while it stays open.                                                                                                    |
 | `failure`           | A short lowercase code (`^[a-z][a-z0-9_]{0,31}$`) of your choosing, or `null`. There is no fixed list: add a `failure.<code>` message for each code you use. Never an error message. |
+
+| Scope                            | Use it when the observation proves           |
+| -------------------------------- | -------------------------------------------- |
+| `private_file_write_read_delete` | a file could be written, read and deleted    |
+| `broker_read`                    | the queue broker answered a read             |
+| `provider_acceptance`            | an outside provider accepted a direct send   |
+| `provider_request`               | a request to an outside service was answered |
+| `configuration_only`             | nothing: only settings are known             |
+
+Use `instance: 'answering_instance'` when only the API server that answered observed it
+(for example its own storage check) and `'shared'` when every server sees the same stored
+result. If the settings changed since the observation, report `result: 'none'`: an old
+result must not vouch for new settings (the email test does this).
 
 A configuration-only integration reports `result: 'none'` and `checkedAt: null`. Do not
 give it a time: a refresh must not make a configuration look verified. A new scope is a
@@ -144,9 +176,10 @@ cannot supply a recipient, URL, subject, text or command. To add a new kind, add
 its limits in `integration-validation.ts`. The **admission strategy** is the code that
 decides whether a test may start: cooldown, hourly cap, one test in flight, and the audit
 record before the send; for the email test it is `EmailTestStore` and `EmailTestProbe`. The
-kind selects the dialog text and the receipt
-wording. This is a reviewed change, not configuration. Pointing a new idea, for example an
-arbitrary URL, at an existing kind does not create a new kind.
+kind selects the dialog text and the receipt wording. This is a reviewed change, not
+configuration. The kind decides the strategy and its ceilings, the registry checks the
+registered numbers against them, and the port carries the strategy out. Pointing a new idea,
+for example an arbitrary URL, at an existing kind does not create a new kind.
 
 The probe is a field of the integration's entry in `INTEGRATIONS`:
 
@@ -175,6 +208,13 @@ interface IntegrationProbePort {
   receiptFor(actorId: string, attemptId: string): Promise<ProbeReceipt> // read-only recovery
 }
 ```
+
+In v1 the shipped email test (`EmailTestProbe`) is the only port of its kind. A second
+integration that uses the same kind registers a port that **delegates to the same admission
+and send code** (`EmailTestStore`, `EmailTestProbe`) and supplies only what differs. Do not
+reimplement the admission. List the port in `providers` (and `exports`, like the reader) of
+your integration module. The recipient is never part of the registration: the shipped port
+reads the verified address from the acting operator's account.
 
 A probe registration needs every field, and startup fails without them:
 
@@ -206,7 +246,8 @@ defect that review and the port's own tests must catch. Use the email test as th
 Startup fails with a clear message for: a bad or duplicate id, a name over 48 characters,
 a missing reader, two registrations that share a reader, a probe with a missing field, an
 unknown probe kind, and a policy that is not made of finite whole numbers or is looser than
-its kind allows. Disabled registrations are checked too.
+its kind allows. A registration is checked even when your product switches its module off (its reader
+reports `disabled`).
 
 The check has two stages. When the registry is created, it validates the registrations
 above. After all modules have started, it resolves each reader and each probe port, compares
@@ -220,7 +261,18 @@ the page is read, only turns that row into **Cannot read**.
 `integrations-guide-example.spec.ts` (the example above) and `integration-registry.spec.ts`
 show the pattern: register through `IntegrationsModule.register(...)`, start the module,
 and read the list. Assert that your reading passes the schema and that it contains no
-secret.
+secret. Two assertions that are worth copying:
+
+```ts
+// the reading shows no secret
+const text = JSON.stringify(await registry.list('operator'))
+expect(text).not.toContain(process.env.CRM_API_KEY!)
+
+// the declared policy reaches the admission (fake store, as in email-test.probe.spec.ts)
+const strict = { ...POLICY, operatorCooldownSeconds: 120 }
+await port.run('u1', attemptId, strict)
+expect(store.reserve).toHaveBeenCalledWith(expect.objectContaining({ policy: strict }))
+```
 
 ```bash
 pnpm --filter api test -- src/core/admin/integrations

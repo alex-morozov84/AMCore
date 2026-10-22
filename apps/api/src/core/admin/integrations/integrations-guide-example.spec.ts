@@ -20,6 +20,7 @@ import { IntegrationsModule } from './integrations.module.js'
 interface CrmStatus {
   enabled: boolean
   lastOk: boolean
+  failureCode: string | null // your own short code for the stored reason, for example 'timeout'
   finishedAt: Date | null // null until the first sync has finished
   openTickets: number
 }
@@ -28,6 +29,7 @@ class CrmStatusService {
   status: CrmStatus = {
     enabled: true,
     lastOk: false,
+    failureCode: 'timeout',
     finishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
     openTickets: 4,
   }
@@ -55,6 +57,8 @@ class CrmIntegrationReader implements IntegrationReader {
 
   read(): Promise<IntegrationReading> {
     const status = this.crm.lastSyncStatus() // stored, already measured; no call to the CRM
+    // 'configured': the required settings exist; 'not_configured': they are missing;
+    // 'disabled': the integration is switched off.
     const configuration = status.enabled ? 'configured' : 'disabled'
     if (!status.finishedAt) {
       // Never measured: report the settings only, with no time.
@@ -71,7 +75,7 @@ class CrmIntegrationReader implements IntegrationReader {
         instance: 'shared',
         checkedAt: status.finishedAt.toISOString(),
         staleAfterSeconds,
-        failure: status.lastOk ? null : 'timeout',
+        failure: status.lastOk ? null : status.failureCode, // a short code, never a message
       },
       facts: [{ key: 'open_tickets', value: status.openTickets }],
       links: [],
@@ -126,6 +130,7 @@ describe('the registration example of the guide', () => {
     moduleRef.get(CrmStatusService, { strict: false }).status = {
       enabled: true,
       lastOk: false,
+      failureCode: null,
       finishedAt: null,
       openTickets: 0,
     }

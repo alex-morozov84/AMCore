@@ -92,7 +92,8 @@ result of an attempt as saved on the server.
   for you.
 - The email provider is not the mock provider in production. In a production deployment
   with mock email the button is disabled and says why. Configure a real provider first; see
-  [Email](../email/README.md).
+  [Email](../email/README.md). The mail settings are the deployment's environment variables
+  `EMAIL_PROVIDER`, `RESEND_API_KEY` and `EMAIL_FROM`; "production" means `NODE_ENV=production`.
 - You can re-enter your password when asked. The Console asks when you have not entered it
   in the last 10 minutes.
 - Your browser is online. Offline, the button is disabled and says why, because the result
@@ -103,8 +104,10 @@ result of an attempt as saved on the server.
 1. In the **Email** row, select **Send test email**.
 2. Read the confirmation. It shows your address in masked form (for example
    `o***@example.com`). With a real provider it counts toward the provider's limits. With the mock provider (not allowed in production) nothing leaves the server and the result is **Simulated**.
-3. Select **Send test**. Enter your password if the Console asks for it. From this moment
-   the email cannot be cancelled. Closing the confirmation before this step sends nothing.
+3. Select **Send test**. If the Console asks for your password, enter it: the password
+   window is part of this step and nothing has been sent while it is open. Closing it sends
+   nothing. The email is sent only after the password is accepted, and from that moment it
+   cannot be cancelled. Closing the confirmation before step 3 sends nothing.
 4. Read the result window.
 
 ### Results
@@ -116,6 +119,11 @@ result of an attempt as saved on the server.
 | **Refused**         | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected.                  | Check the provider key and the sender address in the mail settings.                                                                                        |
 | **Outcome unknown** | The provider may or may not have accepted the message: no answer in time, a lost connection, or a limit or quota was reported. | Wait a minute and reopen the result. Do not assume the email was not sent. Start a new test only if you need one (it must also pass the one-minute limit). |
 | **Did not start**   | The test stopped before anything was sent (for example the audit record could not be written).                                 | Start a new test.                                                                                                                                          |
+
+**Outcome unknown** does not change by itself: a late answer from the provider is not
+applied. To learn what really happened, read the provider's own log. For **Refused** with
+"request rejected", check that the sender address belongs to a domain the provider has
+verified and that the key may send mail; the provider's dashboard has the details.
 
 The Console never shows the provider's own error text. A reported limit or quota is
 shown as **Outcome unknown** with the note that the provider reported a limit: the
@@ -134,15 +142,30 @@ Console cannot prove from that answer that nothing was accepted.
 The hourly limit of the platform is not known in advance: the button stays available and
 the attempt ends with **The hourly limit for test emails is reached.** Try again later.
 
+### When nothing was sent
+
+| Message                                                                | Meaning                                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **The confirmation expired. Start the test again.**                    | The confirmation is older than 30 minutes or used.           |
+| **Your email address changed…** / **The email settings changed…**      | The confirmation no longer matches. Start again.             |
+| **The hourly limit for test emails is reached.**                       | Platform limit (below).                                      |
+| **A test was started a moment ago…** / **Another test is being sent.** | See the table above.                                         |
+| **The check could not start. Nothing was sent.**                       | Redis or the audit record was unavailable _before_ the send. |
+
+A request refused at the start (the hourly limit, the cooldown, another test in flight) is not
+counted. A test that was reserved but did not start (**Did not start**, which includes
+**Another test is being sent.** caused by a slow connection on the same server) is counted
+toward the per-minute and hourly limits.
+
 ### Limits
 
-| Limit                        | Value                                               |
-| ---------------------------- | --------------------------------------------------- |
-| Waiting for the provider     | 10 seconds, then **Outcome unknown**                |
-| Per operator                 | One test per minute                                 |
-| Whole platform               | 20 tests per hour                                   |
-| At the same time             | One test at a time, in normal operation (see below) |
-| Time to confirm after step 1 | 30 minutes; after that, start again                 |
+| Limit                        | Value                                                                 |
+| ---------------------------- | --------------------------------------------------------------------- |
+| Waiting for the provider     | 10 seconds, then **Outcome unknown**                                  |
+| Per operator                 | One test per minute                                                   |
+| Whole platform               | 20 tests per hour; the count restarts at the start of each hour (UTC) |
+| At the same time             | One test at a time, in normal operation (see below)                   |
+| Time to confirm after step 1 | 30 minutes; after that, start again                                   |
 
 The limits are shared by all API servers through Redis.
 
@@ -176,8 +199,10 @@ reopened result never sends.
 
 **Last test** reopens your own latest attempt, or the latest result for the platform when
 you have none. The platform's latest result shows the outcome and the time, never who ran
-it. It only reads. It never sends. The details of an attempt are kept for
-24 hours and the latest result for 7 days; after that the row says **No stored
+it. It only reads. It never sends. The **Email** row always shows the platform's latest
+result, which can differ from your own attempt that **Last test** opens first. The details
+of an attempt are kept for 24 hours; after that **Last test** shows the platform's latest
+result. The latest result is kept for 7 days; after that the row says **No stored
 result**, which is not the same as "never checked". The same text appears if the
 provider key, sender or provider type changed after the test, because an old result
 must not vouch for new settings.
