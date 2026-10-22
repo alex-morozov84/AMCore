@@ -345,7 +345,10 @@ test('ready adoption connects organization selection, roles, invitations, own ke
     .getByRole('alertdialog')
     .getByRole('button', { name: removal.confirm, exact: true })
     .click()
-  await expect(page.getByText(removal.success, { exact: true })).toBeVisible()
+  await expect(
+    page.locator('[data-slot="toast-title"]').getByText(removal.success, { exact: true })
+  ).toBeVisible()
+  await expect(page.getByTestId('member-removal-notice')).toHaveCount(0)
   expect(deletes).toBe(1)
   expect(
     count("SELECT count(*) FROM core.org_members WHERE id=:'member';", { member: membership })

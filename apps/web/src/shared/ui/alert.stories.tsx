@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { AlertCircle, Terminal } from 'lucide-react'
 import { expect, userEvent, within } from 'storybook/test'
 
+import ru from '../../../messages/ru.json'
+
 import { Alert, AlertDescription, AlertTitle } from './alert'
 
 const meta = {
@@ -99,4 +101,25 @@ export const DismissibleWithSpace: Story = {
     await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
     await expect(canvas.getByRole('heading', { name: 'Team' })).toHaveFocus()
   },
+}
+
+export const DismissiblePreview: Story = {
+  render: () => (
+    <section className="w-full max-w-sm space-y-4">
+      <h2 id="preview-alert-destination" tabIndex={-1}>
+        Список сотрудников
+      </h2>
+      <Alert
+        showCloseButton
+        closeLabel={ru.common.close}
+        dismissFocusTargetId="preview-alert-destination"
+      >
+        <AlertTitle>Данные обновлены</AlertTitle>
+        <AlertDescription>
+          Это пример уведомления. Нажмите крестик справа: сообщение исчезнет, а фокус вернётся к
+          заголовку.
+        </AlertDescription>
+      </Alert>
+    </section>
+  ),
 }
