@@ -98,11 +98,18 @@ interface RunRecord {
 export class PendingEvidence {
   static readonly OPEN_RUNS_PER_JOB = 3
   static readonly RECORDS_PER_JOB = 10
+  /** As many as the database keeps abandoned rows per job: a later finish can still close one. */
+  static readonly RELEASED_PER_JOB = 7
 
   private evidence = new Map<string, Evidence>()
   private records = new Map<string, RunRecord>()
   /** Tracked, unfinished runs (pending or already written), so a finish knows its start was accepted. */
   private open = new Map<string, { jobId: string; startMono: number; maxRuntimeMs: number }>()
+  /**
+   * Runs whose slot was freed because they outlived their maximum runtime. Their start was
+   * accepted, so a late finish with a known outcome is still taken (oldest forgotten first).
+   */
+  private released = new Map<string, string>()
   private dropped = new Map<string, { lane: Lane; count: number }>()
 
   put(next: Evidence): void {
@@ -130,8 +137,7 @@ export class PendingEvidence {
 
   /** False when the start was never accepted: there is nothing to close and nothing to record. */
   finishRun(finish: RunFinish): boolean {
-    if (!this.open.has(finish.runId)) return false
-    this.open.delete(finish.runId)
+    if (!this.open.delete(finish.runId) && !this.released.delete(finish.runId)) return false
     const record = this.records.get(finish.runId)
     if (record) {
       record.finish = finish
@@ -229,7 +235,12 @@ export class PendingEvidence {
   /** A tracked run older than its maximum runtime is treated as abandoned and frees its slot. */
   private expireOpen(jobId: string, now: number): void {
     for (const [runId, item] of this.open) {
-      if (item.jobId === jobId && now - item.startMono > item.maxRuntimeMs) this.open.delete(runId)
+      if (item.jobId !== jobId || now - item.startMono <= item.maxRuntimeMs) continue
+      this.open.delete(runId)
+      this.released.set(runId, jobId)
     }
+    const own = [...this.released.entries()].filter(([, owner]) => owner === jobId)
+    for (const [runId] of own.slice(0, Math.max(0, own.length - PendingEvidence.RELEASED_PER_JOB)))
+      this.released.delete(runId)
   }
 }

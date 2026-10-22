@@ -51,6 +51,10 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
   const manualInFlight = useRef(false)
   const handled = useRef({ data: initialUpdatedAt, error: 0 })
   const accessLost = useRef(false)
+  const [historyFloors, setHistoryFloors] = useState<PollFloors>(NO_FLOORS)
+  const historyFloorsRef = useRef<PollFloors>(NO_FLOORS)
+  const historyStreak = useRef(0)
+  const manualRefresh = useRef(false)
   const owns = useCallback(
     (key: readonly unknown[]) =>
       key[0] === 'console' && key[1] === 'scheduled-jobs' && key.includes(instance),
@@ -106,7 +110,14 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     setNow(Date.now())
     setStreak(0)
     setFloors(NO_FLOORS)
-    // Opened histories follow the page: only mounted (opened) ones refetch, closed ones have no observer.
+    // Opened histories follow the page: only mounted (opened) ones refetch, closed ones have no
+    // observer. A history that was refused waits for its own cool-down first: `Retry-After` always,
+    // backoff unless the operator pressed Refresh.
+    const wasManual = manualRefresh.current
+    manualRefresh.current = false
+    const floors = historyFloorsRef.current
+    const at = Date.now()
+    if (at < floors.retryAfterUntil || (!wasManual && at < floors.backoffUntil)) return
     void queryClient.invalidateQueries({
       queryKey: ['console', 'scheduled-jobs', 'runs', instance],
       refetchType: 'active',
@@ -128,10 +139,36 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     setFloors(floorsAfterFailure(at, next, retryAfterSecondsOf(query.error)))
   }, [query.errorUpdatedAt])
 
+  const reportHistoryFailure = useCallback(
+    (error: unknown) => {
+      if (isAccessLoss(error)) {
+        reportAccessLoss()
+        return
+      }
+      historyStreak.current += 1
+      const floors = floorsAfterFailure(
+        Date.now(),
+        historyStreak.current,
+        retryAfterSecondsOf(error)
+      )
+      historyFloorsRef.current = floors
+      setHistoryFloors(floors)
+    },
+    [reportAccessLoss]
+  )
+
+  const reportHistorySuccess = useCallback(() => {
+    if (historyStreak.current === 0) return
+    historyStreak.current = 0
+    historyFloorsRef.current = NO_FLOORS
+    setHistoryFloors(NO_FLOORS)
+  }, [])
+
   const refresh = useCallback(async () => {
     if (!canRefreshManually({ denied, online: onlineManager.isOnline(), now: Date.now(), floors }))
       return
     manualInFlight.current = true
+    manualRefresh.current = true
     try {
       await query.refetch({ cancelRefetch: false })
     } finally {
@@ -143,6 +180,9 @@ export function useScheduledJobs(initial: ScheduledJobsResponse, initialUpdatedA
     data: denied ? null : (query.data ?? null),
     instance,
     reportAccessLoss,
+    historyFloors,
+    reportHistoryFailure,
+    reportHistorySuccess,
     denied,
     auto,
     setAuto,

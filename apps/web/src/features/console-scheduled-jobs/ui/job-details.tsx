@@ -170,6 +170,11 @@ export function RunSummary({
   const bucket = useTranslations('console.scheduledJobs.buckets')
   const locale = useLocale()
   const codeLabel = useCodeLabel()
+  // A recorded code is a failed step (a bucket name) or a result code; unknown ids stay as they are.
+  const wording = (code: string): string => {
+    const key = code as Parameters<typeof bucket.has>[0]
+    return bucket.has(key) ? bucket(key) : codeLabel(code)
+  }
   const counts = Object.entries(summary?.counts ?? {})
   const codes = summary?.codes ?? []
   const number = new Intl.NumberFormat(locale)
@@ -187,7 +192,7 @@ export function RunSummary({
       )}
       {codes.length > 0 && (
         <p className="text-muted-foreground">
-          {t('details')} {codes.map(codeLabel).join(', ')}
+          {t('details')} {codes.map(wording).join(', ')}
         </p>
       )}
       {code && <p className="text-muted-foreground">{codeLabel(code)}</p>}

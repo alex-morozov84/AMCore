@@ -191,3 +191,27 @@ describe('run records', () => {
     expect(pending.startRun(start('later', { startMono: 100 }))).toBe(true)
   })
 })
+
+describe('released slots', () => {
+  it('accepts the late finish of a run whose slot was released, once, and only for that run', () => {
+    const pending = new PendingEvidence()
+    pending.startRun(start('A', { startMono: 0, maxRuntimeMs: 100 }))
+    pending.take('event') // A's start is already written
+    expect(pending.startRun(start('B', { startMono: 101, maxRuntimeMs: 100 }))).toBe(true)
+    expect(pending.finishRun(finish('A', { startMono: 0, endMono: 110 }))).toBe(true)
+    expect(pending.finishRun(finish('A', { startMono: 0, endMono: 111 }))).toBe(false)
+    expect(pending.finishRun(finish('never', { startMono: 0 }))).toBe(false)
+    expect(pending.take('event').finishes.map((item) => item.runId)).toEqual(['A'])
+  })
+
+  it('remembers at most seven released runs per job, so memory stays bounded', () => {
+    const pending = new PendingEvidence()
+    for (let i = 0; i < 12; i += 1)
+      pending.startRun(start(`r${i}`, { startMono: i * 1000, maxRuntimeMs: 10 }))
+    pending.startRun(start('last', { startMono: 100_000, maxRuntimeMs: 10 }))
+    const accepted = Array.from({ length: 12 }, (_, i) => `r${i}`).filter((id) =>
+      pending.finishRun(finish(id, { startMono: 0 }))
+    )
+    expect(accepted.length).toBeLessThanOrEqual(PendingEvidence.RELEASED_PER_JOB)
+  })
+})

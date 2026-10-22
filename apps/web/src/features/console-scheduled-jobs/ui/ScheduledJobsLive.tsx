@@ -59,7 +59,13 @@ export function ScheduledJobsLive({
         ) : (
           <>
             <ScheduledJobsScopeProvider
-              value={{ instance: live.instance, onAccessLoss: live.reportAccessLoss }}
+              value={{
+                instance: live.instance,
+                onAccessLoss: live.reportAccessLoss,
+                historyFloors: live.historyFloors,
+                onHistoryFailure: live.reportHistoryFailure,
+                onHistorySuccess: live.reportHistorySuccess,
+              }}
             >
               <ScheduledJobsTable jobs={data.jobs} />
               <ScheduledJobCards jobs={data.jobs} />

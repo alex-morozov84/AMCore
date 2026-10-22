@@ -328,3 +328,42 @@ describe('memory stays bounded while the database is hung', () => {
     expect(snapshot.dropped.get('cleanup')).toBeGreaterThan(0)
   })
 })
+
+describe('admission is checked before every physical transaction', () => {
+  it('keeps evidence pending when business queries took the pool during the registration', async () => {
+    const { instance, tx, writes, stats } = recorder()
+    instance.registerJobs([CLEANUP_JOB], () => null)
+    instance.finish(CLEANUP_JOB, instance.begin(CLEANUP_JOB), succeeded())
+    await advance(0)
+    expect(tx).toHaveBeenCalledTimes(1) // the registration transaction
+    // While it runs, requests fill the pool and queue for a connection.
+    Object.assign(stats, { total: 10, idle: 0, waiting: 2 })
+    writes.splice(0).forEach((write) => write.resolve())
+    await advance(0)
+    await advance(30_000)
+    expect(tx).toHaveBeenCalledTimes(1) // no evidence transaction while requests wait
+    // The pool recovers: the retry writes the evidence, and the registration is not repeated.
+    Object.assign(stats, { total: 3, idle: 2, waiting: 0 })
+    await advance(60_000)
+    expect(tx).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('a late finish still closes the run whose slot was released', () => {
+  it('keeps the known outcome of an abandoned run after the next run began', async () => {
+    const { instance, writes } = recorder()
+    const pending = (instance as unknown as { pending: PendingEvidence }).pending
+    const first = instance.begin(CLEANUP_JOB)
+    await advance(0)
+    writes.splice(0).forEach((write) => write.resolve())
+    await advance(0)
+    // Older than the maximum runtime, so the next start releases its slot.
+    await advance(CLEANUP_JOB.graceMs + 1000)
+    const second = instance.begin(CLEANUP_JOB)
+    expect(second.tracked).toBe(true)
+    instance.finish(CLEANUP_JOB, first, succeeded())
+    const snapshot = pending.take('event')
+    expect(snapshot.finishes.map((item) => item.runId)).toEqual([first.runId])
+    expect(snapshot.dropped.get('cleanup')).toBeUndefined()
+  })
+})

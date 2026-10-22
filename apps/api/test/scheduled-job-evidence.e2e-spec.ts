@@ -300,6 +300,46 @@ describe('Scheduled job evidence (PostgreSQL)', () => {
       expect(row.finishedAt).not.toBeNull()
     })
 
+    it('closes only the abandoned run when its late finish comes after the next run began', async () => {
+      const pending = new PendingEvidence()
+      const first = randomUUID()
+      const second = randomUUID()
+      const maxRuntimeMs = 1000
+      const begin = (runId: string, startMono: number): void => {
+        startMonos.set(runId, startMono)
+        pending.startRun({
+          jobId: 'cleanup',
+          runId,
+          startMono,
+          maxRuntimeMs,
+          clock: clockOf(runId),
+        })
+      }
+      begin(first, (mono += 10))
+      await writeSnapshot(service, pending.take('event'), catalogue, anchors)
+      // The next run begins after the first outlived its maximum runtime: its slot is released
+      // and the database marks the first row abandoned.
+      // The database clock decides what is abandoned, so let real time pass as well.
+      await new Promise((resolve) => setTimeout(resolve, maxRuntimeMs + 700))
+      mono += maxRuntimeMs + 700
+      begin(second, mono)
+      await writeSnapshot(service, pending.take('event'), catalogue, anchors)
+      expect(
+        (await db.scheduledJobRun.findUniqueOrThrow({ where: { runId: first } })).outcome
+      ).toBe('unknown')
+      // The first run finally ends with a known outcome, through the same pending state.
+      expect(pending.finishRun({ ...finish(first), startMono: startMonos.get(first) ?? 0 })).toBe(
+        true
+      )
+      await writeSnapshot(service, pending.take('event'), catalogue, anchors)
+      expect(
+        (await db.scheduledJobRun.findUniqueOrThrow({ where: { runId: first } })).outcome
+      ).toBe('success')
+      expect(
+        (await db.scheduledJobRun.findUniqueOrThrow({ where: { runId: second } })).outcome
+      ).toBeNull()
+    })
+
     it('counts a finish that has no run row as a lost observation and still writes the summary', async () => {
       const runId = randomUUID()
       await write({ finishes: [finish(runId)], evidence: [evidence({ runId })] })

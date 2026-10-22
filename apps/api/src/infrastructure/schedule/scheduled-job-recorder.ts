@@ -198,8 +198,12 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
    * the pending state and the failure is rethrown for the flush control to back off.
    */
   private async writeLane(lane: Lane): Promise<void> {
-    await this.ensureRegistered()
+    const registered = await this.ensureRegistered()
     if (!this.pending.has(lane)) return
+    // Admission was checked before the registration transaction; business queries may have taken
+    // the pool while it ran. Check again before the next physical transaction and keep the
+    // evidence pending until a connection is free (the flush control retries).
+    if (registered && !this.admitted()) throw new Error('pool_busy')
     const snapshot = this.pending.take(lane)
     try {
       await writeSnapshot(this.prisma, snapshot, [...this.definitions.keys()], {
@@ -211,12 +215,14 @@ export class ScheduledJobRecorder implements OnModuleDestroy {
     }
   }
 
-  private async ensureRegistered(): Promise<void> {
+  /** True when this call wrote the registration (so a transaction has just been taken). */
+  private async ensureRegistered(): Promise<boolean> {
     const items = this.registration
-    if (!items) return
+    if (!items) return false
     try {
       await writeRegistration(this.prisma, items)
       if (this.registration === items) this.registration = null
+      return true
     } catch (error) {
       this.logger.warn(
         { event: 'schedule.registration_failed', error: errorName(error) },

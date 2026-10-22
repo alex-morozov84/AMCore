@@ -65,7 +65,13 @@ function Harness({ auto = true }: { auto?: boolean }) {
   if (!live.data) return <p>hidden</p>
   return (
     <ScheduledJobsScopeProvider
-      value={{ instance: live.instance, onAccessLoss: live.reportAccessLoss }}
+      value={{
+        instance: live.instance,
+        onAccessLoss: live.reportAccessLoss,
+        historyFloors: live.historyFloors,
+        onHistoryFailure: live.reportHistoryFailure,
+        onHistorySuccess: live.reportHistorySuccess,
+      }}
     >
       <button onClick={() => void live.refresh()}>Refresh now</button>
       <ScheduledJobHistory jobId="cleanup" />
@@ -170,5 +176,44 @@ describe('losing access', () => {
     await screen.findByText('hidden')
     await act(async () => void (await Promise.resolve()))
     expect(refreshPage).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a refused history waits for its Retry-After', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'],
+    })
+  })
+  afterEach(() => vi.useRealTimers())
+
+  const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(0)))
+  const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)))
+
+  it('does not read again on a page refresh, a reopen or a manual refresh before the time, and resumes after it', async () => {
+    runs.mockRejectedValueOnce(new ApiRequestError(429, undefined, 120))
+    view()
+    open()
+    await settle()
+    expect(runs).toHaveBeenCalledTimes(1)
+
+    // The page refreshes successfully (manual): the history stays quiet.
+    refreshNow()
+    await settle()
+    expect(list).toHaveBeenCalled()
+    expect(runs).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(/Available in 1[0-2][0-9] seconds/)).toBeInTheDocument()
+
+    // Closing and opening the history again does not bypass the time.
+    open()
+    open()
+    await settle()
+    expect(runs).toHaveBeenCalledTimes(1)
+
+    // After the time the history is read again without any other action.
+    runs.mockResolvedValueOnce(page('2026-10-21T09:30:00.000Z'))
+    await wait(121_000)
+    expect(runs).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('Success')).toBeInTheDocument()
   })
 })
