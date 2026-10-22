@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The custom team example uses an independent crew directory and personnel dossier with separate role, key and membership sections.
+- Alerts support optional internal dismissal with an accessible focus destination. Ordinary successful member removal no longer duplicates its toast with a permanent banner.
+
 - External web sign-in completes through a same-origin form with automatic
   continuation and a no-JavaScript Continue button, preserving Strict cookies
   and the validated return page without exposing its code through Referer.

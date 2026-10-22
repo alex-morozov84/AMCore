@@ -485,3 +485,29 @@ use `destructive`; reversible pause/resume actions remain neutral. Unselected co
 normal variant; keyboard focus remains a separate visible ring. These tokens
 follow the active brand and light/dark theme. A momentary click is not a
 persistent selection.
+
+## Dismissible alerts
+
+`Alert` keeps its existing presentation unless `showCloseButton` is true.
+The dismissible variant hides itself internally; no `onClose` or visibility state is required.
+Supply a localized `closeLabel` and `dismissFocusTargetId` naming a stable focus destination.
+
+```tsx
+<h2 id="team-heading" tabIndex={-1}>{t('team')}</h2>
+<Alert key={notification.id} showCloseButton
+  closeLabel={t('closeNotification')} dismissFocusTargetId="team-heading">
+  <AlertDescription>{notification.text}</AlertDescription>
+</Alert>
+```
+
+The destination must remain visible, enabled and outside the alert. A heading needs
+`tabIndex={-1}`. Closing focuses that exact element before hiding. If it cannot
+receive focus, the alert stays visible. Appearing alerts never take focus.
+Use a stable notification ID as the React key: rerendering the same message keeps
+it dismissed; a new ID shows a new message, even if its text is unchanged.
+
+The default component stays universal. Only the dismissible branch uses a private
+client component; its focus destination is a serializable DOM ID. Server callers
+must not pass event handlers or refs across that boundary. Closing only hides
+presentation; it does not cancel a request or resolve an unknown result. Do not
+enable dismissal when it would hide the only recovery action or safe exit.

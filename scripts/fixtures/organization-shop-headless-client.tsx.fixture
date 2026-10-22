@@ -1,21 +1,63 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { ProductAccessBootstrap } from '@amcore/shared'
 
-import { CustomMembers } from './custom-members'
+import { useOrganizationContext } from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+
+import { ShopOperations } from './shop-operations'
 
 import styles from './shop-team.module.css'
 
 export function ShopTeam({ admission, id }: { admission: ProductAccessBootstrap; id: string }) {
+  return <ShopSession key={`${admission.binding}:${id}`} admission={admission} id={id} />
+}
+function ShopSession({ admission, id }: { admission: ProductAccessBootstrap; id: string }) {
+  const locale = useLocale()
   const t = useTranslations('productAdminExample')
+  const membersText = useTranslations('organizationMembers')
+  const access = useOrganizationContext(admission.binding, { kind: 'selected', id, locale })
+  const allowed = Boolean(
+    access.state.status === 'ready' &&
+    access.data &&
+    'canManageTeamAccess' in access.data.data &&
+    access.data.data.canManageTeamAccess
+  )
+  const sameSession = !['missing', 'changed'].includes(access.state.status)
   return (
     <main className={styles.station} data-testid="shop-team">
-      <div className={styles.missionHeading}>
-        <p className={styles.stationName}>{t('station')}</p>
-        <p className={styles.stationDescription}>{t('stationDescription')}</p>
+      <div className={styles.frame}>
+        <header className={styles.missionHeading}>
+          <p className={styles.stationName}>{t('station')}</p>
+          <p className={styles.stationDescription}>{t('stationDescription')}</p>
+          <Button
+            variant="outline"
+            disabled={access.busy || access.state.status === 'pending'}
+            onClick={() => void access.refresh().catch(() => undefined)}
+          >
+            {membersText('refresh')}
+          </Button>
+        </header>
+        <ApiErrorAlert error={access.state.error} />
+        {access.state.status === 'missing' && (
+          <RouteProgressLink href="/login">{t('signIn')}</RouteProgressLink>
+        )}
+        {access.state.status === 'changed' && (
+          <Button onClick={() => window.location.reload()}>{t('reload')}</Button>
+        )}
+        {!allowed && sameSession && access.state.status !== 'pending' && (
+          <p role="status">{t('unavailable')}</p>
+        )}
+        <ShopOperations
+          admission={admission}
+          controller={access.controller}
+          allowed={allowed}
+          sameSession={sameSession}
+        />
       </div>
-      <CustomMembers admission={admission} organizationId={id} />
     </main>
   )
 }

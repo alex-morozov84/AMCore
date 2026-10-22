@@ -143,6 +143,11 @@ test('shop replaces effective palette blocks and preserves fonts and charts', as
     const preserved = (text) => text.split('\n').filter((line) => /--(?:chart-|font-)/.test(line))
     assert.deepEqual(preserved(css), preserved(original))
     assert.notEqual(css, original)
+    const ui = join(generated, 'apps/web/src/_pages/shop-team/ui')
+    assert.match(await readFile(join(ui, 'shop-team.tsx'), 'utf8'), /ShopOperations/)
+    for (const module of ['directory', 'dossier', 'operations', 'roles', 'keys', 'membership'])
+      assert.ok((await readFile(join(ui, `shop-${module}.tsx`), 'utf8')).length)
+    await assert.rejects(readFile(join(ui, 'custom-members.tsx')), { code: 'ENOENT' })
   } finally {
     await rm(generated, { recursive: true, force: true })
   }

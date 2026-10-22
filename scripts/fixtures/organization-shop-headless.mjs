@@ -3,7 +3,6 @@ import { join } from 'node:path'
 
 import {
   exampleInstructions,
-  memberTemplates,
   prepareExample,
   replaceOnce,
   template,
@@ -43,7 +42,14 @@ const context = await prepareExample('shop', process.argv.slice(2), undefined, a
 })
 const page = 'apps/web/src/_pages/shop-team'
 const files = {
-  ...(await memberTemplates(`${page}/ui`)),
+  ...Object.fromEntries(
+    await Promise.all(
+      ['directory', 'dossier', 'operations', 'roles', 'keys', 'membership'].map(async (name) => [
+        `${page}/ui/shop-${name}.tsx`,
+        await template(`organization-shop-${name}.tsx.fixture`),
+      ])
+    )
+  ),
   [`${page}/ui/shop-team.tsx`]: await template('organization-shop-headless-client.tsx.fixture'),
   [`${page}/ui/shop-team.module.css`]: await template(
     'organization-shop-headless.module.css.fixture'

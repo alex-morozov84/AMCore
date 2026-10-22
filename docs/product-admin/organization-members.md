@@ -244,7 +244,8 @@ In Russian, the actions are **Удалить из организации…**, *
 1. On **Members**, find the colleague by name or email. Open their row menu and choose **Remove from organization…**.
 2. Check the organization, name and email. All the person's keys for this organization will be permanently revoked, including expired keys.
 3. Choose **Cancel** to make no request, or **Remove member** to confirm. Rejoining will require new keys.
-4. Read the status above the list. A confirmed success means membership and key revocation committed together.
+4. After deleting another member, the success toast and refreshed list confirm completion. Membership and key revocation committed together.
+   If the refresh fails or the result is unknown, a persistent message above the list provides recovery.
 
 Removing yourself requires the same authority and displays an additional access-loss warning.
 Another member must hold the builtin ADMIN role. A custom role named ADMIN does not qualify.

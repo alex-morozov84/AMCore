@@ -33,6 +33,7 @@ export function RemovalNotice({
     getErrorStatus(error) === 400 && getErrorCode(error) === 'BUSINESS_RULE_VIOLATION'
   const limit = getErrorStatus(error) === 409 && getErrorCode(error) === 'MEMBER_API_KEYS_LIMIT'
   const committed = outcome?.status === 'committed'
+  if (committed && !self && outcome.followup === 'ready') return null
   const unknown = outcome?.status === 'unknown'
   const rejected = outcome?.status === 'rejected'
   const title = removal.pending

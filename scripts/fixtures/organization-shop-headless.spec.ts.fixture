@@ -148,9 +148,10 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
     page.getByRole('button', { name: catalogues.ownApiKeys.create, exact: true })
   ).toHaveCount(0)
   const row = page.getByRole('listitem').filter({ hasText: colleague.user.email })
-  await row.getByRole('button', { name: colleague.user.email, exact: true }).click()
-  const editor = page.locator('[data-example-region="editor"]')
-  await expect(editor).toBeFocused()
+  await row.getByRole('button').click()
+  const editor = page.getByTestId('shop-dossier')
+  await expect(page.locator('#shop-dossier-heading')).toBeFocused()
+  await expect(page.getByTestId('shop-directory')).toHaveCount(0)
   await expect(editor.getByRole('checkbox', { name: 'ADMIN', exact: true })).toBeChecked()
   const mainRefresh = page.getByRole('button', { name: t.refresh, exact: true })
   let primaryFault = false
@@ -188,11 +189,11 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
   await expect(editor.getByRole('checkbox')).toHaveCount(0)
   primaryFault = false
   await mainRefresh.click()
-  await expect(row).toBeVisible()
+  await expect(page.locator('#shop-dossier-heading')).toBeVisible()
   await expect(editor.getByRole('checkbox', { name: 'ADMIN', exact: true })).toBeVisible()
   rolesFault = true
   await mainRefresh.click()
-  await expect(row).toBeVisible()
+  await expect(page.locator('#shop-dossier-heading')).toBeVisible()
   await expect(editor.getByRole('checkbox')).toHaveCount(0)
   rolesFault = false
   await mainRefresh.click()
@@ -266,6 +267,7 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
     count("SELECT count(*) FROM core.org_members WHERE id=:'member';", { member: buyerMember })
   ).toBe(1)
 
+  await page.getByRole('tab', { name: catalogues.productAdminExample.keys, exact: true }).click()
   const keyPanel = page.getByTestId('custom-headless-member-keys')
   await expect(keyPanel.getByText('Shop export', { exact: true })).toBeVisible()
   await keyPanel.getByRole('button', { name: keys.revokeAll, exact: true }).click()
@@ -288,15 +290,24 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
   )
   expect(await keyStatus(removalKey.key, org)).toBe(200)
   await keyPanel.getByRole('button', { name: keys.check, exact: true }).click()
-  await row.getByRole('button', { name: removal.action, exact: true }).click()
+  await page
+    .getByRole('tab', { name: catalogues.productAdminExample.membership, exact: true })
+    .click()
+  await page
+    .getByTestId('custom-headless-removal')
+    .getByRole('button', { name: removal.title, exact: true })
+    .click()
   const inline = page.getByTestId('custom-headless-removal')
   let deletes = 0
   page.on('request', (request) => {
     if (request.method() === 'DELETE' && request.url().includes('/members/')) deletes++
   })
-  await inline.getByRole('button', { name: removal.cancel, exact: true }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: removal.cancel, exact: true })
+    .click()
   expect(deletes).toBe(0)
-  await row.getByRole('button', { name: removal.action, exact: true }).click()
+  await inline.getByRole('button', { name: removal.title, exact: true }).click()
   // The server commits once, but the reply is lost. Recovery must inspect, never replay.
   const deletePattern = '**/api/product-access/organizations/*/members/*?expectedMemberId=*'
   await page.route(deletePattern, async (route) => {
@@ -304,12 +315,18 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
     await route.fetch()
     await route.abort('failed')
   })
-  await inline.getByRole('checkbox', { name: removal.warning, exact: true }).check()
-  await inline.getByRole('button', { name: removal.confirm, exact: true }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('checkbox', { name: removal.warning, exact: true })
+    .check()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: removal.confirm, exact: true })
+    .click()
   await expect(inline.getByText(removal.unknown, { exact: true })).toBeVisible()
   await expect(inline.getByRole('button', { name: removal.confirm, exact: true })).toHaveCount(0)
   await inline.getByRole('button', { name: removal.check, exact: true }).click()
-  await expect(inline.getByText(removal.different, { exact: true })).toBeVisible()
+  await expect(inline.getByText(removal.unavailable, { exact: true })).toBeVisible()
   await page.unroute(deletePattern)
   expect(deletes).toBe(1)
   expect(await keyStatus(removalKey.key, org)).toBe(401)
@@ -333,11 +350,26 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
     )
   ).toBe(2)
 
+  await inline
+    .getByRole('button', { name: catalogues.productAdminExample.back, exact: true })
+    .click()
   const self = page.getByRole('listitem').filter({ hasText: email })
-  await self.getByRole('button', { name: removal.action, exact: true }).click()
-  await inline.getByRole('checkbox', { name: removal.warning, exact: true }).check()
-  await inline.getByRole('button', { name: removal.confirm, exact: true }).click()
-  await expect(inline.getByText(removal.success, { exact: true })).toBeVisible()
+  await self.getByRole('button').click()
+  await page
+    .getByRole('tab', { name: catalogues.productAdminExample.membership, exact: true })
+    .click()
+  await inline.getByRole('button', { name: removal.title, exact: true }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('checkbox', { name: removal.warning, exact: true })
+    .check()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: removal.confirm, exact: true })
+    .click()
+  await expect(
+    page.getByText(catalogues.productAdminExample.selfRemoved, { exact: false })
+  ).toBeVisible()
   await expect(page.getByRole('listitem')).toHaveCount(0)
   await expect(editor.getByRole('checkbox')).toHaveCount(0)
   expect((await page.goto(path))?.status()).toBe(404)

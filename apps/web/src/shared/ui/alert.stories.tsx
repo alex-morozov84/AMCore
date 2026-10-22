@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { AlertCircle, Terminal } from 'lucide-react'
+import { expect, userEvent, within } from 'storybook/test'
 
 import { Alert, AlertDescription, AlertTitle } from './alert'
 
@@ -58,4 +59,44 @@ export const InformationalNote: Story = {
       </AlertDescription>
     </Alert>
   ),
+}
+
+export const Dismissible: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const close = canvas.getByRole('button', { name: 'Close notification' })
+    close.focus()
+    await userEvent.keyboard('{Enter}')
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
+    await expect(canvas.getByRole('heading', { name: 'Team' })).toHaveFocus()
+  },
+  render: () => (
+    <section className="w-full max-w-sm space-y-4">
+      <h2 id="notification-destination" tabIndex={-1}>
+        Team
+      </h2>
+      <Alert
+        showCloseButton
+        closeLabel="Close notification"
+        dismissFocusTargetId="notification-destination"
+      >
+        <AlertTitle className="line-clamp-none">A completed informational action</AlertTitle>
+        <AlertDescription>
+          This long message wraps while leaving room for the close control. Closing returns keyboard
+          focus to Team.
+        </AlertDescription>
+      </Alert>
+    </section>
+  ),
+}
+
+export const DismissibleWithSpace: Story = {
+  ...Dismissible,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    canvas.getByRole('button', { name: 'Close notification' }).focus()
+    await userEvent.keyboard(' ')
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument()
+    await expect(canvas.getByRole('heading', { name: 'Team' })).toHaveFocus()
+  },
 }

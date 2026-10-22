@@ -155,7 +155,10 @@ shop example use the same public organization-context APIs.
 In the generated shop copy:
 
 - `_pages/shop-team/ui/shop-team.tsx` composes the product presentation.
-- Its sibling `custom-members.tsx` consumes the public headless hooks.
+- `shop-directory.tsx` owns search and member tiles; selecting a member opens a full-width dossier.
+- `shop-dossier.tsx` owns the identity and Roles/API keys/Membership sections.
+- `shop-operations.tsx` preserves operation state across those sections.
+- `shop-roles.tsx`, `shop-keys.tsx` and `shop-membership.tsx` consume public headless hooks directly.
 - `shop-team.module.css` owns the page's panels, spacing and control geometry.
 - `apps/web/src/app/globals.css` owns light/dark semantic color values. Root values
   also reach login and confirmation dialogs rendered outside the page container.
@@ -163,7 +166,10 @@ In the generated shop copy:
 Replace these product-owned presentation choices while retaining the public module
 contract. Use the existing [semantic tokens](../frontend/brand-theme-and-tokens.md)
 and shared controls. Keep keyboard focus, contrast, translations and confirmation
-meaning. A custom skin does not automatically prove accessibility.
+meaning. Independent markup does not automatically prove accessibility. The ready table/row menus
+and the shop directory/dossier demonstrate different journeys over the same public operations.
+Back and section changes require an explicit decision before discarding a role draft.
+Pending and unknown operations stay mounted and block unsafe navigation.
 
 ## Verify and recover
 
