@@ -56,7 +56,15 @@ worker-only module (see [Register in the correct process role](architecture-and-
    `bucketOutcome()` (in `scheduled-job-outcome.ts`) is for a job that runs independent
    steps and collects their failures instead of throwing: no failed step is
    `success`, some failed steps are `partial`, every step failed is `failed`. A job
-   with a different shape builds the result itself.
+   with a different shape builds the result itself. `bucketOutcome(result)` takes the
+   numeric fields of `result` as `counts` and the names in `result.failures` as `codes`
+   (the first 8), and returns `succeeded`, `partial('bucket_failed')` or
+   `failed('all_buckets_failed')`. A pass in which nothing was due has all counts at 0 and
+   no failures: it is `success`.
+
+   Import `succeeded`, `partial`, `failed` and `skippedFor` from `scheduled-job.ts` and
+   `CronExpression` from `@nestjs/schedule`; `daily`, `frequent` and the `EVERY_*`
+   constants are in the catalogue file itself.
 
    Inject `ScheduledJobExecutor` (import `ScheduledJobsModule` in the module that
    provides the service). For a `singleton` job the executor takes the Redis lock
@@ -72,25 +80,53 @@ catalogue; an id with hyphens is used as it is, for example `"report-cleanup": {
 
 ## Choose the result
 
-| Return                    | When                                                                                                                                                                                                                                                                                                             |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `succeeded(summary?)`     | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                                                                                                                                                                      |
-| `partial(code, summary?)` | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                                                                                                                                                                            |
-| `failed(code, summary?)`  | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary.                                                                                                                                               |
-| `skippedFor(reason)`      | Frequent jobs only: `not_ready` (the work cannot start yet, for example the application is still starting), `shutdown` (the process is stopping) or `busy` (another pass or every lane is already taken). The job decides which applies. A skip never makes a job look fresh. Daily jobs must not return a skip. |
+| Return                                                                                                      | When                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `succeeded(summary?)`                                                                                       | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                                                                                                                                                     |
+| `partial(code, summary?)`                                                                                   | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                                                                                                                                                           |
+| `failed(code, summary?)`                                                                                    | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary.                                                                                                                              |
+| `skippedFor(reason)`                                                                                        | Frequent jobs only: `not_ready` (the work cannot start yet, for example the application is still starting), `shutdown` (the process is stopping) or `busy` (another pass or every lane is already taken). The job decides which applies, from its own state: the existing dispatchers use their |
+| readiness flag and their lane gate. A skip never makes a job look fresh. Daily jobs must not return a skip. |
+
+### Throw or return
 
 `return failed('code')` ends the run normally: nothing is rethrown. A thrown error is
 recorded as `failed` and then rethrown to the scheduler as before, so choose one of
-the two. After some steps committed and a later one aborted the loop, return
-`failed('code', { counts: { committed: 3 }, codes: [] })` unless the scheduler should
-also see the error.
-Its code is the error class name only when the name is on a closed list (database,
-timeout and standard JavaScript error classes); any other name is recorded as
-`unexpected`, because a name chosen by a library or by input could carry content.
-Return `failed('your_code')` yourself when the Console should show a specific reason. The summary holds **counters and codes only**
-(at most 16 keys, 512 bytes): never an error message, row content or user data.
-A resolved result that does not describe the real outcome is a defect: classify
+the two. A thrown error carries its class name as the code only when the name is on a
+closed list (database, timeout and standard JavaScript error classes); any other name is
+recorded as `unexpected`, because a name chosen by a library or by input could carry
+content. Return `failed('your_code')` yourself when the Console should show a specific
+reason. A resolved result that does not describe the real outcome is a defect: classify
 inside the job, at the place that knows, not around it.
+
+### The summary has one shape
+
+The optional `summary` is always `{ counts, codes }`, never a bare object of numbers:
+
+- `counts`: an object of non-negative whole numbers, at most 16 keys.
+- `codes`: an array of short codes, at most 8. Use it for failed steps or result codes.
+- A key or code starts with a letter and has only letters, digits and `_`, up to 48
+  characters. The whole summary is at most 512 bytes.
+- Counters and codes only: never an error message, an email address, row content or any
+  user data. Put such detail in the worker log.
+
+```ts
+// A frequent job: finished its pass, checked 12 items. Nothing failed.
+return succeeded({ counts: { checked: 12 }, codes: [] })
+
+// Not ready yet or busy: a skip has no summary and never makes the job look fresh.
+if (!this.ready) return skippedFor('not_ready')
+if (this.busy) return skippedFor('busy')
+
+// Some independent steps failed, the others worked.
+return partial('step_failed', { counts: { cleaned: 40 }, codes: ['expiredSessions'] })
+
+// Three transactions committed, the fourth threw and the loop stopped.
+return failed('cleanup_aborted', { counts: { committed: 3 }, codes: [] })
+```
+
+The Console words a code through its own catalogue; a code it does not know is shown as it
+is, so choose readable ids.
 
 Do not record a manual run or a startup attempt as a scheduled run. Call the
 shared logic directly, as `POST /admin/cleanup` and the GeoIP startup/CLI path do.
@@ -117,7 +153,10 @@ shared logic directly, as `POST /admin/cleanup` and the GeoIP startup/CLI path d
   a job at its start or its end. One background writer does one write at a time
   (the event lane at most once a second, the summary lane at most once a minute).
   It starts a write only when the pool has an idle connection or can open one
-  without making a request wait, and it needs `DATABASE_POOL_MAX` of at least 2.
+  without making a request wait, and it needs `DATABASE_POOL_MAX` of at least 2. A write that hangs holds that one connection until the pool's
+  `DATABASE_QUERY_TIMEOUT_MS` cuts it off, so with a pool of 2 a stuck write takes half of
+  the pool for that time (measured: recovery passes were about 50% slower at p95); with a
+  pool of 10 the effect on other work was within measurement noise.
   Memory is bounded: at most 3 tracked unfinished runs and 10 run records per job,
   and the newest evidence of each kind per job. A lost write loses an observation,
   never a run. After five failed writes only failures and partial results are kept
@@ -150,8 +189,18 @@ under the old one.
   production `migrator` and `runtime` roles are in
   `apps/api/test/scheduled-job-roles.e2e-spec.ts`.
 - To measure the recorder's cost against the connection pool, run the on-demand
-  `apps/api/test/measure/scheduled-job-overhead.measure.ts` (its header gives the
-  command). It is not part of the regular suites.
+  `apps/api/test/measure/scheduled-job-overhead.measure.ts`. It is not part of the regular
+  suites and `pnpm test:e2e` refuses it. It needs Docker. From `apps/api`, after
+  `node ../../scripts/api-e2e-ci.mjs --prepare`:
+
+  ```bash
+  NODE_OPTIONS=--experimental-vm-modules node_modules/.bin/jest -c jest-e2e.config.js \
+    --testMatch '<rootDir>/test/measure/*.measure.ts' \
+    --runTestsByPath test/measure/scheduled-job-overhead.measure.ts
+  ```
+
+  Add `--listTests` to check that it is found. Set `DOCKER_HOST` if your container runtime
+  is not at `/var/run/docker.sock`.
 
 ## Related
 

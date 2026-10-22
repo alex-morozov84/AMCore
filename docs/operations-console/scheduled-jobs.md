@@ -71,7 +71,9 @@ lock is normal and is not recorded.
 Daily jobs have **Run history**. Open it to see up to the latest 20 runs with their
 start, end, duration, result and what the run counted (for example _expired
 sessions: 12_). An open history is refreshed together with the page; if that fails,
-it keeps the older runs and says when they were read. Per job, the page keeps at most
+it keeps the older runs and says when they were read. If the server asks the
+page to wait (HTTP 429 with Retry-After), the history is not read again before that time,
+not even by closing and opening it, and says **Available in N seconds**. Per job, the page keeps at most
 30 finished runs, none older than 30 days, and a few unfinished ones. Old runs are
 removed when that job records its next run, so a job that no longer runs keeps its
 last rows. Jobs that run every few seconds have no history: their row is a summary of
