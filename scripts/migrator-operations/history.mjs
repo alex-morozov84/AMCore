@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 import { root } from './context.mjs'
 import { cli } from './cli.mjs'
 import { imageUrl, withConnection, usingConnection } from './connection.mjs'
-import { createDatabase, runtimeProof } from './roles.mjs'
+import { createDatabase, runtimeProof, ownership } from './roles.mjs'
 
 export async function ledger(f, client, names) {
   const { rows } = await client.query(
@@ -56,12 +56,7 @@ export async function fresh(f, admin) {
   await cli(f)
   await ledger(f, admin, f.migrations)
   await admin.query(f.grants)
-  const owners = (
-    await admin.query(
-      `SELECT count(*)::int AS wrong FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE (n.nspname IN ('core','notifications','ai') AND c.relkind IN ('r','S')) AND pg_get_userbyid(c.relowner)<>'amcore_migrator'`
-    )
-  ).rows[0].wrong
-  assert.equal(owners, 0)
+  await ownership(f, admin, 'fresh')
   await withConnection(f, 'amcore', 'amcore_migrator', (c) =>
     c.query('CREATE TABLE core.migration_probe(id serial PRIMARY KEY,payload text NOT NULL)')
   )
@@ -69,7 +64,7 @@ export async function fresh(f, admin) {
   emit(f, 'fresh-current-history-and-ownership', {
     migrations: f.migrations.length,
     checksumMatches: true,
-    wrongOwners: owners,
+    wrongOwners: 0,
   })
 }
 export async function upgrade(f) {
@@ -106,6 +101,7 @@ export async function upgrade(f) {
       c.query('CREATE TABLE core.migration_probe(id serial PRIMARY KEY,payload text NOT NULL)')
     )
     await runtimeProof(f, 'amcore_upgrade')
+    await ownership(f, upgrade, 'upgrade')
     emit(f, 'upgrade-with-data', {
       from: f.migrations.length - 1,
       to: f.migrations.length,

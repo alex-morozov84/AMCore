@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { cli } from './cli.mjs'
 import { audit, audited } from './audit.mjs'
 import { imageUrl, withConnection, usingConnection } from './connection.mjs'
-import { createDatabase, runtimeProof } from './roles.mjs'
+import { createDatabase, runtimeProof, ownership } from './roles.mjs'
 import { ledger } from './history.mjs'
 
 export async function partialRecovery(f) {
@@ -107,19 +107,19 @@ export async function backupRestore(f, admin) {
     await restored.query(f.grants)
     await ledger(f, restored, f.migrations)
     await runtimeProof(f, 'amcore_restore')
+    await withConnection(f, 'amcore_restore', 'amcore_migrator', (c) =>
+      c.query(
+        'CREATE TABLE core.migration_after_restore(id serial PRIMARY KEY,payload text NOT NULL)'
+      )
+    )
+    await runtimeProof(f, 'amcore_restore', 'migration_after_restore')
+    emit(f, 'restore-future-table-and-sequence-privileges', { objectSpecificGrants: false })
     assert.equal(
       (await restored.query(`SELECT count(*)::int AS n FROM core.users WHERE id='backup-user'`))
         .rows[0].n,
       1
     )
-    assert.equal(
-      (
-        await restored.query(
-          `SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('core','notifications','ai') AND c.relkind IN ('r','S') AND pg_get_userbyid(c.relowner)<>'amcore_migrator'`
-        )
-      ).rows[0].n,
-      0
-    )
+    await ownership(f, restored, 'restore')
     emit(f, 'backup-restore-owner-acl-data-ledger', {
       migrations: f.migrations.length,
       ownerPreserved: true,

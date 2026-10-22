@@ -32,19 +32,7 @@ export async function preflight(f) {
   })
 }
 export async function startupOptions(f, admin) {
-  const escaping = [
-    String.raw`-c application_name=hello\ world`,
-    String.raw`-c application_name=trailing\ `,
-    String.raw`-c application_name=back\\slash`,
-  ]
-  for (const options of escaping)
-    await audited(
-      f,
-      admin,
-      'escaped-startup-option',
-      ['db', 'execute', '--file', './migrator-check.sql'],
-      { url: imageUrl(f, 'amcore', 'amcore_migrator', { options }) }
-    )
+  await escapedOptions(f, admin)
   await cli(f, ['db', 'execute', '--file', './migrator-check.sql'], {
     url: imageUrl(f, 'amcore', 'amcore_migrator', {
       options: '-c client_connection_check_interval=0',
@@ -107,4 +95,30 @@ export async function startupOptions(f, admin) {
     ).rows[0].n,
     0
   )
+}
+
+export async function escapedOptions(f, admin) {
+  const file = `${f.directory}/escaped-option.sql`
+  for (const [options, expected] of [
+    [String.raw`-c application_name=hello\ world`, 'hello world'],
+    [String.raw`-c application_name=trailing\ `, 'trailing '],
+    [String.raw`-c application_name=back\\slash`, String.raw`back\slash`],
+  ]) {
+    const sql = (value) => `DO $$ BEGIN
+      IF current_setting('application_name') IS DISTINCT FROM '${value.replaceAll("'", "''")}'
+      THEN RAISE EXCEPTION 'application_name mismatch'; END IF;
+      IF current_setting('client_connection_check_interval') <> '50ms'
+      THEN RAISE EXCEPTION 'wrong interval'; END IF; END $$;`
+    const args = ['db', 'execute', '--file', '/run/amcore-migration/escaped.sql']
+    const config = {
+      url: imageUrl(f, 'amcore', 'amcore_migrator', { options }),
+      mounts: [[file, '/run/amcore-migration/escaped.sql']],
+    }
+    await writeFile(file, sql(expected))
+    await audited(f, admin, 'exact-escaped-startup-option', args, config)
+    await writeFile(file, sql(`${expected}-deliberate-mismatch`))
+    const rejected = await cli(f, args, { ...config, expected: 1 })
+    assert.match(rejected.text, /application_name mismatch/)
+    emit(f, 'escaped-option-mismatch-control', { expected, actualSQLAssertion: true })
+  }
 }

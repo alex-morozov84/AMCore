@@ -281,11 +281,61 @@ Check the resolved path is `/opt/pnpm/pnpm`, the declared version matches, and n
 library is missing. Match each platform digest and executable/archive hash to
 the upstream release and build provenance. These commands inspect identity;
 they do not verify a publisher signature. Run them natively on both architectures.
-For the required two clean preparation samples, use two new disposable BuildKit
-builders: `--no-cache` alone does not clear named package-store cache mounts.
-Compare unchanged lock hashes, dependency identities, engine hashes and hook
-traces/sentinels. This is additional update-admission evidence; neither the
-coherence guard nor one ordinary image build provides it.
+For the required clean preparation comparison, run the complete protocol below.
+`--no-cache` alone does not clear named package-store cache mounts.
+
+### Verify isolated preparation
+
+Use the repository's pinned pnpm, Node, Docker and Buildx with a local Unix engine.
+No database credential is needed. Choose a new absolute output directory outside
+the checkout; its parent must exist. Do not use a directory containing previous results.
+
+```sh
+node scripts/verify-migrator-preparation.mjs /absolute/new/preparation-output
+```
+
+The command copies only root/workspace manifests, the root lock and workspace
+policy into a disposable context. It derives the preparation stage and exact
+install/deploy commands from `apps/api/Dockerfile`. It replaces authoring hooks
+only in copied workspace manifests with failing sentinels. It does not change
+Prisma package files, production source or root build/release-age policy.
+
+Two newly named `docker-container` builders have separate stores and caches.
+The fixture observes Node lifecycle events through an external test-only loader.
+Before deploy, it checks declared hooks and requires zero executed install hooks.
+After deploy, it permits only the expected Prisma preinstall and engines postinstall.
+Known registry authoring `prepare` entries stay in the inventory and must not execute.
+A separate positive control runs a failing prepare and requires both its trace and sentinel.
+Missing control evidence fails the command; `HUSKY=0` alone proves nothing.
+
+The extraction paths inside each fixture are `/app/node_modules` after install,
+`/prod/migrator/node_modules` after deploy, `/app/pnpm-lock.yaml`, and
+`/verification/trace.jsonl`. The output contains `a-installed.json`,
+`a-deployed.json`, matching `b-*` files, `a-artifact.json`, `b-artifact.json`,
+`source-inputs.json`, and `positive-control-{trace,forbidden-hooks}.jsonl`.
+The deployed inventories include package versions/manifest hashes, declared and
+observed hooks, and native Prisma engine paths/hashes. Both samples must match;
+the root lock hash must remain unchanged before/after both frozen commands.
+Each sample also runs the official CLI and checks pnpm/ELF resolution without network access.
+
+Require command exit zero and `result.json` with `verdict: PASS` and `cleanup: true`.
+Unexpected graph/hook/compiler, missing engine, wrong architecture, changed lock,
+unequal samples or failed cleanup stops admission. Investigate without changing
+assertions, allowBuilds, release-age or package files to force a pass.
+This protocol proves preparation behavior, not final-image vulnerability remediation.
+Run it separately on native ARM64 and native AMD64.
+
+The command removes only its recorded builders, images, containers and builder
+volumes. It retains `resources.json` if cleanup fails. After the original command
+has stopped, recover an interrupted run with:
+
+```sh
+node scripts/verify-migrator-preparation.mjs --cleanup /absolute/new/preparation-output
+```
+
+Inspect the retained failure before retrying. Recovery checks ownership and cannot
+turn a failed preparation into passing evidence. Keep raw output outside private
+planning records; retain a short result with run ID, architecture and hashes.
 
 ### Verify cancellation in a development checkout
 

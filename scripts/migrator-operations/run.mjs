@@ -6,14 +6,14 @@ import { connect } from './connection.mjs'
 import { fixture } from './fixture.mjs'
 import { inventory, fresh, ledger, upgrade } from './history.mjs'
 import { setupRoles } from './roles.mjs'
-import { preflight, startupOptions } from './options.mjs'
+import { preflight, startupOptions, escapedOptions } from './options.mjs'
 import { audit, audited } from './audit.mjs'
 import { cli } from './cli.mjs'
 import { imageUrl } from './connection.mjs'
 import { partialRecovery, backupRestore } from './recovery.mjs'
 import { emit } from './context.mjs'
 
-export async function run(image, baseline) {
+export async function run(image, baseline, { runtimeFixes = false } = {}) {
   let f, admin, watchdog, pendingSignal
   const failures = []
   const stopped = (signal) => {
@@ -41,7 +41,7 @@ export async function run(image, baseline) {
     await inventory(f)
     await f.observer.query('CREATE DATABASE amcore')
     admin = await connect(f, 'amcore')
-    for (const [phase, operation] of [
+    const operations = new Map([
       ['roles', () => setupRoles(f, admin)],
       ['tls-preflight', () => preflight(f)],
       ['fresh-current-history', () => fresh(f, admin)],
@@ -50,16 +50,23 @@ export async function run(image, baseline) {
       ['upgrade', () => upgrade(f)],
       ['partial-recovery', () => partialRecovery(f)],
       ['backup-restore', () => backupRestore(f, admin)],
-    ]) {
+      ['escaped-options', () => escapedOptions(f, admin)],
+    ])
+    const phases = runtimeFixes
+      ? ['roles', 'fresh-current-history', 'escaped-options', 'upgrade', 'backup-restore']
+      : [...operations.keys()].filter((phase) => phase !== 'escaped-options')
+    for (const phase of phases) {
       checkpoint(f)
       f.phase = phase
-      await operation()
+      if (phase === 'escaped-options') await audit(f, admin)
+      await operations.get(phase)()
     }
     checkpoint(f)
-    emit(f, 'operations-matrix', {
+    emit(f, runtimeFixes ? 'operations-runtime-fixes' : 'operations-matrix', {
       architecture: f.artifact.Architecture,
       migrationCount: f.migrations.length,
-      baselineCompared: Boolean(baseline),
+      baselineCompared: Boolean(baseline) && !runtimeFixes,
+      phases,
     })
   } catch (error) {
     failures.push(error)
