@@ -30,7 +30,7 @@ export async function preview(m, profile = 'default') {
     throw new Error('Notification work preview needs a fresh stand created with this profile')
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_END
   // AMCORE_CONSOLE_AI_PROFILE_START
-  profiles.push('ai-run-control')
+  profiles.push('ai-run-control', 'scheduled-jobs')
   // AMCORE_CONSOLE_AI_PROFILE_END
   // AMCORE_CONSOLE_ESTABLISHMENT_PROFILE_START
   profiles.push('organization-establishment')
@@ -113,6 +113,10 @@ export async function preview(m, profile = 'default') {
     if (profile === 'ai-run-control') {
       const { aiRunControlFixture } = await import('./ai-run-control-fixture.mjs')
       await aiRunControlFixture(m, api)
+    }
+    if (profile === 'scheduled-jobs') {
+      const { scheduledJobsFixture } = await import('./scheduled-jobs-fixture.mjs')
+      await scheduledJobsFixture(m)
     }
     // AMCORE_CONSOLE_AI_FIXTURE_END
     for (const account of m.accounts) {

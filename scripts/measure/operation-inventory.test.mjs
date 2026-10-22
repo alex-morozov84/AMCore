@@ -17,7 +17,7 @@ describe('operation inventory against the real plans', () => {
       // Own-key settings add a page move and two pathname edits in three locale
       // recipes (+9), plus three story deletions in two Storybook-off recipes
       // (+6): 15 additional operations/facts/claims. No new provider or manifest.
-      { name: 'measured operations', expected: 865, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 871, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -36,17 +36,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1192,
+        expected: 1198,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1961,
+        expected: 1969,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 845,
+        expected: 851,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

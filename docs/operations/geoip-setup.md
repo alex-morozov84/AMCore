@@ -25,8 +25,11 @@ configured, loaded, or current.
   reads retry on later checks even if the file has not changed; warnings
   are emitted once per failed file generation.
 - **Updater:** a daily scheduled check (`GeoIpUpdateService`), using the same
-  `@Cron` + Redis-lock singleton pattern as the existing nightly session
-  cleanup job — only the lock-winner replica actually downloads. It only
+  scheduled-job pattern (`@ScheduledJob` + Redis-lock singleton) as the existing nightly
+  session cleanup job — only the lock-winner replica actually downloads. Its result is
+  on the optional Console Scheduled jobs screen: a
+  failed download is a failed run even though the previous database keeps serving, and
+  the startup attempt and the operator command are not recorded as scheduled runs. It only
   runs where the scheduler is active (the `worker`/`all` process roles, never
   `web`; see [Deployment & migrations](deployment.md) for the process-role
   split). A worker with no valid database yet also makes one nonblocking

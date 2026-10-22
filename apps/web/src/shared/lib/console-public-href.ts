@@ -15,6 +15,11 @@ export function getConsoleBackgroundWorkHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/background-work`
 }
 
+/** Scheduled jobs: recorded results of periodic jobs, same topology rule as the other panels. */
+export function getConsoleScheduledJobsHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/scheduled-jobs`
+}
+
 /**
  * Where the browser reaches the read-only queue board. It is served by the Console BFF route
  * `app/api/console/bull-board`; in host mode the edge maps `/api/*` to `/api/console/*`, so the

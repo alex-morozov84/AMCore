@@ -48,4 +48,18 @@ describe('consoleApi', () => {
       signal: controller.signal,
     })
   })
+
+  it('reads the scheduled jobs list and the history of one job through the topology-aware path', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({} as never)
+    const controller = new AbortController()
+
+    await consoleApi.getScheduledJobs(controller.signal)
+    await consoleApi.getScheduledJobRuns('cleanup', controller.signal)
+
+    expect(getConsolePublicApiPath).toHaveBeenCalledWith('/scheduled-jobs')
+    expect(getConsolePublicApiPath).toHaveBeenCalledWith('/scheduled-jobs/cleanup/runs')
+    expect(apiClient.get).toHaveBeenCalledWith('/console/scheduled-jobs', {
+      signal: controller.signal,
+    })
+  })
 })

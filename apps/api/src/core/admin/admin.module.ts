@@ -18,6 +18,8 @@ import { AdminOverviewService } from './admin-overview.service.js'
 import { AdminOverviewResourcesService } from './admin-overview-resources.service.js'
 import { AdminQueuesController } from './admin-queues.controller.js'
 import { AdminQueuesService } from './admin-queues.service.js'
+import { AdminScheduledJobsController } from './admin-scheduled-jobs.controller.js'
+import { AdminScheduledJobsService } from './admin-scheduled-jobs.service.js'
 import { AdminSessionsService } from './admin-sessions.service.js'
 import { AdminStorageSettingController } from './admin-storage-setting.controller.js'
 import { AdminStorageSettingService } from './admin-storage-setting.service.js'
@@ -53,6 +55,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
     AdminApiKeysController,
     AdminStorageSettingController,
     AdminQueuesController,
+    AdminScheduledJobsController,
     BackgroundWorkController,
   ],
   providers: [
@@ -67,6 +70,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
     AdminAuditService,
     AdminSessionsService,
     AdminQueuesService,
+    AdminScheduledJobsService,
     BackgroundWorkService,
     BackgroundWorkCatalogue,
     BackgroundWorkReader,

@@ -54,7 +54,7 @@ describe('SingletonCronRunner', () => {
     lock.acquire.mockRejectedValue(new Error('redis down'))
     const task = jest.fn()
 
-    await expect(runner.run(options, task)).resolves.toBeUndefined()
+    await expect(runner.run(options, task)).resolves.toEqual({ status: 'lock_unavailable' })
 
     expect(task).not.toHaveBeenCalled()
     expect(lock.release).not.toHaveBeenCalled()
@@ -67,7 +67,10 @@ describe('SingletonCronRunner', () => {
   it('logs a stable event and still releases when the task throws', async () => {
     const task = jest.fn().mockRejectedValue(new Error('boom'))
 
-    await expect(runner.run(options, task)).resolves.toBeUndefined()
+    await expect(runner.run(options, task)).resolves.toEqual({
+      status: 'failed',
+      error: expect.any(Error),
+    })
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'job.test_failed' }),
@@ -80,7 +83,7 @@ describe('SingletonCronRunner', () => {
     lock.release.mockRejectedValue(new Error('release failed'))
     const task = jest.fn().mockResolvedValue(undefined)
 
-    await expect(runner.run(options, task)).resolves.toBeUndefined()
+    await expect(runner.run(options, task)).resolves.toEqual({ status: 'ran', value: undefined })
 
     expect(task).toHaveBeenCalled()
     expect(logger.error).toHaveBeenCalledWith(

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 
+import { ScheduledJobsModule } from '../../infrastructure/schedule/scheduled-jobs.module.js'
 import { ThrottlingModule } from '../../infrastructure/throttling/throttling.module.js'
 import { PrismaModule } from '../../prisma/index.js'
 
@@ -11,7 +12,7 @@ import { InvitationRetentionService } from './invitation-retention.service.js'
 
 /** Credential authority shared by auth issuance and organization settlement. */
 @Module({
-  imports: [PrismaModule, ThrottlingModule],
+  imports: [PrismaModule, ThrottlingModule, ScheduledJobsModule],
   providers: [
     InvitationRetentionService,
     InvitationRequestGuard,

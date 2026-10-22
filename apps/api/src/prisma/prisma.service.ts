@@ -111,6 +111,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     })
   }
 
+  /**
+   * Read-only pool pressure for optional background writers (scheduled-job recorder): they proceed
+   * only when a connection is free or can be opened without making anyone wait.
+   */
+  poolStats(): { max: number; total: number; idle: number; waiting: number } {
+    return {
+      max: this.pool.options.max ?? 10,
+      total: this.pool.totalCount,
+      idle: this.pool.idleCount,
+      waiting: this.pool.waitingCount,
+    }
+  }
+
   /** Two named capabilities share this pool; an uncertain token cannot be reset by its consumer. */
   observedTransactions(name: 'ai-catalogue' | 'ai-diagnosis'): ObservedTransactionRunner {
     if (this.tearingDown) throw new Error('prisma_shutdown_registration_closed')

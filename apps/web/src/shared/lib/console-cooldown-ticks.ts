@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 
-import type { PollFloors } from './queue-poll-policy'
+import type { PollFloors } from './console-poll-policy'
 
 /**
  * Re-renders the owner when a cool-down ends. Each floor expires on its own clock, so a short
