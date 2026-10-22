@@ -1163,6 +1163,7 @@
         "private_file_write_read_delete": "Writes, reads and deletes a test file",
         "broker_read": "The broker answered. Workers are not tested.",
         "provider_acceptance": "A direct send from the API server to the provider",
+        "provider_request": "A request from the API server to the provider",
         "configuration_only": "Configuration only"
       },
       "instance": {

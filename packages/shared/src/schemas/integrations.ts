@@ -24,6 +24,7 @@ export const INTEGRATION_SCOPES = [
   'private_file_write_read_delete',
   'broker_read',
   'provider_acceptance',
+  'provider_request',
   'configuration_only',
 ] as const
 export const INTEGRATION_INSTANCES = ['answering_instance', 'shared'] as const

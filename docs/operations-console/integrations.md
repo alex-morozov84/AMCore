@@ -47,17 +47,19 @@ Each row has one word for scanning. The columns beside it are the facts behind i
 
 ### What each row proves
 
-| Row                   | Source                                                                                      | What it proves                                                                                                                                                    | Freshness limit                |
-| --------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| **Email**             | Provider settings, and your last **Send test email**                                        | The provider accepted a direct send from the API server. Not queued email, not invitations, not an inbox.                                                         | 24 hours                       |
-| **Files**             | The storage check that the API runs by itself (write, read and delete of its own test file) | The answering API server could use the storage. Other servers are not covered.                                                                                    | Three times the check interval |
-| **Sign-in providers** | Settings                                                                                    | Nothing about sign-in itself. A configured provider does not prove that a user can sign in.                                                                       | none                           |
-| **Queue**             | A short read-only question to the broker                                                    | The broker answered. It does not prove that workers run. Queue depths are on Background work.                                                                     | 1 minute                       |
-| **AI**                | The cached catalogue of enabled providers and models                                        | Only configuration. It counts providers that have an enabled model and whether a key is present. It is not a call to any provider and can be up to 5 minutes old. | none                           |
-| **Telegram**          | Settings of the notification channel                                                        | Nothing about reachability. Whether this server can reach Telegram is not checked yet.                                                                            | none                           |
+| Row                   | Source                                                                                                    | What it proves                                                                                                                                                                        | Freshness limit                |
+| --------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Email**             | Provider settings, and the latest stored test result of the whole platform (**Last test** opens your own) | After an **Accepted** test: the provider accepted a direct send from the API server. Never queued email, invitations or an inbox. **Simulated** proves nothing about a real provider. | 24 hours                       |
+| **Files**             | The storage check that the API runs by itself (write, read and delete of its own test file)               | The answering API server could use the storage. Other servers are not covered.                                                                                                        | Three times the check interval |
+| **Sign-in providers** | Settings                                                                                                  | Nothing about sign-in itself. A configured provider does not prove that a user can sign in.                                                                                           | none                           |
+| **Queue**             | A short read-only question to the broker                                                                  | The broker answered. It does not prove that workers run. Queue depths are on Background work.                                                                                         | 1 minute                       |
+| **AI**                | The cached catalogue of enabled providers and models                                                      | Only configuration. It counts providers that have an enabled model and whether a key is present. It is not a call to any provider and can be up to 5 minutes old.                     | none                           |
+| **Telegram**          | Settings of the notification channel                                                                      | Nothing about reachability. Whether this server can reach Telegram is not checked yet.                                                                                                | none                           |
 
-Reading this page never runs a check. Files and Queue show what the server already
-observed; the email row shows your last test.
+Reading this page never sends an email and never calls an outside provider. Files shows
+what the API already observed. Queue asks the broker one short, bounded, read-only
+question when the page is read; it starts no work. The email row shows the latest stored
+test result of the platform, which can be another operator's.
 
 ## Send a test email
 
@@ -71,12 +73,14 @@ server right now?
 - The email provider is not the mock provider in production. In a production deployment
   with mock email the button is disabled and says why.
 - You can re-enter your password when asked.
+- Your browser is online. Offline, the button is disabled and says why, because the result
+  could not be read back.
 
 ### Steps
 
 1. In the **Email** row, select **Send test email**.
 2. Read the confirmation. It shows your address in masked form (for example
-   `o***@example.com`). It uses the real provider and counts toward its limits.
+   `o***@example.com`). With a real provider it counts toward the provider's limits. With the mock provider (not allowed in production) nothing leaves the server and the result is **Simulated**.
 3. Select **Send test**. Enter your password if the Console asks for it.
 4. Read the result window.
 
@@ -96,22 +100,39 @@ Console cannot prove from that answer that nothing was accepted.
 
 ### Limits
 
-| Limit                        | Value                                |
-| ---------------------------- | ------------------------------------ |
-| Waiting for the provider     | 10 seconds, then **Outcome unknown** |
-| Per operator                 | One test per minute                  |
-| Whole platform               | 20 tests per hour                    |
-| At the same time             | One test at a time                   |
-| Time to confirm after step 1 | 30 minutes; after that, start again  |
+| Limit                        | Value                                               |
+| ---------------------------- | --------------------------------------------------- |
+| Waiting for the provider     | 10 seconds, then **Outcome unknown**                |
+| Per operator                 | One test per minute                                 |
+| Whole platform               | 20 tests per hour                                   |
+| At the same time             | One test at a time, in normal operation (see below) |
+| Time to confirm after step 1 | 30 minutes; after that, start again                 |
 
-If Redis is unavailable, the test is refused and nothing is sent. The limits are shared
-by all API servers through Redis.
+The limits are shared by all API servers through Redis.
+
+**One at a time** is a rule for normal operation, not a physical guarantee. A process
+pause, an expired 30-second lease, or a provider connection that ignores the 10-second limit
+can let a second test start on another server; the per-minute and per-hour limits still
+apply. On the same server a new test waits until the earlier connection really ends and
+answers **Another test is being sent**.
+
+If Redis is unavailable _before_ the send starts, the test is refused and nothing is sent.
+If it becomes unavailable _after_ the send, the window shows the test as still running and
+reads the same attempt again: the email may have been sent, and no second one is sent. If
+Redis loses its data, stored results disappear (the row says **No stored result**) and an
+old confirmation cannot be used. Restoring Redis from an old snapshot is outside these
+guarantees.
 
 ### If the connection is lost
 
 If the browser loses the answer, the window says it is checking and reads the stored
-result of the same attempt. It does not send a second email. Pressing **Send test
-email** again always starts a new attempt and passes through the limits above.
+result of the same attempt. It does not send a second email.
+
+**Send test email** only asks the server for a confirmation; nothing is sent yet. While
+your earlier confirmation is still valid and your address and the mail settings are
+unchanged, you get the same confirmation back. The email is sent when you confirm, and a
+confirmation works once: repeating it returns its stored result and sends nothing. A
+reopened result never sends.
 
 ### Reopen a result
 
@@ -124,11 +145,14 @@ must not vouch for new settings.
 
 ## Audit
 
-Each test writes **Test email requested** before anything is sent, and **Test email
-finished** with the outcome after it. Neither record contains an email address. Find
+Each test writes **Test email requested** before anything is sent; if that record cannot
+be written, the email is not sent. When the server stored a final result it also writes
+**Test email finished** with that stored outcome (a result that arrived after the time limit
+is recorded as unknown). A test that did not start, or whose result could not be stored, may
+have no finished record, so do not expect every request to have a pair. Neither record
+contains an email address. Find
 them in [Audit](audit.md) under the actions `integration.email_test_requested` and
-`integration.email_test_settled`. If the first record cannot be written, the email is
-not sent.
+`integration.email_test_settled`.
 
 ## Security
 

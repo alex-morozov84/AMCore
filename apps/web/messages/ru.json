@@ -1163,6 +1163,7 @@
         "private_file_write_read_delete": "Записывает, читает и удаляет тестовый файл",
         "broker_read": "Брокер ответил. Воркеры не проверяются.",
         "provider_acceptance": "Прямая отправка с сервера API провайдеру",
+        "provider_request": "Запрос с сервера API к провайдеру",
         "configuration_only": "Только настройка"
       },
       "instance": {
