@@ -80,13 +80,12 @@ catalogue; an id with hyphens is used as it is, for example `"report-cleanup": {
 
 ## Choose the result
 
-| Return                                                                                                      | When                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `succeeded(summary?)`                                                                                       | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                                                                                                                                                     |
-| `partial(code, summary?)`                                                                                   | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                                                                                                                                                           |
-| `failed(code, summary?)`                                                                                    | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary.                                                                                                                              |
-| `skippedFor(reason)`                                                                                        | Frequent jobs only: `not_ready` (the work cannot start yet, for example the application is still starting), `shutdown` (the process is stopping) or `busy` (another pass or every lane is already taken). The job decides which applies, from its own state: the existing dispatchers use their |
-| readiness flag and their lane gate. A skip never makes a job look fresh. Daily jobs must not return a skip. |
+| Return                    | When                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `succeeded(summary?)`     | The run reached its end and did its work. Doing nothing because nothing was due is success.                                                                                                                                                                                                                                                                                                                 |
+| `partial(code, summary?)` | The run reached its end, but some independent steps failed (buckets, lanes) while others worked. The job continued after the failure.                                                                                                                                                                                                                                                                       |
+| `failed(code, summary?)`  | The run stopped because of an error, or every independent step failed so nothing was done. If earlier steps had already committed, put their count in the summary.                                                                                                                                                                                                                                          |
+| `skippedFor(reason)`      | Frequent jobs only: `not_ready` (the work cannot start yet, for example the application is still starting), `shutdown` (the process is stopping) or `busy` (another pass or every lane is already taken). The job decides which applies, from its own state: the existing dispatchers use their readiness flag and their lane gate. A skip never makes a job look fresh. Daily jobs must not return a skip. |
 
 ### Throw or return
 
@@ -108,7 +107,10 @@ The optional `summary` is always `{ counts, codes }`, never a bare object of num
 - A key or code starts with a letter and has only letters, digits and `_`, up to 48
   characters. The whole summary is at most 512 bytes.
 - Counters and codes only: never an error message, an email address, row content or any
-  user data. Put such detail in the worker log.
+  user data. For diagnosis, log through the project's logging rules (see
+  [Observability](../operations/observability.md#structured-logs)): an event name, ids and
+  counters, with the redaction the logger already applies. Never copy the message, an email
+  address or row content into a log field of your own.
 
 ```ts
 // A frequent job: finished its pass, checked 12 items. Nothing failed.
