@@ -8,10 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   IntegrationFacts,
   IntegrationLastCheck,
-  IntegrationLinks,
   IntegrationName,
   IntegrationSetup,
 } from './integration-cells'
+import { IntegrationLinks } from './IntegrationLinks'
 import { ProbeAction } from './ProbeAction'
 
 function Row({ item, now, online }: { item: IntegrationItem; now: number; online: boolean }) {

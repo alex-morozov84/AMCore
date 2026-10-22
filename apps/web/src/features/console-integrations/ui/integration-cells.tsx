@@ -13,13 +13,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 
-import { docsPageHref } from '@/shared/lib/console-docs-links'
-import {
-  getConsoleBackgroundWorkHref,
-  getConsoleOverviewHref,
-} from '@/shared/lib/console-public-href'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
-import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
 import { evidenceAt, type Headline, headlineOf } from '../model/headline'
 
@@ -173,43 +167,5 @@ export function IntegrationLastCheck({ item, now }: { item: IntegrationItem; now
       <p className="text-xs text-muted-foreground">{t(`scope.${evidence.scope}`)}</p>
       {failure && <p className="text-xs text-muted-foreground">{failure}</p>}
     </div>
-  )
-}
-
-const LINK_HREF = {
-  overview: () => getConsoleOverviewHref(),
-  background_work: () => getConsoleBackgroundWorkHref(),
-} as const
-
-/** Closed links only. The registration supplies no URL; each kind maps to a helper here. */
-export function IntegrationLinks({ item }: { item: IntegrationItem }) {
-  const t = useTranslations('console.integrations.link')
-  return (
-    <ul className="space-y-1 text-sm">
-      {item.links.map((kind) =>
-        kind === 'runbook' ? (
-          <li key={kind}>
-            <a
-              href={docsPageHref('docs/operations-console/integrations.md')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-4 hover:text-foreground"
-            >
-              {t(kind)}
-            </a>
-          </li>
-        ) : (
-          <li key={kind}>
-            <RouteProgressLink
-              href={LINK_HREF[kind]()}
-              prefetch={false}
-              className="underline underline-offset-4 hover:text-foreground"
-            >
-              {t(kind)}
-            </RouteProgressLink>
-          </li>
-        )
-      )}
-    </ul>
   )
 }

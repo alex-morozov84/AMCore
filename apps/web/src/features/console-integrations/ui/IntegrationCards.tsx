@@ -6,10 +6,10 @@ import type { IntegrationItem } from '@amcore/shared'
 import {
   IntegrationFacts,
   IntegrationLastCheck,
-  IntegrationLinks,
   IntegrationName,
   IntegrationSetup,
 } from './integration-cells'
+import { IntegrationLinks } from './IntegrationLinks'
 import { ProbeAction } from './ProbeAction'
 
 function Field({
