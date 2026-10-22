@@ -14,7 +14,7 @@ worker processes. Production promotion uses immutable image digests; see
 
 ## Contents and commands
 
-The final image contains Node 24, OpenSSL, certificates, Prisma's complete official
+The final image contains Node 24 on Debian Trixie, OpenSSL, certificates, Prisma's complete official
 dependency tree, an image-specific Prisma configuration, schema files and SQL
 migration history. The configuration composes the unchanged API base configuration.
 Its working directory remains `/app/apps/api`. The default command is
@@ -170,62 +170,109 @@ Container exit and database cleanup are separate checks. Recovery after an
 interrupted migration must inspect the ledger and any partial SQL before using
 `migrate resolve`. Image replacement does not undo SQL that already committed.
 
-## Isolated installation and maintenance
+## Installation and maintenance
 
-`docker/migrator/package.json`, `pnpm-workspace.yaml` and `pnpm-lock.yaml` define
-an independent deployment graph outside the application workspace. The installer
-pin includes its integrity hash. Preparation verifies its archive before
-extraction and checks its actual version from an isolated working directory.
-The published pnpm launcher verifies and obtains its platform executable through
-the upstream distribution mechanism; neither installer is copied to runtime.
+The private workspace package `@amcore/migrator` at `docker/migrator/package.json`
+selects Prisma CLI and dotenv. The repository's root `pnpm-lock.yaml` owns their
+resolutions. There is no second source lockfile or custom installer. Root frozen
+installation includes this package; keep its Prisma version equal to the API CLI,
+client and adapter versions.
 
-The preparation stage uses a frozen production install. This isolated graph
-explicitly enables `minimumReleaseAgeStrict: true`, retaining the standard
-24-hour cutoff. This is a project policy; pnpm also supports non-strict behavior.
-Strict checking rejects newly published dependencies until that cooldown ends.
-Wait for that boundary when a new Prisma release is too young. Do not add
-release-age exceptions or disable the policy to get a passing build.
+Docker prepares the package in a separate Node24/Trixie stage. It copies the
+complete `/opt/pnpm` from the official glibc pnpm image, pinned by version and
+index digest. The directory includes node-gyp; copying only its executable is
+insufficient. The package-manager version must match root `packageManager`.
+See [pnpm's Docker guidance](https://pnpm.io/docker).
 
-CI runs `node scripts/migrator-contract.mjs` before the image job through its
-required lint dependency. It checks API CLI/client/adapter and migrator versions,
-both lock resolutions, installer pin and the isolated workspace policy.
-
-1. For a Prisma update, change the API CLI/client/adapter family and the isolated
-   CLI to the same exact supported version.
-2. Refresh both lockfiles with their declared package managers. Keep the root
-   workspace package manager unchanged unless a separate migration is intended.
-3. Run the version guard, frozen installs, image checks and migration/recovery
-   tests. Commit the coherent update in one maintenance PR.
-4. For isolated dotenv or transitive updates, refresh that graph without changing
-   an unaffected root lock merely to produce a matching diff.
-5. Update the isolated installer version and integrity together. Review major
-   versions and prereleases manually. The installer version must equal the root
-   `packageManager` pnpm version; `scripts/lib/toolchain-pins.test.mjs` fails on drift.
-
-Dependabot has a separate weekly non-major entry for `/docker/migrator`.
-One-sided Prisma update proposals fail the version guard until reconciled.
-Dependency freshness reports isolated dependencies and the installer separately
-(and the root pnpm pin in its Toolchain section);
-the root recursive outdated command does not cover this directory.
-The weekly recursive OSV scan includes the separate lockfile.
-
-To refresh the isolated lock after editing its manifest, start at the repository
-root. These commands use the declared installer rather than the workspace pnpm:
+Preparation installs only the selected package with frozen resolutions and
+`--ignore-scripts`. It then uses non-legacy `pnpm deploy --prod` to create the
+portable production directory. Deploy runs dependency scripts allowed by root
+`allowBuilds`, including Prisma's engine download. Root and API authoring hooks
+must not run in this stage. Preparation receives no migration credential.
+Inside Docker preparation, both commands inherit `pnpm_config_frozen_lockfile=true`:
 
 ```sh
-cd docker/migrator
-migrator_tools="$(mktemp -d)"
-node installer.mjs "$migrator_tools/pnpm"
-node "$migrator_tools/pnpm/bin/pnpm.mjs" install --prod --lockfile-only
-node "$migrator_tools/pnpm/bin/pnpm.mjs" install --prod --frozen-lockfile
-rm -rf "$migrator_tools"
-cd ../..
-node scripts/migrator-contract.mjs
+HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match install --prod --frozen-lockfile --ignore-scripts
+HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match deploy --prod /prod/migrator
 ```
 
+These are container preparation commands, not replacements for development checkout
+installation. The final stage copies the deployed directory, config and SQL, without the store,
+package manager, workspace or API build output.
+
+Prisma's official graph can include its optional TypeScript5 peer. That is distinct
+from the API's native TypeScript7 compiler. Preserve official peer packages and
+platform engines. An ambiguous peer resolution, unexpected hook, missing engine
+or changed unrelated resolution stops the update. Return to review; do not use
+legacy deploy, overrides, compatibility forks or manual pruning as a workaround.
+
+The root workspace applies the strict24-hour release-age floor and rejects missing
+publication times. Its allowBuilds policy also applies to migration dependencies.
+Wait when a release is too young; do not add exclusions or disable these policies.
+Frozen installation fixes versions; it does not prove that those versions are safe.
+
+### Update dependencies
+
+Start from the repository root with its supported Node and pinned pnpm version.
+Use a development checkout without production credentials.
+
+1. For a Prisma update, set API CLI/client/adapter and the migration CLI to the
+   same exact supported version in `apps/api/package.json` (`prisma` in
+   devDependencies; `@prisma/client` and `@prisma/adapter-pg` in dependencies) and
+   `docker/migrator/package.json` (`prisma` in dependencies). For another
+   dependency, edit its owning manifest.
+2. Generate the root lock and run the frozen installation and coherence guard:
+
+   ```sh
+   pnpm install --lockfile-only --ignore-scripts
+   pnpm install --frozen-lockfile
+   node scripts/migrator-contract.mjs
+   ```
+
+   Review every changed resolution. The second command runs normal development
+   lifecycle hooks, including API client generation and Husky. It is not the
+   isolated Docker preparation command.
+
+3. Build the migration target with the command at the top of this guide. Verify
+   the CLI and engine without package-registry access, then test migrations,
+   signals, roles, TLS and recovery on both supported architectures.
+4. For pnpm updates, update root packageManager, existing Docker Corepack pins,
+   the stand installer fixture and the official migration bootstrap image together.
+   Resolve the exact image's index/platform digests, inspect upstream build/source
+   provenance and check executable identity/version on ARM64 and native AMD64.
+   Copy the whole matching-libc distribution. Stop on a mismatch; do not substitute
+   an unreviewed downloader or treat provenance metadata as a verified signature.
+5. Commit the coherent dependency, lock, pins, guard and documentation changes
+   together after the required checks. Promote image digests from the same source
+   state; do not install packages when the migration credential is present.
+
+The root Dependabot npm entry covers the package with its existing schedule,
+three-day cooldown and non-major policy. Root recursive outdated and OSV scans
+cover the shared graph; there is no nested updater or separate freshness list.
+CI runs `node scripts/migrator-contract.mjs` through its required lint dependency.
+The guard checks coherent manifests/resolutions, the reachable migration graph,
+minimal package boundary and root release-age policy.
+
 ```text
-manifest -> isolated lock -> frozen install -> version guard -> image -> database
+minimal manifest + root lock -> filtered preparation -> deploy output
+  -> fresh migration image -> endpoint preflight -> migration -> app rollout
 ```
+
+### Verify cancellation in a development checkout
+
+After installing root frozen dependencies and building the image, run:
+
+```sh
+node scripts/verify-migrator-lifecycle.mjs amcore-migrator
+```
+
+This test creates its own PostgreSQL18 Testcontainer and network on the local Unix
+Docker engine. It uses no checkout database URL. The image architecture must match
+the engine architecture. TERM and INT each interrupt active SQL, with transactional
+and nontransactional cases. The original45-second natural-exit deadline and200ms
+session/lock observation remain fixed; diagnostic disposal cannot produce a pass.
+This command checks cancellation and transactional rollback. Dependency updates
+also require the broader CLI, roles, TLS, migration-history and recovery checks above.
 
 ## Security reports and remaining risk
 

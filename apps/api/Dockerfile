@@ -14,7 +14,11 @@ FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7
 RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade perl-base && \
     rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@12.14.0 --activate
+# Update the whole npm distribution; ADD verifies the pinned upstream archive.
+ADD --checksum=sha256:228bd64aaef23270dbdbd2cf3d5ef5c467602ef38c4066246cef1984adab9a67 https://registry.npmjs.org/npm/-/npm-12.2.1.tgz /tmp/npm.tgz
+RUN npm install --global --ignore-scripts /tmp/npm.tgz && \
+    test "$(npm --version)" = "12.2.1" && rm /tmp/npm.tgz && \
+    corepack enable && corepack prepare pnpm@12.14.0 --activate
 
 # The pnpm content-addressed store lives in a BuildKit cache mount (see the
 # `--mount=type=cache,id=pnpm-store` steps below), not in an image layer. It
@@ -48,6 +52,7 @@ COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
+COPY docker/migrator/package.json ./docker/migrator/
 # The api `postinstall` runs `prisma generate`, which needs the schema + config
 # at install time (the placeholder datasource in prisma.config.ts lets it run
 # without a DB).
@@ -110,20 +115,37 @@ RUN find /prod/api/node_modules/.pnpm -maxdepth 1 \( \
 # ===========================================
 # Migrator — CLI-capable one-shot migration target
 # ===========================================
-# Prepare the official CLI's complete dependency tree outside the API workspace.
-# The isolated manifest owns its installer pin and its own frozen lockfile.
-FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS migrator-dependencies
+# The official standalone pnpm distribution includes node-gyp. Copy it whole,
+# matching the preparation stage's glibc; no package manager enters runtime.
+FROM ghcr.io/pnpm/pnpm:12.14.0@sha256:71202ae73719148f6b6e129ca1e9fa3ceabbc9a037dc34800715606f2b5290a1 AS migrator-pnpm
 
-WORKDIR /migrator
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates perl-base && \
+# Share resolutions with the workspace, without running its build or hooks.
+FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS migrator-dependencies
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates perl-base libatomic1 && \
     rm -rf /var/lib/apt/lists/*
-COPY docker/migrator/package.json docker/migrator/pnpm-workspace.yaml docker/migrator/pnpm-lock.yaml ./
-COPY docker/migrator/installer.mjs ./installer.mjs
-RUN node installer.mjs /opt/migrator-pnpm && \
-    node /opt/migrator-pnpm/bin/pnpm.mjs install --prod --frozen-lockfile
+COPY --from=migrator-pnpm /opt/pnpm /opt/pnpm
+RUN ln -sf /opt/pnpm/pnpm /usr/local/bin/pnpm && test "$(pnpm --version)" = "12.14.0"
+ENV pnpm_config_store_dir=/pnpm/store
+ENV pnpm_config_cache_dir=/pnpm/cache
+ENV pnpm_config_frozen_lockfile=true
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY docker/migrator/package.json ./docker/migrator/
+# Suppress authoring hooks during install. Deploy runs only the locked CLI
+# dependency scripts allowed by root policy, including the engine download.
+RUN --mount=type=cache,id=migrator-pnpm-store,target=/pnpm/store \
+    --mount=type=cache,id=migrator-pnpm-metadata,target=/pnpm/cache \
+    HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match install --prod --frozen-lockfile --ignore-scripts && \
+    HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match deploy --prod /prod/migrator
 
 # Do not inherit build tooling, installer caches, or the API dependency graph.
-FROM node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS migrator
+FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS migrator
 
 WORKDIR /app/apps/api
 ENV NODE_ENV=production
@@ -132,8 +154,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
     rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn* && \
     rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
       /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg
-COPY --from=migrator-dependencies /migrator/package.json ./package.json
-COPY --from=migrator-dependencies /migrator/node_modules ./node_modules
+COPY --from=migrator-dependencies /prod/migrator/package.json ./package.json
+COPY --from=migrator-dependencies /prod/migrator/node_modules ./node_modules
 COPY apps/api/prisma.config.ts ./prisma.base.config.ts
 COPY docker/migrator/prisma.config.mjs docker/migrator/connection-options.mjs ./
 COPY docker/migrator/check-connection.sql ./migrator-check.sql

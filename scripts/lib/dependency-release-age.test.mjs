@@ -9,16 +9,13 @@ import { parse } from 'yaml'
 
 const root = new URL('../../', import.meta.url)
 
-test('policy applies to both npm update roots and keeps retry privileges on trusted main', async () => {
+test('policy applies to the shared npm update root and keeps retry privileges on trusted main', async () => {
   const bot = parse(await readFile(new URL('.github/dependabot.yml', root), 'utf8'))
   assert.deepEqual(
     bot.updates
       .filter((entry) => entry['package-ecosystem'] === 'npm')
       .map((entry) => [entry.directory, entry.cooldown['default-days']]),
-    [
-      ['/', 3],
-      ['/docker/migrator', 3],
-    ]
+    [['/', 3]]
   )
   const workflow = parse(
     await readFile(new URL('.github/workflows/dependabot-retry.yml', root), 'utf8')

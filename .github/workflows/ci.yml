@@ -585,6 +585,12 @@ jobs:
         with:
           node-version: 24
 
+      - name: Setup pnpm for migration verification
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Install migration verification dependencies
+        run: pnpm --filter api --fail-if-no-match install --frozen-lockfile --ignore-scripts
+
       - name: Install Trivy
         env:
           TRIVY_VERSION: 0.75.0
@@ -610,6 +616,9 @@ jobs:
             ./node_modules/.bin/prisma --version
             test -x ./node_modules/.bin/prisma
           '
+
+      - name: Verify native migration cancellation
+        run: node scripts/verify-migrator-lifecycle.mjs "$AMCORE_API_MIGRATOR_IMAGE"
 
       - name: Verify npm/npx are absent from the runner image
         run: |

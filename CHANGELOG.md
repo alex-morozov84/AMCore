@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The migration image uses a minimal workspace package and the shared root lock,
+  with official pnpm bootstrap and a Node24/Debian Trixie base. The API builder
+  updates its whole npm distribution. OS and build-tool findings still require
+  separate review; the packaging change does not certify an empty vulnerability inventory.
+
 - Root workspace installs explicitly enforce the strict 24-hour release-age floor
   and refuse registry packages with unknown publication times.
   Ordinary npm Dependabot updates use a three-day cooldown; a trusted controller

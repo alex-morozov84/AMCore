@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { backlogCount, renderDependabotHealth } from './lib/dependabot-health.mjs'
 import { renderToolchain, toolchainFreshness } from './lib/toolchain-freshness.mjs'
-import { dockerPins, migratorFreshness, renderMigrator } from './lib/migrator-freshness.mjs'
+import { dockerPins } from './lib/docker-pins.mjs'
 
 // Every probe is bounded: on timeout execFileSync kills the child and throws, so
 // a slow/hanging registry or API degrades to a note in the report instead of
@@ -128,7 +128,7 @@ function cliDrift() {
   })
 }
 
-function render({ npm, health, docker, cli, migrator, toolchain }) {
+function render({ npm, health, docker, cli, toolchain }) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const out = [
     '<!-- dependency-freshness:auto -->',
@@ -172,7 +172,7 @@ function render({ npm, health, docker, cli, migrator, toolchain }) {
       )
   }
 
-  out.push(...renderToolchain(toolchain), ...renderMigrator(migrator))
+  out.push(...renderToolchain(toolchain))
   out.push('', '## curl-pinned CLI tools', '', '| Tool | Pinned | Latest | |', '|---|---|---|---|')
   for (const c of cli) {
     const mark = c.pinned == null || c.latest == null ? '❔' : c.stale ? '⚠️' : '✅'
@@ -193,7 +193,6 @@ console.log(
     }),
     docker: DOCKERFILES.flatMap(dockerDrift),
     cli: cliDrift(),
-    migrator: await migratorFreshness(process.cwd()),
     toolchain: await toolchainFreshness(process.cwd()),
   })
 )

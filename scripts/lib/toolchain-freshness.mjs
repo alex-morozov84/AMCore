@@ -166,7 +166,7 @@ export function renderToolchain(rows) {
   return [
     '## Toolchain: pnpm and Node.js',
     '',
-    'Dependabot does not bump `packageManager` or Node selectors. Move pnpm in one PR: root pin, both `corepack prepare` lines, the stand installer and `docker/migrator` together. Node selectors are majors; digests are in the Docker section.',
+    'Dependabot does not bump `packageManager` or Node selectors. Move pnpm in one PR: root pin, both `corepack prepare` lines, the stand installer and the official pnpm bootstrap image in the API Dockerfile together. Node selectors are majors; digests are in the Docker section.',
     '',
     '| Item | Pinned | Latest signal |',
     '|---|---|---|',
