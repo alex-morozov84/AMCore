@@ -273,6 +273,11 @@ For the Console Scheduled jobs screen, use `pnpm stand preview --id scheduled-jo
 adds a result history to the daily jobs, which otherwise show "No runs yet" until 02:00:
 cleanup partly done and overdue, notification cleanup failed and overdue, invitation cleanup
 with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the owner's changes.
+For the Console Integrations screen, use `pnpm stand preview --id integrations --profile integrations`.
+The profile marks the demo `SUPER_ADMIN` address verified (a demo-only mailbox substitute), because
+the test email goes only to the operator's own verified address. A stand uses the mock email
+provider, so the test shows **Simulated** and no mail leaves the machine. Repeated preview keeps
+the owner's changes.
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared
