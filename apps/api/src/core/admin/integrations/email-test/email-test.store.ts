@@ -4,6 +4,7 @@ import { IntegrationErrorCode } from '@amcore/shared'
 
 import { AppException } from '../../../../common/exceptions/index.js'
 import { type AppRedisClient, REDIS_CLIENT } from '../../../../infrastructure/redis/index.js'
+import type { IntegrationProbePolicy } from '../integration.types.js'
 
 import { emailTestKeys } from './email-test.keys.js'
 import { EMAIL_TEST_POLICY } from './email-test.policy.js'
@@ -30,6 +31,8 @@ export interface ReserveInput {
   scopeWitness: string
   leaseToken: string
   provider: 'resend' | 'mock'
+  /** The registered policy: it, not a constant of this feature, sets the admission and the budget. */
+  policy: IntegrationProbePolicy
 }
 
 type Arguments = (string | number)[]
@@ -127,11 +130,11 @@ export class EmailTestStore {
         input.scopeWitness,
         input.leaseToken,
         input.provider,
-        EMAIL_TEST_POLICY.operatorCooldownSeconds * 1000,
-        EMAIL_TEST_POLICY.platformPerHour,
-        EMAIL_TEST_POLICY.leaseSeconds * 1000,
+        input.policy.operatorCooldownSeconds * 1000,
+        input.policy.platformPerHour,
+        input.policy.leaseSeconds * 1000,
         EMAIL_TEST_POLICY.issueTtlMs,
-        EMAIL_TEST_POLICY.deadlineMs,
+        input.policy.deadlineMs,
         EMAIL_TEST_POLICY.attemptTtlMs,
         EMAIL_TEST_POLICY.lastTtlMs,
         EMAIL_TEST_POLICY.actorTtlMs,
@@ -200,18 +203,22 @@ export class EmailTestStore {
     ])
   }
 
+  /**
+   * The result the SERVER stored, which can differ from the one offered: a result that arrives after
+   * the stored deadline is kept as unknown. `null` when the attempt was no longer `sending`.
+   */
   async settle(
     attemptId: string,
     leaseToken: string,
     outcome: string,
     probeClass: string
-  ): Promise<void> {
-    await this.script(EMAIL_TEST_SCRIPTS.settle, this.keysFor(attemptId), [
-      attemptId,
-      leaseToken,
-      outcome,
-      probeClass,
-    ])
+  ): Promise<{ outcome: string; class: string } | null> {
+    const [head, storedOutcome, storedClass] = await this.script(
+      EMAIL_TEST_SCRIPTS.settle,
+      this.keysFor(attemptId),
+      [attemptId, leaseToken, outcome, probeClass]
+    )
+    return head === 'OK' ? { outcome: storedOutcome ?? 'unknown', class: storedClass ?? '' } : null
   }
 
   async readAttempt(attemptId: string): Promise<StoredAttempt | null> {

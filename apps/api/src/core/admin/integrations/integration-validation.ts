@@ -4,14 +4,37 @@ import type { IntegrationProbePolicy, IntegrationRegistration } from './integrat
 
 const ID = /^[a-z][a-z0-9_]{0,31}$/
 
-function validatePolicy(id: string, policy: IntegrationProbePolicy): void {
+/**
+ * Per-kind ceilings. A registration of an existing kind may be stricter than its kind, never
+ * looser, so a registration cannot widen what the reviewed kind allows.
+ */
+const KIND_ENVELOPE: Record<
+  (typeof INTEGRATION_PROBE_KINDS)[number],
+  { maxDeadlineMs: number; minCooldownSeconds: number; maxPlatformPerHour: number }
+> = {
+  operator_email_test: { maxDeadlineMs: 10_000, minCooldownSeconds: 60, maxPlatformPerHour: 20 },
+}
+
+const wholeNumber = (value: number): boolean => Number.isFinite(value) && Number.isInteger(value)
+
+function validatePolicy(
+  id: string,
+  kind: keyof typeof KIND_ENVELOPE,
+  policy: IntegrationProbePolicy
+): void {
+  const envelope = KIND_ENVELOPE[kind]
   const ok =
-    Number.isInteger(policy.deadlineMs) &&
+    [
+      policy.deadlineMs,
+      policy.operatorCooldownSeconds,
+      policy.platformPerHour,
+      policy.leaseSeconds,
+    ].every(wholeNumber) &&
     policy.deadlineMs > 0 &&
-    policy.deadlineMs <= 30_000 &&
-    policy.operatorCooldownSeconds >= 30 &&
+    policy.deadlineMs <= Math.min(30_000, envelope.maxDeadlineMs) &&
+    policy.operatorCooldownSeconds >= Math.max(30, envelope.minCooldownSeconds) &&
     policy.platformPerHour > 0 &&
-    policy.platformPerHour <= 60 &&
+    policy.platformPerHour <= Math.min(60, envelope.maxPlatformPerHour) &&
     policy.leaseSeconds >= policy.deadlineMs / 1000 + 20
   if (!ok) throw new Error(`Integration "${id}" has an unsafe probe policy`)
 }
@@ -39,7 +62,7 @@ export function validateRegistrations(registrations: readonly IntegrationRegistr
       if (!(INTEGRATION_PROBE_KINDS as readonly string[]).includes(probe.kind))
         throw new Error(`Unknown probe kind: ${id}`)
       if (typeof probe.port !== 'function') throw new Error(`Incomplete probe: ${id}`)
-      validatePolicy(id, probe.policy)
+      validatePolicy(id, probe.kind, probe.policy)
     }
   }
 }

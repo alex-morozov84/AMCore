@@ -27,7 +27,6 @@ import {
   ProbeReceiptDto,
   ProbeRequestDto,
 } from './dto/integrations.dto.js'
-import type { IntegrationProbePort } from './integrations/integration.types.js'
 import { IntegrationRegistry } from './integrations/integration-registry.js'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard.js'
 
@@ -47,7 +46,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
 export class AdminIntegrationsController {
   constructor(private readonly registry: IntegrationRegistry) {}
 
-  private probe(id: string): IntegrationProbePort {
+  private probe(id: string): NonNullable<ReturnType<IntegrationRegistry['probe']>> {
     const probe = this.registry.probe(id)
     if (!probe)
       throw new AppException(
@@ -96,7 +95,7 @@ export class AdminIntegrationsController {
     @Param('id', { schema: integrationIdSchema }) id: string,
     @CurrentUser() actor: RequestPrincipal
   ): Promise<ProbePreparation> {
-    return this.probe(id).prepare(actor.sub)
+    return this.probe(id).port.prepare(actor.sub)
   }
 
   @Post(':id/probe')
@@ -122,14 +121,21 @@ export class AdminIntegrationsController {
   })
   @ApiResponse({ status: 410, description: 'INTEGRATION_ATTEMPT_EXPIRED; prepare again' })
   @ApiResponse({ status: 429, description: 'Cooldown, hourly limit or another test in flight' })
-  @ApiResponse({ status: 503, description: 'Admission unavailable; nothing was sent' })
+  @ApiResponse({
+    status: 503,
+    description:
+      'INTEGRATION_PROBE_UNAVAILABLE: refused BEFORE anything was sent. After a send the answer is 200 ' +
+      'with the stored receipt, or with outcome `in_progress` when it cannot be read yet; read the ' +
+      'receipt route, do not send again',
+  })
   @SchemaResponse({ type: ProbeReceiptDto, status: 200, description: 'Receipt of the attempt' })
   run(
     @Param('id', { schema: integrationIdSchema }) id: string,
     @Body({ schema: ProbeRequestDto.schema }) body: ProbeRequestDto,
     @CurrentUser() actor: RequestPrincipal
   ): Promise<ProbeReceipt> {
-    return this.probe(id).run(actor.sub, body.attemptId)
+    const { port, policy } = this.probe(id)
+    return port.run(actor.sub, body.attemptId, policy)
   }
 
   @Get(':id/probe/:attemptId')
@@ -149,6 +155,6 @@ export class AdminIntegrationsController {
     @Param('attemptId', { schema: probeAttemptIdSchema }) attemptId: string,
     @CurrentUser() actor: RequestPrincipal
   ): Promise<ProbeReceipt> {
-    return this.probe(id).receiptFor(actor.sub, attemptId)
+    return this.probe(id).port.receiptFor(actor.sub, attemptId)
   }
 }

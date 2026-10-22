@@ -32,3 +32,29 @@ describe('email test Redis contract', () => {
     }
   )
 })
+
+/** The KEYS/ARGV table of the lifecycle: the store passes exactly these counts to each script. */
+const CONTRACT = {
+  prepare: { keys: 1, args: 5 },
+  reserve: { keys: 6, args: 14 },
+  markSending: { keys: 3, args: 2 },
+  failBeforeSend: { keys: 3, args: 3 },
+  settle: { keys: 3, args: 4 },
+} as const
+
+describe('email test script argument contract', () => {
+  const indexes = (script: string, name: 'KEYS' | 'ARGV'): number[] =>
+    [...script.matchAll(new RegExp(`${name}\\[(\\d+)\\]`, 'g'))].map((match) => Number(match[1]))
+
+  it.each(Object.entries(CONTRACT))(
+    '%s uses exactly its declared keys and arguments',
+    (name, shape) => {
+      const script = EMAIL_TEST_SCRIPTS[name as keyof typeof EMAIL_TEST_SCRIPTS]
+      const keys = new Set(indexes(script, 'KEYS'))
+      expect([...keys].sort((a, b) => a - b)).toEqual(
+        Array.from({ length: shape.keys }, (_unused, index) => index + 1)
+      )
+      expect(Math.max(...indexes(script, 'ARGV'))).toBe(shape.args)
+    }
+  )
+})

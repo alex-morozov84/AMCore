@@ -191,10 +191,114 @@ describe('IntegrationRegistry', () => {
     }).compile()
     await moduleRef.init()
     const registry = moduleRef.get(IntegrationRegistry)
-    expect(registry.probe('demo')).toBeInstanceOf(DemoProbe)
+    expect(registry.probe('demo')?.port).toBeInstanceOf(DemoProbe)
+    expect(registry.probe('demo')?.policy).toEqual(POLICY)
     expect(registry.probe('missing')).toBeNull()
     const response = await registry.list('operator')
     expect(response.items[0]?.action).toMatchObject({ probeId: 'demo_probe', available: true })
     await moduleRef.close()
   })
 })
+
+describe('startup contract (C6) and the kind envelope (C3)', () => {
+  const probeOf = (policy: Partial<typeof POLICY>) => ({
+    ...demo,
+    probe: {
+      id: 'demo_probe',
+      kind: 'operator_email_test' as const,
+      policy: { ...POLICY, ...policy },
+      port: DemoProbe,
+    },
+  })
+
+  it('rejects a policy that is not made of finite whole numbers', () => {
+    for (const bad of [
+      { operatorCooldownSeconds: Infinity },
+      { leaseSeconds: Infinity },
+      { platformPerHour: 2.5 },
+      { deadlineMs: Number.NaN },
+      { deadlineMs: 9_999.5 },
+    ])
+      expect(() => validateRegistrations([probeOf(bad)])).toThrow('unsafe probe policy')
+  })
+
+  it('does not let a registration loosen what its kind allows', () => {
+    // Valid for the generic bounds, but looser than the reviewed email-test kind.
+    for (const loose of [
+      { operatorCooldownSeconds: 45 },
+      { platformPerHour: 21 },
+      { deadlineMs: 20_000, leaseSeconds: 60 },
+    ])
+      expect(() => validateRegistrations([probeOf(loose)])).toThrow('unsafe probe policy')
+    expect(() =>
+      validateRegistrations([probeOf({ operatorCooldownSeconds: 120, platformPerHour: 5 })])
+    ).not.toThrow()
+  })
+
+  it('fails startup when the provided probe port is incomplete', async () => {
+    @Injectable()
+    class EmptyProbe {}
+    @Module({ providers: [EmptyProbe], exports: [EmptyProbe] })
+    class EmptyProbeModule {}
+    const registration = {
+      ...probeOf({}),
+      probe: { ...probeOf({}).probe, port: EmptyProbe as never },
+    }
+    await expect(
+      Test.createTestingModule({
+        imports: [IntegrationsModule.register([registration]), EmptyProbeModule],
+      })
+        .compile()
+        .then((moduleRef) => moduleRef.init())
+    ).rejects.toThrow('does not match its registration')
+  })
+})
+
+describe('the whole row is bounded (C4)', () => {
+  @Injectable()
+  class SlowActionProbe extends DemoProbe {
+    override action = jest.fn(() => new Promise<never>(() => undefined))
+  }
+  @Module({ providers: [SlowActionProbe], exports: [SlowActionProbe] })
+  class SlowActionModule {}
+
+  it('returns the neighbouring rows and keeps the reading when only the action hangs', async () => {
+    const probe = {
+      id: 'demo_probe',
+      kind: 'operator_email_test' as const,
+      policy: POLICY,
+      port: SlowActionProbe,
+    }
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        IntegrationsModule.register([
+          { ...demo, probe },
+          { id: 'other', name: 'Other', module: FreeTextOkModule, reader: FreeTextOkReader },
+        ]),
+        SlowActionModule,
+      ],
+    }).compile()
+    await moduleRef.init()
+    const registry = moduleRef.get(IntegrationRegistry)
+    const started = Date.now()
+    const first = await registry.list('operator')
+    const second = await registry.list('operator')
+    expect(Date.now() - started).toBeLessThan(4_000)
+    for (const response of [first, second]) {
+      expect(response.items.map((item) => [item.id, item.source, item.action])).toEqual([
+        ['demo', 'ok', null],
+        ['other', 'ok', null],
+      ])
+    }
+    await moduleRef.close()
+  }, 10_000)
+})
+
+@Injectable()
+class FreeTextOkReader implements IntegrationReader {
+  read(): Promise<IntegrationReading> {
+    return Promise.resolve(readingOf())
+  }
+}
+@Module({ providers: [FreeTextOkReader], exports: [FreeTextOkReader] })
+class FreeTextOkModule {}

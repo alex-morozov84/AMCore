@@ -8,7 +8,10 @@ local t = redis.call('TIME')
 local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
 `
 
-/** KEYS: actor. ARGV: newId, recipientToken, scopeWitness, issueTtlMs, actorTtlMs. Replaces any earlier issue. */
+/**
+ * KEYS: actor. ARGV: newId, recipientToken, scopeWitness, issueTtlMs, actorTtlMs.
+ * Returns the live issue while token and witness are unchanged; otherwise replaces any earlier issue.
+ */
 export const PREPARE_SCRIPT = `${NOW}
 local issuedId = redis.call('HGET', KEYS[1], 'issuedId')
 local issuedAt = tonumber(redis.call('HGET', KEYS[1], 'issuedAt') or '0')

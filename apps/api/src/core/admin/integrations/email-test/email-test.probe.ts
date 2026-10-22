@@ -18,12 +18,13 @@ import { AuditActorType, AuditTargetType } from '../../../../generated/prisma/cl
 import type { EmailProvider } from '../../../../infrastructure/email/email.types.js'
 import { PrismaService } from '../../../../prisma/index.js'
 import { AuditLogService } from '../../../audit/audit-log.service.js'
+import type { IntegrationProbePolicy } from '../integration.types.js'
 
 import { buildTestEmailBody } from './email-test.body.js'
 import { classifySend, type ProbeResult } from './email-test.outcome.js'
 import { EMAIL_TEST_POLICY } from './email-test.policy.js'
 import { EmailTestStore, integrationError } from './email-test.store.js'
-import { lastToEvidence, toReceipt } from './email-test.view.js'
+import { lastToEvidence, type StoredAttempt, toReceipt } from './email-test.view.js'
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex')
 
@@ -48,6 +49,9 @@ function mask(email: string): string {
  */
 @Injectable()
 export class EmailTestProbe {
+  /** The transport call still open in this process, also after its logical deadline. */
+  private physicalInFlight = false
+
   constructor(
     private readonly store: EmailTestStore,
     private readonly env: EnvService,
@@ -118,7 +122,11 @@ export class EmailTestProbe {
     }
   }
 
-  async run(actorId: string, attemptId: string): Promise<ProbeReceipt> {
+  async run(
+    actorId: string,
+    attemptId: string,
+    policy: IntegrationProbePolicy
+  ): Promise<ProbeReceipt> {
     const operator = await this.requireOperator(actorId)
     const leaseToken = randomBytes(16).toString('base64url')
     const reserved = await this.store.reserve({
@@ -128,6 +136,7 @@ export class EmailTestProbe {
       scopeWitness: this.witness(),
       leaseToken,
       provider: this.mode,
+      policy,
     })
     if (reserved.kind === 'refused')
       throw integrationError(
@@ -135,18 +144,34 @@ export class EmailTestProbe {
         STATUS[reserved.code] ?? 409,
         reserved.retryAfterSeconds ? { retryAfterSeconds: reserved.retryAfterSeconds } : undefined
       )
-    if (reserved.kind === 'replay')
-      return toReceipt(attemptId, reserved.attempt, await this.store.now())
+    if (reserved.kind === 'replay') return this.replayReceipt(attemptId, reserved.attempt)
+    if (this.physicalInFlight) {
+      // An earlier send passed its logical deadline but its transport call has not ended. Another
+      // call is not started on top of it, even though the shared lease was already released.
+      await this.safeFail(attemptId, leaseToken, 'busy')
+      throw integrationError(IntegrationErrorCode.INTEGRATION_PROBE_BUSY, 429, {
+        retryAfterSeconds: 5,
+      })
+    }
 
-    await this.execute(actorId, attemptId, leaseToken, operator.email)
-    return this.receipt(attemptId)
+    await this.execute(actorId, attemptId, leaseToken, operator.email, policy)
+    return this.receiptAfterSend(attemptId)
+  }
+
+  /** A replay never sends; if the clock cannot be read, the attempt's own times are used. */
+  private async replayReceipt(attemptId: string, attempt: StoredAttempt): Promise<ProbeReceipt> {
+    const now = await this.store
+      .now()
+      .catch(() => attempt.settledAt || attempt.sentAt || attempt.reservedAt)
+    return toReceipt(attemptId, attempt, now)
   }
 
   private async execute(
     actorId: string,
     attemptId: string,
     leaseToken: string,
-    email: string
+    email: string,
+    policy: IntegrationProbePolicy
   ): Promise<void> {
     try {
       await this.audit.record(
@@ -177,23 +202,28 @@ export class EmailTestProbe {
     if (performance.now() - t0 > EMAIL_TEST_POLICY.precheckMs)
       return this.safeFail(attemptId, leaseToken, 'precheck')
 
-    const result = await this.send(email, attemptId, t0)
+    const result = await this.send(email, attemptId, t0, policy.deadlineMs)
+    // The audit states what the SERVER stored (a late result is kept as unknown), or that the
+    // stored result is unknown because the settle failed. It never repeats the offered result.
+    let settled: { outcome: string; class: string } | null = null
     try {
-      await this.store.settle(attemptId, leaseToken, result.outcome, result.class ?? '')
+      settled = await this.store.settle(attemptId, leaseToken, result.outcome, result.class ?? '')
     } catch {
       // The attempt stays `sending` and reads as unknown after its deadline.
       this.logger.warn(
         { event: 'integration.email_test.settle_failed' },
         'Test email settle failed'
       )
+      settled = { outcome: 'unknown', class: 'settle_failed' }
     }
+    if (!settled) return
     await this.audit.record({
       action: 'integration.email_test_settled',
       actorType: AuditActorType.USER,
       actorId,
       targetType: AuditTargetType.USER,
       targetId: actorId,
-      metadata: { provider: this.mode, outcome: result.outcome, class: result.class ?? 'none' },
+      metadata: { provider: this.mode, outcome: settled.outcome, class: settled.class || 'none' },
     })
   }
 
@@ -205,17 +235,30 @@ export class EmailTestProbe {
     }
   }
 
-  /** One logical deadline from `t0`; the physical call keeps its slot and its late result is fenced. */
-  private send(email: string, attemptId: string, t0: number): Promise<ProbeResult> {
+  /**
+   * One logical deadline from `t0`. The physical call keeps this process's slot until it really
+   * ends, even after the deadline: a second call is not stacked on a transport that ignores abort.
+   * Its late result is fenced by SETTLE.
+   */
+  private send(
+    email: string,
+    attemptId: string,
+    t0: number,
+    deadlineMs: number
+  ): Promise<ProbeResult> {
     const controller = new AbortController()
     const body = buildTestEmailBody(this.env.get('EMAIL_FROM'), email)
+    this.physicalInFlight = true
     const physical = this.provider
       .sendPrepared(body, `integration-test-${attemptId}`, controller.signal)
       .then(
         (result) => classifySend(this.mode, result),
         (): ProbeResult => ({ outcome: 'unknown', class: null })
       )
-    const remaining = Math.max(0, EMAIL_TEST_POLICY.deadlineMs - (performance.now() - t0))
+      .finally(() => {
+        this.physicalInFlight = false
+      })
+    const remaining = Math.max(0, deadlineMs - (performance.now() - t0))
     return new Promise<ProbeResult>((resolve) => {
       const timer = setTimeout(() => {
         controller.abort()
@@ -228,10 +271,30 @@ export class EmailTestProbe {
     })
   }
 
-  private async receipt(attemptId: string): Promise<ProbeReceipt> {
-    const [attempt, now] = await Promise.all([this.store.readAttempt(attemptId), this.store.now()])
-    if (!attempt) throw integrationError(IntegrationErrorCode.INTEGRATION_PROBE_UNAVAILABLE, 503)
-    return toReceipt(attemptId, attempt, now)
+  /**
+   * After the send path the transport may have been called, so a stored result that cannot be read
+   * is never reported as a refusal ("nothing was sent"): the answer is an in-progress receipt and
+   * the client reads the same attempt again without posting.
+   */
+  private async receiptAfterSend(attemptId: string): Promise<ProbeReceipt> {
+    try {
+      const [attempt, now] = await Promise.all([
+        this.store.readAttempt(attemptId),
+        this.store.now(),
+      ])
+      if (attempt) return toReceipt(attemptId, attempt, now)
+    } catch {
+      // Fall through to the in-progress receipt.
+    }
+    return {
+      attemptId,
+      state: 'sending',
+      outcome: 'in_progress',
+      class: null,
+      provider: this.mode,
+      reservedAt: new Date().toISOString(),
+      settledAt: null,
+    }
   }
 
   /** Read-only recovery of the operator's own attempt. Never creates or resends. */

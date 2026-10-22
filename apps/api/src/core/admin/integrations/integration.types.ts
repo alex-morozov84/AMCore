@@ -33,7 +33,8 @@ export interface IntegrationProbePolicy {
 export interface IntegrationProbePort {
   action(actorId: string): Promise<IntegrationAction>
   prepare(actorId: string): Promise<ProbePreparation>
-  run(actorId: string, attemptId: string): Promise<ProbeReceipt>
+  /** `policy` is the registered one: the port must apply it to its admission and its time budget. */
+  run(actorId: string, attemptId: string, policy: IntegrationProbePolicy): Promise<ProbeReceipt>
   receiptFor(actorId: string, attemptId: string): Promise<ProbeReceipt>
 }
 

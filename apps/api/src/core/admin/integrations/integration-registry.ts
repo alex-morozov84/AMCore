@@ -9,6 +9,7 @@ import {
 
 import {
   INTEGRATION_REGISTRATIONS,
+  type IntegrationProbePolicy,
   type IntegrationProbePort,
   type IntegrationReader,
   type IntegrationReading,
@@ -18,10 +19,12 @@ import { validateRegistrations } from './integration-validation.js'
 
 export const INTEGRATION_READ_DEADLINE_MS = 1500
 
+const PORT_METHODS = ['action', 'prepare', 'run', 'receiptFor'] as const
+
 interface Resolved {
   registration: IntegrationRegistration
   reader: IntegrationReader
-  probe: IntegrationProbePort | null
+  probe: { port: IntegrationProbePort; policy: IntegrationProbePolicy } | null
 }
 
 const UNREADABLE: Omit<IntegrationItem, 'id' | 'name' | 'action'> = {
@@ -40,10 +43,19 @@ const UNREADABLE: Omit<IntegrationItem, 'id' | 'name' | 'action'> = {
   links: [],
 }
 
+/** Rejects when `work` does not settle before `deadlineAt`; the work itself is not cancelled. */
+function within<T>(work: Promise<T>, deadlineAt: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined
+  const expiry = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('deadline')), Math.max(0, deadlineAt - Date.now()))
+  })
+  return Promise.race([work, expiry]).finally(() => clearTimeout(timer))
+}
+
 /**
  * The single place that turns registrations into the Console response. Readers run concurrently
  * under a deadline, one read per reader in flight (a concurrent request joins it), and one failing
- * reader never hides the others.
+ * reader never hides the others. The deadline covers the whole row, including its probe action.
  */
 @Injectable()
 export class IntegrationRegistry implements OnApplicationBootstrap {
@@ -60,24 +72,30 @@ export class IntegrationRegistry implements OnApplicationBootstrap {
 
   /**
    * Ports are resolved after all modules initialised. A global token lookup does not restrict
-   * resolution to the declared module, so each instance is checked against its declared class.
+   * resolution to the declared module, so each instance is checked against its declared class
+   * and against the methods the Console calls.
    */
   onApplicationBootstrap(): void {
     this.resolved = this.registrations.map((registration) => {
       const reader = this.moduleRef.get(registration.reader, { strict: false })
       if (!(reader instanceof registration.reader) || typeof reader.read !== 'function')
         throw new Error(`Integration reader does not match its registration: ${registration.id}`)
-      let probe: IntegrationProbePort | null = null
+      let probe: Resolved['probe'] = null
       if (registration.probe) {
-        probe = this.moduleRef.get(registration.probe.port, { strict: false })
-        if (!(probe instanceof registration.probe.port))
+        const port = this.moduleRef.get(registration.probe.port, { strict: false })
+        if (
+          !(port instanceof registration.probe.port) ||
+          PORT_METHODS.some((method) => typeof port[method] !== 'function')
+        )
           throw new Error(`Integration probe does not match its registration: ${registration.id}`)
+        probe = { port, policy: registration.probe.policy }
       }
       return { registration, reader, probe }
     })
   }
 
-  probe(id: string): IntegrationProbePort | null {
+  /** The registered port and the registered policy that the Console must hand to it. */
+  probe(id: string): NonNullable<Resolved['probe']> | null {
     return this.resolved.find((entry) => entry.registration.id === id)?.probe ?? null
   }
 
@@ -97,26 +115,16 @@ export class IntegrationRegistry implements OnApplicationBootstrap {
 
   private async item(entry: Resolved, actorId: string): Promise<IntegrationItem> {
     const { id, name } = entry.registration
-    let timer: NodeJS.Timeout | undefined
+    const deadlineAt = Date.now() + INTEGRATION_READ_DEADLINE_MS
     try {
-      const reading = await Promise.race([
-        this.readOnce(entry),
-        new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => reject(new Error('deadline')), INTEGRATION_READ_DEADLINE_MS)
-        }),
-      ])
-      const action = entry.probe ? await entry.probe.action(actorId).catch(() => null) : null
-      return integrationItemSchema.parse({
-        id,
-        name,
-        source: 'ok',
-        ...reading,
-        action,
-      })
+      const reading = await within(this.readOnce(entry), deadlineAt)
+      // A slow or failing action costs the button, never the row or the neighbouring rows.
+      const action = entry.probe
+        ? await within(entry.probe.port.action(actorId), deadlineAt).catch(() => null)
+        : null
+      return integrationItemSchema.parse({ id, name, source: 'ok', ...reading, action })
     } catch {
       return { id, name, ...UNREADABLE, action: null }
-    } finally {
-      clearTimeout(timer)
     }
   }
 

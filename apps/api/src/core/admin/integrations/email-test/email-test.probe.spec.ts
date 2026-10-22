@@ -6,6 +6,12 @@ import type { StoredAttempt } from './email-test.view.js'
 
 const ATTEMPT = 'A'.repeat(22)
 const KEY = 'sk-secret-key-value'
+const POLICY = {
+  deadlineMs: EMAIL_TEST_POLICY.deadlineMs,
+  operatorCooldownSeconds: EMAIL_TEST_POLICY.operatorCooldownSeconds,
+  platformPerHour: EMAIL_TEST_POLICY.platformPerHour,
+  leaseSeconds: EMAIL_TEST_POLICY.leaseSeconds,
+}
 
 function stored(over: Partial<StoredAttempt> = {}): StoredAttempt {
   return {
@@ -30,7 +36,11 @@ function build(overrides: { mode?: 'resend' | 'mock'; env?: string; verified?: b
     reserve: jest.fn().mockResolvedValue({ kind: 'reserved', now: 1_000 }),
     markSending: jest.fn().mockResolvedValue(true),
     failBeforeSend: jest.fn().mockResolvedValue(undefined),
-    settle: jest.fn().mockResolvedValue(undefined),
+    settle: jest
+      .fn()
+      .mockImplementation((_id: string, _lease: string, outcome: string, probeClass: string) =>
+        Promise.resolve({ outcome, class: probeClass })
+      ),
     readAttempt: jest.fn().mockResolvedValue(stored()),
     readLast: jest.fn().mockResolvedValue(null),
     readActorAttempt: jest.fn().mockResolvedValue(null),
@@ -120,9 +130,9 @@ describe('EmailTestProbe.run', () => {
     })
     store.settle.mockImplementation(() => {
       calls.push('settle')
-      return Promise.resolve()
+      return Promise.resolve({ outcome: 'accepted', class: '' })
     })
-    const receipt = await probe.run('u1', ATTEMPT)
+    const receipt = await probe.run('u1', ATTEMPT, POLICY)
     expect(calls).toEqual([
       'integration.email_test_requested',
       'mark',
@@ -137,7 +147,7 @@ describe('EmailTestProbe.run', () => {
 
   it('sends a fixed message to the stored address with the attempt as idempotency key', async () => {
     const { probe, provider } = build()
-    await probe.run('u1', ATTEMPT)
+    await probe.run('u1', ATTEMPT, POLICY)
     const [body, key] = provider.sendPrepared.mock.calls[0] as [string, string]
     const parsed = JSON.parse(body) as { to: string[]; from: string }
     expect(parsed.to).toEqual(['op@example.com'])
@@ -148,7 +158,7 @@ describe('EmailTestProbe.run', () => {
   it('does not send when the audit write fails, and closes the reservation as not started', async () => {
     const { probe, store, provider, audit } = build()
     audit.record.mockRejectedValueOnce(new Error('db down'))
-    await expect(probe.run('u1', ATTEMPT)).rejects.toThrow(
+    await expect(probe.run('u1', ATTEMPT, POLICY)).rejects.toThrow(
       IntegrationErrorCode.INTEGRATION_PROBE_UNAVAILABLE
     )
     expect(provider.sendPrepared).not.toHaveBeenCalled()
@@ -159,7 +169,7 @@ describe('EmailTestProbe.run', () => {
   it('does not send when the lease was lost before MARK_SENDING', async () => {
     const { probe, store, provider } = build()
     store.markSending.mockResolvedValue(false)
-    await probe.run('u1', ATTEMPT)
+    await probe.run('u1', ATTEMPT, POLICY)
     expect(provider.sendPrepared).not.toHaveBeenCalled()
     expect(store.failBeforeSend).toHaveBeenCalledWith(ATTEMPT, expect.any(String), 'lease_lost')
   })
@@ -169,7 +179,7 @@ describe('EmailTestProbe.run', () => {
     const clock = jest.spyOn(performance, 'now')
     clock.mockReturnValueOnce(0) // t0, taken before the command
     clock.mockReturnValue(EMAIL_TEST_POLICY.precheckMs + 1) // the reply is processed after a pause
-    await probe.run('u1', ATTEMPT)
+    await probe.run('u1', ATTEMPT, POLICY)
     expect(provider.sendPrepared).not.toHaveBeenCalled()
     expect(store.failBeforeSend).toHaveBeenCalledWith(ATTEMPT, expect.any(String), 'precheck')
     expect(store.settle).not.toHaveBeenCalled()
@@ -178,7 +188,7 @@ describe('EmailTestProbe.run', () => {
   it('refuses before any audit or send when Redis admission is unavailable', async () => {
     const { probe, store, provider, audit } = build()
     store.reserve.mockRejectedValue(new Error(IntegrationErrorCode.INTEGRATION_PROBE_UNAVAILABLE))
-    await expect(probe.run('u1', ATTEMPT)).rejects.toThrow()
+    await expect(probe.run('u1', ATTEMPT, POLICY)).rejects.toThrow()
     expect(audit.record).not.toHaveBeenCalled()
     expect(provider.sendPrepared).not.toHaveBeenCalled()
   })
@@ -190,7 +200,7 @@ describe('EmailTestProbe.run', () => {
       code: IntegrationErrorCode.INTEGRATION_PROBE_COOLDOWN,
       retryAfterSeconds: 42,
     })
-    await expect(probe.run('u1', ATTEMPT)).rejects.toMatchObject({
+    await expect(probe.run('u1', ATTEMPT, POLICY)).rejects.toMatchObject({
       status: 429,
       details: { retryAfterSeconds: 42 },
     })
@@ -202,7 +212,7 @@ describe('EmailTestProbe.run', () => {
       kind: 'replay',
       attempt: stored({ provider: 'mock', outcome: 'simulated' }),
     })
-    const receipt = await probe.run('u1', ATTEMPT)
+    const receipt = await probe.run('u1', ATTEMPT, POLICY)
     expect(receipt).toMatchObject({ outcome: 'simulated', provider: 'mock' })
     expect(audit.record).not.toHaveBeenCalled()
     expect(provider.sendPrepared).not.toHaveBeenCalled()
@@ -214,7 +224,7 @@ describe('EmailTestProbe.run', () => {
     const { probe, store, provider } = build()
     let finishLate: (value: unknown) => void = () => undefined
     provider.sendPrepared.mockImplementation(() => new Promise((resolve) => (finishLate = resolve)))
-    const pending = probe.run('u1', ATTEMPT)
+    const pending = probe.run('u1', ATTEMPT, POLICY)
     await jest.advanceTimersByTimeAsync(EMAIL_TEST_POLICY.deadlineMs + 10)
     await pending
     expect(store.settle).toHaveBeenCalledWith(ATTEMPT, expect.any(String), 'unknown', 'deadline')
@@ -226,7 +236,7 @@ describe('EmailTestProbe.run', () => {
   it('treats a thrown transport error as unknown', async () => {
     const { probe, store, provider } = build()
     provider.sendPrepared.mockRejectedValue(new Error('socket hang up'))
-    await probe.run('u1', ATTEMPT)
+    await probe.run('u1', ATTEMPT, POLICY)
     expect(store.settle).toHaveBeenCalledWith(ATTEMPT, expect.any(String), 'unknown', '')
   })
 
@@ -237,7 +247,7 @@ describe('EmailTestProbe.run', () => {
       id: '',
       error: `invalid_api_key ${KEY}`,
     })
-    await probe.run('u1', ATTEMPT)
+    await probe.run('u1', ATTEMPT, POLICY)
     const seen = JSON.stringify([audit.record.mock.calls, store.settle.mock.calls])
     expect(seen).not.toContain(KEY)
     expect(seen).not.toContain('op@example.com')
@@ -297,5 +307,109 @@ describe('EmailTestProbe.action', () => {
     foreign.store.readActorAttempt.mockResolvedValue(ATTEMPT)
     foreign.store.readAttempt.mockResolvedValue(stored({ actorId: 'other' }))
     expect((await foreign.probe.action('u1')).ownAttemptId).toBeNull()
+  })
+})
+
+describe('after the transport was called (C1)', () => {
+  it('answers with an in-progress receipt, never a refusal, when the stored result cannot be read', async () => {
+    const { probe, store, provider } = build()
+    store.readAttempt.mockRejectedValue(
+      new Error(IntegrationErrorCode.INTEGRATION_PROBE_UNAVAILABLE)
+    )
+    const receipt = await probe.run('u1', ATTEMPT, POLICY)
+    expect(provider.sendPrepared).toHaveBeenCalledTimes(1)
+    expect(receipt).toMatchObject({ attemptId: ATTEMPT, outcome: 'in_progress', state: 'sending' })
+    expect(JSON.stringify(receipt)).not.toContain('op@example.com')
+  })
+
+  it('answers a replay from the stored attempt even when the clock cannot be read', async () => {
+    const { probe, store, provider } = build()
+    store.reserve.mockResolvedValue({ kind: 'replay', attempt: stored() })
+    store.now.mockRejectedValue(new Error('redis down'))
+    const receipt = await probe.run('u1', ATTEMPT, POLICY)
+    expect(receipt).toMatchObject({ outcome: 'accepted', state: 'settled' })
+    expect(provider.sendPrepared).not.toHaveBeenCalled()
+  })
+})
+
+describe('local capacity of a transport that ignores abort (C2)', () => {
+  it('holds this process’s slot after the logical deadline and frees it when the call ends', async () => {
+    jest.useFakeTimers()
+    const { probe, store, provider } = build()
+    let finishLate: (value: unknown) => void = () => undefined
+    provider.sendPrepared.mockImplementationOnce(
+      () => new Promise((resolve) => (finishLate = resolve))
+    )
+    const first = probe.run('u1', 'A'.repeat(22), POLICY)
+    await jest.advanceTimersByTimeAsync(POLICY.deadlineMs + 10)
+    await first
+    expect(store.settle).toHaveBeenCalledWith(
+      'A'.repeat(22),
+      expect.any(String),
+      'unknown',
+      'deadline'
+    )
+
+    // The shared lease is already released, but the earlier transport call is still open here.
+    await expect(probe.run('u2', 'B'.repeat(22), POLICY)).rejects.toMatchObject({ status: 429 })
+    expect(provider.sendPrepared).toHaveBeenCalledTimes(1)
+    expect(store.failBeforeSend).toHaveBeenCalledWith('B'.repeat(22), expect.any(String), 'busy')
+
+    finishLate({ success: true, id: 'late' })
+    await jest.advanceTimersByTimeAsync(1)
+    await probe.run('u3', 'C'.repeat(22), POLICY)
+    expect(provider.sendPrepared).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('the registered policy drives the execution (C3)', () => {
+  it('passes the registered policy to admission and uses its deadline', async () => {
+    jest.useFakeTimers()
+    const { probe, store, provider } = build()
+    const strict = {
+      ...POLICY,
+      deadlineMs: 2_000,
+      operatorCooldownSeconds: 120,
+      platformPerHour: 3,
+    }
+    provider.sendPrepared.mockImplementation(() => new Promise(() => undefined))
+    const pending = probe.run('u1', ATTEMPT, strict)
+    await jest.advanceTimersByTimeAsync(1_999)
+    expect(store.settle).not.toHaveBeenCalled()
+    await jest.advanceTimersByTimeAsync(20)
+    await pending
+    expect(store.reserve).toHaveBeenCalledWith(expect.objectContaining({ policy: strict }))
+    expect(store.settle).toHaveBeenCalledWith(ATTEMPT, expect.any(String), 'unknown', 'deadline')
+  })
+})
+
+describe('the audit repeats only what the server stored (C5)', () => {
+  const settledAudit = (audit: { record: jest.Mock }) =>
+    audit.record.mock.calls.find(
+      ([entry]) => (entry as { action: string }).action === 'integration.email_test_settled'
+    )?.[0] as { metadata: Record<string, string> } | undefined
+
+  it('records a late result as the unknown the server kept', async () => {
+    const { probe, store, audit } = build()
+    store.settle.mockResolvedValue({ outcome: 'unknown', class: 'deadline' })
+    await probe.run('u1', ATTEMPT, POLICY)
+    expect(settledAudit(audit)?.metadata).toMatchObject({ outcome: 'unknown', class: 'deadline' })
+  })
+
+  it('records an unknown stored result when the settle itself failed', async () => {
+    const { probe, store, audit } = build()
+    store.settle.mockRejectedValue(new Error('redis down'))
+    await probe.run('u1', ATTEMPT, POLICY)
+    expect(settledAudit(audit)?.metadata).toMatchObject({
+      outcome: 'unknown',
+      class: 'settle_failed',
+    })
+  })
+
+  it('writes no finished record when the attempt was already settled', async () => {
+    const { probe, store, audit } = build()
+    store.settle.mockResolvedValue(null)
+    await probe.run('u1', ATTEMPT, POLICY)
+    expect(settledAudit(audit)).toBeUndefined()
   })
 })

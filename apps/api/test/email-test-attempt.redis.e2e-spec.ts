@@ -11,6 +11,13 @@ import type { AppRedisClient } from '../src/infrastructure/redis/index.js'
 import { e2eContainerLabels } from './e2e-owned-containers'
 
 /** The Lua lifecycle of the operator email test against a real Redis 7. */
+const policy = {
+  deadlineMs: EMAIL_TEST_POLICY.deadlineMs,
+  operatorCooldownSeconds: EMAIL_TEST_POLICY.operatorCooldownSeconds,
+  platformPerHour: EMAIL_TEST_POLICY.platformPerHour,
+  leaseSeconds: EMAIL_TEST_POLICY.leaseSeconds,
+}
+
 describe('email test attempt lifecycle (real Redis)', () => {
   let container: StartedRedisContainer
   let client: AppRedisClient
@@ -46,6 +53,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: lease,
       provider: 'resend',
+      policy,
     })
     return { result, lease }
   }
@@ -80,6 +88,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(again.kind).toBe('replay')
     expect(await store.readLast()).toMatchObject({ attemptId: id('b') })
@@ -99,6 +108,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(foreign).toEqual({
       kind: 'refused',
@@ -111,6 +121,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(unknown).toMatchObject({ code: IntegrationErrorCode.INTEGRATION_ATTEMPT_EXPIRED })
   })
@@ -128,6 +139,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(retry).toMatchObject({
       kind: 'refused',
@@ -145,6 +157,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(old).toMatchObject({
       kind: 'refused',
@@ -161,6 +174,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(changedRecipient).toMatchObject({
       code: IntegrationErrorCode.INTEGRATION_RECIPIENT_CHANGED,
@@ -172,6 +186,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
       scopeWitness: 'new-witness',
       leaseToken: token(),
       provider: 'resend',
+      policy,
     })
     expect(changedSettings).toMatchObject({ code: IntegrationErrorCode.INTEGRATION_CONFIG_CHANGED })
     expect(await client.exists(emailTestKeys.attempt(id('a')))).toBe(0)
@@ -222,20 +237,90 @@ describe('email test attempt lifecycle (real Redis)', () => {
     expect(await store.readLast()).toMatchObject({ outcome: 'unknown', class: 'deadline' })
   })
 
-  it('keeps the newer observation when an older attempt settles late, and never recreates last', async () => {
+  it('keeps the newer observation when an older attempt settles late', async () => {
     const a = await reserved('u1', 'a')
     await store.markSending(id('a'), a.lease)
     await client.del(emailTestKeys.lease) // lease expired while A is still sending
     const b = await reserved('u2', 'b')
     expect(b.result.kind).toBe('reserved')
     await store.settle(id('a'), a.lease, 'accepted', '')
+    expect(await store.readAttempt(id('a'))).toMatchObject({
+      state: 'settled',
+      outcome: 'accepted',
+    })
     expect(await store.readLast()).toMatchObject({ attemptId: id('b'), state: 'reserved' })
-    await client.del(emailTestKeys.last)
+  })
+
+  it('never recreates a missing last when an attempt settles', async () => {
     const c = await reserved('u3', 'c')
-    await store.markSending(id('c'), c.lease)
+    expect(c.result.kind).toBe('reserved')
+    expect(await store.markSending(id('c'), c.lease)).toBe(true)
     await client.del(emailTestKeys.last)
     await store.settle(id('c'), c.lease, 'accepted', '')
+    expect(await store.readAttempt(id('c'))).toMatchObject({
+      state: 'settled',
+      outcome: 'accepted',
+    })
     expect(await store.readLast()).toBeNull()
+  })
+
+  it('reports the result the server stored, which a late result does not change', async () => {
+    const a = await reserved('u1', 'a')
+    await store.markSending(id('a'), a.lease)
+    expect(await store.settle(id('a'), a.lease, 'accepted', '')).toEqual({
+      outcome: 'accepted',
+      class: '',
+    })
+    const b = await reserved('u2', 'b')
+    await store.markSending(id('b'), b.lease)
+    await client.hSet(emailTestKeys.attempt(id('b')), 'deadlineAt', '1')
+    expect(await store.settle(id('b'), b.lease, 'accepted', '')).toEqual({
+      outcome: 'unknown',
+      class: 'deadline',
+    })
+    expect(await store.settle(id('b'), b.lease, 'refused', 'auth')).toBeNull()
+  })
+
+  it('applies the registered policy to admission and to the stored deadline', async () => {
+    const strict = {
+      ...policy,
+      operatorCooldownSeconds: 120,
+      platformPerHour: 1,
+      deadlineMs: 4_000,
+    }
+    await store.prepare('u1', id('a'), 'recipient-token', 'witness')
+    const first = await store.reserve({
+      attemptId: id('a'),
+      actorId: 'u1',
+      recipientToken: 'recipient-token',
+      scopeWitness: 'witness',
+      leaseToken: token(),
+      provider: 'resend',
+      policy: strict,
+    })
+    expect(first.kind).toBe('reserved')
+    expect(await store.cooldownRemainingMs('u1')).toBeGreaterThan(110_000)
+    expect(await client.hGet(emailTestKeys.attempt(id('a')), 'deadlineMs')).toBe('4000')
+    await client.del(emailTestKeys.lease)
+    await store.prepare('u2', id('b'), 'recipient-token', 'witness')
+    const second = await store.reserve({
+      attemptId: id('b'),
+      actorId: 'u2',
+      recipientToken: 'recipient-token',
+      scopeWitness: 'witness',
+      leaseToken: token(),
+      provider: 'resend',
+      policy: strict,
+    })
+    expect(second).toMatchObject({ code: IntegrationErrorCode.INTEGRATION_PROBE_LIMIT })
+  })
+
+  it('returns the same live issue while token and settings are unchanged, and replaces it otherwise', async () => {
+    const first = await store.prepare('u1', id('one'), 'recipient-token', 'witness')
+    const again = await store.prepare('u1', id('two'), 'recipient-token', 'witness')
+    expect(again.attemptId).toBe(first.attemptId)
+    const changed = await store.prepare('u1', id('three'), 'other-token', 'witness')
+    expect(changed.attemptId).toBe(id('three'))
   })
 
   it('closes a reservation that never started and releases only its own lease', async () => {

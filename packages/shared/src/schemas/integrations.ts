@@ -116,6 +116,7 @@ export const PROBE_CLASSES = [
   'redis_timeout',
   'precheck',
   'abandoned',
+  'busy',
 ] as const
 export const PROBE_PROVIDERS = ['resend', 'mock'] as const
 
