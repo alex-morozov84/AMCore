@@ -7,7 +7,8 @@ import type {
   IntegrationReading,
   IntegrationRegistration,
 } from './integration.types.js'
-import { IntegrationRegistry, validateRegistrations } from './integration-registry.js'
+import { IntegrationRegistry } from './integration-registry.js'
+import { validateRegistrations } from './integration-validation.js'
 import { IntegrationsModule } from './integrations.module.js'
 
 const NONE = {
