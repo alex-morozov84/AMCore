@@ -30,6 +30,32 @@ type Target =
   | { kind: 'probe'; id: string }
   | { kind: 'receipt'; id: string; attemptId: string }
 
+type Upstream = { path: string; body?: string }
+
+/** Validates identifiers and the body, and builds the one upstream route for a target. */
+async function resolveUpstream(request: Request, target: Target): Promise<Upstream | Response> {
+  if (target.kind === 'list') return { path: BASE }
+  const id = integrationIdSchema.safeParse(target.id)
+  if (!id.success)
+    return apiErrorResponse(request, { statusCode: 400, message: 'Invalid integration identifier' })
+  const probe = `${BASE}/${encodeURIComponent(id.data)}/probe`
+  if (target.kind === 'prepare') return { path: `${probe}/prepare` }
+  if (target.kind === 'receipt') {
+    const attempt = probeAttemptIdSchema.safeParse(target.attemptId)
+    if (!attempt.success)
+      return apiErrorResponse(request, { statusCode: 400, message: 'Invalid attempt identifier' })
+    return { path: `${probe}/${encodeURIComponent(attempt.data)}` }
+  }
+  const parsed = probeRequestSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success)
+    return apiErrorResponse(request, {
+      statusCode: 400,
+      message: 'Validation failed',
+      errors: zodValidationErrors(parsed.error),
+    })
+  return { path: probe, body: JSON.stringify(parsed.data) }
+}
+
 /**
  * Fixed same-origin routes. Each forwards to exactly one backend route; ids are checked against
  * their schemas before they are placed in a path, so the browser can never choose an upstream.
@@ -46,42 +72,15 @@ export async function handleConsoleIntegrations(
       message: 'Request origin rejected',
       errorCode: AuthErrorCode.AUTH_ORIGIN_REJECTED,
     })
-
-  let path = BASE
-  let body: string | undefined
-  if (target.kind !== 'list') {
-    const id = integrationIdSchema.safeParse(target.id)
-    if (!id.success)
-      return apiErrorResponse(request, {
-        statusCode: 400,
-        message: 'Invalid integration identifier',
-      })
-    path = `${BASE}/${encodeURIComponent(id.data)}/probe`
-    if (target.kind === 'prepare') path += '/prepare'
-    if (target.kind === 'receipt') {
-      const attempt = probeAttemptIdSchema.safeParse(target.attemptId)
-      if (!attempt.success)
-        return apiErrorResponse(request, { statusCode: 400, message: 'Invalid attempt identifier' })
-      path += `/${encodeURIComponent(attempt.data)}`
-    }
-    if (target.kind === 'probe') {
-      const parsed = probeRequestSchema.safeParse(await request.json().catch(() => null))
-      if (!parsed.success)
-        return apiErrorResponse(request, {
-          statusCode: 400,
-          message: 'Validation failed',
-          errors: zodValidationErrors(parsed.error),
-        })
-      body = JSON.stringify(parsed.data)
-    }
-  }
+  const upstream = await resolveUpstream(request, target)
+  if (upstream instanceof Response) return upstream
 
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${API_URL}${upstream.path}`, {
       method: mutation ? 'POST' : 'GET',
-      body,
+      body: upstream.body,
       cache: 'no-store',
       headers: forwardRequestHeaders(
         request.headers,

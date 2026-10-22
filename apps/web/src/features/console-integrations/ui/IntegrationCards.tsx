@@ -12,9 +12,17 @@ import {
 } from './integration-cells'
 import { ProbeAction } from './ProbeAction'
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-0.5">{children}</dd>
     </div>
@@ -33,11 +41,9 @@ function Card({ item, now }: { item: IntegrationItem; now: number }) {
         <Field label={t('columnSetup')}>
           <IntegrationSetup item={item} />
         </Field>
-        <div className="col-span-2">
-          <Field label={t('columnLastCheck')}>
-            <IntegrationLastCheck item={item} now={now} />
-          </Field>
-        </div>
+        <Field label={t('columnLastCheck')} className="col-span-2">
+          <IntegrationLastCheck item={item} now={now} />
+        </Field>
       </dl>
       <div className="mt-3 space-y-2">
         <ProbeAction item={item} />
