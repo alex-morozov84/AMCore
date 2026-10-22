@@ -25,7 +25,8 @@ test('alternate inline invitation composer uses public headless API through the 
   expect(register.status()).toBe(201)
   const login = await directApi('auth/login', { email, password: TEST_PASSWORD })
   const org = await directApi('organizations', { name: 'Custom invitation composition' }, login.accessToken)
-  const t = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')).organizationInvitations
+  const messages = JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8'))
+  const t = messages.organizationInvitations
   await page.goto(new URL(localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `organizations/${org.id}/invites`)).pathname)
   await expect(page.getByTestId('custom-headless-invitations')).toBeVisible()
   const input = page.getByLabel(t.email, { exact: true })
@@ -82,7 +83,8 @@ test('alternate inline invitation composer uses public headless API through the 
     data: { email: uniqueEmail('headless-replacement'), password: TEST_PASSWORD } })).status()).toBe(201)
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(page.getByText(t.denied, { exact: true })).toBeVisible()
-  await expect(input).toBeDisabled()
+  await expect(input).toHaveCount(0)
+  await expect(page.getByRole('button', { name: messages.productAdminExample.reload, exact: true })).toBeVisible()
   await expect(page.getByTestId('custom-headless-invitations').getByRole('listitem')).toHaveCount(0)
   expect(await page.getByRole('dialog').count()).toBe(0)
   await expectNoAxeViolations(page)
