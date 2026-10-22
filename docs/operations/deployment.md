@@ -625,6 +625,27 @@ backup** (see [Backup & Restore](backup-restore.md)) or by shipping a
 columns) require app-compatibility planning — deploy a backward-compatible app
 first, migrate, then remove the old path in a later release.
 
+For a failed migration, stop rollout and competing writers. Retain its name and
+the error, then run `migrate status` through the same migrator image, URL and
+configuration. Inspect the ledger through a trusted connection to that database:
+
+```sql
+SELECT migration_name, checksum, started_at, finished_at, rolled_back_at
+FROM public._prisma_migrations
+ORDER BY started_at;
+```
+
+Compare the failed SQL with actual objects and affected data. A failed command
+can leave committed changes. Replacing the image or running `migrate resolve`
+does not undo them. Prepare a state-specific reconciliation or verified restore
+before retrying. Do not invent destructive repair SQL when the state is unknown.
+Use `resolve --rolled-back <failed-migration-name>` only when the database has
+been reconciled for retry. Use `--applied` only after independently confirming
+that all intended SQL effects are present. Neither flag checks those facts for
+you. Preserve the Tini entrypoint and use the full local CLI command as shown in
+the [migration guide](migrator-image.md#supported-configuration-boundary).
+Confirm status, schema/data and application compatibility before resuming rollout.
+
 ## Seeding
 
 Production rollout runs `migrate deploy` without an implicit seed. A clean database

@@ -49,6 +49,10 @@ of workflow self-hardening to keep the example forkable.
     The required lint dependency first checks coherent Prisma versions and the
     migration package in the shared frozen lock. The [migration image guide](migrator-image.md) describes
     dependency upkeep and the residual security risk of API build tooling.
+    The same Docker smoke job declares native migration cancellation, roles/TLS,
+    history and recovery checks. Its negative controls test network isolation,
+    interrupted verification, independent cleanup and missing lifecycle protections.
+    Cleanup runs independently with `always()` and cannot erase an earlier failure.
 - **Test** is the aggregate for unit+real-Redis, capability extension,
   notification/AI extension, focused API fallback and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.

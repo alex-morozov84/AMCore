@@ -238,6 +238,10 @@ Use a development checkout without production credentials.
    signals, roles, TLS and recovery on both supported architectures.
 4. For pnpm updates, update root packageManager, existing Docker Corepack pins,
    the stand installer fixture and the official migration bootstrap image together.
+   These pins live in `package.json`, `apps/api/Dockerfile`, `apps/web/Dockerfile`,
+   `scripts/stand/linux-startup.test.mjs` and the `migrator-pnpm` stage of
+   `apps/api/Dockerfile`. Search the pinned version across the checkout before editing;
+   the coherence tests reject a partial update.
    Resolve the exact image's index/platform digests, inspect upstream build/source
    provenance and check executable identity/version on ARM64 and native AMD64.
    Copy the whole matching-libc distribution. Stop on a mismatch; do not substitute
@@ -257,6 +261,31 @@ minimal package boundary and root release-age policy.
 minimal manifest + root lock -> filtered preparation -> deploy output
   -> fresh migration image -> endpoint preflight -> migration -> app rollout
 ```
+
+For a package-manager update, inspect the selected official image before changing
+its pin. Replace the version and digest with the proposed values:
+
+```sh
+docker buildx imagetools inspect ghcr.io/pnpm/pnpm:<version>@sha256:<index-digest>
+docker build -f apps/api/Dockerfile --target migrator-dependencies -t amcore-migrator-preparation .
+docker run --rm --network none amcore-migrator-preparation sh -ec '
+  test "$(command -v pnpm)" = /usr/local/bin/pnpm
+  readlink -f /usr/local/bin/pnpm
+  pnpm --version
+  sha256sum /opt/pnpm/pnpm /app/pnpm-lock.yaml
+  ldd /opt/pnpm/pnpm
+'
+```
+
+Check the resolved path is `/opt/pnpm/pnpm`, the declared version matches, and no
+library is missing. Match each platform digest and executable/archive hash to
+the upstream release and build provenance. These commands inspect identity;
+they do not verify a publisher signature. Run them natively on both architectures.
+For the required two clean preparation samples, use two new disposable BuildKit
+builders: `--no-cache` alone does not clear named package-store cache mounts.
+Compare unchanged lock hashes, dependency identities, engine hashes and hook
+traces/sentinels. This is additional update-admission evidence; neither the
+coherence guard nor one ordinary image build provides it.
 
 ### Verify cancellation in a development checkout
 
@@ -290,6 +319,75 @@ foreign resources. CI uses a fixed runner-temporary journal path and an independ
 cleanup step, including when the verification process cannot handle a stop signal.
 Missing journals require no cleanup. A cleanup error remains a failed check;
 it cannot turn the original lifecycle failure into a pass.
+
+### Verify roles, TLS, history and recovery
+
+Use a development checkout, frozen API test dependencies, Docker and OpenSSL on
+the host. Build the image from the same source state. First check its CLI without
+network access:
+
+```sh
+docker run --rm --network none amcore-migrator ./node_modules/.bin/prisma --version
+node scripts/verify-migrator-operations.mjs amcore-migrator
+```
+
+The second command creates its own TLS-enabled PostgreSQL18 fixture. It checks
+the current SQL inventory and ledger checksums, no-op deploy, status, database
+roles, runtime permissions, the preceding migration's upgrade with data, invalid
+credentials/CA, effective startup settings, partial commits, resolve and backup/restore.
+Its login-audit trigger exists only in the disposable fixture; production does
+not need that trigger or a superuser migration role. Endpoint simulations do not
+prove support on a managed provider. Run the separate endpoint preflight there.
+
+For a packaging comparison, pass a locally available baseline image as a second
+argument. Both images must match the native Docker architecture:
+
+```sh
+node scripts/verify-migrator-operations.mjs amcore-migrator amcore-migrator-baseline
+```
+
+This adds baseline CLI status against the current schema. It does not prove
+application compatibility or replace paired preparation and scanner comparisons.
+
+Check the negative controls separately. Choose an existing writable directory;
+the journal path must be absolute and must not already exist:
+
+```sh
+export AMCORE_MIGRATOR_LIFECYCLE_JOURNAL=/absolute/path/to/migrator-controls.json
+node scripts/verify-migrator-controls.mjs amcore-migrator network
+node scripts/verify-migrator-controls.mjs amcore-migrator interrupt
+node scripts/verify-migrator-controls.mjs amcore-migrator negative
+node scripts/verify-migrator-controls.mjs amcore-migrator advisory
+```
+
+Run one command at a time. Stop and investigate any nonzero exit.
+`network` checks a reachable canary outside the internal network, denies its
+route from that network, injects resource-removal failure and independently
+recovers the journal. `interrupt` stops the real lifecycle command with TERM,
+INT and KILL after confirmed active SQL. It uses journal suffixes `.sigterm`,
+`.sigint` and `.sigkill`. After a stopped run, recover any retained journal with
+the cleanup command above, including each suffix.
+The other control modes reuse exactly the base journal; they have no hidden
+journal suffixes. The operations command uses its printed journal, or the base
+path when that environment variable is set. CI chooses separate files under
+`$RUNNER_TEMP`: `migrator-lifecycle.json`, `migrator-operations.json`,
+`migrator-network.json`, `migrator-negative.json`, `migrator-advisory.json`, and
+`migrator-interrupt.json.sigterm`, `.sigint`, `.sigkill` with the same prefix.
+
+`negative` deliberately bypasses Tini or the image configuration. It requires
+the original45-second or200ms admission to fail. These are test fixtures,
+not supported production alternatives. `advisory` interrupts the CLI while it
+waits for a deliberately held Prisma advisory lock. Its200ms observation permits
+only the known blocker; the separate lifecycle command still requires zero
+sessions and locks. After closing the blocker, the control also requires zero.
+
+Run the commands on native ARM64 and native AMD64 engines. Emulation does not
+satisfy native admission. The hosted Docker smoke job declares these runtime
+checks and independent cleanup; a local PASS does not mean that CI has passed.
+Record image IDs, architecture, source revision and structured run IDs without
+credentials. Successful disposal deletes fixture databases, keys and journals.
+The full dependency inventory, frozen preparation repeats, application rollout
+and required CI remain separate verification gates.
 
 ## Security reports and remaining risk
 

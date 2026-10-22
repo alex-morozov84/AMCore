@@ -625,6 +625,45 @@ jobs:
         if: always()
         run: node scripts/cleanup-migrator-lifecycle.mjs "$AMCORE_MIGRATOR_LIFECYCLE_JOURNAL"
 
+      - name: Verify native migration operations
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-operations.json
+        run: node scripts/verify-migrator-operations.mjs "$AMCORE_API_MIGRATOR_IMAGE"
+
+      - name: Verify migration isolation and cleanup failure
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-network.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" network
+
+      - name: Verify interrupted migration harness recovery
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-interrupt.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" interrupt
+
+      - name: Verify migration negative lifecycle controls
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-negative.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" negative
+
+      - name: Verify migration advisory-lock cancellation
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-advisory.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" advisory
+
+      - name: Recover migration operations and control resources
+        if: always()
+        run: |
+          cleanup_status=0
+          for journal in migrator-operations migrator-network migrator-negative migrator-advisory \
+            migrator-interrupt.json.sigterm migrator-interrupt.json.sigint migrator-interrupt.json.sigkill; do
+            case "$journal" in
+              *.json.*) path="$RUNNER_TEMP/$journal" ;;
+              *) path="$RUNNER_TEMP/$journal.json" ;;
+            esac
+            node scripts/cleanup-migrator-lifecycle.mjs "$path" || cleanup_status=1
+          done
+          exit "$cleanup_status"
+
       - name: Verify npm/npx are absent from the runner image
         run: |
           docker run --rm "$AMCORE_API_IMAGE" sh -lc '

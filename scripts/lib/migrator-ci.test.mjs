@@ -90,3 +90,24 @@ test('native hosted image admission runs the cancellation harness without author
   )
   assert.equal(ci.jobs['docker-image-smoke']['runs-on'], 'ubuntu-latest')
 })
+
+test('hosted operations and failure controls preserve independent recovery', () => {
+  const operations = steps.find((s) => s.name === 'Verify native migration operations')
+  assert.match(operations.run, /verify-migrator-operations\.mjs/)
+  assert.equal(operations['continue-on-error'], undefined)
+  const cleanup = steps.find((s) => s.name === 'Recover migration operations and control resources')
+  assert.equal(cleanup.if, 'always()')
+  assert.equal(cleanup['continue-on-error'], undefined)
+  for (const mode of ['network', 'interrupt', 'negative', 'advisory']) {
+    const control = steps.find((s) => s.run?.endsWith(` ${mode}`))
+    assert.match(control.run, /verify-migrator-controls\.mjs/)
+    assert.equal(control['continue-on-error'], undefined)
+    const journal = control.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL.split('/').at(-1)
+    if (mode === 'interrupt') {
+      for (const signal of ['sigterm', 'sigint', 'sigkill'])
+        assert.ok(cleanup.run.includes(`${journal}.${signal}`))
+    } else assert.ok(cleanup.run.includes(journal.replace(/\.json$/, '')))
+  }
+  assert.match(cleanup.run, /\|\| cleanup_status=1/)
+  assert.match(cleanup.run, /exit "\$cleanup_status"/)
+})
