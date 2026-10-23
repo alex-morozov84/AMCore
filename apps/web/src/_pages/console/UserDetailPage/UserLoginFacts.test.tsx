@@ -9,6 +9,9 @@ import ru from '../../../../messages/ru.json'
 import { UserLoginFacts } from './UserLoginFacts'
 import { UserSecurityEvents } from './UserSecurityEvents'
 
+const catalogues = { en, ru }
+const locales = Object.keys(catalogues) as (keyof typeof catalogues)[]
+
 vi.mock('next-intl/server', () => ({ getTranslations: vi.fn() }))
 vi.mock('@/shared/ui/route-progress-link', () => ({
   RouteProgressLink: ({
@@ -26,8 +29,8 @@ vi.mock('@/shared/ui/route-progress-link', () => ({
   ),
 }))
 
-function translations(locale: 'en' | 'ru') {
-  const messages = locale === 'en' ? en : ru
+function translations(locale: keyof typeof catalogues) {
+  const messages = catalogues[locale]
   vi.mocked(getTranslations).mockResolvedValue(
     createTranslator({ locale, messages, namespace: 'console.detail.login' }) as never
   )
@@ -35,36 +38,36 @@ function translations(locale: 'en' | 'ru') {
 }
 
 describe('human-readable user sign-in setup', () => {
-  it.each(['en', 'ru'] as const)(
-    'shows a neutral no-methods account with visible help in %s',
+  it.each(locales)('shows a neutral no-methods account with visible help in %s', async (locale) => {
+    const copy = translations(locale)
+    render(await UserLoginFacts({ diagnostics: { hasPassword: false, linkedProviders: [] } }))
+    expect(screen.getByText(copy.notConfigured)).toBeVisible()
+    expect(screen.getByText(copy.noLinkedAccounts)).toBeVisible()
+    expect(screen.getByText(copy.passwordHelp)).toBeVisible()
+    expect(screen.getByText(copy.linkedAccountsHelp)).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it.each(locales)(
+    'renders all provider names without credentials or a login claim in %s',
     async (locale) => {
       const copy = translations(locale)
-      render(await UserLoginFacts({ diagnostics: { hasPassword: false, linkedProviders: [] } }))
-      expect(screen.getByText(copy.notConfigured)).toBeVisible()
-      expect(screen.getByText(copy.noLinkedAccounts)).toBeVisible()
-      expect(screen.getByText(copy.passwordHelp)).toBeVisible()
-      expect(screen.getByText(copy.linkedAccountsHelp)).toBeVisible()
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      const { container } = render(
+        await UserLoginFacts({
+          diagnostics: {
+            hasPassword: true,
+            linkedProviders: ['google', 'github', 'apple', 'telegram'],
+          },
+        })
+      )
+      expect(screen.getByText('Google, GitHub, Apple, Telegram')).toBeVisible()
+      expect(screen.getByText(copy.configured)).toBeVisible()
+      expect(screen.queryByText(copy.passwordHelp)).not.toBeInTheDocument()
+      expect(container.innerHTML).not.toMatch(/passwordHash|accessToken|providerAccountId/)
     }
   )
 
-  it('renders all four provider names without credential fields or a login claim', async () => {
-    const copy = translations('en')
-    const { container } = render(
-      await UserLoginFacts({
-        diagnostics: {
-          hasPassword: true,
-          linkedProviders: ['google', 'github', 'apple', 'telegram'],
-        },
-      })
-    )
-    expect(screen.getByText('Google, GitHub, Apple, Telegram')).toBeVisible()
-    expect(screen.getByText(copy.configured)).toBeVisible()
-    expect(screen.queryByText(copy.passwordHelp)).not.toBeInTheDocument()
-    expect(container.innerHTML).not.toMatch(/passwordHash|accessToken|providerAccountId/)
-  })
-
-  it.each(['en', 'ru'] as const)(
+  it.each(locales)(
     'explains each security link and avoids audit prefetch in %s',
     async (locale) => {
       const copy = translations(locale)

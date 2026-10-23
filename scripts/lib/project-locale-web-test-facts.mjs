@@ -35,6 +35,7 @@ const catalogueFixtures = [
     'storage-setting',
   ],
   ['apps/web/src/_pages/console/OverviewPage/overview-copy.test.ts', 'errors'],
+  ['apps/web/src/_pages/console/UserDetailPage/UserLoginFacts.test.tsx', 'errors'],
   ['apps/web/src/shared/api/error-messages.test.ts', 'errors'],
   ['apps/web/src/_pages/settings/SessionsPage/SessionsTable.test.tsx', 'sessions'],
   ['apps/web/src/features/auth-oauth/ui/OAuthSection.test.tsx', 'oauth'],

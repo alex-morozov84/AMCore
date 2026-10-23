@@ -4,6 +4,8 @@ export const LOCALE_ONLY_E2E_PATHS = [
 ]
 
 export const E2E_ROUTE_SURFACES = [
+  ['apps/web/e2e/real-stack/admin-users.spec.ts', 16],
+  ['apps/web/e2e/console-real-stack/users.spec.ts', 4],
   ['apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts', 2],
   ['apps/web/e2e/product-admin-real-stack/product-admin-denied-loss.spec.ts', 3],
   ['apps/web/e2e/product-admin-real-stack/product-admin-host.spec.ts', 5],

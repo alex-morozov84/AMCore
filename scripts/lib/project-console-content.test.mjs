@@ -70,6 +70,9 @@ test('disabled Console integrations docs retain backend registration without rem
 test('disabled Console docs preserve API audit redaction without a dead guide link', () => {
   const after = materialize('docs/operations/audit-log.md', 'console.audit-history-guide')
   assert.match(after, /request query and raw URL logs/)
+  assert.match(after, /A `SESSION` event can show its safe session\s+identifier in `targetId`/)
+  assert.match(after, /the bounded operator reason/)
+  assert.match(after, /session IDs stored only in metadata are not projected/)
   assert.doesNotMatch(after, /operations-console\/configuration|With the optional Console/)
 })
 

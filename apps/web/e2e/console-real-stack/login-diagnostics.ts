@@ -62,9 +62,9 @@ export async function inspectLoginDiagnostics(
     page.getByRole('cell', { name: /Fresh authentication failed/ }).first()
   ).toBeVisible()
   await expect(
-    page.getByRole('row').filter({ hasText: /Fresh authentication (failed|succeeded)/ })
+    page.getByRole('row', { name: /Fresh authentication (failed|succeeded)/ })
   ).toHaveCount(2)
-  await expect(page.getByRole('row').filter({ hasText: 'User system role changed' })).toHaveCount(0)
+  await expect(page.getByRole('row', { name: /User system role changed/ })).toHaveCount(0)
   await page.goBack()
   await expect(page).toHaveURL(detail)
   await expect(
@@ -73,9 +73,9 @@ export async function inspectLoginDiagnostics(
   await main.getByRole('link', { name: 'Access changes', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Audit', exact: true })).toBeVisible()
   await expect(
-    page.getByRole('row').filter({ hasText: /User system role changed|User sessions? revoked/ })
+    page.getByRole('row', { name: /User system role changed|User sessions? revoked/ })
   ).toHaveCount(3)
-  await expect(page.getByRole('row').filter({ hasText: 'Fresh authentication' })).toHaveCount(0)
+  await expect(page.getByRole('row', { name: /Fresh authentication/ })).toHaveCount(0)
   await page.goBack()
   await main.getByRole('link', { name: 'Back to Users', exact: true }).click()
   await expect(page).toHaveURL(list.href)

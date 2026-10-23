@@ -91,6 +91,41 @@ export const E2E_UI_PROFILES = Object.freeze({
     ['/sign in/i', '/войти/i'],
     ['/sign out/i', '/выйти/i'],
   ],
+  consoleUsers: [
+    ['/users/i', '/пользователи/i'],
+    ["'Users'", "'Пользователи'"],
+    ["'Super admin'", "'Супер-админ'"],
+    ["'Overview'", "'Обзор'"],
+    ['/404|not found/i', '/404|не найден/i'],
+    ['/toggle.*navigation/i', '/переключить.*навигацию/i'],
+    ['/next/i', '/далее/i'],
+    ['/previous/i', '/назад/i'],
+    ['/search users/i', '/поиск пользователей/i'],
+    ["'1 user'", "'1 пользователь'"],
+    ['/clear search/i', '/очистить поиск/i'],
+    ['/^Sort by User,/', '/^Сортировать по: Пользователь,/'],
+    ["'This page is unavailable'", "'Эта страница недоступна'"],
+    ['/first page/i', '/первую страницу/i'],
+    ['/no matching users/i', '/никого не найдено/i'],
+  ],
+  loginDiagnostics: [
+    ["'User details'", "'Карточка пользователя'"],
+    ["'Configured'", "'Настроен'"],
+    ['/^Last sign-in$/', '/^Последний вход$/'],
+    ["'Password confirmations'", "'Подтверждения пароля'"],
+    ["'Audit'", "'Аудит'"],
+    ['/Fresh authentication failed/', '/Ошибка повторного подтверждения/'],
+    ['/Fresh authentication (failed|succeeded)/', '/(?:Ошибка|Успешное) повторного подтверждения/'],
+    ['/User system role changed/', '/Изменение системной роли/'],
+    ["'Recorded security events'", "'Записанные события безопасности'"],
+    ["'Access changes'", "'Изменения доступа'"],
+    [
+      '/User system role changed|User sessions? revoked/',
+      '/Изменение системной роли|Отзыв сесси[ий] пользователя/',
+    ],
+    ['/Fresh authentication/', '/повторного подтверждения/'],
+    ["'Back to Users'", "'Вернуться к пользователям'"],
+  ],
   storageSetting: [
     ["'File storage'", "'Файловое хранилище'"],
     ["'Probe interval (seconds)'", "'Интервал проверки (секунды)'"],
@@ -138,6 +173,13 @@ const surface = (path, namespaces, expectedReferences) => ({
 })
 
 export const E2E_UI_SURFACES = Object.freeze([
+  surface('apps/web/e2e/real-stack/admin-users.spec.ts', ['consoleUsers'], 26),
+  surface('apps/web/e2e/console-real-stack/users.spec.ts', ['console', 'consoleUsers'], 4),
+  surface(
+    'apps/web/e2e/console-real-stack/login-diagnostics.ts',
+    ['consoleUsers', 'loginDiagnostics'],
+    18
+  ),
   surface(
     'apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts',
     ['auth', 'productAdmin'],
