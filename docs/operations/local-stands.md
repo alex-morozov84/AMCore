@@ -17,6 +17,9 @@ ports. Keep long runs in a foreground terminal with visible output.
 
 `pnpm test:stands` checks isolation and recovery. Narrow a risk with
 `pnpm test:stands --test-name-pattern="startup"`; options reach the Node runner.
+Test files run sequentially by default because they share the host network:
+Docker network changes can interrupt Chromium's transport checks. Deliberate
+concurrent scenarios within a test retain their own process and stand orchestration.
 
 | Goal                                 | Command                                      | Data lifetime                                           |
 | ------------------------------------ | -------------------------------------------- | ------------------------------------------------------- |
