@@ -2,7 +2,7 @@
   "$comment": "Per-route first-load JS limits in raw bytes (route-bundle-stats.json). Contract and update rule: docs/frontend/bundle-budget.md.",
   "routes": {
     "app:/": 1154438,
-    "app:/_not-found": 479723,
+    "app:/_not-found": "report-only",
     "app:/auth/callback": 1045930,
     "app:/forgot-password": 1045930,
     "app:/invite/flow/[flowId]": 1118554,

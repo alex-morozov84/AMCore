@@ -93,10 +93,13 @@ physical route prefix; `product-admin` uses the alias from
 example `/[locale]/manage/organizations` is `product-admin:/organizations`.
 
 A value is a positive byte limit or `"report-only"` (measured and checked, but
-without a limit). Give every page a byte limit; all current rows have one. Use
-`"report-only"` only when you decide not to limit a page yet, and say why in the
-pull request. These pages must have a byte limit: `app:/`, `app:/login`,
-`app:/register`, `app:/settings/sessions` and `product-admin:/organizations`.
+without a limit). Give every page a byte limit. Use `"report-only"` only for a page
+whose JavaScript depends on the project choices, and say why in the pull request.
+`app:/_not-found` is the one current case: with locale routing it carries only the
+Next runtime, and in a single-locale project it also carries the root layout's
+client code, which the limits of all other pages already cover. These pages must
+have a byte limit: `app:/`, `app:/login`, `app:/register`, `app:/settings/sessions`
+and `product-admin:/organizations`.
 
 <!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START -->
 
