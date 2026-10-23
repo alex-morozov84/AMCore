@@ -210,12 +210,17 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   await expect(page.getByText(roles.saved, { exact: true })).toBeVisible()
   await nav.getByRole('link', { name: messages.organizationNav.members, exact: true }).click()
   await memberAction(page, members, colleagueEmail, members.edit)
-  await page
-    .getByRole('dialog')
-    .getByRole('checkbox', { name: 'Adopter reader', exact: true })
-    .check()
-  await page.getByRole('dialog').getByRole('button', { name: members.save, exact: true }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
+  // Interactive toasts also use role=dialog; target the editor by its accessible name.
+  const roleDialog = page.getByRole('dialog', { name: members.edit, exact: true })
+  await roleDialog.getByRole('checkbox', { name: 'Adopter reader', exact: true }).check()
+  const savedRoles = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PATCH' &&
+      response.url().endsWith(`/members/${colleague.user.id}/roles`)
+  )
+  await roleDialog.getByRole('button', { name: members.save, exact: true }).click()
+  expect((await savedRoles).status()).toBe(200)
+  await expect(roleDialog).toHaveCount(0)
   expect(
     count(
       'SELECT count(*) FROM core.member_roles WHERE "memberId"=:\'member\' AND "roleId"=:\'role\';',
