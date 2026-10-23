@@ -87,7 +87,7 @@ async function queued(f, name, email) {
     f,
     name,
     `import {createRequire} from 'node:module';const require=createRequire('/app/package.json');
-    const {Queue}=require('bullmq');const q=new Queue('email',{connection:{host:'redis',port:6379}});
+    const {Queue}=require('bullmq');const q=new Queue('email',{prefix:'amcore',connection:{host:'redis',port:6379}});
     try {const jobs=(await q.getJobs()).filter(j=>j.data?.payload?.to===process.argv[1]);
       console.log(JSON.stringify(await Promise.all(jobs.map(async j=>({id:j.id,state:await j.getState()})))))
     } finally {await q.close()}`,
