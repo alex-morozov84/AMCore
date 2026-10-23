@@ -14,7 +14,7 @@ worker processes. Production promotion uses immutable image digests; see
 
 ## Contents and commands
 
-The final image contains Node 24, OpenSSL, certificates, Prisma's complete official
+The final image contains Node 24 on Debian Trixie, OpenSSL, certificates, Prisma's complete official
 dependency tree, an image-specific Prisma configuration, schema files and SQL
 migration history. The configuration composes the unchanged API base configuration.
 Its working directory remains `/app/apps/api`. The default command is
@@ -44,6 +44,9 @@ Use the default command for deploy. For status, override only the command
 arguments with `./node_modules/.bin/prisma migrate status`; Kubernetes uses
 `args`, leaving `command` unset. An orchestrator's ordinary init option does
 not replace this image contract. Signal exits remain failures.
+For resolve, the same rule gives `args: ["./node_modules/.bin/prisma", "migrate",
+"resolve", "--rolled-back", "<failed-migration-name>"]`. Choose the resolve flag
+only after the [rollback inspection](deployment.md#rollback).
 
 Only the image's Prisma configuration adds the PostgreSQL startup option
 `client_connection_check_interval=50ms`. It preserves the API configuration's
@@ -157,6 +160,8 @@ promoted digest + migration URL + network + trusted CA
 
 Require exit zero before running deploy against that endpoint. This is an explicit
 operator preflight; the image does not run it automatically before each command.
+The bundled SQL requires the effective value to equal `50ms`; otherwise it raises
+an error and the CLI must exit nonzero. Exit zero is the acceptance criterion.
 Unknown, denied, ignored or zero settings do not satisfy this prerequisite.
 If the image, selected endpoint/URL, credential, CA or configuration changes,
 repeat the preflight for that exact combination. A failed check stops rollout;
@@ -170,62 +175,318 @@ Container exit and database cleanup are separate checks. Recovery after an
 interrupted migration must inspect the ledger and any partial SQL before using
 `migrate resolve`. Image replacement does not undo SQL that already committed.
 
-## Isolated installation and maintenance
+## Installation and maintenance
 
-`docker/migrator/package.json`, `pnpm-workspace.yaml` and `pnpm-lock.yaml` define
-an independent deployment graph outside the application workspace. The installer
-pin includes its integrity hash. Preparation verifies its archive before
-extraction and checks its actual version from an isolated working directory.
-The published pnpm launcher verifies and obtains its platform executable through
-the upstream distribution mechanism; neither installer is copied to runtime.
+The private workspace package `@amcore/migrator` at `docker/migrator/package.json`
+selects Prisma CLI and dotenv. The repository's root `pnpm-lock.yaml` owns their
+resolutions. There is no second source lockfile or custom installer. Root frozen
+installation includes this package; keep its Prisma version equal to the API CLI,
+client and adapter versions.
 
-The preparation stage uses a frozen production install. This isolated graph
-explicitly enables `minimumReleaseAgeStrict: true`, retaining the standard
-24-hour cutoff. This is a project policy; pnpm also supports non-strict behavior.
-Strict checking rejects newly published dependencies until that cooldown ends.
-Wait for that boundary when a new Prisma release is too young. Do not add
-release-age exceptions or disable the policy to get a passing build.
+Docker prepares the package in a separate Node24/Trixie stage. It copies the
+complete `/opt/pnpm` from the official glibc pnpm image, pinned by version and
+index digest. The directory includes node-gyp; copying only its executable is
+insufficient. The package-manager version must match root `packageManager`.
+This bootstrap supplies pnpm itself; it is separate from installing the selected
+package's dependencies.
+See [pnpm's Docker guidance](https://pnpm.io/docker).
 
-CI runs `node scripts/migrator-contract.mjs` before the image job through its
-required lint dependency. It checks API CLI/client/adapter and migrator versions,
-both lock resolutions, installer pin and the isolated workspace policy.
-
-1. For a Prisma update, change the API CLI/client/adapter family and the isolated
-   CLI to the same exact supported version.
-2. Refresh both lockfiles with their declared package managers. Keep the root
-   workspace package manager unchanged unless a separate migration is intended.
-3. Run the version guard, frozen installs, image checks and migration/recovery
-   tests. Commit the coherent update in one maintenance PR.
-4. For isolated dotenv or transitive updates, refresh that graph without changing
-   an unaffected root lock merely to produce a matching diff.
-5. Update the isolated installer version and integrity together. Review major
-   versions and prereleases manually. The installer version must equal the root
-   `packageManager` pnpm version; `scripts/lib/toolchain-pins.test.mjs` fails on drift.
-
-Dependabot has a separate weekly non-major entry for `/docker/migrator`.
-One-sided Prisma update proposals fail the version guard until reconciled.
-Dependency freshness reports isolated dependencies and the installer separately
-(and the root pnpm pin in its Toolchain section);
-the root recursive outdated command does not cover this directory.
-The weekly recursive OSV scan includes the separate lockfile.
-
-To refresh the isolated lock after editing its manifest, start at the repository
-root. These commands use the declared installer rather than the workspace pnpm:
+Preparation installs only the selected package with frozen resolutions and
+`--ignore-scripts`. It then uses non-legacy `pnpm deploy --prod` to create the
+portable production directory. Deploy runs dependency scripts allowed by root
+`allowBuilds`, including Prisma's engine download. Root and API authoring hooks
+must not run in this stage. Preparation receives no migration credential.
+Inside Docker preparation, both commands inherit `pnpm_config_frozen_lockfile=true`:
 
 ```sh
-cd docker/migrator
-migrator_tools="$(mktemp -d)"
-node installer.mjs "$migrator_tools/pnpm"
-node "$migrator_tools/pnpm/bin/pnpm.mjs" install --prod --lockfile-only
-node "$migrator_tools/pnpm/bin/pnpm.mjs" install --prod --frozen-lockfile
-rm -rf "$migrator_tools"
-cd ../..
-node scripts/migrator-contract.mjs
+HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match install --prod --frozen-lockfile --ignore-scripts
+HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match deploy --prod /prod/migrator
 ```
 
+These are container preparation commands, not replacements for development checkout
+installation. The final stage copies the deployed directory, config and SQL, without the store,
+package manager, workspace or API build output.
+
+Prisma's official graph can include its optional TypeScript5 peer. That is distinct
+from the API's native TypeScript7 compiler. Preserve official peer packages and
+platform engines. An ambiguous peer resolution, unexpected hook, missing engine
+or changed unrelated resolution stops the update. Return to review; do not use
+legacy deploy, overrides, compatibility forks or manual pruning as a workaround.
+
+The root workspace applies the strict24-hour release-age floor and rejects missing
+publication times. Its allowBuilds policy also applies to migration dependencies.
+Wait when a release is too young; do not add exclusions or disable these policies.
+Frozen installation fixes versions; it does not prove that those versions are safe.
+
+### Update dependencies
+
+Start from the repository root with its supported Node and pinned pnpm version.
+Use a development checkout without production credentials.
+
+1. For a Prisma update, set API CLI/client/adapter and the migration CLI to the
+   same exact supported version in `apps/api/package.json` (`prisma` in
+   devDependencies; `@prisma/client` and `@prisma/adapter-pg` in dependencies) and
+   `docker/migrator/package.json` (`prisma` in dependencies). For another
+   dependency, edit its owning manifest.
+2. Generate the root lock and run the frozen installation and coherence guard:
+
+   ```sh
+   pnpm install --lockfile-only --ignore-scripts
+   pnpm install --frozen-lockfile
+   node scripts/migrator-contract.mjs
+   ```
+
+   Review every changed resolution. The second command runs normal development
+   lifecycle hooks, including API client generation and Husky. It is not the
+   isolated Docker preparation command.
+
+3. Build the migration target with the command at the top of this guide. Verify
+   the CLI and engine without package-registry access, then test migrations,
+   signals, roles, TLS and recovery on both supported architectures.
+4. For pnpm updates, update root packageManager, existing Docker Corepack pins,
+   the stand installer fixture and the official migration bootstrap image together.
+   These pins live in `package.json`, `apps/api/Dockerfile`, `apps/web/Dockerfile`,
+   `scripts/stand/linux-startup.test.mjs` and the `migrator-pnpm` stage of
+   `apps/api/Dockerfile`. Search the pinned version across the checkout before editing;
+   the coherence tests reject a partial update.
+   Resolve the exact image's index/platform digests, inspect upstream build/source
+   provenance and check executable identity/version on ARM64 and native AMD64.
+   Copy the whole matching-libc distribution. Stop on a mismatch; do not substitute
+   an unreviewed downloader or treat provenance metadata as a verified signature.
+5. Commit the coherent dependency, lock, pins, guard and documentation changes
+   together after the required checks. Promote image digests from the same source
+   state; do not install packages when the migration credential is present.
+
+The root Dependabot npm entry covers the package with its existing schedule,
+three-day cooldown and non-major policy. Root recursive outdated and OSV scans
+cover the shared graph; there is no nested updater or separate freshness list.
+CI runs `node scripts/migrator-contract.mjs` through its required lint dependency.
+The guard checks coherent manifests/resolutions, the reachable migration graph,
+minimal package boundary and root release-age policy.
+
 ```text
-manifest -> isolated lock -> frozen install -> version guard -> image -> database
+minimal manifest + root lock -> filtered preparation -> deploy output
+  -> fresh migration image -> endpoint preflight -> migration -> app rollout
 ```
+
+For a package-manager update, inspect the selected official image before changing
+its pin. Replace the version and digest with the proposed values:
+
+```sh
+docker buildx imagetools inspect ghcr.io/pnpm/pnpm:<version>@sha256:<index-digest>
+docker build -f apps/api/Dockerfile --target migrator-dependencies -t amcore-migrator-preparation .
+docker run --rm --network none amcore-migrator-preparation sh -ec '
+  test "$(command -v pnpm)" = /usr/local/bin/pnpm
+  readlink -f /usr/local/bin/pnpm
+  pnpm --version
+  sha256sum /opt/pnpm/pnpm /app/pnpm-lock.yaml
+  ldd /opt/pnpm/pnpm
+'
+```
+
+Check the resolved path is `/opt/pnpm/pnpm`, the declared version matches, and no
+library is missing. Match each platform digest and executable/archive hash to
+the upstream release and build provenance. These commands inspect identity;
+they do not verify a publisher signature. Run them natively on both architectures.
+For the required clean preparation comparison, run the complete protocol below.
+`--no-cache` alone does not clear named package-store cache mounts.
+
+### Verify isolated preparation
+
+Use the repository's pinned pnpm, Node, Docker and Buildx with a local Unix engine.
+No database credential is needed. Choose a new absolute output directory outside
+the checkout; its parent must exist. Do not use a directory containing previous results.
+
+```sh
+node scripts/verify-migrator-preparation.mjs /absolute/new/preparation-output
+```
+
+The command copies only root/workspace manifests, the root lock and workspace
+policy into a disposable context. It derives the preparation stage and exact
+install/deploy commands from `apps/api/Dockerfile`. It replaces authoring hooks
+only in copied workspace manifests with failing sentinels. It does not change
+Prisma package files, production source or root build/release-age policy.
+
+Two newly named `docker-container` builders have separate stores and caches.
+The fixture observes Node lifecycle events through an external test-only loader.
+Before deploy, it checks declared hooks and requires zero executed install hooks.
+After deploy, it permits only the expected Prisma preinstall and engines postinstall.
+Known registry authoring `prepare` entries stay in the inventory and must not execute.
+A separate positive control runs a failing prepare and requires both its trace and sentinel.
+Missing control evidence fails the command; `HUSKY=0` alone proves nothing.
+
+The extraction paths inside each fixture are `/app/node_modules` after install,
+`/prod/migrator/node_modules` after deploy, `/app/pnpm-lock.yaml`, and
+`/verification/trace.jsonl`. The output contains `a-installed.json`,
+`a-deployed.json`, matching `b-*` files, `a-artifact.json`, `b-artifact.json`,
+`source-inputs.json`, and `positive-control-{trace,forbidden-hooks}.jsonl`.
+The deployed inventories include package versions/manifest hashes, declared and
+observed hooks, and native Prisma engine paths/hashes. Both samples must match;
+the root lock hash must remain unchanged before/after both frozen commands.
+Each sample also runs the official CLI and checks pnpm/ELF resolution without network access.
+
+Require command exit zero and `result.json` with `verdict: PASS` and `cleanup: true`.
+Unexpected graph/hook/compiler, missing engine, wrong architecture, changed lock,
+unequal samples or failed cleanup stops admission. Investigate without changing
+assertions, allowBuilds, release-age or package files to force a pass.
+This protocol proves preparation behavior, not final-image vulnerability remediation.
+Run it separately on native ARM64 and native AMD64.
+
+The command removes only its recorded builders, images, containers and builder
+volumes. It retains `resources.json` if cleanup fails. After the original command
+has stopped, recover an interrupted run with:
+
+```sh
+node scripts/verify-migrator-preparation.mjs --cleanup /absolute/new/preparation-output
+```
+
+Inspect the retained failure before retrying. Recovery checks ownership and cannot
+turn a failed preparation into passing evidence. Keep raw output outside private
+planning records; retain a short result with run ID, architecture and hashes.
+
+### Verify cancellation in a development checkout
+
+After installing root frozen dependencies and building the image, run:
+
+```sh
+node scripts/verify-migrator-lifecycle.mjs amcore-migrator
+```
+
+This test creates its own PostgreSQL18 Testcontainer and network on the local Unix
+Docker engine. It uses no checkout database URL. The migrator joins only an internal
+fixture network; the host observer uses PostgreSQL's published port separately.
+The image architecture must match the engine architecture. TERM and INT each
+interrupt a confirmed PostgreSQL `PgSleep`, with and without an explicit transaction.
+The original45-second natural-exit deadline and200ms session/lock observation from
+the attached process's `exit` event remain fixed; diagnostic disposal cannot produce a pass.
+This command checks cancellation and transactional rollback. Dependency updates
+also require the broader CLI, roles, TLS, migration-history and recovery checks above.
+The case without an explicit transaction does not prove partial-commit recovery.
+
+The command prints a recovery journal path at startup. It records failures before
+forced disposal and retains the journal when resource cleanup fails. After an
+interrupted command has stopped, retry cleanup with its printed absolute path:
+
+```sh
+node scripts/cleanup-migrator-lifecycle.mjs /absolute/path/to/resources.json
+```
+
+Cleanup checks the recorded run label before removing each resource; it refuses
+foreign resources. CI uses a fixed runner-temporary journal path and an independent
+cleanup step, including when the verification process cannot handle a stop signal.
+Missing journals require no cleanup. A cleanup error remains a failed check;
+it cannot turn the original lifecycle failure into a pass.
+Diagnose the retained failure before repeating its affected check. Valid,
+unchanged results need no repetition; forced disposal never satisfies natural exit.
+
+### Verify roles, TLS, history and recovery
+
+Use a development checkout, frozen API test dependencies, Docker and OpenSSL on
+the host. Build the image from the same source state. First check its CLI without
+network access:
+
+```sh
+docker run --rm --network none amcore-migrator ./node_modules/.bin/prisma --version
+node scripts/verify-migrator-operations.mjs amcore-migrator
+```
+
+The second command creates its own TLS-enabled PostgreSQL18 fixture. It checks
+the current SQL inventory and ledger checksums, no-op deploy, status, database
+roles, runtime permissions, the preceding migration's upgrade with data, invalid
+credentials/CA, effective startup settings, partial commits, resolve and backup/restore.
+Its login-audit trigger exists only in the disposable fixture; production does
+not need that trigger or a superuser migration role. Endpoint simulations do not
+prove support on a managed provider. Run the separate endpoint preflight there.
+
+For a packaging comparison, pass a locally available baseline image as a second
+argument. Both images must match the native Docker architecture:
+
+```sh
+node scripts/verify-migrator-operations.mjs amcore-migrator amcore-migrator-baseline
+```
+
+This adds baseline CLI status against the current schema. It does not prove
+application compatibility or replace paired preparation and scanner comparisons.
+
+Check the negative controls separately. Choose an existing writable directory;
+the journal path must be absolute and must not already exist:
+
+```sh
+export AMCORE_MIGRATOR_LIFECYCLE_JOURNAL=/absolute/path/to/migrator-controls.json
+node scripts/verify-migrator-controls.mjs amcore-migrator network
+node scripts/verify-migrator-controls.mjs amcore-migrator interrupt
+node scripts/verify-migrator-controls.mjs amcore-migrator negative
+node scripts/verify-migrator-controls.mjs amcore-migrator advisory
+```
+
+Run one command at a time. Stop and investigate any nonzero exit.
+`network` checks a reachable canary outside the internal network, denies its
+route from that network, injects resource-removal failure and independently
+recovers the journal. `interrupt` stops the real lifecycle command with TERM,
+INT and KILL after confirmed active SQL. It uses journal suffixes `.sigterm`,
+`.sigint` and `.sigkill`. After a stopped run, recover any retained journal with
+the cleanup command above, including each suffix.
+The other control modes reuse exactly the base journal; they have no hidden
+journal suffixes. The operations command uses its printed journal, or the base
+path when that environment variable is set. CI chooses separate files under
+`$RUNNER_TEMP`: `migrator-lifecycle.json`, `migrator-operations.json`,
+`migrator-network.json`, `migrator-negative.json`, `migrator-advisory.json`, and
+`migrator-interrupt.json.sigterm`, `.sigint`, `.sigkill` with the same prefix.
+
+`negative` deliberately bypasses Tini or the image configuration. It requires
+the original45-second or200ms admission to fail. These are test fixtures,
+not supported production alternatives. `advisory` interrupts the CLI while it
+waits for a deliberately held Prisma advisory lock. Its200ms observation permits
+only the known blocker; the separate lifecycle command still requires zero
+sessions and locks. After closing the blocker, the control also requires zero.
+
+Run the commands on native ARM64 and native AMD64 engines. Emulation does not
+satisfy native admission. The hosted Docker smoke job declares these runtime
+checks and independent cleanup; a local PASS does not mean that CI has passed.
+Record image IDs, architecture, source revision and structured run IDs without
+credentials. Successful disposal deletes fixture databases, keys and journals.
+The full dependency inventory, frozen preparation repeats, application rollout
+and required CI remain separate verification gates.
+
+### Verify application rollout after a packaging change
+
+Use the development checkout's frozen dependencies, Docker Compose, OpenSSL and
+`flock` on the host. Load four images matching the native engine architecture:
+the candidate migrator, previous API runner, candidate API runner and Redis8.
+The example names them `amcore-migrator`, `amcore-api-previous`,
+`amcore-api-current` and `redis:8-alpine`; substitute your local image names or IDs.
+If `flock` is absent or an image has the wrong architecture, stop and provision
+the required tool or native image before running the fixture.
+For this packaging comparison, build both API images from the same application
+code and migration history as the checkout. Build the candidate pair together.
+
+Choose an existing private, writable directory outside the checkout. Set new
+absolute journal and lock paths there. Run the **whole** fixture under one lock:
+
+```sh
+export AMCORE_MIGRATOR_LIFECYCLE_JOURNAL=/absolute/private/path/application.json
+export AMCORE_MIGRATOR_RELEASE_LOCK=/absolute/private/path/release.lock
+flock "$AMCORE_MIGRATOR_RELEASE_LOCK" node scripts/verify-migrator-application.mjs \
+  amcore-migrator amcore-api-previous amcore-api-current redis:8-alpine
+# Run only after the fixture exits zero:
+flock --nonblock "$AMCORE_MIGRATOR_RELEASE_LOCK" true
+```
+
+The fixture creates isolated PostgreSQL/Redis resources and generated credentials.
+It uses no checkout database URL, publishes no application port and sends no
+external email. Require exit zero from both commands, failure/success migration
+gate receipts and `application-matrix` with four combinations. Each previous/new
+API producer must leave a queued job that the selected previous/new worker
+completes after replacement. Login must retain the same user. Competing release
+commands must remain blocked before migration and before rollout.
+
+On failure, retain the original error and stop. After the fixture process has
+stopped, recover its journal with `scripts/cleanup-migrator-lifecycle.mjs` as
+described above. Successful cleanup does not make the application check pass.
+Run this proof separately on native ARM64 and AMD64. Its mock provider, current
+schema and single-host lock do not prove external delivery, arbitrary future
+breaking migrations or a distributed release coordinator. Production still
+needs endpoint preflight and coordination around the entire release.
 
 ## Security reports and remaining risk
 

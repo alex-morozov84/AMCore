@@ -37,24 +37,29 @@ test('runner scan remains unchanged while migrator gets independent coverage', (
   )
 })
 
-test('nested migrator graph has independent weekly non-major upkeep', () => {
+test('the shared root updater covers the migrator without a second npm entry', () => {
   const updates = parse(readFileSync('.github/dependabot.yml', 'utf8')).updates
-  const entry = updates.find((item) => item.directory === '/docker/migrator')
-  assert.equal(entry['package-ecosystem'], 'npm')
-  assert.equal(entry.schedule.interval, 'weekly')
-  assert.ok(
-    entry.ignore.some((item) => item['update-types'].includes('version-update:semver-major'))
+  const npm = updates.filter((item) => item['package-ecosystem'] === 'npm')
+  assert.deepEqual(
+    npm.map((item) => item.directory),
+    ['/']
   )
-  assert.ok(updates.some((item) => item.directory === '/' && item['package-ecosystem'] === 'npm'))
+  assert.equal(npm[0].schedule.interval, 'cron')
+  assert.equal(npm[0].schedule.cronjob, '0 6 * * 1,4')
+  assert.equal(npm[0].cooldown['default-days'], 3)
+  assert.ok(
+    npm[0].ignore.some((item) => item['update-types']?.includes('version-update:semver-major'))
+  )
+  const workspace = parse(readFileSync('pnpm-workspace.yaml', 'utf8'))
+  assert.ok(workspace.packages.includes('docker/migrator'))
 })
 
 test('migrator files survive managed snapshots and have generated-full selector coverage', () => {
   const declaration = readDeclaration('scripts/scaffold-selector/declaration.v1.json')
   for (const path of [
     'docker/migrator/package.json',
-    'docker/migrator/pnpm-lock.yaml',
-    'docker/migrator/pnpm-workspace.yaml',
-    'docker/migrator/installer.mjs',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
     'docker/migrator/prisma.config.mjs',
     'docker/migrator/connection-options.mjs',
     'docker/migrator/check-connection.sql',
@@ -67,4 +72,47 @@ test('migrator files survive managed snapshots and have generated-full selector 
       path
     )
   }
+})
+
+test('native hosted image admission runs the cancellation harness without authoring hooks', () => {
+  const setup = steps.find((step) => step.name === 'Install migration verification dependencies')
+  assert.match(setup.run, /--filter api .*--frozen-lockfile --ignore-scripts/)
+  const admission = steps.find((step) => step.name === 'Verify native migration cancellation')
+  assert.match(admission.run, /verify-migrator-lifecycle\.mjs/)
+  assert.equal(admission['continue-on-error'], undefined)
+  const cleanup = steps.find((step) => step.name === 'Recover migration verification resources')
+  assert.equal(cleanup.if, 'always()')
+  assert.match(cleanup.run, /cleanup-migrator-lifecycle\.mjs "\$AMCORE_MIGRATOR_LIFECYCLE_JOURNAL"/)
+  assert.equal(cleanup['continue-on-error'], undefined)
+  assert.equal(
+    admission.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL,
+    '${{ runner.temp }}/migrator-lifecycle.json'
+  )
+  assert.equal(
+    cleanup.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL,
+    admission.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL
+  )
+  assert.equal(ci.jobs['docker-image-smoke'].env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL, undefined)
+  assert.equal(ci.jobs['docker-image-smoke']['runs-on'], 'ubuntu-latest')
+})
+
+test('hosted operations and failure controls preserve independent recovery', () => {
+  const operations = steps.find((s) => s.name === 'Verify native migration operations')
+  assert.match(operations.run, /verify-migrator-operations\.mjs/)
+  assert.equal(operations['continue-on-error'], undefined)
+  const cleanup = steps.find((s) => s.name === 'Recover migration operations and control resources')
+  assert.equal(cleanup.if, 'always()')
+  assert.equal(cleanup['continue-on-error'], undefined)
+  for (const mode of ['network', 'interrupt', 'negative', 'advisory']) {
+    const control = steps.find((s) => s.run?.endsWith(` ${mode}`))
+    assert.match(control.run, /verify-migrator-controls\.mjs/)
+    assert.equal(control['continue-on-error'], undefined)
+    const journal = control.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL.split('/').at(-1)
+    if (mode === 'interrupt') {
+      for (const signal of ['sigterm', 'sigint', 'sigkill'])
+        assert.ok(cleanup.run.includes(`${journal}.${signal}`))
+    } else assert.ok(cleanup.run.includes(journal.replace(/\.json$/, '')))
+  }
+  assert.match(cleanup.run, /\|\| cleanup_status=1/)
+  assert.match(cleanup.run, /exit "\$cleanup_status"/)
 })

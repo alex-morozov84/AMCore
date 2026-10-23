@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { installerPin, verifyArchive } from '../../docker/migrator/installer.mjs'
+import { parseAllDocuments, stringify } from 'yaml'
 import { verifyMigrator } from './migrator-contract.mjs'
 
 const root = new URL('../..', import.meta.url).pathname
-const paths = ['apps/api/package.json', 'pnpm-lock.yaml', 'docker/migrator']
+const paths = [
+  'package.json',
+  'pnpm-workspace.yaml',
+  'apps/api/package.json',
+  'pnpm-lock.yaml',
+  'docker/migrator',
+]
 
 function fixture(action) {
   const directory = mkdtempSync(join(tmpdir(), 'amcore-migrator-contract-'))
@@ -26,13 +30,22 @@ function edit(directory, path, change) {
   writeFileSync(file, change(readFileSync(file, 'utf8')))
 }
 
-// The pnpm 12 root lock leads with a package-manager document, so this also covers document selection.
-test('migrator version guard accepts both actual frozen graphs', () => {
+function editLock(directory, change) {
+  edit(directory, 'pnpm-lock.yaml', (text) => {
+    const documents = parseAllDocuments(text).map((doc) => doc.toJS())
+    change(documents.find((doc) => doc.importers?.['apps/api']))
+    return documents.map((doc) => stringify(doc)).join('---\n')
+  })
+}
+
+// The manager document precedes the application graph. TS7 in the API stays legal;
+// Prisma's reachable upstream TS5 peer is legal in the migration graph.
+test('the shared lock guards the migrator closure independently of the API compiler', () => {
   assert.deepEqual(verifyMigrator(root), { prisma: '7.10.1', pnpm: '12.14.0' })
 })
 
 for (const name of ['prisma', '@prisma/client', '@prisma/adapter-pg'])
-  test(`migrator version guard rejects an API ${name} mismatch`, () => {
+  test(`the coherence guard rejects an API ${name} mismatch`, () => {
     fixture((directory) => {
       edit(directory, 'apps/api/package.json', (text) => {
         const manifest = JSON.parse(text)
@@ -44,78 +57,94 @@ for (const name of ['prisma', '@prisma/client', '@prisma/adapter-pg'])
     })
   })
 
-for (const [change, message] of [
-  [(text) => text.replace('specifier: 7.10.1', 'specifier: 7.10.0'), /Stale prisma specifier/],
-  [(text) => text.replace('version: 7.10.1', 'version: 7.10.0'), /Stale prisma resolution/],
-  [(text) => text.slice(0, text.indexOf('---', 3)), /dependency graph missing/],
-  [() => 'lockfileVersion: [invalid', /Invalid lock/],
+for (const [label, change, message] of [
+  ['missing importer', (app) => delete app.importers['docker/migrator'], /importer missing/],
+  [
+    'stale specifier',
+    (app) => {
+      app.importers['docker/migrator'].dependencies.prisma.specifier = '7.10.0'
+    },
+    /Stale prisma specifier/,
+  ],
+  [
+    'stale resolution',
+    (app) => {
+      app.importers['docker/migrator'].dependencies.prisma.version = '7.10.0'
+    },
+    /Stale prisma resolution/,
+  ],
+  [
+    'missing integrity',
+    (app) => delete app.packages['dotenv@18.0.8'].resolution.integrity,
+    /Missing dotenv.*integrity/,
+  ],
+  ['missing snapshot', (app) => delete app.snapshots['dotenv@18.0.8'], /Missing migrator snapshot/],
+  [
+    'transitive compiler',
+    (app) => {
+      app.snapshots['dotenv@18.0.8'].dependencies = { '@typescript/native': '7.0.2' }
+    },
+    /Native compiler/,
+  ],
 ])
-  test(`migrator rejects damaged nested lock: ${message.source}`, () => {
+  test(`the shared lock guard rejects ${label}`, () => {
     fixture((directory) => {
-      edit(directory, 'docker/migrator/pnpm-lock.yaml', change)
+      editLock(directory, change)
       assert.throws(() => verifyMigrator(directory), message)
     })
   })
 
-for (const [label, change] of [
-  ['missing', (text) => text.replace('apps/api:', 'apps/other:')],
-  ['duplicate', (text) => `${text}---\n${text}`],
+for (const [label, change, message] of [
+  [
+    'missing application',
+    (text) => text.replace('apps/api:', 'apps/other:'),
+    /exactly one application document/,
+  ],
+  ['duplicate application', (text) => `${text}---\n${text}`, /exactly one application document/],
+  ['invalid YAML', () => 'lockfileVersion: [invalid', /Invalid root lock/],
 ])
-  test(`root lock guard rejects a ${label} application document`, () => {
+  test(`the root lock guard rejects ${label}`, () => {
     fixture((directory) => {
       edit(directory, 'pnpm-lock.yaml', change)
-      assert.throws(() => verifyMigrator(directory), /exactly one application document/)
+      assert.throws(() => verifyMigrator(directory), message)
     })
   })
 
-test('installer verifies bytes before extraction, rejecting tampering and missing pins', () => {
-  const bytes = Buffer.from('harmless fixture archive bytes')
-  const hash = createHash('sha512').update(bytes).digest('hex')
-  verifyArchive(bytes, hash)
-  assert.throws(() => verifyArchive(Buffer.from('tampered'), hash), /integrity mismatch/)
-  assert.throws(() => installerPin({ packageManager: 'pnpm@12.11.2' }), /SHA512/)
-})
-
-test('migrator refuses release-age exceptions', () => {
-  fixture((directory) => {
-    edit(
-      directory,
-      'docker/migrator/pnpm-workspace.yaml',
-      (text) => `${text}\nminimumReleaseAgeExclude: ['prisma']\n`
-    )
-    assert.throws(() => verifyMigrator(directory), /exclusions forbidden/)
+for (const [field, value, message] of [
+  ['scripts', { postinstall: 'node unrelated.js' }, /workspace scripts/],
+  ['devDependencies', { typescript: '7.0.2' }, /development dependencies/],
+  ['packageManager', 'pnpm@12.14.0', /root packageManager/],
+])
+  test(`minimal manifest refuses ${field}`, () => {
+    fixture((directory) => {
+      edit(directory, 'docker/migrator/package.json', (text) =>
+        JSON.stringify({ ...JSON.parse(text), [field]: value })
+      )
+      assert.throws(() => verifyMigrator(directory), message)
+    })
   })
-})
 
-for (const age of [0, 60])
-  test(`migrator refuses an overridden release-age cutoff: ${age}`, () => {
+for (const [setting, value, message] of [
+  ['minimumReleaseAge', '0', /24-hour/],
+  ['minimumReleaseAgeStrict', 'false', /false/],
+  ['minimumReleaseAgeIgnoreMissingTime', 'true', /true/],
+  ['minimumReleaseAgeExclude', "['prisma']", /exclusions forbidden/],
+  ['trustLockfile', 'true', /must not be skipped/],
+])
+  test(`shared release-age guard refuses ${setting}=${value}`, () => {
     fixture((directory) => {
       edit(
         directory,
-        'docker/migrator/pnpm-workspace.yaml',
-        (text) => `${text}\nminimumReleaseAge: ${age}\n`
+        'pnpm-workspace.yaml',
+        (text) => `${text.replace(new RegExp(`^${setting}:.*$`, 'm'), '')}\n${setting}: ${value}\n`
       )
-      assert.throws(() => verifyMigrator(directory), /standard release-age cutoff/)
+      assert.throws(() => verifyMigrator(directory), message)
     })
   })
 
-test('installer rejects root workspace selection and disabled executable signatures before download', () => {
-  const installer = new URL('../../docker/migrator/installer.mjs', import.meta.url).pathname
-  for (const [value, message] of [
-    [undefined, /isolated migrator cwd/],
-    ['0', /signature verification/],
-  ]) {
-    const env = { ...process.env }
-    if (value === undefined) delete env.COREPACK_INTEGRITY_KEYS
-    else env.COREPACK_INTEGRITY_KEYS = value
-    const result = spawnSync(process.execPath, [installer], {
-      cwd: root,
-      env,
-      encoding: 'utf8',
-      timeout: 5000,
-    })
-    assert.equal(result.error, undefined)
-    assert.notEqual(result.status, 0)
-    assert.match(result.stderr, message)
-  }
+test('a second migrator lock is rejected instead of silently becoming another authority', () => {
+  fixture((directory) => {
+    writeFileSync(join(directory, 'docker/migrator/pnpm-lock.yaml'), 'lockfileVersion: 12\n')
+    assert.throws(() => verifyMigrator(directory), /Obsolete migrator pnpm-lock/)
+  })
 })

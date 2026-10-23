@@ -589,6 +589,12 @@ jobs:
         with:
           node-version: 24
 
+      - name: Setup pnpm for migration verification
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Install migration verification dependencies
+        run: pnpm --filter api --fail-if-no-match install --frozen-lockfile --ignore-scripts
+
       - name: Install Trivy
         env:
           TRIVY_VERSION: 0.75.0
@@ -614,6 +620,56 @@ jobs:
             ./node_modules/.bin/prisma --version
             test -x ./node_modules/.bin/prisma
           '
+
+      - name: Verify native migration cancellation
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-lifecycle.json
+        run: node scripts/verify-migrator-lifecycle.mjs "$AMCORE_API_MIGRATOR_IMAGE"
+
+      - name: Recover migration verification resources
+        if: always()
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-lifecycle.json
+        run: node scripts/cleanup-migrator-lifecycle.mjs "$AMCORE_MIGRATOR_LIFECYCLE_JOURNAL"
+
+      - name: Verify native migration operations
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-operations.json
+        run: node scripts/verify-migrator-operations.mjs "$AMCORE_API_MIGRATOR_IMAGE"
+
+      - name: Verify migration isolation and cleanup failure
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-network.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" network
+
+      - name: Verify interrupted migration harness recovery
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-interrupt.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" interrupt
+
+      - name: Verify migration negative lifecycle controls
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-negative.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" negative
+
+      - name: Verify migration advisory-lock cancellation
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-advisory.json
+        run: node scripts/verify-migrator-controls.mjs "$AMCORE_API_MIGRATOR_IMAGE" advisory
+
+      - name: Recover migration operations and control resources
+        if: always()
+        run: |
+          cleanup_status=0
+          for journal in migrator-operations migrator-network migrator-negative migrator-advisory \
+            migrator-interrupt.json.sigterm migrator-interrupt.json.sigint migrator-interrupt.json.sigkill; do
+            case "$journal" in
+              *.json.*) path="$RUNNER_TEMP/$journal" ;;
+              *) path="$RUNNER_TEMP/$journal.json" ;;
+            esac
+            node scripts/cleanup-migrator-lifecycle.mjs "$path" || cleanup_status=1
+          done
+          exit "$cleanup_status"
 
       - name: Verify npm/npx are absent from the runner image
         run: |

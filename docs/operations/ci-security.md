@@ -51,9 +51,13 @@ of workflow self-hardening to keep the example forkable.
   - boot the API and serve `/api/v1/health/ready`;
   - let the Next.js web container return `/` `200`;
   - keep the worker healthy.
-    The required lint dependency first checks coherent Prisma versions and both
-    frozen graphs. The [migration image guide](migrator-image.md) describes isolated
+    The required lint dependency first checks coherent Prisma versions and the
+    migration package in the shared frozen lock. The [migration image guide](migrator-image.md) describes
     dependency upkeep and the residual security risk of API build tooling.
+    The same Docker smoke job declares native migration cancellation, roles/TLS,
+    history and recovery checks. Its negative controls test network isolation,
+    interrupted verification, independent cleanup and missing lifecycle protections.
+    Cleanup runs independently with `always()` and cannot erase an earlier failure.
 - **Test** is the aggregate for unit+real-Redis, capability extension,
   notification/AI extension, focused API fallback and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.
@@ -584,7 +588,7 @@ tool** releases. It also does not bump the root `packageManager` pnpm pin or the
 Node.js major selectors; the report has a **Toolchain** section for both (pnpm
 versus the registry; Node majors versus the LTS, Current and next-LTS schedule).
 Move the pnpm pin in one PR: root manifest, both Dockerfiles, the stand installer and
-`docker/migrator` together (`scripts/lib/toolchain-pins.test.mjs` checks they agree).
+the official migration bootstrap image together (`scripts/lib/toolchain-pins.test.mjs` checks they agree).
 The `dependency-freshness.yml` workflow closes that visibility
 gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
@@ -599,9 +603,8 @@ The root workspace explicitly sets `minimumReleaseAge: 1440` and
 `minimumReleaseAgeStrict: true`. It also sets
 `minimumReleaseAgeIgnoreMissingTime: false`: a registry entry without a publication
 time fails with `ERR_PNPM_MISSING_TIME`. Fix the registry metadata or mirror;
-waiting alone cannot establish an unknown publication time. The isolated migrator
-retains its separate strict/default-age policy; this change does not tighten its
-missing-time setting. Strict mode prevents fresh resolution from
+waiting alone cannot establish an unknown publication time. The migration workspace
+package shares this root policy and lock. Strict mode prevents fresh resolution from
 persisting age exceptions. pnpm 12 re-checks every lockfile entry during `pnpm install --frozen-lockfile`. A lockfile that holds a version
 published less than 24 hours ago therefore fails the install step with
 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, even though the lockfile matches the
@@ -611,7 +614,7 @@ workflow with **Re-run all jobs**. Do not rerun individual or only failed jobs. 
 `trustLockfile`, lower `minimumReleaseAge` or add an exclusion to make the job pass:
 each one switches off the protection against freshly published malicious versions.
 
-Both npm entries in `dependabot.yml` explicitly set a three-day cooldown for
+The root npm entry in `dependabot.yml` explicitly sets a three-day cooldown for
 ordinary version updates. Groups, schedules and major-version ignores still apply.
 Security updates can open immediately; installing their packages still follows
 the 24-hour rule. An urgent exception needs a separate maintainer decision.

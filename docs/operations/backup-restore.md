@@ -210,6 +210,43 @@ Adapt the failure action to however you already page/alert — the important
 part is that a failed drill produces a signal an operator sees, not a line
 buried in `docker compose logs`.
 
+### Verify a role-separated restore
+
+The generic drill above skips owners and ACLs. Rehearse your actual archive on an
+isolated, empty target before restoring production. Provision the original owner
+and runtime roles there using [database role separation](database-role-separation.md).
+Use an authorized restore administrator that can restore ownership to those roles;
+the application runtime credential cannot do this. Keep production writers away
+from this target and supply credentials through the normal secret mechanism.
+
+With libpq connection settings selecting only that isolated target, restore the
+archive without `--no-owner` or `--no-privileges`:
+
+```sh
+pg_restore --exit-on-error --dbname="${PGDATABASE:?select the isolated target database}" /absolute/path/to/verified.dump
+```
+
+Require `PGDATABASE` and the other connection settings to identify the empty
+target explicitly before running the command. A refusal is a failed drill; do
+not disable ownership/ACL restoration to obtain a pass. Reapply the reviewed
+step3 grants/default privileges from `docker/postgres/setup-roles.sql` on the
+restored target. Do not rerun its CREATE ROLE section over existing roles.
+
+Verify the expected application schema/table/sequence owners, runtime DML and
+sequence use, denied DDL/TRUNCATE/SET ROLE, migration ledger/checksums and selected
+business rows against your backup evidence. A restored table count is insufficient.
+Check future-object default privileges as well as existing grants. Fix any gap
+before traffic resumes. On this isolated target, create a uniquely named disposable
+table with a generated sequence as the migrator role in each application schema.
+Without object-specific grants, connect as runtime and verify inserts, reads and
+sequence use; verify the same DDL/TRUNCATE/SET ROLE denials. Remove the probes as
+the migrator after inspection. Never run these probes on the production target.
+Unknown provider-specific restore permissions require capability verification on
+the isolated target; do not infer them from `CREATEROLE` alone.
+The [migration operations test](migrator-image.md#verify-roles-tls-history-and-recovery)
+exercises this contract on its own synthetic data; it does not read or certify
+your archive. Managed PITR and WAL restores need the equivalent provider-specific drill.
+
 ### Operational notes
 
 - **Dumps contain full data, including PII.** Apply the same access

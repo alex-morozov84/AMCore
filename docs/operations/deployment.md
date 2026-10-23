@@ -4,7 +4,7 @@ How to take AMCore from clone → migrated schema → running app, locally and i
 production.
 
 The [migration image guide](migrator-image.md) covers the independent Prisma CLI
-image, its frozen dependency graph, maintenance and security reports.
+image, its minimal package in the shared frozen lock, maintenance and security reports.
 
 For product administration, deploy the same checked placement source in API/web
 and its generated edge mapping. Configure exact canonical origins and the shared
@@ -15,9 +15,11 @@ Native development defaults to web port3002; Compose publishes3000. Override bot
 `FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` to the actual Compose browser origin.
 
 The API Dockerfile refreshes `perl-base` from Debian security repositories in
-build/migrator and runner targets. The pinned Node base still includes an older
-package; remove this explicit refresh only after a base update includes the fixes
-and the final image scan confirms them. Existing deployed images need a rebuild
+build/migrator and runner targets. API build/runner use Bookworm; the independent
+migrator uses Trixie. Remove a refresh only after that target's base includes the
+fixes and its final image scan confirms them. The API builder updates the whole
+npm distribution from a checksum-pinned archive; its remaining toolchain risk is
+separate from the final migrator inventory. Existing deployed images need a rebuild
 and rollout to receive the update.
 
 ## Branch, release & environments model
@@ -622,6 +624,27 @@ backup** (see [Backup & Restore](backup-restore.md)) or by shipping a
 **forward-fix** migration. Destructive migrations (dropping/renaming
 columns) require app-compatibility planning — deploy a backward-compatible app
 first, migrate, then remove the old path in a later release.
+
+For a failed migration, stop rollout and competing writers. Retain its name and
+the error, then run `migrate status` through the same migrator image, URL and
+configuration. Inspect the ledger through a trusted connection to that database:
+
+```sql
+SELECT migration_name, checksum, started_at, finished_at, rolled_back_at
+FROM public._prisma_migrations
+ORDER BY started_at;
+```
+
+Compare the failed SQL with actual objects and affected data. A failed command
+can leave committed changes. Replacing the image or running `migrate resolve`
+does not undo them. Prepare a state-specific reconciliation or verified restore
+before retrying. Do not invent destructive repair SQL when the state is unknown.
+Use `resolve --rolled-back <failed-migration-name>` only when the database has
+been reconciled for retry. Use `--applied` only after independently confirming
+that all intended SQL effects are present. Neither flag checks those facts for
+you. Preserve the Tini entrypoint and use the full local CLI command as shown in
+the [migration guide](migrator-image.md#supported-configuration-boundary).
+Confirm status, schema/data and application compatibility before resuming rollout.
 
 ## Seeding
 

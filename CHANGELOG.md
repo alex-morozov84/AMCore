@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The migration image uses a minimal workspace package and the shared root lock,
+  with official pnpm bootstrap and a Node24/Debian Trixie base. The API builder
+  updates its whole npm distribution. OS and build-tool findings still require
+  separate review; the packaging change does not certify an empty vulnerability inventory.
+
 - Public pages are lighter. The Operations Console's translations reach the
   browser only on Console pages (login HTML about 46 % smaller in English and
   50 % in Russian), and the monospace font is no longer preloaded on every page.
