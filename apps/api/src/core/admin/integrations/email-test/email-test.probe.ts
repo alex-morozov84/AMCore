@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, scryptSync } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
@@ -29,12 +29,18 @@ import { lastToEvidence, type StoredAttempt, toReceipt } from './email-test.view
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex')
 
 /**
- * A change fingerprint of the provider key, never stored or returned as a credential: it only
- * tells "the key changed since this result". It is a keyed digest with a fixed domain label, not
- * password storage, so a slow password hash would add cost without adding safety.
+ * A change fingerprint of the provider key: it only tells "the key changed since this result" and
+ * is never returned. A deliberately slow derivation keeps a leaked fingerprint useless for guessing
+ * the key; the last value is remembered so a repeated read costs nothing.
  */
-const keyFingerprint = (value: string): string =>
-  createHmac('sha256', 'amcore.integrations.email-test.key.v1').update(value).digest('hex')
+let lastFingerprint: { key: string; value: string } | undefined
+function keyFingerprint(key: string): string {
+  if (lastFingerprint?.key !== key) {
+    const value = scryptSync(key, 'amcore.integrations.email-test.key.v1', 16, { N: 16_384 })
+    lastFingerprint = { key, value: value.toString('hex') }
+  }
+  return lastFingerprint.value
+}
 
 const STATUS: Partial<Record<IntegrationErrorCode, number>> = {
   [IntegrationErrorCode.INTEGRATION_ATTEMPT_EXPIRED]: 410,
