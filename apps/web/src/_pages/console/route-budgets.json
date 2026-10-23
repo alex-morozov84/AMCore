@@ -5,6 +5,7 @@
     "admin-console:/api-keys": 1346913,
     "admin-console:/audit": 1461215,
     "admin-console:/background-work": 1411262,
+    "admin-console:/integrations": 1341489,
     "admin-console:/login": 1304831,
     "admin-console:/organizations": 1304831,
     "admin-console:/organizations/[id]": 1312400,
