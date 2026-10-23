@@ -199,7 +199,8 @@ export class EmailTestProbe {
       throw error
     }
     if (!marked) return this.safeFail(attemptId, leaseToken, 'lease_lost')
-    if (performance.now() - t0 > EMAIL_TEST_POLICY.precheckMs)
+    // The pause limit never exceeds the registered deadline: an exhausted budget sends nothing.
+    if (performance.now() - t0 > Math.min(EMAIL_TEST_POLICY.precheckMs, policy.deadlineMs))
       return this.safeFail(attemptId, leaseToken, 'precheck')
 
     const result = await this.send(email, attemptId, t0, policy.deadlineMs)

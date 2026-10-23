@@ -185,6 +185,16 @@ describe('EmailTestProbe.run', () => {
     expect(store.settle).not.toHaveBeenCalled()
   })
 
+  it('does not call the transport when a pause exhausts a shorter registered deadline', async () => {
+    const { probe, store, provider } = build()
+    const clock = jest.spyOn(performance, 'now')
+    clock.mockReturnValueOnce(0)
+    clock.mockReturnValue(3_000) // below the 5 s pause limit, above the 2 s deadline
+    await probe.run('u1', ATTEMPT, { ...POLICY, deadlineMs: 2_000 })
+    expect(provider.sendPrepared).not.toHaveBeenCalled()
+    expect(store.failBeforeSend).toHaveBeenCalledWith(ATTEMPT, expect.any(String), 'precheck')
+  })
+
   it('refuses before any audit or send when Redis admission is unavailable', async () => {
     const { probe, store, provider, audit } = build()
     store.reserve.mockRejectedValue(new Error(IntegrationErrorCode.INTEGRATION_PROBE_UNAVAILABLE))

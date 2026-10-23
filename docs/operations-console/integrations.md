@@ -144,17 +144,19 @@ the attempt ends with **The hourly limit for test emails is reached.** Try again
 
 ### When nothing was sent
 
-| Message                                                                | Meaning                                                      |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **The confirmation expired. Start the test again.**                    | The confirmation is older than 30 minutes or used.           |
-| **Your email address changed…** / **The email settings changed…**      | The confirmation no longer matches. Start again.             |
-| **The hourly limit for test emails is reached.**                       | Platform limit (below).                                      |
-| **A test was started a moment ago…** / **Another test is being sent.** | See the table above.                                         |
-| **The check could not start. Nothing was sent.**                       | Redis or the audit record was unavailable _before_ the send. |
+| Message                                                                | Meaning                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The confirmation expired. Start the test again.**                    | A confirmation that was not yet used is older than 30 minutes. A confirmation that was already used returns its stored result instead; if that result is gone, it is **No stored result** and nothing is sent again. |
+| **Your email address changed…** / **The email settings changed…**      | The confirmation no longer matches. Start again.                                                                                                                                                                     |
+| **The hourly limit for test emails is reached.**                       | Platform limit (below).                                                                                                                                                                                              |
+| **A test was started a moment ago…** / **Another test is being sent.** | See the table above.                                                                                                                                                                                                 |
+| **The check could not start. Nothing was sent.**                       | Redis or the audit record was unavailable _before_ the send.                                                                                                                                                         |
 
-A request refused at the start (the hourly limit, the cooldown, another test in flight) is not
-counted. A test that was reserved but did not start (**Did not start**) is counted
-toward the per-minute and hourly limits.
+A request refused before the test was reserved (the hourly limit, the cooldown) is not counted.
+**Another test is being sent.** can also appear after the reservation, when the start then fails:
+that attempt is recorded as **Did not start** and is counted toward the per-minute and hourly
+limits. The message alone does not show which case you have, so do not assume the limits are
+unused. Wait for the cooldown shown on the button.
 
 ### Limits
 
