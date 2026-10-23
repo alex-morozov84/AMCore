@@ -1,0 +1,358 @@
+import { createHash, randomBytes, scryptSync } from 'node:crypto'
+
+import { Inject, Injectable } from '@nestjs/common'
+import { PinoLogger } from 'nestjs-pino'
+
+import {
+  type IntegrationAction,
+  IntegrationErrorCode,
+  type IntegrationEvidence,
+  type ProbePreparation,
+  type ProbeReceipt,
+  ResourceErrorCode,
+} from '@amcore/shared'
+
+import { AppException } from '../../../../common/exceptions/index.js'
+import { EnvService } from '../../../../env/env.service.js'
+import { AuditActorType, AuditTargetType } from '../../../../generated/prisma/client.js'
+import type { EmailProvider } from '../../../../infrastructure/email/email.types.js'
+import { PrismaService } from '../../../../prisma/index.js'
+import { AuditLogService } from '../../../audit/audit-log.service.js'
+import type { IntegrationProbePolicy } from '../integration.types.js'
+
+import { buildTestEmailBody } from './email-test.body.js'
+import { classifySend, type ProbeResult } from './email-test.outcome.js'
+import { EMAIL_TEST_POLICY } from './email-test.policy.js'
+import { EmailTestStore, integrationError } from './email-test.store.js'
+import { lastToEvidence, type StoredAttempt, toReceipt } from './email-test.view.js'
+
+const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex')
+
+/**
+ * A change fingerprint of the provider key: it only tells "the key changed since this result" and
+ * is never returned. A deliberately slow derivation keeps a leaked fingerprint useless for guessing
+ * the key; the last value is remembered so a repeated read costs nothing.
+ */
+let lastFingerprint: { key: string; value: string } | undefined
+function keyFingerprint(key: string): string {
+  if (lastFingerprint?.key !== key) {
+    const value = scryptSync(key, 'amcore.integrations.email-test.key.v1', 16, { N: 16_384 })
+    lastFingerprint = { key, value: value.toString('hex') }
+  }
+  return lastFingerprint.value
+}
+
+const STATUS: Partial<Record<IntegrationErrorCode, number>> = {
+  [IntegrationErrorCode.INTEGRATION_ATTEMPT_EXPIRED]: 410,
+  [IntegrationErrorCode.INTEGRATION_ATTEMPT_MISMATCH]: 409,
+  [IntegrationErrorCode.INTEGRATION_RECIPIENT_CHANGED]: 409,
+  [IntegrationErrorCode.INTEGRATION_CONFIG_CHANGED]: 409,
+  [IntegrationErrorCode.INTEGRATION_PROBE_COOLDOWN]: 429,
+  [IntegrationErrorCode.INTEGRATION_PROBE_LIMIT]: 429,
+  [IntegrationErrorCode.INTEGRATION_PROBE_BUSY]: 429,
+}
+
+function mask(email: string): string {
+  const at = email.lastIndexOf('@')
+  return at < 1 ? '***' : `${email.slice(0, 1)}***${email.slice(at)}`
+}
+
+/**
+ * The operator email test. It proves one thing: the configured provider accepted a direct send
+ * from this API server. Not the worker path, not invitation templates, not inbox delivery.
+ */
+@Injectable()
+export class EmailTestProbe {
+  /** The transport call still open in this process, also after its logical deadline. */
+  private physicalInFlight = false
+
+  constructor(
+    private readonly store: EmailTestStore,
+    private readonly env: EnvService,
+    @Inject('EmailProvider') private readonly provider: EmailProvider,
+    private readonly audit: AuditLogService,
+    private readonly db: PrismaService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext(EmailTestProbe.name)
+  }
+
+  get mode(): 'resend' | 'mock' {
+    return this.env.get('EMAIL_PROVIDER') === 'resend' ? 'resend' : 'mock'
+  }
+
+  /**
+   * Binds saved evidence to the current settings. Kept only in Redis; never returned, logged,
+   * audited or used as an identifier. Same technique as the queued-email scope witness.
+   */
+  witness(): string {
+    return sha256(
+      JSON.stringify({
+        provider: this.mode,
+        credential: keyFingerprint(this.env.get('RESEND_API_KEY') ?? ''),
+        from: this.env.get('EMAIL_FROM'),
+        recipeVersion: 1,
+      })
+    )
+  }
+
+  private mockInProduction(): boolean {
+    return this.mode === 'mock' && this.env.get('NODE_ENV') === 'production'
+  }
+
+  private async operator(actorId: string): Promise<{ email: string; token: string } | null> {
+    const user = await this.db.user.findUnique({
+      where: { id: actorId },
+      select: { email: true, emailVerified: true },
+    })
+    if (!user?.emailVerified) return null
+    return {
+      email: user.email,
+      token: sha256(`${actorId}|${user.email.toLowerCase()}`).slice(0, 32),
+    }
+  }
+
+  private async requireOperator(actorId: string): Promise<{ email: string; token: string }> {
+    if (this.mockInProduction())
+      throw integrationError(IntegrationErrorCode.INTEGRATION_MOCK_IN_PRODUCTION, 409)
+    const operator = await this.operator(actorId)
+    if (!operator) throw integrationError(IntegrationErrorCode.INTEGRATION_NO_VERIFIED_ADDRESS, 409)
+    return operator
+  }
+
+  /** Issues the single-use attempt id shown with the confirmation. Nothing is sent. */
+  async prepare(actorId: string): Promise<ProbePreparation> {
+    const operator = await this.requireOperator(actorId)
+    const issued = await this.store.prepare(
+      actorId,
+      randomBytes(16).toString('base64url'),
+      operator.token,
+      this.witness()
+    )
+    return {
+      attemptId: issued.attemptId,
+      recipientHint: mask(operator.email),
+      expiresAt: new Date(issued.expiresAt).toISOString(),
+    }
+  }
+
+  async run(
+    actorId: string,
+    attemptId: string,
+    policy: IntegrationProbePolicy
+  ): Promise<ProbeReceipt> {
+    const operator = await this.requireOperator(actorId)
+    const leaseToken = randomBytes(16).toString('base64url')
+    const reserved = await this.store.reserve({
+      attemptId,
+      actorId,
+      recipientToken: operator.token,
+      scopeWitness: this.witness(),
+      leaseToken,
+      provider: this.mode,
+      policy,
+    })
+    if (reserved.kind === 'refused')
+      throw integrationError(
+        reserved.code,
+        STATUS[reserved.code] ?? 409,
+        reserved.retryAfterSeconds ? { retryAfterSeconds: reserved.retryAfterSeconds } : undefined
+      )
+    if (reserved.kind === 'replay') return this.replayReceipt(attemptId, reserved.attempt)
+    if (this.physicalInFlight) {
+      // An earlier send passed its logical deadline but its transport call has not ended. Another
+      // call is not started on top of it, even though the shared lease was already released.
+      await this.safeFail(attemptId, leaseToken, 'busy')
+      throw integrationError(IntegrationErrorCode.INTEGRATION_PROBE_BUSY, 429, {
+        retryAfterSeconds: 5,
+      })
+    }
+
+    await this.execute(actorId, attemptId, leaseToken, operator.email, policy)
+    return this.receiptAfterSend(attemptId)
+  }
+
+  /** A replay never sends; if the clock cannot be read, the attempt's own times are used. */
+  private async replayReceipt(attemptId: string, attempt: StoredAttempt): Promise<ProbeReceipt> {
+    const now = await this.store
+      .now()
+      .catch(() => attempt.settledAt || attempt.sentAt || attempt.reservedAt)
+    return toReceipt(attemptId, attempt, now)
+  }
+
+  private async execute(
+    actorId: string,
+    attemptId: string,
+    leaseToken: string,
+    email: string,
+    policy: IntegrationProbePolicy
+  ): Promise<void> {
+    try {
+      await this.audit.record(
+        {
+          action: 'integration.email_test_requested',
+          actorType: AuditActorType.USER,
+          actorId,
+          targetType: AuditTargetType.USER,
+          targetId: actorId,
+          metadata: { provider: this.mode },
+        },
+        { failOpen: false }
+      )
+    } catch {
+      await this.safeFail(attemptId, leaseToken, 'audit_failed')
+      throw integrationError(IntegrationErrorCode.INTEGRATION_PROBE_UNAVAILABLE, 503)
+    }
+    // The monotonic reading precedes the command so a stalled reply is counted in the pause.
+    const t0 = performance.now()
+    let marked: boolean
+    try {
+      marked = await this.store.markSending(attemptId, leaseToken)
+    } catch (error) {
+      await this.safeFail(attemptId, leaseToken, 'redis_timeout')
+      throw error
+    }
+    if (!marked) return this.safeFail(attemptId, leaseToken, 'lease_lost')
+    // The pause limit never exceeds the registered deadline: an exhausted budget sends nothing.
+    if (performance.now() - t0 > Math.min(EMAIL_TEST_POLICY.precheckMs, policy.deadlineMs))
+      return this.safeFail(attemptId, leaseToken, 'precheck')
+
+    const result = await this.send(email, attemptId, t0, policy.deadlineMs)
+    // The audit states what the SERVER stored (a late result is kept as unknown), or that the
+    // stored result is unknown because the settle failed. It never repeats the offered result.
+    let settled: { outcome: string; class: string } | null = null
+    try {
+      settled = await this.store.settle(attemptId, leaseToken, result.outcome, result.class ?? '')
+    } catch {
+      // The attempt stays `sending` and reads as unknown after its deadline.
+      this.logger.warn(
+        { event: 'integration.email_test.settle_failed' },
+        'Test email settle failed'
+      )
+      settled = { outcome: 'unknown', class: 'settle_failed' }
+    }
+    if (!settled) return
+    await this.audit.record({
+      action: 'integration.email_test_settled',
+      actorType: AuditActorType.USER,
+      actorId,
+      targetType: AuditTargetType.USER,
+      targetId: actorId,
+      metadata: { provider: this.mode, outcome: settled.outcome, class: settled.class || 'none' },
+    })
+  }
+
+  private async safeFail(attemptId: string, leaseToken: string, code: string): Promise<void> {
+    try {
+      await this.store.failBeforeSend(attemptId, leaseToken, code)
+    } catch {
+      // A reserved attempt that cannot be closed reads as "did not start" after its limit.
+    }
+  }
+
+  /**
+   * One logical deadline from `t0`. The physical call keeps this process's slot until it really
+   * ends, even after the deadline: a second call is not stacked on a transport that ignores abort.
+   * Its late result is fenced by SETTLE.
+   */
+  private send(
+    email: string,
+    attemptId: string,
+    t0: number,
+    deadlineMs: number
+  ): Promise<ProbeResult> {
+    const controller = new AbortController()
+    const body = buildTestEmailBody(this.env.get('EMAIL_FROM'), email)
+    this.physicalInFlight = true
+    const physical = this.provider
+      .sendPrepared(body, `integration-test-${attemptId}`, controller.signal)
+      .then(
+        (result) => classifySend(this.mode, result),
+        (): ProbeResult => ({ outcome: 'unknown', class: null })
+      )
+      .finally(() => {
+        this.physicalInFlight = false
+      })
+    const remaining = Math.max(0, deadlineMs - (performance.now() - t0))
+    return new Promise<ProbeResult>((resolve) => {
+      const timer = setTimeout(() => {
+        controller.abort()
+        resolve({ outcome: 'unknown', class: 'deadline' })
+      }, remaining)
+      void physical.then((result) => {
+        clearTimeout(timer)
+        resolve(result)
+      })
+    })
+  }
+
+  /**
+   * After the send path the transport may have been called, so a stored result that cannot be read
+   * is never reported as a refusal ("nothing was sent"): the answer is an in-progress receipt and
+   * the client reads the same attempt again without posting.
+   */
+  private async receiptAfterSend(attemptId: string): Promise<ProbeReceipt> {
+    try {
+      const [attempt, now] = await Promise.all([
+        this.store.readAttempt(attemptId),
+        this.store.now(),
+      ])
+      if (attempt) return toReceipt(attemptId, attempt, now)
+    } catch {
+      // Fall through to the in-progress receipt.
+    }
+    return {
+      attemptId,
+      state: 'sending',
+      outcome: 'in_progress',
+      class: null,
+      provider: this.mode,
+      reservedAt: new Date().toISOString(),
+      settledAt: null,
+    }
+  }
+
+  /** Read-only recovery of the operator's own attempt. Never creates or resends. */
+  async receiptFor(actorId: string, attemptId: string): Promise<ProbeReceipt> {
+    const [attempt, now] = await Promise.all([this.store.readAttempt(attemptId), this.store.now()])
+    if (!attempt || attempt.actorId !== actorId)
+      throw new AppException(
+        ResourceErrorCode.RESOURCE_NOT_FOUND,
+        404,
+        ResourceErrorCode.RESOURCE_NOT_FOUND
+      )
+    return toReceipt(attemptId, attempt, now)
+  }
+
+  async evidence(): Promise<IntegrationEvidence> {
+    const [last, now] = await Promise.all([this.store.readLast(), this.store.now()])
+    return lastToEvidence(last, this.witness(), now)
+  }
+
+  async action(actorId: string): Promise<IntegrationAction> {
+    const operator = await this.operator(actorId)
+    const [cooldownMs, busy, ownId] = await Promise.all([
+      this.store.cooldownRemainingMs(actorId),
+      this.store.leaseHeld(),
+      this.store.readActorAttempt(actorId),
+    ])
+    const own = ownId ? await this.store.readAttempt(ownId) : null
+    const reason: IntegrationAction['unavailableReason'] = this.mockInProduction()
+      ? 'mock_in_production'
+      : !operator
+        ? 'no_verified_address'
+        : cooldownMs > 0
+          ? 'cooldown'
+          : busy
+            ? 'busy'
+            : null
+    return {
+      probeId: 'email_test',
+      kind: 'operator_email_test',
+      available: reason === null,
+      unavailableReason: reason,
+      cooldownRemainingSeconds: Math.ceil(cooldownMs / 1000),
+      ownAttemptId: own && own.actorId === actorId ? ownId : null,
+    }
+  }
+}

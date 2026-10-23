@@ -37,6 +37,36 @@ test('disabled Console docs retain Settings pending proof and its runnable comma
   assert.doesNotMatch(after, /admin-sessions\/readability|actual initials on the composited/)
 })
 
+test('disabled Console integrations docs retain backend registration without removed UI links', () => {
+  const email = materialize('docs/email/README.md', 'console.integrations-email-guide')
+  assert.doesNotMatch(
+    email,
+    /operations-console\/integrations\.md|## Check that the provider accepts mail/
+  )
+  assert.match(email, /## Guides/)
+  assert.match(email, /\.\/delivery\.md/)
+
+  const backend = materialize(
+    'docs/backend/integrations.md',
+    'console.integrations-extension-guide'
+  )
+  assert.doesNotMatch(
+    backend,
+    /operations-console\/integrations\.md|apps\/web\/messages|3\. \*\*Add copy/
+  )
+  assert.match(backend, /backend status API/)
+  assert.match(backend, /GET \/api\/v1\/admin\/integrations/)
+  assert.match(backend, /imports: \[CrmModule\]/)
+  assert.match(backend, /class CrmIntegrationReader/)
+  assert.match(backend, /## Add an operator probe/)
+  assert.match(backend, /EmailTestStore/)
+
+  const index = materialize('docs/README.md', 'docs-index-console')
+  assert.doesNotMatch(index, /operations-console\/integrations\.md/)
+  assert.match(index, /backend\/integrations\.md/)
+  assert.match(index, /backend status API/)
+})
+
 test('disabled Console docs preserve API audit redaction without a dead guide link', () => {
   const after = materialize('docs/operations/audit-log.md', 'console.audit-history-guide')
   assert.match(after, /request query and raw URL logs/)

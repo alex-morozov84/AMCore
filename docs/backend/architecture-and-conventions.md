@@ -239,6 +239,8 @@ the **right** list — a misplaced processor runs in the wrong process:
   reference: `EmailModule` (producer, everywhere) vs `EmailWorkerModule` (processor,
   worker only).
 - **Genuinely shared infrastructure / producers** → `coreImports`.
+- **Outside service status:** register a reader once in the integrations composition list
+  to expose stored state through the backend status API. See [Register an integration](integrations.md).
 
 ### Shared configured extension modules
 

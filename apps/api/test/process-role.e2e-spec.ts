@@ -29,6 +29,8 @@ let WebModule: Token
 let WorkerModule: Token
 let AdminController: Token
 let AdminQueuesController: Token
+let AdminIntegrationsController: Token
+let IntegrationRegistry: Token
 let QueueObservationService: Token
 let AuthController: Token
 let EmailProcessor: Token
@@ -193,6 +195,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const observability = await import('../src/infrastructure/observability')
     const queue = await import('../src/infrastructure/queue')
     const adminQueuesController = await import('../src/core/admin/admin-queues.controller')
+    const adminIntegrationsController =
+      await import('../src/core/admin/admin-integrations.controller')
+    const integrationRegistry = await import('../src/core/admin/integrations/integration-registry')
     const tgController =
       await import('../src/core/notifications/channels/telegram/telegram.controller')
     const tgWebhookController =
@@ -259,6 +264,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     QueueService = queue.QueueService
     QueueObservationService = queue.QueueObservationService
     AdminQueuesController = adminQueuesController.AdminQueuesController
+    AdminIntegrationsController = adminIntegrationsController.AdminIntegrationsController
+    IntegrationRegistry = integrationRegistry.IntegrationRegistry
     TelegramController = tgController.TelegramController
     TelegramWebhookController = tgWebhookController.TelegramWebhookController
     TelegramChannelDeliverer = tgDeliverer.TelegramChannelDeliverer
@@ -317,6 +324,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('observes queues read-only and serves the Console summary (no worker needed)', () => {
       present(m, QueueObservationService)
       present(m, AdminQueuesController)
+      present(m, AdminIntegrationsController)
+      present(m, IntegrationRegistry)
     })
 
     it('has no scheduler explorer and no scheduler-decorated method outside the catalogue', () => {
@@ -424,6 +433,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AuthController)
       absent(m, AdminController)
       absent(m, AdminQueuesController)
+      absent(m, AdminIntegrationsController)
+      absent(m, IntegrationRegistry)
     })
 
     it('keeps the shared queue inventory/observation provider with the core queue module', () => {
@@ -506,6 +517,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, SchedulerRegistry)
       present(m, QueueObservationService)
       present(m, AdminQueuesController)
+      present(m, AdminIntegrationsController)
+      present(m, IntegrationRegistry)
     })
 
     it('composes the realtime publisher, subscriber, hub, and stream route', () => {

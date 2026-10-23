@@ -96,3 +96,13 @@ export function createUsersForPagination(markerEmail: string, fillerPrefix: stri
     { records: JSON.stringify(records) }
   )
 }
+/** Demo-only mailbox substitute: the Console test email goes only to a verified own address. */
+export function setEmailVerified(email: string): void {
+  const output = guardedSql(
+    `UPDATE core.users SET "emailVerified" = true WHERE "emailCanonical" = :'email';`,
+    { email }
+  )
+  if (output.trim() !== 'UPDATE 1') {
+    throw new Error(`Expected exactly one registered user to verify; got ${output.trim()}`)
+  }
+}

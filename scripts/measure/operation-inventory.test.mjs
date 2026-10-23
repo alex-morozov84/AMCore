@@ -19,7 +19,10 @@ describe('operation inventory against the real plans', () => {
       // (+6): 15 additional operations/facts/claims. No new provider or manifest.
       // The Alert catalogue fixture adds one edit in each of three single-locale
       // recipes (+3 operations/facts/claims); its Storybook deletions already exist.
-      { name: 'measured operations', expected: 874, actual: inventory.operations.length },
+      // Integration docs add two retained-file edits with four owned blocks in the Console-off recipe.
+      // Each content fact and its claims appear in both the shared and Console semantic inventories:
+      // +4 facts, +8 claims, but only two final edits.
+      { name: 'measured operations', expected: 879, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -38,17 +41,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1201,
+        expected: 1208,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1972,
+        expected: 1985,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 854,
+        expected: 859,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

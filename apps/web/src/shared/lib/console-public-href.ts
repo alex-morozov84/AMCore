@@ -143,3 +143,8 @@ export function parseConsoleReturnHref(value: unknown): string | null {
   }
   return `${url.pathname}${url.search}`
 }
+
+/** Integrations: safe state of configured outside services, same topology rule as the other panels. */
+export function getConsoleIntegrationsHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/integrations`
+}

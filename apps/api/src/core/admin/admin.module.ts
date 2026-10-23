@@ -14,6 +14,7 @@ import { AdminApiKeysController } from './admin-api-keys.controller.js'
 import { AdminApiKeysService } from './admin-api-keys.service.js'
 import { AdminAuditService } from './admin-audit.service.js'
 import { AdminDetailService } from './admin-detail.service.js'
+import { AdminIntegrationsController } from './admin-integrations.controller.js'
 import { AdminOverviewService } from './admin-overview.service.js'
 import { AdminOverviewResourcesService } from './admin-overview-resources.service.js'
 import { AdminQueuesController } from './admin-queues.controller.js'
@@ -28,6 +29,7 @@ import { BackgroundWorkController } from './background-work.controller.js'
 import { BackgroundWorkService } from './background-work.service.js'
 import { BackgroundWorkCatalogue } from './background-work-catalogue.js'
 import { BackgroundWorkReader } from './background-work-reader.js'
+import { configuredIntegrations } from './integrations/integrations.module.js'
 import { OrganizationEstablishmentController } from './organization-establishment.controller.js'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard.js'
 
@@ -48,6 +50,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
     GeoipModule,
     QueueModule,
     BackgroundControlModule,
+    configuredIntegrations,
   ],
   controllers: [
     AdminController,
@@ -56,6 +59,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
     AdminStorageSettingController,
     AdminQueuesController,
     AdminScheduledJobsController,
+    AdminIntegrationsController,
     BackgroundWorkController,
   ],
   providers: [

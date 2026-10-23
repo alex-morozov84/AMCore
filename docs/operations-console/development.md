@@ -262,6 +262,15 @@ live panel; do not copy `useQueueSummary`, which also merges the queue and work 
 storage setting editor polls with different rules (fixed 2 seconds only while a saved value
 is still being applied) and does not use the shared policy.
 
+The Integrations page (`features/console-integrations`) follows the same shape and adds one
+action. Its test flow is `useProbeFlow`: prepare, confirm, step-up when required, send, then
+a result dialog that can be reopened read-only. A response that is lost is recovered by
+polling the receipt route, never by posting again. The page renders any registered
+integration from the API response; do not add per-integration branches to it. To add an
+integration see [Register an integration](../backend/integrations.md). The route handlers
+under `app/api/console/integrations` give the test send a 20 second budget (reads use 5);
+copying the 10 second budget of the storage-setting write would cut off a near-deadline result.
+
 ## Queues and the Background work screen
 
 The screen uses the background-work application registry. One registration

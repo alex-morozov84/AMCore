@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   getConsoleBackgroundWorkHref,
+  getConsoleIntegrationsHref,
   getConsoleScheduledJobsHref,
 } from '@/shared/lib/console-public-href'
 
@@ -21,6 +22,7 @@ const messages = {
     overview: 'Overview',
     backgroundWork: { title: 'Background work' },
     scheduledJobs: { title: 'Scheduled jobs' },
+    integrations: { title: 'Integrations' },
     users: 'Users',
     organizations: 'Organizations',
     apiKeys: { title: 'API keys' },
@@ -47,12 +49,13 @@ const inProvider = (node: React.ReactNode) =>
 beforeEach(() => pathname.mockReturnValue('/admin'))
 
 describe('Console navigation', () => {
-  it('lists seven sections with Scheduled jobs right after Background work', () => {
+  it('lists eight sections with Scheduled jobs after Background work and Integrations before Users', () => {
     inProvider(<Items />)
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Overview',
       'Background work',
       'Scheduled jobs',
+      'Integrations',
       'Users',
       'Organizations',
       'API keys',
@@ -64,6 +67,12 @@ describe('Console navigation', () => {
     pathname.mockReturnValue(getConsoleScheduledJobsHref())
     inProvider(<ConsoleBreadcrumb />)
     expect(screen.getByText('OPS / Scheduled jobs')).toBeInTheDocument()
+  })
+
+  it('names the page in the breadcrumb on the Integrations route', () => {
+    pathname.mockReturnValue(getConsoleIntegrationsHref())
+    inProvider(<ConsoleBreadcrumb />)
+    expect(screen.getByText('OPS / Integrations')).toBeInTheDocument()
   })
 
   it('keeps the Background work breadcrumb for its own route', () => {
