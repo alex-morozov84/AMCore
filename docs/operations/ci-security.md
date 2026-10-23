@@ -121,6 +121,11 @@ of workflow self-hardening to keep the example forkable.
   The 20-minute lane timeout is emergency headroom, not a runtime target or
   performance proof. Measure cold setup and runner-minutes as well as test time.
   [Local reproduction and isolation](../frontend/testing.md#complete-ci-e2e-locally).
+  In `ci.yml`, browser and generated scaffold jobs prefer the existing Ubuntu
+  archive mirror over the Azure entry in the hosted runner's APT mirror list.
+  A reachable but slow mirror does not trigger APT's failure fallback. This
+  preference preserves release suites, fallback mirrors and package-signature
+  verification; it does not change the test limits or assertions.
 - **Observability contract (static)** — job id `promtool`, display name
   "Observability contract (static)" — cross-checks every alert/recording-rule
   and dashboard-panel PromQL expression, runbook links/anchors/panel
