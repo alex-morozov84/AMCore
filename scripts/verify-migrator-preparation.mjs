@@ -10,7 +10,7 @@ import {
   docker,
   command,
   cleanup,
-  load,
+  recover,
   label,
 } from './migrator-preparation/resources.mjs'
 import { safeError } from './migrator-lifecycle/safety.mjs'
@@ -28,7 +28,7 @@ if (existsSync(join(root, 'ai'))) {
   assert.ok(outside(privateRoot), 'Raw artifacts must stay outside ai')
 }
 if (argument === '--cleanup') {
-  if (existsSync(join(output, 'resources.json'))) await cleanup(load(output))
+  await recover(output)
 } else {
   assert.ok(
     argument && !second,

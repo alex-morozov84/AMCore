@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs'
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  unlinkSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+} from 'node:fs'
 import { join, isAbsolute } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { clientsStopped } from '../migrator-lifecycle/resources.mjs'
@@ -8,10 +16,13 @@ import { localEndpoint } from '../migrator-lifecycle/docker.mjs'
 import { bounded, safeError } from '../migrator-lifecycle/safety.mjs'
 import { closeAttached } from '../migrator-lifecycle/exit.mjs'
 export const label = 'io.amcore.migrator-preparation.run'
-export const save = (f) =>
-  writeFileSync(join(f.output, 'resources.json'), JSON.stringify(f, null, 2) + '\n', {
+export function save(f) {
+  const path = join(f.output, 'resources.json')
+  writeFileSync(`${path}.tmp`, JSON.stringify(f, null, 2) + '\n', {
     mode: 0o600,
   })
+  renameSync(`${path}.tmp`, path)
+}
 export function docker(f, args) {
   return execFileSync('docker', ['--host', f.endpoint, ...args], {
     encoding: 'utf8',
@@ -88,6 +99,15 @@ export function load(output) {
   for (const name of [...f.builders, ...f.images, ...f.containers])
     assert.ok(name.startsWith(`amcore-migrator-prep-${f.run}-`), 'Refuse foreign resource name')
   return f
+}
+export async function recover(output) {
+  if (existsSync(join(output, 'resources.json'))) await cleanup(load(output))
+  else
+    assert.equal(
+      existsSync(join(output, 'resources.json.tmp')),
+      false,
+      'Uncommitted preparation journal; preserve the output directory for inspection'
+    )
 }
 export async function cleanup(f) {
   const failures = []
@@ -201,6 +221,7 @@ export async function cleanup(f) {
     failures.push(error)
   }
   if (failures.length) throw new AggregateError(failures, 'Preparation cleanup incomplete')
+  rmSync(join(f.output, 'resources.json.tmp'), { force: true })
   writeFileSync(
     join(f.output, 'cleanup.json'),
     JSON.stringify(

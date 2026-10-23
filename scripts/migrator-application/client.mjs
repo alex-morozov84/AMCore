@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { bounded } from '../migrator-lifecycle/safety.mjs'
+import { bounded, safeError } from '../migrator-lifecycle/safety.mjs'
 import { closeAttached } from '../migrator-lifecycle/exit.mjs'
 
 export async function command(f, name, args, expected = 0) {
@@ -33,10 +33,34 @@ export async function command(f, name, args, expected = 0) {
     else assert.ok(result.code > 0, 'Expected application command refusal')
   } catch (error) {
     failure = error
+    console.error(
+      JSON.stringify({
+        run: f.run,
+        phase: 'application-command',
+        verdict: 'FAIL',
+        error: safeError(error),
+      })
+    )
   }
-  await closeAttached({ child, closed, cancellation: new globalThis.AbortController() }, () =>
-    console.error(JSON.stringify({ run: f.run, verdict: 'CLEANUP_ERROR' }))
-  )
+  try {
+    await closeAttached(
+      { child, closed, cancellation: new globalThis.AbortController() },
+      (error) =>
+        console.error(
+          JSON.stringify({
+            run: f.run,
+            phase: 'application-command-close',
+            verdict: 'CLEANUP_ERROR',
+            error: safeError(error),
+          })
+        )
+    )
+  } catch (error) {
+    throw new AggregateError(
+      [...(failure ? [failure] : []), error],
+      'Application command/close failed'
+    )
+  }
   if (failure) throw failure
   return output
 }
