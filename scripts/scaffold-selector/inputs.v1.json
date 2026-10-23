@@ -91,6 +91,8 @@
           "docs/product-admin/organization-establishment.md",
           "docs/product-admin/organization-provisioning.md",
           "docs/product-admin/organization-administration.md",
+          "docs/backend/integrations.md",
+          "docs/email/README.md",
           "docs/auth/README.md",
           "docs/auth/csrf.md",
           "docs/auth/rbac.md",
