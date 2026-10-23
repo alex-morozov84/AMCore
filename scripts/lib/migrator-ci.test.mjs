@@ -85,9 +85,14 @@ test('native hosted image admission runs the cancellation harness without author
   assert.match(cleanup.run, /cleanup-migrator-lifecycle\.mjs "\$AMCORE_MIGRATOR_LIFECYCLE_JOURNAL"/)
   assert.equal(cleanup['continue-on-error'], undefined)
   assert.equal(
-    ci.jobs['docker-image-smoke'].env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL,
+    admission.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL,
     '${{ runner.temp }}/migrator-lifecycle.json'
   )
+  assert.equal(
+    cleanup.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL,
+    admission.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL
+  )
+  assert.equal(ci.jobs['docker-image-smoke'].env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL, undefined)
   assert.equal(ci.jobs['docker-image-smoke']['runs-on'], 'ubuntu-latest')
 })
 
