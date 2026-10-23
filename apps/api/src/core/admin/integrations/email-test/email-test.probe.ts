@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
@@ -27,6 +27,14 @@ import { EmailTestStore, integrationError } from './email-test.store.js'
 import { lastToEvidence, type StoredAttempt, toReceipt } from './email-test.view.js'
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex')
+
+/**
+ * A change fingerprint of the provider key, never stored or returned as a credential: it only
+ * tells "the key changed since this result". It is a keyed digest with a fixed domain label, not
+ * password storage, so a slow password hash would add cost without adding safety.
+ */
+const keyFingerprint = (value: string): string =>
+  createHmac('sha256', 'amcore.integrations.email-test.key.v1').update(value).digest('hex')
 
 const STATUS: Partial<Record<IntegrationErrorCode, number>> = {
   [IntegrationErrorCode.INTEGRATION_ATTEMPT_EXPIRED]: 410,
@@ -75,7 +83,7 @@ export class EmailTestProbe {
     return sha256(
       JSON.stringify({
         provider: this.mode,
-        credential: sha256(this.env.get('RESEND_API_KEY') ?? ''),
+        credential: keyFingerprint(this.env.get('RESEND_API_KEY') ?? ''),
         from: this.env.get('EMAIL_FROM'),
         recipeVersion: 1,
       })
