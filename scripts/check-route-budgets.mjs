@@ -72,10 +72,13 @@ function provenance(statsText) {
   }
   const hash = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)
   const lock = path.join(root, 'pnpm-lock.yaml')
+  // Next writes a non-empty ID; its format is Next's own, so only emptiness is checked.
+  const buildId = readText(path.join(next, 'BUILD_ID'), 'BUILD_ID').trim()
+  if (!buildId) throw new RouteBudgetError(`BUILD_ID is empty: ${path.join(next, 'BUILD_ID')}`)
   return [
     `source ${git(['rev-parse', 'HEAD'])}${git(['status', '--porcelain']) ? ' (dirty)' : ''}`,
     `lockfile ${existsSync(lock) ? hash(readFileSync(lock)) : 'missing'}`,
-    `BUILD_ID ${readText(path.join(next, 'BUILD_ID'), 'BUILD_ID').trim()}`,
+    `BUILD_ID ${buildId}`,
     `stats ${hash(statsText)}`,
   ].join(', ')
 }
@@ -103,7 +106,7 @@ try {
   console.log(`Route budgets (Next ${nextVersion}; ${provenance(readFileSync(statsFile, 'utf8'))})`)
   for (const { key, route, bytes, limit, over } of report)
     console.log(
-      `${over ? 'OVER' : 'ok  '} ${key.padEnd(48)} ${String(bytes).padStart(9)} / ${String(limit).padStart(11)}  gzip ${gzipBytes(rows.get(route).chunks)}`
+      `${over ? 'OVER' : 'ok  '} ${key.padEnd(48)} ${String(bytes).padStart(9)} / ${String(limit ?? 'none').padStart(11)}  gzip ${gzipBytes(rows.get(route).chunks)}`
     )
   if (failures.length) {
     console.error(`\nRoute budget check failed:\n- ${failures.join('\n- ')}`)

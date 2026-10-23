@@ -44,6 +44,10 @@ failsWith('missing stats file', /route-bundle-stats\.json is missing/, (f) =>
   rmSync(path.join(f.root, STATS))
 )
 failsWith('broken stats JSON', /not valid JSON/, (f) => f.write(STATS, '{'))
+failsWith('missing build ID', /BUILD_ID is missing/, (f) =>
+  rmSync(path.join(f.root, 'apps/web/.next/BUILD_ID'))
+)
+failsWith('empty build ID', /BUILD_ID is empty/, (f) => f.write('apps/web/.next/BUILD_ID', '\n'))
 failsWith('empty stats', /has no rows/, (f) => f.write(STATS, []))
 failsWith('unsupported Next version', /not a verified route-bundle-stats format/, (f) =>
   f.write('apps/web/node_modules/next/package.json', { version: '16.5.0' })

@@ -64,7 +64,7 @@ export function evaluate(keyed, rows, budgets, mandatory) {
     if (!keyed.has(key)) failures.push(`${key} is budgeted but is not a built page`)
   for (const key of mandatory)
     if (!Number.isSafeInteger(budgets.get(key)))
-      failures.push(`${key} is mandatory and needs a byte limit, not "${budgets.get(key)}"`)
+      failures.push(`${key} is mandatory and needs a byte limit, not ${budgets.get(key) ?? 'none'}`)
   const report = [...keyed]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, route]) => {
