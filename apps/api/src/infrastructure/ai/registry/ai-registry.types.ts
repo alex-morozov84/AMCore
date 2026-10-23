@@ -44,3 +44,11 @@ export type ResolvedAiModel = z.infer<typeof resolvedAiModelSchema>
 /** The cached snapshot: every enabled, schema-valid model (with its provider) in the catalog. */
 export const aiCatalogSnapshotSchema = z.array(resolvedAiModelSchema).max(1024)
 export type AiCatalogSnapshot = z.infer<typeof aiCatalogSnapshotSchema>
+
+/** Secret-free counts for the Console Integrations page. */
+export interface AiCatalogAvailability {
+  providersWithModels: number
+  providersWithKey: number
+  effectiveDefault: 'credentialed' | 'mock' | 'none'
+  cacheSeconds: number
+}

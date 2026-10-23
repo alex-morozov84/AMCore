@@ -155,6 +155,26 @@ export const operationsConsoleCodeSeams = [
     { occurrences: 3, disposition: 'rewrite', operationKey: 'context-console' }
   ),
   seam(
+    'console.client-messages',
+    'apps/web/src/i18n/route-scoped-namespaces.ts',
+    'owned-block',
+    {
+      start: '// AMCORE_CONSOLE_CLIENT_MESSAGES_START',
+      end: '// AMCORE_CONSOLE_CLIENT_MESSAGES_END',
+    },
+    ['feature-import']
+  ),
+  seam(
+    'console.route-budgets',
+    'scripts/check-route-budgets.mjs',
+    'owned-block',
+    {
+      start: '// AMCORE_CONSOLE_ROUTE_BUDGETS_START',
+      end: '// AMCORE_CONSOLE_ROUTE_BUDGETS_END',
+    },
+    ['feature-import']
+  ),
+  seam(
     'console.context-host-doc',
     'PROJECT_CONTEXT.md',
     'structural-operation',

@@ -209,7 +209,7 @@ entry. Downstream projects may replace page composition, routes, tables, dialogs
 and visual styling, or omit ready UI while retaining headless consumers and typed
 BFF routes. Shared primitives remain available with the Operations Console disabled.
 No headless module imports Console discovery, ready widgets or a shell. Use the
-existing semantic tokens and translation catalogues rather than a second theme.
+existing semantic tokens and translation catalogues rather than a competing theme mechanism.
 
 Search/read identity includes session binding, organization, target, committed
 search and page. Retire stale async success, failure and cleanup when identities
@@ -244,7 +244,8 @@ In Russian, the actions are **Удалить из организации…**, *
 1. On **Members**, find the colleague by name or email. Open their row menu and choose **Remove from organization…**.
 2. Check the organization, name and email. All the person's keys for this organization will be permanently revoked, including expired keys.
 3. Choose **Cancel** to make no request, or **Remove member** to confirm. Rejoining will require new keys.
-4. Read the status above the list. A confirmed success means membership and key revocation committed together.
+4. After deleting another member, the success toast and refreshed list confirm completion. Membership and key revocation committed together.
+   If the refresh fails or the result is unknown, a persistent message above the list provides recovery.
 
 Removing yourself requires the same authority and displays an additional access-loss warning.
 Another member must hold the builtin ADMIN role. A custom role named ADMIN does not qualify.
@@ -328,3 +329,7 @@ It returns the typed acknowledgment envelope. Keep it server-only and supply the
 
 The address above uses default path placement. For the staff-host address or a
 custom alias, see [placement and sessions](placement-and-sessions.md).
+
+For a distinct visual style, change product-owned JSX, CSS and semantic token values.
+See [Your own appearance](adoption.md#your-own-appearance) for portal, contrast and
+state requirements. Headless operations do not require the ready page's visual design.

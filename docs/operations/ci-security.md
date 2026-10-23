@@ -11,6 +11,7 @@ of workflow self-hardening to keep the example forkable.
 | `codeql.yml`                 | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                 | report-only, uploads SARIF           |
 | `dependency-review.yml`      | `pull_request`                          | GitHub Dependency Review                                                                             | blocking on `high+`                  |
 | `security-scans.yml`         | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                        | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                     | `push`, `pull_request`                  | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                     | blocking                             |
 | `ci.yml`                     | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                               | Trivy report-only; boot-smoke blocks |
 | `ci.yml`                     | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
 | `ci.yml`                     | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
@@ -29,6 +30,10 @@ of workflow self-hardening to keep the example forkable.
   for the narrow, documented `allow-ghsas` escape hatch.
 - **gitleaks** blocks newly introduced secrets on `push`/`pull_request`; the
   weekly full-history scan is the backstop for historical drift.
+- **Route bundle budgets** prove that no web page's first-load JavaScript grew
+  past its limit in that build, and that Next measured every page completely. The
+  generated scaffold variants run the same check after their own web build. See
+  [Route bundle budgets](../frontend/bundle-budget.md).
 - **OSV-Scanner** produces repository-level vulnerability SARIF on the weekly
   schedule without blocking routine development.
 - **Trivy** preserves the runner scan and its default scanners/filter policy.

@@ -1,0 +1,71 @@
+/// Latest recorded evidence per scheduled job, written by workers and read by the Console.
+/// One row per registered job id (hard cap enforced at registration). Each outcome kind
+/// (success / partial / failure / skip) is one atomic snapshot keyed by (startedAt, runId): a
+/// snapshot is replaced only by a newer key, so concurrent replicas never mix fields of two runs.
+/// The migration adds CHECK constraints that Prisma 7 cannot express yet (database-features
+/// reference, "CHECK: not yet" in schema and Migrate): each snapshot's startedAt/runId are both
+/// null or both set. Re-check when Prisma ships declarative CHECK support.
+model ScheduledJobSummary {
+  jobId             String    @id @db.VarChar(64)
+  firstRegisteredAt DateTime  @db.Timestamptz(3)
+  lastRegisteredAt  DateTime  @db.Timestamptz(3)
+  configVersion     String    @db.VarChar(64)
+  scheduleTimeZone  String?   @db.VarChar(64)
+  enabled           Boolean
+  disabledReason    String?   @db.VarChar(48)
+  /// Display only: the next planned fire as last reported by a worker.
+  nextFireAt        DateTime? @db.Timestamptz(3)
+  /// Due time of the first success when no success exists under the current config.
+  baselineDueAt     DateTime? @db.Timestamptz(3)
+  droppedEvents     Int       @default(0)
+  recordedAt        DateTime  @db.Timestamptz(3)
+
+  successStartedAt     DateTime? @db.Timestamptz(3)
+  successRunId         String?   @db.Uuid
+  successFinishedAt    DateTime? @db.Timestamptz(3)
+  successDurationMs    Int?
+  successCode          String?   @db.VarChar(48)
+  successSummary       Json?
+  /// Next planned fire after the run that succeeded; the time the next success is required by.
+  successDueAt         DateTime? @db.Timestamptz(3)
+  successConfigVersion String?   @db.VarChar(64)
+
+  partialStartedAt  DateTime? @db.Timestamptz(3)
+  partialRunId      String?   @db.Uuid
+  partialFinishedAt DateTime? @db.Timestamptz(3)
+  partialDurationMs Int?
+  partialCode       String?   @db.VarChar(48)
+  partialSummary    Json?
+
+  failureStartedAt  DateTime? @db.Timestamptz(3)
+  failureRunId      String?   @db.Uuid
+  failureFinishedAt DateTime? @db.Timestamptz(3)
+  failureDurationMs Int?
+  failureCode       String?   @db.VarChar(48)
+  failureSummary    Json?
+
+  skipStartedAt DateTime? @db.Timestamptz(3)
+  skipRunId     String?   @db.Uuid
+  skipReason    String?   @db.VarChar(48)
+
+  @@schema("core")
+  @@map("scheduled_job_summaries")
+}
+
+/// Run history for daily jobs only. Classes: open (outcome null), abandoned (outcome 'unknown',
+/// no finish recorded), terminal (success / partial / failed). Per job at most 3 open, 7 abandoned
+/// and 30 terminal rows; the table holds at most 2560 rows. All writers hold one advisory lock.
+model ScheduledJobRun {
+  runId      String    @id @db.Uuid
+  jobId      String    @db.VarChar(64)
+  startedAt  DateTime  @db.Timestamptz(3)
+  finishedAt DateTime? @db.Timestamptz(3)
+  outcome    String?   @db.VarChar(16)
+  durationMs Int?
+  code       String?   @db.VarChar(48)
+  summary    Json?
+
+  @@index([jobId, startedAt(sort: Desc)])
+  @@schema("core")
+  @@map("scheduled_job_runs")
+}

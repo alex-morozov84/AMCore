@@ -1,5 +1,6 @@
 import { Injectable, Module, type OnModuleInit } from '@nestjs/common'
 
+import { ScheduledJobsModule } from '../schedule/scheduled-jobs.module.js'
 import { SingletonCronRunner } from '../schedule/singleton-cron.runner.js'
 
 import { GeoipModule } from './geoip.module.js'
@@ -15,7 +16,7 @@ class GeoIpBootstrapService implements OnModuleInit {
 
 /** Imported only by the worker/all scheduler; web processes never download. */
 @Module({
-  imports: [GeoipModule],
+  imports: [GeoipModule, ScheduledJobsModule],
   providers: [SingletonCronRunner, GeoIpUpdateService, GeoIpBootstrapService],
 })
 export class GeoipUpdaterModule {}

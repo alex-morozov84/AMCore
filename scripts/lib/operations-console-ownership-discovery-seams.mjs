@@ -73,6 +73,20 @@ export const operationsConsoleDiscoverySeams = [
     { operationKey: 'docs-index-console' }
   ),
   entry(
+    'console.docs-scheduled-jobs',
+    'docs/README.md',
+    { text: '(operations-console/scheduled-jobs.md)' },
+    undefined,
+    { operationKey: 'docs-index-console' }
+  ),
+  entry(
+    'console.docs-integrations',
+    'docs/README.md',
+    { text: '(operations-console/integrations.md)' },
+    undefined,
+    { operationKey: 'docs-index-console' }
+  ),
+  entry(
     'console.docs-api-keys',
     'docs/README.md',
     { text: '(operations-console/api-keys.md)' },

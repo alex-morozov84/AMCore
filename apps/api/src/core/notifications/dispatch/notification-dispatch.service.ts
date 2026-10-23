@@ -6,6 +6,13 @@ import { PinoLogger } from 'nestjs-pino'
 import { WorkReadiness } from '../../../infrastructure/background-work/work-readiness.js'
 import { MetricsService } from '../../../infrastructure/observability/index.js'
 import { QueueName } from '../../../infrastructure/queue/constants/queues.constant.js'
+import {
+  CYCLE_BUSY,
+  CYCLE_NOT_READY,
+  CYCLE_SHUTDOWN,
+  type DispatchCycleResult,
+  type DrainBudget,
+} from '../../../infrastructure/schedule/dispatch-cycle.js'
 import { AttemptRuntime } from '../../../infrastructure/worker-lifecycle/index.js'
 import { PrismaService } from '../../../prisma/index.js'
 import { ChannelDelivererRegistry } from '../channels/channel-deliverer.registry.js'
@@ -106,10 +113,11 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
   }
 
   /** Reclaim expired leases, then drain due deliveries until the backlog is clear. */
-  async runDispatchCycle(): Promise<void> {
-    if (!this.readiness.isReady || this.latch.closed) return
+  async runDispatchCycle(): Promise<DispatchCycleResult> {
+    const unavailable = this.unavailable()
+    if (unavailable) return unavailable
     await this.reapExpiredLeases()
-    await this.drainDueBatches()
+    return this.drainDueBatches()
   }
 
   /** Reclaim crashed/stalled (`PROCESSING`, lease expired) deliveries. */
@@ -136,19 +144,26 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
    * Reserve lanes, drain due rows (one claim per lane, bounded by a shared delivery budget) and
    * resolve when lane WORK is done — never waiting for a still-pending physical call.
    */
-  async drainDueBatches(): Promise<void> {
-    if (!this.readiness.isReady || this.latch.closed) return
+  async drainDueBatches(): Promise<DispatchCycleResult> {
+    const unavailable = this.unavailable()
+    if (unavailable) return unavailable
     const granted = this.gate.reserve(this.gate.capacity)
     if (granted === 0) {
       // Full: a running lane will look once more before it exits (no lost wake).
       this.gate.requestRescan()
-      return
+      return CYCLE_BUSY
     }
-    const budget = { remaining: NOTIFICATION_MAX_DRAIN_DELIVERIES }
+    const budget: DrainBudget = { remaining: NOTIFICATION_MAX_DRAIN_DELIVERIES, errors: 0 }
     await Promise.all(Array.from({ length: granted }, () => this.startLane(budget)))
+    return { status: 'completed', isolatedFailures: budget.errors }
   }
 
-  private startLane(budget: { remaining: number }): Promise<void> {
+  private unavailable(): DispatchCycleResult | null {
+    if (!this.readiness.isReady) return CYCLE_NOT_READY
+    return this.latch.closed ? CYCLE_SHUTDOWN : null
+  }
+
+  private startLane(budget: DrainBudget): Promise<void> {
     const work = this.runLane(budget)
     this.activeLanes.add(work)
     void work.finally(() => this.activeLanes.delete(work))
@@ -156,7 +171,7 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
   }
 
   /** One lane: owns one gate reservation. Never rejects. */
-  private async runLane(budget: { remaining: number }): Promise<void> {
+  private async runLane(budget: DrainBudget): Promise<void> {
     let released = false
     let handedOff = false
     const release = (): void => {
@@ -186,6 +201,7 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
         try {
           await this.processClaim(claim, runtime)
         } catch {
+          budget.errors += 1
           this.logger.error(
             { event: 'notification.lane_failed', deliveryId: claim.id, channel: claim.channel },
             'Notification delivery lane failed (the row recovers via lease expiry)'
@@ -204,6 +220,7 @@ export class NotificationDispatchService implements OnModuleInit, OnModuleDestro
         runtime.attempt.dispose()
       }
     } catch {
+      budget.errors += 1
       this.logger.error({ event: 'notification.lane_failed' }, 'Notification dispatch lane failed')
     } finally {
       // Not handed off to the settlement tracker (which releases later) → release now.

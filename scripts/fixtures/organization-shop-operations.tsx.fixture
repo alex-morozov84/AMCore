@@ -1,0 +1,201 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import type { ProductAccessBootstrap } from '@amcore/shared'
+
+import {
+  type MemberRemovalTarget,
+  type OrganizationAccessController,
+  useOrganizationMembers,
+} from '@/entities/organization-context'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
+import { RouteProgressLink } from '@/shared/ui/route-progress-link'
+import { TabsContent } from '@/shared/ui/tabs'
+
+import { ShopDirectory } from './shop-directory'
+import { ShopDossier, type ShopSection } from './shop-dossier'
+import { ShopKeys } from './shop-keys'
+import { ShopMembership } from './shop-membership'
+import { ShopRoles } from './shop-roles'
+
+import styles from './shop-team.module.css'
+
+export function ShopOperations({
+  admission,
+  controller,
+  allowed,
+  sameSession,
+}: {
+  admission: ProductAccessBootstrap
+  controller: OrganizationAccessController
+  allowed: boolean
+  sameSession: boolean
+}) {
+  const t = useTranslations('productAdminExample')
+  const [query, setQuery] = useState({ page: 1, search: '' })
+  const members = useOrganizationMembers(controller, query)
+  const [target, setTarget] = useState<MemberRemovalTarget>()
+  const [section, setSection] = useState<ShopSection>('roles')
+  const [dirty, setDirty] = useState(false)
+  const [roleLocked, setRoleLocked] = useState(false)
+  const [keyLocked, setKeyLocked] = useState(false)
+  const [removalLocked, setRemovalLocked] = useState(false)
+  const [selfRemoved, setSelfRemoved] = useState(false)
+  const [pending, setPending] = useState<ShopSection | 'back'>()
+  const [revision, setRevision] = useState(0)
+  const lastMember = useRef<string | undefined>(undefined)
+  const locked = roleLocked || keyLocked || removalLocked || members.busy
+  const available = allowed && members.available && !selfRemoved
+  const visible = Boolean(
+    available && target && members.data?.data.some((row) => row.memberId === target.memberId)
+  )
+  function focus(id: string) {
+    requestAnimationFrame(() => document.getElementById(id)?.focus())
+  }
+  function navigate(next: ShopSection | 'back') {
+    if (locked) return
+    if (dirty) {
+      setPending(next)
+      return
+    }
+    proceed(next)
+  }
+  function proceed(next: ShopSection | 'back') {
+    if (next === 'back') {
+      setTarget(undefined)
+      requestAnimationFrame(() => {
+        const row = document.getElementById(`shop-person-${lastMember.current}`)
+        ;(row ?? document.getElementById('shop-directory-heading'))?.focus()
+      })
+    } else {
+      setSection(next)
+      focus(`shop-section-${next}`)
+    }
+  }
+  return (
+    <>
+      {!selfRemoved && <ApiErrorAlert error={members.error} />}
+      {target && available && !visible && !locked && (
+        <Button variant="outline" onClick={() => navigate('back')}>
+          {t('back')}
+        </Button>
+      )}
+      {selfRemoved && sameSession && (
+        <p role="status">
+          {t('selfRemoved')} <RouteProgressLink href="/">{t('home')}</RouteProgressLink>
+        </p>
+      )}
+      {!target && (
+        <ShopDirectory
+          data={members.data}
+          available={available}
+          pending={members.pending}
+          query={query}
+          locked={locked}
+          change={(next) => {
+            if (!locked) setQuery(next)
+          }}
+          choose={(row) => {
+            if (locked) return
+            lastMember.current = row.memberId
+            setTarget({
+              userId: row.user.id,
+              memberId: row.memberId,
+              name: row.user.name,
+              email: row.user.email,
+            })
+            setSection('roles')
+            focus('shop-dossier-heading')
+          }}
+        />
+      )}
+      {target && (
+        <div key={`${target.memberId}:${revision}`} data-testid="shop-dossier">
+          <ShopDossier
+            visible={visible}
+            target={target}
+            section={section}
+            locked={locked || !visible}
+            back={() => navigate('back')}
+            change={navigate}
+          >
+            <TabsContent
+              value="roles"
+              id="shop-section-roles"
+              keepMounted
+              className={styles.workSection}
+            >
+              <ShopRoles
+                controller={controller}
+                target={target}
+                actorId={admission.actor.id}
+                visible={visible && section === 'roles'}
+                sameSession={sameSession}
+                onLock={setRoleLocked}
+                onDirty={setDirty}
+              />
+            </TabsContent>
+            <TabsContent
+              value="keys"
+              id="shop-section-keys"
+              keepMounted
+              className={styles.workSection}
+            >
+              <ShopKeys
+                controller={controller}
+                target={target}
+                visible={visible && section === 'keys'}
+                sameSession={sameSession}
+                onLock={setKeyLocked}
+              />
+            </TabsContent>
+            <TabsContent
+              value="membership"
+              id="shop-section-membership"
+              keepMounted
+              className={styles.workSection}
+            >
+              <ShopMembership
+                controller={controller}
+                target={target}
+                visible={visible && section === 'membership'}
+                sameSession={sameSession}
+                onLock={setRemovalLocked}
+                onAcknowledged={() => {
+                  if (target.userId === admission.actor.id) setSelfRemoved(true)
+                }}
+                onRemoved={() => {
+                  if (target.userId === admission.actor.id) setSelfRemoved(true)
+                  else {
+                    setDirty(false)
+                    proceed('back')
+                  }
+                }}
+              />
+            </TabsContent>
+          </ShopDossier>
+        </div>
+      )}
+      <ConfirmDialog
+        open={pending !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setPending(undefined)
+        }}
+        title={t('discardTitle')}
+        description={t('discardDescription')}
+        confirmLabel={t('discard')}
+        cancelLabel={t('stay')}
+        onConfirm={() => {
+          const next = pending
+          setPending(undefined)
+          setDirty(false)
+          setRevision((value) => value + 1)
+          if (next) proceed(next)
+        }}
+      />
+    </>
+  )
+}

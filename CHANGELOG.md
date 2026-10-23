@@ -7,12 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CI fails a change that pushes any web page's first-load JavaScript over its
+  per-page budget (`pnpm check:route-budgets`, also run in generated scaffold
+  variants). The check fails closed when Next's build measurement is incomplete.
+
+- Product-administration adoption guide with shop, CRM/ERP and SaaS recipes,
+  clean fork initialization and a cosmic custom interface using public headless operations.
+
 ### Changed
 
 - The migration image uses a minimal workspace package and the shared root lock,
   with official pnpm bootstrap and a Node24/Debian Trixie base. The API builder
   updates its whole npm distribution. OS and build-tool findings still require
   separate review; the packaging change does not certify an empty vulnerability inventory.
+
+- Public pages are lighter. The Operations Console's translations reach the
+  browser only on Console pages (login HTML about 46 % smaller in English and
+  50 % in Russian), and the monospace font is no longer preloaded on every page.
+- `@amcore/shared` is emitted module by module and declares `"sideEffects": false`,
+  so each page bundles only the contracts it imports (login JavaScript about 6 %
+  smaller). Shared modules must not run side effects when imported.
+- Audit action labels use keys without dots, which removes next-intl
+  `INVALID_KEY` errors from development logs; the missing label for accepted
+  background-work provider uncertainty was added.
+
+- The custom team example uses an independent crew directory and personnel dossier with separate role, key and membership sections.
+- Alerts support optional internal dismissal with an accessible focus destination. Ordinary successful member removal no longer duplicates its toast with a permanent banner.
 
 - Root workspace installs explicitly enforce the strict 24-hour release-age floor
   and refuse registry packages with unknown publication times.
@@ -30,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with confirmation.
 
 ### Fixed
+
+- Headless administration examples preserve initialized project choices, replace
+  existing mounts and keep unknown results locked until explicit safe recovery.
 
 - Docker E2E runs retain cleanup ownership during the initial source copy and
   replacement allocation, so early interruption no longer loses the allocated stand.
@@ -55,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with shared website login in path mode and independent staff sessions in host
   mode. Login, recovery, invitation links and OAuth callbacks follow the selected
   frontend; inaccessible pages offer safe list, website and logout recovery.
+- The Operations Console has an **Integrations** screen. It lists the outside services the platform uses (email, files, sign-in providers, the queue broker, AI, Telegram) with their setup, the last observation, its age and its scope, and it never starts a check when it is read. **Send test email** sends one fixed message to the operator's own verified address after a confirmation and a recent password check, and reports whether the provider accepted it (a timeout or a reported limit is shown as unknown, never as not sent). Limits: one test per operator per minute, 20 per hour, one at a time. A module registers itself in one composition list to appear on the page: see `docs/backend/integrations.md`. New audit actions `integration.email_test_requested` and `integration.email_test_settled`.
+- The Operations Console has a **Scheduled jobs** screen. Workers now record the result of each periodic job (nightly cleanups, notification retention, the GeoIP update and the recovery passes) in two new tables, and the screen shows each job's schedule, last result and freshness separately, so a job can be "Partly done" and "Overdue" at once. Daily jobs keep at most 30 finished runs per job, none older than 30 days. Add your own job once to the catalogue with `@ScheduledJob`; a test fails if a raw `@Cron` or `@Interval` bypasses it. Recording is best-effort and bounded: a job never waits for the database to start or to finish, a write starts only when the pool has a free connection, and it needs `DATABASE_POOL_MAX` of at least 2. New read-only API: `GET /admin/background-work/scheduled-jobs` and `.../{jobId}/runs`. No new environment variable. See [Scheduled jobs](docs/operations-console/scheduled-jobs.md) and [Scheduled jobs for developers](docs/backend/scheduled-jobs.md).
 - The Operations Console links job, delivery, run and audit request IDs to the log search: **Find in logs** in Background work and Audit opens Grafana with the last 7 days of lines for that ID. It needs the new optional `ADMIN_CONSOLE_LOGS_GRAFANA_URL` (the Grafana of the log-search overlay); without it nothing changes. Audit events now return their `requestId` when it is a well-formed correlation ID. See [Find in logs links](docs/operations-console/configuration.md#find-in-logs-links).
 
 - My API keys settings with personal creation, catalogue scope selection, one-time secret handling, session checks and owner-wide inventory/revocation. Ordinary member issuance remains available through the API and headless hooks.

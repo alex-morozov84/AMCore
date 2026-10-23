@@ -234,6 +234,14 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   hosts or session selection, read
   `docs/product-admin/placement-and-sessions.md`. Source configuration, physical
   routes, generated edge mapping and API/web placement must stay aligned.
+- **Periodic jobs:** declare a timer job once in the scheduled-jobs catalogue and decorate
+  it with `@ScheduledJob`, never a raw `@Cron` or `@Interval` (a test fails otherwise). The
+  task returns an explicit result; a resolved promise is not success. See
+  `docs/backend/scheduled-jobs.md`.
+- **Integration status:** register a module's outside service once in the integrations
+  composition list with a reader that reports stored state, never a provider call, secret or
+  free text; the backend API needs no change. An operator action is a reviewed probe kind with a
+  safe policy, not configuration. See `docs/backend/integrations.md`.
 - **Frontend (web):** Feature-Sliced Design on Next.js App Router — `app/` is
   Next routing plumbing only (thin), application composition lives in `_app/`, page composition lives in `_pages/`,
   `widgets`/`features`/`entities`/`shared` keep canonical FSD meanings.

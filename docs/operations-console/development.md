@@ -239,8 +239,10 @@ reference for a panel that also refreshes itself. Its pieces:
   (`app/api/console/background-work/queues`, guarded by `withConsoleHostGuard()`,
   with no client-supplied path and no token in the response). The handler passes
   the browser's abort on and adds its own deadline.
-- The refresh policy lives in one hook and one pure module
-  (`use-queue-summary.ts`, `queue-poll-policy.ts`). Automatic fetches (interval,
+- The refresh policy lives in one hook per panel and one shared pure module,
+  `shared/lib/console-poll-policy.ts` (`use-queue-summary.ts` here; `use-scheduled-jobs.ts` in
+  `features/console-scheduled-jobs`). Panel-specific rules, such as what counts as a degraded
+  `200`, stay with the panel (`queue-poll-policy.ts`). Automatic fetches (interval,
   focus, reconnect, mount) are allowed by a single rule: auto-refresh on, access
   intact, tab visible, browser online and every cool-down elapsed. Losing that
   admission cancels queued or in-flight automatic work. A manual refresh joins a
@@ -255,10 +257,19 @@ reference for a panel that also refreshes itself. Its pieces:
   reloads an old tab. A live panel uses a plain `GET`, never a Server Action, and
   needs no version check of its own.
 
-Reuse the `use-queue-summary.ts` shape for another live panel. Promote the
-policy to `shared/lib` when a second panel needs it; the storage setting editor
-polls with different rules (fixed 2 seconds only while a saved value is still
-being applied) and does not use it.
+Reuse the `use-scheduled-jobs.ts` shape (one query, the shared policy, its own hook) for another
+live panel; do not copy `useQueueSummary`, which also merges the queue and work reads. The
+storage setting editor polls with different rules (fixed 2 seconds only while a saved value
+is still being applied) and does not use the shared policy.
+
+The Integrations page (`features/console-integrations`) follows the same shape and adds one
+action. Its test flow is `useProbeFlow`: prepare, confirm, step-up when required, send, then
+a result dialog that can be reopened read-only. A response that is lost is recovered by
+polling the receipt route, never by posting again. The page renders any registered
+integration from the API response; do not add per-integration branches to it. To add an
+integration see [Register an integration](../backend/integrations.md). The route handlers
+under `app/api/console/integrations` give the test send a 20 second budget (reads use 5);
+copying the 10 second budget of the storage-setting write would cut off a near-deadline result.
 
 ## Queues and the Background work screen
 

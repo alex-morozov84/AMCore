@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { CSPProvider } from '@base-ui/react/csp-provider'
 
+import { getClientMessages } from '@/i18n/client-messages'
 import { resolveLocaleParam } from '@/i18n/params'
 import { routing } from '@/i18n/routing'
 import { getThemeInitScript } from '@/shared/lib'
@@ -23,9 +24,11 @@ const geistSans = Geist({
   subsets: ['latin', 'cyrillic'],
 })
 
+// Not preloaded: few product screens use monospace, so the font loads when one renders.
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin', 'cyrillic'],
+  preload: false,
 })
 
 type LocaleParams = { locale: string }
@@ -104,9 +107,11 @@ export default async function LocaleLayout({
             today, but adding one later without this wrapper would silently
             violate CSP. See docs/frontend/ CSP guide (Track 3 PR4). */}
         <CSPProvider nonce={nonce}>
-          {/* Rendered from a Server Component, so locale/messages/formats/timeZone
-              are inherited from `i18n/request.ts` — do not pass them by hand. */}
-          <NextIntlClientProvider>
+          {/* Rendered from a Server Component, so locale/formats/timeZone are inherited
+              from `i18n/request.ts` — do not pass them by hand. Messages are passed
+              explicitly: route-scoped namespaces stay out of every page's payload
+              (i18n/client-messages.ts). */}
+          <NextIntlClientProvider messages={await getClientMessages()}>
             {/* Suspense: RouteProgressBar reads useSearchParams(). See
                 docs/frontend/route-progress.md; disabled entirely (no DOM,
                 listeners, or timers) when ROUTE_PROGRESS_ENABLED is false. */}

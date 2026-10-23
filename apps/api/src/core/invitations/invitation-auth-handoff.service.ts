@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 
 import { AuthErrorCode, type RequestPrincipal } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions/index.js'
 import type { InvitationAuthHandoff, Prisma } from '../../generated/prisma/client.js'
+import {
+  errorCode,
+  ScheduledJobExecutor,
+} from '../../infrastructure/schedule/scheduled-job.executor.js'
+import { failed, ScheduledJob, succeeded } from '../../infrastructure/schedule/scheduled-job.js'
+import { INVITATION_HANDOFF_JOB } from '../../infrastructure/schedule/scheduled-jobs.catalogue.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { equalHandoffKey, type InvitationHandoffProof } from './invitation-auth-handoff.js'
@@ -12,7 +17,10 @@ import { invitationClock } from './invitation-locks.js'
 
 @Injectable()
 export class InvitationAuthHandoffService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: ScheduledJobExecutor
+  ) {}
 
   settle(
     proof: InvitationHandoffProof,
@@ -74,8 +82,21 @@ export class InvitationAuthHandoffService {
   }
 
   /** DB-only safety net runs on worker/all; Redis publication is never required. */
-  @Cron(CronExpression.EVERY_MINUTE)
+  @ScheduledJob(INVITATION_HANDOFF_JOB)
   async sweep(): Promise<void> {
+    await this.jobs.run(INVITATION_HANDOFF_JOB, async () => {
+      let committed = 0
+      try {
+        await this.sweepExpired(() => (committed += 1))
+      } catch (error) {
+        // Fail-fast is kept: the next tick continues. Earlier candidates are already committed.
+        return failed(errorCode(error), { counts: { committed }, codes: [] })
+      }
+      return succeeded({ counts: { committed }, codes: [] })
+    })
+  }
+
+  private async sweepExpired(onCommitted: () => void): Promise<void> {
     const expired = await this.prisma.$queryRaw<{ attemptId: string }[]>`
       SELECT "attemptId" FROM core.invitation_auth_handoffs
       WHERE status = 'pending' AND deadline <= clock_timestamp() AT TIME ZONE 'UTC'
@@ -92,6 +113,7 @@ export class InvitationAuthHandoffService {
         },
         { maxWait: 2000, timeout: 4000 }
       )
+      onCommitted()
     }
   }
 

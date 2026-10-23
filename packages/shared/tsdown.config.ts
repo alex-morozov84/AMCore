@@ -9,6 +9,10 @@ export default defineConfig({
   target: 'es2022',
   platform: 'node',
   outDir: 'dist',
+  // One output file per source module, so bundlers (with `sideEffects: false` in
+  // package.json) drop the schemas a route never imports instead of keeping the
+  // whole package in every client bundle.
+  unbundle: true,
   outExtensions: ({ format }) => ({
     js: format === 'cjs' ? '.cjs' : '.js',
     dts: format === 'cjs' ? '.d.cts' : '.d.ts',

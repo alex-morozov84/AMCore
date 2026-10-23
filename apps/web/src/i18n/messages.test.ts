@@ -86,6 +86,21 @@ describe('message catalogues', () => {
     expect(empty).toEqual([])
   })
 
+  // next-intl reads "." in a key as nesting and reports INVALID_KEY on every render.
+  // Data codes such as audit actions use "_" in their keys instead.
+  it.each(SUPPORTED_LOCALES)('%s has no "." inside a message key', (locale) => {
+    const dotted: string[] = []
+    const walk = (value: unknown, prefix: string) => {
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) return
+      for (const [key, child] of Object.entries(value as Catalogue)) {
+        if (key.includes('.')) dotted.push(`${prefix}${key}`)
+        walk(child, `${prefix}${key}/`)
+      }
+    }
+    walk(catalogues[locale], '')
+    expect(dotted).toEqual([])
+  })
+
   it.each(SUPPORTED_LOCALES)('%s supplies every required plural category', (locale) => {
     const required = REQUIRED_PLURAL_CATEGORIES[locale]
     expect(required, `no plural categories declared for ${locale}`).toBeDefined()

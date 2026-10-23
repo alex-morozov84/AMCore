@@ -10,13 +10,30 @@ compiler API tools or declaration generation.
 
 Run `pnpm --filter @amcore/shared build` after changing shared contracts.
 Run `pnpm --filter @amcore/shared dev` to rebuild on source changes.
-Each build cleans `dist` before emitting dual ES2022 Node formats:
+Each build cleans `dist` before emitting dual ES2022 Node formats. The build is
+unbundled: `dist` mirrors `src` module by module.
 
-- ESM: `dist/index.js` and `dist/index.d.ts`.
-- CommonJS: `dist/index.cjs` and `dist/index.d.cts`.
-- JavaScript source maps embed their source content.
+- ESM: `dist/index.js`, `dist/index.d.ts` and one `.js`/`.d.ts` per source module.
+- CommonJS: `dist/index.cjs`, `dist/index.d.cts` and one `.cjs`/`.d.cts` per module.
+- JavaScript source maps embed their source content. The entry files only re-export,
+  so they have no map.
 
 The package retains its existing root export conditions and `files: ["dist"]`.
+
+## Import-time side effects are not allowed
+
+`package.json` declares `"sideEffects": false`. Together with the unbundled output,
+this lets the web bundler drop every shared module a route never imports, instead of
+shipping all schemas to every page. The declaration is a promise about every module:
+
+- A shared module may only declare values: constants, enums, schemas, functions.
+- It must not register anything globally, configure Zod (`z.config`), patch
+  prototypes, read the environment or write anywhere when it is imported.
+- A value computed at import, such as `PRODUCT_ADMIN_CONFIG` validating its JSON,
+  is allowed only when nothing outside the module depends on it having run.
+
+This rule is a review convention, not a lint check. If a module truly needs an
+import-time effect, list that file in `sideEffects` instead of breaking the promise.
 Zod remains an external runtime and declaration dependency. Generated declarations
 preserve inferred schemas; `isolatedDeclarations` is not required.
 Declaration maps are disabled because the package does not ship its source tree.
@@ -36,7 +53,7 @@ Strict NodeNext ESM/CommonJS and Bundler fixtures exercise inferred inputs,
 outputs, union discrimination and generic item types. Expected-invalid fixtures
 must fail type checking. These are representative contracts, not semantic equality
 of every exported type. Both runtime formats exercise the same parsing checks.
-Clean, removed-module, build failure, source maps and watch checks supplement
+Clean, removed-module, mirrored output, build failure, source maps and watch checks supplement
 shared source-level Vitest tests.
 
 API preparation hashes the builder configuration and generated output. Run

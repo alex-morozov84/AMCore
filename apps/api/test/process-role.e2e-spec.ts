@@ -1,8 +1,11 @@
-import { SchedulerRegistry } from '@nestjs/schedule'
+import { DiscoveryService, MetadataScanner } from '@nestjs/core'
+import { ScheduleExplorer, SchedulerRegistry } from '@nestjs/schedule'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import { PinoLogger } from 'nestjs-pino'
+
+import type { ScheduledJobDefinition } from '../src/infrastructure/schedule/scheduled-job'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
 
@@ -26,6 +29,8 @@ let WebModule: Token
 let WorkerModule: Token
 let AdminController: Token
 let AdminQueuesController: Token
+let AdminIntegrationsController: Token
+let IntegrationRegistry: Token
 let QueueObservationService: Token
 let AuthController: Token
 let EmailProcessor: Token
@@ -76,6 +81,8 @@ let AiAssistantAdminService: Token
 let AiArtifactsController: Token
 let AiArtifactUploadService: Token
 let AiArtifactDownloadService: Token
+let SCHEDULED_JOBS: readonly ScheduledJobDefinition[]
+let SCHEDULED_JOB_METADATA: string
 
 const noopPinoLogger = {
   setContext: () => undefined,
@@ -104,6 +111,54 @@ async function compileRole(root: Token): Promise<TestingModule> {
     })
     .compile()
 }
+
+/**
+ * What the real scheduler would register for this graph. It runs Nest's own explorer (the code that
+ * reads @Cron/@Interval from every provider) without mounting any timer, so a job that bypasses the
+ * catalogue, is missing, is registered twice or is present in the wrong role is seen here.
+ */
+function scheduledNames(m: TestingModule): string[] {
+  const explorer = m.get(ScheduleExplorer, { strict: false }) as unknown as {
+    explore(): void
+    schedulerOrchestrator: {
+      cronJobs: Record<string, { options: { cronTime: string; timeZone?: string } }>
+      intervals: Record<string, { timeout: number }>
+      timeouts: Record<string, unknown>
+    }
+  }
+  explorer.explore()
+  const { cronJobs, intervals, timeouts } = explorer.schedulerOrchestrator
+  expect(Object.keys(timeouts)).toEqual([])
+  // What the scheduler holds is exactly what the definition declares (the tick times of each job).
+  for (const job of SCHEDULED_JOBS) {
+    if (job.schedule.kind === 'cron') {
+      expect(cronJobs[job.id]?.options.cronTime).toBe(job.schedule.expression)
+      expect(cronJobs[job.id]?.options.timeZone).toBe(job.schedule.timeZone ?? undefined)
+    } else expect(intervals[job.id]?.timeout).toBe(job.schedule.everyMs)
+  }
+  return [...Object.keys(cronJobs), ...Object.keys(intervals)].sort()
+}
+
+/** Methods carrying a scheduler decorator but not the catalogue tag: a bypass of @ScheduledJob. */
+function untaggedSchedulerMethods(m: TestingModule): string[] {
+  const discovery = m.get(DiscoveryService, { strict: false })
+  const scanner = m.get(MetadataScanner, { strict: false })
+  const offenders: string[] = []
+  for (const wrapper of [...discovery.getControllers(), ...discovery.getProviders()]) {
+    const proto = wrapper.instance && Object.getPrototypeOf(wrapper.instance)
+    if (!proto) continue
+    for (const name of scanner.getAllMethodNames(proto)) {
+      const method = proto[name]
+      if (
+        Reflect.getMetadata('SCHEDULER_TYPE', method) !== undefined &&
+        Reflect.getMetadata(SCHEDULED_JOB_METADATA, method) === undefined
+      )
+        offenders.push(`${proto.constructor.name}.${name}`)
+    }
+  }
+  return offenders
+}
+const catalogueIds = (): string[] => SCHEDULED_JOBS.map((job) => job.id).sort()
 
 const present = (m: TestingModule, token: Token): void =>
   expect(() => m.get(token, { strict: false })).not.toThrow()
@@ -140,6 +195,9 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const observability = await import('../src/infrastructure/observability')
     const queue = await import('../src/infrastructure/queue')
     const adminQueuesController = await import('../src/core/admin/admin-queues.controller')
+    const adminIntegrationsController =
+      await import('../src/core/admin/admin-integrations.controller')
+    const integrationRegistry = await import('../src/core/admin/integrations/integration-registry')
     const tgController =
       await import('../src/core/notifications/channels/telegram/telegram.controller')
     const tgWebhookController =
@@ -185,6 +243,10 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     const aiArtifactDownloadService =
       await import('../src/core/ai/artifacts/ai-artifact-download.service')
 
+    const jobs = await import('../src/infrastructure/schedule/scheduled-jobs.catalogue')
+    const jobDecorator = await import('../src/infrastructure/schedule/scheduled-job')
+    SCHEDULED_JOBS = jobs.SCHEDULED_JOBS
+    SCHEDULED_JOB_METADATA = jobDecorator.SCHEDULED_JOB_METADATA
     AppModule = appModule.AppModule
     WebModule = webModule.WebModule
     WorkerModule = workerModule.WorkerModule
@@ -202,6 +264,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     QueueService = queue.QueueService
     QueueObservationService = queue.QueueObservationService
     AdminQueuesController = adminQueuesController.AdminQueuesController
+    AdminIntegrationsController = adminIntegrationsController.AdminIntegrationsController
+    IntegrationRegistry = integrationRegistry.IntegrationRegistry
     TelegramController = tgController.TelegramController
     TelegramWebhookController = tgWebhookController.TelegramWebhookController
     TelegramChannelDeliverer = tgDeliverer.TelegramChannelDeliverer
@@ -260,6 +324,13 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('observes queues read-only and serves the Console summary (no worker needed)', () => {
       present(m, QueueObservationService)
       present(m, AdminQueuesController)
+      present(m, AdminIntegrationsController)
+      present(m, IntegrationRegistry)
+    })
+
+    it('has no scheduler explorer and no scheduler-decorated method outside the catalogue', () => {
+      absent(m, ScheduleExplorer)
+      expect(untaggedSchedulerMethods(m)).toEqual([])
     })
 
     it('has NO BullMQ worker and NO scheduler (so @Cron never fires)', () => {
@@ -340,6 +411,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await m?.close()
     })
 
+    it('registers exactly the catalogue with the scheduler: each job once, nothing else', () => {
+      expect(scheduledNames(m)).toEqual(catalogueIds())
+      expect(untaggedSchedulerMethods(m)).toEqual([])
+    })
+
     it('has the BullMQ processor and the scheduler', () => {
       present(m, EmailProcessor)
       present(m, NotificationDispatchProcessor)
@@ -357,6 +433,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       absent(m, AuthController)
       absent(m, AdminController)
       absent(m, AdminQueuesController)
+      absent(m, AdminIntegrationsController)
+      absent(m, IntegrationRegistry)
     })
 
     it('keeps the shared queue inventory/observation provider with the core queue module', () => {
@@ -423,6 +501,11 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await m?.close()
     })
 
+    it('registers exactly the catalogue with the scheduler: each job once, nothing else', () => {
+      expect(scheduledNames(m)).toEqual(catalogueIds())
+      expect(untaggedSchedulerMethods(m)).toEqual([])
+    })
+
     it('composes web + worker: controllers, producer, processor, and scheduler', () => {
       present(m, AuthController)
       present(m, AdminController)
@@ -434,6 +517,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, SchedulerRegistry)
       present(m, QueueObservationService)
       present(m, AdminQueuesController)
+      present(m, AdminIntegrationsController)
+      present(m, IntegrationRegistry)
     })
 
     it('composes the realtime publisher, subscriber, hub, and stream route', () => {

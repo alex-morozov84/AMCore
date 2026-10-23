@@ -3,6 +3,11 @@ import type {
   AdminQueuesResponse,
   AdminSessionsListResponse,
   AdminUserResponse,
+  IntegrationsResponse,
+  ProbePreparation,
+  ProbeReceipt,
+  ScheduledJobsResponse,
+  ScheduledRunsResponse,
   StorageProbeSettingResponse,
   StorageProbeSettingUpdate,
   SupportedLocale,
@@ -83,6 +88,38 @@ export const consoleApi = {
   /** Live refresh of Background work; the signal cancels the browser request on unmount. */
   getBackgroundWorkQueues: (signal?: AbortSignal): Promise<AdminQueuesResponse> =>
     apiClient.get(getConsolePublicApiPath('/background-work/queues'), { signal }),
+  /** Live refresh of Scheduled jobs; the signal cancels the browser request on unmount. */
+  getScheduledJobs: (signal?: AbortSignal): Promise<ScheduledJobsResponse> =>
+    apiClient.get(getConsolePublicApiPath('/scheduled-jobs'), { signal }),
+  getScheduledJobRuns: (jobId: string, signal?: AbortSignal): Promise<ScheduledRunsResponse> =>
+    apiClient.get(getConsolePublicApiPath(`/scheduled-jobs/${encodeURIComponent(jobId)}/runs`), {
+      signal,
+    }),
+  /** Live refresh of Integrations; reads stored state only and never starts a check. */
+  getIntegrations: (signal?: AbortSignal): Promise<IntegrationsResponse> =>
+    apiClient.get(getConsolePublicApiPath('/integrations'), { signal }),
+  /** Issues a single-use attempt id and the masked recipient. Nothing is sent. */
+  prepareIntegrationProbe: (id: string): Promise<ProbePreparation> =>
+    apiClient.post(
+      getConsolePublicApiPath(`/integrations/${encodeURIComponent(id)}/probe/prepare`)
+    ),
+  /** Runs the prepared test. The same id replays the stored attempt and never sends again. */
+  runIntegrationProbe: (id: string, attemptId: string): Promise<ProbeReceipt> =>
+    apiClient.post(getConsolePublicApiPath(`/integrations/${encodeURIComponent(id)}/probe`), {
+      attemptId,
+    }),
+  /** Read-only recovery of the operator's own attempt after a timeout or a reload. */
+  getIntegrationProbeReceipt: (
+    id: string,
+    attemptId: string,
+    signal?: AbortSignal
+  ): Promise<ProbeReceipt> =>
+    apiClient.get(
+      getConsolePublicApiPath(
+        `/integrations/${encodeURIComponent(id)}/probe/${encodeURIComponent(attemptId)}`
+      ),
+      { signal }
+    ),
   getStorageProbeSetting: (): Promise<StorageProbeSettingResponse> =>
     apiClient.get(getConsolePublicApiPath('/runtime-settings/storage-probe')),
   updateStorageProbeSetting: (

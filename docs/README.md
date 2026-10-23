@@ -27,6 +27,7 @@ find for something, that page is under-documented; please open an issue.
 
 ## Find the right guide
 
+[Add product administration to your product](product-admin/adoption.md) — shop, CRM/ERP and SaaS recipes, initialization and your own interface.
 [Create a company or prepare its first administrator](product-admin/organization-establishment.md) — policies, Console/CLI/API setup and recovery.
 [Create an organization and invite its administrator](product-admin/organization-provisioning.md) — Console, protected API, mail readiness and recovery.
 
@@ -41,6 +42,8 @@ find for something, that page is under-documented; please open an issue.
 | Build or verify shared package distribution                                              | [`backend/shared-package-build.md`](backend/shared-package-build.md)                                                                    |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                                    |
 | Register background work, an idempotent handler or a database-owned control adapter      | [`backend/background-work.md`](backend/background-work.md)                                                                              |
+| Add a periodic (cron/interval) job that shows its result in the Console                  | [`backend/scheduled-jobs.md`](backend/scheduled-jobs.md)                                                                                |
+| Register an outside service in the backend status API                                    | [`backend/integrations.md`](backend/integrations.md)                                                                                    |
 | Add a route/page on the frontend the AMCore way                                          | [`frontend/architecture-and-conventions.md`](frontend/architecture-and-conventions.md#the-recipe--adding-a-route)                       |
 | Add local or URL-backed frontend search                                                  | [`frontend/search/README.md`](frontend/search/README.md)                                                                                |
 | Know which import/styling rules are enforced                                             | [`frontend/fsd-boundaries-and-guardrails.md`](frontend/fsd-boundaries-and-guardrails.md)                                                |
@@ -52,8 +55,10 @@ find for something, that page is under-documented; please open an issue.
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                        |
 | Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                          |
 | Diagnose and safely control background work (or open the read-only queue board)          | [`operations-console/background-work.md`](operations-console/background-work.md), [`queue-board.md`](operations-console/queue-board.md) |
+| Check that nightly cleanups, the GeoIP update and recovery passes keep running           | [`operations-console/scheduled-jobs.md`](operations-console/scheduled-jobs.md)                                                          |
+| See which outside services are set up, and send a test email to yourself                 | [`operations-console/integrations.md`](operations-console/integrations.md)                                                              |
 | Use, configure, deploy, or safely extend Operations Console                              | [`operations-console/`](operations-console/README.md)                                                                                   |
-| Check or update the frontend bundle baseline                                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                                |
+| Check or update the per-route frontend bundle budgets                                    | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                                |
 | Add a navigating Link / programmatic navigation, or configure the route-progress bar     | [`frontend/route-progress.md`](frontend/route-progress.md)                                                                              |
 | Add an environment variable                                                              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)                     |
 | Add an external service / infra dependency                                               | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)       |
@@ -146,9 +151,9 @@ provide an operator interface for admin session management.
 - **[Storybook](frontend/storybook.md)** — the `shared/ui`/feature-flow
   component workshop: decorators, story conventions, the accessibility
   gate, and the CLI-safety/`optimizeDeps.include` procedures.
-- **[Bundle baseline and budget](frontend/bundle-budget.md)** — the
-  per-route client bundle size methodology, the current baseline, the
-  non-vacuity proof, and why CI enforcement is deferred.
+- **[Route bundle budgets](frontend/bundle-budget.md)** — the CI check
+  that limits each page's first-load JavaScript, how to investigate a
+  failure and how to change a limit.
 - **[Top route progress bar](frontend/route-progress.md)** — the global
   navigation-progress indicator: what starts/finishes it, the
   `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,

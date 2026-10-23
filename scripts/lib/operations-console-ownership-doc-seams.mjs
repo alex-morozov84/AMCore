@@ -16,6 +16,39 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
   entry(
+    'console.integrations-email-guide',
+    'docs/email/README.md',
+    section('## Check that the provider accepts mail', '## Guides'),
+    ['../operations-console/integrations.md']
+  ),
+  entry(
+    'console.integrations-extension-intro',
+    'docs/backend/integrations.md',
+    block(
+      'With the optional [Operations Console](../operations-console/integrations.md), the',
+      'Add its display text to the message catalogues as described in step 3.'
+    ),
+    ['../operations-console/integrations.md'],
+    { operationKey: 'console.integrations-extension-guide' }
+  ),
+  entry(
+    'console.integrations-extension-copy',
+    'docs/backend/integrations.md',
+    section('3. **Add copy.**', 'The configured backend imports the composition list at startup;'),
+    ['apps/web/messages', 'console.integrations'],
+    { operationKey: 'console.integrations-extension-guide' }
+  ),
+  entry(
+    'console.integrations-extension-runbook',
+    'docs/backend/integrations.md',
+    block(
+      'The state of a probe attempt, its limits and its retention are described for operators in',
+      '[Integrations](../operations-console/integrations.md#send-a-test-email).'
+    ),
+    ['../operations-console/integrations.md'],
+    { operationKey: 'console.integrations-extension-guide' }
+  ),
+  entry(
     'console.member-key-lifecycle-controls',
     'docs/operations/api-key-lifecycle.md',
     { text: 'See [Console API keys](../operations-console/api-keys.md) for operator controls.' },
@@ -206,6 +239,15 @@ export const operationsConsoleDocSeams = [
       'The optional Operations Console supplies this override through',
       "(ADR-081's host/path session split)."
     )
+  ),
+  entry(
+    'console.route-budgets-doc',
+    'docs/frontend/bundle-budget.md',
+    block(
+      '<!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START -->',
+      '<!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_END -->'
+    ),
+    ['AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START']
   ),
   entry(
     'console.query-state-doc',

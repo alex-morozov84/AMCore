@@ -14,6 +14,7 @@ import { AiCatalogCache } from './ai-catalog-cache.js'
 import { AiCatalogLoad } from './ai-catalog-load.js'
 import type { AiExecutionDescriptor } from './ai-execution-descriptor.js'
 import {
+  type AiCatalogAvailability,
   type AiCatalogSnapshot,
   aiCatalogSnapshotSchema,
   type ResolvedAiModel,
@@ -89,6 +90,33 @@ export class AiModelRegistry {
   /** Whether a resolved model's provider has a usable credential (mock is always available). */
   hasCredential(model: ResolvedAiModel): boolean {
     return this.credentials.hasCredential(model.provider.type, model.provider.credentialSlot)
+  }
+
+  /**
+   * Secret-free availability for the Console: counts only, from the cached enabled-model snapshot
+   * (bounded by `AI_CATALOG_CACHE_TTL_SECONDS`). A provider counts when it has at least one enabled,
+   * schema-valid model. This is configuration, never a credential check against the provider.
+   */
+  async describeAvailability(signal?: AbortSignal): Promise<AiCatalogAvailability> {
+    const snapshot = await this.getSnapshot(signal)
+    const providers = new Map<string, { requiresKey: boolean; hasKey: boolean }>()
+    for (const model of snapshot) {
+      const entry = providers.get(model.provider.id) ?? {
+        requiresKey: this.credentials.requiresCredential(model.provider.type),
+        hasKey: false,
+      }
+      entry.hasKey ||= this.hasCredential(model)
+      providers.set(model.provider.id, entry)
+    }
+    const keyed = [...providers.values()].filter((entry) => entry.requiresKey && entry.hasKey)
+    const credentialedDefault = snapshot.some((model) => model.isDefault && this.hasCredential(model))
+    const hasMock = snapshot.some((model) => model.provider.type === AiProviderType.MOCK)
+    return {
+      providersWithModels: providers.size,
+      providersWithKey: keyed.length,
+      effectiveDefault: credentialedDefault ? 'credentialed' : hasMock ? 'mock' : 'none',
+      cacheSeconds: this.env.get('AI_CATALOG_CACHE_TTL_SECONDS'),
+    }
   }
 
   /** Primary-PG permission read. Cached enabled state is never execution authority. */

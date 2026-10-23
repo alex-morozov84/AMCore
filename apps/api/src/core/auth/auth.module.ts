@@ -117,6 +117,7 @@ import { UserCacheService } from './user-cache.service.js'
     EmailIdentityService,
     OrgAclVersionService,
     OrganizationContextResolver,
+    OAuthProviderFactory,
   ],
 })
 export class AuthModule {}

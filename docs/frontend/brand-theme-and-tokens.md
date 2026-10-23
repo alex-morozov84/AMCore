@@ -309,6 +309,12 @@ current commands yet, and it will not be exposed as a mandatory separate
 `init:finalize` step. `PROJECT_CONTEXT.md` remains the boundary that prevents
 the AMCore upstream checkout from being finalized accidentally.
 
+For a complete product-administration setup, see the
+[adoption guide](../product-admin/adoption.md). Commit brand initialization before
+applying project choices. Install changed manifests and complete deferred checks
+before adding custom consumers. The cosmic example changes product-owned semantic
+token values while preserving theme persistence, font mapping and chart tokens.
+
 ### Project scaffolding
 
 `pnpm init:project` is the separate, one-time sibling command for

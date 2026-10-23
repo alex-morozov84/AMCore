@@ -231,6 +231,8 @@ const specs: Record<AuditAction, MetadataSpec> = {
     beforeRevision: true,
     afterRevision: true,
   },
+  'integration.email_test_requested': { provider: aiCode },
+  'integration.email_test_settled': { provider: aiCode, outcome: aiCode, class: aiCode },
   'admin.cleanup.executed': { counts: cleanupCounts },
   'admin.user.session_revoked': { sessionId: true, count: true },
   'admin.user.sessions_revoked': { count: true, reason: true },

@@ -4,6 +4,7 @@ import { InvitationAuthorityModule } from '../../core/invitations/invitation-aut
 import { PrismaModule } from '../../prisma/index.js'
 
 import { CleanupService } from './cleanup.service.js'
+import { ScheduledJobsModule } from './scheduled-jobs.module.js'
 import { SingletonCronRunner } from './singleton-cron.runner.js'
 
 /**
@@ -14,7 +15,7 @@ import { SingletonCronRunner } from './singleton-cron.runner.js'
  * `NestScheduleModule.forRoot()`) is present — i.e. worker/all, never `web`.
  */
 @Module({
-  imports: [PrismaModule, InvitationAuthorityModule],
+  imports: [PrismaModule, InvitationAuthorityModule, ScheduledJobsModule],
   providers: [SingletonCronRunner, CleanupService],
   exports: [CleanupService, SingletonCronRunner],
 })

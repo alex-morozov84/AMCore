@@ -126,6 +126,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/shared/ui/section-error-boundary.test.tsx',
   'apps/web/src/shared/ui/role-checklist.test.tsx',
   'apps/web/src/shared/ui/role-checklist.stories.tsx',
+  'apps/web/src/shared/ui/alert.stories.tsx',
   'apps/web/src/features/auth-oauth/ui/OAuthErrorAlert.test.tsx',
   'apps/web/src/shared/lib/zod-error-map.test.tsx',
   'apps/web/src/shared/ui/api-error-alert.test.tsx',

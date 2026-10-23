@@ -1,11 +1,19 @@
 import { Injectable, Optional } from '@nestjs/common'
-import { Interval } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
 import { lockControlBudget } from '../../infrastructure/background-work/control-budget-store.js'
 import { CONTROL_LIMITS } from '../../infrastructure/background-work/control-limits.js'
 import { backgroundControlTransaction } from '../../infrastructure/background-work/control-transaction.js'
 import { ProviderEvidenceStore } from '../../infrastructure/background-work/provider-evidence.store.js'
+import { ScheduledJobExecutor } from '../../infrastructure/schedule/scheduled-job.executor.js'
+import {
+  failed,
+  ScheduledJob,
+  type ScheduledJobResult,
+  skippedFor,
+  succeeded,
+} from '../../infrastructure/schedule/scheduled-job.js'
+import { BACKGROUND_CONTROL_JOB } from '../../infrastructure/schedule/scheduled-jobs.catalogue.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { BackgroundCommandSettlement } from './background-command-settlement.js'
@@ -19,12 +27,18 @@ export class BackgroundControlMaintenance {
     private readonly prisma: PrismaService,
     private readonly settlement: BackgroundCommandSettlement,
     private readonly logger: PinoLogger,
+    private readonly jobs: ScheduledJobExecutor,
     @Optional() private readonly evidence?: ProviderEvidenceStore
   ) {}
 
-  @Interval(CONTROL_LIMITS.maintenance.intervalMs)
+  @ScheduledJob(BACKGROUND_CONTROL_JOB)
   async tick(): Promise<void> {
-    if (this.running) return
+    await this.jobs.run(BACKGROUND_CONTROL_JOB, () => this.runTick())
+  }
+
+  /** `busy`: the previous tick is still running in this process. Anything else deferred is failed. */
+  private async runTick(): Promise<ScheduledJobResult> {
+    if (this.running) return skippedFor('busy')
     this.running = true
     const until = performance.now() + CONTROL_LIMITS.maintenance.transactionMs
     try {
@@ -190,12 +204,14 @@ export class BackgroundControlMaintenance {
         )
         if (!changed) break
       }
+      return succeeded()
     } catch {
       // No retry loop or Redis dispatch. The next fixed tick observes durable state again.
       this.logger.warn(
         { code: 'BACKGROUND_CONTROL_MAINTENANCE_DEFERRED' },
         'Background control expiration deferred; pending receipts remain visible'
       )
+      return failed('maintenance_deferred')
     } finally {
       this.running = false
     }

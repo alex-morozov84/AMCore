@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 import { PinoLogger } from 'nestjs-pino'
 
 import { Prisma } from '../../generated/prisma/client.js'
-import { SingletonCronRunner } from '../../infrastructure/schedule/singleton-cron.runner.js'
+import { ScheduledJobExecutor } from '../../infrastructure/schedule/scheduled-job.executor.js'
+import { ScheduledJob } from '../../infrastructure/schedule/scheduled-job.js'
+import { bucketOutcome } from '../../infrastructure/schedule/scheduled-job-outcome.js'
+import { NOTIFICATION_RETENTION_JOB } from '../../infrastructure/schedule/scheduled-jobs.catalogue.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { lockRetentionChildren, protectsNotification } from './notification-retention-locks.js'
@@ -33,12 +35,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const RETENTION_BATCH_LIMIT = 500
 const RETENTION_MAX_CYCLES = 200
 
-// Distributed-lock key + generous TTL (mirrors CleanupService): the daily cron fires on
-// every replica, only the lock-winner sweeps; the TTL outlives a slow sweep yet expires
-// on a crash. A missed run self-repairs next night (ADR-052 §10), so SingletonCronRunner's
-// fail-closed-on-lock-failure is acceptable here (unlike the recovery poller).
-const RETENTION_LOCK_KEY = 'amcore:notifications:retention:lock'
-const RETENTION_LOCK_TTL_MS = 30 * 60 * 1000
+// The distributed lock (key + generous TTL, mirrors CleanupService) is in
+// `NOTIFICATION_RETENTION_JOB`: the daily cron fires on every replica, only the lock-winner
+// sweeps; the TTL outlives a slow sweep yet expires on a crash. A missed run self-repairs next
+// night (ADR-052 §10), so the fail-closed-on-lock-failure runner is acceptable here (unlike the
+// recovery poller).
 
 /** Buckets swept by retention; also the identifiers used in `failures`. */
 export type RetentionBucket =
@@ -74,25 +75,24 @@ export interface NotificationRetentionResult {
 export class NotificationRetentionService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly singletonCron: SingletonCronRunner,
+    private readonly jobs: ScheduledJobExecutor,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(NotificationRetentionService.name)
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  @ScheduledJob(NOTIFICATION_RETENTION_JOB)
   async scheduledRetention(): Promise<void> {
-    // One replica sweeps; the rest skip. A skipped run self-repairs next night.
-    await this.singletonCron.run(
-      { name: 'notification.retention', lockKey: RETENTION_LOCK_KEY, ttlMs: RETENTION_LOCK_TTL_MS },
-      async () => {
-        const result = await this.runRetention()
-        this.logger.info(
-          { event: 'notification.retention_complete', ...result },
-          'Notification retention complete'
-        )
-      }
-    )
+    // One replica sweeps (lock in `NOTIFICATION_RETENTION_JOB`); the rest skip. A skipped run
+    // self-repairs next night.
+    await this.jobs.run(NOTIFICATION_RETENTION_JOB, async () => {
+      const result = await this.runRetention()
+      this.logger.info(
+        { event: 'notification.retention_complete', ...result },
+        'Notification retention complete'
+      )
+      return bucketOutcome(result)
+    })
   }
 
   /**

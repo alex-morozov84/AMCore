@@ -91,6 +91,8 @@
           "docs/product-admin/organization-establishment.md",
           "docs/product-admin/organization-provisioning.md",
           "docs/product-admin/organization-administration.md",
+          "docs/backend/integrations.md",
+          "docs/email/README.md",
           "docs/auth/README.md",
           "docs/auth/csrf.md",
           "docs/auth/rbac.md",
@@ -99,6 +101,7 @@
           "docs/frontend/api-consumption.md",
           "docs/frontend/architecture-and-conventions.md",
           "docs/frontend/brand-theme-and-tokens.md",
+          "docs/frontend/bundle-budget.md",
           "docs/frontend/route-progress.md",
           "docs/frontend/server-rendered-resilience.md",
           "docs/frontend/shared-ui-and-shadcn.md",
@@ -213,6 +216,7 @@
           "scripts/e2e-ci.mjs",
           "scripts/e2e-ci-plan.mjs",
           "scripts/product-admin-e2e-plan.mjs",
+          "scripts/check-route-budgets.mjs",
           "docs/operations/local-stands.md"
         ]
       },

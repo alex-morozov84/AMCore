@@ -60,6 +60,17 @@ redact initial query tokens in ingress logs; see
 New product emails are not queueable by default. Classify each email before
 adding code.
 
+## Check that the provider accepts mail
+
+A `SUPER_ADMIN` can send one fixed test message to their own verified address from the
+Console [Integrations](../operations-console/integrations.md#send-a-test-email) page. The
+message carries no link and no user content. A successful result means the provider
+accepted a direct send from the API server. It does not prove inbox delivery, and it does
+not exercise the queue, the worker or the invitation templates. A timeout or a reported
+provider limit is shown as unknown, never as "not sent". The result is stored in Redis
+(attempt 24 hours, latest result 7 days) and is hidden when the provider, key or sender
+changes. The Console shows only closed codes, never the provider's own error text.
+
 ## Guides
 
 - [Templates](./templates.md) — add React Email templates, data types, subjects, i18n, and tests.

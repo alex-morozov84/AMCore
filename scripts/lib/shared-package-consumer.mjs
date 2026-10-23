@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { cpSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { cpSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 
@@ -87,17 +87,26 @@ function verifyRuntime(consumer, expectedValues) {
   if (expectedValues) assert.deepEqual(JSON.parse(common), expectedValues)
 }
 
+// The build mirrors source modules. Entry barrels only re-export, so they carry no map.
+const ENTRY_BARRELS = new Set(['index.js', 'index.cjs'])
+
 export function verifyMaps(packageRoot) {
-  for (const name of ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts']) {
-    const content = readFileSync(join(packageRoot, 'dist', name), 'utf8')
+  const dist = join(packageRoot, 'dist')
+  const files = readdirSync(dist, { recursive: true }).filter((name) =>
+    /\.(?:js|cjs|d\.ts|d\.cts)$/.test(name)
+  )
+  for (const name of ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts'])
+    assert.equal(files.includes(name), true, `missing dist/${name}`)
+  for (const name of files) {
+    const content = readFileSync(join(dist, name), 'utf8')
     assert.equal(content.length > 0, true)
-    if (name.endsWith('.ts') || name.endsWith('.cts')) {
+    if (name.endsWith('.ts') || name.endsWith('.cts') || ENTRY_BARRELS.has(name)) {
       assert.equal(content.includes('sourceMappingURL='), false)
       continue
     }
     const url = content.match(/sourceMappingURL=(.+)/)?.[1].trim()
-    assert.equal(url, `${name}.map`)
-    const map = JSON.parse(readFileSync(join(packageRoot, 'dist', url)))
+    assert.equal(url, `${basename(name)}.map`, `dist/${name} map URL`)
+    const map = JSON.parse(readFileSync(join(dist, dirname(name), url)))
     assert.equal(map.sources.length > 0, true)
     assert.equal(map.sources.length, map.sourcesContent.length)
     assert.equal(
@@ -106,7 +115,9 @@ export function verifyMaps(packageRoot) {
           (typeof source === 'string' && source.length > 0) ||
           // Rolldown's JSON loader emits this source without embedded content.
           // Keep the exception exact; every TypeScript source still needs content.
-          (source === '' && map.sources[index] === '../src/config/product-admin.json')
+          (source === '' &&
+            name.startsWith('config/product-admin.') &&
+            map.sources[index] === '../../src/config/product-admin.json')
       ),
       true
     )

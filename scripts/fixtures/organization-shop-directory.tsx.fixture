@@ -1,0 +1,101 @@
+'use client'
+
+import { useState } from 'react'
+import { useTranslations } from 'next-intl'
+import type { OrganizationMembersResponse } from '@amcore/shared'
+
+import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
+import { PaginationButtons } from '@/shared/ui/pagination'
+import { Skeleton } from '@/shared/ui/skeleton'
+
+import styles from './shop-team.module.css'
+
+type Row = OrganizationMembersResponse['data'][number]
+export function ShopDirectory({
+  data,
+  available,
+  pending,
+  query,
+  locked,
+  choose,
+  change,
+}: {
+  data?: OrganizationMembersResponse
+  available: boolean
+  pending: boolean
+  query: { page: number; search: string }
+  locked: boolean
+  choose: (member: Row) => void
+  change: (query: { page: number; search: string }) => void
+}) {
+  const t = useTranslations('productAdminExample')
+  const [search, setSearch] = useState(query.search)
+  return (
+    <section aria-busy={pending} data-testid="shop-directory">
+      <div className={styles.directoryHeading}>
+        <h1 id="shop-directory-heading" tabIndex={-1}>
+          {t('directory')}
+        </h1>
+      </div>
+      <form
+        className={styles.search}
+        onSubmit={(event) => {
+          event.preventDefault()
+          change({ page: 1, search })
+        }}
+      >
+        <Input
+          aria-label={t('search')}
+          value={search}
+          disabled={locked}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t('search')}
+        />
+        <Button type="submit" disabled={locked}>
+          {t('find')}
+        </Button>
+      </form>
+      {pending && <Skeleton className="h-52 w-full" />}
+      {available && !data?.data.length && <p className={styles.empty}>{t('emptyDirectory')}</p>}
+      {available && (
+        <ul className={styles.directory}>
+          {data?.data.map((member) => (
+            <li key={member.memberId}>
+              <button
+                type="button"
+                id={`shop-person-${member.memberId}`}
+                className={styles.personTile}
+                disabled={locked}
+                onClick={() => choose(member)}
+              >
+                <span className={styles.seal} aria-hidden="true">
+                  {(member.user.name ?? member.user.email).slice(0, 2).toLocaleUpperCase()}
+                </span>
+                <span className={styles.personName}>{member.user.name ?? member.user.email}</span>
+                <span className={styles.email}>{member.user.email}</span>
+                <span className={styles.rolePreview}>
+                  {member.rolesPreview.map((role) => role.name).join(' / ') || t('noRoles')}
+                </span>
+                <span className={styles.openDossier}>
+                  {t('openDossier')} <span aria-hidden="true">↗</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {available && data && (
+        <PaginationButtons
+          page={query.page}
+          onPageChange={(page) => change({ ...query, page })}
+          total={data.total}
+          pageSize={20}
+          isFetching={pending || locked}
+          previousLabel={t('previous')}
+          nextLabel={t('next')}
+        />
+      )}
+    </section>
+  )
+}

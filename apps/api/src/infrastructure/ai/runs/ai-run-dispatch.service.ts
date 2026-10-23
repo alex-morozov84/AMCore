@@ -4,6 +4,13 @@ import { PinoLogger } from 'nestjs-pino'
 import { PrismaService } from '../../../prisma/index.js'
 import { WorkReadiness } from '../../background-work/work-readiness.js'
 import {
+  CYCLE_BUSY,
+  CYCLE_NOT_READY,
+  CYCLE_SHUTDOWN,
+  type DispatchCycleResult,
+  type DrainBudget,
+} from '../../schedule/dispatch-cycle.js'
+import {
   AttemptRuntime,
   type CapacityGate,
   CUTOFF,
@@ -86,15 +93,29 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Recovery pass: reclaim crashed leases, sweep overdue queued runs, then drain the backlog. */
-  async runDispatchCycle(): Promise<void> {
-    if (!this.readiness.isReady || this.latch.closed) return
-    await this.reap()
-    await this.drainDueBatches()
+  async runDispatchCycle(): Promise<DispatchCycleResult> {
+    const unavailable = this.unavailable()
+    if (unavailable) return unavailable
+    const degraded = await this.reap()
+    const drained = await this.drainDueBatches()
+    // A degraded diagnosis is an isolated failure of an otherwise completed pass.
+    return drained.status === 'completed'
+      ? { ...drained, isolatedFailures: drained.isolatedFailures + (degraded ? 1 : 0) }
+      : drained
   }
 
-  /** Reclaim expired leases, expire overdue never-run queued runs and fail runs whose history is full. */
-  async reap(): Promise<void> {
-    if (!this.readiness.isReady || this.latch.closed) return
+  private unavailable(): DispatchCycleResult | null {
+    if (!this.readiness.isReady) return CYCLE_NOT_READY
+    return this.latch.closed ? CYCLE_SHUTDOWN : null
+  }
+
+  /**
+   * Reclaim expired leases, expire overdue never-run queued runs and fail runs whose history is full.
+   * Resolves `true` when the independent queued-restriction diagnosis was unavailable.
+   */
+  async reap(): Promise<boolean> {
+    if (!this.readiness.isReady || this.latch.closed) return false
+    let diagnosisDegraded = false
     // Each sweep is its own latch-bounded operation: once the dispatcher is closed or sealed no LATER sweep
     // starts (an outer wrapper would release the waiter on seal but let the callback keep issuing queries).
     let rescheduled = 0
@@ -105,8 +126,8 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
     if (reaped !== CUTOFF) {
       ;({ rescheduled, failed } = reaped)
       if (!this.latch.closed) {
-        await this.diagnoseQueuedRestrictions()
-        if (!this.readiness.isReady || this.latch.closed) return
+        diagnosisDegraded = !(await this.diagnoseQueuedRestrictions())
+        if (!this.readiness.isReady || this.latch.closed) return diagnosisDegraded
         const overdue = await this.latch.run(() => this.repository.expireDeadlinedRuns())
         if (overdue !== CUTOFF) {
           expired = overdue
@@ -123,12 +144,17 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
         'Reclaimed expired AI run leases and swept overdue/over-attempted runs'
       )
     }
+    return diagnosisDegraded
   }
 
-  /** Diagnosis is an independent capability; failure must not disable healthy main-client recovery. */
-  private async diagnoseQueuedRestrictions(): Promise<void> {
+  /**
+   * Diagnosis is an independent capability; failure must not disable healthy main-client recovery.
+   * Resolves `false` when the diagnosis was unavailable.
+   */
+  private async diagnoseQueuedRestrictions(): Promise<boolean> {
     try {
       await this.latch.run(() => this.repository.diagnoseQueuedRestrictions())
+      return true
     } catch {
       // Do not serialize database errors or reset the diagnosis runner's physical token/quarantine.
       if (!this.latch.closed)
@@ -136,6 +162,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
           { event: 'ai.run.diagnosis_unavailable' },
           'AI queued restriction diagnosis unavailable; ordinary recovery continues'
         )
+      return false
     }
   }
 
@@ -143,19 +170,21 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
    * Reserve lanes, drain due runs (one claim per lane, bounded by a shared run budget) and resolve when
    * lane WORK is done — never waiting for a still-pending physical call.
    */
-  async drainDueBatches(): Promise<void> {
-    if (!this.readiness.isReady || this.latch.closed) return
+  async drainDueBatches(): Promise<DispatchCycleResult> {
+    const unavailable = this.unavailable()
+    if (unavailable) return unavailable
     const granted = this.gate.reserve(this.gate.capacity)
     if (granted === 0) {
       // Full: a running lane will look once more before it exits (no lost wake).
       this.gate.requestRescan()
-      return
+      return CYCLE_BUSY
     }
-    const budget = { remaining: AI_RUN_MAX_DRAIN_CYCLES * this.gate.capacity }
+    const budget: DrainBudget = { remaining: AI_RUN_MAX_DRAIN_CYCLES * this.gate.capacity, errors: 0 }
     await Promise.all(Array.from({ length: granted }, () => this.startLane(budget)))
+    return { status: 'completed', isolatedFailures: budget.errors }
   }
 
-  private startLane(budget: { remaining: number }): Promise<void> {
+  private startLane(budget: DrainBudget): Promise<void> {
     const work = this.runLane(budget)
     this.activeLanes.add(work)
     void work.finally(() => this.activeLanes.delete(work))
@@ -163,7 +192,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** One lane: owns one gate reservation. Never rejects. */
-  private async runLane(budget: { remaining: number }): Promise<void> {
+  private async runLane(budget: DrainBudget): Promise<void> {
     let released = false
     let handedOff = false
     const release = (): void => {
@@ -195,6 +224,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
           // settles (the physical call keeps its slot via the runtime; the run recovers by lease expiry).
           await this.latch.run(() => this.executor.execute(claim, runtime))
         } catch {
+          budget.errors += 1
           this.logger.error(
             { event: 'ai.run.lane_failed', runId: claim.id },
             'AI run lane failed (the run recovers via lease expiry)'
@@ -213,6 +243,7 @@ export class AiRunDispatchService implements OnModuleInit, OnModuleDestroy {
         runtime.attempt.dispose()
       }
     } catch {
+      budget.errors += 1
       this.logger.error({ event: 'ai.run.lane_failed' }, 'AI run dispatch lane failed')
     } finally {
       // Not handed off to the settlement tracker (which releases later) → release now.

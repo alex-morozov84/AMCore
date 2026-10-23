@@ -1,4 +1,4 @@
-import { NextIntlClientProvider } from 'next-intl'
+import { createTranslator, NextIntlClientProvider } from 'next-intl'
 import type { CapabilityCatalogueResponse } from '@amcore/shared'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { fireEvent, render, screen, within } from '@testing-library/react'
@@ -9,6 +9,7 @@ import { CapabilityEditor } from './capability-editor'
 type Capability = CapabilityCatalogueResponse['capabilities'][number]
 const messages = (await import(`../../../../messages/${DEFAULT_LOCALE}.json`)).default
 const t = messages.organizationRoles
+const say = createTranslator({ locale: DEFAULT_LOCALE, messages, namespace: 'organizationRoles' })
 
 /** Ten areas of ten capabilities, none of which has copy: they render by id. */
 const catalogue: Capability[] = Array.from({ length: 100 }, (_, index) => ({
@@ -35,12 +36,16 @@ describe('CapabilityEditor with a large catalogue', () => {
   it('collapses areas, opens the one with a configured level and counts them', () => {
     view(['area3.op35:own'])
     const areas = screen
-      .getAllByText(/^\d+ of \d+ configured$/)
+      .getAllByText((text) =>
+        [0, 1].some((configured) => text === say('areaConfigured', { configured, total: 10 }))
+      )
       .map((node) => node.closest('details')!)
     expect(areas).toHaveLength(10)
     expect(areas.filter((details) => details.open)).toHaveLength(1)
     expect(areas[3]!.open).toBe(true)
-    expect(within(areas[3]!).getByText(new RegExp('^1 of 10'))).toBeInTheDocument()
+    expect(
+      within(areas[3]!).getByText(say('areaConfigured', { configured: 1, total: 10 }))
+    ).toBeInTheDocument()
   })
 
   it('searches across areas, opens every match and can be cleared', () => {
@@ -68,7 +73,7 @@ describe('CapabilityEditor with a large catalogue', () => {
     const onToggle = vi.fn()
     view(['area0.op0:own'], onToggle)
     const group = document.querySelector<HTMLElement>('div[role="group"]')!
-    fireEvent.click(within(group).getByRole('checkbox', { name: 'All' }))
+    fireEvent.click(within(group).getByRole('checkbox', { name: t.levels.all }))
     expect(onToggle).toHaveBeenCalledWith('area0.op0', 'all')
   })
 })
