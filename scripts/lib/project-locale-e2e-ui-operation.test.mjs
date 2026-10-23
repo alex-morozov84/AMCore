@@ -60,6 +60,32 @@ test('EN is byte-identical and RU has only concrete selected-catalogue expectati
   assert.deepEqual(e2eUiResiduals('ru', outputs('ru')), [])
 })
 
+test('RU confirmation row selectors match both actual action labels and exclude access changes', () => {
+  const pathname = 'apps/web/e2e/console-real-stack/login-diagnostics.ts'
+  const model = parseStructuralModel(pathname, outputs('ru').get(pathname))
+  const { references } = e2eUiExpectationInventory(
+    model,
+    ['consoleUsers', 'loginDiagnostics'],
+    'ru'
+  )
+  const actions = JSON.parse(source('apps/web/messages/ru.json')).console.audit.actions
+  for (const english of ['/Fresh authentication (failed|succeeded)/', '/Fresh authentication/']) {
+    const reference = references.find(({ replacement }) => replacement === english)
+    assert.ok(reference, english)
+    const literal = reference.node.getText()
+    const end = literal.lastIndexOf('/')
+    const selector = new RegExp(literal.slice(1, end), literal.slice(end + 1))
+    for (const action of ['auth.step_up_failed', 'auth.step_up_succeeded'])
+      assert.ok(selector.test(actions[action]), `${english}: ${action}`)
+    for (const action of [
+      'admin.user.system_role_changed',
+      'admin.user.session_revoked',
+      'admin.user.sessions_revoked',
+    ])
+      assert.equal(selector.test(actions[action]), false, `${english}: ${action}`)
+  }
+})
+
 test('RU keeps technical strings and test semantics outside localized selectors', () => {
   const projected = outputs('ru')
   // Logout moved into the shared helper, so this spec carries no localized selector and is not a

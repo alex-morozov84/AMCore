@@ -115,7 +115,10 @@ export const E2E_UI_PROFILES = Object.freeze({
     ["'Password confirmations'", "'Подтверждения пароля'"],
     ["'Audit'", "'Аудит'"],
     ['/Fresh authentication failed/', '/Ошибка повторного подтверждения/'],
-    ['/Fresh authentication (failed|succeeded)/', '/(?:Ошибка|Успешное) повторного подтверждения/'],
+    [
+      '/Fresh authentication (failed|succeeded)/',
+      '/(?:Ошибка повторного подтверждения|Успешное повторное подтверждение)/',
+    ],
     ['/User system role changed/', '/Изменение системной роли/'],
     ["'Recorded security events'", "'Записанные события безопасности'"],
     ["'Access changes'", "'Изменения доступа'"],
@@ -123,7 +126,7 @@ export const E2E_UI_PROFILES = Object.freeze({
       '/User system role changed|User sessions? revoked/',
       '/Изменение системной роли|Отзыв сесси[ий] пользователя/',
     ],
-    ['/Fresh authentication/', '/повторного подтверждения/'],
+    ['/Fresh authentication/', '/повторно(?:го подтверждения|е подтверждение)/'],
     ["'Back to Users'", "'Вернуться к пользователям'"],
   ],
   storageSetting: [
