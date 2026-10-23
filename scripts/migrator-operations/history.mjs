@@ -106,7 +106,7 @@ export async function upgrade(f) {
       from: f.migrations.length - 1,
       to: f.migrations.length,
       dataPreserved: true,
-      newDefaultVerified: true,
+      preservedDefaultsVerified: true,
     })
   })
 }

@@ -95,3 +95,23 @@ test('product-admin and lifecycle Console seams select full generated verificati
   }
   assert.equal(affected('docs/product-admin/integration.md'), false)
 })
+
+test('migration proof entrypoints and modules select full generated verification', () => {
+  const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
+    .split('\0')
+    .filter((file) =>
+      /^scripts\/(?:(?:verify|cleanup)-migrator-[^/]+\.mjs|migrator-(?:preparation|lifecycle|operations|controls|application)\/)/.test(
+        file
+      )
+    )
+  assert.ok(files.length > 0)
+  for (const pathname of files) {
+    const matched = declaration.inputs.filter((input) => entryMatches(input, pathname))
+    assert.ok(
+      matched.some(
+        (input) => input.graph === 'generated-verification' && input.lane === 'generated-full'
+      ),
+      `${pathname} needs explicit migration proof coverage`
+    )
+  }
+})

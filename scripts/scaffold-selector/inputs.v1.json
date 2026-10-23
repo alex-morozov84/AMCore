@@ -166,12 +166,35 @@
           "scripts/lint.mjs",
           "scripts/migrator-contract.mjs",
           "scripts/scan-migrator-image.mjs",
+          "scripts/verify-migrator-preparation.mjs",
+          "scripts/verify-migrator-lifecycle.mjs",
+          "scripts/verify-migrator-operations.mjs",
+          "scripts/verify-migrator-controls.mjs",
+          "scripts/verify-migrator-application.mjs",
+          "scripts/cleanup-migrator-lifecycle.mjs",
           "turbo.json"
         ]
       },
       "statuses": ["A", "M", "D", "R"],
       "lane": "generated-full",
       "rationale": "Dependency, runtime, and repository toolchain changes can invalidate generated output."
+    },
+    {
+      "id": "verification.migrator-proofs",
+      "graph": "generated-verification",
+      "matcher": {
+        "kind": "root",
+        "patterns": [
+          "scripts/migrator-preparation",
+          "scripts/migrator-lifecycle",
+          "scripts/migrator-operations",
+          "scripts/migrator-controls",
+          "scripts/migrator-application"
+        ]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Migration preparation and runtime proofs must survive every generated project topology."
     },
     {
       "id": "verification.runtime-topology",
