@@ -90,6 +90,12 @@ export function rewriteMessageSuite(model, locale, ctx) {
     'empty-message',
     ctx
   )
+  simplifyCatalogueTest(
+    model,
+    titledTest(model, suite, '%s has no "." inside a message key', ctx),
+    'dotted-key',
+    ctx
+  )
   const plural = titledTest(model, suite, '%s supplies every required plural category', ctx)
   simplifyCatalogueTest(model, plural, 'plural-message', ctx)
   const required = findUniqueNode(
