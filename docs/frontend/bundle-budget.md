@@ -36,26 +36,54 @@ ok   app:/login            996123 /     1045930  gzip 315762
 OVER app:/register        1074315 /     1045930  gzip 339108
 ```
 
-The header names the source commit (with `(dirty)` for uncommitted changes), the
-lockfile hash, the build ID and the stats file hash. Use them to tell which build a
-report describes; the check itself cannot prove the build matches the source.
+The header names the source commit as it is when the check runs (with `(dirty)`
+for uncommitted changes), the lockfile hash, the build ID and the stats file hash.
+Use them to identify a saved report. They cannot show that the build is stale:
+the check never compares the build with the source. A pass proves the current
+source only when the web build ran first in the same checkout. After a source
+change, build again before you run the check.
 
 ## When a page is over budget
 
-1. Find what grew. Run `pnpm exec next analyze --output --snapshot before` on the
-   base branch and `--snapshot after` on yours from `apps/web`, then compare
-   `pnpm exec next analyze export --snapshot <name> --route '/[locale]/login'`.
-   The export is JSON Lines with each module's size and import chain.
+1. Find what grew. `next analyze` runs its own analysis build of the current
+   checkout and saves a named snapshot under `.next/diagnostics/analyze`. A later
+   `next build` keeps it. In `apps/web`, run:
+
+   ```bash
+   # with the base branch checked out and installed
+   pnpm exec next analyze --output --snapshot before
+   # with your branch checked out and installed
+   pnpm exec next analyze --output --snapshot after
+   pnpm exec next analyze export --snapshot before --route '/[locale]/login' > before.jsonl
+   pnpm exec next analyze export --snapshot after --route '/[locale]/login' > after.jsonl
+   ```
+
+   Each export line is one JSON record. Compare the `size` of the records per
+   `source_path` in the two files to find the new or larger modules. To see why a
+   module is included, run `pnpm exec next analyze` without `--output`: it serves
+   a browser view with each module's import chain.
+
 2. Prefer removing the cost: import a smaller module, move work to a Server
    Component, or load an independent feature lazily.
 3. If the growth is intended, raise the limit in the budget file in the same pull
-   request and say why in its description.
+   request and say why in its description. The budget file has no per-row
+   comments, so the pull request description is the record of the reason.
 
 ## Budget files
 
-Rows live in `apps/web/route-budgets.json`. A feature that owns a closed directory
-can keep its rows in its own `route-budgets.json` there: the check reads every
-`apps/web/src/**/route-budgets.json` as well.
+Rows live in `apps/web/route-budgets.json`, product administration rows included.
+A feature that owns a closed directory can keep its rows in its own
+`route-budgets.json` there: the check reads every
+`apps/web/src/**/route-budgets.json` as well. Every file has this shape:
+
+```json
+{
+  "routes": {
+    "app:/login": 1045930,
+    "app:/_not-found": "report-only"
+  }
+}
+```
 
 A row key is `scope:/path`. The check removes the `[locale]` segment, so one key
 serves multi- and single-locale projects. A scope claims the pages under its
@@ -78,15 +106,21 @@ have a byte limit.
 <!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_END -->
 
 To set a limit, take the page's current bytes from the check output and add
-5 % or 15 KiB (15,360 bytes), whichever is larger. Lowering a limit after an
-optimization keeps the gain; record that choice in the pull request too.
+5 % or 15 KiB (15,360 bytes), whichever is larger, rounded up to a whole byte:
+`996123` bytes give `1045930`. A new page has no row yet, so the check fails with
+`has no budget row`. It still prints the page's bytes, with `none` as the limit.
+Add the row with the computed limit and run the check again.
+
+Lowering a limit after an optimization keeps the gain. Say so in the pull request
+description, as for a raised limit.
 
 ## What else fails the check
 
 The stats file is an internal Next diagnostic, and Next skips missing chunk files
 silently when it sums a row. The check therefore also fails when:
 
-- the stats file, the route manifest or the build ID is missing or malformed;
+- the stats file or the route manifest is missing or is not valid JSON;
+- the `BUILD_ID` file is missing or empty;
 - the installed Next version is not one whose stats format was verified;
 - a page in `app-path-routes-manifest.json` is missing from the stats, or the
   stats list a route the manifest does not (Route Handlers and Next's own
@@ -99,9 +133,20 @@ silently when it sums a row. The check therefore also fails when:
 
 ## Upgrading Next
 
-`scripts/lib/route-budget-inputs.mjs` lists the Next versions whose stats format
-was checked (`SUPPORTED_NEXT`). After an upgrade the check stops with an
-unsupported-version message. Read the installed
-`node_modules/next/dist/build/route-bundle-stats.js`, confirm the row fields and
-the excluded routes in `filterAndSortList` have not changed, then widen the
-pattern. Run `node --test scripts/lib/route-budgets.test.mjs` afterwards.
+`SUPPORTED_NEXT` in `scripts/lib/route-budget-inputs.mjs` is a regular expression
+for the Next versions whose stats format was checked, for example
+`/^16\.4\.\d+$/`. After an upgrade the check stops with an unsupported-version
+message.
+
+1. Read the installed `apps/web/node_modules/next/dist/build/route-bundle-stats.js`.
+   Confirm that the row fields (`route`, `firstLoadUncompressedJsBytes`,
+   `firstLoadChunkPaths`) and the routes `filterAndSortList` leaves out have not
+   changed.
+2. If they are unchanged, widen `SUPPORTED_NEXT` to the new version.
+3. If they changed, update the readers in `route-budget-inputs.mjs` and the fixture
+   in `scripts/lib/route-budgets-fixture.mjs` to the new format first.
+4. In `scripts/lib/route-budgets.test.mjs`, the unsupported-version test writes a
+   version that must stay outside the pattern. Change it if the new pattern now
+   accepts it.
+5. Run `node --test scripts/lib/route-budgets.test.mjs`, then build the web app and
+   run `pnpm check:route-budgets`.
