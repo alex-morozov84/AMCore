@@ -14,12 +14,7 @@ export async function inspectLoginDiagnostics(
   list.searchParams.set('sortBy', 'createdAt')
   await page.goto(list.href)
   await expect(page.getByLabel(/search users/i)).toHaveValue(email)
-  const payloads: Array<Promise<string>> = []
   const authHeaders: string[] = []
-  page.on('response', (response) => {
-    if (new URL(response.url()).pathname.endsWith(`/users/${id}`))
-      payloads.push(response.text().catch(() => ''))
-  })
   page.on('request', (request) => {
     if (request.headers().authorization) authHeaders.push(request.url())
   })
@@ -42,7 +37,16 @@ export async function inspectLoginDiagnostics(
   const detail = page.url()
   const html = await page.request.get(detail)
   expect(html.ok()).toBe(true)
-  payloads.push(html.text())
+  const htmlBody = await html.text()
+  expect(htmlBody).not.toContain(canary)
+  expect(htmlBody).not.toMatch(/passwordHash|providerAccountId|accessToken|refreshToken/)
+  const rsc = await page.request.get(detail, { headers: { RSC: '1' } })
+  expect(rsc.ok()).toBe(true)
+  expect(rsc.headers()['content-type']).toContain('text/x-component')
+  const rscBody = await rsc.text()
+  expect(rscBody).toContain(email)
+  expect(rscBody).not.toContain(canary)
+  expect(rscBody).not.toMatch(/passwordHash|providerAccountId|accessToken|refreshToken/)
   const confirmations = main.getByRole('link', { name: 'Password confirmations', exact: true })
   await confirmations.focus()
   await expect(confirmations).toBeFocused()
@@ -89,9 +93,5 @@ export async function inspectLoginDiagnostics(
     true
   )
   await expectNoAxeViolations(page)
-  const bodies = await Promise.all(payloads)
-  expect(bodies.length).toBeGreaterThanOrEqual(2)
-  expect(bodies.join('\n')).not.toContain(canary)
-  expect(bodies.join('\n')).not.toMatch(/passwordHash|providerAccountId|accessToken|refreshToken/)
   expect(authHeaders).toEqual([])
 }
