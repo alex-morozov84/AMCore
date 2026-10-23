@@ -50,9 +50,9 @@ change, build again before you run the check.
    `next build` keeps it. In `apps/web`, run:
 
    ```bash
-   # with the base branch checked out and installed
+   # base branch checked out, then: pnpm install
    pnpm exec next analyze --output --snapshot before
-   # with your branch checked out and installed
+   # your branch checked out, then: pnpm install
    pnpm exec next analyze --output --snapshot after
    pnpm exec next analyze export --snapshot before --route '/[locale]/login' > before.jsonl
    pnpm exec next analyze export --snapshot after --route '/[locale]/login' > after.jsonl
@@ -67,7 +67,8 @@ change, build again before you run the check.
    Component, or load an independent feature lazily.
 3. If the growth is intended, raise the limit in the budget file in the same pull
    request and say why in its description. The budget file has no per-row
-   comments, so the pull request description is the record of the reason.
+   comments, so the pull request description is the record of the reason. The
+   reviewer decides whether the reason justifies the growth or asks for step 2.
 
 ## Budget files
 
@@ -80,7 +81,7 @@ A feature that owns a closed directory can keep its rows in its own
 {
   "routes": {
     "app:/login": 1045930,
-    "app:/_not-found": "report-only"
+    "product-admin:/organizations": 1620216
   }
 }
 ```
@@ -92,7 +93,9 @@ physical route prefix; `product-admin` uses the alias from
 example `/[locale]/manage/organizations` is `product-admin:/organizations`.
 
 A value is a positive byte limit or `"report-only"` (measured and checked, but
-without a limit). These pages must have a byte limit: `app:/`, `app:/login`,
+without a limit). Give every page a byte limit; all current rows have one. Use
+`"report-only"` only when you decide not to limit a page yet, and say why in the
+pull request. These pages must have a byte limit: `app:/`, `app:/login`,
 `app:/register`, `app:/settings/sessions` and `product-admin:/organizations`.
 
 <!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START -->
@@ -106,8 +109,8 @@ have a byte limit.
 <!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_END -->
 
 To set a limit, take the page's current bytes from the check output and add
-5 % or 15 KiB (15,360 bytes), whichever is larger, rounded up to a whole byte:
-`996123` bytes give `1045930`. A new page has no row yet, so the check fails with
+5 % of those bytes or 15 KiB (15,360 bytes), whichever is larger. Round the
+result up to a whole byte: `996123` bytes give `1045930`. A new page has no row yet, so the check fails with
 `has no budget row`. It still prints the page's bytes, with `none` as the limit.
 Add the row with the computed limit and run the check again.
 
@@ -139,14 +142,15 @@ for the Next versions whose stats format was checked, for example
 message.
 
 1. Read the installed `apps/web/node_modules/next/dist/build/route-bundle-stats.js`.
-   Confirm that the row fields (`route`, `firstLoadUncompressedJsBytes`,
-   `firstLoadChunkPaths`) and the routes `filterAndSortList` leaves out have not
-   changed.
-2. If they are unchanged, widen `SUPPORTED_NEXT` to the new version.
+   Confirm that a row still has the fields `route`, `firstLoadUncompressedJsBytes`
+   and `firstLoadChunkPaths`. Confirm that `filterAndSortList` still leaves out
+   exactly the routes in `STATS_EXCLUDED_ROUTES` in `route-budget-inputs.mjs`.
+2. If they are unchanged, widen `SUPPORTED_NEXT` by the verified minor version
+   only, for example `/^16\.(4|5)\.\d+$/`. Do not accept versions nobody checked.
 3. If they changed, update the readers in `route-budget-inputs.mjs` and the fixture
    in `scripts/lib/route-budgets-fixture.mjs` to the new format first.
 4. In `scripts/lib/route-budgets.test.mjs`, the unsupported-version test writes a
-   version that must stay outside the pattern. Change it if the new pattern now
-   accepts it.
+   version that must stay outside the pattern. If the new pattern accepts it,
+   change it to the next minor version that nobody has checked.
 5. Run `node --test scripts/lib/route-budgets.test.mjs`, then build the web app and
    run `pnpm check:route-budgets`.
