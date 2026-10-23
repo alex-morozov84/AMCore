@@ -40,7 +40,10 @@ export async function inspectLoginDiagnostics(
   const htmlBody = await html.text()
   expect(htmlBody).not.toContain(canary)
   expect(htmlBody).not.toMatch(/passwordHash|providerAccountId|accessToken|refreshToken/)
-  const rsc = await page.request.get(detail, { headers: { RSC: '1' } })
+  const rscUrl = new URL(detail)
+  // With no router variation headers, Next expects an empty cache-busting value.
+  rscUrl.searchParams.set('_rsc', '')
+  const rsc = await page.request.get(rscUrl.href, { headers: { RSC: '1' }, maxRedirects: 0 })
   expect(rsc.ok()).toBe(true)
   expect(rsc.headers()['content-type']).toContain('text/x-component')
   const rscBody = await rsc.text()
