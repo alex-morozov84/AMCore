@@ -236,7 +236,14 @@ Verify the expected application schema/table/sequence owners, runtime DML and
 sequence use, denied DDL/TRUNCATE/SET ROLE, migration ledger/checksums and selected
 business rows against your backup evidence. A restored table count is insufficient.
 Check future-object default privileges as well as existing grants. Fix any gap
-before traffic resumes. The [migration operations test](migrator-image.md#verify-roles-tls-history-and-recovery)
+before traffic resumes. On this isolated target, create a uniquely named disposable
+table with a generated sequence as the migrator role in each application schema.
+Without object-specific grants, connect as runtime and verify inserts, reads and
+sequence use; verify the same DDL/TRUNCATE/SET ROLE denials. Remove the probes as
+the migrator after inspection. Never run these probes on the production target.
+Unknown provider-specific restore permissions require capability verification on
+the isolated target; do not infer them from `CREATEROLE` alone.
+The [migration operations test](migrator-image.md#verify-roles-tls-history-and-recovery)
 exercises this contract on its own synthetic data; it does not read or certify
 your archive. Managed PITR and WAL restores need the equivalent provider-specific drill.
 

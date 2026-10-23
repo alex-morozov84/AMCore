@@ -44,6 +44,9 @@ Use the default command for deploy. For status, override only the command
 arguments with `./node_modules/.bin/prisma migrate status`; Kubernetes uses
 `args`, leaving `command` unset. An orchestrator's ordinary init option does
 not replace this image contract. Signal exits remain failures.
+For resolve, the same rule gives `args: ["./node_modules/.bin/prisma", "migrate",
+"resolve", "--rolled-back", "<failed-migration-name>"]`. Choose the resolve flag
+only after the [rollback inspection](deployment.md#rollback).
 
 Only the image's Prisma configuration adds the PostgreSQL startup option
 `client_connection_check_interval=50ms`. It preserves the API configuration's
@@ -157,6 +160,8 @@ promoted digest + migration URL + network + trusted CA
 
 Require exit zero before running deploy against that endpoint. This is an explicit
 operator preflight; the image does not run it automatically before each command.
+The bundled SQL requires the effective value to equal `50ms`; otherwise it raises
+an error and the CLI must exit nonzero. Exit zero is the acceptance criterion.
 Unknown, denied, ignored or zero settings do not satisfy this prerequisite.
 If the image, selected endpoint/URL, credential, CA or configuration changes,
 repeat the preflight for that exact combination. A failed check stops rollout;
@@ -182,6 +187,8 @@ Docker prepares the package in a separate Node24/Trixie stage. It copies the
 complete `/opt/pnpm` from the official glibc pnpm image, pinned by version and
 index digest. The directory includes node-gyp; copying only its executable is
 insufficient. The package-manager version must match root `packageManager`.
+This bootstrap supplies pnpm itself; it is separate from installing the selected
+package's dependencies.
 See [pnpm's Docker guidance](https://pnpm.io/docker).
 
 Preparation installs only the selected package with frozen resolutions and
@@ -369,6 +376,8 @@ foreign resources. CI uses a fixed runner-temporary journal path and an independ
 cleanup step, including when the verification process cannot handle a stop signal.
 Missing journals require no cleanup. A cleanup error remains a failed check;
 it cannot turn the original lifecycle failure into a pass.
+Diagnose the retained failure before repeating its affected check. Valid,
+unchanged results need no repetition; forced disposal never satisfies natural exit.
 
 ### Verify roles, TLS, history and recovery
 
@@ -438,6 +447,46 @@ Record image IDs, architecture, source revision and structured run IDs without
 credentials. Successful disposal deletes fixture databases, keys and journals.
 The full dependency inventory, frozen preparation repeats, application rollout
 and required CI remain separate verification gates.
+
+### Verify application rollout after a packaging change
+
+Use the development checkout's frozen dependencies, Docker Compose, OpenSSL and
+`flock` on the host. Load four images matching the native engine architecture:
+the candidate migrator, previous API runner, candidate API runner and Redis8.
+The example names them `amcore-migrator`, `amcore-api-previous`,
+`amcore-api-current` and `redis:8-alpine`; substitute your local image names or IDs.
+If `flock` is absent or an image has the wrong architecture, stop and provision
+the required tool or native image before running the fixture.
+For this packaging comparison, build both API images from the same application
+code and migration history as the checkout. Build the candidate pair together.
+
+Choose an existing private, writable directory outside the checkout. Set new
+absolute journal and lock paths there. Run the **whole** fixture under one lock:
+
+```sh
+export AMCORE_MIGRATOR_LIFECYCLE_JOURNAL=/absolute/private/path/application.json
+export AMCORE_MIGRATOR_RELEASE_LOCK=/absolute/private/path/release.lock
+flock "$AMCORE_MIGRATOR_RELEASE_LOCK" node scripts/verify-migrator-application.mjs \
+  amcore-migrator amcore-api-previous amcore-api-current redis:8-alpine
+# Run only after the fixture exits zero:
+flock --nonblock "$AMCORE_MIGRATOR_RELEASE_LOCK" true
+```
+
+The fixture creates isolated PostgreSQL/Redis resources and generated credentials.
+It uses no checkout database URL, publishes no application port and sends no
+external email. Require exit zero from both commands, failure/success migration
+gate receipts and `application-matrix` with four combinations. Each previous/new
+API producer must leave a queued job that the selected previous/new worker
+completes after replacement. Login must retain the same user. Competing release
+commands must remain blocked before migration and before rollout.
+
+On failure, retain the original error and stop. After the fixture process has
+stopped, recover its journal with `scripts/cleanup-migrator-lifecycle.mjs` as
+described above. Successful cleanup does not make the application check pass.
+Run this proof separately on native ARM64 and AMD64. Its mock provider, current
+schema and single-host lock do not prove external delivery, arbitrary future
+breaking migrations or a distributed release coordinator. Production still
+needs endpoint preflight and coordination around the entire release.
 
 ## Security reports and remaining risk
 
