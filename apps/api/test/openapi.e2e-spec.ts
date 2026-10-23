@@ -9,6 +9,7 @@ import { addQueueBoardOperation, buildApiDocument } from '../src/swagger.config'
 import type { E2ETestContext } from './helpers'
 import { setupE2ETest, teardownE2ETest } from './helpers'
 import { assertInvitationSchemaContracts } from './openapi-invitation-contracts'
+import { assertLoginDiagnosticsContract } from './openapi-login-diagnostics'
 
 /**
  * Arc C — OpenAPI success-surface completeness (ADR-050).
@@ -1022,6 +1023,10 @@ describe('OpenAPI success surface (e2e)', () => {
     }
 
     expect(violations).toEqual([])
+  })
+
+  it('documents safe detail-only login diagnostics with bearer-only admission', () => {
+    assertLoginDiagnosticsContract(document)
   })
 
   it('documents both admin detail searches and their guarded response contract', () => {

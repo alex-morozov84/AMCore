@@ -1,3 +1,4 @@
+import { adminAuditQuerySchema } from '@amcore/shared'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
@@ -11,6 +12,7 @@ import {
   getConsoleQueueBoardHref,
   getConsoleScheduledJobsHref,
   getConsoleUserDetailHref,
+  getConsoleUserSecurityHrefs,
   getConsoleUsersHref,
   parseConsoleReturnHref,
 } from './console-public-href'
@@ -170,4 +172,44 @@ describe('queue board address', () => {
     expect(getConsoleQueueBoardBasePath()).toBe('/api/bull-board')
     expect(getConsoleQueueBoardHref()).toBe('/api/bull-board')
   })
+})
+
+describe('recorded security views', () => {
+  it.each(['path', 'host'] as const)(
+    'binds exact actions and identity to the same 31-day interval in %s mode',
+    (mode) => {
+      mutableConfig.mode = mode
+      mutableConfig.slug = 'operations'
+      const now = Date.parse('2026-10-23T12:00:00.000Z')
+      const hrefs = getConsoleUserSecurityHrefs('user1', now)
+      const parse = (href: string) => {
+        const url = new URL(href, 'http://console.invalid')
+        expect(url.pathname).toBe(mode === 'host' ? '/audit' : '/operations/audit')
+        expect(parseConsoleReturnHref(href)).toBe(href)
+        expect(url.searchParams.has('cursor')).toBe(false)
+        return adminAuditQuerySchema.parse(Object.fromEntries(url.searchParams))
+      }
+      const confirmations = parse(hrefs.confirmations)
+      const access = parse(hrefs.access)
+      expect(confirmations).toMatchObject({
+        actorType: 'USER',
+        actorId: 'user1',
+        actions: ['auth.step_up_failed', 'auth.step_up_succeeded'],
+      })
+      expect(confirmations.targetId).toBeUndefined()
+      expect(access).toMatchObject({
+        targetType: 'USER',
+        targetId: 'user1',
+        actions: [
+          'admin.user.system_role_changed',
+          'admin.user.session_revoked',
+          'admin.user.sessions_revoked',
+        ],
+      })
+      expect(access.actorId).toBeUndefined()
+      expect(access.from).toBe(confirmations.from)
+      expect(access.to).toBe(confirmations.to)
+      expect(Date.parse(access.to!) - Date.parse(access.from!)).toBe(31 * 86400000)
+    }
+  )
 })

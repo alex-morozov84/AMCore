@@ -252,9 +252,12 @@ user/organization names plus user email or organization slug. Current identity
 may differ from the identity at event time. A missing present-day record leaves
 only its ID; this does not prove when or why the record disappeared. The `requestId` is returned only when it is a well-formed correlation ID (the bounded search
 key of the [log-search guide](log-search.md)); any other stored value is left out. Raw
-`metadata`, `ip`, credential material, free text, stored names,
-scopes and session IDs are never returned. An unsafe old ID is displayed as
-unavailable, but its event stays in chronological order.
+`metadata`, `ip` and credential material are never returned. Explicit allowlists
+project selected coded summaries and background-work command details, including
+the bounded operator reason. A `SESSION` event can show its safe session
+identifier in `targetId`; session IDs stored only in metadata are not projected.
+An unsafe old ID is displayed as unavailable, but its event stays in
+chronological order.
 
 Filters are exact actor, action, target and organization values in a UTC
 `[from,to)` interval. The first request defaults to the last seven days;

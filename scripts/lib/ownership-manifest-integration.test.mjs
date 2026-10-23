@@ -64,8 +64,9 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // Exact Console inventory, including provisioning, administrator management
       // and their route, story and browser proof files, and the Scheduled jobs page, feature,
       // BFF routes, server API modules and operator guide, and the Integrations page, feature, BFF routes,
-      // stand fixture, browser spec and operator guide.
-      expected: 506,
+      // stand fixture, browser spec and operator guide. Login diagnostics adds three detail UI/test
+      // files, a Console API adapter test and the shared host/path browser helper under existing roots.
+      expected: 511,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

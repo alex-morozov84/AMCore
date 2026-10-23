@@ -4,6 +4,7 @@ import {
   adminDetailIdSchema,
   adminOrganizationDetailQuerySchema,
   adminUserDetailQuerySchema,
+  adminUserDetailResponseSchema,
 } from './admin-detail'
 
 describe('admin detail queries', () => {
@@ -37,5 +38,31 @@ describe('admin detail queries', () => {
     expect(adminDetailIdSchema.safeParse('not-an-id').success).toBe(false)
     expect(adminDetailIdSchema.safeParse('clz1234560000abcdefghijk').success).toBe(true)
     expect(adminDetailIdSchema.safeParse('757a9fb4-34cf-40f4-a807-0f0cdbb9728b').success).toBe(true)
+  })
+})
+
+describe('detail-only login diagnostics', () => {
+  const schema = adminUserDetailResponseSchema.shape.loginDiagnostics
+  it('requires actual facts and rejects duplicate/unknown providers and credential material', () => {
+    expect(schema.parse({ hasPassword: false, linkedProviders: [] })).toEqual({
+      hasPassword: false,
+      linkedProviders: [],
+    })
+    expect(
+      schema.parse({
+        hasPassword: true,
+        linkedProviders: ['google', 'github', 'apple', 'telegram'],
+      }).linkedProviders
+    ).toHaveLength(4)
+    for (const value of [
+      undefined,
+      {},
+      { linkedProviders: [] },
+      { hasPassword: false },
+      { hasPassword: false, linkedProviders: ['google', 'google'] },
+      { hasPassword: false, linkedProviders: ['unknown'] },
+      { hasPassword: true, linkedProviders: [], passwordHash: 'must-not-leak' },
+    ])
+      expect(schema.safeParse(value).success).toBe(false)
   })
 })

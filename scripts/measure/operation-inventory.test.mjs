@@ -22,7 +22,9 @@ describe('operation inventory against the real plans', () => {
       // Integration docs add two retained-file edits with four owned blocks in the Console-off recipe.
       // Each content fact and its claims appear in both the shared and Console semantic inventories:
       // +4 facts, +8 claims, but only two final edits.
-      { name: 'measured operations', expected: 882, actual: inventory.operations.length },
+      // Login diagnostics adds two disabled fixture removals and six selected-locale test edits.
+      // Shared/Console inventories can describe the same final edit; semantic claims count separately.
+      { name: 'measured operations', expected: 893, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -41,17 +43,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1214,
+        expected: 1232,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 1991,
+        expected: 2030,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 862,
+        expected: 871,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

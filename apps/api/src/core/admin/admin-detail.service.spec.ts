@@ -10,7 +10,9 @@ const date = new Date('2026-01-01T00:00:00.000Z')
 describe('AdminDetailService', () => {
   it('reads safe user detail, count and bounded memberships in one snapshot', async () => {
     const tx = {
+      oAuthAccount: { groupBy: jest.fn().mockResolvedValue([]) },
       user: {
+        count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn().mockResolvedValue({
           id,
           email: 'ada@example.test',
@@ -44,6 +46,7 @@ describe('AdminDetailService', () => {
     })
     expect(result.user.locale).toBe(DEFAULT_LOCALE)
     expect(result.user).not.toHaveProperty('passwordHash')
+    expect(result.loginDiagnostics).toEqual({ hasPassword: false, linkedProviders: [] })
     expect(result.memberships).toMatchObject({ total: 30, page: 2, limit: 10 })
     expect(result.membershipCount).toBe(30)
     expect(tx.orgMember.findMany).toHaveBeenCalledWith(
@@ -60,7 +63,9 @@ describe('AdminDetailService', () => {
 
   it('filters all user memberships by organization name or slug', async () => {
     const tx = {
+      oAuthAccount: { groupBy: jest.fn().mockResolvedValue([]) },
       user: {
+        count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn().mockResolvedValue({
           id,
           email: 'ada@example.test',
@@ -136,7 +141,8 @@ describe('AdminDetailService', () => {
 
   it('returns 404 for a valid missing user instead of reading memberships', async () => {
     const tx = {
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      oAuthAccount: { groupBy: jest.fn().mockResolvedValue([]) },
+      user: { findUnique: jest.fn().mockResolvedValue(null), count: jest.fn() },
       orgMember: { count: jest.fn(), findMany: jest.fn() },
     }
     const prisma = {
@@ -152,5 +158,7 @@ describe('AdminDetailService', () => {
       })
     ).rejects.toMatchObject({ status: 404 })
     expect(tx.orgMember.count).not.toHaveBeenCalled()
+    expect(tx.user.count).not.toHaveBeenCalled()
+    expect(tx.oAuthAccount.groupBy).not.toHaveBeenCalled()
   })
 })
