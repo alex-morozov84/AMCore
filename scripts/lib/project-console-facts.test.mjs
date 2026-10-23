@@ -47,10 +47,10 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console disabled content',
-      expected: 60,
+      expected: 62,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 135, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 137, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -72,7 +72,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale content',
-      expected: 59,
+      expected: 61,
       actual: count(singleDisabled.consoleFacts, 'content'),
     },
   ])
@@ -85,6 +85,24 @@ test('derives the complete disabled Console projection from the manifest', () =>
       (fact) => fact.kind === 'delete' && fact.path === 'docs/operations-console'
     )
   )
+  const removed = (file) =>
+    result.consoleFacts.some(
+      (fact) => fact.kind === 'delete' && (file === fact.path || file.startsWith(`${fact.path}/`))
+    )
+  for (const file of [
+    'apps/web/src/features/console-integrations',
+    'scripts/stand/integrations-fixture.mjs',
+    'apps/web/e2e/real-stack/admin-integrations.spec.ts',
+  ])
+    assert.equal(removed(file), true, file)
+  for (const file of [
+    'apps/api/src/core/admin/integrations/integration-registry.ts',
+    'apps/api/src/core/admin/admin-integrations.controller.ts',
+    'apps/api/src/core/admin/integrations/readers/email.reader.ts',
+    'docs/backend/integrations.md',
+    'docs/email/README.md',
+  ])
+    assert.equal(removed(file), false, file)
   assert.ok(result.consoleFacts.every((fact) => !('scenario' in fact)))
 })
 

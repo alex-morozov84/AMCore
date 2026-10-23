@@ -1,10 +1,14 @@
 # Register an integration
 
-A module that talks to an outside service can register itself so that the Console
-[Integrations](../operations-console/integrations.md) page shows it. You write a reader
-that reports what is already known, add one line to the composition list, and add copy.
-You change nothing in the page, the controller or the frontend code; only the message
-catalogues in `apps/web/messages` get new keys.
+A module that talks to an outside service can register itself in the backend status API.
+Write a reader that reports what is already known and add one entry to the composition list.
+The registry and its API remain available when the Operations Console is disabled.
+The API's `/docs` describes the list, prepare, send and receipt routes, including their
+authentication requirements and response schemas.
+
+With the optional [Operations Console](../operations-console/integrations.md), the
+Integrations page shows the registered service without page or controller changes.
+Add its display text to the message catalogues as described in step 3.
 
 Use this for services such as a payment provider or a CRM sync. It reports state. It does
 not edit settings and it does not run checks when the page is read.
@@ -107,13 +111,14 @@ You need a module that already owns the service your reader uses. In the example
    }
    ```
 
-The composition list is read by the Console module at startup; you do not call
-`IntegrationsModule.register(...)` yourself (tests do). Restart the API. The integration appears on the page. A test runs this exact example:
+The configured backend imports the composition list at startup; you do not call
+`IntegrationsModule.register(...)` yourself (tests do). Restart the API. The integration appears in
+`GET /api/v1/admin/integrations`. A test runs this exact example:
 `apps/api/src/core/admin/integrations/integrations-guide-example.spec.ts`.
 
 To remove an integration your product does not need, delete its entry from the composition
-list and restart the API. It then has no row and the Console no longer imports
-`CrmIntegrationModule`. Your own module (`CrmModule`) is not touched; if the Console was
+list and restart the API. It then has no status item and the registry no longer imports
+`CrmIntegrationModule`. Your own module (`CrmModule`) is not touched; if the registry was
 the only place that imported it, import it where it belongs. Delete the reader files and the
 messages yourself if you no longer need them.
 
