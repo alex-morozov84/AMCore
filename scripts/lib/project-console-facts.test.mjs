@@ -37,11 +37,12 @@ test('reports every stale Console exact count together', () => {
   })
   // The lifecycle Console link adds one content fact and one disabled step. Scheduled jobs add one
   // feature root, two shared modules (one with a test), a stand fixture and an e2e spec: six deletes.
+  // Integrations add a feature root, a stand fixture and an e2e spec: three more deletes.
   assertExactScaffoldCounts([
-    { name: 'console roots', expected: 23, actual: operationsConsoleOwnership.facts.roots.length },
+    { name: 'console roots', expected: 24, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 90,
+      expected: 93,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
@@ -49,7 +50,7 @@ test('reports every stale Console exact count together', () => {
       expected: 60,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 132, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 135, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -66,7 +67,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 90,
+      expected: 93,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {

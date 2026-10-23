@@ -25,7 +25,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   // Provisioning owns two feature roots and a browser-scenario root; Scheduled jobs owns one feature root.
   // Nested files inherit ownership without individual registration.
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 23)
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 24)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -63,8 +63,9 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       name: 'console closed-root files',
       // Exact Console inventory, including provisioning, administrator management
       // and their route, story and browser proof files, and the Scheduled jobs page, feature,
-      // BFF routes, server API modules and operator guide.
-      expected: 474,
+      // BFF routes, server API modules and operator guide, and the Integrations page, feature, BFF routes,
+      // stand fixture, browser spec and operator guide.
+      expected: 504,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {
