@@ -103,7 +103,7 @@ export async function compatibility(f) {
       await compose(f, ['up', '-d', '--no-deps', '--no-build', '--pull', 'never', 'api'])
       await ready(f, f.names.api)
       const email = `${producer}-${consumer}-${f.run}@example.invalid`
-      const password = 'fixture-only-password-never-real-123!'
+      const password = 'Fixture-only-password-never-real-123!'
       const registered = await request(f, f.names.api, 'register', {
         email,
         password,
