@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 
 export function verifyExports(root, packageRoot) {
   const require = createRequire(join(root, 'package.json'))
@@ -37,13 +37,24 @@ export function verifyExports(root, packageRoot) {
     .sort()
   assert.deepEqual(exports[1], exports[0])
   assert.deepEqual(exports[2], exports[0])
-  assert.deepEqual(readdirSync(join(packageRoot, 'dist')).sort(), [
-    'index.cjs',
-    'index.cjs.map',
-    'index.d.cts',
-    'index.d.ts',
-    'index.js',
-    'index.js.map',
-  ])
+  verifyMirroredOutput(packageRoot)
   return values
+}
+
+/** dist mirrors src module by module (unbundled build): no orphan or foreign file kinds. */
+function verifyMirroredOutput(packageRoot) {
+  const files = readdirSync(join(packageRoot, 'dist'), { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath, entry.name).slice(join(packageRoot, 'dist').length + 1))
+  for (const entry of ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts'])
+    assert.equal(files.includes(entry), true, `missing dist/${entry}`)
+  for (const file of files) {
+    const module = file.match(/^(.+?)\.(?:js|cjs|js\.map|cjs\.map|d\.ts|d\.cts)$/)?.[1]
+    assert.ok(module, `unexpected dist file ${file}`)
+    const sources = [`${module}.ts`, `${module}.json`].map((name) => join(packageRoot, 'src', name))
+    assert.ok(
+      sources.some((path) => existsSync(path)),
+      `dist/${file} has no source module`
+    )
+  }
 }

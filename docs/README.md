@@ -58,7 +58,7 @@ find for something, that page is under-documented; please open an issue.
 | Check that nightly cleanups, the GeoIP update and recovery passes keep running           | [`operations-console/scheduled-jobs.md`](operations-console/scheduled-jobs.md)                                                          |
 | See which outside services are set up, and send a test email to yourself                 | [`operations-console/integrations.md`](operations-console/integrations.md)                                                              |
 | Use, configure, deploy, or safely extend Operations Console                              | [`operations-console/`](operations-console/README.md)                                                                                   |
-| Check or update the frontend bundle baseline                                             | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                                |
+| Check or update the per-route frontend bundle budgets                                    | [`frontend/bundle-budget.md`](frontend/bundle-budget.md)                                                                                |
 | Add a navigating Link / programmatic navigation, or configure the route-progress bar     | [`frontend/route-progress.md`](frontend/route-progress.md)                                                                              |
 | Add an environment variable                                                              | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-environment-variable)                     |
 | Add an external service / infra dependency                                               | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)       |
@@ -151,9 +151,9 @@ provide an operator interface for admin session management.
 - **[Storybook](frontend/storybook.md)** — the `shared/ui`/feature-flow
   component workshop: decorators, story conventions, the accessibility
   gate, and the CLI-safety/`optimizeDeps.include` procedures.
-- **[Bundle baseline and budget](frontend/bundle-budget.md)** — the
-  per-route client bundle size methodology, the current baseline, the
-  non-vacuity proof, and why CI enforcement is deferred.
+- **[Route bundle budgets](frontend/bundle-budget.md)** — the CI check
+  that limits each page's first-load JavaScript, how to investigate a
+  failure and how to change a limit.
 - **[Top route progress bar](frontend/route-progress.md)** — the global
   navigation-progress indicator: what starts/finishes it, the
   `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,

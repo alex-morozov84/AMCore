@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { verifyNativeConsumer } from './native-typecheck-shared.mjs'
@@ -8,6 +8,15 @@ import { verifyExports } from './shared-package-exports.mjs'
 import { verifyConsumer, verifyMaps } from './shared-package-consumer.mjs'
 
 import { root, copyShared, build } from './shared-package-fixture.mjs'
+
+/** Every emitted file's text: the build mirrors source modules, not one bundle. */
+function distText(directory) {
+  const dist = join(directory, 'dist')
+  return readdirSync(dist, { recursive: true })
+    .filter((name) => /\.(?:js|cjs|d\.ts|d\.cts)$/.test(name))
+    .map((name) => readFileSync(join(dist, name), 'utf8'))
+    .join('\n')
+}
 
 test(
   'packed shared contracts, clean removed module and nonzero build failure',
@@ -19,7 +28,7 @@ test(
       copyShared(directory)
       build(directory)
       verifyMaps(directory)
-      const mapPath = join(directory, 'dist/index.js.map')
+      const mapPath = join(directory, 'dist/schemas/auth.js.map')
       const originalMap = readFileSync(mapPath, 'utf8')
       const map = JSON.parse(originalMap)
       const typescriptIndex = map.sources.findIndex((source) => source.endsWith('.ts'))
@@ -40,20 +49,13 @@ test(
         Buffer.concat([original, Buffer.from('\nexport * from "./removed-module"\n')])
       )
       build(directory)
-      assert.match(
-        readFileSync(join(directory, 'dist/index.js'), 'utf8'),
-        /removed-module-sentinel/
-      )
+      assert.match(distText(directory), /removed-module-sentinel/)
       rmSync(removed)
       writeFileSync(index, original)
       writeFileSync(join(directory, 'dist/orphan.js'), 'stale')
       build(directory)
       assert.equal(existsSync(join(directory, 'dist/orphan.js')), false)
-      for (const file of ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts'])
-        assert.doesNotMatch(
-          readFileSync(join(directory, 'dist', file), 'utf8'),
-          /removedModule|removed-module-sentinel/
-        )
+      assert.doesNotMatch(distText(directory), /removedModule|removed-module-sentinel/)
       writeFileSync(
         index,
         Buffer.concat([original, Buffer.from('\nexport * from "./missing-module"\n')])

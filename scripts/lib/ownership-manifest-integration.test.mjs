@@ -65,7 +65,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // and their route, story and browser proof files, and the Scheduled jobs page, feature,
       // BFF routes, server API modules and operator guide, and the Integrations page, feature, BFF routes,
       // stand fixture, browser spec and operator guide.
-      expected: 504,
+      expected: 506,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

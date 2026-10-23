@@ -64,6 +64,7 @@ describe('scenario-registry', () => {
       ['typecheck'],
       ['lint'],
       ['--filter', 'web', 'build'],
+      ['check:route-budgets'],
       ['--filter', 'api', 'test'],
       ['--filter', 'web', 'test'],
     ])

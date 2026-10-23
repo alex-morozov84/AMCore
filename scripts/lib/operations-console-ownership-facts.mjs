@@ -175,4 +175,5 @@ export const operationsConsoleSurfaceRoots = [
   'scripts/e2e-ci-plan.mjs',
   'scripts/e2e-ci.mjs',
   'scripts/product-admin-e2e-plan.mjs',
+  'scripts/check-route-budgets.mjs',
 ]

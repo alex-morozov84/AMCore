@@ -97,6 +97,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Reads the web build above (same job, no second build); docs/frontend/bundle-budget.md.
+      - name: Check route budgets
+        run: pnpm check:route-budgets
+
   test-unit-redis:
     name: Test unit and Redis
     runs-on: ubuntu-latest

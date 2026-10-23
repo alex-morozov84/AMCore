@@ -243,10 +243,13 @@ Use the [backend conventions](docs/backend/architecture-and-conventions.md),
    `next dev` target can't prove "zero violations" (Turbopack's own HMR
    tooling noise). See
    [`docs/frontend/browser-security-and-csp.md`](docs/frontend/browser-security-and-csp.md).
-8. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
-9. For optional-feature work, confirm that closed-root additions are automatic,
-   shared-surface contributions have a declared seam/operation, and any novel
-   unmarked semantics were explicitly classified.
+8. **Web bundle growth:** after `pnpm build`, run `pnpm check:route-budgets`. If a
+   page is over its limit, reduce the cost or raise the limit in the same PR and
+   explain why; see [route bundle budgets](docs/frontend/bundle-budget.md).
+9. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
+10. For optional-feature work, confirm that closed-root additions are automatic,
+    shared-surface contributions have a declared seam/operation, and any novel
+    unmarked semantics were explicitly classified.
 
 For product-admin placement changes, validate the physical routes and generated
 edge mapping as described in [placement and sessions](docs/product-admin/placement-and-sessions.md).
