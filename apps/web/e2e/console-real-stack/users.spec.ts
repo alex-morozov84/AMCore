@@ -3,9 +3,11 @@ import { activeTarget } from '../support/managed-target.mjs'
 const standTarget = activeTarget()
 import { expect, test } from '@playwright/test'
 
+import { createLoginDiagnosticTarget } from '../real-stack/admin-helpers'
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 
 import { setSystemRole } from './helpers'
+import { inspectLoginDiagnostics } from './login-diagnostics'
 
 test('host-mode Users inventory uses only the isolated console session', async ({ browser }) => {
   const email = uniqueEmail('console-users')
@@ -43,6 +45,9 @@ test('host-mode Users inventory uses only the isolated console session', async (
   await expect(consolePage.getByText(email)).toBeVisible()
   expect(await consolePage.content()).not.toContain('Bearer ')
   expect(requestsWithAuthHeader).toHaveLength(0)
+  const targetEmail = uniqueEmail('host-diagnostics-target')
+  const target = createLoginDiagnosticTarget(targetEmail)
+  await inspectLoginDiagnostics(consolePage, target.id, targetEmail, target.canary)
   await product.close()
   await console.close()
 })

@@ -39,6 +39,40 @@ message for a missing user, no memberships, no search matches, an out-of-range
 page, or a temporarily unavailable service. Both the initial page and a
 refreshing relation list have loading placeholders.
 
+## Understand sign-in setup
+
+The profile shows **Password** as **Configured** or **Not configured**, and
+**Linked accounts** lists the names of connected services. A passwordless
+account cannot sign in with a password until its owner sets one. Linked
+accounts describe saved connections; application settings determine which
+sign-in methods are available. These facts do not prove a successful sign-in
+or identify how the person originally registered. The Console never shows
+passwords, hashes or provider credentials.
+
+Under **Recorded security events**, select:
+
+- **Password confirmations** for recorded password re-entry before protected
+  actions. These are not email verification or ordinary sign-in attempts.
+- **Access changes** for system-role changes and sessions ended by an operator.
+  This view does not cover password resets, self sign-out or provider linking.
+
+Both links open Audit with the user's identity and event types already selected,
+for the same last-31-day interval. Choose an earlier interval in Audit to look
+further back. The interval is a search limit, not an event retention period.
+Ordinary sign-in attempts are not recorded in Audit. Password confirmation
+recording is best-effort, and some early refusals create no event. An empty
+result does not establish that no sign-in or password confirmation occurred.
+
+No linked accounts is a valid setup fact. If the service fails, the page shows
+an error and retry action instead of claiming that the account has no password
+or linked accounts. See [Audit](audit.md) for browsing and return navigation.
+
+A failed password confirmation means that the additional verification did not
+complete. Possible causes include a wrong password, no active session or no
+configured password. The Audit summary does not show that cause. Use the time,
+actor and available Request ID to investigate with authorized logs; do not
+infer a wrong password from the event name alone.
+
 **Actions by user** searches Audit for this user's actor ID; **Events about
 user** searches for events targeting this user. Each link opens the last 31
 days, Audit’s widest single interval. Choose an earlier interval there to

@@ -74,6 +74,8 @@ const verification = [
   'scripts/stand/ai-run-control-fixture.mjs',
   'scripts/stand/scheduled-jobs-fixture.mjs',
   'scripts/stand/integrations-fixture.mjs',
+  'scripts/stand/login-diagnostics-fixture.mjs',
+  'scripts/stand/login-diagnostics-fixture.test.mjs',
   'scripts/stand/wrapper-cancellation.test.mjs',
   'scripts/run-console-session-e2e.mjs',
   'scripts/run-console-single-locale-proxy-smoke.mjs',

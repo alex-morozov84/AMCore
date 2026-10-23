@@ -4,7 +4,13 @@ import { Skeleton } from '@/shared/ui/skeleton'
 const ROWS = [0, 1, 2]
 
 /** Same summary card and related-list geometry used by both detail pages. */
-export function DetailResultsSkeleton({ searchable = false }: { searchable?: boolean }) {
+export function DetailResultsSkeleton({
+  searchable = false,
+  userFacts = false,
+}: {
+  searchable?: boolean
+  userFacts?: boolean
+}) {
   return (
     <div aria-busy="true" className="space-y-5">
       <Card>
@@ -13,7 +19,7 @@ export function DetailResultsSkeleton({ searchable = false }: { searchable?: boo
           <Skeleton className="h-4 w-64 max-w-full" />
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {ROWS.map((row) => (
+          {(userFacts ? [0, 1, 2, 3, 4, 5, 6, 7] : ROWS).map((row) => (
             <div key={row} className="space-y-2">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-5 w-32" />

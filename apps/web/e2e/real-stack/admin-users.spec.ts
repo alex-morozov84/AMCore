@@ -1,8 +1,14 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { inspectLoginDiagnostics } from '../console-real-stack/login-diagnostics'
 import { expectNoAxeViolations } from '../shared/axe'
 
-import { createNamedUser, createUsersForPagination, setSystemRole } from './admin-helpers'
+import {
+  createLoginDiagnosticTarget,
+  createNamedUser,
+  createUsersForPagination,
+  setSystemRole,
+} from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
 async function signInAsPathAdmin(page: Page, email: string) {
@@ -12,6 +18,16 @@ async function signInAsPathAdmin(page: Page, email: string) {
   await loginViaUi(page, email)
   await expect(page).toHaveURL(/\/en\/?$/)
 }
+
+test('path-mode user detail safely explains setup and opens precise security event views', async ({
+  page,
+}) => {
+  await signInAsPathAdmin(page, uniqueEmail('diagnostics-admin'))
+  const email = uniqueEmail('diagnostics-target')
+  const target = createLoginDiagnosticTarget(email)
+  await page.goto('/en/admin/users')
+  await inspectLoginDiagnostics(page, target.id, email, target.canary)
+})
 
 test('path-mode Users inventory renders real user data without exposing a token', async ({
   page,

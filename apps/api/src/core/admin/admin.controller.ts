@@ -237,7 +237,11 @@ export class AdminController {
   @Get('users/:id')
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({
-    summary: 'Inspect one user and paginated organization memberships — SUPER_ADMIN only',
+    summary: 'Inspect user sign-in setup and paginated memberships — SUPER_ADMIN only',
+    description:
+      'Returns password presence and unique linked provider names, never credentials. ' +
+      'Saved setup does not prove provider availability or successful sign-in. ' +
+      'Requires a current SUPER_ADMIN bearer; API keys are rejected.',
   })
   @ApiParam({ name: 'id', description: 'User CUID or UUID' })
   @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
@@ -263,7 +267,8 @@ export class AdminController {
   @SchemaResponse({
     type: AdminUserDetailResponseDto,
     status: 200,
-    description: 'Safe user detail and bounded memberships',
+    description:
+      'Safe user detail, password presence, linked provider names and bounded memberships',
   })
   findUserDetail(
     @Param('id') id: string,

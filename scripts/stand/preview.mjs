@@ -30,7 +30,12 @@ export async function preview(m, profile = 'default') {
     throw new Error('Notification work preview needs a fresh stand created with this profile')
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_END
   // AMCORE_CONSOLE_AI_PROFILE_START
-  profiles.push('ai-run-control', 'scheduled-jobs', 'integrations')
+  profiles.push('ai-run-control', 'scheduled-jobs', 'integrations', 'login-diagnostics')
+  if (
+    profile === 'login-diagnostics' &&
+    (!m.consoleEnabled || m.purpose !== 'preview' || m.fixtureProfile !== profile)
+  )
+    throw new Error('Login diagnostics needs a fresh enabled-Console stand with this profile')
   // AMCORE_CONSOLE_AI_PROFILE_END
   // AMCORE_CONSOLE_ESTABLISHMENT_PROFILE_START
   profiles.push('organization-establishment')
@@ -121,6 +126,10 @@ export async function preview(m, profile = 'default') {
     if (profile === 'integrations') {
       const { integrationsFixture } = await import('./integrations-fixture.mjs')
       await integrationsFixture(m)
+    }
+    if (profile === 'login-diagnostics') {
+      const { loginDiagnosticsFixture } = await import('./login-diagnostics-fixture.mjs')
+      await loginDiagnosticsFixture(m)
     }
     // AMCORE_CONSOLE_AI_FIXTURE_END
     for (const account of m.accounts) {
