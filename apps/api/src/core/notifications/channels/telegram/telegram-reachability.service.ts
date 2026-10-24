@@ -96,10 +96,10 @@ export class TelegramReachabilityService implements OnModuleInit, OnModuleDestro
     const redisStart = await this.store.now()
     const startedAt = performance.now()
     const outcome = await checkTelegram({ baseUrl, token, shutdown: this.shutdown.signal })
-    if (outcome === 'shutdown') return skippedFor('shutdown')
+    // A stopping process publishes nothing: neither the metric nor a stored result.
+    if (outcome === 'shutdown' || this.shutdown.signal.aborted) return skippedFor('shutdown')
     this.last = { outcome, at: performance.now() }
     if (redisStart === undefined) return failed('store_unavailable')
-    if (this.shutdown.signal.aborted) return skippedFor('shutdown')
     this.lastWriteAt = performance.now()
     const written = await this.store.write(this.instanceId, {
       v: 1,

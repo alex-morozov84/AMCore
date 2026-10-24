@@ -154,6 +154,43 @@ describe('TelegramReachabilityService', () => {
     }
   })
 
+  it('a stop that arrives during the check keeps the metric, writes nothing and skips', async () => {
+    const { service, store, metricValues } = setup()
+    jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            cancel() {
+              void service.onModuleDestroy()
+            },
+          }),
+          { status: 401 }
+        )
+      )
+    )
+    await expect(service.runOnce()).resolves.toEqual({ skipped: 'shutdown' })
+    expect(store.write).not.toHaveBeenCalled()
+    expect(metricValues()).toMatchObject({ none: 1, failed: 0 })
+  })
+
+  it('a stop during the check without Redis time is still a shutdown skip', async () => {
+    const { service, store } = setup()
+    store.now.mockResolvedValueOnce(undefined as unknown as number)
+    jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            cancel() {
+              void service.onModuleDestroy()
+            },
+          }),
+          { status: 500 }
+        )
+      )
+    )
+    await expect(service.runOnce()).resolves.toEqual({ skipped: 'shutdown' })
+  })
+
   it('a stop before any write removes nothing', async () => {
     const { service, store } = setup()
     await service.onModuleDestroy()

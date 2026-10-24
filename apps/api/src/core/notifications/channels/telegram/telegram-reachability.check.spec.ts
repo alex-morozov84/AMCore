@@ -131,6 +131,19 @@ describe('checkTelegram decision order', () => {
     )
   })
 
+  it('shutdown while a non-2xx body is being cancelled publishes nothing', async () => {
+    const shutdown = new AbortController()
+    const response = new Response(
+      new ReadableStream({
+        cancel() {
+          shutdown.abort()
+        },
+      }),
+      { status: 401 }
+    )
+    await expect(run(() => Promise.resolve(response), shutdown.signal)).resolves.toBe('shutdown')
+  })
+
   it('shutdown after a 2xx response arrived still publishes nothing', async () => {
     const shutdown = new AbortController()
     const outcome = await run(() => {

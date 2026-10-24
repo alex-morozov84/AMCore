@@ -65,6 +65,8 @@ export async function checkTelegram(
     }
     if (response.status < 200 || response.status >= 300) {
       await cancelBody(response)
+      // Shutdown is re-checked after every await: it may arrive while the body is cancelled.
+      if (input.shutdown.aborted) return 'shutdown'
       return classifyStatus(response.status)
     }
     const body = await readBoundedBody(response)
