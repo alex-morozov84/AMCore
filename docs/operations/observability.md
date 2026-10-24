@@ -682,7 +682,11 @@ match; and the public/private-boundary ratchet (below) holds.
 
 **Live tier** (`pnpm test:observability-contract:live`, the `Observability
 contract (live)` CI job, `needs: [promtool]` — boots the real `local-infra` +
-`monitoring` Compose profiles under an isolated project): the metric-reference
+`monitoring` Compose profiles under an isolated project):
+`docker/testing/observability-live.yml` supplies a fake Telegram token only to the
+worker, with a container-loopback URL on a port blocked by Node fetch. This enables
+the optional metric without contacting Telegram or proving provider reachability.
+The metric-reference
 guard queries `GET /api/v1/targets/metadata` scoped to `job=~"amcore-(api|worker)"`
 (never Prometheus's own self-scrape families) to build the real exposed-metric
 set live, expanding histogram families into `_bucket`/`_sum`/`_count`, and
@@ -690,7 +694,7 @@ parses every shipped expression through `POST /api/v1/parse_query` to assert
 every referenced name is real; every expression is also evaluated via
 `POST /api/v1/query`, distinguishing a genuine query error from a valid empty
 result; `GET /api/v1/targets` asserts `amcore-api`/`amcore-worker` are exactly
-`up`; `GET /api/v1/rules` asserts exactly the 8 default groups are loaded
+`up`; `GET /api/v1/rules` asserts exactly the declared default groups are loaded
 and the optional SLO groups are genuinely absent (proving the off-by-default
 glob above holds live, not only on paper); `GET /api/v1/alertmanagers` asserts
 Alertmanager discovery resolved; and Grafana is checked three ways — the
