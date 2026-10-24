@@ -152,12 +152,7 @@ denied for schema public`, before applying anything — Postgres 15+ no
    for each schema, grant `amcore_runtime` `USAGE` on the schema, DML on all
    its tables, `USAGE`/`SELECT` on all its sequences, and set
    `ALTER DEFAULT PRIVILEGES` so **future** tables/sequences in that schema
-   auto-grant too, with no manual `GRANT` needed per migration. Step 3 also
-   grants `amcore_runtime` read-only `SELECT` on Prisma's
-   `public._prisma_migrations`, so the bundled `backup` profile, which dumps
-   as the runtime role, can include it (without it `pg_dump` fails with
-   `permission denied for table _prisma_migrations`). An installation set up
-   before this grant runs that one statement once.
+   auto-grant too, with no manual `GRANT` needed per migration.
 
 Step 3's statements act on objects `amcore_migrator` owns — issuing a
 `GRANT` on someone else's object requires the session to actually hold that
@@ -249,6 +244,19 @@ resolve` never touch it. The production migrator role needs no shadow-DB
   `REVOKE UPDATE, DELETE ON core.audit_log FROM amcore_runtime;` as defense
   in depth (a second, independent layer alongside the trigger), but it is
   optional hardening, not something this guide requires.
+
+## A backup reader role
+
+`pg_dump` needs read access to every table, including Prisma's
+`public._prisma_migrations`, which `amcore_runtime` deliberately cannot read (so
+it also cannot run migrations). Do not widen the runtime role for backups. The
+optional last section of `setup-roles.sql` creates `amcore_backup` instead: it is a
+member of PostgreSQL's predefined `pg_read_all_data` role (PostgreSQL 14+), so it
+reads every table and sequence and can write nothing. Set its password with
+`\password amcore_backup` while it is `NOLOGIN`, then `ALTER ROLE amcore_backup
+LOGIN`, and point the bundled `backup` profile at it with `BACKUP_DATABASE_URL`.
+Granting a predefined role needs a superuser or a provider admin allowed to grant
+it.
 
 ## A third role for query investigation
 

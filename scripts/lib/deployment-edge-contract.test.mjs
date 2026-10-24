@@ -101,13 +101,16 @@ test('the Postgres TLS overlay keeps every base server option', () => {
 
 test('only one-shot services receive the migration (owner) URL', () => {
   const base = compose('docker-compose.yml').services
-  const oneShot = new Set(['migrate', 'seed', 'restore'])
+  const oneShot = new Set(['migrate', 'system-seed', 'restore'])
   for (const [name, service] of Object.entries(base)) {
     const env = JSON.stringify(service.environment ?? {})
     if (env.includes('MIGRATION_DATABASE_URL')) assert.ok(oneShot.has(name), name)
   }
-  assert.equal(base.seed.restart, 'no')
-  assert.equal(base.seed.environment.MIGRATION_DATABASE_URL, '${MIGRATION_DATABASE_URL:-}')
+  assert.equal(base['system-seed'].restart, 'no')
+  assert.equal(
+    base['system-seed'].environment.MIGRATION_DATABASE_URL,
+    '${MIGRATION_DATABASE_URL:-}'
+  )
 })
 
 test('the local-build supervision overlay matches the registry overlay', () => {

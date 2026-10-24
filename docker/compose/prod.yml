@@ -26,7 +26,7 @@
 #     file, which deliberately avoids `:?` for exactly this reason) would
 #     break `compose config`/`up` even when that profile is off. This
 #     overlay only uses `:?` on migrate/api/worker/web (the profile-gated
-#     `seed` reuses COMPOSE_API_IMAGE, which `api` already requires, so it adds
+#     `system-seed` reuses COMPOSE_API_IMAGE, which `api` already requires, so it adds
 #     no new failure); `postgres`/`redis`/
 #     `caddy`/`backup`/`restore` below stay optional, matching the base
 #     file's own rule.
@@ -88,7 +88,7 @@ services:
     logging: *logging
 
   # One-shot guarded seed from the same promoted API image (profile `seed`).
-  seed:
+  system-seed:
     build: !reset null
     image: ${COMPOSE_API_IMAGE:?Set COMPOSE_API_IMAGE to the promoted api image digest, e.g. ghcr.io/<org>/<repo>/api@sha256:...}
     pull_policy: always

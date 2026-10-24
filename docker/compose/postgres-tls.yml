@@ -40,7 +40,7 @@ services:
   worker:
     volumes: *db-ca
 
-  seed:
+  system-seed:
     volumes: *db-ca
 
   backup:

@@ -70,8 +70,9 @@ The `backup` service runs on the same image family as the reference stack
 repo's supply-chain/pin discipline). It targets the same database the app
 uses — `COMPOSE_DATABASE_URL` if set, otherwise the bundled `postgres`
 service — so it works whether you're on local-infra or a managed/VPS DB.
-With [role separation](database-role-separation.md) that is the runtime role,
-which needs Step 3's read-only grant on `public._prisma_migrations` to dump.
+With [role separation](database-role-separation.md) the runtime role cannot read
+Prisma's history table, so the dump fails; set `BACKUP_DATABASE_URL` to the
+read-only [backup reader role](database-role-separation.md#a-backup-reader-role).
 
 **This is an interval, not a wall-clock schedule.** `BACKUP_INTERVAL_SECONDS`
 (default `86400`, i.e. once a day) is how long the container sleeps between

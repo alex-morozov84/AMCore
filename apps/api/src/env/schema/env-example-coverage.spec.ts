@@ -53,6 +53,7 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // Optional bundled `backup`/`restore` profiles — consumed by the `backup`
   // compose service's own environment, not the app's env schema.
   'BACKUP_INTERVAL_SECONDS',
+  'BACKUP_DATABASE_URL',
   'BACKUP_RETENTION_DAYS',
   // apps/web-only (ADR-068): the browser<->Next CSRF trusted-origin
   // allowlist, read directly via `process.env` in apps/web (no EnvService

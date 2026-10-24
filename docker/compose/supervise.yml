@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
     logging: *logging
 
-  seed:
+  system-seed:
     logging: *logging
 
   backup:

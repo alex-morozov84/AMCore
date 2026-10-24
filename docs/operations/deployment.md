@@ -686,13 +686,13 @@ Run the seed as a one-shot container from the same API image as the deployment. 
 host needs no source checkout, Node.js or pnpm, and the database needs no host port:
 
 ```sh
-docker compose --profile seed run --rm seed
+docker compose --profile seed run --rm system-seed
 ```
 
 Without Compose, run the API image with `node dist/cli/system-seed.js --url-from-env MIGRATION_DATABASE_URL`
 and that variable set for this container only.
 
-- The `seed` service receives only `NODE_ENV` and `MIGRATION_DATABASE_URL` from `.env`;
+- The `system-seed` service receives only `NODE_ENV` and `MIGRATION_DATABASE_URL` from `.env`;
   `api` and `worker` never receive the owner URL. Anyone who can inspect containers on
   the host can still read it, as with every container environment.
 - `MIGRATION_DATABASE_URL` names the migration (owner) role from

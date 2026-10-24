@@ -161,10 +161,10 @@ docker compose build api
 docker compose build worker
 docker compose build web
 docker compose build migrate
-docker compose --profile seed build seed
+docker compose --profile seed build system-seed
 ```
 
-`worker` and `seed` use the same build as `api` and come from the build cache in
+`worker` and `system-seed` use the same build as `api` and come from the build cache in
 seconds. Build every service on each upgrade too: `up` builds only images that are
 missing, so it would keep running an old `worker` image. The web build takes the
 longest (about 18 minutes on the reference host).
@@ -202,11 +202,11 @@ ALTER ROLE amcore_runtime LOGIN;
 docker compose run --rm migrate
 sed -n '/^-- Step 3:/,/^-- Optional query-statistics observer/p' docker/postgres/setup-roles.sql \
   | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
-docker compose --profile seed run --rm seed
+docker compose --profile seed run --rm system-seed
 ```
 
 Expected results: `migrate` ends with `All migrations have been successfully
-applied.`; the grants (Step 3) print no error; the last line of `seed` is
+applied.`; the grants (Step 3) print no error; the last line of `system-seed` is
 `{"status":"seeded"}`. The seed runs from the API image and needs no source tools on
 the host. See [Seeding](deployment.md#seeding) for refusals and repeated runs.
 
@@ -237,8 +237,25 @@ before it serves: a `502` in the first seconds means it is still starting.
    ends with `pg_hba.conf rejects connection`.
 
 Then create the first organization: [Initial organization and administrator](deployment.md#initial-organization-and-administrator),
-and turn on backups: add `backup` to `COMPOSE_PROFILES` (keep `local-infra,edge`) and
-run `docker compose up -d backup` ([Backup & restore](backup-restore.md)).
+and turn on backups ([Backup & restore](backup-restore.md)). The runtime role cannot
+read Prisma's history table, so backups use the read-only `amcore_backup` role:
+
+```bash
+sed -n '/^-- Optional backup reader/,$p' docker/postgres/setup-roles.sql \
+  | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
+docker compose exec postgres psql -U amcore -d amcore
+```
+
+In `psql`, type a new password twice for `\password amcore_backup`, then
+`ALTER ROLE amcore_backup LOGIN;` and `\q`. Set in `.env` (same query string as the
+other URLs) and add `backup` to `COMPOSE_PROFILES` (keep `local-infra,edge`):
+
+```bash
+BACKUP_DATABASE_URL=postgresql://amcore_backup:<backup-password>@postgres:5432/amcore?sslmode=verify-full&sslrootcert=/etc/amcore/db-ca/ca.crt
+```
+
+Then `docker compose up -d backup`; `docker compose logs backup` shows `completed`
+after the first dump.
 
 ## Images from a registry
 
@@ -252,7 +269,7 @@ When CI publishes images by digest
    (`prod.yml` refuses to load without them). Log in to a private registry with
    `docker login`; every `run` and `up` then checks the registry.
 2. Replace step 4 with `docker compose pull` and
-   `docker compose --profile seed pull seed`. No swap or build options are needed.
+   `docker compose --profile seed pull system-seed`. No swap or build options are needed.
 3. Steps 2, 3 and 5–8 do not change.
 
 ## Upgrades
@@ -538,7 +555,7 @@ before restore step 5 re-run the `setup-roles.sql` Step 3 command from
 | Symptom                                                     | Action                                                                                                                                                                         |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | A service logs a certificate or `self-signed` error         | Check `POSTGRES_TLS_CA_DIR` holds the `ca.crt` that signed the server certificate, and the certificate date.                                                                   |
-| `no pg_hba.conf entry` or `rejects connection`              | The URL uses a role other than `amcore_migrator`/`amcore_runtime`, or `sslmode` is not set.                                                                                    |
-| `seed` prints `invalid_input`                               | `MIGRATION_DATABASE_URL` is empty or lacks `sslmode=verify-full`.                                                                                                              |
+| `no pg_hba.conf entry` or `rejects connection`              | The URL uses a role other than `amcore_migrator`/`amcore_runtime`/`amcore_backup`, or `sslmode` is not set.                                                                    |
+| `system-seed` prints `invalid_input`                        | `MIGRATION_DATABASE_URL` is empty or lacks `sslmode=verify-full`.                                                                                                              |
 | `up` fails with `Pool overlaps with other one on this host` | Choose another `COMPOSE_NETWORK_SUBNET` and a matching `COMPOSE_WEB_IPV4`.                                                                                                     |
 | All visitors get `429` together                             | `bff-relay.yml` is not in `COMPOSE_FILE`, or a command used explicit `-f` files. On the own-sessions list and other dedicated handlers this is the known gap (see Visitor IP). |

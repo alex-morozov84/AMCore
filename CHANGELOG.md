@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   built images), `postgres-tls.yml` (bundled Postgres accepts only TLS connections from
   application roles) and `bff-relay.yml` (fixed web address so the API can trust the
   visitor IP relayed by the web BFF). The guarded system seed now runs from the API image
-  (`docker compose --profile seed run --rm seed`), without a source checkout on the host.
+  (`docker compose --profile seed run --rm system-seed`), without a source checkout on the host.
   `BUILD_NODE_OPTIONS` passes build-only Node options to the image builds.
 
 ### Changed
@@ -38,7 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   publishing bypasses host firewalls, so the old `0.0.0.0` default exposed the fixed
   Postgres login and the password-less Redis on internet-facing hosts. The `restore`
   profile now connects with `MIGRATION_DATABASE_URL` when it is set, because a restore
-  drops and recreates objects.
+  drops and recreates objects. The `backup` profile reads `BACKUP_DATABASE_URL` first:
+  under role separation the runtime role cannot read Prisma's history table, so
+  `setup-roles.sql` gains an optional read-only `amcore_backup` role
+  (`pg_read_all_data`).
 
 - The migration image uses a minimal workspace package and the shared root lock,
   with official pnpm bootstrap and a Node24/Debian Trixie base. The API builder
