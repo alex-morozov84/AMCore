@@ -85,3 +85,14 @@ GRANT CONNECT ON DATABASE amcore TO amcore_observer;
 --   ALTER ROLE amcore_observer LOGIN;
 -- Then grant pg_monitor from a connection authorized to delegate it:
 --   GRANT pg_monitor TO amcore_observer;
+
+-- Optional backup reader for the bundled backup profile (BACKUP_DATABASE_URL).
+-- pg_read_all_data (PostgreSQL 14+) can read every table and sequence, including
+-- Prisma's history in public, and can write nothing. The runtime role gets no
+-- such access, so it still cannot run migrations.
+CREATE ROLE amcore_backup WITH NOLOGIN;
+GRANT CONNECT ON DATABASE amcore TO amcore_backup;
+GRANT pg_read_all_data TO amcore_backup;
+-- In interactive psql:
+--   \password amcore_backup
+--   ALTER ROLE amcore_backup LOGIN;

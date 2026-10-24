@@ -1,8 +1,8 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AI_RUN_GUARDRAIL_REFUSAL_MESSAGE } from '../src/infrastructure/ai/runs/ai-run.constants'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'

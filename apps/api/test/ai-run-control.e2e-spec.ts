@@ -4,7 +4,6 @@ import { v7 as uuidv7 } from 'uuid'
 
 import { aiMessageContentSchema, SystemRole, type WorkCommand } from '@amcore/shared'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AppException } from '../src/common/exceptions'
 import { BackgroundCommandService } from '../src/core/admin/background-command-service'
 import { AiWorkCleanup } from '../src/core/ai/control/ai-work-cleanup'
@@ -16,6 +15,7 @@ import { AiConversationOperatorService } from '../src/core/ai/conversations/ai-c
 import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { aiRunInputFingerprint } from '../src/core/ai/runs/ai-run-input-fingerprint'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import {
   AI_PROVIDER_ADAPTERS,
   type AiProviderAdapter,

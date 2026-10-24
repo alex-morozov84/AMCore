@@ -1,0 +1,40 @@
+# Production opt-in: relay the real visitor IP from the web BFF to the API (ADR-072).
+# docs/operations/single-host-compose.md -> "Visitor IP through the web BFF".
+#
+#   docker compose -f docker-compose.yml -f docker/compose/web.yml \
+#     -f docker/compose/bff-relay.yml up -d
+#
+# Without it, every browser request through the BFF reaches the API from the web
+# container, so all visitors share one rate-limit bucket per handler.
+#
+# The API trusts the relayed header only from one exact socket address, so web gets a
+# fixed IPv4 address in a fixed project subnet. Both values are required and must agree:
+# COMPOSE_WEB_IPV4 inside COMPOSE_NETWORK_SUBNET, not its first address (the gateway),
+# and the subnet free on this host (no overlap with host, VPN or other Docker networks).
+# Changing them on a running deployment: `docker compose down` (never -v), then `up -d`.
+#
+# Scope: one web replica, IPv4. The edge in front must overwrite X-Forwarded-For and strip
+# X-AMCore-Client-Ip; the bundled Caddyfiles do both (Caddy replaces X-Forwarded-For from
+# an untrusted client by default, so do not add `trusted_proxies` without a review).
+# The trust values are set here literally, so an .env value cannot widen them.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${COMPOSE_NETWORK_SUBNET:?Set COMPOSE_NETWORK_SUBNET, e.g. 172.30.240.0/24}
+
+services:
+  web:
+    networks:
+      default:
+        ipv4_address: ${COMPOSE_WEB_IPV4:?Set COMPOSE_WEB_IPV4 inside COMPOSE_NETWORK_SUBNET, e.g. 172.30.240.10}
+    environment:
+      WEB_TRUSTED_CLIENT_IP_HEADER: x-forwarded-for
+
+  api:
+    environment:
+      TRUSTED_WEB_PEERS: ${COMPOSE_WEB_IPV4:?Set COMPOSE_WEB_IPV4}
+
+  worker:
+    environment:
+      TRUSTED_WEB_PEERS: ${COMPOSE_WEB_IPV4:?Set COMPOSE_WEB_IPV4}

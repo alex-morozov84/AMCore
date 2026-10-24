@@ -1,11 +1,11 @@
 import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiConversationControlService } from '../src/core/ai/conversations/ai-conversation-control.service'
 import { AiRunService } from '../src/core/ai/runs/ai-run.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import { AI_PROVIDER_ADAPTERS } from '../src/infrastructure/ai/gateway/ai-gateway.types'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiApprovalExpiryService } from '../src/infrastructure/ai/runs/ai-approval-expiry.service'

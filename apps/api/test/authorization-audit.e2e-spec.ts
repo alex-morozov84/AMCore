@@ -1,8 +1,8 @@
 import { SystemRole } from '@amcore/shared'
 
-import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { admissionForTest } from '../src/core/auth/__tests__/privileged-admission.fixture'
 import { AbilityFactory } from '../src/core/auth/casl/ability.factory'
+import { seedOrgRoles } from '../src/core/system-seed/seed-org-roles'
 
 import {
   type AuthorizationDbFixture,

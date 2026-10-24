@@ -1,9 +1,6 @@
-import {
-  ORG_DEFAULT_PERMISSIONS,
-  ORG_DEFAULT_ROLE_GRANTS,
-} from '../src/core/auth/casl/org-role-defaults.js'
-import { hasCanonicalTemplate } from '../src/core/organizations/system-template-validation.js'
-import { Prisma, type PrismaClient } from '../src/generated/prisma/client.js'
+import { Prisma, type PrismaClient } from '../../generated/prisma/client.js'
+import { ORG_DEFAULT_PERMISSIONS, ORG_DEFAULT_ROLE_GRANTS } from '../auth/casl/org-role-defaults.js'
+import { hasCanonicalTemplate } from '../organizations/system-template-validation.js'
 
 /** Clean installation or exact-v2 no-op only; installed policies need migration. */
 export async function seedOrgRoles(prisma: Pick<PrismaClient, '$transaction'>): Promise<void> {

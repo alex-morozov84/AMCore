@@ -22,6 +22,10 @@ each one assumes the previous is done:
 6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
    VPS.
 
+**One server, building on the host?** Follow
+[Single-host production with Docker Compose](single-host-compose.md) end to end,
+and size the host with [Capacity](capacity.md).
+
 Already running? Reach for whichever concern below applies.
 
 - **[Migration image](migrator-image.md)** — isolated Prisma CLI packaging,

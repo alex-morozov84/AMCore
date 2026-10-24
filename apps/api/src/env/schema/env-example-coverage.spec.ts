@@ -53,6 +53,7 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // Optional bundled `backup`/`restore` profiles — consumed by the `backup`
   // compose service's own environment, not the app's env schema.
   'BACKUP_INTERVAL_SECONDS',
+  'BACKUP_DATABASE_URL',
   'BACKUP_RETENTION_DAYS',
   // apps/web-only (ADR-068): the browser<->Next CSRF trusted-origin
   // allowlist, read directly via `process.env` in apps/web (no EnvService
@@ -77,8 +78,19 @@ const COMPOSE_ONLY_ALLOW = new Set([
   // docker-compose.yml only: the host interface for apps/web's published
   // development port, consumed by Compose rather than either app schema.
   'WEB_PUBLISH_HOST',
+  // docker-compose.yml only: host interfaces for the bundled Postgres and Redis ports.
+  'POSTGRES_PUBLISH_HOST',
+  'REDIS_PUBLISH_HOST',
   // Web build identity, passed through Compose build args; not API runtime env.
   'NEXT_DEPLOYMENT_ID',
+  // Compose build args for the image build stage only (api/worker/seed/web Dockerfiles).
+  'BUILD_NODE_OPTIONS',
+  // Production single-host overlays: docker/compose/bff-relay.yml (fixed subnet and web
+  // address) and docker/compose/postgres-tls.yml (certificate directories).
+  'COMPOSE_NETWORK_SUBNET',
+  'COMPOSE_WEB_IPV4',
+  'POSTGRES_TLS_SERVER_DIR',
+  'POSTGRES_TLS_CA_DIR',
   // apps/web-only (Track 3, ai/models-talk.md FINAL PLAN §3): the browser
   // Content-Security-Policy mode (report-only/enforce), read directly via
   // `process.env` in apps/web (no EnvService there) — same reasoning as

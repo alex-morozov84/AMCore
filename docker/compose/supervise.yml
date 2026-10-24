@@ -1,0 +1,55 @@
+# Supervision overlay for a host that builds images locally (docs/operations/
+# single-host-compose.md). Same restart policies and bounded logs as
+# docker/compose/prod.yml, without its registry image sourcing:
+#
+#   docker compose -f docker-compose.yml -f docker/compose/supervise.yml up -d
+#
+# Docker restarts a container when its process exits (crash, OOM kill, host reboot).
+# It does not restart a container that only reports unhealthy.
+# Keep these values in step with prod.yml (a static test compares them).
+
+x-logging: &logging
+  driver: ${COMPOSE_LOG_DRIVER:-local}
+  options:
+    max-size: ${COMPOSE_LOG_MAX_SIZE:-20m}
+    max-file: '${COMPOSE_LOG_MAX_FILE:-5}'
+
+services:
+  postgres:
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    logging: *logging
+
+  api:
+    restart: unless-stopped
+    logging: *logging
+
+  worker:
+    restart: unless-stopped
+    logging: *logging
+
+  web:
+    restart: unless-stopped
+    logging: *logging
+
+  caddy:
+    restart: unless-stopped
+    logging: *logging
+
+  system-seed:
+    logging: *logging
+
+  backup:
+    logging: *logging
+
+  restore:
+    logging: *logging
+
+  restore-drill:
+    logging: *logging

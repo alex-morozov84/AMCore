@@ -12,8 +12,8 @@ import { execSync } from 'child_process'
 import { PinoLogger } from 'nestjs-pino'
 import { Client } from 'pg'
 
-import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
+import { seedOrgRoles } from '../src/core/system-seed/seed-org-roles'
 import {
   MANAGED_WORKERS,
   type ManagedWorkerBinding,
