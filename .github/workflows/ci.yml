@@ -607,8 +607,8 @@ jobs:
 
       - name: Install Trivy
         env:
-          TRIVY_VERSION: 0.75.0
-          TRIVY_LINUX_64BIT_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+          TRIVY_VERSION: 0.76.1
+          TRIVY_LINUX_64BIT_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           asset="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"

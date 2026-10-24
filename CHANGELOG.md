@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Installations use pnpm 12.15, including its registry package-name validation.
+  Updated lint parents select Handlebars 4.7.10; email tests use Happy DOM 21
+  with CSS and iframe loading disabled by default. API parsing uses the ESM
+  content-type 3 package. Node 24 base pins and security CLI pins are refreshed;
+  existing installation policies and required CI coverage remain in force.
+
 - The bundled Postgres and Redis publish their ports on `127.0.0.1` by default, like
   `api` and `web` (`POSTGRES_PUBLISH_HOST` / `REDIS_PUBLISH_HOST` widen them). Docker
   publishing bypasses host firewalls, so the old `0.0.0.0` default exposed the fixed

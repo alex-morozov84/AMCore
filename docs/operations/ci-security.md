@@ -599,10 +599,14 @@ gap: on a weekly schedule (and on-demand via `workflow_dispatch`) it runs
 `scripts/dependency-freshness.mjs` and **upserts a single tracking issue** (label
 `dependency-freshness`, edited in place) listing all four categories (semver-major npm updates, Docker digest
 drift, curl-pinned tool releases and the toolchain). It opens no PRs and is
-a report only — triage each item and bump deliberately. For semver-major updates,
-use a separate PR, read the upstream migration notes/changelog, record any
-intentional deferral in the product's own backlog or issue tracker, and run the
-full relevant CI before merging.
+a report only — triage each item and bump deliberately. Review semver-major
+updates manually and read their upstream migration notes. Use a separate PR
+when an update needs an independent migration or rollback. Explicitly reviewed
+compatible updates may share a PR when each update has identified risks and
+checks, and the combined rollback remains coherent. Preserve all required CI
+coverage and installation policies. Record intentional deferrals in the
+product's own backlog or issue tracker. Dependabot's major-version ignore and
+automatic update groups remain unchanged.
 
 The root workspace explicitly sets `minimumReleaseAge: 1440` and
 `minimumReleaseAgeStrict: true`. It also sets
