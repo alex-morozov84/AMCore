@@ -21,6 +21,7 @@ export const METRIC_NAMES = {
   aiRunDue: 'amcore_ai_run_due',
   cacheOperationsTotal: 'amcore_cache_operations_total',
   storageProbeState: 'amcore_storage_probe_state',
+  telegramReachabilityState: 'amcore_telegram_reachability_state',
   storagePublicCheckState: 'amcore_storage_public_check_state',
   storagePrivateExposed: 'amcore_storage_private_exposed',
   storageOperationsTotal: 'amcore_storage_operations_total',

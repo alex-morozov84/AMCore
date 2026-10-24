@@ -45,6 +45,7 @@ const HEADLINE: Record<Headline, { tone: Tone; icon: Icon }> = {
   unknown: { tone: 'warning', icon: CircleHelp },
   simulated: { tone: 'warning', icon: TriangleAlert },
   working: { tone: 'success', icon: CircleCheck },
+  checkPassed: { tone: 'success', icon: CircleCheck },
   lastCheckOld: { tone: 'warning', icon: TriangleAlert },
   setUpNotVerified: { tone: 'muted', icon: CircleDashed },
   inProgress: { tone: 'muted', icon: Clock },
@@ -133,6 +134,20 @@ const RESULT: Record<IntegrationEvidence['result'], { tone: Tone; icon: Icon }> 
   simulated: { tone: 'warning', icon: TriangleAlert },
 }
 
+type IntegrationsT = ReturnType<typeof useTranslations<'console.integrations'>>
+
+/**
+ * Failure codes are short slugs chosen by each integration, so one code can mean different things
+ * on different rows. A row-specific `failureFor.<id>.<code>` wins over the shared `failure.<code>`.
+ */
+function failureText(t: IntegrationsT, id: string, code: string | null): string | null {
+  if (!code) return null
+  const specific = `failureFor.${id}.${code}` as Parameters<typeof t.has>[0]
+  if (t.has(specific)) return t(specific)
+  const shared = `failure.${code}` as Parameters<typeof t.has>[0]
+  return t.has(shared) ? t(shared) : null
+}
+
 /** Last observation: what, how old, where it was taken, and the safe reason when it failed. */
 export function IntegrationLastCheck({ item, now }: { item: IntegrationItem; now: number }) {
   const t = useTranslations('console.integrations')
@@ -144,8 +159,7 @@ export function IntegrationLastCheck({ item, now }: { item: IntegrationItem; now
     )
   const evidence = evidenceAt(item.evidence, now)
   const { tone, icon } = RESULT[evidence.result]
-  const failureKey = `failure.${evidence.failure ?? ''}` as Parameters<typeof t.has>[0]
-  const failure = evidence.failure && t.has(failureKey) ? t(failureKey) : null
+  const failure = failureText(t, item.id, evidence.failure)
   const missing = evidence.result === 'none' && evidence.scope === 'provider_acceptance'
   const resultWord = t(`result.${evidence.result}`)
   const word = missing

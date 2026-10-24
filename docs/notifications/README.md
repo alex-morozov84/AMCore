@@ -237,6 +237,20 @@ The relay itself is just a reverse proxy that forwards `/bot*` requests
 unmodified to the real `https://api.telegram.org` (nginx/Caddy or similar) —
 AMCore doesn't ship one.
 
+**Is Telegram reachable?** Every worker with a token asks `getMe` once a minute
+through the same `TELEGRAM_API_BASE_URL`, so a blocked network, a refused token
+or a broken relay shows up before users notice missing messages. The result is
+the `amcore_telegram_reachability_state` metric with example alerts
+([Telegram runbook](../operations/runbooks/telegram.md)) and, with the optional
+Console, the **Telegram** row on **Integrations**. The check sends nothing and
+does not cover the incoming webhook.
+
+**Removing the Telegram channel** from `NOTIFICATION_CHANNELS` also removes its
+check: delete `telegram-reachability.service.ts` (and its provider line in
+`notification-delivery.modules.ts`) and the `TELEGRAM_REACHABILITY_JOB` entry in
+`scheduled-jobs.catalogue.ts`, in the same change. `test/process-role.e2e-spec.ts`
+fails while the catalogue still lists the job but no worker registers it.
+
 **Only point this at infrastructure you control.** The bot token travels in the
 URL path of every request, so whoever terminates TLS on the relay gets full
 control of the bot (read/send messages, change the webhook). Never point it at

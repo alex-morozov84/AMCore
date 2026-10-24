@@ -5,10 +5,10 @@ import { EnvService } from '../../../../env/env.service.js'
 
 import {
   DEFAULT_TELEGRAM_API_BASE_URL,
-  TELEGRAM_MAX_RESPONSE_BYTES,
   TELEGRAM_REQUEST_TIMEOUT_MS,
   TelegramDeliveryError,
 } from './telegram.constants.js'
+import { readBoundedBody } from './telegram-response-body.js'
 
 /** One outbound text message. Plain text only — no `parse_mode` (no escaping/injection surface). */
 export interface TelegramSendMessageInput {
@@ -126,9 +126,9 @@ export class TelegramBotApiClient {
           ? AbortSignal.any([controller.signal, externalSignal])
           : controller.signal,
       })
-      const text = await readBounded(response)
-      if (text === undefined) return 'transport_error'
-      return { httpStatus: response.status, body: parseBody(text) }
+      const body = await readBoundedBody(response)
+      if ('error' in body) return 'transport_error'
+      return { httpStatus: response.status, body: parseBody(body.text) }
     } catch {
       // Never leak the token-bearing URL or the raw error.
       return 'transport_error'
@@ -136,44 +136,6 @@ export class TelegramBotApiClient {
       clearTimeout(timer)
     }
   }
-}
-
-/**
- * Read the body with a true **byte** ceiling. Rejects an honest oversize `content-length` before
- * reading, then streams `response.body` counting `Uint8Array.byteLength` per chunk and **cancels
- * early** the moment the cumulative bytes exceed the ceiling — so a chunked, compressed (fetch
- * decompresses), or multibyte body cannot bypass it (UTF-16 `String.length` would). Returns the
- * decoded text, or `undefined` (→ transient) on oversize/stream error.
- */
-async function readBounded(response: Response): Promise<string | undefined> {
-  const declared = Number(response.headers.get('content-length') ?? '')
-  if (Number.isFinite(declared) && declared > TELEGRAM_MAX_RESPONSE_BYTES) {
-    await response.body?.cancel().catch(() => undefined)
-    return undefined
-  }
-  if (!response.body) {
-    const text = await response.text()
-    return Buffer.byteLength(text, 'utf8') > TELEGRAM_MAX_RESPONSE_BYTES ? undefined : text
-  }
-
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done || value === undefined) break
-      total += value.byteLength
-      if (total > TELEGRAM_MAX_RESPONSE_BYTES) {
-        await reader.cancel().catch(() => undefined)
-        return undefined
-      }
-      chunks.push(value)
-    }
-  } catch {
-    return undefined
-  }
-  return Buffer.concat(chunks).toString('utf8')
 }
 
 /** Parse + bounded-project the body; an unparseable/unexpected body yields an empty projection. */

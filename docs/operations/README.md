@@ -103,6 +103,8 @@ Already running? Reach for whichever concern below applies.
   permissions, sampling delay and recovery; see
   [storage configuration](../storage/configuration.md#active-file-monitoring-and-readiness)
   for cadence, operation budget and production setup.
+- **[Telegram check](runbooks/telegram.md)** — the workers' `getMe` check of Telegram: metric
+  states, the two alerts, network/token/relay causes and recovery.
 - **[Adding tests](adding-tests.md)** — discovery, local execution and CI group ownership.
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,

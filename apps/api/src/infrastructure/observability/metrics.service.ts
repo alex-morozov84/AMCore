@@ -28,6 +28,7 @@ export type RedisMetricsClient =
   | 'throttler'
   | 'notif_subscriber'
   | 'ai_run_subscriber'
+  | 'telegram_check'
 export type RedisMetricsEvent = 'error' | 'reconnecting' | 'degraded'
 
 /** Outcome of a best-effort realtime publish (ADR-053). */

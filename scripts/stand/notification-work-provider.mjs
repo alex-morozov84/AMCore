@@ -8,6 +8,15 @@ export function notificationProviderService(m) {
       const reply = (status, body) => { res.writeHead(status, {'content-type':'application/json'}); res.end(JSON.stringify(body)); };
       if (req.url === '/health') return reply(200, {ok:true});
       if (req.method !== 'POST') return reply(404, {ok:false});
+      // Telegram check: the answer comes from an optional mode file, so a preview can show each state.
+      if (req.url.endsWith('/getMe')) {
+        req.resume();
+        const mode = fs.existsSync('/app/uploads/getme-mode') ? fs.readFileSync('/app/uploads/getme-mode', 'utf8').trim() : 'ok';
+        if (mode === 'slow') return;
+        if (mode === 'malformed') { res.writeHead(200, {'content-type':'text/html'}); return res.end('<html>'); }
+        if (/^[0-9]{3}$/.test(mode)) return reply(Number(mode), {ok:false,error_code:Number(mode)});
+        return reply(200, {ok:true,result:{id:100000001,is_bot:true}});
+      }
       let body = '', bytes = 0;
       req.on('data', chunk => { bytes += chunk.length; if (bytes > 131072) req.destroy(); else body += chunk; });
       req.on('end', () => {

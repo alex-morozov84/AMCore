@@ -188,7 +188,8 @@ existing application labels, buckets, alert rules or dashboard queries. Tests us
 - `redis_client_events_total{client,event,role}` — `client` is one of
   `shared`, `queue_producer`, `queue_worker`, `throttler` (unchanged since
   ADR-073 — it describes the Redis-client role, not the specific storage
-  implementation behind it), `notif_subscriber`, or `ai_run_subscriber`;
+  implementation behind it), `notif_subscriber`, `ai_run_subscriber`, or
+  `telegram_check` (the worker's dedicated connection for the Telegram check);
   `event=error|reconnecting|degraded`.
 - `redis_ping_seconds` — round-trip latency of a `PING` against the shared
   Redis client, sampled at scrape time. A cheap interim signal; a real
@@ -240,6 +241,15 @@ unchanged. Its "Oldest queued job" is a sampled creation age and has no metric.
 
 - `cache_operations_total{cache,result,role}` — `cache=user|permissions|
 ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
+
+**Telegram**
+
+- `telegram_reachability_state{state}` — each worker's own `getMe` check of Telegram, once a
+  minute, only when `TELEGRAM_BOT_TOKEN` is set (otherwise the metric does not exist). Exactly
+  one of ok/failed/unknown/stale/none is 1; `stale` means the worker's check stopped updating,
+  `none` that it has no result since start. `AMCoreTelegramCheckFailing` (10 minutes) and
+  `AMCoreTelegramCheckNotStarted` (15 minutes) alert per worker. See
+  [Telegram runbook](runbooks/telegram.md).
 
 **Storage & media**
 
