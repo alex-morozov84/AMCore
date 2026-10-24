@@ -293,9 +293,15 @@ describe('Support mail dispatch deadlines and one physical transport', () => {
   it('rejects an old delayed callback after another attempt completes', async () => {
     const resume = deferred<void>()
     let physicalCalls = 0
+    let oldCallbackRefused = false
     email.sendDirectSecret.mockImplementationOnce(async (_params, _template, fence) => {
       await resume.promise
-      expect(fence).toThrow('Secret transport admission expired')
+      try {
+        fence()
+        physicalCalls++
+      } catch {
+        oldCallbackRefused = true
+      }
       return { outcome: 'not_started', reason: 'precheck' }
     })
     const first = prepare(),
@@ -311,6 +317,7 @@ describe('Support mail dispatch deadlines and one physical transport', () => {
     expect(await service.run(actor, user.id, prepare())).toMatchObject({ outcome: 'simulated' })
     resume.resolve()
     await flush()
+    expect(oldCallbackRefused).toBe(true)
     expect(physicalCalls).toBe(1)
     expect(await service.receipt(actor, user.id, first)).toMatchObject({ outcome: 'unknown' })
   })
