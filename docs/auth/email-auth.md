@@ -190,6 +190,10 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
    emailed link cannot rely on a browser cookie
 4. Token expires in **15 minutes**
 
+SHA-256 stores a lookup key for the 256-bit random token, not a human password.
+Password values use Argon2id. A slow password KDF is unnecessary for these random tokens;
+changing their digest format would invalidate existing links.
+
 **Success response** `200 OK` (always the same, regardless of whether the email exists):
 
 ```json

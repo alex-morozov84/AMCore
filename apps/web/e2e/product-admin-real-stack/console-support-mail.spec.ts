@@ -49,10 +49,16 @@ test('operator recovery and verification use real localized website mail with sa
   })
   guardedSql(
     `INSERT INTO core.users (id,email,"emailCanonical",name,"passwordHash",locale,"updatedAt")
-    SELECT :'target',:'recipient',:'recipient','Support recipient',"passwordHash",:'recipientLocale',now() FROM core.users WHERE id=:'operator';
+    SELECT :'target',:'recipient',:'recipient','Support recipient',"passwordHash",:'recipient_locale',now() FROM core.users WHERE id=:'operator';
     INSERT INTO core.users (id,email,"emailCanonical",name,locale,"updatedAt")
-    VALUES (:'passwordless','support-passwordless@e2e.amcore.test','support-passwordless@e2e.amcore.test','Passwordless recipient',:'recipientLocale',now());`,
-    { target, recipient, operator: prepared.userId, passwordless, recipientLocale }
+    VALUES (:'passwordless','support-passwordless@e2e.amcore.test','support-passwordless@e2e.amcore.test','Passwordless recipient',:'recipient_locale',now());`,
+    {
+      target,
+      recipient,
+      operator: prepared.userId,
+      passwordless,
+      recipient_locale: recipientLocale,
+    }
   )
 
   await page.goto(localizedFrontendUrl(consoleOrigin, baseLocale, 'login'))

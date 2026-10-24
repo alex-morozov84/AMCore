@@ -224,7 +224,11 @@ export class TokenManagerService {
     return randomBytes(32).toString('hex') // 64 hex chars
   }
 
-  /** Hash token with SHA-256 for storage */
+  /**
+   * SHA-256 lookup key for the 256-bit random mail token, never a human password.
+   * A slow password KDF adds no protection against guessing this random value.
+   * Preserve the digest format so previously issued links remain usable.
+   */
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex')
   }

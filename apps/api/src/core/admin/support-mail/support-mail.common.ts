@@ -15,6 +15,8 @@ export const MAIL_LIMITS = {
   retentionMs: 604_800_000,
   physical: 2,
 } as const
+// Equality fingerprint of recipient/policy metadata, never a password or credential.
+// PASSWORD_RESET_EXPIRY_MINUTES is a numeric lifetime, despite its password-related name.
 export const sha = (value: string): string => createHash('sha256').update(value).digest('hex')
 export const recipientBinding = (user: Pick<User, 'emailCanonical'>): string =>
   sha(user.emailCanonical)

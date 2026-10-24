@@ -76,6 +76,12 @@ unknown with a safe reason. An accepted response requires a bounded, valid
 provider ID and no contradictory error. It does not prove delivery or completion.
 This does not change the public `sendNow()` compatibility contract.
 
+Attempt bindings use SHA-256 to compare the canonical recipient and non-secret
+policy metadata. The password-reset setting in that metadata is a numeric link
+lifetime, not a password. These fingerprints do not store credentials or replace
+Argon2id password hashing. Random mail-token lookup keys follow the
+[authentication contract](../auth/email-auth.md#password-reset).
+
 ## Notification Email Channel
 
 Notification email is not the email queue. The notifications subsystem stores
