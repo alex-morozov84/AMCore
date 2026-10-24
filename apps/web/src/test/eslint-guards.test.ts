@@ -12,8 +12,9 @@
 // today. The structural one is the reason this cannot silently regress: it
 // derives from the config, so it covers guards that do not exist yet.
 
-import { spawnSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import path from 'node:path'
+import { promisify } from 'node:util'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -26,6 +27,7 @@ beforeAll(() => {
 })
 afterAll(() => fixture?.cleanup())
 
+const execFileAsync = promisify(execFile)
 const WEB_ROOT = path.resolve(import.meta.dirname, '../..')
 
 async function lint(code: string, filePath: string) {
@@ -378,21 +380,16 @@ describe('FSD boundaries', () => {
   // The config must not rely on a deprecated plugin API. Run in a child process
   // on purpose: the plugin warns through `console` once per process, so an
   // in-process assertion would pass simply because an earlier test consumed it.
-  // Generous timeout on purpose: this spawns a full ESLint run over `src`, which
-  // takes ~1.5 s locally and ~7.5 s on CI. Vitest's 5 s default killed it on the
-  // first CI run. Narrowing the target would be faster but reintroduces the
-  // "no imports, so the plugin never warns" false green this check exists to
-  // avoid, so the run stays wide and the budget is stated instead.
-  it('uses no deprecated boundaries API', () => {
-    const run = spawnSync(
-      'node',
-      // The whole tree on purpose. The plugin only warns once it actually
-      // resolves a dependency, so a file with no imports reports nothing --
-      // an earlier version of this test linted `manifest.ts` and passed with a
-      // deprecated rule reintroduced. Linting `src` also survived the `views`
-      // -> `_pages` rename (Track 9), which a narrower path would not have.
+  // Full-tree lint competes with the unit workers on CI. Keep its process
+  // asynchronous and give it a bounded two-minute budget, plus ten seconds
+  // for Vitest to report a process failure instead of masking its diagnostics.
+  it('uses no deprecated boundaries API', async () => {
+    const run = await execFileAsync(
+      process.execPath,
+      // Keep the whole tree: files without imports cannot exercise the plugin's
+      // dependency resolution and can hide deprecated API warnings.
       [path.resolve(WEB_ROOT, '../../scripts/lint.mjs'), '--scope', 'web', 'src'],
-      { cwd: WEB_ROOT, encoding: 'utf8' }
+      { cwd: WEB_ROOT, encoding: 'utf8', timeout: 120_000, maxBuffer: 20 * 1024 * 1024 }
     )
 
     // stdout AND stderr: the plugin warns through `console.warn`, which is
@@ -400,10 +397,10 @@ describe('FSD boundaries', () => {
     // happily with a deprecated rule reintroduced.
     const output = `${run.stdout ?? ''}${run.stderr ?? ''}`
 
-    expect(run.status, output).toBe(0)
+    // execFile rejects on a nonzero exit, signal, timeout or output overflow.
     expect(output).not.toMatch(/\[boundaries]\[warning]/)
     expect(output).not.toMatch(/deprecated/i)
-  }, 60_000)
+  }, 130_000)
 })
 
 describe('token-only styling', () => {
