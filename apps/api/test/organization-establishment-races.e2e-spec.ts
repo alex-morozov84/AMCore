@@ -4,10 +4,10 @@ import { Client } from 'pg'
 
 import { SystemRole } from '@amcore/shared'
 
-import { seedOrgRoles } from '../prisma/seed-org-roles'
 import { OrganizationCreationService } from '../src/core/organizations/organization-creation.service'
 import type { SetupOperator } from '../src/core/organizations/organization-setup-admission'
 import { OrganizationSetupOperations } from '../src/core/organizations/organization-setup-operations'
+import { seedOrgRoles } from '../src/core/system-seed/seed-org-roles'
 import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
 

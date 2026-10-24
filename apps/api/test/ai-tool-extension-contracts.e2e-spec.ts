@@ -6,10 +6,10 @@ import request from 'supertest'
 
 import { Action, Subject } from '@amcore/shared'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { ConflictException, ForbiddenException, NotFoundException } from '../src/common/exceptions'
 import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunRepository } from '../src/infrastructure/ai/runs/ai-run.repository'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'

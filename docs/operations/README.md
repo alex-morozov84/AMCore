@@ -22,6 +22,10 @@ each one assumes the previous is done:
 6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
    VPS.
 
+**One server, building on the host?** Follow
+[Single-host production with Docker Compose](single-host-compose.md) end to end,
+and size the host with [Capacity](capacity.md).
+
 Already running? Reach for whichever concern below applies.
 
 - **[Migration image](migrator-image.md)** — isolated Prisma CLI packaging,
@@ -103,6 +107,8 @@ Already running? Reach for whichever concern below applies.
   permissions, sampling delay and recovery; see
   [storage configuration](../storage/configuration.md#active-file-monitoring-and-readiness)
   for cadence, operation budget and production setup.
+- **[Telegram check](runbooks/telegram.md)** — the workers' `getMe` check of Telegram: metric
+  states, the two alerts, network/token/relay causes and recovery.
 - **[Adding tests](adding-tests.md)** — discovery, local execution and CI group ownership.
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,

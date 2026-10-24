@@ -188,7 +188,8 @@ existing application labels, buckets, alert rules or dashboard queries. Tests us
 - `redis_client_events_total{client,event,role}` — `client` is one of
   `shared`, `queue_producer`, `queue_worker`, `throttler` (unchanged since
   ADR-073 — it describes the Redis-client role, not the specific storage
-  implementation behind it), `notif_subscriber`, or `ai_run_subscriber`;
+  implementation behind it), `notif_subscriber`, `ai_run_subscriber`, or
+  `telegram_check` (the worker's dedicated connection for the Telegram check);
   `event=error|reconnecting|degraded`.
 - `redis_ping_seconds` — round-trip latency of a `PING` against the shared
   Redis client, sampled at scrape time. A cheap interim signal; a real
@@ -240,6 +241,15 @@ unchanged. Its "Oldest queued job" is a sampled creation age and has no metric.
 
 - `cache_operations_total{cache,result,role}` — `cache=user|permissions|
 ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
+
+**Telegram**
+
+- `telegram_reachability_state{state}` — each worker's own `getMe` check of Telegram, once a
+  minute, only when `TELEGRAM_BOT_TOKEN` is set (otherwise the metric does not exist). Exactly
+  one of ok/failed/unknown/stale/none is 1; `stale` means the worker's check stopped updating,
+  `none` that it has no result since start. `AMCoreTelegramCheckFailing` (10 minutes) and
+  `AMCoreTelegramCheckNotStarted` (15 minutes) alert per worker. See
+  [Telegram runbook](runbooks/telegram.md).
 
 **Storage & media**
 
@@ -518,13 +528,14 @@ cannot resolve a bare relative path against a Git checkout the way a real
 hyperlink would need) — a fork's own checkout has the linked file at the
 same relative location regardless of its Git remote. `docs/operations/runbooks/`
 ships one file per category (`http`, `node-runtime`,
-`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`, `storage`),
+`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`, `storage`,
+`telegram`),
 each anchor matching a `runbook_path` above exactly: symptom, ranked likely
 causes, diagnostic steps with executable PromQL derived from the rule and the matching
 dashboard panel, mitigation, and escalation guidance.
 
-Every alert is proven, not just written: every one of the 32 rules in
-`docs/operations/prometheus/tests/amcore-alerts_test.yml` has both a
+Every alert is proven, not just written: every rule in `amcore-alerts.yml` has, in
+`docs/operations/prometheus/tests/amcore-alerts_test.yml`, both a
 firing-case test (fires on a constructed bad case) and a genuine
 healthy-case test (`exp_alerts: []`, stays silent when nothing is wrong).
 Every alert that joins two metric families with a boolean `or`/`and` — the
@@ -671,7 +682,11 @@ match; and the public/private-boundary ratchet (below) holds.
 
 **Live tier** (`pnpm test:observability-contract:live`, the `Observability
 contract (live)` CI job, `needs: [promtool]` — boots the real `local-infra` +
-`monitoring` Compose profiles under an isolated project): the metric-reference
+`monitoring` Compose profiles under an isolated project):
+`docker/testing/observability-live.yml` supplies a fake Telegram token only to the
+worker, with a container-loopback URL on a port blocked by Node fetch. This enables
+the optional metric without contacting Telegram or proving provider reachability.
+The metric-reference
 guard queries `GET /api/v1/targets/metadata` scoped to `job=~"amcore-(api|worker)"`
 (never Prometheus's own self-scrape families) to build the real exposed-metric
 set live, expanding histogram families into `_bucket`/`_sum`/`_count`, and
@@ -679,7 +694,7 @@ parses every shipped expression through `POST /api/v1/parse_query` to assert
 every referenced name is real; every expression is also evaluated via
 `POST /api/v1/query`, distinguishing a genuine query error from a valid empty
 result; `GET /api/v1/targets` asserts `amcore-api`/`amcore-worker` are exactly
-`up`; `GET /api/v1/rules` asserts exactly the 8 default groups are loaded
+`up`; `GET /api/v1/rules` asserts exactly the declared default groups are loaded
 and the optional SLO groups are genuinely absent (proving the off-by-default
 glob above holds live, not only on paper); `GET /api/v1/alertmanagers` asserts
 Alertmanager discovery resolved; and Grafana is checked three ways — the

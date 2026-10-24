@@ -4,12 +4,12 @@ import request from 'supertest'
 
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { ConflictException } from '../src/common/exceptions'
 import { AiApprovalService } from '../src/core/ai/approvals/ai-approval.service'
 import { AiConversationControlService } from '../src/core/ai/conversations/ai-conversation-control.service'
 import { AiConversationOperatorService } from '../src/core/ai/conversations/ai-conversation-operator.service'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import { currentTimeTool } from '../src/infrastructure/ai/tools/reference/current-time.tool'

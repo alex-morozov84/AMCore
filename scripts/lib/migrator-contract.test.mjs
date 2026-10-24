@@ -41,7 +41,8 @@ function editLock(directory, change) {
 // The manager document precedes the application graph. TS7 in the API stays legal;
 // Prisma's reachable upstream TS5 peer is legal in the migration graph.
 test('the shared lock guards the migrator closure independently of the API compiler', () => {
-  assert.deepEqual(verifyMigrator(root), { prisma: '7.10.1', pnpm: '12.14.0' })
+  const manager = JSON.parse(readFileSync(join(root, 'package.json'))).packageManager
+  assert.deepEqual(verifyMigrator(root), { prisma: '7.10.1', pnpm: manager.slice('pnpm@'.length) })
 })
 
 for (const name of ['prisma', '@prisma/client', '@prisma/adapter-pg'])

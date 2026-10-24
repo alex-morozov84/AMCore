@@ -1,4 +1,4 @@
-import type { AiProviderType } from '../src/generated/prisma/client'
+import type { AiProviderType } from '../../generated/prisma/client.js'
 
 /**
  * Declarative AI catalog seed data (Track C — ADR-054, Arc A). The intent is that a fresh

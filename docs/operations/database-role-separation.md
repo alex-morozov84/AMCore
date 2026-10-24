@@ -245,6 +245,19 @@ resolve` never touch it. The production migrator role needs no shadow-DB
   in depth (a second, independent layer alongside the trigger), but it is
   optional hardening, not something this guide requires.
 
+## A backup reader role
+
+`pg_dump` needs read access to every table, including Prisma's
+`public._prisma_migrations`, which `amcore_runtime` deliberately cannot read (so
+it also cannot run migrations). Do not widen the runtime role for backups. The
+optional last section of `setup-roles.sql` creates `amcore_backup` instead: it is a
+member of PostgreSQL's predefined `pg_read_all_data` role (PostgreSQL 14+), so it
+reads every table and sequence and can write nothing. Set its password with
+`\password amcore_backup` while it is `NOLOGIN`, then `ALTER ROLE amcore_backup
+LOGIN`, and point the bundled `backup` profile at it with `BACKUP_DATABASE_URL`.
+Granting a predefined role needs a superuser or a provider admin allowed to grant
+it.
+
 ## A third role for query investigation
 
 `setup-roles.sql` also provisions `amcore_observer` — a read-only role for

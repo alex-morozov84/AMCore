@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common'
 import { SchedulerRegistry } from '@nestjs/schedule'
 import request from 'supertest'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'

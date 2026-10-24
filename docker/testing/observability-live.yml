@@ -1,0 +1,8 @@
+# Enable the optional Telegram metric in the isolated live-contract worker.
+# Never send the fake token to Telegram: port 9 is blocked by Node fetch,
+# and the loopback address belongs to this container, not the host.
+services:
+  worker:
+    environment:
+      TELEGRAM_BOT_TOKEN: ci-fake-token-never-a-real-secret
+      TELEGRAM_API_BASE_URL: http://127.0.0.1:9

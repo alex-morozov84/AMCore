@@ -3,10 +3,9 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { config } from 'dotenv'
 import { Pool } from 'pg'
 
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
+import { seedOrgRoles } from '../src/core/system-seed/seed-org-roles'
 import { PrismaClient } from '../src/generated/prisma/client'
-
-import { seedAiCatalog } from './seed-ai-catalog'
-import { seedOrgRoles } from './seed-org-roles'
 
 // Prisma 7 requires a driver adapter; mirror prisma.config.ts so `prisma db seed`
 // (and a standalone `tsx prisma/seed.ts`) resolve `DATABASE_URL` and connect.

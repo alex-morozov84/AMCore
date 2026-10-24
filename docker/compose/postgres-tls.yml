@@ -1,0 +1,50 @@
+# Production overlay for the bundled Postgres (local-infra profile): TLS-only network
+# access. docs/operations/single-host-compose.md -> "Database TLS".
+#
+#   docker compose -f docker-compose.yml -f docker/compose/postgres-tls.yml ...
+#
+# Two host directories, both required:
+#   POSTGRES_TLS_SERVER_DIR  server.crt (SAN DNS:postgres) and server.key (mode 0600,
+#                            owned by the image's postgres user). Mounted as a directory,
+#                            so a renewal is: replace both files, then reload Postgres.
+#   POSTGRES_TLS_CA_DIR      ca.crt only. Clients verify the server with it. Never put the
+#                            CA private key here.
+# Client URLs use host `postgres` and
+#   ?sslmode=verify-full&sslrootcert=/etc/amcore/db-ca/ca.crt
+#
+# pg_hba.tls.conf allows only the application roles over TLS; the amcore superuser can
+# connect only through the container's Unix socket (`docker compose exec`).
+x-db-ca: &db-ca
+  - ${POSTGRES_TLS_CA_DIR:?Set POSTGRES_TLS_CA_DIR to the directory holding ca.crt}:/etc/amcore/db-ca:ro
+
+services:
+  postgres:
+    # The base options (pg_stat_statements preload, track_utility=off) repeated in full,
+    # then TLS. A static test keeps this list in step with docker-compose.yml.
+    command: >-
+      postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=top
+      -c pg_stat_statements.track_utility=off
+      -c ssl=on -c ssl_cert_file=/etc/postgresql/tls/server.crt
+      -c ssl_key_file=/etc/postgresql/tls/server.key
+      -c hba_file=/etc/postgresql/pg_hba.tls.conf
+    volumes:
+      - ${POSTGRES_TLS_SERVER_DIR:?Set POSTGRES_TLS_SERVER_DIR to the directory holding server.crt and server.key}:/etc/postgresql/tls:ro
+      - ./docker/postgres/pg_hba.tls.conf:/etc/postgresql/pg_hba.tls.conf:ro
+
+  migrate:
+    volumes: *db-ca
+
+  api:
+    volumes: *db-ca
+
+  worker:
+    volumes: *db-ca
+
+  system-seed:
+    volumes: *db-ca
+
+  backup:
+    volumes: *db-ca
+
+  restore:
+    volumes: *db-ca

@@ -1087,6 +1087,93 @@ tests:
         alertname: AMCoreRealtimeStartupFailurePage
         exp_alerts: []
 
+  # Telegram check: one worker stays unhealthy for 15 minutes while its reason changes
+  # failed -> unknown -> stale (each shorter than the 10m `for`), then recovers. The alert must
+  # keep one identity without `state`, fire at 10m, and resolve after ok. worker-b stays healthy.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-a:5002",state="failed"}'
+        values: '1x4 0x11'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-a:5002",state="unknown"}'
+        values: '0x4 1x4 0x6'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-a:5002",state="stale"}'
+        values: '0x9 1x4 0x1'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-a:5002",state="ok"}'
+        values: '0x14 1x1'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-a:5002",state="none"}'
+        values: '0x16'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-b:5002",state="ok"}'
+        values: '1x16'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-b:5002",state="failed"}'
+        values: '0x16'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-b:5002",state="unknown"}'
+        values: '0x16'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-b:5002",state="stale"}'
+        values: '0x16'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-b:5002",state="none"}'
+        values: '0x16'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: AMCoreTelegramCheckFailing
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: AMCoreTelegramCheckFailing
+        exp_alerts:
+          - exp_labels:
+              job: amcore-worker
+              instance: worker-a:5002
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore worker cannot confirm Telegram'
+              description: 'For 10m this worker could not confirm that Telegram answers and accepts the bot token (failed, unclear or no recent check). Notifications sent by this worker may not arrive.'
+              runbook_path: docs/operations/runbooks/telegram.md#check-failing
+      - eval_time: 14m
+        alertname: AMCoreTelegramCheckFailing
+        exp_alerts:
+          - exp_labels:
+              job: amcore-worker
+              instance: worker-a:5002
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore worker cannot confirm Telegram'
+              description: 'For 10m this worker could not confirm that Telegram answers and accepts the bot token (failed, unclear or no recent check). Notifications sent by this worker may not arrive.'
+              runbook_path: docs/operations/runbooks/telegram.md#check-failing
+      - eval_time: 16m
+        alertname: AMCoreTelegramCheckFailing
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: AMCoreTelegramCheckNotStarted
+        exp_alerts: []
+
+  # No result after start: `none` for 15m alerts; a normal start (a result within ~68 s) does not.
+  - interval: 1m
+    input_series:
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-c:5002",state="none"}'
+        values: '1x20'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-d:5002",state="none"}'
+        values: '1 0x19'
+      - series: 'amcore_telegram_reachability_state{job="amcore-worker",instance="worker-d:5002",state="ok"}'
+        values: '0 1x19'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: AMCoreTelegramCheckNotStarted
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AMCoreTelegramCheckNotStarted
+        exp_alerts:
+          - exp_labels:
+              job: amcore-worker
+              instance: worker-c:5002
+              state: none
+              severity: ticket
+            exp_annotations:
+              summary: 'AMCore worker has no Telegram check result'
+              description: 'For 15m after start this worker has produced no Telegram check result. The check job may not be running on it.'
+              runbook_path: docs/operations/runbooks/telegram.md#check-not-started
+      - eval_time: 15m
+        alertname: AMCoreTelegramCheckFailing
+        exp_alerts: []
+
   - interval: 1m
     input_series:
       - series: 'amcore_storage_probe_state{driver="s3",state="failed",instance="api:5002"}'

@@ -77,8 +77,10 @@ bound from this setting alone.
 
 ## VPS + Docker Compose
 
-The owned recipe. See [Deployment &
-migrations](deployment.md#production-rollout-via-registry-image-pull-path),
+The owned recipe. Start with [Single-host production with Docker
+Compose](single-host-compose.md) (images built on the host) or [Deployment &
+migrations](deployment.md#production-rollout-via-registry-image-pull-path) (images
+pulled by digest); size the host with [Capacity](capacity.md). See also
 [Production deploy profile](production-deploy-profile.md), [Database role
 separation](database-role-separation.md), [Backup &
 restore](backup-restore.md), and [Secret rotation](secret-rotation.md) — this

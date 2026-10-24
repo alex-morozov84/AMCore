@@ -4,7 +4,11 @@
 }
 
 {$CADDY_DOMAIN} {
-	reverse_proxy api:5002
+	reverse_proxy api:5002 {
+		# The API trusts this header only from TRUSTED_WEB_PEERS (the web BFF relay). A client
+		# must never deliver it through the edge, whatever that setting is.
+		header_up -X-AMCore-Client-Ip
+	}
 }
 
 {$CADDY_WEB_DOMAIN} {

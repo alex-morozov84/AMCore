@@ -56,6 +56,18 @@ describe('catalogue', () => {
     )
     expect(configVersionOf(job)).not.toBe(configVersionOf({ ...job, graceMs: job.graceMs + 1 }))
   })
+
+  it('a frequent job can name why a configuration disables it: the Telegram check needs a token', () => {
+    const job = catalogue.TELEGRAM_REACHABILITY_JOB
+    expect(cadenceOf(job)).toBe('frequent')
+    expect(job.family).toBe('per-replica')
+    const env = (token: string) =>
+      ({ get: () => token }) as unknown as Parameters<
+        NonNullable<ScheduledJobDefinition['disabledReason']>
+      >[0]
+    expect(job.disabledReason?.(env(''))).toBe('telegram_not_configured')
+    expect(job.disabledReason?.(env('123:abc'))).toBeNull()
+  })
 })
 
 /**

@@ -49,6 +49,15 @@ describe('headlineOf', () => {
     expect(headlineOf(item({ configuration: 'not_configured' }), evidence())).toBe('notSetUp')
   })
 
+  it('says "check passed", not "working", for a token check; other scopes keep "working"', () => {
+    const passed = evidence({ result: 'ok', freshness: 'fresh', scope: 'provider_token_check' })
+    expect(headlineOf(item({ id: 'telegram', evidence: passed }), passed)).toBe('checkPassed')
+    const old = { ...passed, freshness: 'stale' as const }
+    expect(headlineOf(item({ id: 'telegram', evidence: old }), old)).toBe('lastCheckOld')
+    const sent = evidence({ result: 'ok', freshness: 'fresh' })
+    expect(headlineOf(item({ evidence: sent }), sent)).toBe('working')
+  })
+
   it('distinguishes a test in progress and an unknown outcome', () => {
     expect(headlineOf(item(), evidence({ failure: 'in_progress' }))).toBe('inProgress')
     expect(headlineOf(item(), evidence({ result: 'unknown', freshness: 'fresh' }))).toBe('unknown')

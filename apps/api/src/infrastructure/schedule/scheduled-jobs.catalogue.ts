@@ -30,13 +30,15 @@ const daily = (
 const frequent = (
   id: string,
   schedule: ScheduledJobDefinition['schedule'],
-  periodMs: number
+  periodMs: number,
+  options: Pick<ScheduledJobDefinition, 'disabledReason'> = {}
 ): ScheduledJobDefinition => ({
   id,
   family: 'per-replica',
   schedule,
   graceMs: 0,
   staleAfterMs: Math.max(10 * periodMs, 5 * MINUTE),
+  ...(options.disabledReason ? { disabledReason: options.disabledReason } : {}),
 })
 
 export const CLEANUP_JOB = daily('cleanup', CronExpression.EVERY_DAY_AT_2AM, {
@@ -85,6 +87,10 @@ export const NOTIFICATION_RECOVERY_JOB = frequent('notification-recovery', EVERY
 export const AI_RUN_RECOVERY_JOB = frequent('ai-run-recovery', EVERY_30S, 30_000)
 export const AI_APPROVAL_EXPIRY_JOB = frequent('ai-approval-expiry', EVERY_MIN, MINUTE)
 export const INVITATION_HANDOFF_JOB = frequent('invitation-handoff-sweep', EVERY_MIN, MINUTE)
+/** Removing the Telegram channel removes this entry together with its job source. */
+export const TELEGRAM_REACHABILITY_JOB = frequent('telegram-reachability', EVERY_MIN, MINUTE, {
+  disabledReason: (env) => (env.get('TELEGRAM_BOT_TOKEN') ? null : 'telegram_not_configured'),
+})
 export const BACKGROUND_CONTROL_JOB = frequent(
   'background-control-maintenance',
   { kind: 'interval', everyMs: CONTROL_LIMITS.maintenance.intervalMs },
@@ -101,6 +107,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJobDefinition[] = Object.freeze([
   AI_RUN_RECOVERY_JOB,
   AI_APPROVAL_EXPIRY_JOB,
   INVITATION_HANDOFF_JOB,
+  TELEGRAM_REACHABILITY_JOB,
   BACKGROUND_CONTROL_JOB,
 ])
 

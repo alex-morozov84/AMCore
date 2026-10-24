@@ -206,6 +206,11 @@ audit-log IP and invite-abuse/password-login/step-up limiters are **not** wired 
 remain scoped to `req.ip` exactly as before; extending them is a deliberate,
 separately-reviewed future decision, not an implicit side effect.
 
+Safe use also requires every edge in front of `apps/api` to strip
+`X-AMCore-Client-Ip`, and `TRUSTED_WEB_PEERS` to name the exact `apps/web`
+address, never a range that also covers the edge. See
+[BFF client-IP relay](../operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy).
+
 Session metadata capture uses the same actual-peer validation for registration,
 password login, OAuth login callbacks and refresh. The BFF forwards descriptive
 UA and derives the internal IP claim from the configured edge header for each

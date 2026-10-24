@@ -1213,7 +1213,8 @@
         "working": "Working (as last checked)",
         "lastCheckOld": "Last check is old",
         "setUpNotVerified": "Set up, not verified",
-        "inProgress": "Test in progress"
+        "inProgress": "Test in progress",
+        "checkPassed": "Check passed"
       },
       "result": {
         "none": "Not verified",
@@ -1227,11 +1228,13 @@
         "broker_read": "The broker answered. Workers are not tested.",
         "provider_acceptance": "A direct send from the API server to the provider",
         "provider_request": "A request from the API server to the provider",
+        "provider_token_check": "Checks the connection and the bot token. Message delivery and incoming messages are not checked.",
         "configuration_only": "Configuration only"
       },
       "instance": {
         "answering_instance": "this server",
-        "shared": "shared"
+        "shared": "shared",
+        "workers": "workers"
       },
       "checkedAgo": "{time} · {instance}",
       "failure": {
@@ -1257,6 +1260,20 @@
         "precheck": "a test did not start",
         "not_started": "a test did not start"
       },
+      "failureFor": {
+        "telegram": {
+          "unreachable": "the server cannot reach Telegram",
+          "timeout": "Telegram did not answer within 8 s",
+          "auth_rejected": "Telegram or the relay did not accept the bot token",
+          "request_rejected": "Telegram or the relay refused the request",
+          "rate_limited": "Telegram reported a request limit",
+          "provider_error": "Telegram or the relay reported an error",
+          "unexpected_response": "unexpected answer from Telegram or the relay",
+          "invalid_response": "unexpected answer from Telegram or the relay",
+          "too_many_workers": "more workers report than can be stored; the result is incomplete",
+          "invalid_observation": "a stored result could not be read"
+        }
+      },
       "noStoredResult": "No stored result",
       "resultStale": "{result}, old",
       "fact": {
@@ -1271,7 +1288,11 @@
         "providers_with_models": "Providers with models",
         "providers_with_key": "With a key",
         "effective_default": "Default model",
-        "catalogue_cache_seconds": "List may be up to {value} s old"
+        "catalogue_cache_seconds": "List may be up to {value} s old",
+        "workers_reporting": "Workers reporting",
+        "workers_failed": "Failed",
+        "workers_stale": "No recent result",
+        "other_settings": "Results for other settings"
       },
       "factValue": {
         "local": "local disk",
@@ -1480,6 +1501,10 @@
         "invitation-handoff-sweep": {
           "name": "Invitation sign-in sweep",
           "purpose": "Closes invitation sign-in attempts that were not completed in time."
+        },
+        "telegram-reachability": {
+          "name": "Telegram check",
+          "purpose": "Every minute each worker asks Telegram whether it can be reached with the bot token. The result is on the Integrations page."
         },
         "background-control-maintenance": {
           "name": "Background work command upkeep",
