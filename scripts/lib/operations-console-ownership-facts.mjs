@@ -184,6 +184,7 @@ export const operationsConsoleSurfaceRoots = [
   'scripts/run-console-single-locale-proxy-smoke.mjs',
   'scripts/stand.mjs',
   'scripts/stand',
+  'scripts/lib/product-admin-e2e-inventory.test.mjs',
   'scripts/e2e-ci-plan.mjs',
   'scripts/e2e-ci.mjs',
   'scripts/product-admin-e2e-plan.mjs',

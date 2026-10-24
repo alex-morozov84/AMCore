@@ -15,6 +15,7 @@ const consolePaths = [
 const profileConsumers = [
   'scripts/stand/product-admin-source.mjs',
   'scripts/product-admin-e2e-plan.mjs',
+  'scripts/lib/product-admin-e2e-inventory.test.mjs',
   'scripts/stand/organization-setup-fixture.mjs',
   'scripts/stand/config.mjs',
   'scripts/stand/config-proof.test.mjs',

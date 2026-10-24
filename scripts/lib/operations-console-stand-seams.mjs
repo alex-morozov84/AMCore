@@ -20,6 +20,7 @@ const entry = (path, key) => ({
 })
 
 export const operationsConsoleStandSeams = [
+  entry('scripts/lib/product-admin-e2e-inventory.test.mjs', 'SUPPORT_MAIL_INVENTORY'),
   entry('scripts/stand/config-proof.test.mjs', 'SUPPORT_MAIL_CONFIG_PROOF'),
   entry('scripts/stand/product-admin-source.mjs', 'SUPPORT_MAIL_PROFILES'),
   entry('scripts/stand/organization-setup-fixture.mjs', 'SUPPORT_MAIL_PROFILES'),

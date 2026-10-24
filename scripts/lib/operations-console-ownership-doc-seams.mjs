@@ -15,7 +15,7 @@ const section = (start, end) => ({ start, end, retainEnd: true })
 const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
-  // Released history is retained; only the current feature's marked entry is removed.
+  // Existing changelog history is retained; only this feature's marked entry is removed.
   ...[
     'ADMIN_CONSOLE_METRICS_URL',
     'ADMIN_CONSOLE_LOGS_URL',

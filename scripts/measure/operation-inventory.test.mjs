@@ -24,7 +24,9 @@ describe('operation inventory against the real plans', () => {
       // +4 facts, +8 claims, but only two final edits.
       // Login diagnostics adds two disabled fixture removals and six selected-locale test edits.
       // Shared/Console inventories can describe the same final edit; semantic claims count separately.
-      { name: 'measured operations', expected: 893, actual: inventory.operations.length },
+      // Support mail adds locale fixture edits and Console removals/seams across these recipes.
+      // Providers, manifests, scenarios and exact-copy edges remain unchanged.
+      { name: 'measured operations', expected: 920, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -43,17 +45,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1232,
+        expected: 1269,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2030,
+        expected: 2079,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 871,
+        expected: 896,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

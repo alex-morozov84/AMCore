@@ -53,17 +53,28 @@ test('actual Playwright fixture configurations select exactly their declared pro
   }
 })
 
-test('required staff CI plans cover each declared host spec exactly once', () => {
-  const files = Object.values(productAdminE2ePlans)
-    .filter((plan) => plan.lane === 'product-admin-real-stack')
-    .flatMap((plan) => plan.files)
+const sharedSpecs = new Map()
+// AMCORE_CONSOLE_SUPPORT_MAIL_INVENTORY_START
+sharedSpecs.set('console-support-mail.spec.ts', ['support-mail-host', 'support-mail-path'])
+// AMCORE_CONSOLE_SUPPORT_MAIL_INVENTORY_END
+
+test('required staff CI plans cover every spec with only declared cross-profile reuse', () => {
+  const owners = new Map()
+  for (const [name, plan] of Object.entries(productAdminE2ePlans)) {
+    if (plan.lane !== 'product-admin-real-stack') continue
+    for (const file of plan.files) owners.set(file, [...(owners.get(file) ?? []), name])
+  }
   assert.deepEqual(
-    [...files].sort(),
+    [...owners.keys()].sort(),
     readdirSync('apps/web/e2e/product-admin-real-stack')
       .filter((file) => file.endsWith('.spec.ts'))
       .sort()
   )
-  assert.equal(new Set(files).size, files.length)
+  for (const [file, expected] of sharedSpecs)
+    assert.deepEqual(owners.get(file)?.sort(), expected, file)
+  for (const [file, profiles] of owners) {
+    if (!sharedSpecs.has(file)) assert.equal(profiles.length, 1, file)
+  }
   for (const lane of productAdminCiLanes(process.cwd()))
     assert.ok(ciLanes(process.cwd()).includes(lane))
 })
