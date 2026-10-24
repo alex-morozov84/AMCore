@@ -35,10 +35,13 @@ max without (state) (amcore_telegram_reachability_state{state=~"failed|unknown|s
    per host.
 2. From that worker's host or container, check outgoing HTTPS to `api.telegram.org` (or your
    relay) without the token, for example
-   `curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org/`: any HTTP code means
-   the network path works; a timeout or connection error means it is blocked. Then check
-   firewall and security group rules, DNS, an outbound proxy. If the hosting provider
-   blocks Telegram, run a relay and set `TELEGRAM_API_BASE_URL`; see
+   `curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org/` (for a relay, its base
+   address). Any HTTP code, 404 included, shows that this address answers; it does not show that
+   a relay forwards to Telegram or that `getMe` works. A timeout or connection error is a symptom:
+   find its cause in firewall and security group rules, DNS, an outbound proxy and the address
+   itself. If the hosting provider blocks Telegram, run a relay **that you control** and set
+   `TELEGRAM_API_BASE_URL`; never use a public Bot API mirror, because the token travels in every
+   request. See the relay rules and the leaked-token steps in
    [Notifications](../../notifications/README.md).
 3. If the token was refused (the Console says **Telegram or the relay did not accept the bot
    token**), compare `TELEGRAM_BOT_TOKEN` with the token from BotFather. Set the same value on

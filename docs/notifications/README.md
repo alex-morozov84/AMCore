@@ -262,15 +262,20 @@ URL path of every request, so whoever terminates TLS on the relay gets full
 control of the bot (read/send messages, change the webhook). Never point it at
 a third-party or public Bot API mirror.
 
-If the token was ever sent to such a mirror, treat it as leaked. Do these steps in
-this order, and start nothing with the new token before step 2 is done everywhere:
+If the token was ever sent to such a mirror, treat it as leaked, together with the
+webhook secret (`setWebhook` sent it through the same address) and the messages that
+passed through it (handle those under your incident process). Do these steps in this
+order, and start nothing with the new token before step 2 is done everywhere:
 
 1. In BotFather, revoke the token and generate a new one
    ([Telegram: generating a token](https://core.telegram.org/bots/features#generating-an-authentication-token)).
 2. Replace the untrusted `TELEGRAM_API_BASE_URL` with the official API (remove the
-   variable) or a relay you control, in every place that uses it: the API server, every
-   worker or `all` process, and the environment that runs `telegram:setup`.
-3. Set the new `TELEGRAM_BOT_TOKEN` in the same places.
+   variable; the default is `https://api.telegram.org`) or a relay you control, in every
+   place that uses it: the API server, every worker or `all` process, and the one-shot job
+   or container that runs `telegram:setup`. If your platform restarts a process as soon as
+   a variable changes, change the address first: a restart with the old, revoked token is
+   harmless.
+3. Set the new `TELEGRAM_BOT_TOKEN` and a new `WEBHOOK_TELEGRAM_SECRET` in the same places.
 4. Start or restart those processes.
 5. If you use the webhook, register it again
    ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)).
