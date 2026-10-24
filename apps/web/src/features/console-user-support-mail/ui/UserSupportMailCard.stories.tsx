@@ -73,7 +73,7 @@ export const Confirmation: Story = {
         t('password_recovery.confirm', { email: 'recipient@example.test', minutes: 15 })
       )
     ).toBeVisible()
-    await userEvent.click(within(dialog).getByRole('button', { name: t('cancel'), exact: true }))
+    await userEvent.click(within(dialog).getByRole('button', { name: t('cancel') }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
   },
 }

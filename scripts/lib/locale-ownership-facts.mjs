@@ -157,6 +157,7 @@ export const localeSurfaceRoots = [
   'scripts/fixtures/lint/web.json',
   'apps/api/prisma/user.prisma',
   'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql',
+  'apps/api/test/admin-support-mail.e2e-spec.ts',
   'apps/api/test/auth.e2e-spec.ts',
   'apps/api/test/oauth.e2e-spec.ts',
   'apps/api/src',
