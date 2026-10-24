@@ -40,7 +40,7 @@ describe('AuthService', () => {
   let mockNotifications: { notify: jest.Mock }
   let mockUserCacheService: jest.Mocked<Pick<UserCacheService, 'invalidateUser'>>
   let mockEnvService: { get: jest.Mock }
-  let mockCache: { get: jest.Mock; set: jest.Mock }
+  let mailLimiter: { reserve: jest.Mock }
   let mockLoginRateLimiter: jest.Mocked<LoginRateLimiterService>
   let mockAuditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   let mockLogger: jest.Mocked<PinoLogger>
@@ -90,6 +90,7 @@ describe('AuthService', () => {
       consumePasswordResetToken: jest.fn(),
       consumeEmailVerificationToken: jest.fn(),
       invalidateUserTokens: jest.fn(),
+      consumeLocked: jest.fn().mockResolvedValue({ id: 'reset-token-1', userId: mockUser.id }),
     } as unknown as jest.Mocked<TokenManagerService>
 
     mockSessionService = {
@@ -133,10 +134,7 @@ describe('AuthService', () => {
       }),
     }
 
-    mockCache = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-    }
+    mailLimiter = { reserve: jest.fn().mockResolvedValue(undefined) }
 
     mockLoginRateLimiter = {
       check: jest.fn().mockResolvedValue(undefined),
@@ -158,13 +156,13 @@ describe('AuthService', () => {
       prisma,
       mockTokenService,
       mockTokenManager,
+      mailLimiter as never,
       mockSessionService,
       mockEmailService as never,
       mockUserCacheService as never,
       mockEnvService as never,
       new EmailIdentityService(),
       mockAuditLog as never,
-      mockCache as never,
       mockLoginRateLimiter,
       mockNotifications as never,
       mockLogger,
@@ -355,6 +353,7 @@ describe('AuthService', () => {
       it('generates verification token via tokenManager inside register()', async () => {
         setupRegisterMocks()
         mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          id: 'mail-token-row',
           token: 'verify-token-abc',
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         })
@@ -371,6 +370,7 @@ describe('AuthService', () => {
       it('does not call resendVerificationEmail from register()', async () => {
         setupRegisterMocks()
         mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          id: 'mail-token-row',
           token: 'verify-token-abc',
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         })
@@ -384,6 +384,7 @@ describe('AuthService', () => {
       it('passes the generated token in the email verification URL', async () => {
         setupRegisterMocks()
         mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          id: 'mail-token-row',
           token: 'verify-token-xyz',
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         })
@@ -403,8 +404,8 @@ describe('AuthService', () => {
 
       it('awaits token generation before returning the auth response', async () => {
         setupRegisterMocks()
-        let resolveToken!: (value: { token: string; expiresAt: Date }) => void
-        const pending = new Promise<{ token: string; expiresAt: Date }>((resolve) => {
+        let resolveToken!: (value: { id: string; token: string; expiresAt: Date }) => void
+        const pending = new Promise<{ id: string; token: string; expiresAt: Date }>((resolve) => {
           resolveToken = resolve
         })
         mockTokenManager.generateEmailVerificationToken.mockReturnValue(pending)
@@ -421,6 +422,7 @@ describe('AuthService', () => {
         expect(resolved).toBe(false)
 
         resolveToken({
+          id: 'mail-token-row',
           token: 'late-token',
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         })
@@ -431,6 +433,7 @@ describe('AuthService', () => {
       it('does not fail register() when the verification email send rejects', async () => {
         setupRegisterMocks()
         mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          id: 'mail-token-row',
           token: 'verify-token-abc',
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         })
@@ -452,6 +455,7 @@ describe('AuthService', () => {
       it('does not fail register() when the welcome email send rejects', async () => {
         setupRegisterMocks()
         mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+          id: 'mail-token-row',
           token: 'verify-token-abc',
           expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         })
@@ -837,7 +841,6 @@ describe('AuthService', () => {
   describe('forgotPassword', () => {
     it('should silently succeed for unknown email', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(null)
-      mockCache.get.mockResolvedValue(null)
 
       await expect(authService.forgotPassword('unknown@example.com')).resolves.not.toThrow()
 
@@ -849,8 +852,8 @@ describe('AuthService', () => {
 
     it('should queue reset email for known user', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      mockCache.get.mockResolvedValue(null)
       mockTokenManager.generatePasswordResetToken.mockResolvedValue({
+        id: 'mail-token-row',
         token: 'a'.repeat(64),
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       })
@@ -874,8 +877,8 @@ describe('AuthService', () => {
 
     it('should lookup password reset by canonical email but send to display email', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue({ ...mockUser, email: 'Test@Example.COM' })
-      mockCache.get.mockResolvedValue(null)
       mockTokenManager.generatePasswordResetToken.mockResolvedValue({
+        id: 'mail-token-row',
         token: 'a'.repeat(64),
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       })
@@ -892,7 +895,9 @@ describe('AuthService', () => {
     })
 
     it('should throw if rate limit exceeded', async () => {
-      mockCache.get.mockResolvedValue(3)
+      mailLimiter.reserve.mockRejectedValue(
+        new AppException('Limit reached', 429, AuthErrorCode.RATE_LIMIT_EXCEEDED)
+      )
 
       await expect(authService.forgotPassword(mockUser.email)).rejects.toThrow(AppException)
     })
@@ -901,8 +906,8 @@ describe('AuthService', () => {
       // sendNow throws on provider failure; for a KNOWN email that must not
       // become a 500 while unknown emails return 200.
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      mockCache.get.mockResolvedValue(null)
       mockTokenManager.generatePasswordResetToken.mockResolvedValue({
+        id: 'mail-token-row',
         token: 'a'.repeat(64),
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       })
@@ -925,7 +930,10 @@ describe('AuthService', () => {
       ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
         (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
       )
-      mockCtx.prisma.passwordResetToken.updateMany.mockResolvedValue({ count: consumeCount })
+      if (consumeCount === 0)
+        mockTokenManager.consumeLocked.mockRejectedValue(
+          new AppException('Invalid token', 401, AuthErrorCode.TOKEN_INVALID)
+        )
       mockCtx.prisma.user.update.mockResolvedValue(mockUser)
       mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
     }
@@ -936,12 +944,11 @@ describe('AuthService', () => {
       await authService.resetPassword('a'.repeat(64), 'NewPassword123')
 
       expect(mockTokenManager.verifyPasswordResetToken).toHaveBeenCalled()
-      // Single-use consumption is an atomic CAS (used:false + not expired), not a blind update.
-      expect(mockCtx.prisma.passwordResetToken.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ id: 'reset-token-1', used: false }),
-          data: expect.objectContaining({ used: true }),
-        })
+      expect(mockTokenManager.consumeLocked).toHaveBeenCalledWith(
+        mockCtx.prisma,
+        'a'.repeat(64),
+        'password-reset',
+        undefined
       )
       expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
       expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
@@ -981,6 +988,31 @@ describe('AuthService', () => {
       )
     })
 
+    it.each(['sessions', 'cache'])(
+      'preserves the committed password when %s follow-up fails',
+      async (failure) => {
+        arrangeResetMocks()
+        const error = new Error('follow-up unavailable')
+        if (failure === 'sessions') mockSessionService.deleteAllByUserId.mockRejectedValue(error)
+        else mockUserCacheService.invalidateUser.mockRejectedValue(error)
+
+        await expect(authService.resetPassword('a'.repeat(64), 'NewPassword123')).rejects.toBe(
+          error
+        )
+
+        expect(mockTokenManager.consumeLocked).toHaveBeenCalledTimes(1)
+        expect(mockCtx.prisma.user.update).toHaveBeenCalledWith({
+          where: { id: mockUser.id },
+          data: { passwordHash: 'new-hashed-password', emailVerified: true },
+        })
+        expect(mockCtx.prisma.$transaction).toHaveBeenCalledTimes(1)
+        expect(mockNotifications.notify).not.toHaveBeenCalled()
+        expect(mockUserCacheService.invalidateUser).toHaveBeenCalledTimes(
+          failure === 'sessions' ? 0 : 1
+        )
+      }
+    )
+
     it('rejects a token already consumed by a racing reset (CAS matched 0 rows)', async () => {
       arrangeResetMocks(0)
 
@@ -1018,7 +1050,6 @@ describe('AuthService', () => {
   describe('resendVerificationEmail', () => {
     it('should silently succeed for already-verified user', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue({ ...mockUser, emailVerified: true })
-      mockCache.get.mockResolvedValue(null)
 
       await expect(authService.resendVerificationEmail(mockUser.email)).resolves.not.toThrow()
 
@@ -1030,8 +1061,8 @@ describe('AuthService', () => {
 
     it('should queue verification email for unverified user', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      mockCache.get.mockResolvedValue(null)
       mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+        id: 'mail-token-row',
         token: 'b'.repeat(64),
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       })
@@ -1049,8 +1080,8 @@ describe('AuthService', () => {
 
     it('does not throw when the direct send fails (no enumeration oracle — EQS-02)', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      mockCache.get.mockResolvedValue(null)
       mockTokenManager.generateEmailVerificationToken.mockResolvedValue({
+        id: 'mail-token-row',
         token: 'b'.repeat(64),
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       })

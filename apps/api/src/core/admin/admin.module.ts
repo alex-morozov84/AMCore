@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common'
 
 import { HealthModule } from '../../health/index.js'
+import { EmailModule } from '../../infrastructure/email/index.js'
 import { GeoipModule } from '../../infrastructure/geoip/geoip.module.js'
 import { QueueModule } from '../../infrastructure/queue/index.js'
 import { CleanupModule } from '../../infrastructure/schedule/cleanup.module.js'
 import { PrismaModule } from '../../prisma/index.js'
 import { ApiKeyRevocationService } from '../api-keys/api-key-revocation.service.js'
 import { AuditModule } from '../audit/index.js'
+import { AuthMailModule } from '../auth/auth-mail.module.js'
 
 import { AdminController } from './admin.controller.js'
 import { AdminService } from './admin.service.js'
@@ -24,6 +26,7 @@ import { AdminScheduledJobsService } from './admin-scheduled-jobs.service.js'
 import { AdminSessionsService } from './admin-sessions.service.js'
 import { AdminStorageSettingController } from './admin-storage-setting.controller.js'
 import { AdminStorageSettingService } from './admin-storage-setting.service.js'
+import { AdminSupportMailController } from './admin-support-mail.controller.js'
 import { BackgroundControlModule } from './background-control.module.js'
 import { BackgroundWorkController } from './background-work.controller.js'
 import { BackgroundWorkService } from './background-work.service.js'
@@ -32,6 +35,9 @@ import { BackgroundWorkReader } from './background-work-reader.js'
 import { configuredIntegrations } from './integrations/integrations.module.js'
 import { OrganizationEstablishmentController } from './organization-establishment.controller.js'
 import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.guard.js'
+import { SupportMailService } from './support-mail/support-mail.service.js'
+import { SupportMailStore } from './support-mail/support-mail.store.js'
+import { SupportMailDispatch } from './support-mail/support-mail-dispatch.service.js'
 
 // Imports CleanupModule (not ScheduleModule): AdminController's manual
 // POST /admin/cleanup needs CleanupService, but must NOT pull in the scheduler
@@ -44,6 +50,8 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
 @Module({
   imports: [
     PrismaModule,
+    AuthMailModule,
+    EmailModule,
     CleanupModule,
     AuditModule,
     HealthModule,
@@ -54,6 +62,7 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
   ],
   controllers: [
     AdminController,
+    AdminSupportMailController,
     OrganizationEstablishmentController,
     AdminApiKeysController,
     AdminStorageSettingController,
@@ -64,6 +73,9 @@ import { PlatformSettingsPrincipalGuard } from './platform-settings-principal.gu
   ],
   providers: [
     AdminService,
+    SupportMailStore,
+    SupportMailService,
+    SupportMailDispatch,
     AdminStorageSettingService,
     PlatformSettingsPrincipalGuard,
     AdminApiKeysService,

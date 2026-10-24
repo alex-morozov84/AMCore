@@ -11,6 +11,8 @@ import type { QueuedEmailProvider } from './queued-email-provider.js'
  * Email send parameters
  */
 export interface SendEmailParams {
+  /** Synchronous final admission, after request preparation and immediately before transport. */
+  beforeTransport?: () => void
   to: string
   subject: string
   html: string
@@ -63,6 +65,7 @@ export interface SendEmailResult {
  * All email providers (Resend, Mock) must implement this interface
  */
 export interface EmailProvider {
+  readonly supportsDirectSecretFence?: true
   /** Absent for an unapproved custom transport: queued replay has no generic safety guarantee. */
   readonly queuedEmail?: QueuedEmailProvider
   /**

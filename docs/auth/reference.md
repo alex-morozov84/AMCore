@@ -75,7 +75,8 @@ alone:
   [invitation contract](invites.md) for its precise limits.
 - **`POST /auth/logout` always returns `204`,** even without a valid cookie.
 - **`POST /auth/reset-password` side effects:** the token is consumed atomically
-  (single-use under concurrency), all sessions are revoked, the account email is
+  with the password update (single-use under concurrency). Session deletion and
+  cache invalidation follow the commit and can fail after the change. The account email is
   marked **verified** (the reset proves mailbox control), and an
   `account.password_changed` security notification is emitted.
 - **Step-up (`POST /auth/step-up`)** re-verifies the current password to refresh

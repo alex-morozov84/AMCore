@@ -27,6 +27,7 @@ return 'accepted'
  */
 @Injectable()
 export class MockEmailProvider implements EmailProvider {
+  readonly supportsDirectSecretFence = true as const
   readonly queuedEmail?: QueuedEmailProvider
 
   constructor(
@@ -72,6 +73,8 @@ export class MockEmailProvider implements EmailProvider {
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
     const { to, html, text, from, replyTo } = params
+
+    params.beforeTransport?.()
 
     // Same redaction as the real provider: a stand using the mock still ships logs to a store.
     this.logger.info(

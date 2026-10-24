@@ -18,12 +18,21 @@ export async function executeSetupCommand(m, input) {
   if (
     !previewDiagnostics &&
     (m.purpose !== 'e2e' ||
-      !['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-        m.fixtureProfile
-      ))
+      ![
+        'organization-setup',
+        'organization-provisioning',
+        'product-admin-closed-signup',
+        'support-mail-path',
+        'support-mail-host',
+      ].includes(m.fixtureProfile))
   )
     throw new Error('Wrong setup fixture')
-  if (m.fixtureProfile === 'organization-provisioning' && input.command !== 'prepare-account')
+  if (
+    ['organization-provisioning', 'support-mail-path', 'support-mail-host'].includes(
+      m.fixtureProfile
+    ) &&
+    input.command !== 'prepare-account'
+  )
     throw new Error('Provisioning fixture allows only prerequisite account preparation')
   await dataAdmission(m)
   const schemas = () => createRequire(join(m.snapshot, 'apps/api/package.json'))('@amcore/shared')

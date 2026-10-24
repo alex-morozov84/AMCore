@@ -306,6 +306,13 @@ their own issuance lifetime.
 
 ## When sessions are automatically invalidated
 
+Password reset commits the password and token consumption before deleting
+sessions and invalidating the profile cache. A follow-up failure can leave an
+error response after the change; old session rows can remain if deletion fails.
+Try ordinary sign-in with the chosen password, then inspect/revoke sessions if
+needed. Do not replay the consumed link. See [completion failures](email-auth.md#completion-and-session-failures).
+Already issued access JWTs retain their ordinary expiry.
+
 Sessions don't just expire — they can be invalidated by specific events:
 
 | Event                      | What gets invalidated                 |

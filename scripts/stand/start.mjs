@@ -44,9 +44,13 @@ export async function start(m) {
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'notification-provider'])
   // AMCORE_CONSOLE_NOTIFICATION_START_END
   if (
-    ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-      m.fixtureProfile
-    )
+    [
+      'organization-setup',
+      'organization-provisioning',
+      'product-admin-closed-signup',
+      'support-mail-path',
+      'support-mail-host',
+    ].includes(m.fixtureProfile)
   )
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'mail-capture'])
   await compose(m, [

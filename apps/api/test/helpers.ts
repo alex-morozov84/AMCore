@@ -299,6 +299,7 @@ export async function cleanDatabase(
   throttlerStorage?: GcraRedisLimiter
 ): Promise<void> {
   // Delete in correct order (respecting foreign keys)
+  await prisma.supportMailAttempt.deleteMany()
   await prisma.passwordResetToken.deleteMany()
   await prisma.emailVerificationToken.deleteMany()
   await prisma.session.deleteMany()

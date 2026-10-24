@@ -5,8 +5,11 @@ import {
   auditActionCodeSchema,
   auditCommandDetailsSchema,
   auditDisplayIdSchema,
+  auditMailSummarySchema,
   auditSummarySchema,
   isCorrelationId,
+  SUPPORT_MAIL_OUTCOMES,
+  SUPPORT_MAIL_REASONS,
 } from '@amcore/shared'
 
 type Item = AdminAuditResponse['items'][number]
@@ -73,6 +76,25 @@ export function auditSummary(action: string, metadata: unknown): Item['summary']
         m.count <= 1_000_000
           ? m.count
           : undefined,
+    }
+  }
+  if (
+    ['requested', 'dispatching', 'settled', 'refused'].some(
+      (event) => action === `admin.user.support_mail_${event}`
+    )
+  ) {
+    const mail: Record<string, unknown> = {}
+    for (const [key, schema] of Object.entries(auditMailSummarySchema.shape)) {
+      const parsed = schema.safeParse(m[key])
+      if (parsed.success && parsed.data !== undefined) mail[key] = parsed.data
+    }
+    const outcomes: readonly string[] = ['claimed', 'dispatching', ...SUPPORT_MAIL_OUTCOMES]
+    const reasons: readonly string[] = SUPPORT_MAIL_REASONS
+    return {
+      mail: Object.keys(mail).length ? auditMailSummarySchema.parse(mail) : undefined,
+      outcome:
+        typeof m.outcome === 'string' && outcomes.includes(m.outcome) ? m.outcome : undefined,
+      reasonCode: typeof m.reason === 'string' && reasons.includes(m.reason) ? m.reason : undefined,
     }
   }
   if (action.startsWith('background_work.command_')) {

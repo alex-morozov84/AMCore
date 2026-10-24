@@ -26,7 +26,8 @@ function stepUpRequired(): AppException {
 export async function assertSessionFresh(
   prisma: Pick<Prisma.TransactionClient, 'session'>,
   windowSec: number,
-  principal: RequestPrincipal | undefined
+  principal: RequestPrincipal | undefined,
+  clock?: Date
 ): Promise<void> {
   const sid = principal?.sid
   if (!sid || !principal) throw stepUpRequired()
@@ -36,7 +37,7 @@ export async function assertSessionFresh(
     select: { lastAuthAt: true, revokedAt: true, expiresAt: true, userId: true },
   })
 
-  const now = Date.now()
+  const now = clock?.getTime() ?? Date.now()
   if (
     !session ||
     session.revokedAt !== null ||

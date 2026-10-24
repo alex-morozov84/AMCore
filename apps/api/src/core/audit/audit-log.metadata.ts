@@ -66,6 +66,7 @@ const cleanupCounts: MetadataSpec = {
   expiredSessions: true,
   failures: 'string[]',
   staleTerminalInvites: true,
+  expiredSupportMailAttempts: true,
 }
 
 const commonSpec: MetadataSpec = { emailHash: true, pinoEvent: true }
@@ -177,7 +178,23 @@ const administratorCommandMetadata: MetadataSpec = {
       : undefined,
 }
 
+const supportMailMetadata: MetadataSpec = {
+  attemptId: boundedString(36, /^[a-f0-9-]{36}$/),
+  kind: boundedString(20, /^(email_verification|password_recovery)$/),
+  provider: boundedString(6, /^(resend|mock)$/),
+  tokenIssued: auditFilterFlag,
+  outcome: boundedString(
+    20,
+    /^(claimed|dispatching|accepted|simulated|refused|not_started|unknown)$/
+  ),
+  reason: aiCode,
+}
+
 const specs: Record<AuditAction, MetadataSpec> = {
+  'admin.user.support_mail_requested': supportMailMetadata,
+  'admin.user.support_mail_dispatching': supportMailMetadata,
+  'admin.user.support_mail_settled': supportMailMetadata,
+  'admin.user.support_mail_refused': supportMailMetadata,
   'org.administrator_invitation_created': administratorCommandMetadata,
   'org.administrator_invitation_reissued': administratorCommandMetadata,
   'org.administrator_invitation_replaced': administratorCommandMetadata,

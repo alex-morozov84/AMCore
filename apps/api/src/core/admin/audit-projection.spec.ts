@@ -15,6 +15,55 @@ const row = {
 }
 
 describe('audit read projection', () => {
+  it('keeps support-mail facts while removing secret or unrecognized metadata', () => {
+    const summary = projectAuditRow(
+      {
+        ...row,
+        action: 'admin.user.support_mail_settled',
+        metadata: {
+          attemptId: '019a1234-1234-7123-8123-123456789012',
+          kind: 'password_recovery',
+          provider: 'resend',
+          tokenIssued: true,
+          outcome: 'not_started',
+          reason: 'render_failed',
+          token: 'never-expose',
+          recipient: 'never-expose',
+          body: 'never-expose',
+        },
+      },
+      new Map(),
+      new Map()
+    ).summary
+    expect(summary).toEqual({
+      mail: {
+        attemptId: '019a1234-1234-7123-8123-123456789012',
+        kind: 'password_recovery',
+        provider: 'resend',
+        tokenIssued: true,
+      },
+      outcome: 'not_started',
+      reasonCode: 'render_failed',
+    })
+    const hostile = projectAuditRow(
+      {
+        ...row,
+        action: 'admin.user.support_mail_settled',
+        metadata: {
+          kind: 'password_recovery',
+          provider: 'never-expose',
+          attemptId: 'never-expose',
+          outcome: 'never-expose',
+          reason: 'never-expose',
+          tokenIssued: 'yes',
+        },
+      },
+      new Map(),
+      new Map()
+    ).summary
+    expect(hostile.mail).toEqual({ kind: 'password_recovery' })
+    expect(JSON.stringify(hostile)).not.toContain('never-expose')
+  })
   it('projects only bounded runtime interval and revision metadata', () => {
     const metadata = {
       beforeIntervalSeconds: null,

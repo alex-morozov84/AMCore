@@ -22,10 +22,19 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   const productAdminHost =
     !pathOAuth && (choices.productAdminHost || productAdminProfiles.includes(fixtureProfile))
   const consoleTopology =
-    fixtureProfile === 'product-admin-three-host' ? 'host' : choices.consoleTopology
+    fixtureProfile === 'support-mail-path'
+      ? 'path'
+      : ['product-admin-three-host', 'support-mail-host'].includes(fixtureProfile)
+        ? 'host'
+        : choices.consoleTopology
   topology ??= pathOAuth ? 'host' : productAdminHost ? 'host' : choices.topology
   if (productAdminHost && topology !== 'host')
     throw new Error('Staff rehearsal requires HTTPS transport')
+  if (
+    ['support-mail-path', 'support-mail-host'].includes(fixtureProfile) &&
+    !choices.consoleEnabled
+  )
+    throw new Error('Support mail E2E requires enabled Console')
   const uuid = randomUUID()
   const attempt = randomUUID()
   const suffix = uuid.replaceAll('-', '').slice(0, 12)
@@ -66,9 +75,13 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     consoleTopology,
     fixtureVersion: 2,
     fixtureProfile,
-    ...(['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-      fixtureProfile
-    )
+    ...([
+      'organization-setup',
+      'organization-provisioning',
+      'product-admin-closed-signup',
+      'support-mail-path',
+      'support-mail-host',
+    ].includes(fixtureProfile)
       ? { mailCaptureKey: randomBytes(32).toString('hex') }
       : {}),
     mocked,
@@ -96,6 +109,12 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   m.sourceHash = await snapshot(root, m.snapshot)
   await prepareOrganizationSetupSource(m)
   // AMCORE_CONSOLE_HOST_SNAPSHOT_START
+  if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
+    const file = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')
+    const value = await readFile(file, 'utf8')
+    if (!value.includes('enabled: true')) throw new Error('Support mail Console disabled')
+    await writeFile(file, value.replace(/mode: '(?:path|host)'/, `mode: '${consoleTopology}'`))
+  }
   if (
     topology === 'host' &&
     (!productAdminHost || (choices.consoleEnabled && consoleTopology === 'host'))
@@ -104,7 +123,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     const content = await readFile(path, 'utf8')
     if (!content.includes('enabled: true'))
       throw new Error('Console host lane unavailable in this fork')
-    await writeFile(path, content.replace("mode: 'path'", "mode: 'host'"))
+    await writeFile(path, content.replace(/mode: '(?:path|host)'/, `mode: '${consoleTopology}'`))
   }
   // AMCORE_CONSOLE_HOST_SNAPSHOT_END
   await prepareProductAdminSource(m)

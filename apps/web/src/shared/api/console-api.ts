@@ -20,6 +20,12 @@ import type {
   WorkReconciliation,
   WorkSummary,
 } from '@amcore/shared'
+import {
+  type SupportMailKind,
+  supportMailPreparationSchema,
+  supportMailReceiptSchema,
+  supportMailStatusSchema,
+} from '@amcore/shared'
 
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 
@@ -33,6 +39,39 @@ import { apiClient } from './http-client'
  * `getConsolePublicApiPath()` so it resolves correctly in both topologies.
  */
 export const consoleApi = {
+  getSupportMailStatus: async (userId: string, signal?: AbortSignal) =>
+    supportMailStatusSchema.parse(
+      await apiClient.get(
+        getConsolePublicApiPath(`/users/${encodeURIComponent(userId)}/support-mail`),
+        { signal }
+      )
+    ),
+  prepareSupportMail: async (userId: string, kind: SupportMailKind) =>
+    supportMailPreparationSchema.parse(
+      await apiClient.post(
+        getConsolePublicApiPath(`/users/${encodeURIComponent(userId)}/support-mail/prepare`),
+        { kind }
+      )
+    ),
+  sendSupportMail: async (userId: string, attemptId: string) =>
+    supportMailReceiptSchema.parse(
+      await apiClient.post(
+        getConsolePublicApiPath(
+          `/users/${encodeURIComponent(userId)}/support-mail/${encodeURIComponent(attemptId)}/send`
+        ),
+        {},
+        { signal: AbortSignal.timeout(25_000) }
+      )
+    ),
+  getSupportMailReceipt: async (userId: string, attemptId: string, signal?: AbortSignal) =>
+    supportMailReceiptSchema.parse(
+      await apiClient.get(
+        getConsolePublicApiPath(
+          `/users/${encodeURIComponent(userId)}/support-mail/${encodeURIComponent(attemptId)}`
+        ),
+        { signal }
+      )
+    ),
   getBackgroundWork: (signal?: AbortSignal): Promise<WorkSummary[]> =>
     apiClient.get(getConsolePublicApiPath('/background-work/works'), { signal }),
   getBackgroundWorkJobs: (

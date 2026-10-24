@@ -2,11 +2,16 @@ import { defineConfig, devices } from '@playwright/test'
 
 import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-target.mjs'
 
+const supportMail = ['support-mail-path', 'support-mail-host'].includes(
+  activeTarget().fixtureProfile ?? ''
+)
+
 export default defineConfig({
   ...outputPaths(),
   testDir: './e2e/product-admin-real-stack',
-  testMatch:
-    activeTarget().fixtureProfile === 'product-admin-oauth'
+  testMatch: supportMail
+    ? '**/console-support-mail.spec.ts'
+    : activeTarget().fixtureProfile === 'product-admin-oauth'
       ? [
           '**/product-admin-oauth*.spec.ts',
           '**/product-admin-review-c2.spec.ts',
@@ -20,12 +25,13 @@ export default defineConfig({
   fullyParallel: false,
   timeout: 120_000,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: supportMail ? 0 : process.env.CI ? 1 : 0,
   workers: 1,
   use: {
     ...testOptions(),
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: supportMail ? 'off' : 'on-first-retry',
+    screenshot: supportMail ? 'off' : 'only-on-failure',
+    video: 'off',
     serviceWorkers: 'block',
   },
   projects: [{ name: 'product-admin-real-stack', use: { ...devices['Desktop Chrome'] } }],

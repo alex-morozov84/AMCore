@@ -1,0 +1,29 @@
+// Only bounded attempt metadata. Secret links and rendered mail exist in process memory only.
+model SupportMailAttempt {
+  id String @id @db.Uuid
+  actorUserId String
+  targetUserId String
+  kind String
+  recipientBinding String @db.VarChar(64)
+  policyBinding String @db.VarChar(64)
+  ownerNonce String? @db.Uuid
+  state String @default("prepared")
+  provider String
+  reason String?
+  tokenId String?
+  preparedAt DateTime @default(now())
+  prepareExpiresAt DateTime
+  claimedAt DateTime?
+  tokenIssuedAt DateTime?
+  deadlineAt DateTime?
+  dispatchAt DateTime?
+  settledAt DateTime?
+  readUntil DateTime
+  purgeAfter DateTime
+
+  @@index([actorUserId, targetUserId, kind, preparedAt(sort: Desc)])
+  @@index([purgeAfter, id])
+  @@index([actorUserId, state, prepareExpiresAt])
+  @@map("support_mail_attempts")
+  @@schema("core")
+}

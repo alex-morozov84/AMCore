@@ -357,3 +357,21 @@ persistence, atomic audit and runtime reconciliation. Console removal owns only
 this editor, its BFF/UI copy and adapters; shared contracts, backend API, migration
 and API/worker reader remain core. Organization capability catalogue/permissions
 remain separate from personal platform settings rights.
+
+## Support-mail interaction and safety
+
+`features/console-user-support-mail` owns the user-detail client leaf. Its key
+includes operator, target and locale. It uses shared confirmation and cancellable
+step-up controls. A fresh accepted/simulated result uses one toast; the card keeps
+only status/time and an outline **Details** button. Historical reads show the
+result dialog without another toast. Failure and uncertainty use that dialog
+with consequences and a safe next action.
+
+Four fixed BFF routes under `users/[id]/support-mail` validate kind/attempt ID,
+origin and bounded bodies. They use Console-aware session resolution and no-store.
+Every ambiguous submitted response, including malformed success and 500/502,
+recovers with GET of the same attempt. Only recognized pre-effect errors can
+assert no issuance. Closing or unmounting cancels continuation and polling, not
+an already submitted send. The backend rechecks live admission and owns quotas,
+transactional token issuance, strict audit, transport fences and bounded slots.
+It remains available when the Console frontend is removed.

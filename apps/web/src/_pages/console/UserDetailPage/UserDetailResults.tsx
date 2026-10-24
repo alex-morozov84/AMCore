@@ -3,6 +3,7 @@ import { adminDetailIdSchema } from '@amcore/shared'
 
 import { UserRoleAction } from '@/features/console-user-role'
 import { UserSessionsCard } from '@/features/console-user-sessions'
+import { UserSupportMailCard } from '@/features/console-user-support-mail'
 import { getConsoleAwareUser } from '@/shared/api/console/access-token'
 import { fetchConsoleUserDetail } from '@/shared/api/console/users'
 import { detailPageHref } from '@/shared/lib/console-detail-url'
@@ -95,6 +96,9 @@ export async function UserDetailResults({
           </dl>
         </CardContent>
       </Card>
+      {actor && (
+        <UserSupportMailCard userId={user.id} actorId={actor.id} targetEmail={user.email} />
+      )}
       <section className="space-y-4" aria-label={t('organizations', { count: membershipCount })}>
         <h2 className="text-xl font-semibold">{t('organizations', { count: membershipCount })}</h2>
         <DetailRelationSearch

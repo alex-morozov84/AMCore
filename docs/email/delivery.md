@@ -60,6 +60,22 @@ This path has no BullMQ job, no Redis payload, no Bull Board visibility, no
 queue retry, and no queue durability. The caller owns the immediate failure
 semantics.
 
+### Privileged support mail
+
+The privileged support-mail service renders in memory, then calls
+`EmailService.sendDirectSecret()` once with the rendered parameters and a
+synchronous `beforeTransport` callback. It never queues a link or retries a
+provider call. Only adapters declaring `supportsDirectSecretFence` are eligible.
+They must prepare request arguments first, call the callback exactly once, then
+enter transport immediately without logging or awaiting between them.
+
+The finite result distinguishes validated provider acceptance, non-production
+simulation, a call that did not start, and uncertainty. Resend's parsed error
+names lack an independent no-effect HTTP witness, so negative responses remain
+unknown with a safe reason. An accepted response requires a bounded, valid
+provider ID and no contradictory error. It does not prove delivery or completion.
+This does not change the public `sendNow()` compatibility contract.
+
 ## Notification Email Channel
 
 Notification email is not the email queue. The notifications subsystem stores

@@ -7,6 +7,8 @@ export interface ManagedTarget {
   id: string
   uuid: string
   fixtureProfile?: string
+  consoleTopology: 'path' | 'host'
+  consoleSlug: string
   purpose: string
   topology: string
   worktree: string

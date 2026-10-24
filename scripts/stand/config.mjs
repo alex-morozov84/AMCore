@@ -32,6 +32,10 @@ export async function configuration(m) {
     'organization-shop',
     'organization-provisioning',
     'product-admin-closed-signup',
+    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
+    'support-mail-path',
+    'support-mail-host',
+    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
   ]
   // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_START
   closedCreationProfiles.push('organization-establishment')
@@ -56,15 +60,23 @@ export async function configuration(m) {
       'organization-setup',
       'organization-provisioning',
       'product-admin-closed-signup',
+      // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
+      'support-mail-path',
+      'support-mail-host',
+      // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
     ].includes(m.fixtureProfile)
       ? 'false'
       : 'true',
     ORG_SELF_SERVICE_CREATION_ENABLED: closedCreationProfiles.includes(m.fixtureProfile)
       ? 'false'
       : 'true',
-    ...(['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-      m.fixtureProfile
-    )
+    ...([
+      'organization-setup',
+      'organization-provisioning',
+      'product-admin-closed-signup',
+      'support-mail-path',
+      'support-mail-host',
+    ].includes(m.fixtureProfile)
       ? { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
       : {}),
     FRONTEND_URL: m.origins.product,
@@ -75,7 +87,11 @@ export async function configuration(m) {
     CORS_ORIGIN: Object.values(m.origins).join(','),
     TRUST_PROXY: m.topology === 'host' ? '1' : 'false',
   }
-  if (m.fixtureProfile === 'organization-provisioning')
+  if (
+    ['organization-provisioning', 'support-mail-path', 'support-mail-host'].includes(
+      m.fixtureProfile
+    )
+  )
     Object.assign(app, {
       EMAIL_PROVIDER: 'resend',
       RESEND_API_KEY: '<fake-e2e-provider-key>',
@@ -132,9 +148,13 @@ export async function configuration(m) {
   }
   // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_END
   if (
-    ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-      m.fixtureProfile
-    )
+    [
+      'organization-setup',
+      'organization-provisioning',
+      'product-admin-closed-signup',
+      'support-mail-path',
+      'support-mail-host',
+    ].includes(m.fixtureProfile)
   )
     environments['mail-capture'] = { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
   if (m.productAdminHost)
@@ -232,9 +252,13 @@ export function validateModel(m) {
   assertAppleOAuthFixture(m)
   const collector = m.model.services['mail-capture']
   if (
-    ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-      m.fixtureProfile
-    )
+    [
+      'organization-setup',
+      'organization-provisioning',
+      'product-admin-closed-signup',
+      'support-mail-path',
+      'support-mail-host',
+    ].includes(m.fixtureProfile)
   ) {
     if (
       !collector ||
@@ -247,7 +271,9 @@ export function validateModel(m) {
     for (const name of ['api', 'worker']) {
       const environment = m.model.services[name].environment
       if (
-        m.fixtureProfile === 'organization-provisioning' &&
+        ['organization-provisioning', 'support-mail-path', 'support-mail-host'].includes(
+          m.fixtureProfile
+        ) &&
         (environment.NODE_ENV !== 'development' ||
           environment.EMAIL_PROVIDER !== 'resend' ||
           environment.RESEND_API_KEY !== '<fake-e2e-provider-key>')

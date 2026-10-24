@@ -125,6 +125,7 @@ export const cleanupResultSchema = z.object({
   staleTerminalApiKeys: z.number().int(),
   expiredPendingInvites: z.number().int(),
   staleTerminalInvites: z.number().int(),
+  expiredSupportMailAttempts: z.number().int().min(0).max(1000),
   failures: z.array(z.string()),
 })
 

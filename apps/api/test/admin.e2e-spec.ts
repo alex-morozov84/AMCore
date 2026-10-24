@@ -625,6 +625,7 @@ describe('Admin (e2e)', () => {
         staleTerminalApiKeys: expect.any(Number),
         expiredPendingInvites: expect.any(Number),
         staleTerminalInvites: expect.any(Number),
+        expiredSupportMailAttempts: 0,
         failures: [], // EQS-04: per-type failures surfaced; empty on success
       })
     })

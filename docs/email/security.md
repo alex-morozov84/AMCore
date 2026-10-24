@@ -65,3 +65,12 @@ be enqueued at all.
 - Verify provider/logging paths do not expose rendered bodies or payload values.
 
 Provisioning stores no raw invitation token/link or email body in its permanent result or mail-attempt projection. Late mail callbacks match the exact attempt and invitation generation; they cannot reopen completion or assign access. See [operator recovery](../product-admin/organization-provisioning.md).
+
+Privileged support-mail attempts persist only bounded identity, binding, state,
+clock and token-row identifiers. Audit projects a closed set of attempt/kind,
+provider, issuance and outcome facts. Neither surface stores the raw token,
+token hash, recipient copy, rendered body or destination URL. Admission and
+settlement audit share their database transaction. Submitted attempts remain
+for seven days; actor-bound receipt reads expire after 24 hours. The existing
+cleanup tick removes at most 1000 eligible attempts, with a two-second SQL limit.
+Expired never-submitted preparations become eligible after thirty minutes.

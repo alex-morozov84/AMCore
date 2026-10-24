@@ -42,6 +42,10 @@ export function standReporters(m, dir) {
   return [
     'organization-setup',
     'organization-provisioning',
+    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
+    'support-mail-path',
+    'support-mail-host',
+    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
     'product-admin-closed-signup',
     'product-admin-oauth',
     'product-admin-oauth-path',

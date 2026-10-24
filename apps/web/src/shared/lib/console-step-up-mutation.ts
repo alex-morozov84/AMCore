@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AuthErrorCode } from '@amcore/shared'
 import { useMutation } from '@tanstack/react-query'
 
@@ -36,18 +36,28 @@ export function useStepUpMutation<TResult>({
   onError,
 }: UseStepUpMutationOptions<TResult>) {
   const describeError = useApiError()
+  const continuation = useRef(0)
+  useEffect(
+    () => () => {
+      continuation.current += 1
+    },
+    []
+  )
   const [stepUp, setStepUp] = useState<StepUpPhase>({ kind: 'closed' })
 
-  const primaryMutation = useMutation({ mutationFn })
+  const primaryMutation = useMutation({ mutationFn, retry: false })
   const stepUpMutation = useMutation({
     mutationFn: (password: string) => consoleApi.stepUp(password),
+    retry: false,
   })
 
   async function confirm() {
+    const epoch = ++continuation.current
     try {
       const result = await primaryMutation.mutateAsync()
-      onSuccess(result)
+      if (epoch === continuation.current) onSuccess(result)
     } catch (error) {
+      if (epoch !== continuation.current) return
       if (getErrorCode(error) === AuthErrorCode.STEP_UP_REQUIRED) {
         setStepUp({ kind: 'open' })
         return
@@ -57,9 +67,11 @@ export function useStepUpMutation<TResult>({
   }
 
   async function submitStepUp(password: string) {
+    const epoch = continuation.current
     try {
       await stepUpMutation.mutateAsync(password)
     } catch (error) {
+      if (epoch !== continuation.current) return
       setStepUp({
         kind: 'error',
         message: describeError(error).message,
@@ -67,15 +79,17 @@ export function useStepUpMutation<TResult>({
       })
       return
     }
-    await retryAfterStepUp()
+    if (epoch === continuation.current) await retryAfterStepUp(epoch)
   }
 
-  async function retryAfterStepUp() {
+  async function retryAfterStepUp(epoch: number) {
     try {
       const result = await primaryMutation.mutateAsync()
+      if (epoch !== continuation.current) return
       setStepUp({ kind: 'closed' })
       onSuccess(result)
     } catch (error) {
+      if (epoch !== continuation.current) return
       // A second STEP_UP_REQUIRED means the underlying session died between
       // the successful step-up and this retry (e.g. revoked elsewhere) —
       // not something resubmitting the same password again would fix.
@@ -94,7 +108,10 @@ export function useStepUpMutation<TResult>({
     stepUp,
     isSteppingUp: stepUpMutation.isPending,
     submitStepUp,
-    closeStepUp: () => setStepUp({ kind: 'closed' }),
+    closeStepUp: () => {
+      continuation.current += 1
+      setStepUp({ kind: 'closed' })
+    },
   }
 }
 

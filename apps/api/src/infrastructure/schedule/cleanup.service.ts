@@ -18,6 +18,7 @@ export type CleanupRecordType =
   | 'staleTerminalApiKeys'
   | 'expiredPendingInvites'
   | 'staleTerminalInvites'
+  | 'expiredSupportMailAttempts'
 
 export interface CleanupResult {
   expiredSessions: number
@@ -26,6 +27,7 @@ export interface CleanupResult {
   staleTerminalApiKeys: number
   expiredPendingInvites: number
   staleTerminalInvites: number
+  expiredSupportMailAttempts: number
   /**
    * Record types whose delete failed this run (EQS-04). Empty on full success.
    * A per-type failure does not abort the others or throw — the caller gets the
@@ -90,6 +92,7 @@ export class CleanupService {
     const now = new Date()
 
     const tasks: { field: CleanupRecordType; run: () => Promise<{ count: number }> }[] = [
+      { field: 'expiredSupportMailAttempts', run: () => this.pruneSupportMailAttempts() },
       {
         field: 'expiredSessions',
         run: () => this.prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
@@ -126,6 +129,7 @@ export class CleanupService {
       staleTerminalApiKeys: 0,
       expiredPendingInvites: 0,
       staleTerminalInvites: 0,
+      expiredSupportMailAttempts: 0,
       failures: [],
     }
 
@@ -147,5 +151,22 @@ export class CleanupService {
     })
 
     return result
+  }
+
+  private async pruneSupportMailAttempts(): Promise<{ count: number }> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SET LOCAL statement_timeout = '2000ms'`
+        const count = await tx.$executeRaw`WITH eligible AS (
+        SELECT id FROM core.support_mail_attempts
+        WHERE (state='prepared' AND "prepareExpiresAt"<=clock_timestamp())
+          OR "purgeAfter"<=clock_timestamp()
+        ORDER BY "purgeAfter", id LIMIT 1000 FOR UPDATE SKIP LOCKED
+      ) DELETE FROM core.support_mail_attempts target USING eligible
+        WHERE target.id=eligible.id`
+        return { count }
+      },
+      { maxWait: 2000, timeout: 3000, isolationLevel: 'ReadCommitted' }
+    )
   }
 }

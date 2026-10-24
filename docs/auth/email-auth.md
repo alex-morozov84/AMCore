@@ -181,7 +181,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
 
 **What happens:**
 
-1. Rate limit is checked (3 requests per canonical email per hour)
+1. The shared recipient/type budget is checked (three requests; each admitted
+   request renews its one-hour expiry; refusals do not renew it)
 2. If the email exists, a reset token is generated (32 random bytes, encoded as
    64 hexadecimal characters, then SHA-256 hashed for storage)
 3. An email is sent with a link: `https://amcore.dev/{locale}/reset-password?token={raw_token}`
@@ -199,7 +200,9 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
 
 > **Why the same response?** If we returned different messages for existing vs non-existing emails, an attacker could use this endpoint to find out which emails are registered. The vague response protects your users' privacy.
 
-**Rate limit:** 3 requests per canonical email per hour. After that:
+**Rate limit:** Three requests per canonical email and email type. Each admitted
+request renews the one-hour window; refusals do not extend it. Operator requests
+use the same recipient budget. After that:
 `429 Too Many Requests`.
 
 ---
@@ -221,12 +224,14 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 
 **What happens:**
 
-1. Token is hashed (SHA-256) and looked up in the database
-2. Expiry is checked (15-minute window)
-3. Token is marked as used — it cannot be reused
-4. New password is hashed with Argon2id
-5. **All existing sessions are revoked** — every device is signed out
-6. A "password changed" confirmation email is sent
+1. Resolve the token and hash the new password outside the transaction.
+2. Lock the user's mail-token operations and recheck the token, frontend binding
+   and expiry against the current database clock after lock waits.
+3. Conditionally consume the unused, unexpired token and update the password
+   and `emailVerified` together in one transaction.
+4. Delete the user's server-side sessions and invalidate their cached profile
+   after the password transaction commits.
+5. Emit the password-changed notification best-effort.
 
 **Success response:** `204 No Content`
 
@@ -236,7 +241,19 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 | --------------- | ---- | ----------------------------------------- |
 | `TOKEN_INVALID` | 401  | Token not found, already used, or expired |
 
-> **Important:** After a successful reset, the user must log in again on all devices. This is intentional — if the reset was triggered by an attacker, this signs them out.
+### Completion and session failures
+
+Session deletion and cache invalidation occur after the password/token commit.
+If either fails, the endpoint can return an error although the password changed
+and the link was consumed. Existing session rows can remain when deletion fails;
+a cache failure can leave stale profile data. Notification failure alone does not
+reject the committed reset. There is no automatic replay of these follow-ups.
+
+Try normal sign-in with the chosen password. Do not repeatedly reuse the consumed
+link. Inspect and revoke sessions through Settings or an authorized administrator
+when needed. Successful deletion prevents future refresh; already issued access
+JWTs retain their ordinary lifetime. A mail-send result proves none of these
+recipient completion effects.
 
 ---
 
@@ -260,9 +277,9 @@ curl -X POST https://api.amcore.dev/api/v1/auth/verify-email \
 
 1. Token is hashed and looked up
 2. Expiry is checked (48-hour window)
-3. Token is marked as used
-4. `emailVerified` is set to `true`
-5. User cache is cleared so the next request reflects the change
+3. Under the common user mail-token lock, conditionally consume the unused,
+   unexpired token and set `emailVerified` together in one transaction
+4. User cache is cleared so the next request reflects the change
 
 **Success response:** `204 No Content`
 
@@ -292,7 +309,9 @@ curl -X POST https://api.amcore.dev/api/v1/auth/resend-verification \
 }
 ```
 
-**Rate limit:** 3 requests per canonical email per hour.
+**Rate limit:** Three requests per canonical email and email type. Each admitted
+request renews the one-hour window; refusals do not extend it. Operator requests
+use the same recipient budget.
 
 ---
 
@@ -382,3 +401,26 @@ An ordinary verification email opened in a new tab contains no invitation-flow
 selector. Return to the invitation tab and refresh current identity, or reopen
 the original invitation. Password reset preserves all-session revocation; sign
 in again and reopen rather than transferring invitation authority through reset.
+
+## Shared issuance and upgrade
+
+Registration, invited registration, public recovery/resend and privileged support
+mail use the same per-user database lock. New issuance cancels earlier unused
+links of the same type. Verification and password-reset links remain independent.
+Final consumption checks current database time in its conditional write, including
+a wait for a token row. Public responses remain enumeration-safe; public passwordless
+recovery still lets the mailbox owner establish a password.
+
+Before upgrading existing installations, stop and drain every old API writer
+that can request auth email. Apply the migration, then start the new version.
+Do not run old and new writers together: old cache counters cannot participate
+in the new atomic budget. The new limiter imports the installed CacheModule/Keyv
+legacy counter and its remaining Redis TTL on first reservation without granting
+a second budget. Unknown or malformed live data refuses safely. Admitted requests
+renew the new recipient counter for one hour; denied requests retain its expiry.
+
+For rollback, stop/drain new writers first. Retain the database migration and
+wait at least one full hour with auth-mail requests stopped before starting old
+writers. That avoids resetting a live new-version quota through an old namespace.
+Do not delete counters to bypass refusal. Redis unavailability refuses auth-mail
+requests; there is no in-memory fallback or automatic send retry.

@@ -175,7 +175,12 @@
     "MEMBER_API_KEYS_LIMIT": "More than 1000 keys. Contact the deployment operator for bounded maintenance recovery.",
     "MEMBER_API_KEYS_READ_UNAVAILABLE": "Key metadata is unavailable. Retry loading or contact the deployment operator.",
     "MEMBER_API_KEYS_WRITE_UNAVAILABLE": "The key operation was not confirmed. Check keys before a new request.",
-    "RESOURCE_NOT_FOUND": "The resource was not found or is no longer available."
+    "RESOURCE_NOT_FOUND": "The resource was not found or is no longer available.",
+    "SUPPORT_MAIL_NOT_ELIGIBLE": "This action is not available for this account. Refresh its details.",
+    "SUPPORT_MAIL_BINDING_CHANGED": "The recipient or settings changed. Refresh and confirm again.",
+    "SUPPORT_MAIL_ATTEMPT_EXPIRED": "The request or its result has expired.",
+    "SUPPORT_MAIL_UNAVAILABLE": "Email requests are temporarily unavailable.",
+    "SUPPORT_MAIL_LIMIT": "The email request limit has been reached. Please try later."
   },
   "validation": {
     "required": "This field is required.",
@@ -371,7 +376,11 @@
         "org_administrator_invitation_completed": "Administrator invitation accepted",
         "org_administrator_assigned": "Organization administrator assigned",
         "organization_api_keys_revocation_requested": "Organization member keys revoked",
-        "organization_member_removed": "Organization member removed"
+        "organization_member_removed": "Organization member removed",
+        "admin_user_support_mail_requested": "Support email requested",
+        "admin_user_support_mail_dispatching": "Support email send started",
+        "admin_user_support_mail_settled": "Support email result recorded",
+        "admin_user_support_mail_refused": "Support email request refused"
       },
       "draftTimeZone": "Invalid time entered in {zone}. Correct it using the selected time zone.",
       "summaryInterval": "Probe interval",
@@ -408,6 +417,38 @@
           "proven_applied": "Application confirmed",
           "proven_no_effect": "No effect confirmed"
         }
+      },
+      "mail": {
+        "kinds": {
+          "email_verification": "Email verification",
+          "password_recovery": "Password recovery"
+        },
+        "outcomes": {
+          "accepted": "Accepted by the mail service",
+          "simulated": "Test send",
+          "not_started": "Not sent",
+          "refused": "Rejected",
+          "unknown": "Result unknown",
+          "in_progress": "Checking result",
+          "claimed": "Link created",
+          "dispatching": "Send started"
+        },
+        "reasons": {
+          "deadline": "The request exceeded its time limit.",
+          "render_failed": "The message could not be prepared.",
+          "provider_failure": "The email service result could not be confirmed.",
+          "auth": "The email service reported a credential problem.",
+          "invalid_sender": "The email service reported a sender configuration problem.",
+          "invalid_request": "The email service reported a request problem.",
+          "rate_limit": "The email service reported a request limit.",
+          "quota": "The email service reported a sending quota.",
+          "superseded": "A newer link replaced this one.",
+          "admission_changed": "Access or account details changed.",
+          "precheck": "Sending could not start safely.",
+          "expired": "The request expired.",
+          "unavailable": "The service is unavailable."
+        },
+        "linkReplaced": "Previous same-purpose link cancelled"
       }
     },
     "detail": {
@@ -1382,7 +1423,8 @@
         "finishedAttempts": "delivery attempts",
         "telegramLinkTokens": "Telegram link tokens",
         "telegramUpdateReceipts": "Telegram update receipts",
-        "isolatedFailures": "parts that failed"
+        "isolatedFailures": "parts that failed",
+        "expiredSupportMailAttempts": "old support mail attempts"
       },
       "codes": {
         "bucket_failed": "Some steps did not finish",
@@ -1707,6 +1749,107 @@
       "emailBlocked": "Invitation sending is unavailable because email is only simulated. Ask the person responsible for deployment to configure email. You can still assign a verified member.",
       "replaceHelp": "The previous invitation link will stop working. The new recipient must verify their email and explicitly accept.",
       "reviewAction": "Continue"
+    },
+    "supportMail": {
+      "title": "Help with sign-in",
+      "refresh": "Refresh details",
+      "recipient": "Messages go to {email}.",
+      "loading": "Loading mail actions",
+      "send": "Send email",
+      "cancel": "Cancel",
+      "close": "Close",
+      "preparing": "Preparing confirmation…",
+      "sending": "Sending email…",
+      "checking": "Checking the saved result…",
+      "closePending": "Closing this window does not cancel the email. You can check the result later.",
+      "check": "Check result",
+      "noResult": "No saved result",
+      "resultExpired": "The result is no longer retained.",
+      "accessLost": "Your access could not be confirmed. Refresh details before continuing.",
+      "seconds": "{count, plural, one {# second} other {# seconds}}",
+      "unknownRepeat": "The previous email may have been sent. A new email can arrive as well and will replace its link.",
+      "email_verification": {
+        "title": "Email verification",
+        "help": "The user confirms their own email address.",
+        "button": "Send verification email",
+        "confirmTitle": "Send an email verification message?",
+        "confirm": "Recipient: {email}. The link is valid for {hours, plural, one {# hour} other {# hours}}. The new link cancels the previous verification link, even if sending fails. The user must follow the email to confirm their address.",
+        "replaced": "The previous email verification link was cancelled."
+      },
+      "password_recovery": {
+        "title": "Password recovery",
+        "help": "The user chooses their own new password.",
+        "button": "Send password recovery email",
+        "confirmTitle": "Send a password recovery email?",
+        "confirm": "Recipient: {email}. The link is valid for {minutes, plural, one {# minute} other {# minutes}}. The new link cancels the previous recovery link, even if sending fails. The password changes only after the user follows the email. After a successful change, they need to sign in again.",
+        "replaced": "The previous password recovery link was cancelled."
+      },
+      "unavailable": {
+        "already_verified": "Email is already verified.",
+        "no_password": "This user has no password configured. Only an existing password can be recovered here.",
+        "mock_in_production": "Real email sending is not configured.",
+        "transport_unavailable": "Email sending is temporarily unavailable.",
+        "cooldown": "Please wait before sending another email.",
+        "limit": "The email request limit has been reached."
+      },
+      "reason": {
+        "deadline": "The request exceeded its time limit.",
+        "render_failed": "The message could not be prepared.",
+        "provider_failure": "The email service result could not be confirmed.",
+        "auth": "The email service reported a credential problem.",
+        "invalid_sender": "The email service reported a sender configuration problem.",
+        "invalid_request": "The email service reported a request problem.",
+        "rate_limit": "The email service reported a request limit.",
+        "quota": "The email service reported a sending quota.",
+        "superseded": "A newer link replaced this one.",
+        "admission_changed": "Access or account details changed.",
+        "precheck": "Sending could not start safely.",
+        "expired": "The request expired.",
+        "unavailable": "The service is unavailable."
+      },
+      "refreshing": "Refreshing data…",
+      "lastAttempt": "Your last attempt",
+      "details": "Details",
+      "detailsLabel": "Details: {kind}",
+      "sendFailed": "Could not send email",
+      "prepareHelp": "No email is being sent yet. You can close this window.",
+      "readingHelp": "Reading the saved result. This does not send another email.",
+      "linkMayBeReplaced": "The previous link may no longer work.",
+      "summary": {
+        "accepted": "Accepted by the mail service",
+        "simulated": "Test send",
+        "not_started": "Not sent",
+        "refused": "Rejected",
+        "unknown": "Result unknown",
+        "in_progress": "Checking result"
+      },
+      "outcomeTitle": {
+        "accepted": "The mail service accepted the email",
+        "simulated": "Test send completed",
+        "not_started": "Email not sent",
+        "refused": "The mail service rejected the email",
+        "unknown": "The send result is unknown",
+        "in_progress": "The result is not confirmed yet"
+      },
+      "detail": {
+        "accepted": "Delivery to the inbox is not confirmed. The user still needs to follow the link in the email.",
+        "simulated": "No real email was sent.",
+        "unknown": "We could not confirm the send. The email may have been sent.",
+        "in_progress": "The attempt is still being checked. You can close this window and check the saved result later."
+      },
+      "next": {
+        "not_started": "Close this window and request a new email.",
+        "refused": "You can request a new email after the issue is resolved."
+      },
+      "toast": {
+        "accepted": "The mail service accepted the email",
+        "simulated": "Test send completed"
+      },
+      "previousLinkCancelled": "The previous link was cancelled.",
+      "toastDescription": {
+        "accepted": "Delivery to the inbox is not confirmed.",
+        "simulated": "No real email was sent."
+      }
     }
   },
   "auth": {
