@@ -1,5 +1,26 @@
 [
   {
+    "name": "a page group may enter its child public API",
+    "file": "src/_pages/auth/admission-group-probe.ts",
+    "code": "import * as x from '@/_pages/auth/LoginPage'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": false
+  },
+  {
+    "name": "a page group cannot enter child internals",
+    "file": "src/_pages/auth/admission-group-deep-probe.ts",
+    "code": "import * as x from '@/_pages/auth/LoginPage/LoginPage'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
+    "name": "a nested page cannot enter its sibling public API",
+    "file": "src/_pages/auth/LoginPage/lib/admission-sibling-probe.ts",
+    "code": "import * as x from '@/_pages/auth/RegisterPage'\nexport const y=x\n",
+    "rule": "boundaries/dependencies",
+    "expected": true
+  },
+  {
     "name": "routing may enter composition public API",
     "file": "src/app/api/admission-0-probe.ts",
     "code": "import * as x from '@/_app/product-api'\nexport const y=x\n",
