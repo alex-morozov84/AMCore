@@ -21,6 +21,7 @@ function fixtureFor(glob) {
 }
 
 const samples = [
+  ['support mail changelog seam', ['CHANGELOG.md'], true],
   ['support mail ownership', ['scripts/lib/operations-console-stand-seams.mjs'], true],
   ['support mail profiles', ['scripts/stand/organization-setup-fixture.mjs'], true],
   ['support mail browser config', ['apps/web/playwright.product-admin-real-stack.config.ts'], true],

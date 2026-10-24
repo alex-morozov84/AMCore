@@ -15,6 +15,7 @@ import { validateOwnership } from './lib/ownership-validate.mjs'
 import {
   assertSupportMailCoreRetained,
   assertSupportMailProjection,
+  supportMailCoreSnapshot,
 } from './lib/support-mail-scaffold-assertions.mjs'
 
 const copies = []
@@ -86,8 +87,9 @@ describe('init-project --admin-console', () => {
   it('removes only console-owned frontend/runtime files when disabled', () => {
     const root = copy()
     const ownedPaths = removableConsolePaths(root)
+    const originalCore = supportMailCoreSnapshot(root)
     applyProject(root, ['--admin-console=disabled'])
-    assertSupportMailCoreRetained(root, process.cwd())
+    assertSupportMailCoreRetained(root, originalCore)
     assertSupportMailProjection(root, false)
     const docsIndex = readFileSync(path.join(root, 'docs/README.md'), 'utf8')
     assert.doesNotMatch(docsIndex, /operations-console\//)

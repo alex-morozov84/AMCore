@@ -28,15 +28,22 @@ const profileConsumers = [
 ]
 const read = (root, relative) => readFileSync(join(root, relative), 'utf8')
 
-export function assertSupportMailCoreRetained(root, originalRoot) {
+// Snapshot the disposable source fixture before projection, excluding local generated clients.
+export function supportMailCoreSnapshot(root) {
+  const snapshot = new Map()
   for (const directory of retainedRoots) {
-    for (const file of readdirSync(join(originalRoot, directory), { recursive: true })) {
+    for (const file of readdirSync(join(root, directory), { recursive: true })) {
       if (!/\.(ts|prisma|sql)$/.test(file)) continue
       const relative = `${directory}/${file}`
-      assert.equal(read(root, relative), read(originalRoot, relative), relative)
+      snapshot.set(relative, read(root, relative))
     }
   }
-  assert.equal(read(root, 'docs/auth/email-auth.md'), read(originalRoot, 'docs/auth/email-auth.md'))
+  snapshot.set('docs/auth/email-auth.md', read(root, 'docs/auth/email-auth.md'))
+  return snapshot
+}
+
+export function assertSupportMailCoreRetained(root, snapshot) {
+  for (const [relative, source] of snapshot) assert.equal(read(root, relative), source, relative)
   for (const name of ['auth', 'errors'])
     assert.ok(JSON.parse(read(root, 'apps/web/messages/en.json'))[name])
 }
