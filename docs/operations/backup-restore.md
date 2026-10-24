@@ -70,6 +70,8 @@ The `backup` service runs on the same image family as the reference stack
 repo's supply-chain/pin discipline). It targets the same database the app
 uses — `COMPOSE_DATABASE_URL` if set, otherwise the bundled `postgres`
 service — so it works whether you're on local-infra or a managed/VPS DB.
+With [role separation](database-role-separation.md) that is the runtime role,
+which needs Step 3's read-only grant on `public._prisma_migrations` to dump.
 
 **This is an interval, not a wall-clock schedule.** `BACKUP_INTERVAL_SECONDS`
 (default `86400`, i.e. once a day) is how long the container sleeps between
@@ -130,8 +132,10 @@ This is destructive by design for every object the dump contains
 **not** a full database wipe: objects that exist in the target and aren't in
 the dump are left untouched. If you need a clean replacement, restore into
 an empty/scratch database (or drop and recreate the target database/schema
-first), not an existing one with unrelated objects in it. Point
-`DATABASE_URL`/`COMPOSE_DATABASE_URL` at the intended target before running
+first), not an existing one with unrelated objects in it. The service connects
+with `MIGRATION_DATABASE_URL` when it is set (the owner role that can drop and
+recreate objects under [role separation](database-role-separation.md)), otherwise
+with `COMPOSE_DATABASE_URL`. Point it at the intended target before running
 it, and never run it against a database you don't intend to overwrite.
 
 ### Restore-drill (rehearsing a restore, not just taking one)

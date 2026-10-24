@@ -333,6 +333,11 @@ and each states plainly what it does **not** give you.
    web app. A decision matrix, not recipes — VPS/Compose is the one path this
    repo owns end to end.
 
+Building on one server instead of pulling from a registry? Follow
+[Single-host production](docs/operations/single-host-compose.md) end to end (TLS
+database, HTTPS edge, restore and certificate procedures), and size the host with
+[Capacity](docs/operations/capacity.md).
+
 Production stays closed to search engines until you open it on purpose; see
 [Search-engine indexing](docs/frontend/seo.md).
 

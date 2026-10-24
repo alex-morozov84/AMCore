@@ -52,6 +52,7 @@ ${renderProductAdminEdge(m.snapshot).caddy}
     header_up -X-Amcore-Web-Frontend
     header_up -X-Amcore-Web-Placement
     header_up -X-Amcore-Web-Context-Key
+    header_up -X-AMCore-Client-Ip
   }
 }
 {$CADDY_WEB_DOMAIN} {

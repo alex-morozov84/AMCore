@@ -69,7 +69,10 @@ COPY scripts/typecheck-native.mjs ./scripts/typecheck-native.mjs
 RUN pnpm --filter @amcore/shared build
 RUN pnpm --filter api db:generate
 ARG BUILD_SOURCE_COMMIT
-RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" pnpm --filter api build
+# Optional build-only Node options (see apps/web/Dockerfile); scoped to this RUN.
+ARG BUILD_NODE_OPTIONS=""
+RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" NODE_OPTIONS="$BUILD_NODE_OPTIONS" \
+    pnpm --filter api build
 
 # Produce a self-contained production bundle (flat node_modules with all deps,
 # including the workspace `@amcore/shared`, resolvable from the bundle root).

@@ -5,9 +5,9 @@ import request from 'supertest'
 
 import type { AiRunSseEvent } from '@amcore/shared'
 
-import { seedAiCatalog } from '../prisma/seed-ai-catalog'
 import { AiRunRealtimePublisher } from '../src/core/ai/realtime/ai-run-realtime.publisher'
 import { AiRunProducerService } from '../src/core/ai/runs/ai-run-producer.service'
+import { seedAiCatalog } from '../src/core/system-seed/seed-ai-catalog'
 import { AiModelRegistry } from '../src/infrastructure/ai/registry/ai-model-registry.service'
 import { AiRunDispatchService } from '../src/infrastructure/ai/runs/ai-run-dispatch.service'
 import type { PrismaService } from '../src/prisma'

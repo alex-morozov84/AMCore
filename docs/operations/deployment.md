@@ -80,6 +80,10 @@ its DB/Redis from `COMPOSE_DATABASE_URL` / `COMPOSE_REDIS_URL` (default: bundled
 services), kept separate from the host `DATABASE_URL` / `REDIS_URL` used by
 `pnpm dev`, so a host `.env` cannot misconfigure the containers.
 
+For a complete production deployment on one server, follow
+[Single-host production with Docker Compose](single-host-compose.md); size the host
+with [Capacity](capacity.md).
+
 ### Local — bundled Postgres + Redis (default)
 
 ```bash
@@ -97,6 +101,23 @@ that authenticates browser requests lives in Redis, not just in `api` — so
 unreachable, `web` fails closed on those flows (no session can be created or
 verified) rather than falling back to an insecure path; unauthenticated pages
 keep working.
+
+### Bundled Postgres and Redis
+
+The bundled services publish their ports on `127.0.0.1` only, like `api` and
+`web`. Tools on the same host reach `localhost:5432` and `localhost:6379`; other
+hosts cannot.
+
+| Situation                           | Action                                                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Local development                   | Keep the defaults.                                                                                                                                                             |
+| A VPS with bundled services         | Keep the defaults and follow [Single-host production](single-host-compose.md): its TLS overlay closes the fixed `amcore`/`amcore` login to the network. Redis has no password. |
+| A tool on another host must connect | Set `POSTGRES_PUBLISH_HOST` or `REDIS_PUBLISH_HOST` only behind your own firewall.                                                                                             |
+
+Docker port publishing bypasses host firewalls such as `ufw`, and many cloud
+firewalls allow all inbound traffic by default. A published `0.0.0.0` port is
+therefore reachable from the internet. Verify with `ss -tlnp` on the host:
+the bundled ports must show `127.0.0.1`.
 
 ### Managed / VPS DB and remote Redis, with S3
 
@@ -659,8 +680,47 @@ upserts. Review both effects before using it on an installation: exact current
 authorization templates are unchanged, but AI catalogue defaults are reapplied.
 It is not a routine production migration or a repair command.
 
-For an explicit deployment seed, use a source checkout matching the deployed
-version and the Node/pnpm versions declared by its root `package.json`.
+### Seed from the API image (deployment)
+
+Run the seed as a one-shot container from the same API image as the deployment. The
+host needs no source checkout, Node.js or pnpm, and the database needs no host port:
+
+```sh
+docker compose --profile seed run --rm seed
+```
+
+Without Compose, run the API image with `node dist/cli/system-seed.js --url-from-env MIGRATION_DATABASE_URL`
+and that variable set for this container only.
+
+- The `seed` service receives only `NODE_ENV` and `MIGRATION_DATABASE_URL` from `.env`;
+  `api` and `worker` never receive the owner URL. Anyone who can inspect containers on
+  the host can still read it, as with every container environment.
+- `MIGRATION_DATABASE_URL` names the migration (owner) role from
+  [role separation](database-role-separation.md), not a superuser. With
+  `NODE_ENV=production`, it must use `sslmode=verify-full`; with the bundled
+  Postgres, use the TLS overlay's CA path (see [Single-host production](single-host-compose.md#3-complete-env)).
+- The database must already be running and migrated: `run` starts Postgres if it is
+  bundled and stopped, but never runs migrations.
+- The last output line is JSON. Exit codes:
+
+| Exit | Output `status`                                                              | Meaning and next step                                                                                                      |
+| ---- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 0    | `seeded`                                                                     | Role templates exist, AI catalogue defaults are applied.                                                                   |
+| 2    | `invalid_input`                                                              | The variable is empty, not a Postgres URL, or lacks `verify-full` in production. Fix `.env`.                               |
+| 3    | `TEMPLATES_REQUIRE_MIGRATION`, `TEMPLATES_AMBIGUOUS`, `PERMISSION_COLLISION` | Installed authorization data differs. Nothing was changed; use the [controlled upgrade](../auth/authorization-upgrade.md). |
+| 3    | `SEED_FAILED` (with `sqlState` when the database reported one)               | Connection, TLS or permission failure (`42501` = missing privilege). Fix the cause and run again.                          |
+
+The output never contains the URL or the driver's message. The role templates are
+written in one transaction; the AI catalogue then follows as separate upserts without a
+shared transaction. A failure in the catalogue part can leave it partly applied, with
+the role templates complete; running the seed again after fixing the cause completes it. Each run
+re-applies the catalogue defaults (enabled flags, default model, non-secret
+configuration), so do not use it to repair a live installation.
+
+### Seed from a source checkout (development)
+
+The same seed runs from a source checkout matching the deployed version and the
+Node/pnpm versions declared by its root `package.json`.
 Prepare dependencies and the seed's generated/shared imports:
 
 ```sh
@@ -699,7 +759,7 @@ DATABASE_URL="$MIGRATION_DATABASE_URL" pnpm --filter api exec tsx prisma/seed.ts
 ```
 
 This invokes the same guarded seed directly, with the explicitly selected URL.
-The final migrator does not contain pnpm/tsx or the seed's API dependencies.
+The migrator image does not contain the seed; the API image does (see above).
 Stop on a connection, TLS, permission or template refusal; do not switch targets
 or bypass verification. A successful seed prints `System roles and AI catalogue seeded`.
 Before initial setup, use the runner's documented `status` command to confirm
@@ -721,8 +781,8 @@ service inherits the same policy; it does not reconfigure existing API replicas.
 Roll out that policy consistently before admitting traffic or running initial setup.
 Prepare an ordinary account, complete normal mailbox proof, then assign
 its verified ID as organization `ADMIN`. Run `organization-setup.js` from the runner;
-migrations use the migrator. Explicit seed runs from the matching prepared source
-checkout, as described under [Seeding](#seeding). First platform `SUPER_ADMIN` trust
+migrations use the migrator. The explicit seed runs from the API image, as described
+under [Seeding](#seeding). First platform `SUPER_ADMIN` trust
 is separate. The [establishment runbook](../product-admin/organization-establishment.md)
 gives exact image commands, prerequisites, status/exit codes and failure recovery.
 
@@ -916,7 +976,18 @@ disabled by default so a fresh checkout is unaffected:
   peer (not a forwarded header) matches this set; otherwise it falls back
   to stock `req.ip`, identical to before ADR-072.
 
-**Both must be set for either to have an effect.** `getClientIp()`/audit-log
+**Both must be set for either to have an effect.**
+
+**Every edge in front of `apps/api` must strip `X-AMCore-Client-Ip`.** The API
+accepts the header from any socket address in `TRUSTED_WEB_PEERS`. If that set
+includes the edge itself (a broad range such as `uniquelocal`, or the Docker
+gateway a host nginx connects from), a client could send the header through the
+edge and choose its own address. The bundled Caddyfiles and the reference nginx
+config below strip it. Set `TRUSTED_WEB_PEERS` to the exact web address only; with
+the reference Compose stack, `docker/compose/bff-relay.yml` does this (see
+[Single-host production](single-host-compose.md#visitor-ip-through-the-web-bff)).
+
+`getClientIp()`/audit-log
 IP, invite-abuse, password-login and step-up limiters are not wired to
 this relay. Its consumers are the existing global throttler and Session
 metadata capture only. Credential register/login, OAuth login callbacks and
@@ -997,6 +1068,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header Host $http_host;
+        # Never forward a client's BFF relay claim (see "BFF client-IP relay").
+        proxy_set_header X-AMCore-Client-Ip "";
     }
 
     # SSE endpoints (see "Realtime SSE behind a proxy" below) need buffering
@@ -1008,6 +1081,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header Host $http_host;
+        proxy_set_header X-AMCore-Client-Ip "";
         proxy_buffering off;
         proxy_read_timeout 75s;
     }
@@ -1059,7 +1133,11 @@ docker compose --profile edge \
 ```
 
 `docker/caddy/Caddyfile.web` fronts the product web host but creates no
-console hostname. **OAuth login needs the product web host fronted**: per
+console hostname. All bundled Caddyfiles strip `X-AMCore-Client-Ip` toward the API
+and leave Caddy's default `X-Forwarded-For` handling (the client's address, never a
+client-supplied value). Add `docker/compose/bff-relay.yml` to relay visitor
+addresses from the web app to the API; see
+[Single-host production](single-host-compose.md#visitor-ip-through-the-web-bff). **OAuth login needs the product web host fronted**: per
 `docs/auth/oauth.md`'s ADR-068 note, provider callback URLs
 (`GOOGLE_CALLBACK_URL` etc.) point at `apps/web`'s own origin, not `api`'s —
 fronting only `api:5002` leaves OAuth's callback URL unreachable.

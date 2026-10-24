@@ -66,6 +66,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA ai
 ALTER DEFAULT PRIVILEGES IN SCHEMA ai
   GRANT USAGE, SELECT ON SEQUENCES TO amcore_runtime;
 
+-- Prisma's migration history in public: read-only for the runtime role, so a
+-- runtime-role pg_dump (the bundled backup profile) can include it. Without
+-- it, the dump fails with "permission denied for table _prisma_migrations".
+GRANT SELECT ON public._prisma_migrations TO amcore_runtime;
+
 RESET ROLE;
 REVOKE amcore_migrator FROM CURRENT_USER;
 

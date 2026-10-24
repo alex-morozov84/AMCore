@@ -1,8 +1,8 @@
-import { seedOrgRoles } from '../prisma/seed-org-roles'
 import {
   ORG_DEFAULT_PERMISSIONS,
   ORG_DEFAULT_ROLE_GRANTS,
 } from '../src/core/auth/casl/org-role-defaults'
+import { seedOrgRoles } from '../src/core/system-seed/seed-org-roles'
 
 import {
   type AuthorizationDbFixture,

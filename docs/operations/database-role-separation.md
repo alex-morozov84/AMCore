@@ -152,7 +152,12 @@ denied for schema public`, before applying anything — Postgres 15+ no
    for each schema, grant `amcore_runtime` `USAGE` on the schema, DML on all
    its tables, `USAGE`/`SELECT` on all its sequences, and set
    `ALTER DEFAULT PRIVILEGES` so **future** tables/sequences in that schema
-   auto-grant too, with no manual `GRANT` needed per migration.
+   auto-grant too, with no manual `GRANT` needed per migration. Step 3 also
+   grants `amcore_runtime` read-only `SELECT` on Prisma's
+   `public._prisma_migrations`, so the bundled `backup` profile, which dumps
+   as the runtime role, can include it (without it `pg_dump` fails with
+   `permission denied for table _prisma_migrations`). An installation set up
+   before this grant runs that one statement once.
 
 Step 3's statements act on objects `amcore_migrator` owns — issuing a
 `GRANT` on someone else's object requires the session to actually hold that

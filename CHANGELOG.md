@@ -22,7 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alerts and a runbook, and the **Telegram** row of the Console Integrations page ("Check
   passed", or the reason). It sends nothing and does not prove message delivery.
 
+- Single-host production guide (`docs/operations/single-host-compose.md`) and a capacity
+  page with measured throughput, memory and build requirements for a 2 vCPU / 2 GiB host.
+  New Compose overlays: `supervise.yml` (restart policies and bounded logs for locally
+  built images), `postgres-tls.yml` (bundled Postgres accepts only TLS connections from
+  application roles) and `bff-relay.yml` (fixed web address so the API can trust the
+  visitor IP relayed by the web BFF). The guarded system seed now runs from the API image
+  (`docker compose --profile seed run --rm seed`), without a source checkout on the host.
+  `BUILD_NODE_OPTIONS` passes build-only Node options to the image builds.
+
 ### Changed
+
+- The bundled Postgres and Redis publish their ports on `127.0.0.1` by default, like
+  `api` and `web` (`POSTGRES_PUBLISH_HOST` / `REDIS_PUBLISH_HOST` widen them). Docker
+  publishing bypasses host firewalls, so the old `0.0.0.0` default exposed the fixed
+  Postgres login and the password-less Redis on internet-facing hosts. The `restore`
+  profile now connects with `MIGRATION_DATABASE_URL` when it is set, because a restore
+  drops and recreates objects.
 
 - The migration image uses a minimal workspace package and the shared root lock,
   with official pnpm bootstrap and a Node24/Debian Trixie base. The API builder
@@ -253,6 +269,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failures use a safe 500 with `INTERNAL_ERROR`.
 
 ### Security
+
+- The bundled Caddyfiles and the reference nginx config strip `X-AMCore-Client-Ip`
+  toward the API. Before, with the relay enabled and `TRUSTED_WEB_PEERS` covering the
+  edge (the former `uniquelocal` example in `.env.example`), a client could send the
+  header through the edge and choose its own rate-limit bucket and stored session IP.
+  `.env.example` now asks for the exact web address only.
 
 - Update follow-redirects to 1.16.1 to prevent credential header leaks during
   cross-origin redirects (CVE-2026-111755 and CVE-2026-111756).

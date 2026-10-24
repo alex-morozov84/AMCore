@@ -1,7 +1,7 @@
 /* oxlint-disable no-console */
-import { Prisma, type PrismaClient } from '../src/generated/prisma/client'
+import { Prisma, type PrismaClient } from '../../generated/prisma/client.js'
 
-import { AI_CATALOG_SEED } from './seed-ai-catalog.data'
+import { AI_CATALOG_SEED } from './seed-ai-catalog.data.js'
 
 /**
  * Seed the AI capability-layer catalog (Track C — ADR-054, Arc A). **Convergent** upsert by

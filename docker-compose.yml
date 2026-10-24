@@ -185,7 +185,11 @@ services:
       POSTGRES_PASSWORD: amcore
       POSTGRES_DB: amcore
     ports:
-      - '5432:5432'
+      # Loopback-only by default, like api/web: host tools reach localhost:5432, other
+      # hosts do not. Docker port publishing bypasses host firewalls such as ufw, and this
+      # bundled role uses the fixed amcore/amcore credentials above. Widen it only behind
+      # your own firewall. See docs/operations/deployment.md → "Bundled Postgres and Redis".
+      - '${POSTGRES_PUBLISH_HOST:-127.0.0.1}:5432:5432'
     # postgres:18+ images declare VOLUME /var/lib/postgresql (PGDATA lives at
     # /var/lib/postgresql/18/docker inside it) — the pre-18 /var/lib/postgresql/data
     # mount point is gone; see docs/operations/postgresql-major-upgrade.md.
@@ -206,7 +210,8 @@ services:
     # correct — BullMQ docs); appendonly (AOF) persists jobs across restarts.
     command: redis-server --appendonly yes --maxmemory-policy noeviction
     ports:
-      - '6379:6379'
+      # Loopback-only by default: the bundled Redis has no password.
+      - '${REDIS_PUBLISH_HOST:-127.0.0.1}:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -235,11 +240,39 @@ services:
         required: false
     restart: 'no'
 
+  # ---------------------------------------------------------------------------
+  # Guarded system seed — one-shot, never part of a normal `up`. Runs from the API
+  # image, so a production host needs no source checkout or Node toolchain:
+  #   docker compose --profile seed run --rm seed
+  # Only this container receives the migration (owner) URL; api/worker never do.
+  # An unset URL keeps `compose config` working; the seed command then refuses.
+  # See docs/operations/deployment.md → "Seeding".
+  # ---------------------------------------------------------------------------
+  seed:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
+    profiles: ['seed']
+    command: ['node', 'dist/cli/system-seed.js', '--url-from-env', 'MIGRATION_DATABASE_URL']
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: 'no'
+
   # API (web role): HTTP only, enqueues jobs. PROCESS_ROLE=web → no processors/cron.
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        # Build stage only (never the runtime image). See docs/operations/capacity.md.
+        BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
     ports:
       # Loopback-only by default (ADR-072): reachable as localhost:5002 on
       # THIS host for local dev/curl, but not from other hosts or the
@@ -284,6 +317,8 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
     # See the note on `api`: the worker's notification dispatcher closes (no new claims or sends),
     # waits up to ~15 s for in-flight deliveries to record their result, then the database is
     # torn down. The default 10 s kill timer would cut that short.
@@ -312,6 +347,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_DEPLOYMENT_ID: ${NEXT_DEPLOYMENT_ID:-}
+        BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
     ports:
       - '${WEB_PUBLISH_HOST:-127.0.0.1}:3000:3000'
     environment:
@@ -426,7 +462,9 @@ services:
     profiles: ['restore']
     entrypoint: ['sh', '/scripts/restore.sh']
     environment:
-      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
+      # Like `migrate`: restore drops and recreates objects, so it needs the owner role
+      # when roles are separated (database-role-separation.md); one-shot only.
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:-${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}}
     volumes:
       - ./docker/postgres/restore.sh:/scripts/restore.sh:ro
       - postgres_backups:/backups
