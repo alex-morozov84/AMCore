@@ -142,6 +142,18 @@ describe('Telegram reachability store (real Redis)', () => {
     expect(await client.hKeys(telegramCheckKeys.observations)).toEqual(['w1'])
   })
 
+  it('keeps another damaged value with a valid time until retention, and the row stays unknown', async () => {
+    const foreign = { ...(await observation()), v: 2 }
+    await client.hSet(telegramCheckKeys.observations, 'other-version', JSON.stringify(foreign))
+    await store.write('w1', await observation())
+    expect((await client.hKeys(telegramCheckKeys.observations)).sort()).toEqual([
+      'other-version',
+      'w1',
+    ])
+    const { evidence } = aggregateTelegram(await read(), BINDING, Date.now())
+    expect(evidence).toMatchObject({ result: 'unknown', failure: 'invalid_observation' })
+  })
+
   it('concurrent writes, deletes and reads stay within the cap and never throw', async () => {
     const ops = Array.from({ length: 80 }, async (_, i) => {
       if (i % 3 === 0) return store.remove(`w${i % 40}`)

@@ -231,8 +231,8 @@ reads it. To be told without opening the Console, alert on the metric (see
 - **Provider** column: **Workers reporting** is the number of workers whose result for the
   current settings is stored. **Failed** and **No recent result** appear only when they are
   not zero. **Checked every 60 s** is the interval.
-- **Last check** column: the result, its time and **workers**, then what the check covers and,
-  for a failure, the reason.
+- **Last check** column: the result; for a failure or an unclear result, the reason right under
+  it; then its time and **workers**; then what the check covers.
 - With several workers the row shows the most important result: a recent failure first, then
   a recent unclear result, then an old failure, then an old result, and only when every worker
   reported a recent success, **Confirmed**. The time is the time of the result that decided the
@@ -242,17 +242,17 @@ reads it. To be told without opening the Console, alert on the metric (see
 
 ### Reasons and next steps
 
-| Reason on the row                                                   | Result          | Next step                                                                                                                                                              |
-| ------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **the server cannot reach Telegram**                                | Failed          | From the worker's host, check outgoing HTTPS to `api.telegram.org` (or to your relay): firewall, DNS, proxy. If the provider blocks Telegram, configure a relay.       |
-| **Telegram did not answer within 8 s**                              | Failed          | The same network checks; a very slow path or a relay that does not answer also ends here.                                                                              |
-| **Telegram or the relay did not accept the bot token**              | Failed          | Check `TELEGRAM_BOT_TOKEN` against the token from BotFather. If you use a relay, check that the relay forwards the token. Restart the workers after changing it.       |
-| **Telegram or the relay refused the request**                       | Failed          | Usually a wrong `TELEGRAM_API_BASE_URL` (a path that does not exist on the relay). Check the address.                                                                  |
-| **Telegram reported a request limit**                               | Outcome unknown | Wait. Telegram limits the bot; the next checks show whether it recovers.                                                                                               |
-| **Telegram or the relay reported an error** / **unexpected answer** | Outcome unknown | Wait for the next checks. If it stays, check the relay's logs or Telegram's status.                                                                                    |
-| **more workers report than can be stored**                          | Outcome unknown | More than 32 workers wrote a result within an hour (for example after many restarts). The row stays like this for one hour after the last refused result.              |
-| **a stored result could not be read**                               | Outcome unknown | A stored value is damaged. It is removed at the next check, within a minute.                                                                                           |
-| **settings changed since the last check**                           | Not verified    | Results exist only for other settings (another token or address). Wait a minute for the workers with the new settings, or restart workers that still use the old ones. |
+| Reason on the row                                                   | Result          | Next step                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **the server cannot reach Telegram**                                | Failed          | From the worker's host, check outgoing HTTPS to `api.telegram.org` (or to your relay): firewall, DNS, proxy. If the provider blocks Telegram, configure a relay.                                                                                                                               |
+| **Telegram did not answer within 8 s**                              | Failed          | The same network checks; a very slow path or a relay that does not answer also ends here.                                                                                                                                                                                                      |
+| **Telegram or the relay did not accept the bot token**              | Failed          | Check `TELEGRAM_BOT_TOKEN` against the token from BotFather. If you use a relay, check that the relay forwards the token. After changing it, restart the workers and the API server: both must use the same token.                                                                             |
+| **Telegram or the relay refused the request**                       | Failed          | Usually a wrong `TELEGRAM_API_BASE_URL` (a path that does not exist on the relay). Check the address.                                                                                                                                                                                          |
+| **Telegram reported a request limit**                               | Outcome unknown | Wait. Telegram limits the bot; the next checks show whether it recovers.                                                                                                                                                                                                                       |
+| **Telegram or the relay reported an error** / **unexpected answer** | Outcome unknown | Wait for the next checks. If it stays, check the relay's logs or Telegram's status.                                                                                                                                                                                                            |
+| **more workers report than can be stored**                          | Outcome unknown | More than 32 workers wrote a result within an hour (for example after many restarts). The row stays like this for one hour after the last refused result.                                                                                                                                      |
+| **a stored result could not be read**                               | Outcome unknown | A stored value has a format this server does not read, usually because workers and the API server run different AMCore versions, or the value was changed by hand. Run the same version everywhere. A damaged value disappears at most one hour after it was written.                          |
+| **settings changed since the last check**                           | Not verified    | Results exist only for other settings: the token or address of the workers differs from the API server's. Both must use the same `TELEGRAM_BOT_TOKEN` and `TELEGRAM_API_BASE_URL`. Restart the processes that still have the old values; workers with the new settings report within a minute. |
 
 **Not verified** without a reason means no worker has reported yet: wait a minute after the
 workers start. If it stays, look at **Scheduled jobs** → **Telegram check**: that row tells
@@ -262,9 +262,10 @@ is a successful run there; the result is only on this page.
 ### Old and missing results
 
 A result is recent for 210 seconds. After that the row says it is old; a failure stays
-**Failed**. When a worker stops normally, its result is removed at once, and the counts drop.
-When a worker crashes or is killed, its last result stays, becomes old after 210 seconds and
-is removed after one hour. The times are shown in the API server's clock; if the servers'
+**Failed**. When a worker stops normally, it removes its result within about 5 seconds, and the
+counts drop at the next read. If Redis does not answer at that moment, the result stays and ages
+as after a crash. When a worker crashes or is killed, its last result stays, becomes old
+210 seconds after that check and is no longer counted one hour after it. The times are shown in the API server's clock; if the servers'
 clocks differ, the exact minute may differ from the worker's logs, but the age is right. The
 row is the state at the moment shown in **Data read**; while the page stays open only the age
 changes, and the next read brings the other workers' new results.

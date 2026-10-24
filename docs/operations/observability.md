@@ -528,13 +528,14 @@ cannot resolve a bare relative path against a Git checkout the way a real
 hyperlink would need) — a fork's own checkout has the linked file at the
 same relative location regardless of its Git remote. `docs/operations/runbooks/`
 ships one file per category (`http`, `node-runtime`,
-`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`, `storage`),
+`metrics-collector-health`, `db`, `redis`, `queues`, `email`, `realtime`, `storage`,
+`telegram`),
 each anchor matching a `runbook_path` above exactly: symptom, ranked likely
 causes, diagnostic steps with executable PromQL derived from the rule and the matching
 dashboard panel, mitigation, and escalation guidance.
 
-Every alert is proven, not just written: every one of the 32 rules in
-`docs/operations/prometheus/tests/amcore-alerts_test.yml` has both a
+Every alert is proven, not just written: every rule in `amcore-alerts.yml` has, in
+`docs/operations/prometheus/tests/amcore-alerts_test.yml`, both a
 firing-case test (fires on a constructed bad case) and a genuine
 healthy-case test (`exp_alerts: []`, stays silent when nothing is wrong).
 Every alert that joins two metric families with a boolean `or`/`and` — the

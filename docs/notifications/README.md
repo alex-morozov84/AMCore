@@ -246,10 +246,11 @@ Console, the **Telegram** row on **Integrations**. The check sends nothing and
 does not cover the incoming webhook.
 
 **Removing the Telegram channel** from `NOTIFICATION_CHANNELS` also removes its
-check: delete `telegram-reachability.service.ts` (and its provider line in
+check: delete `telegram-reachability.service.ts` (with its import and provider line in
 `notification-delivery.modules.ts`) and the `TELEGRAM_REACHABILITY_JOB` entry in
 `scheduled-jobs.catalogue.ts`, in the same change. `test/process-role.e2e-spec.ts`
-fails while the catalogue still lists the job but no worker registers it.
+fails while the catalogue still lists the job but no worker registers it; the source scan
+in `scheduled-jobs.catalogue.spec.ts` fails for a decorated method without its entry.
 
 **Only point this at infrastructure you control.** The bot token travels in the
 URL path of every request, so whoever terminates TLS on the relay gets full

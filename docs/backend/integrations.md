@@ -93,10 +93,10 @@ You need a module that already owns the service your reader uses. In the example
    readable form of each fact key (`open tickets: 4`) and no line for the failure code. To
    localize, add keys under `console.integrations` in `apps/web/messages/en.json` and in
    every other catalogue (`apps/web/messages/ru.json` in the upstream layout):
-   `names.crm_sync`, `fact.open_tickets`, and `failure.timeout` for each failure code your
-   reader returns. `failure.<code>` is shared by every row; if your meaning of a code differs
-   from an existing one (for example `timeout` or `unreachable`), add
-   `failureFor.crm_sync.<code>` instead, which wins for your row only. Once you add a key to
+   `names.crm_sync`, `fact.open_tickets`, and `failureFor.crm_sync.<code>` for each failure
+   code your reader returns (here `timeout`). `failureFor.<id>.<code>` is shown for your row
+   only and wins over the shared `failure.<code>`, which every row uses; never change a shared
+   `failure.<code>` text for your own meaning, because other rows show it too. Once you add a key to
    one catalogue, add it to all of them: a mismatch fails a test. For a bilingual product treat the keys as required. The catalogue is
    nested JSON; the path below is relative to `apps/web` (the repository rule calls it
    `messages/en.json`):
@@ -107,7 +107,7 @@ You need a module that already owns the service your reader uses. In the example
        "integrations": {
          "names": { "crm_sync": "CRM sync" },
          "fact": { "open_tickets": "Open tickets" },
-         "failure": { "timeout": "The CRM did not answer in time" }
+         "failureFor": { "crm_sync": { "timeout": "The CRM did not answer in time" } }
        }
      }
    }
@@ -149,15 +149,15 @@ registry does not log why a reading was rejected, so check your reading with a t
 
 ### Evidence
 
-| Field               | Values                                                                                                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `result`            | `none` (nothing observed for the current configuration), `ok`, `failed`, `unknown` (a check ran and its outcome is not established), `simulated`.                                    |
-| `freshness`         | `none`, `fresh`, `stale`. A `failed` result stays `failed` when it is stale.                                                                                                         |
-| `scope`             | `private_file_write_read_delete`, `broker_read`, `provider_acceptance`, `provider_request`, `provider_token_check` or `configuration_only`.                                          |
-| `instance`          | `answering_instance` (only the API server that answered), `shared`, or `workers` (results that workers stored; see below).                                                           |
-| `checkedAt`         | The time of the observation, or `null`. Never the time the page was read.                                                                                                            |
-| `staleAfterSeconds` | How long the observation stays recent. The page re-judges it while it stays open.                                                                                                    |
-| `failure`           | A short lowercase code (`^[a-z][a-z0-9_]{0,31}$`) of your choosing, or `null`. There is no fixed list: add a `failure.<code>` message for each code you use. Never an error message. |
+| Field               | Values                                                                                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `result`            | `none` (nothing observed for the current configuration), `ok`, `failed`, `unknown` (a check ran and its outcome is not established), `simulated`.                                                     |
+| `freshness`         | `none`, `fresh`, `stale`. A `failed` result stays `failed` when it is stale.                                                                                                                          |
+| `scope`             | `private_file_write_read_delete`, `broker_read`, `provider_acceptance`, `provider_request`, `provider_token_check` or `configuration_only`.                                                           |
+| `instance`          | `answering_instance` (only the API server that answered), `shared`, or `workers` (results that workers stored; see below).                                                                            |
+| `checkedAt`         | The time of the observation, or `null`. Never the time the page was read.                                                                                                                             |
+| `staleAfterSeconds` | How long the observation stays recent. The page re-judges it while it stays open.                                                                                                                     |
+| `failure`           | A short lowercase code (`^[a-z][a-z0-9_]{0,31}$`) of your choosing, or `null`. There is no fixed list: add a `failureFor.<id>.<code>` message for each code you use (step 3). Never an error message. |
 
 | Scope                            | Use it when the observation proves                                                                                                     |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
