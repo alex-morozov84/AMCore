@@ -59,6 +59,13 @@ const databaseTestSeams = [
 )
 
 export const localeApiAuthSeams = [
+  localeSeam(
+    'locale.support-mail-recipient-link',
+    'apps/api/test/admin-support-mail.e2e-spec.ts',
+    { identifiers: ['/ru/reset-password?token='] },
+    ['/ru/reset-password?token='],
+    'locale.api-fixture'
+  ),
   ...emailTemplateSeams,
   ...databaseTestSeams,
   localeSeam(

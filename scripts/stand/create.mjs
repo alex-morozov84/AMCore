@@ -11,6 +11,7 @@ import { allocate } from './ports.mjs'
 import { engine } from './docker.mjs'
 import {
   assertOrganizationSetupFixture,
+  isOrganizationMailFixture,
   prepareOrganizationSetupSource,
 } from './organization-setup-fixture.mjs'
 
@@ -21,20 +22,17 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     throw new Error('Path OAuth HTTPS fixture requires the enabled Console rehearsal')
   const productAdminHost =
     !pathOAuth && (choices.productAdminHost || productAdminProfiles.includes(fixtureProfile))
-  const consoleTopology =
-    fixtureProfile === 'support-mail-path'
-      ? 'path'
-      : ['product-admin-three-host', 'support-mail-host'].includes(fixtureProfile)
-        ? 'host'
-        : choices.consoleTopology
+  let consoleTopology =
+    fixtureProfile === 'product-admin-three-host' ? 'host' : choices.consoleTopology
+  // AMCORE_CONSOLE_SUPPORT_MAIL_POLICY_START
+  if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
+    if (!choices.consoleEnabled) throw new Error('Support mail E2E requires enabled Console')
+    consoleTopology = fixtureProfile === 'support-mail-host' ? 'host' : 'path'
+  }
+  // AMCORE_CONSOLE_SUPPORT_MAIL_POLICY_END
   topology ??= pathOAuth ? 'host' : productAdminHost ? 'host' : choices.topology
   if (productAdminHost && topology !== 'host')
     throw new Error('Staff rehearsal requires HTTPS transport')
-  if (
-    ['support-mail-path', 'support-mail-host'].includes(fixtureProfile) &&
-    !choices.consoleEnabled
-  )
-    throw new Error('Support mail E2E requires enabled Console')
   const uuid = randomUUID()
   const attempt = randomUUID()
   const suffix = uuid.replaceAll('-', '').slice(0, 12)
@@ -75,13 +73,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     consoleTopology,
     fixtureVersion: 2,
     fixtureProfile,
-    ...([
-      'organization-setup',
-      'organization-provisioning',
-      'product-admin-closed-signup',
-      'support-mail-path',
-      'support-mail-host',
-    ].includes(fixtureProfile)
+    ...(isOrganizationMailFixture({ fixtureProfile })
       ? { mailCaptureKey: randomBytes(32).toString('hex') }
       : {}),
     mocked,

@@ -20,6 +20,12 @@ const entry = (path, key) => ({
 })
 
 export const operationsConsoleStandSeams = [
+  entry('scripts/stand/config-proof.test.mjs', 'SUPPORT_MAIL_CONFIG_PROOF'),
+  entry('scripts/stand/product-admin-source.mjs', 'SUPPORT_MAIL_PROFILES'),
+  entry('scripts/stand/organization-setup-fixture.mjs', 'SUPPORT_MAIL_PROFILES'),
+  entry('scripts/stand/create.mjs', 'SUPPORT_MAIL_POLICY'),
+  entry('apps/web/e2e/support/managed-target.mjs', 'SUPPORT_MAIL_PROFILES'),
+  entry('apps/web/playwright.product-admin-real-stack.config.ts', 'SUPPORT_MAIL_OPTIONS'),
   entry('scripts/stand/product-admin-source.mjs', 'STAFF_EDGE'),
   entry('scripts/product-admin-e2e-plan.mjs', 'STAFF_CI'),
   entry('apps/web/playwright.real-stack.config.ts', 'PROVISIONING_TEST_DIR'),

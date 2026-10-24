@@ -21,6 +21,19 @@ function fixtureFor(glob) {
 }
 
 const samples = [
+  ['support mail ownership', ['scripts/lib/operations-console-stand-seams.mjs'], true],
+  ['support mail profiles', ['scripts/stand/organization-setup-fixture.mjs'], true],
+  ['support mail browser config', ['apps/web/playwright.product-admin-real-stack.config.ts'], true],
+  [
+    'support mail browser inventory',
+    ['apps/web/e2e/product-admin-real-stack/console-support-mail.spec.ts'],
+    true,
+  ],
+  [
+    'support mail retained backend',
+    ['apps/api/src/core/admin/support-mail/support-mail.service.ts'],
+    true,
+  ],
   ['locale lint fixtures', ['scripts/fixtures/lint/web.json'], true],
   ['paired lint wrapper', ['scripts/lint.mjs'], true],
   ['#431', ['scripts/lib/project-composition-contract.test.mjs'], true],

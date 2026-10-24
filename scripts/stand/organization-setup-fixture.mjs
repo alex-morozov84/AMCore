@@ -1,16 +1,18 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export const isOrganizationMailFixture = (m) =>
-  [
-    'organization-setup',
-    'organization-provisioning',
-    'product-admin-closed-signup',
-    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
-    'support-mail-path',
-    'support-mail-host',
-    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
-  ].includes(m.fixtureProfile)
+const mailFixtures = new Map([
+  ['organization-setup', 'mock'],
+  ['organization-provisioning', 'resend'],
+  ['product-admin-closed-signup', 'mock'],
+  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
+  ['support-mail-path', 'resend'],
+  ['support-mail-host', 'resend'],
+  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
+])
+
+export const isOrganizationMailFixture = (m) => mailFixtures.has(m.fixtureProfile)
+export const usesResendMailFixture = (m) => mailFixtures.get(m.fixtureProfile) === 'resend'
 
 export function assertOrganizationSetupFixture(m) {
   if (m.fixtureProfile === 'organization-shop' && (m.purpose !== 'e2e' || m.mocked))
@@ -24,9 +26,7 @@ export function assertOrganizationSetupFixture(m) {
 export async function prepareOrganizationSetupSource(m) {
   if (!isOrganizationMailFixture(m)) return
   assertOrganizationSetupFixture(m)
-  const provisioning =
-    m.fixtureProfile === 'organization-provisioning' ||
-    ['support-mail-path', 'support-mail-host'].includes(m.fixtureProfile)
+  const provisioning = usesResendMailFixture(m)
   const provider = provisioning ? 'resend' : 'mock'
   const path = join(
     m.snapshot,

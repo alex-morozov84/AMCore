@@ -80,6 +80,19 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one('apps/web/src/features/console-user-support-mail/model/use-support-mail.test.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/console-user-support-mail/ui/SupportMailDialog.test.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.test.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+
     one('apps/web/src/shared/ui/alert.stories.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/shared/ui/role-checklist.test.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/shared/ui/role-checklist.stories.tsx', { disposition: 'rewrite' }),

@@ -73,6 +73,7 @@ export async function supportMailFixture(m) {
       attempts: JSON.stringify(record.attempts),
       operator,
       user,
+      locale: m.localePrefix ? 'ru' : m.baseLocale,
     }
     const check = await sql(
       m,
@@ -86,7 +87,7 @@ export async function supportMailFixture(m) {
       m,
       `${source}, inserted AS (
       INSERT INTO core.users (id,email,"emailCanonical",name,"passwordHash","emailVerified",locale,"updatedAt")
-      SELECT t.id,t.email,t.email,t.name,d."passwordHash",t.verified,'ru',now()
+      SELECT t.id,t.email,t.email,t.name,d."passwordHash",t.verified,:'locale',now()
       FROM targets t LEFT JOIN core.users d ON t.password AND d.id=:'user' RETURNING id
     ), linked AS (
       INSERT INTO core.oauth_accounts (id,"userId",provider,"providerAccountId")

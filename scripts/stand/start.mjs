@@ -1,3 +1,4 @@
+import { isOrganizationMailFixture } from './organization-setup-fixture.mjs'
 import { initializeMarker } from './bootstrap-marker.mjs'
 import { writeFile } from 'node:fs/promises'
 import { compose, docker, inspect } from './docker.mjs'
@@ -43,15 +44,7 @@ export async function start(m) {
   if (m.fixtureProfile === 'notification-work')
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'notification-provider'])
   // AMCORE_CONSOLE_NOTIFICATION_START_END
-  if (
-    [
-      'organization-setup',
-      'organization-provisioning',
-      'product-admin-closed-signup',
-      'support-mail-path',
-      'support-mail-host',
-    ].includes(m.fixtureProfile)
-  )
+  if (isOrganizationMailFixture(m))
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'mail-capture'])
   await compose(m, [
     'up',

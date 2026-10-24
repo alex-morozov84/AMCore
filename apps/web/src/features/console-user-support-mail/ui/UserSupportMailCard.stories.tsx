@@ -1,9 +1,14 @@
-import type { SupportMailStatus } from '@amcore/shared'
+import { createTranslator } from 'next-intl'
+import { DEFAULT_LOCALE, type SupportMailStatus } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import en from '../../../../messages/en.json'
+
 import { UserSupportMailCard } from './UserSupportMailCard'
+
+const t = createTranslator({ locale: DEFAULT_LOCALE, messages: en.console.supportMail })
 
 const id = '00000000-0000-4000-8000-000000000001'
 const attemptId = '00000000-0000-4000-8000-000000000002'
@@ -35,9 +40,9 @@ export const NoHistory: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(
-      canvas.findByRole('button', { name: 'Send password recovery email' })
+      canvas.findByRole('button', { name: t('password_recovery.button') })
     ).resolves.toBeEnabled()
-    expect(canvas.getAllByText('No saved result')).toHaveLength(2)
+    expect(canvas.getAllByText(t('noResult'))).toHaveLength(2)
   },
 }
 export const Confirmation: Story = {
@@ -59,12 +64,16 @@ export const Confirmation: Story = {
     const canvas = within(canvasElement),
       screen = within(document.body)
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Send password recovery email' })
+      await canvas.findByRole('button', { name: t('password_recovery.button') })
     )
     const dialog = await screen.findByRole('alertdialog')
     await waitFor(() => expect(within(dialog).getByText(/recipient@example.test/)).toBeVisible())
-    expect(within(dialog).getByText(/cancels the previous recovery link/)).toBeVisible()
-    await userEvent.click(within(dialog).getByRole('button', { name: /^Cancel$/ }))
+    expect(
+      within(dialog).getByText(
+        t('password_recovery.confirm', { email: 'recipient@example.test', minutes: 15 })
+      )
+    ).toBeVisible()
+    await userEvent.click(within(dialog).getByRole('button', { name: t('cancel'), exact: true }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
   },
 }
@@ -85,7 +94,7 @@ export const Passwordless: Story = {
   },
   play: async ({ canvasElement }) => {
     await expect(
-      within(canvasElement).findByRole('button', { name: 'Send password recovery email' })
+      within(canvasElement).findByRole('button', { name: t('password_recovery.button') })
     ).resolves.toBeDisabled()
   },
 }
@@ -117,7 +126,9 @@ export const UnknownHistory: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(
-      canvas.findByRole('button', { name: 'Details: Password recovery' })
+      canvas.findByRole('button', {
+        name: t('detailsLabel', { kind: t('password_recovery.title') }),
+      })
     ).resolves.toBeVisible()
   },
 }

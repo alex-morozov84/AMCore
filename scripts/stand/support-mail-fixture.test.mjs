@@ -115,9 +115,9 @@ for (const profile of ['support-mail-path', 'support-mail-host']) {
       /account preparation/
     )
     const config = await readFile('apps/web/playwright.product-admin-real-stack.config.ts', 'utf8')
-    assert.match(config, /trace: supportMail \? 'off'/)
-    assert.match(config, /screenshot: supportMail \? 'off'/)
+    assert.match(config, /trace: 'off'/)
+    assert.match(config, /screenshot: 'off'/)
     assert.match(config, /video: 'off'/)
-    assert.match(config, /retries: supportMail \? 0/)
+    assert.match(config, /config.retries = 0/)
   })
 }

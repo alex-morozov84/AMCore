@@ -12,6 +12,11 @@ import { filesForFacts } from './lib/ownership-facts.mjs'
 import { assertSharedSearchRetained } from './lib/shared-search-scaffold-assertions.mjs'
 import { validateOwnership } from './lib/ownership-validate.mjs'
 
+import {
+  assertSupportMailCoreRetained,
+  assertSupportMailProjection,
+} from './lib/support-mail-scaffold-assertions.mjs'
+
 const copies = []
 afterEach(() => copies.splice(0).forEach((copy) => copy.cleanup()))
 
@@ -39,6 +44,7 @@ describe('init-project --admin-console', () => {
         `--admin-console=${mode}`,
         ...(slug ? [`--admin-console-slug=${slug}`] : []),
       ])
+      assertSupportMailProjection(root, mode !== 'disabled')
       const context = readFileSync(path.join(root, 'PROJECT_CONTEXT.md'), 'utf8')
       assert.ok(
         context.includes(`**admin_console:** ${mode === 'disabled' ? 'disabled' : 'enabled'}`)
@@ -81,6 +87,8 @@ describe('init-project --admin-console', () => {
     const root = copy()
     const ownedPaths = removableConsolePaths(root)
     applyProject(root, ['--admin-console=disabled'])
+    assertSupportMailCoreRetained(root, process.cwd())
+    assertSupportMailProjection(root, false)
     const docsIndex = readFileSync(path.join(root, 'docs/README.md'), 'utf8')
     assert.doesNotMatch(docsIndex, /operations-console\//)
     for (const rel of ownedPaths) {

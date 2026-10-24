@@ -1,21 +1,15 @@
 import { dataAdmission, owned } from './ownership.mjs'
 import { docker, inspect } from './docker.mjs'
 import { cleanEnvironment, run } from './process.mjs'
-import { assertOrganizationSetupFixture } from './organization-setup-fixture.mjs'
+import {
+  assertOrganizationSetupFixture,
+  isOrganizationMailFixture,
+} from './organization-setup-fixture.mjs'
 
 /** The active verifier authenticates the exact supervisor lease before any Docker access. */
 export async function consumeSetupMail(m, to) {
   assertOrganizationSetupFixture(m)
-  if (
-    ![
-      'organization-setup',
-      'organization-provisioning',
-      'product-admin-closed-signup',
-      'support-mail-path',
-      'support-mail-host',
-    ].includes(m.fixtureProfile) ||
-    !/^[a-z0-9._+-]{1,180}@e2e\.amcore\.test$/i.test(to)
-  )
+  if (!isOrganizationMailFixture(m) || !/^[a-z0-9._+-]{1,180}@e2e\.amcore\.test$/i.test(to))
     throw new Error('Setup mail fixture unavailable')
   await dataAdmission(m)
   let collector

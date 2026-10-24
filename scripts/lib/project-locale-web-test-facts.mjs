@@ -1,6 +1,20 @@
 import { localeContent, localeDelete } from './project-locale-fact-helpers.mjs'
 
 const catalogueFixtures = [
+  ['apps/web/src/features/console-user-support-mail/model/use-support-mail.test.tsx', 'invitation'],
+  [
+    'apps/web/src/features/console-user-support-mail/ui/SupportMailDialog.test.tsx',
+    'catalogue-pair',
+  ],
+  [
+    'apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.test.tsx',
+    'catalogue-pair',
+  ],
+  [
+    'apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.stories.tsx',
+    'invitation',
+  ],
+
   ['apps/web/src/shared/ui/alert.stories.tsx', 'catalogue-pair'],
   ['apps/web/src/shared/ui/role-checklist.test.tsx', 'catalogue-pair'],
   ['apps/web/src/shared/ui/role-checklist.stories.tsx', 'catalogue-pair'],

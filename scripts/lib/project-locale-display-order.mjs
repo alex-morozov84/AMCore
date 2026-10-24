@@ -3,6 +3,11 @@ import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
 import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
 
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/features/console-user-support-mail/model/use-support-mail.test.tsx',
+  'apps/web/src/features/console-user-support-mail/ui/SupportMailDialog.test.tsx',
+  'apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.test.tsx',
+  'apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.stories.tsx',
+
   'apps/web/src/_app/product-admin/ui/login-form.tsx',
   'apps/web/src/_app/auth-completion/index.tsx',
   'apps/web/src/_app/product-admin/server/admission.ts',
@@ -42,6 +47,8 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/api/prisma/user.prisma',
   'apps/api/src/core/auth/locale-negotiation.spec.ts',
   'apps/api/test/auth.e2e-spec.ts',
+  'apps/api/test/admin-support-mail.e2e-spec.ts',
+  'apps/api/src/core/admin/support-mail/support-mail-dispatch.service.spec.ts',
   'apps/api/test/oauth.e2e-spec.ts',
   'apps/web/e2e/mocked/locale-redirect.spec.ts',
   'apps/web/e2e/real-stack/locale-persistence.spec.ts',

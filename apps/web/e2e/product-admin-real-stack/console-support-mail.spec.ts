@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -11,7 +12,7 @@ import { openSecretMail } from '../support/secret-mail'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 
-test('operator recovery and verification use real Russian website mail with safe lost-response recovery', async ({
+test('operator recovery and verification use real localized website mail with safe lost-response recovery', async ({
   page,
   browser,
 }) => {
@@ -26,10 +27,12 @@ test('operator recovery and verification use real Russian website mail with safe
     throw new Error('Owned support-mail topology required')
   const copy = (locale: string) =>
     JSON.parse(readFileSync(join(m.snapshot, `apps/web/messages/${locale}.json`), 'utf8'))
-  const en = copy('en'),
-    ru = copy('ru')
-  const operatorLocale = m.consoleTopology === 'host' ? 'en' : 'ru'
-  const operatorCopy = operatorLocale === 'en' ? en : ru
+  const baseLocale = DEFAULT_LOCALE
+  const recipientLocale = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+  const operatorLocale = m.consoleTopology === 'host' ? baseLocale : recipientLocale
+  const loginCopy = copy(baseLocale)
+  const operatorCopy = copy(operatorLocale)
+  const recipientCopy = copy(recipientLocale)
   const t = operatorCopy.console.supportMail
   const product = m.origins.product,
     consoleOrigin = m.origins.console ?? product
@@ -37,7 +40,7 @@ test('operator recovery and verification use real Russian website mail with safe
   const consoleApi = m.consoleTopology === 'host' ? '/api' : '/api/console'
   const operator = 'support-operator@e2e.amcore.test',
     recipient = 'support-recipient@e2e.amcore.test'
-  const prepared = setupCommand('prepare-account', { email: operator, locale: 'en' })
+  const prepared = setupCommand('prepare-account', { email: operator, locale: baseLocale })
   await proveSetupMailbox(page, operator)
   const target = randomUUID(),
     passwordless = randomUUID()
@@ -46,18 +49,20 @@ test('operator recovery and verification use real Russian website mail with safe
   })
   guardedSql(
     `INSERT INTO core.users (id,email,"emailCanonical",name,"passwordHash",locale,"updatedAt")
-    SELECT :'target',:'recipient',:'recipient','Support recipient',"passwordHash",'ru',now() FROM core.users WHERE id=:'operator';
+    SELECT :'target',:'recipient',:'recipient','Support recipient',"passwordHash",:'recipientLocale',now() FROM core.users WHERE id=:'operator';
     INSERT INTO core.users (id,email,"emailCanonical",name,locale,"updatedAt")
-    VALUES (:'passwordless','support-passwordless@e2e.amcore.test','support-passwordless@e2e.amcore.test','Passwordless recipient','ru',now());`,
-    { target, recipient, operator: prepared.userId, passwordless }
+    VALUES (:'passwordless','support-passwordless@e2e.amcore.test','support-passwordless@e2e.amcore.test','Passwordless recipient',:'recipientLocale',now());`,
+    { target, recipient, operator: prepared.userId, passwordless, recipientLocale }
   )
 
-  await page.goto(`${consoleOrigin}/en/login`)
-  await page.getByLabel(en.auth.email, { exact: true }).fill(operator)
-  await page.getByLabel(en.auth.password, { exact: true }).fill(SETUP_PASSWORD)
-  await page.getByRole('button', { name: en.auth.login, exact: true }).click()
+  await page.goto(localizedFrontendUrl(consoleOrigin, baseLocale, 'login'))
+  await page.getByLabel(loginCopy.auth.email, { exact: true }).fill(operator)
+  await page.getByLabel(loginCopy.auth.password, { exact: true }).fill(SETUP_PASSWORD)
+  await page.getByRole('button', { name: loginCopy.auth.login, exact: true }).click()
   await page.waitForURL((url) => url.origin === consoleOrigin && !url.pathname.endsWith('/login'))
-  await page.goto(`${consoleOrigin}/${operatorLocale}${consolePath}/users/${target}`)
+  await page.goto(
+    localizedFrontendUrl(consoleOrigin, operatorLocale, `${consolePath}/users/${target}`)
+  )
   const card = page
     .locator('[data-slot="card"]')
     .filter({ has: page.getByRole('heading', { name: t.title, exact: true }) })
@@ -123,13 +128,19 @@ test('operator recovery and verification use real Russian website mail with safe
     recipientPage.setDefaultTimeout(15000)
     recipientPage.setDefaultNavigationTimeout(20000)
     await openSecretMail(recipientPage, recipient, 'verify-email')
-    expect(await recipientPage.evaluate(() => location.pathname)).toBe('/ru/verify-email')
-    await expect(recipientPage.getByText(ru.auth.verifyEmailSuccess, { exact: true })).toBeVisible()
+    expect(await recipientPage.evaluate(() => location.pathname)).toBe(
+      new URL(localizedFrontendUrl(product, recipientLocale, 'verify-email')).pathname
+    )
+    await expect(
+      recipientPage.getByText(recipientCopy.auth.verifyEmailSuccess, { exact: true })
+    ).toBeVisible()
     recipientStage = 'recipient sign-in'
-    await recipientPage.goto(`${product}/ru/login`)
-    await recipientPage.getByLabel(ru.auth.email, { exact: true }).fill(recipient)
-    await recipientPage.getByLabel(ru.auth.password, { exact: true }).fill(SETUP_PASSWORD)
-    await recipientPage.getByRole('button', { name: ru.auth.login, exact: true }).click()
+    await recipientPage.goto(localizedFrontendUrl(product, recipientLocale, 'login'))
+    await recipientPage.getByLabel(recipientCopy.auth.email, { exact: true }).fill(recipient)
+    await recipientPage
+      .getByLabel(recipientCopy.auth.password, { exact: true })
+      .fill(SETUP_PASSWORD)
+    await recipientPage.getByRole('button', { name: recipientCopy.auth.login, exact: true }).click()
     await recipientPage.waitForURL((url) => !url.pathname.endsWith('/login'))
     expect(
       guardedSql('SELECT count(*) FROM core.sessions WHERE "userId"=:\'id\';', {
@@ -169,15 +180,17 @@ test('operator recovery and verification use real Russian website mail with safe
     recipientStage = 'open recovery mail'
     await openSecretMail(recipientPage, recipient, 'reset-password')
     recipientStage = 'submit new password'
-    expect(await recipientPage.evaluate(() => location.pathname)).toBe('/ru/reset-password')
+    expect(await recipientPage.evaluate(() => location.pathname)).toBe(
+      new URL(localizedFrontendUrl(product, recipientLocale, 'reset-password')).pathname
+    )
     await recipientPage
-      .getByLabel(ru.auth.newPassword, { exact: true })
+      .getByLabel(recipientCopy.auth.newPassword, { exact: true })
       .fill('RecipientChanged123!')
     await recipientPage
-      .getByRole('button', { name: ru.auth.resetPasswordSubmit, exact: true })
+      .getByRole('button', { name: recipientCopy.auth.resetPasswordSubmit, exact: true })
       .click()
     await expect(
-      recipientPage.getByText(ru.auth.resetPasswordSuccess, { exact: true })
+      recipientPage.getByText(recipientCopy.auth.resetPasswordSuccess, { exact: true })
     ).toBeVisible()
     expect(
       guardedSql('SELECT count(*) FROM core.sessions WHERE "userId"=:\'id\';', {
@@ -187,10 +200,12 @@ test('operator recovery and verification use real Russian website mail with safe
     // A previously issued access JWT retains its lifetime; prove ordinary login without it.
     recipientStage = 'sign in with new password'
     await recipientContext.clearCookies()
-    await recipientPage.goto(`${product}/ru/login`)
-    await recipientPage.getByLabel(ru.auth.email, { exact: true }).fill(recipient)
-    await recipientPage.getByLabel(ru.auth.password, { exact: true }).fill('RecipientChanged123!')
-    await recipientPage.getByRole('button', { name: ru.auth.login, exact: true }).click()
+    await recipientPage.goto(localizedFrontendUrl(product, recipientLocale, 'login'))
+    await recipientPage.getByLabel(recipientCopy.auth.email, { exact: true }).fill(recipient)
+    await recipientPage
+      .getByLabel(recipientCopy.auth.password, { exact: true })
+      .fill('RecipientChanged123!')
+    await recipientPage.getByRole('button', { name: recipientCopy.auth.login, exact: true }).click()
     await recipientPage.waitForURL((url) => !url.pathname.endsWith('/login'))
   } catch {
     throw new Error(
@@ -216,7 +231,9 @@ test('operator recovery and verification use real Russian website mail with safe
     .locator('[data-slot="dialog-footer"]')
     .getByRole('button', { name: t.close, exact: true })
     .click()
-  await page.goto(`${consoleOrigin}/${operatorLocale}${consolePath}/users/${passwordless}`)
+  await page.goto(
+    localizedFrontendUrl(consoleOrigin, operatorLocale, `${consolePath}/users/${passwordless}`)
+  )
   await expect(
     card.getByRole('button', { name: t.password_recovery.button, exact: true })
   ).toBeDisabled()
