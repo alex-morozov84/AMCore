@@ -34,11 +34,16 @@ max without (state) (amcore_telegram_reachability_state{state=~"failed|unknown|s
 1. Identify the `instance`. Other workers may still be healthy: outgoing network can differ
    per host.
 2. From that worker's host or container, check outgoing HTTPS to `api.telegram.org` (or your
-   relay): firewall and security group rules, DNS, an outbound proxy. If the hosting provider
+   relay) without the token, for example
+   `curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org/`: any HTTP code means
+   the network path works; a timeout or connection error means it is blocked. Then check
+   firewall and security group rules, DNS, an outbound proxy. If the hosting provider
    blocks Telegram, run a relay and set `TELEGRAM_API_BASE_URL`; see
    [Notifications](../../notifications/README.md).
 3. If the token was refused (the Console says **Telegram or the relay did not accept the bot
-   token**), compare `TELEGRAM_BOT_TOKEN` with the token from BotFather and restart the worker.
+   token**), compare `TELEGRAM_BOT_TOKEN` with the token from BotFather. Set the same value on
+   the API server and every worker and restart them; if you use the webhook, register it again
+   ([Telegram webhook registration](../deployment.md#telegram-webhook-registration-one-shot-optional)).
 4. If the request was refused, check `TELEGRAM_API_BASE_URL`: a wrong path on a relay answers
    with an error.
 5. A limit or an error from Telegram usually clears by itself; if it stays, check the relay
