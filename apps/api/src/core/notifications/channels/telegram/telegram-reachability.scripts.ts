@@ -21,7 +21,8 @@ local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
  * KEYS: observations, overflow. ARGV: instanceId, value, observedAt, seq, retentionMs, maxWorkers,
  * maxWriteDelayMs. Returns `stored`, `late` or `overflow`.
  * Drops expired fields and fields without a readable time first (another damaged value stays
- * until its time passes retention; the reader reports it); refuses a write that arrives too late,
+ * until a write after its time passes retention, or until the whole key expires; the reader
+ * reports it meanwhile); refuses a write that arrives too late,
  * lies more than the allowed delay in the future or is older than this worker's stored one;
  * never evicts a stored worker to make room.
  */

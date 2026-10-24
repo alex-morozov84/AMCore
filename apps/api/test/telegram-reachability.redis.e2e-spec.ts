@@ -142,7 +142,7 @@ describe('Telegram reachability store (real Redis)', () => {
     expect(await client.hKeys(telegramCheckKeys.observations)).toEqual(['w1'])
   })
 
-  it('keeps another damaged value with a valid time until retention, and the row stays unknown', async () => {
+  it('keeps another damaged value with a readable time on the next write; the row stays unknown', async () => {
     const foreign = { ...(await observation()), v: 2 }
     await client.hSet(telegramCheckKeys.observations, 'other-version', JSON.stringify(foreign))
     await store.write('w1', await observation())
