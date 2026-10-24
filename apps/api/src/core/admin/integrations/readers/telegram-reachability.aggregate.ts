@@ -13,6 +13,13 @@ interface Judged extends TelegramObservation {
   fresh: boolean
 }
 
+/** What one snapshot holds for the reader's own settings. */
+interface Partitioned {
+  current: Judged[]
+  unreadable: number
+  otherSettings: number
+}
+
 const STALE_MS = TELEGRAM_REACHABILITY.staleAfterSeconds * 1000
 
 function parse(raw: string): TelegramObservation | undefined {
@@ -25,16 +32,64 @@ function parse(raw: string): TelegramObservation | undefined {
   }
 }
 
+/** Unreadable values are counted, never dropped; results past retention are forgotten. */
+function partition(snapshot: TelegramObservationSnapshot, binding: string): Partitioned {
+  const out: Partitioned = { current: [], unreadable: 0, otherSettings: 0 }
+  for (const [, raw] of snapshot.fields) {
+    const observation = parse(raw)
+    if (!observation) {
+      out.unreadable += 1
+      continue
+    }
+    const age = snapshot.now - observation.observedAt
+    if (age > TELEGRAM_REACHABILITY.retentionMs) continue
+    if (observation.binding !== binding) out.otherSettings += 1
+    else out.current.push({ ...observation, fresh: age <= STALE_MS })
+  }
+  return out
+}
+
+function evidence(
+  result: Evidence['result'],
+  freshness: Evidence['freshness'],
+  checkedAt: string | null,
+  failure: string | null
+): Evidence {
+  return {
+    result,
+    freshness,
+    scope: 'provider_token_check',
+    instance: 'workers',
+    checkedAt,
+    staleAfterSeconds: checkedAt === null ? null : TELEGRAM_REACHABILITY.staleAfterSeconds,
+    failure,
+  }
+}
+
 const newest = (items: Judged[]): Judged =>
   items.reduce((a, b) => (b.observedAt > a.observedAt ? b : a))
 const oldest = (items: Judged[]): Judged =>
   items.reduce((a, b) => (b.observedAt < a.observedAt ? b : a))
 
+/** Fresh failed > fresh unknown > stale failed > any stale > all fresh ok. */
+function decidingObservation(current: Judged[]): Judged {
+  const pick = (fresh: boolean, result?: TelegramObservation['result']): Judged[] =>
+    current.filter((o) => o.fresh === fresh && (result === undefined || o.result === result))
+  const candidates: [Judged[], (items: Judged[]) => Judged][] = [
+    [pick(true, 'failed'), newest],
+    [pick(true, 'unknown'), newest],
+    [pick(false, 'failed'), newest],
+    [pick(false), oldest],
+  ]
+  for (const [items, choose] of candidates) if (items.length > 0) return choose(items)
+  return oldest(current)
+}
+
 /**
  * The Telegram row as of one snapshot. Precedence: overflow, unreadable value, nothing for the
- * current settings, then fresh failed > fresh unknown > stale failed > any stale > all fresh ok.
- * A row's time is always the real time of the observation that decided it, expressed in the API
- * clock (`apiNow - age`) so the browser ages it like every other row; the age itself is exact.
+ * current settings, then the deciding observation. A row's time is always the real time of the
+ * event that decided it, expressed in the API clock (`apiNow - age`) so the browser ages it like
+ * every other row; the age itself is exact.
  */
 export function aggregateTelegram(
   snapshot: TelegramObservationSnapshot,
@@ -43,42 +98,14 @@ export function aggregateTelegram(
 ): { evidence: Evidence; facts: Facts } {
   const at = (redisTime: number): string =>
     new Date(apiNow - Math.max(0, snapshot.now - redisTime)).toISOString()
-  const evidence = (
-    result: Evidence['result'],
-    freshness: Evidence['freshness'],
-    checkedAt: string | null,
-    failure: string | null
-  ): Evidence => ({
-    result,
-    freshness,
-    scope: 'provider_token_check',
-    instance: 'workers',
-    checkedAt,
-    staleAfterSeconds: checkedAt === null ? null : TELEGRAM_REACHABILITY.staleAfterSeconds,
-    failure,
-  })
-
-  let unreadable = 0
-  let otherSettings = 0
-  const current: Judged[] = []
-  for (const [, raw] of snapshot.fields) {
-    const observation = parse(raw)
-    if (!observation) {
-      unreadable += 1
-      continue
-    }
-    const age = snapshot.now - observation.observedAt
-    if (age > TELEGRAM_REACHABILITY.retentionMs) continue
-    if (observation.binding !== binding) otherSettings += 1
-    else current.push({ ...observation, fresh: age <= STALE_MS })
-  }
+  const { current, unreadable, otherSettings } = partition(snapshot, binding)
   const facts = factsOf(current, otherSettings)
 
   if (snapshot.overflow) {
-    const recent = snapshot.now - snapshot.overflow.lastRefusedAt <= STALE_MS
-    const time = at(snapshot.overflow.lastRefusedAt)
+    const { lastRefusedAt } = snapshot.overflow
+    const freshness = snapshot.now - lastRefusedAt <= STALE_MS ? 'fresh' : 'stale'
     return {
-      evidence: evidence('unknown', recent ? 'fresh' : 'stale', time, 'too_many_workers'),
+      evidence: evidence('unknown', freshness, at(lastRefusedAt), 'too_many_workers'),
       facts,
     }
   }
@@ -91,21 +118,11 @@ export function aggregateTelegram(
     const failure = otherSettings > 0 ? 'configuration_changed' : null
     return { evidence: evidence('none', 'none', null, failure), facts }
   }
-
-  const pick = (fresh: boolean, result?: TelegramObservation['result']): Judged[] =>
-    current.filter((o) => o.fresh === fresh && (result === undefined || o.result === result))
-  const decide = (o: Judged, chooseFreshness: 'fresh' | 'stale'): Evidence =>
-    evidence(o.result, chooseFreshness, at(o.observedAt), o.failure)
-
-  const freshFailed = pick(true, 'failed')
-  if (freshFailed.length > 0) return { evidence: decide(newest(freshFailed), 'fresh'), facts }
-  const freshUnknown = pick(true, 'unknown')
-  if (freshUnknown.length > 0) return { evidence: decide(newest(freshUnknown), 'fresh'), facts }
-  const staleFailed = pick(false, 'failed')
-  if (staleFailed.length > 0) return { evidence: decide(newest(staleFailed), 'stale'), facts }
-  const stale = pick(false)
-  if (stale.length > 0) return { evidence: decide(oldest(stale), 'stale'), facts }
-  return { evidence: decide(oldest(current), 'fresh'), facts }
+  const o = decidingObservation(current)
+  return {
+    evidence: evidence(o.result, o.fresh ? 'fresh' : 'stale', at(o.observedAt), o.failure),
+    facts,
+  }
 }
 
 /** Counts for the current settings only; zero counts are left out to keep a healthy row short. */
