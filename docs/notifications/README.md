@@ -272,10 +272,13 @@ order, and start nothing with the new token before step 2 is done everywhere:
 2. Replace the untrusted `TELEGRAM_API_BASE_URL` with the official API (remove the
    variable; the default is `https://api.telegram.org`) or a relay you control, in every
    place that uses it: the API server, every worker or `all` process, and the one-shot job
-   or container that runs `telegram:setup`. If your platform restarts a process as soon as
-   a variable changes, change the address first: a restart with the old, revoked token is
+   or container that runs `telegram:setup`. If your hosting blocks Telegram, have your own
+   relay running before this step. If your platform restarts a process as soon as a
+   variable changes, change the address first: a restart with the old, revoked token is
    harmless.
-3. Set the new `TELEGRAM_BOT_TOKEN` and a new `WEBHOOK_TELEGRAM_SECRET` in the same places.
+3. Set the new `TELEGRAM_BOT_TOKEN` and a new `WEBHOOK_TELEGRAM_SECRET` in the same places,
+   in one change where your platform allows it; a restart between the two is harmless,
+   because the address is already trusted.
 4. Start or restart those processes.
 5. If you use the webhook, register it again
    ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)).
