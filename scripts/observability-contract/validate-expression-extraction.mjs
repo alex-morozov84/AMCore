@@ -26,6 +26,7 @@ const RUNBOOK_PATHS = [
   'docs/operations/runbooks/node-runtime.md',
   'docs/operations/runbooks/metrics-collector-health.md',
   'docs/operations/runbooks/log-shipping.md',
+  'docs/operations/runbooks/telegram.md',
 ]
 
 /** Every PromQL expression this repo ships, each `{ expr, file, line, label }`. */

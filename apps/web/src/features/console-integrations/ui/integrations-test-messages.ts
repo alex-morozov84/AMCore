@@ -74,6 +74,7 @@ export const integrationsMessages = {
         lastCheckOld: 'Last check is old',
         setUpNotVerified: 'Set up, not verified',
         inProgress: 'Test in progress',
+        checkPassed: 'Check passed',
       },
       result: {
         none: 'Not verified',
@@ -87,11 +88,14 @@ export const integrationsMessages = {
         broker_read: 'The broker answered. Workers are not tested.',
         provider_acceptance: 'A direct send from the API server to the provider',
         provider_request: 'A request from the API server to the provider',
+        provider_token_check:
+          'Checks the connection and the bot token. Message delivery and incoming messages are not checked.',
         configuration_only: 'Configuration only',
       },
       instance: {
         answering_instance: 'this server',
         shared: 'shared',
+        workers: 'workers',
       },
       checkedAgo: '{time} - {instance}',
       failure: {
@@ -117,6 +121,12 @@ export const integrationsMessages = {
         precheck: 'a test did not start',
         not_started: 'a test did not start',
       },
+      failureFor: {
+        telegram: {
+          unreachable: 'the server cannot reach Telegram',
+          auth_rejected: 'Telegram or the relay did not accept the bot token',
+        },
+      },
       noStoredResult: 'No stored result',
       resultStale: '{result}, old',
       fact: {
@@ -132,6 +142,8 @@ export const integrationsMessages = {
         providers_with_key: 'With a key',
         effective_default: 'Default model',
         catalogue_cache_seconds: 'List may be up to {value} s old',
+        workers_reporting: 'Workers reporting',
+        workers_failed: 'Failed',
       },
       factValue: {
         local: 'local disk',

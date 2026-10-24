@@ -152,9 +152,14 @@ export class TelegramReachabilityStore {
     if (!client) return
     try {
       if (client.isReady) await client.close()
-      else client.destroy()
+      else if (client.isOpen) client.destroy()
     } catch {
-      client.destroy()
+      // A client that never connected or already closed throws here; shutdown must not.
+      try {
+        client.destroy()
+      } catch {
+        /* already closed */
+      }
     }
   }
 }

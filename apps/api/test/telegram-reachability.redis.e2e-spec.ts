@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals'
 import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 import type { PinoLogger } from 'nestjs-pino'
