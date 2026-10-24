@@ -455,6 +455,27 @@
       "auditByUser": "Actions by this user",
       "auditAboutUser": "Events targeting this user",
       "auditOrganization": "Organization activity",
+      "login": {
+        "password": "Password",
+        "configured": "Configured",
+        "notConfigured": "Not configured",
+        "passwordHelp": "A password must be set before this account can sign in with a password.",
+        "linkedAccounts": "Linked accounts",
+        "noLinkedAccounts": "No linked accounts",
+        "linkedAccountsHelp": "These are saved account connections. Available sign-in methods depend on the application settings.",
+        "securityEvents": "Recorded security events",
+        "confirmations": "Password confirmations",
+        "confirmationsHelp": "Password re-entry before protected actions.",
+        "access": "Access changes",
+        "accessHelp": "System role changes and sessions ended by an operator.",
+        "historyHelp": "Only recorded events appear. Ordinary sign-in attempts are not recorded here, and some password confirmations may be missing. Opens the last 31 days; choose an earlier period in Audit for older events.",
+        "providers": {
+          "google": "Google",
+          "github": "GitHub",
+          "apple": "Apple",
+          "telegram": "Telegram"
+        }
+      },
       "auditWindowNote": "Opens the last 31 days, the widest single Audit interval. Choose an earlier period in Audit to check older activity."
     },
     "usersEmptyTitle": "No users yet",

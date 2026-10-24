@@ -22,7 +22,7 @@ export async function UserDetailPage({
     <section className="space-y-5">
       <DetailBackLink returnTo={returnTo} kind="user" />
       <h1 className="text-3xl font-semibold tracking-tight">{t('userTitle')}</h1>
-      <Suspense fallback={<DetailResultsSkeleton searchable />}>
+      <Suspense fallback={<DetailResultsSkeleton searchable userFacts />}>
         <UserDetailResults id={id} page={page} search={search} returnTo={returnTo} />
       </Suspense>
     </section>

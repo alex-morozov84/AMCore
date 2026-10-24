@@ -41,8 +41,19 @@ test('disabled projection applies once and passes the residual scan', () =>
       'apps/web/src/shared/ui/console-step-up-dialog.test.tsx',
       'apps/web/src/shared/api/console/session-metadata.test.ts',
       'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
+      'apps/web/src/_pages/console/UserDetailPage',
+      'scripts/stand/login-diagnostics-fixture.mjs',
+      'scripts/stand/login-diagnostics-fixture.test.mjs',
+      'apps/web/e2e/real-stack/admin-users.spec.ts',
+      'apps/web/e2e/console-real-stack/login-diagnostics.ts',
     ])
       assert.equal(existsSync(path.join(root, file)), false, file)
+    for (const file of ['scripts/stand/preview.mjs', 'docs/operations/local-stands.md']) {
+      assert.doesNotMatch(
+        readFileSync(path.join(root, file), 'utf8'),
+        /login-diagnostics|loginDiagnosticsFixture/
+      )
+    }
     for (const file of [
       'apps/api/src/core/admin/admin-sessions.service.ts',
       'apps/api/src/core/admin/organization-establishment.controller.ts',

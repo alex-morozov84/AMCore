@@ -6,7 +6,7 @@ export function UserDetailPageSkeleton() {
     <section aria-busy="true" className="space-y-5">
       <Skeleton className="h-5 w-36" />
       <Skeleton className="h-9 w-48" />
-      <DetailResultsSkeleton searchable />
+      <DetailResultsSkeleton searchable userFacts />
     </section>
   )
 }

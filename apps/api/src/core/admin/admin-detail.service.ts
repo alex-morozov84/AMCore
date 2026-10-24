@@ -22,6 +22,7 @@ import {
   projectRoles,
   USER_MEMBERSHIP_SELECT,
 } from './admin-detail-projection.js'
+import { readLoginDiagnostics } from './admin-login-diagnostics.js'
 
 @Injectable()
 export class AdminDetailService {
@@ -38,6 +39,7 @@ export class AdminDetailService {
       async (tx) => {
         const user = await tx.user.findUnique({ where: { id }, select: DETAIL_USER_SELECT })
         if (!user) throw new NotFoundException('User', id)
+        const loginDiagnostics = await readLoginDiagnostics(tx, id)
         const literal = search ? escapeLikeLiteral(search) : undefined
         const where: Prisma.OrgMemberWhereInput = {
           userId: id,
@@ -63,6 +65,7 @@ export class AdminDetailService {
         })
         return {
           user: projectDetailUser(user, this.storage),
+          loginDiagnostics,
           membershipCount,
           memberships: {
             data: rows.map((row) => ({

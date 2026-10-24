@@ -4,6 +4,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 
 import { commit, runInitProject } from './init-project-test-helpers.mjs'
+import { checkLoginDiagnostics } from './project-console-login-diagnostics-contract.mjs'
 import {
   checkRetainedSettings,
   checkRemovedSettings,
@@ -78,6 +79,7 @@ for (const [name, flags] of scenarios) {
       const result = runInitProject(fixture.root, [...flags, '--yes'])
       assert.equal(result.status, 0, result.stderr)
       checkRetainedSettings(process.cwd(), fixture.root)
+      checkLoginDiagnostics(process.cwd(), fixture.root, flags)
       if (flags.includes('--admin-console=disabled')) {
         checkRemovedSettings(fixture.root)
         return checkDisabled(fixture.root)
