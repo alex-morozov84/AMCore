@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product-administration adoption guide with shop, CRM/ERP and SaaS recipes,
   clean fork initialization and a cosmic custom interface using public headless operations.
 
+- Telegram reachability check: every worker asks Telegram `getMe` once a minute through
+  `TELEGRAM_API_BASE_URL` and reports whether it can reach Telegram and the bot token is
+  accepted. The result is the `amcore_telegram_reachability_state` metric with two example
+  alerts and a runbook, and the **Telegram** row of the Console Integrations page ("Check
+  passed", or the reason). It sends nothing and does not prove message delivery.
+
 ### Changed
 
 - The migration image uses a minimal workspace package and the shared root lock,

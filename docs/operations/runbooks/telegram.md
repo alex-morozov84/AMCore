@@ -17,8 +17,8 @@ state is 1:
 | `stale`   | The worker's own last check is older than 210 seconds: the check stopped.         |
 | `none`    | No check finished since the worker started.                                       |
 
-Without a token the metric does not exist. The optional Console shows the same results on
-**Integrations** → **Telegram** ([operator guide](../../operations-console/integrations.md#telegram-check)).
+Without a token the metric does not exist. The optional Operations Console shows the same
+results on **Integrations** → **Telegram**.
 Delivery of the alert itself needs your own receiver configuration in Alertmanager or the
 downstream monitoring system.
 
