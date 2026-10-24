@@ -172,6 +172,8 @@ export function IntegrationLastCheck({ item, now }: { item: IntegrationItem; now
       <Status tone={tone} icon={icon}>
         {word}
       </Status>
+      {/* The reason is what the operator acts on: right under the result, in its tone, aligned with the word. */}
+      {failure && <p className={`pl-5.5 text-sm ${TONE[tone]}`}>{failure}</p>}
       {evidence.checkedAt && (
         <p className="text-sm text-muted-foreground">
           <ConsoleTimestamp value={evidence.checkedAt} variant="inline" seconds /> ·{' '}
@@ -179,7 +181,6 @@ export function IntegrationLastCheck({ item, now }: { item: IntegrationItem; now
         </p>
       )}
       <p className="text-xs text-muted-foreground">{t(`scope.${evidence.scope}`)}</p>
-      {failure && <p className="text-xs text-muted-foreground">{failure}</p>}
     </div>
   )
 }
