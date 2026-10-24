@@ -152,7 +152,11 @@ describe('Telegram reachability store (real Redis)', () => {
   })
 
   it('with Redis away a write fails at once instead of waiting in an offline queue', async () => {
-    const away = createClient({ url: 'redis://127.0.0.1:1', socket: { reconnectStrategy: false } })
+    // Socket options change the inferred client type; the store only needs the app client shape.
+    const away = createClient({
+      url: 'redis://127.0.0.1:1',
+      socket: { reconnectStrategy: false },
+    }) as unknown as AppRedisClient
     away.on('error', () => undefined)
     const offline = new TelegramReachabilityStore(away, metrics, logger)
     offline.open()
