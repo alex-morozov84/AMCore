@@ -133,6 +133,33 @@ is, so choose readable ids.
 Do not record a manual run or a startup attempt as a scheduled run. Call the
 shared logic directly, as `POST /admin/cleanup` and the GeoIP startup/CLI path do.
 
+### A job that checks an outside service
+
+When the job's work is to observe a service and store what it saw, a stored negative
+observation is a successful run: the job did its work. Return `failed` only when the job
+could not do it, for example when the result could not be stored. Otherwise the Scheduled
+jobs screen would report the service's outage as a broken job, and "the checker stopped"
+would look the same as "the service is down". Put the observed outcome in `codes` and show
+the service's health where it belongs, such as an [integration reader](integrations.md).
+`telegram-reachability` is the reference: `succeeded` with the observed code, `failed`
+(`store_unavailable`, `store_late`, `store_overflow`) when the result was not stored.
+The code of a successful frequent run is recorded but not shown on its row, so name the
+place of the result in the job's `purpose` copy.
+
+### A job that a configuration switches off
+
+Give the catalogue entry a `disabledReason` (both helpers accept it), for example
+`frequent(id, EVERY_MIN, MINUTE, { disabledReason: (env) => (env.get('TOKEN') ? null : 'token_missing') })`.
+The worker reports the reason with the job. The decorated method must also return before
+`jobs.run(...)` when the configuration is off, so an off job records no run; see
+`GeoipUpdateService.scheduledUpdate`.
+
+The catalogue is one list for the whole application. If a feature that owns a job can be
+removed, remove its job source and its catalogue entry in the same change.
+`test/process-role.e2e-spec.ts` compares the jobs that the worker graph really registers
+with the catalogue, so a catalogue entry without its job fails there; the source scan in
+`scheduled-jobs.catalogue.spec.ts` fails for a decorated method without its entry.
+
 ## What is recorded and how it is judged
 
 - A worker reports the job when its process starts. Each result is merged by the

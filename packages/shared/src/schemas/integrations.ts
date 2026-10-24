@@ -25,9 +25,11 @@ export const INTEGRATION_SCOPES = [
   'broker_read',
   'provider_acceptance',
   'provider_request',
+  'provider_token_check',
   'configuration_only',
 ] as const
-export const INTEGRATION_INSTANCES = ['answering_instance', 'shared'] as const
+/** `workers`: results reported by the workers that wrote one; never a claim about every worker. */
+export const INTEGRATION_INSTANCES = ['answering_instance', 'shared', 'workers'] as const
 /** Closed link set: the frontend maps each to its own href helper; a registration supplies no URL. */
 export const INTEGRATION_LINKS = ['overview', 'background_work', 'runbook'] as const
 /** Closed probe kinds: copy, recipient rule and receipt vocabulary are bound to the kind. */

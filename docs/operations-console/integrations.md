@@ -34,29 +34,30 @@ Console shows translations of the same texts.
 
 Each row has one word for scanning. The columns beside it are the facts behind it.
 
-| Headline                      | Meaning                                                                                                                                               |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cannot read**               | This row could not be read now. The other rows are not affected. Select **Refresh**; if it stays, look in the API server's logs for that integration. |
-| **Off** / **Not set up**      | The module is switched off, or its required settings are missing.                                                                                     |
-| **Set up, not verified**      | Settings exist but nothing has confirmed them. This is the normal state for AI, sign-in and Telegram.                                                 |
-| **Working (as last checked)** | The last check succeeded and is still recent. It says nothing about the time after that check.                                                        |
-| **Last check is old**         | The last check succeeded, but longer ago than its freshness limit.                                                                                    |
-| **Failed**                    | The last check failed. The row keeps showing it when the check is old; the age is shown beside it.                                                    |
-| **Outcome unknown**           | A check ran and could not establish whether it worked, for example after a timeout.                                                                   |
-| **Simulated (mock provider)** | The mock provider is in use, so nothing real was sent. It is never shown as working.                                                                  |
-| **Test in progress**          | A test email is still running.                                                                                                                        |
+| Headline                      | Meaning                                                                                                                                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cannot read**               | This row could not be read now. The other rows are not affected. Select **Refresh**; if it stays, look in the API server's logs for that integration.                                                            |
+| **Off** / **Not set up**      | The module is switched off, or its required settings are missing.                                                                                                                                                |
+| **Set up, not verified**      | Settings exist but nothing has confirmed them. This is the normal state for AI and sign-in, and for Telegram until a worker has reported its check.                                                              |
+| **Working (as last checked)** | The last check succeeded and is still recent. It says nothing about the time after that check.                                                                                                                   |
+| **Check passed**              | Telegram only, in place of **Working (as last checked)**: the workers reached Telegram and it accepted the bot token. It does not prove that messages are delivered. An old success shows **Last check is old**. |
+| **Last check is old**         | The last check succeeded, but longer ago than its freshness limit.                                                                                                                                               |
+| **Failed**                    | The last check failed. The row keeps showing it when the check is old; the age is shown beside it.                                                                                                               |
+| **Outcome unknown**           | A check ran and could not establish whether it worked, for example after a timeout.                                                                                                                              |
+| **Simulated (mock provider)** | The mock provider is in use, so nothing real was sent. It is never shown as working.                                                                                                                             |
+| **Test in progress**          | A test email is still running.                                                                                                                                                                                   |
 
 ### Words in the Last check column
 
-| Word                 | Meaning                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Confirmed**        | The last observation succeeded. Its time and where it was taken are shown beside it.                    |
-| **Failed**           | The last observation failed. The safe reason is shown beside it.                                        |
-| **Outcome unknown**  | A check ran and could not establish whether it worked.                                                  |
-| **Simulated**        | The mock provider was used. Nothing real was sent.                                                      |
-| **Not verified**     | Nothing was observed. The row shows the settings only (**Configuration only**).                         |
-| **No stored result** | The email row has no result for the current settings: none was stored, it expired, or settings changed. |
-| **…, old**           | The observation is older than its freshness limit. A failed result stays failed.                        |
+| Word                 | Meaning                                                                                                                           |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Confirmed**        | The last observation succeeded. Its time and where it was taken (**this server**, **shared** or **workers**) are shown beside it. |
+| **Failed**           | The last observation failed. The safe reason is shown beside it.                                                                  |
+| **Outcome unknown**  | A check ran and could not establish whether it worked.                                                                            |
+| **Simulated**        | The mock provider was used. Nothing real was sent.                                                                                |
+| **Not verified**     | Nothing was observed. The row shows the settings only (**Configuration only**).                                                   |
+| **No stored result** | The email row has no result for the current settings: none was stored, it expired, or settings changed.                           |
+| **…, old**           | The observation is older than its freshness limit. A failed result stays failed.                                                  |
 
 ### What each row proves
 
@@ -67,10 +68,10 @@ Each row has one word for scanning. The columns beside it are the facts behind i
 | **Sign-in providers** | Settings                                                                                                  | Nothing about sign-in itself. A configured provider does not prove that a user can sign in.                                                                                           | none                           |
 | **Queue**             | A short read-only question to the broker                                                                  | The broker answered. It does not prove that workers run. Queue depths are on Background work.                                                                                         | 1 minute                       |
 | **AI**                | The cached catalogue of enabled providers and models                                                      | Only configuration. It counts providers that have an enabled model and whether a key is present. It is not a call to any provider and can be up to 5 minutes old.                     | none                           |
-| **Telegram**          | Settings of the notification channel                                                                      | Nothing about reachability. Whether this server can reach Telegram is not checked yet.                                                                                                | none                           |
+| **Telegram**          | The check each worker runs by itself every minute (see [Telegram check](#telegram-check))                 | The workers that reported could reach Telegram, and it accepted the bot token. Not message delivery, not incoming messages.                                                           | 210 seconds                    |
 
 Reading this page never sends an email and never calls an outside provider. Files shows
-what the API already observed. Queue asks the broker one short, bounded, read-only
+what the API already observed; Telegram shows what the workers stored. Queue asks the broker one short, bounded, read-only
 question when the page is read; it starts no work. The email row shows the latest stored
 test result of the platform, which can be another operator's.
 
@@ -207,6 +208,108 @@ result. The latest result is kept for 7 days; after that the row says **No store
 result**, which is not the same as "never checked". The same text appears if the
 provider key, sender or provider type changed after the test, because an old result
 must not vouch for new settings.
+
+## Telegram check
+
+Use it to answer one question: can the servers that send Telegram messages reach Telegram
+with the configured bot token right now? This is the case where a server's outgoing access to
+`api.telegram.org` is closed and the bot stops sending without any error a user sees.
+
+Each worker (a process with `PROCESS_ROLE=worker` or `all`, which sends the notifications) asks
+Telegram `getMe` once a minute. The
+request is free, has no recipient and changes nothing. It goes to the same address the
+messages use, so a configured relay (`TELEGRAM_API_BASE_URL`) is checked too. There is no
+button: the check runs without you, and **Refresh** and **Auto-refresh** only read what the
+workers stored. The check runs only when `TELEGRAM_BOT_TOKEN` is set.
+
+A failure appears on the row about one to two minutes after it starts: up to one minute until
+the next check, up to 8 seconds for the answer, and up to 30 seconds until **Auto-refresh**
+reads it. To be told without opening the Console, alert on the metric (see
+[Get an alert](#get-an-alert)).
+
+### What the row shows
+
+- **Provider** column: **Workers reporting** is the number of workers whose result for the
+  current settings is stored. **Failed** counts those whose latest result failed, recent or old.
+  **No recent result** counts those whose latest result is older than 210 seconds. Both appear
+  only when they are not zero. **Checked every 60 s** is the interval.
+- One success has three names: **Check passed** in the headline, **Confirmed** in **Last
+  check** and `ok` in the metric.
+- **Last check** column: the result; for a failure or an unclear result, the reason right under
+  it; then its time and **workers**; then what the check covers.
+- With several workers the row shows the most important result: a recent failure first, then
+  a recent unclear result, then an old failure, then an old result, and only when every worker
+  reported a recent success, **Confirmed**. The time is the time of the result that decided the
+  row, so another worker's newer success never hides an older failure.
+- Only results for the current settings (the API server's token and address) decide the row
+  and are counted in **Workers reporting**. **Results for other settings: N** shows workers that
+  still report with other values; they are not counted and do not make the row fail. **Not
+  verified — settings changed since the last check** appears only when no current result exists.
+  After a partial restart, the restarted workers decide the row and the others are shown as
+  **Results for other settings**.
+- The row counts the workers that reported. It cannot tell whether a worker never reported (an
+  older version, a worker that never started, a worker that uses another Redis). Comparing
+  **Workers reporting** with the number of workers you run is a hint, not proof: a crashed
+  worker's last result is still counted until it is an hour old, so equal numbers do not show
+  that every running worker reported.
+- **Failed: 1** with **Workers reporting: 2** does not show that the other worker is healthy: its
+  result can be unclear or old (see **No recent result**).
+- A network reason (**cannot reach**, **did not answer**) says nothing about the token, and a
+  wrong `TELEGRAM_API_BASE_URL` (a host that does not resolve or answer) can cause it too.
+- The row does not name a worker. To find the one that fails, use the `instance` label of the
+  metric, which is the address Prometheus scrapes for that worker (see
+  [Get an alert](#get-an-alert)); without Prometheus, run the network check below on each
+  worker's host.
+
+### Reasons and next steps
+
+| Reason on the row                                                   | Result          | Next step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **the server cannot reach Telegram**                                | Failed          | From the worker's host or container, check outgoing HTTPS to `api.telegram.org` (or to your relay) without the token, for example `curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org/` (for a relay, its base address). Any HTTP code, 404 included, shows that this address answers; it does not show that a relay forwards to Telegram or that `getMe` works. A timeout or connection error is a symptom: find its cause in the firewall, DNS, proxy and the address itself. "The server" here is the host of the failing worker, not the API server. If the provider blocks Telegram, configure a relay that you control, never a public Bot API mirror: the token travels in every request (see the relay rules and the leaked-token steps in [Notifications](../notifications/README.md)).                                                                                                                                                       |
+| **Telegram did not answer within 8 s**                              | Failed          | The same network checks; a very slow path or a relay that does not answer also ends here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Telegram or the relay did not accept the bot token**              | Failed          | Check `TELEGRAM_BOT_TOKEN` against the token from BotFather. If you use a relay, check that the relay forwards the token. After changing it, restart the workers and the API server: both must use the same token. If you use the webhook, register it again with the new token ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Telegram or the relay refused the request**                       | Failed          | Usually a wrong `TELEGRAM_API_BASE_URL` (a path that does not exist on the relay). Check the address.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Telegram reported a request limit**                               | Outcome unknown | Wait; change no settings. Telegram limits the bot (the check itself is one request per worker per minute); deliveries wait and retry on their own. The next checks show whether it recovers; after 10 minutes the alert fires, then check the relay logs and Telegram's status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Telegram or the relay reported an error** / **unexpected answer** | Outcome unknown | Wait for the next checks. If it stays, check the relay's logs or Telegram's status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **more workers report than can be stored**                          | Outcome unknown | More than 32 workers wrote a result within an hour (for example after many restarts). The row stays like this for one hour after the last refused result.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **a stored result could not be read**                               | Outcome unknown | A stored value has a format this server does not read, usually because workers and the API server run different AMCore versions, or the value was changed by hand. Run the same version everywhere. A value without a readable time is removed at the next check; other damaged values are not cleared on a fixed schedule. If the row stays like this after every process runs the same version, delete the stored results: `redis-cli DEL 'integrations:{telegram_check}:obs'`. They hold only check results; the workers write new ones within a minute.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **settings changed since the last check**                           | Not verified    | Results exist only for other settings: the token or address of the workers differs from the API server's. Both must use the same `TELEGRAM_BOT_TOKEN` and `TELEGRAM_API_BASE_URL`. The Console does not show which process has the old values: compare the variables of the API server and of each worker without printing the token. Inside each process's own environment (for example its container), with shell tracing off (`set +x`), first check that the variable is not empty, then compare a hash: `test -n "$TELEGRAM_BOT_TOKEN" && printf %s "$TELEGRAM_BOT_TOKEN" \| sha256sum`. Compare `TELEGRAM_API_BASE_URL` separately; it is not secret, and a trailing `/` does not matter. (The Console itself compares a fingerprint of the token and the address, never the raw values.) This also appears when only the API server still has the old values. Restart the processes that still have them; workers with the new settings report within a minute. |
+
+**Not verified** without a reason means no worker has reported yet: wait a minute after the
+workers start. If it stays, look at **Scheduled jobs** → **Telegram check**: that row tells
+whether the check itself runs on the workers. It shows the latest run of any worker, not each
+worker; the metric shows each one. A check that ran and found Telegram unreachable is a
+successful run there; the result is only on this page.
+
+**Check passed, but a user got no message.** The check does not cover delivery. Open
+[Background work](background-work.md#notification-deliveries) → **Notification deliveries**,
+choose the Telegram channel and a state: delivered, skipped (for example, the user has no
+linked Telegram) and cancelled rows are told apart, and **Attempt history** shows the latest
+attempts of one delivery.
+
+### Old and missing results
+
+A result is recent for 210 seconds. After that the row says it is old; a failure stays
+**Failed**. When a worker stops normally, it removes its result within about 5 seconds, and the
+counts drop at the next read. If Redis does not answer at that moment, the result stays and ages
+as after a crash. When a worker crashes or is killed, its last result stays, becomes old
+210 seconds after that check and is no longer counted one hour after it. The times are shown in the API server's clock; if the servers'
+clocks differ, the exact minute may differ from the worker's logs, but the age is right. The
+row is the state at the moment shown in **Data read**; while the page stays open only the age
+changes, and the next read brings the other workers' new results.
+
+If Redis is unavailable, the row says **Cannot read**. A worker that cannot store its result
+still updates its metric.
+
+### Get an alert
+
+Each worker publishes `amcore_telegram_reachability_state` with one of `ok`, `failed`,
+`unknown`, `stale` (its own check stopped updating) or `none` (no result since it started).
+The example rules `AMCoreTelegramCheckFailing` and `AMCoreTelegramCheckNotStarted` in
+[`amcore-alerts.yml`](../operations/prometheus/amcore-alerts.yml) alert per worker; see
+[Observability](../operations/observability.md). A worker that Prometheus cannot scrape is
+reported by your usual `up` monitoring, not by this metric. Without a token the metric does not
+exist and nothing alerts.
 
 ## Audit
 

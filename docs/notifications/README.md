@@ -227,8 +227,13 @@ chat/user id, provider text, or token ever appears in an attempt or log.
 **Telegram relay (blocked regions).** Telegram's Bot API (`api.telegram.org`) is
 blocked at the network level in some deployment regions, independent of the bot
 token or account. `TELEGRAM_API_BASE_URL` (see `.env.example`) overrides the Bot
-API origin the API server calls — set it to a relay you run instead of the
-default public API. Every request the client makes is built as
+API origin that the workers (sending and the reachability check) and the
+`telegram:setup` CLI call — set it to a relay you run instead of the default
+public API. A web-only API server (`PROCESS_ROLE=web`) makes no Bot API call; it
+reads the same token and address only to match the workers' check results to the
+current settings. A process with `PROCESS_ROLE=all` serves HTTP and also sends and
+runs the check, so treat it as a worker (its network path matters too). Set both
+variables identically on every process. Every request the client makes is built as
 `<TELEGRAM_API_BASE_URL>/bot<token>/<method>`
 ([`telegram-bot-api.client.ts`](../../apps/api/src/core/notifications/channels/telegram/telegram-bot-api.client.ts)),
 and the `telegram:setup` CLI's `setWebhook` call honors the same override, so
@@ -237,10 +242,49 @@ The relay itself is just a reverse proxy that forwards `/bot*` requests
 unmodified to the real `https://api.telegram.org` (nginx/Caddy or similar) —
 AMCore doesn't ship one.
 
+**Is Telegram reachable?** Every worker with a token asks `getMe` once a minute
+through the same `TELEGRAM_API_BASE_URL`, so a blocked network, a refused token
+or a broken relay shows up before users notice missing messages. The result is
+the `amcore_telegram_reachability_state` metric with example alerts
+([Telegram runbook](../operations/runbooks/telegram.md)) and, with the optional
+Console, the **Telegram** row on **Integrations**. The check sends nothing and
+does not cover the incoming webhook.
+
+**Removing the Telegram channel** from `NOTIFICATION_CHANNELS` also removes its
+check: delete `telegram-reachability.service.ts` (with its import and provider line in
+`notification-delivery.modules.ts`) and the `TELEGRAM_REACHABILITY_JOB` entry in
+`scheduled-jobs.catalogue.ts`, in the same change. `test/process-role.e2e-spec.ts`
+fails while the catalogue still lists the job but no worker registers it; the source scan
+in `scheduled-jobs.catalogue.spec.ts` fails for a decorated method without its entry.
+
 **Only point this at infrastructure you control.** The bot token travels in the
 URL path of every request, so whoever terminates TLS on the relay gets full
 control of the bot (read/send messages, change the webhook). Never point it at
 a third-party or public Bot API mirror.
+
+If the token was ever sent to such a mirror, treat it as leaked, together with the
+webhook secret (`setWebhook` sent it through the same address) and the messages that
+passed through it (handle those under your incident process). Do these steps in this
+order, and start nothing with the new token before step 2 is done everywhere:
+
+1. In BotFather, revoke the token and generate a new one
+   ([Telegram: generating a token](https://core.telegram.org/bots/features#generating-an-authentication-token)).
+2. Replace the untrusted `TELEGRAM_API_BASE_URL` with the official API (remove the
+   variable; the default is `https://api.telegram.org`) or a relay you control, in every
+   place that uses it: the API server, every worker or `all` process, and the one-shot job
+   or container that runs `telegram:setup`. If your hosting blocks Telegram, have your own
+   relay running before this step. If your platform restarts a process as soon as a
+   variable changes, change the address first: a restart with the old, revoked token is
+   harmless.
+3. Set the new `TELEGRAM_BOT_TOKEN` and a new `WEBHOOK_TELEGRAM_SECRET` in the same places,
+   in one change where your platform allows it; a restart between the two is harmless,
+   because the address is already trusted.
+4. Start or restart those processes.
+5. If you use the webhook, register it again
+   ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)).
+
+The check itself sends the token once a minute from every worker, so keeping the old
+address even for a few minutes sends the new token to the same recipient.
 
 ## Delivery guarantees and operating limits
 

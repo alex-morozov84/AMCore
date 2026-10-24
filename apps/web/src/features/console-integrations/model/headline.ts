@@ -11,6 +11,7 @@ export type Headline =
   | 'lastCheckOld'
   | 'setUpNotVerified'
   | 'inProgress'
+  | 'checkPassed'
 
 /**
  * Age of an observation judged at `now` (server time), so a page that stays open keeps ageing.
@@ -39,7 +40,9 @@ export function headlineOf(item: IntegrationItem, evidence: IntegrationEvidence)
     case 'simulated':
       return 'simulated'
     case 'ok':
-      return evidence.freshness === 'stale' ? 'lastCheckOld' : 'working'
+      if (evidence.freshness === 'stale') return 'lastCheckOld'
+      // A token check proves the connection and the token, not that messages are delivered.
+      return evidence.scope === 'provider_token_check' ? 'checkPassed' : 'working'
     default:
       return 'setUpNotVerified'
   }

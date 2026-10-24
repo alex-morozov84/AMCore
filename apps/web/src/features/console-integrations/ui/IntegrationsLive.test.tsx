@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { DEFAULT_LOCALE, type IntegrationItem } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -124,6 +124,69 @@ describe('the scope text does not claim an acceptance that was not observed (C7)
       screen.getAllByText(/A direct send from the API server to the provider/).length
     ).toBeGreaterThan(0)
     expect(screen.queryByText(/provider accepted a direct send/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('the Telegram check row', () => {
+  const telegram = (
+    over: Partial<IntegrationItem['evidence']>,
+    facts: IntegrationItem['facts']
+  ) => {
+    const base = item()
+    return {
+      ...base,
+      id: 'telegram',
+      name: 'Telegram',
+      action: null,
+      facts,
+      links: ['runbook' as const],
+      evidence: {
+        ...base.evidence,
+        scope: 'provider_token_check' as const,
+        instance: 'workers' as const,
+        checkedAt: '2026-10-22T11:59:00.000Z',
+        staleAfterSeconds: 210,
+        ...over,
+      },
+    }
+  }
+
+  it('says "Check passed", not "Working", and states what the check does not cover', () => {
+    const facts = [
+      { key: 'workers_reporting', value: 2 },
+      { key: 'interval_seconds', value: 60 },
+    ]
+    state({
+      data: response([telegram({ result: 'ok', freshness: 'fresh', failure: null }, facts)]),
+    })
+    view()
+    const cells = within(row('Telegram')).getAllByRole('cell')
+    expect(cells[0]).toHaveTextContent('Check passed')
+    expect(cells[1]).toHaveTextContent('Workers reporting: 2')
+    expect(cells[1]).toHaveTextContent('Checked every 60 s')
+    expect(cells[3]).toHaveTextContent('Confirmed')
+    expect(cells[3]).toHaveTextContent('workers')
+    expect(cells[3]).toHaveTextContent('Message delivery and incoming messages are not checked.')
+    expect(screen.queryByText(/Working/)).not.toBeInTheDocument()
+  })
+
+  it('uses the row-specific reason, right under the result, before the time and scope', () => {
+    const facts = [
+      { key: 'workers_reporting', value: 1 },
+      { key: 'workers_failed', value: 1 },
+    ]
+    state({
+      data: response([
+        telegram({ result: 'failed', freshness: 'fresh', failure: 'unreachable' }, facts),
+      ]),
+    })
+    view()
+    const cell = within(row('Telegram')).getAllByRole('cell')[3]!
+    const reason = within(cell).getByText('the server cannot reach Telegram')
+    expect(within(cell).queryByText('no queue answered')).not.toBeInTheDocument()
+    const lines = [...cell.querySelectorAll('p')].map((p) => p.textContent)
+    expect(lines.indexOf(reason.textContent)).toBe(1)
+    expect(reason.className).toContain('text-danger')
   })
 })
 

@@ -49,6 +49,8 @@ let TelegramController: Token
 let TelegramWebhookController: Token
 let TelegramChannelDeliverer: Token
 let TelegramBotApiClient: Token
+// Telegram reachability check: the process that sends is the process that checks.
+let TelegramReachabilityService: Token
 // AI capability layer (Track C — ADR-054, Arc C)
 let ModelGateway: Token
 let AiProviderAdaptersToken: Token
@@ -206,6 +208,8 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       await import('../src/core/notifications/channels/telegram/telegram-channel.deliverer')
     const tgClient =
       await import('../src/core/notifications/channels/telegram/telegram-bot-api.client')
+    const tgReachability =
+      await import('../src/core/notifications/channels/telegram/telegram-reachability.service')
     const modelGateway = await import('../src/infrastructure/ai/gateway/model-gateway.service')
     const aiGatewayTypes = await import('../src/infrastructure/ai/gateway/ai-gateway.types')
     const aiExecutor = await import('../src/infrastructure/ai/runs/ai-run-executor.service')
@@ -270,6 +274,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     TelegramWebhookController = tgWebhookController.TelegramWebhookController
     TelegramChannelDeliverer = tgDeliverer.TelegramChannelDeliverer
     TelegramBotApiClient = tgClient.TelegramBotApiClient
+    TelegramReachabilityService = tgReachability.TelegramReachabilityService
     ModelGateway = modelGateway.ModelGateway
     AiProviderAdaptersToken = aiGatewayTypes.AI_PROVIDER_ADAPTERS
     AiRunExecutorService = aiExecutor.AiRunExecutorService
@@ -358,6 +363,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, TelegramWebhookController)
       absent(m, TelegramChannelDeliverer)
       absent(m, TelegramBotApiClient)
+      absent(m, TelegramReachabilityService)
     })
 
     it('has the AI HTTP surface + SSE stream/hub/subscriber but NO provider I/O or worker (Track C)', () => {
@@ -451,6 +457,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
     it('has the Telegram Bot client + deliverer but NOT the web link/webhook controllers (Arc D)', () => {
       present(m, TelegramChannelDeliverer)
       present(m, TelegramBotApiClient)
+      present(m, TelegramReachabilityService)
       absent(m, TelegramController)
       absent(m, TelegramWebhookController)
     })
@@ -538,6 +545,7 @@ describe('PROCESS_ROLE module composition (ADR-041)', () => {
       present(m, TelegramWebhookController)
       present(m, TelegramChannelDeliverer)
       present(m, TelegramBotApiClient)
+      present(m, TelegramReachabilityService)
     })
 
     it('composes both AI sides — HTTP + provider I/O + worker AND the SSE stream/hub/subscriber (Track C)', () => {

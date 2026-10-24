@@ -26,7 +26,8 @@ cleanup() {
 trap cleanup EXIT
 
 echo "run-live.sh: booting project ${COMPOSE_PROJECT_NAME}" >&2
-docker compose --profile local-infra --profile monitoring up -d --build \
+docker compose -f docker-compose.yml -f docker/testing/observability-live.yml \
+  --profile local-infra --profile monitoring up -d --build \
   postgres redis migrate api worker prometheus alertmanager grafana
 
 live_checks_failed=0

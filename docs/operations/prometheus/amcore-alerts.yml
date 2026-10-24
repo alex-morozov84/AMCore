@@ -459,6 +459,29 @@ groups:
       # presumes a traffic shape this starter cannot ship and would teach
       # operators to ignore the alert channel — deliberately absent here.
 
+  - name: amcore-telegram
+    rules:
+      # Per worker: `without (state)` keeps the alert identity when the unhealthy state changes
+      # (failed -> unknown -> stale), so `for` is not restarted by a change of reason.
+      - alert: AMCoreTelegramCheckFailing
+        expr: max without (state) (amcore_telegram_reachability_state{state=~"failed|unknown|stale"}) == 1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'AMCore worker cannot confirm Telegram'
+          description: 'For 10m this worker could not confirm that Telegram answers and accepts the bot token (failed, unclear or no recent check). Notifications sent by this worker may not arrive.'
+          runbook_path: docs/operations/runbooks/telegram.md#check-failing
+      - alert: AMCoreTelegramCheckNotStarted
+        expr: amcore_telegram_reachability_state{state="none"} == 1
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'AMCore worker has no Telegram check result'
+          description: 'For 15m after start this worker has produced no Telegram check result. The check job may not be running on it.'
+          runbook_path: docs/operations/runbooks/telegram.md#check-not-started
+
   - name: amcore-storage
     rules:
       - alert: AMCoreStorageProbeFailed
