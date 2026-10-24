@@ -43,8 +43,9 @@ max without (state) (amcore_telegram_reachability_state{state=~"failed|unknown|s
    `TELEGRAM_API_BASE_URL`; never use a public Bot API mirror, because the token travels in every
    request. See the relay rules and the leaked-token steps in
    [Notifications](../../notifications/README.md).
-3. If the token was refused (the Console says **Telegram or the relay did not accept the bot
-   token**), compare `TELEGRAM_BOT_TOKEN` with the token from BotFather. Set the same value on
+3. If the token was refused (the network check above succeeds but the metric stays `failed`;
+   with the optional Operations Console, the reason reads **Telegram or the relay did not accept
+   the bot token**), compare `TELEGRAM_BOT_TOKEN` with the token from BotFather. Set the same value on
    the API server and every worker and restart them; if you use the webhook, register it again
    ([Telegram webhook registration](../deployment.md#telegram-webhook-registration-one-shot-optional)).
 4. If the request was refused, check `TELEGRAM_API_BASE_URL`: a wrong path on a relay answers
