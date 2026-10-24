@@ -12,7 +12,13 @@ const args = process.argv.slice(2)
 const linux = args.includes('--linux-startup-proof')
 const result = spawnSync(
   process.execPath,
-  ['--test', ...args.filter((arg) => arg !== '--linux-startup-proof'), ...files],
+  // Docker network changes in another file can interrupt Chromium's relay checks.
+  [
+    '--test',
+    '--test-concurrency=1',
+    ...args.filter((arg) => arg !== '--linux-startup-proof'),
+    ...files,
+  ],
   {
     cwd: root,
     env: cleanEnvironment(linux ? { AMCORE_LINUX_PROOF: '1' } : {}),

@@ -66,6 +66,13 @@ applies its exact value to the current interval. On narrow screens,
 choose **Show filters** to open the form. There is no general free-text search
 over event contents.
 
+User detail also offers **Password confirmations** and **Access changes**.
+The first searches the user's recorded password re-entry before protected
+actions. The second searches system-role changes and administrative session
+revocations targeting that user. Each opens the last 31 days with the exact
+identity and event types selected. These are limited event views, not complete
+sign-in histories; see [sign-in setup](users.md#understand-sign-in-setup).
+
 ## Choose the time zone and range
 
 The selected date range stays visible above the filters, including when the

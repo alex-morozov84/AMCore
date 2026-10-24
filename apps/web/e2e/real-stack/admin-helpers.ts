@@ -106,3 +106,35 @@ export function setEmailVerified(email: string): void {
     throw new Error(`Expected exactly one registered user to verify; got ${output.trim()}`)
   }
 }
+
+/** Synthetic diagnostic target only; its credential canaries must never reach HTML or RSC. */
+export function createLoginDiagnosticTarget(email: string) {
+  const id = randomUUID()
+  const canary = '<login-diagnostics-canary>'
+  const links = [
+    'GOOGLE',
+    'GOOGLE',
+    'GOOGLE',
+    'GOOGLE',
+    'GOOGLE',
+    'GITHUB',
+    'APPLE',
+    'TELEGRAM',
+  ].map((provider) => ({ id: randomUUID(), provider, account: `${canary}-${randomUUID()}` }))
+  const actions = [
+    'auth.step_up_failed',
+    'auth.step_up_succeeded',
+    'admin.user.system_role_changed',
+    'admin.user.session_revoked',
+    'admin.user.sessions_revoked',
+  ].map((action, index) => ({ id: randomUUID(), action, scoped: index > 1 }))
+  guardedSql(
+    `INSERT INTO core.users (id,email,"emailCanonical",name,"passwordHash","updatedAt") VALUES (:'id',:'email',:'email','Diagnostic target',:'canary',now());
+     INSERT INTO core.oauth_accounts (id,"userId",provider,"providerAccountId","accessToken","refreshToken")
+     SELECT id, :'id', provider::core."OAuthProvider", account, :'canary', :'canary' FROM jsonb_to_recordset(:'links'::jsonb) AS r(id text,provider text,account text);
+     INSERT INTO core.audit_log (id,"actorType","actorId",action,category,"targetType","targetId",metadata)
+     SELECT id,'USER',:'id',action,'SECURITY','USER',:'id','{}'::jsonb FROM jsonb_to_recordset(:'actions'::jsonb) AS r(id text,action text,scoped boolean);`,
+    { id, email, canary, links: JSON.stringify(links), actions: JSON.stringify(actions) }
+  )
+  return { id, canary }
+}

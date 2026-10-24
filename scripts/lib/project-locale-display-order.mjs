@@ -121,6 +121,7 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/_pages/console/BackgroundWorkPage/QueueCatalogue.locale.test.tsx',
   'apps/web/src/shared/api/error-messages.test.ts',
   'apps/web/src/_pages/console/OverviewPage/overview-copy.test.ts',
+  'apps/web/src/_pages/console/UserDetailPage/UserLoginFacts.test.tsx',
   'apps/web/src/_pages/settings/SessionsPage/SessionsTable.test.tsx',
   'apps/web/src/features/auth-oauth/ui/OAuthSection.test.tsx',
   'apps/web/src/shared/ui/section-error-boundary.test.tsx',

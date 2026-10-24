@@ -36,6 +36,7 @@ export function fetchConsoleUserDetail(
     {
       auth: 'required',
       tokenResolver: getConsoleAwareAccessToken,
+      cache: 'no-store',
     }
   )
 }

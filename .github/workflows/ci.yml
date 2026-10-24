@@ -478,6 +478,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # A reachable but slow Azure mirror does not trigger APT's failure fallback.
+      - name: Prefer Ubuntu archive for browser dependencies
+        run: |
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i -E \
+              -e '\#^https?://azure\.archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:2/' \
+              -e '\#^https://archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:1/' \
+              /etc/apt/apt-mirrors.txt
+          fi
+
       # Six isolated generated repositories cover locale topology x Console
       # topology plus every optional-toggle pair and both host proxy
       # shapes. Each row installs and builds once; this shard runs three of
@@ -945,6 +955,16 @@ jobs:
       - name: Build @amcore/shared
         run: pnpm --filter @amcore/shared build
 
+      # A reachable but slow Azure mirror does not trigger APT's failure fallback.
+      - name: Prefer Ubuntu archive for browser dependencies
+        run: |
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i -E \
+              -e '\#^https?://azure\.archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:2/' \
+              -e '\#^https://archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:1/' \
+              /etc/apt/apt-mirrors.txt
+          fi
+
       # Apt must not wait for interactive service-restart prompts.
       - name: Install Playwright Chromium
         working-directory: apps/web
@@ -1190,6 +1210,16 @@ jobs:
       # web-e2e's own "Build @amcore/shared" step.
       - name: Build @amcore/shared
         run: pnpm --filter @amcore/shared build
+
+      # A reachable but slow Azure mirror does not trigger APT's failure fallback.
+      - name: Prefer Ubuntu archive for browser dependencies
+        run: |
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i -E \
+              -e '\#^https?://azure\.archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:2/' \
+              -e '\#^https://archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:1/' \
+              /etc/apt/apt-mirrors.txt
+          fi
 
       # No Docker/real-stack needed here — every story's API surface is
       # mocked via msw-storybook-addon, not a real apps/api. Much lighter

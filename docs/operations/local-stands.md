@@ -17,6 +17,9 @@ ports. Keep long runs in a foreground terminal with visible output.
 
 `pnpm test:stands` checks isolation and recovery. Narrow a risk with
 `pnpm test:stands --test-name-pattern="startup"`; options reach the Node runner.
+Test files run sequentially by default because they share the host network:
+Docker network changes can interrupt Chromium's transport checks. Deliberate
+concurrent scenarios within a test retain their own process and stand orchestration.
 
 | Goal                                 | Command                                      | Data lifetime                                           |
 | ------------------------------------ | -------------------------------------------- | ------------------------------------------------------- |
@@ -278,6 +281,57 @@ The profile marks the demo `SUPER_ADMIN` address verified (a demo-only mailbox s
 the test email goes only to the operator's own verified address. A stand uses the mock email
 provider, so the test shows **Simulated** and no mail leaves the machine. Repeated preview keeps
 the owner's changes.
+For Console user sign-in diagnostics, run:
+
+```sh
+pnpm stand preview --id login-diagnostics --profile login-diagnostics
+```
+
+Use a checkout with the Console enabled; this profile refuses a disabled Console.
+Sign in with the standard demo SUPER_ADMIN above. In **Users**, clear the
+search and search one full email below, then open its name:
+
+| Search email                      | Initial sample                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `login-local@preview.amcore.test` | Password configured, no linked accounts                                                |
+| `login-oauth@preview.amcore.test` | No password, Google linked                                                             |
+| `login-mixed@preview.amcore.test` | Password and Google, GitHub, Apple, Telegram; repeated Google identities show one name |
+| `login-none@preview.amcore.test`  | No password and no linked accounts; a neutral setup state                              |
+
+These four users are inspection targets, separate from the two demo sign-in
+accounts. Linked identities and five security events for the mixed sample are
+synthetic. They do not prove external-provider login or a continuous history.
+Open **Password confirmations** and **Access changes** on the mixed sample;
+the other samples have no seeded security events. Older synthetic events can
+leave the current 31-day search window; select their original period in Audit.
+
+Repeating the same command preserves sample edits and deletions, including
+removed links. It never recreates a deleted sample or resets its state. If
+only these samples changed, repeated preview still succeeds. Login and role
+verification applies to the two demo sign-in accounts, not these four targets.
+The Console diagnostics do not offer rename, delete or unlink actions; any
+sample changes require the relevant supported product action or an admitted
+fixture tool, never an ambient database connection.
+
+If sample preparation reports an interrupted result, it refuses automatic
+reseeding. After the command has exited normally, keep the data for inspection
+or choose a fresh stand ID for initial examples. This message alone does not
+require deletion. If an interrupted managed run left a lease or child processes,
+follow the recovery procedure before further managed commands. Do not purge
+merely to repair an edited sample.
+
+`pnpm stand down --id login-diagnostics` stops this stand and keeps its data.
+`pnpm stand down --id login-diagnostics --purge` deletes its proved-owned data
+and resources, including later reviewer changes. Purge is a deliberate deletion
+choice, not a requirement for inspecting or retaining sample changes.
+For a managed command that reports a retained lease, wait for its supervisor and
+recorded children to stop. Then use `pnpm stand recover --id login-diagnostics`
+to recover while retaining database volumes, or add `--purge` to delete them.
+Recovery checks process absence and ownership itself; a refusal is not permission
+to remove the lease manually. See [cleanup safety](#target-and-cleanup-safety).
+After successful purge, the record remains in state `purged` and its resources
+are absent. A purged ID is not reusable; create a new ID for a fresh dataset.
+
 <!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared

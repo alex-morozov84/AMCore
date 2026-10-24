@@ -1,3 +1,5 @@
+import type { AuditAction } from '@amcore/shared'
+
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 
 /**
@@ -63,6 +65,8 @@ export function getConsoleAuditHref(): string {
 export function getConsoleDetailAuditHref(
   filters: {
     actorId?: string
+    actorType?: 'USER'
+    actions?: readonly AuditAction[]
     targetId?: string
     targetType?: 'USER' | 'API_KEY'
     organizationId?: string
@@ -71,11 +75,37 @@ export function getConsoleDetailAuditHref(
 ): string {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(filters)) {
-    if (value) query.set(key, value)
+    if (value) query.set(key, Array.isArray(value) ? value.join(',') : String(value))
   }
   query.set('from', new Date(now - 31 * 24 * 60 * 60_000).toISOString())
   query.set('to', new Date(now).toISOString())
   return `${getConsoleAuditHref()}?${query}`
+}
+
+/** Two recorded-security views share one interval; neither claims a complete login history. */
+export function getConsoleUserSecurityHrefs(userId: string, now = Date.now()) {
+  return {
+    confirmations: getConsoleDetailAuditHref(
+      {
+        actorType: 'USER',
+        actorId: userId,
+        actions: ['auth.step_up_failed', 'auth.step_up_succeeded'],
+      },
+      now
+    ),
+    access: getConsoleDetailAuditHref(
+      {
+        targetType: 'USER',
+        targetId: userId,
+        actions: [
+          'admin.user.system_role_changed',
+          'admin.user.session_revoked',
+          'admin.user.sessions_revoked',
+        ],
+      },
+      now
+    ),
+  }
 }
 
 function detailHref(base: string, id: string, returnTo?: string): string {

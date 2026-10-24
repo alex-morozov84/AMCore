@@ -18,7 +18,9 @@ import { DetailRelationSearch } from '@/shared/ui/console-detail/DetailRelationS
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 
+import { UserLoginFacts } from './UserLoginFacts'
 import { UserMemberships } from './UserMemberships'
+import { UserSecurityEvents } from './UserSecurityEvents'
 
 export async function UserDetailResults({
   id,
@@ -44,7 +46,7 @@ export async function UserDetailResults({
   if (outcome.status === 'not-found') return <p role="alert">{t('notFoundUser')}</p>
   if (outcome.status === 'unavailable')
     return <PrimaryUnavailableFallback reason={outcome.reason} />
-  const { user, memberships, membershipCount } = outcome.data
+  const { user, loginDiagnostics, memberships, membershipCount } = outcome.data
   const totalPages = Math.max(1, Math.ceil(memberships.total / memberships.limit))
   const base = getConsoleUserDetailHref(id)
   const auditBy = getConsoleDetailAuditHref({ actorId: id })
@@ -76,6 +78,7 @@ export async function UserDetailResults({
               {tConsole(user.systemRole === 'SUPER_ADMIN' ? 'superAdminRole' : 'usersRoleUser')}
             </DetailFact>
             <DetailFact label={t('phone')}>{user.phone ?? tCommon('notAvailable')}</DetailFact>
+            <UserLoginFacts diagnostics={loginDiagnostics} />
             <DetailFact label={t('lastSignIn')}>
               {user.lastLoginAt ? (
                 <ConsoleTimestamp value={user.lastLoginAt} variant="inline" />
@@ -143,25 +146,30 @@ export async function UserDetailResults({
         targetEmail={user.email}
         isSelf={user.id === actor?.id}
       />
-      <nav aria-label={tConsole('auditTitle')} className="space-y-2">
-        <div className="flex flex-wrap gap-4 text-sm">
-          <RouteProgressLink
-            prefetch={false}
-            href={auditBy}
-            className="underline underline-offset-2"
-          >
-            {t('auditByUser')}
-          </RouteProgressLink>
-          <RouteProgressLink
-            prefetch={false}
-            href={auditAbout}
-            className="underline underline-offset-2"
-          >
-            {t('auditAboutUser')}
-          </RouteProgressLink>
-        </div>
-        <p className="text-xs text-muted-foreground">{t('auditWindowNote')}</p>
-      </nav>
+      <Card>
+        <CardContent>
+          <nav aria-label={tConsole('auditTitle')} className="space-y-4">
+            <UserSecurityEvents userId={id} />
+            <div className="flex flex-wrap gap-4 text-sm">
+              <RouteProgressLink
+                prefetch={false}
+                href={auditBy}
+                className="underline underline-offset-2"
+              >
+                {t('auditByUser')}
+              </RouteProgressLink>
+              <RouteProgressLink
+                prefetch={false}
+                href={auditAbout}
+                className="underline underline-offset-2"
+              >
+                {t('auditAboutUser')}
+              </RouteProgressLink>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('auditWindowNote')}</p>
+          </nav>
+        </CardContent>
+      </Card>
     </div>
   )
 }

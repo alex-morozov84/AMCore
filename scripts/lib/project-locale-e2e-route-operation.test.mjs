@@ -50,7 +50,7 @@ function outputs(locale) {
   )
 }
 
-test('token-aware source inventory has the approved 186-reference denominator', () => {
+test('token-aware source inventory has the approved 206-reference denominator', () => {
   const retained = surfaces.reduce(
     (total, [pathname]) =>
       total + routeReferenceInventory(parseStructuralModel(pathname, source(pathname))).count,
@@ -62,7 +62,7 @@ test('token-aware source inventory has the approved 186-reference denominator', 
     0
   )
   assert.equal(retained + deleted, E2E_ROUTE_DENOMINATOR)
-  assert.equal(E2E_ROUTE_DENOMINATOR, 186)
+  assert.equal(E2E_ROUTE_DENOMINATOR, 206)
 })
 
 test('EN and RU retain shared verification with identical prefixless topology', () => {

@@ -37,8 +37,17 @@ export const adminUserDetailQuerySchema = paginationQuerySchema.extend({
 
 export const adminOrganizationDetailQuerySchema = adminUserDetailQuerySchema
 
+const loginDiagnosticsSchema = z.strictObject({
+  hasPassword: z.boolean(),
+  linkedProviders: z
+    .array(z.enum(['google', 'github', 'apple', 'telegram']))
+    .max(4)
+    .refine((providers) => new Set(providers).size === providers.length),
+})
+
 export const adminUserDetailResponseSchema = z.object({
   user: adminUserResponseSchema,
+  loginDiagnostics: loginDiagnosticsSchema,
   memberships: paginatedResponseSchema(adminUserMembershipSchema),
   membershipCount: z.number().int().nonnegative(),
 })
