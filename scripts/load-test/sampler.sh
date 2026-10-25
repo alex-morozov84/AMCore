@@ -14,14 +14,17 @@ INTERVAL=${LT_SAMPLE_INTERVAL:-5} # tests shorten it
 MEMINFO=${LT_MEMINFO:-/proc/meminfo} # tests point this at a fixture
 
 sample() {
+  # Container ids once: a docker compose call every interval costs the small measured
+  # host memory and CPU. A container recreated during the step makes docker stats fail,
+  # which ends the sampler (the step is then invalid, and containers.after shows why).
+  ids=$(lt_compose ps -q) || exit 12
+  [ -n "$ids" ] || exit 12
   while :; do
     ts=$(now)
     avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' "$MEMINFO")
     [ -n "$avail" ] || exit 11
     # Each source runs alone first, so its own exit status counts (a pipeline would
     # report only the last command's status).
-    ids=$(lt_compose ps -q) || exit 12
-    [ -n "$ids" ] || exit 12
     # shellcheck disable=SC2086 # one argument per container id
     stats=$(timeout 20 docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}' $ids) || exit 13
     cpu=$(timeout 20 vmstat 1 2) || exit 14

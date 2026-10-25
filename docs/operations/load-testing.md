@@ -95,7 +95,11 @@ ORG_SELF_SERVICE_CREATION_ENABLED=true
 Also build the fixture loader: `sh scripts/load-test/fixture.sh build`
 (it reuses the API build stage). If you added swap for the build, switch it off now
 (`sudo swapoff -a`; `swapon --show` prints nothing); the report records the swap state.
-Then check the plan; it changes nothing:
+If you built the images on this host, reboot it now (`sudo reboot`). On the 2 GiB
+reference class, a host that had built its images had about 200 MiB less available
+memory under load than one that had not, and steps that started with less than about
+300 MiB available showed multi-second stalls in their first seconds; a reboot is the
+simple way to start from a clean memory state. Then check the plan; it changes nothing:
 
 ```bash
 sh scripts/load-test/preflight.sh plan
@@ -231,8 +235,12 @@ key, cookies or the fixture password, so you can share it.
 | `invalid measurement` | Data are missing or broken: host or generator samples do not cover the whole step, an action has no server records, k6 and the server log disagree by more than the requests in flight and the measured clock skew allow, or the generator CPU saturated (idle < 10 %) | Nothing. Fix the cause and repeat the campaign on a fresh host     |
 | `observed overload`   | Server p95 above 1 s, more than 1 % failed requests overall or of the admin reads, dropped iterations, a container restart, recreation or OOM, or less than 100 MiB available memory on the host                                                                       | The achieved rate under overload, not capacity at the offered rate |
 
-The report also lists failed checks per action (an unexpected status) and every status
-code the server saw.
+The report also lists failed checks per action (an unexpected status), every status
+code the server saw, and the host's available memory at the start and minimum of each
+step. On a 2 GiB host the start value matters: with little headroom the application's
+files leave the page cache between steps and the first seconds of the next step wait for
+the disk. The scripts keep their own work on the host small (statistics are computed on
+the generator) so they do not cause this themselves.
 
 The **Reference** column compares valid ladder steps with the upper bound published
 in Capacity, which counts requests: 5, 10 and 20 iterations/s are about 16, 31 and 61

@@ -24,12 +24,15 @@ if (args[0] === 'compose') {
   if (sub === 'run') log('compose-run-env COMPOSE_PROJECT_NAME=' + (process.env.COMPOSE_PROJECT_NAME ?? ''))
   if (sub === 'config') return console.log(JSON.stringify(cfg.config ?? {}))
   if (sub === 'ps') return console.log(args.includes('postgres') ? 'pg1' : 'id-api\\nid-web')
-  if (sub === 'exec') return console.log('load-test-access.log')
-  if (sub === 'cp') {
+  if (sub === 'exec') {
+    // server-stats.sh logs: a tar stream of the test-entry access log for this step.
     const routes = (cfg.routes || '').split(',')
     const t = Number(fs.readFileSync(cfg.windowStart, 'utf8'))
     const lines = routes.map((uri, i) => JSON.stringify({ ts: t + 0.5 + i * 0.01, duration: 0.02, status: 200, request: { uri, tls: { client_common_name: 'k6' } } }))
-    fs.writeFileSync(args.at(-1), lines.join('\\n') + '\\n')
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'lt-caddy-'))
+    fs.writeFileSync(path.join(dir, 'load-test-access.log'), lines.join('\\n') + '\\n')
+    const tar = spawnSync('tar', ['cf', '-', '-C', dir, 'load-test-access.log'])
+    process.stdout.write(tar.stdout)
     return
   }
   return

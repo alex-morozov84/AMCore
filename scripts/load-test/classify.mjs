@@ -175,6 +175,7 @@ export function classify(f) {
     adminFailedRate: w?.adminFailed,
     checkFails: w?.checkFails,
     dropped,
+    memAvailableStartMiB: f.samples?.[0]?.memAvailableMiB,
     memAvailableMinMiB: memMin,
     status: f.server?.status,
   }

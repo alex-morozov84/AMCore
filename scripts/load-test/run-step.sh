@@ -79,11 +79,14 @@ mv "$LT_WORK/$OUT/$NAME.summary.json" "$DIR/summary.json" 2> /dev/null
 mv "$LT_WORK/$OUT/$NAME.window.json" "$DIR/window.json" 2> /dev/null
 set -e
 
-# The exact window boundaries go to the server statistics (no rounding).
+# The exact window boundaries go to the server statistics (no rounding). The raw logs are
+# fetched and the statistics computed here on the generator, never on the measured host.
 WINDOW=$(sed -n 's/.*"start":\([0-9.]*\),"end":\([0-9.]*\).*/\1 \2/p' "$DIR/window.json" 2> /dev/null || true)
+mkdir -p "$DIR/logs"
 # shellcheck disable=SC2086 # WINDOW is "<from> <to>", two arguments
-if [ -n "$WINDOW" ] && srv sh scripts/load-test/server-stats.sh window $WINDOW > "$DIR/server.json" 2> "$DIR/server.err"; then
-  rm -f "$DIR/server.err"
+if [ -n "$WINDOW" ] && srv sh scripts/load-test/server-stats.sh logs 2> "$DIR/server.err" | tar xf - -C "$DIR/logs" &&
+  docker run --rm -v "$DIR/logs:/logs:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" node /lt/stats.mjs /logs $WINDOW > "$DIR/server.json" 2>> "$DIR/server.err"; then
+  rm -rf "$DIR/server.err" "$DIR/logs"
 else
   rm -f "$DIR/server.json"
   [ -s "$DIR/server.err" ] || echo "measured window or server stats unavailable" > "$DIR/server.err"

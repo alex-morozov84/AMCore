@@ -1,20 +1,17 @@
 #!/bin/sh
 # Host-side facts for one load step (host, deployment checkout).
-#   server-stats.sh window <from> <to>  request statistics of the test entry (JSON, stats.mjs)
+#   server-stats.sh logs                the raw test-entry access logs as a tar stream
 #   server-stats.sh containers          "<name> <id> <restarts> <oom-killed>" per project container
 #   server-stats.sh clock               host epoch milliseconds (the generator measures skew)
 set -eu
 . "$(dirname "$0")/lib.sh"
 case "${1:-}" in
-  window)
-    FROM=${2:?from} TO=${3:?to}
-    TMP=$(mktemp -d)
-    trap 'rm -rf "$TMP"' EXIT
-    for f in $(lt_compose exec -T caddy sh -c 'cd /data && ls load-test-access*' 2> /dev/null); do
-      lt_compose cp "caddy:/data/$f" "$TMP/$f" > /dev/null || die "cannot copy $f from caddy"
-    done
-    [ -n "$(ls "$TMP")" ] || die "no test-entry access log in caddy:/data"
-    docker run --rm -v "$TMP:/logs:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" node /lt/stats.mjs /logs "$FROM" "$TO"
+  logs)
+    # The raw test-entry logs (current and rolled) as a tar stream. The statistics are
+    # computed on the generator: a Node container here would take memory from the small
+    # host being measured and evict the application's file cache (fresh-host diagnosis).
+    lt_compose exec -T caddy sh -c 'cd /data && ls load-test-access* > /dev/null && tar cf - load-test-access*' ||
+      die "no test-entry access log in caddy:/data"
     ;;
   containers)
     # The id reveals a container recreated under the same name during the step.
@@ -41,5 +38,5 @@ case "${1:-}" in
       docker inspect -f 'container={{.Name}} image={{.Config.Image}} digest={{.Image}} mem_limit={{.HostConfig.Memory}} nano_cpus={{.HostConfig.NanoCpus}}' "$id" | sed 's#=/#=#'
     done
     ;;
-  *) die "usage: server-stats.sh window <from> <to> | containers | clock | manifest" ;;
+  *) die "usage: server-stats.sh logs | containers | clock | manifest" ;;
 esac
