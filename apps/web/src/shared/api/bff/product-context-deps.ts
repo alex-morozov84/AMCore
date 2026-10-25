@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers'
 
+import { getBackendBaseUrl } from '../backend-transport'
+
 import type { ContextExecutorDeps } from './context-executor'
 import { type ProductRouteKind, resolveProductWebContext } from './product-web-context.server'
 import { createUpstreamRefresh } from './upstream-refresh'
@@ -15,7 +17,7 @@ export function productContextDeps(
     webContext: context,
     expectedAudience: context.audience,
     readSessionId: async () => (await cookies()).get(context.cookieName)?.value,
-    apiBase: process.env.API_URL ?? 'http://localhost:5002',
+    apiBase: getBackendBaseUrl(),
     store: context.store,
     lock: context.lock,
     upstreamRefresh: createUpstreamRefresh(source, context),

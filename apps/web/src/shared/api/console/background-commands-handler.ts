@@ -13,13 +13,14 @@ import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-erro
 import { readContextJson } from '@/shared/api/bff/context-body-budget'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 /** Fixed routes, bounded input, one HTTP dispatch. A failed POST is recovered through receipt GET. */
 export async function handleConsoleWorkCommand(
@@ -123,17 +124,17 @@ async function forward(request: Request, path: string, body?: string): Promise<R
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
   try {
-    const upstream = await fetch(`${API_URL}/api/v1/admin/background-work${path}`, {
-      method: body === undefined ? 'GET' : 'POST',
-      cache: 'no-store',
-      headers: forwardRequestHeaders(
-        request.headers,
-        resolved.token,
-        resolveTrustedClientIp(request.headers)
-      ),
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
-      ...(body === undefined ? {} : { body }),
-    })
+    const upstream = await fetchBackendResponse(
+      `${API_URL}/api/v1/admin/background-work${path}`,
+      request.headers,
+      {
+        method: body === undefined ? 'GET' : 'POST',
+        cache: 'no-store',
+        headers: forwardRequestHeaders(request.headers, resolved.token),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
+        ...(body === undefined ? {} : { body }),
+      }
+    )
     return new Response(upstream.body, {
       status: upstream.status,
       headers: forwardResponseHeaders(upstream.headers),

@@ -8,6 +8,7 @@ import {
 } from '@amcore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
@@ -26,6 +27,10 @@ import {
 } from './roles.server'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/backend-transport', () => ({
+  fetchBackendResponse: vi.fn(),
+  getBackendBaseUrl: () => 'http://api.test',
+}))
 vi.mock('@/shared/api/bff/product-context-deps', () => ({ productContextDeps: vi.fn() }))
 
 const meta = {
@@ -63,7 +68,7 @@ function setup(respond: () => Response) {
   const store = new FakeVaultStore()
   store.seed('session-x', entry)
   const fetch = vi.fn(async () => respond())
-  const deps: ContextExecutorDeps = {
+  const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
     upstreamRefresh: vi.fn(freshRefresh),
@@ -71,6 +76,7 @@ function setup(respond: () => Response) {
     apiBase: 'http://api.test',
     fetch,
   }
+  vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => deps.fetch(url, init))
   vi.mocked(productContextDeps).mockReturnValue(deps)
   const input = {
     expectedSession: contextSessionBinding('session-x', entry),

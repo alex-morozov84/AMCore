@@ -1,3 +1,5 @@
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { ContextRequestError } from './context-errors'
 import { getOptionalSessionEntry } from './dal'
 import { cancelInvitedOAuthForOrdinaryStart } from './invitation-auth-lifecycle'
@@ -10,7 +12,7 @@ import { sessionMetadataHeaders } from './session-metadata-headers'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 /**
  * OAuth init/callback proxy (ADR-068). Unlike `authenticated-proxy.ts`, this is
@@ -66,7 +68,7 @@ async function fetchUpstream(
   const contentType = request.headers.get('content-type')
   if (hasBody && contentType) headers.set('content-type', contentType)
 
-  return fetch(upstream, {
+  return fetchBackendResponse(upstream, request.headers, {
     method: request.method,
     headers,
     body: hasBody ? request.body : undefined,

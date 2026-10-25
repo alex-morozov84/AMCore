@@ -13,6 +13,16 @@ const seam = (id, path, seamKind, selector, detectors, extra = {}) => ({
 
 export const operationsConsoleCodeSeams = [
   seam(
+    'console.network-exceptions',
+    'apps/web/network-policy.mjs',
+    'owned-block',
+    {
+      start: '// AMCORE_CONSOLE_NETWORK_EXCEPTIONS_START',
+      end: '// AMCORE_CONSOLE_NETWORK_EXCEPTIONS_END',
+    },
+    ['AMCORE_CONSOLE_NETWORK_EXCEPTIONS_START']
+  ),
+  seam(
     'console.nginx-host',
     'docker/nginx/operations-console.conf',
     'owned-block',

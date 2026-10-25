@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server'
 import { AuthErrorCode } from '@amcore/shared'
 import type { ZodType } from 'zod'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { apiErrorResponse, zodValidationErrors } from './api-error-response'
 import { isTrustedOrigin } from './origin-guard'
 import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 export interface PublicAuthActionOptions<TInput> {
   context?: ProductWebContext
@@ -59,11 +61,23 @@ export async function handlePublicAuthAction<TInput>(
     })
   }
 
-  const upstreamResponse = await fetch(`${API_URL}/api/v1${options.backendPath}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...context?.apiHeaders },
-    body: JSON.stringify(parsed.data),
-  })
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetchBackendResponse(
+      `${API_URL}/api/v1${options.backendPath}`,
+      request.headers,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...context?.apiHeaders },
+        body: JSON.stringify(parsed.data),
+      }
+    )
+  } catch {
+    return apiErrorResponse(request, {
+      statusCode: 503,
+      message: 'Backend temporarily unavailable',
+    })
+  }
 
   if (upstreamResponse.status === 204) {
     return new NextResponse(null, { status: 204 })

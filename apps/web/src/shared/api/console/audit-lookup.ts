@@ -10,13 +10,14 @@ import { z } from 'zod'
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 function hasControl(value: string): boolean {
   for (const char of value) if (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) return true
   return false
@@ -58,14 +59,10 @@ export async function handleConsoleAuditLookup(request: Request): Promise<Respon
   const query = new URLSearchParams({ page: '1', limit: '10', search })
   let upstream: Response
   try {
-    upstream = await fetch(`${API_URL}${path}?${query}`, {
+    upstream = await fetchBackendResponse(`${API_URL}${path}?${query}`, request.headers, {
       method: 'GET',
       cache: 'no-store',
-      headers: forwardRequestHeaders(
-        request.headers,
-        resolved.token,
-        resolveTrustedClientIp(request.headers)
-      ),
+      headers: forwardRequestHeaders(request.headers, resolved.token),
     })
   } catch {
     return privateResponse(

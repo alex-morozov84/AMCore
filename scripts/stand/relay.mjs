@@ -1,5 +1,5 @@
 import { createServer, request } from 'node:http'
-import { connect } from 'node:net'
+import { connect, isIP } from 'node:net'
 
 export function relayTarget(origins, value) {
   const url = new URL(value)
@@ -13,7 +13,14 @@ export function relayTarget(origins, value) {
     throw new Error('Destination outside owned stand')
   return url
 }
-export async function relay(origins) {
+export async function relay(origins, edge) {
+  if (
+    edge &&
+    (!origins.includes(edge.origin) ||
+      !edge.origin.startsWith('http:') ||
+      isIP(edge.visitorIp) === 0)
+  )
+    throw new Error('Invalid owned HTTP edge fixture')
   const sockets = new Set()
   const track = (socket) => {
     if (sockets.has(socket)) return socket
@@ -37,7 +44,17 @@ export async function relay(origins) {
         port: target.port || 80,
         path: target.pathname + target.search,
         method: incoming.method,
-        headers: incoming.headers,
+        headers: edge
+          ? (() => {
+              const headers = { ...incoming.headers }
+              delete headers['x-amcore-client-ip']
+              delete headers['x-forwarded-for']
+              delete headers['forwarded']
+              delete headers['x-real-ip']
+              if (target.origin === edge.origin) headers['x-real-ip'] = edge.visitorIp
+              return headers
+            })()
+          : incoming.headers,
       },
       (result) => {
         response.writeHead(result.statusCode, result.headers)
@@ -58,6 +75,8 @@ export async function relay(origins) {
       const matches = origins.filter((origin) => new URL(origin).host === req.url)
       if (matches.length !== 1) throw new Error('CONNECT authority not owned')
       target = relayTarget(origins, matches[0])
+      if (edge && target.origin === edge.origin)
+        throw new Error('Web edge cannot be bypassed by CONNECT')
       if (target.pathname !== '/' || target.search || req.headers.host !== target.host)
         throw new Error('Invalid CONNECT')
     } catch {

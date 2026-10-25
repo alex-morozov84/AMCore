@@ -1,3 +1,4 @@
+import { networkPolicy, NETWORK_IMPORTS, NETWORK_LOADERS } from './network-policy.mjs'
 import { residualConfig } from '@amcore/eslint-config/hybrid'
 import javascriptRules from '@amcore/eslint-config/javascript-recommended' with { type: 'json' }
 import tseslint from 'typescript-eslint'
@@ -179,6 +180,26 @@ export const policy = [
       'public/mockServiceWorker.js',
       'storybook-static/**',
     ],
+  },
+
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: ['src/**/*.{mts,cts,mjs,cjs,js,jsx}'],
+    rules: {},
+  })),
+  ...networkPolicy,
+  {
+    name: 'project/network-additional-extensions',
+    files: ['src/**/*.{mts,cts,mjs,cjs,js,jsx}'],
+    ignores: [
+      'src/**/*.{test,spec,stories}.{mts,cts,mjs,cjs,js,jsx}',
+      'src/**/*.d.{mts,cts}',
+      'src/test/**',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: NETWORK_IMPORTS }],
+      'no-restricted-syntax': ['error', ...NETWORK_LOADERS],
+    },
   },
 
   // Base JavaScript rules
@@ -590,4 +611,32 @@ export const policy = [
   ...storybookPlugin.configs['flat/recommended'],
 ]
 
+// Compose existing path-specific import/syntax policies; excluded fixtures keep their original guards.
+const networkIgnores = [
+  'src/**/*.{test,spec,stories}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}',
+  'src/**/*.d.{ts,mts,cts}',
+  'src/test/**',
+]
+const importBlocks = policy.filter((block) => block.name?.startsWith('project/import-guards'))
+for (const block of importBlocks) {
+  const options = block.rules['no-restricted-imports'][1]
+  policy.push({
+    ...block,
+    name: `${block.name}-network`,
+    ignores: networkIgnores,
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { ...options, patterns: [...options.patterns, ...NETWORK_IMPORTS] },
+      ],
+    },
+  })
+}
+const syntax = policy.find((block) => block.name === 'project/syntax-guards')
+policy.push({
+  name: 'project/network-runtime-loaders',
+  files: ['src/**/*.{ts,tsx}'],
+  ignores: networkIgnores,
+  rules: { 'no-restricted-syntax': [...syntax.rules['no-restricted-syntax'], ...NETWORK_LOADERS] },
+})
 export default residualConfig(policy)

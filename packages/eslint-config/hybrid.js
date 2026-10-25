@@ -4,6 +4,8 @@ import { nativeSettings } from './native-settings.js'
 // These checks retain their ESLint implementation and diagnostic context.
 const RESIDUAL = new Set([
   'no-undef',
+  'no-restricted-globals',
+  'no-restricted-properties',
   'no-unsafe-optional-chaining',
   'react/no-deprecated',
   'jest/no-conditional-expect',

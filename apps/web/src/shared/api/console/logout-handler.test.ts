@@ -53,7 +53,7 @@ describe('handleConsoleLogout', () => {
     const response = await handleConsoleLogout(request())
 
     expect(response.status).toBe(204)
-    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token')
+    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token', expect.any(Headers))
     expect(redisConsoleVaultStore.delete).toHaveBeenCalledWith('console-session')
     expect(response.headers.get('set-cookie')).toContain('__Host-amcore_console_session=')
   })

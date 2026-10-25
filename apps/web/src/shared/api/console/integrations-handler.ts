@@ -7,13 +7,14 @@ import {
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const BASE = '/api/v1/admin/integrations'
 /** Reads and prepare are quick. */
 const READ_TIMEOUT_MS = 5_000
@@ -78,15 +79,11 @@ export async function handleConsoleIntegrations(
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
   try {
-    const response = await fetch(`${API_URL}${upstream.path}`, {
+    const response = await fetchBackendResponse(`${API_URL}${upstream.path}`, request.headers, {
       method: mutation ? 'POST' : 'GET',
       body: upstream.body,
       cache: 'no-store',
-      headers: forwardRequestHeaders(
-        request.headers,
-        resolved.token,
-        resolveTrustedClientIp(request.headers)
-      ),
+      headers: forwardRequestHeaders(request.headers, resolved.token),
       signal: AbortSignal.any([
         request.signal,
         AbortSignal.timeout(target.kind === 'probe' ? PROBE_TIMEOUT_MS : READ_TIMEOUT_MS),

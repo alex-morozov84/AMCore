@@ -2,13 +2,14 @@ import { AuthErrorCode, updateUserSystemRoleSchema } from '@amcore/shared'
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 function originRejected(request: Request): Response {
   return apiErrorResponse(request, {
@@ -45,14 +46,17 @@ export async function handleConsoleUserRoleUpdate(
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
 
-  const trustedClientIp = resolveTrustedClientIp(request.headers)
   let upstreamResponse: Response
   try {
-    upstreamResponse = await fetch(`${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
-      method: 'PATCH',
-      headers: forwardRequestHeaders(request.headers, resolved.token, trustedClientIp),
-      body: JSON.stringify(parsed.data),
-    })
+    upstreamResponse = await fetchBackendResponse(
+      `${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`,
+      request.headers,
+      {
+        method: 'PATCH',
+        headers: forwardRequestHeaders(request.headers, resolved.token),
+        body: JSON.stringify(parsed.data),
+      }
+    )
   } catch {
     return apiErrorResponse(request, {
       statusCode: 503,

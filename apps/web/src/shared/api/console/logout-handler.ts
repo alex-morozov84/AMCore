@@ -25,7 +25,7 @@ export async function handleConsoleLogout(request: Request): Promise<Response> {
   const current = await readConsoleSessionSafely()
   if (current) {
     await Promise.all([
-      revokeBackendSession(current.entry.refreshToken),
+      revokeBackendSession(current.entry.refreshToken, request.headers),
       deleteConsoleVaultEntry(current.sessionId),
     ])
   }

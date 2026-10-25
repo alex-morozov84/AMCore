@@ -292,6 +292,14 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation.responses['503']).toBeDefined()
   })
 
+  it('documents password limiter429 and fail-closed503 for login and step-up', () => {
+    for (const path of ['/auth/login', '/auth/step-up']) {
+      const responses = document.paths[path]!.post!.responses
+      expect(responses['429']).toBeDefined()
+      expect(responses['503']).toBeDefined()
+    }
+  })
+
   it('documents the finite OAuth return destination under its public query name', () => {
     const operation = document.paths['/auth/oauth/{provider}']!.get!
     expect(operation.parameters).toContainEqual(

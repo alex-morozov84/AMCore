@@ -3,6 +3,7 @@
 import { memberRolesResponseSchema, replaceMemberRolesResponseSchema } from '@amcore/shared'
 import { expect, it, vi } from 'vitest'
 
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import { executeContextOperation } from '@/shared/api/bff/context-executor'
 import { contextRoute } from '@/shared/api/bff/context-route'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
@@ -15,6 +16,10 @@ import { membersClient } from '../../api/members-client'
 import { createOrganizationAccessController } from './controller'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/backend-transport', () => ({
+  fetchBackendResponse: vi.fn(),
+  getBackendBaseUrl: () => 'http://api.test',
+}))
 vi.mock('client-only', () => ({}))
 it('replays actual committed safe503 through BFF/headless: unknown, fresh V+1, no PATCH replay', async () => {
   const entry = makeEntry()
@@ -26,13 +31,13 @@ it('replays actual committed safe503 through BFF/headless: unknown, fresh V+1, n
       ? Response.json(captured.body, { status: captured.status })
       : Response.json(captured.snapshot)
   )
+  vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => upstream(url, init))
   const deps = {
     store,
     lock: new SimpleLock(),
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: async () => 'session-x',
     apiBase: 'http://api.test',
-    fetch: upstream as typeof fetch,
   }
   const operation = {
     path: '/api/v1/organizations/org/members/user/roles',

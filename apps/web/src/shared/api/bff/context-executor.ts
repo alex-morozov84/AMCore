@@ -6,6 +6,7 @@ import {
 } from '@amcore/shared'
 import type { ZodType } from 'zod'
 
+import { fetchBackendResponse } from '../backend-transport'
 import { parseRetryAfterSeconds } from '../retry-after'
 
 import { readContextJson } from './context-body-budget'
@@ -19,7 +20,6 @@ import {
 import type { EnsureFreshSessionDeps } from './ensure-fresh-session'
 import { frontendApiHeaders, type ProductWebContext } from './product-web-context.server'
 import { forwardRequestHeaders } from './proxy-headers'
-import { resolveTrustedClientIp } from './trusted-client-ip'
 
 import 'server-only'
 
@@ -60,7 +60,6 @@ export interface ContextExecutorDeps extends EnsureFreshSessionDeps {
   bindingVersion?: 1 | 2
   readSessionId: () => Promise<string | undefined>
   apiBase: string
-  fetch?: typeof fetch
 }
 
 export interface ContextExecutorInput {
@@ -103,11 +102,7 @@ export async function executeContextOperation<T>(
       signal.throwIfAborted()
       const session = await freshContextSession(captured, deps)
       signal.throwIfAborted()
-      const headers = forwardRequestHeaders(
-        input.headers,
-        session.accessToken,
-        resolveTrustedClientIp(input.headers)
-      )
+      const headers = forwardRequestHeaders(input.headers, session.accessToken)
       if (deps.webContext) {
         for (const [key, value] of frontendApiHeaders(deps.webContext)) headers.set(key, value)
       }
@@ -118,7 +113,7 @@ export async function executeContextOperation<T>(
         headers.set('x-invitation-operation-id', operation.invitationOperationId)
       if (operation.organizationCreationId)
         headers.set('x-organization-creation-id', operation.organizationCreationId)
-      const response = await (deps.fetch ?? fetch)(url, {
+      const response = await fetchBackendResponse(url, input.headers, {
         method: operation.method,
         headers,
         cache: 'no-store',

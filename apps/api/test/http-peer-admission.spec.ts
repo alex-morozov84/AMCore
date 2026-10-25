@@ -9,7 +9,10 @@ import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
 
 import { createHttpAdapter } from '../src/bootstrap/create-http-adapter'
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
-import { resolveSessionIpAddress } from '../src/common/utils/verified-visitor-ip'
+import {
+  resolveSessionIpAddress,
+  resolveVerifiedVisitorIp,
+} from '../src/common/utils/verified-visitor-ip'
 import type { EnvService } from '../src/env/env.service'
 import { resolveTracker } from '../src/infrastructure/throttling/client-tracker'
 
@@ -21,6 +24,7 @@ class PeerProbeController {
     const env = { get: () => peers } as unknown as EnvService
     return {
       session: resolveSessionIpAddress(req, env),
+      password: resolveVerifiedVisitorIp(req, env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
       tracker: resolveTracker(req, env),
       peer: req.socket.remoteAddress,
       ip: req.ip,
@@ -99,8 +103,37 @@ for (const [name, makeAdapter] of [
         .set('x-forwarded-for', '9.9.9.9')
       expect(result.status).toBe(200)
       expect(result.body.session).toBe(accepted ? claim : result.body.peer)
+      expect(result.body.password).toBe(accepted ? claim : result.body.peer)
       expect(result.body.tracker).toBe(accepted ? claim : result.body.peer)
       expect(result.body.peer).not.toBe('9.9.9.9')
     })
   })
 }
+
+describe('password identity across actual IPv4/IPv6 web peers', () => {
+  it('keeps one visitor identity across two peers and separates two visitors through one peer', async () => {
+    const adapter = new FastifyAdapter({ trustProxy: false })
+    const app = await NestFactory.create(PeerProbeModule, adapter, { logger: false })
+    try {
+      await app.listen(0, '::')
+      const address = app.getHttpServer().address()
+      if (!address || typeof address === 'string') throw new Error('Missing dual-stack listener')
+      const via = async (host: string, claim: string) =>
+        request(`http://${host}:${address.port}`)
+          .get('/peer-probe')
+          .set('x-probe-trusted', 'yes')
+          .set(AMCORE_CLIENT_IP_HEADER, claim)
+          .expect(200)
+      const first = await via('127.0.0.1', '203.0.113.75')
+      const second = await via('[::1]', '203.0.113.75')
+      expect(first.body.peer).not.toBe(second.body.peer)
+      expect(first.body.password).toBe('203.0.113.75')
+      expect(second.body.password).toBe(first.body.password)
+      const other = await via('127.0.0.1', '203.0.113.76')
+      expect(other.body.peer).toBe(first.body.peer)
+      expect(other.body.password).toBe('203.0.113.76')
+    } finally {
+      await app.close()
+    }
+  })
+})

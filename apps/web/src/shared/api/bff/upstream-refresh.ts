@@ -1,3 +1,5 @@
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import type { UpstreamRefreshFn } from './session-vault.types'
@@ -6,7 +8,7 @@ import { ACCESS_TOKEN_LIFETIME_MS } from './vault-constants'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const REFRESH_COOKIE_NAME = 'refresh_token'
 
 /**
@@ -27,11 +29,12 @@ export function createUpstreamRefresh(
   source: Headers,
   context?: ProductWebContext
 ): UpstreamRefreshFn {
-  const metadata = { ...sessionMetadataHeaders(source), ...context?.apiHeaders }
+  const originalSource = new Headers(source)
+  const metadata = { ...sessionMetadataHeaders(originalSource), ...context?.apiHeaders }
   return async (refreshToken, signal) => {
     let response: Response
     try {
-      response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+      response = await fetchBackendResponse(`${API_URL}/api/v1/auth/refresh`, originalSource, {
         method: 'POST',
         headers: { ...metadata, Cookie: `${REFRESH_COOKIE_NAME}=${refreshToken}` },
         signal,
@@ -64,6 +67,3 @@ export function createUpstreamRefresh(
     }
   }
 }
-
-/** Headerless transport retained for isolated protocol tests. */
-export const upstreamRefresh = createUpstreamRefresh(new Headers())

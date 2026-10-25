@@ -68,3 +68,7 @@ Maintained CLI fixtures run in the scripts test lane. The web guard suite checks
 architecture and user guidance through the paired command. Full generated
 install/build/test coverage belongs to CI; successful transforms alone do not
 prove installation or builds.
+
+## Web transport guards
+
+ESLint owns no-restricted-globals and no-restricted-properties. Web policy composes restricted imports/syntax with existing navigation and styling guards. See [scope, exact adapters and analysis limits](../../docs/frontend/api-consumption.md#server-request-boundary); use the paired wrapper for complete coverage.

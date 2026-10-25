@@ -701,3 +701,13 @@ Managed stands retain their isolated resource ownership with the ESM API.
 For manual Nest watch sessions, see [API build guidance](../backend/api-build.md)
 for asynchronous diagnostics and explicit restarts after configuration/shared changes.
 A successful E2E preparation receipt does not certify compiled API freshness.
+
+### Password limiter and visitor relay preview
+
+Run `pnpm stand preview --id client-ip-preview --profile client-ip` in a path-mode
+checkout. This isolated profile pins web to an unused address on its owned network;
+API trusts that exact peer. Its HTTP browser proxy overwrites x-real-ip and removes
+inbound internal claims. It proves wrong-password accounting and aggregate429, then
+removes only its explicitly seeded demo keys. It never uses another stand/ingress.
+The public preview URL remains useful for ordinary login/settings checks; the
+trusted-edge proof runs through the profile's temporary browser proxy.

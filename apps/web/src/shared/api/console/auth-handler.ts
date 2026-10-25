@@ -30,9 +30,9 @@ export async function handleConsoleLogin(request: Request): Promise<Response> {
     return unavailable(request)
   }
 
-  const access = await probeConsoleAccessWithToken(upstream.accessToken)
+  const access = await probeConsoleAccessWithToken(upstream.accessToken, request.headers)
   if (access.kind !== 'admitted') {
-    await revokeBackendSession(upstream.refreshToken)
+    await revokeBackendSession(upstream.refreshToken, request.headers)
     return access.kind === 'denied' ? accessDenied(request) : unavailable(request)
   }
 
@@ -42,7 +42,7 @@ export async function handleConsoleLogin(request: Request): Promise<Response> {
     response.cookies.set(CONSOLE_SESSION_COOKIE_NAME, sessionId, consoleSessionCookieOptions())
     return response
   } catch {
-    await revokeBackendSession(upstream.refreshToken)
+    await revokeBackendSession(upstream.refreshToken, request.headers)
     return unavailable(request)
   }
 }

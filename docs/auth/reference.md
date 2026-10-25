@@ -228,3 +228,11 @@ vars are set.
 
 `RBAC_ACLV_CACHE_TTL_MS` is deprecated and ignored (default `0`; nonnegative
 integers still validate). See [RBAC freshness and deployment](./rbac.md#freshness--caching).
+
+## Password attempt protection
+
+Login and password step-up can return429 with Retry-After 900 (pair block) or86400
+(aggregate IP limit). Limiter storage/connection/capacity failure returns503 with
+`SERVICE_UNAVAILABLE`; no new session or step-up token is issued. A dispatched
+counter update may already have executed when its reply is lost. The limiter does
+not replay it. See [brute-force protection](concepts.md#brute-force-protection).

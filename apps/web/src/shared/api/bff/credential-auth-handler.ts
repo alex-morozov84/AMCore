@@ -66,6 +66,11 @@ export async function handleCredentialAuth<TInput>(
     if (error instanceof UpstreamAuthError) {
       return NextResponse.json(error.body as object, { status: error.status })
     }
+    if (error instanceof TypeError)
+      return apiErrorResponse(request, {
+        statusCode: 503,
+        message: 'Backend temporarily unavailable',
+      })
     throw error
   }
 
@@ -73,7 +78,7 @@ export async function handleCredentialAuth<TInput>(
   try {
     minted = context ? await mintSession(upstream, context.store) : await mintSession(upstream)
   } catch (error) {
-    await revokeBackendSession(upstream.refreshToken)
+    await revokeBackendSession(upstream.refreshToken, request.headers)
     throw error
   }
   const { sessionId, user } = minted
@@ -81,7 +86,7 @@ export async function handleCredentialAuth<TInput>(
     await retireFlowsForOrdinaryAuth(request, { sessionId, actorId: user.id }, undefined, context)
   } catch (error) {
     await (context?.store ?? redisVaultStore).delete(sessionId).catch(() => undefined)
-    await revokeBackendSession(upstream.refreshToken)
+    await revokeBackendSession(upstream.refreshToken, request.headers)
     throw error
   }
 

@@ -38,7 +38,11 @@ describe('callUpstreamAuth', () => {
       )
     )
 
-    const result = await callUpstreamAuth('/auth/login', { email: 'a@b.com', password: 'x' })
+    const result = await callUpstreamAuth(
+      '/auth/login',
+      { email: 'a@b.com', password: 'x' },
+      new Request('http://web.test')
+    )
 
     expect(result).toEqual({ user: { id: 'u1' }, accessToken: 'at-1', refreshToken: 'rt-1' })
   })
@@ -56,7 +60,7 @@ describe('callUpstreamAuth', () => {
       )
     )
 
-    const result = await callUpstreamAuth('/auth/login', {})
+    const result = await callUpstreamAuth('/auth/login', {}, new Request('http://web.test'))
     expect(result.refreshToken).toBe('rt-1')
   })
 
@@ -67,9 +71,9 @@ describe('callUpstreamAuth', () => {
       vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 401, body: errorBody }))
     )
 
-    await expect(callUpstreamAuth('/auth/login', {})).rejects.toMatchObject(
-      new UpstreamAuthError(401, errorBody)
-    )
+    await expect(
+      callUpstreamAuth('/auth/login', {}, new Request('http://web.test'))
+    ).rejects.toMatchObject(new UpstreamAuthError(401, errorBody))
   })
 
   it('throws if the backend succeeds but never sets a refresh_token cookie', async () => {
@@ -85,7 +89,9 @@ describe('callUpstreamAuth', () => {
       )
     )
 
-    await expect(callUpstreamAuth('/auth/login', {})).rejects.toThrow(/did not set/)
+    await expect(
+      callUpstreamAuth('/auth/login', {}, new Request('http://web.test'))
+    ).rejects.toThrow(/did not set/)
   })
 
   it('forwards browser locale and device metadata from the original request', async () => {
@@ -105,8 +111,8 @@ describe('callUpstreamAuth', () => {
     await callUpstreamAuth('/auth/register', {}, originalRequest)
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect((init.headers as Record<string, string>)['Accept-Language']).toBe('ru-RU,ru;q=0.9')
-    expect((init.headers as Record<string, string>)['User-Agent']).toBe('Browser device probe')
+    expect(new Headers(init.headers).get('Accept-Language')).toBe('ru-RU,ru;q=0.9')
+    expect(new Headers(init.headers).get('User-Agent')).toBe('Browser device probe')
   })
 
   it('omits Accept-Language when the original request has none', async () => {
@@ -120,9 +126,9 @@ describe('callUpstreamAuth', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await callUpstreamAuth('/auth/login', {})
+    await callUpstreamAuth('/auth/login', {}, new Request('http://web.test'))
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect((init.headers as Record<string, string>)['Accept-Language']).toBeUndefined()
+    expect(new Headers(init.headers).get('Accept-Language')).toBeNull()
   })
 })

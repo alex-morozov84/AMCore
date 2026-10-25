@@ -2,12 +2,18 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
+
 import { type ContextExecutorDeps, executeContextOperation } from './context-executor'
 import { contextSessionBinding } from './context-session'
 import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
 import { SimpleLock } from './test-lock-fakes'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/backend-transport', () => ({
+  fetchBackendResponse: vi.fn(),
+  getBackendBaseUrl: () => 'http://api.test',
+}))
 
 function fixture(stale = false) {
   const entry = makeEntry({
@@ -16,7 +22,7 @@ function fixture(stale = false) {
   })
   const store = new FakeVaultStore()
   store.seed('session-x', entry)
-  const deps: ContextExecutorDeps = {
+  const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
     upstreamRefresh: vi.fn(freshRefresh),
@@ -24,6 +30,7 @@ function fixture(stale = false) {
     apiBase: 'http://api.test',
     fetch: vi.fn().mockResolvedValue(Response.json({ name: 'Renamed' })),
   }
+  vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => deps.fetch(url, init))
   const get = vi.spyOn(store, 'get')
   return { deps, entry, get, expected: contextSessionBinding('session-x', entry) }
 }

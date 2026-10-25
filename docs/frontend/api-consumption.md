@@ -169,6 +169,69 @@ Only `useQuery`/`useInfiniteQuery` are affected — `useMutation` never
 retries by default in TanStack Query, and this starter doesn't override
 that.
 
+## Server request boundary
+
+Use `fetchBackend(path, schema, { auth: 'required' })` for ordinary server reads
+that need the existing DataOutcome contract. Its request-scoped header builder
+calls Next's `await headers()` and passes that original source to the sender;
+the read caller does not supply or fabricate a source. A browser feature uses the existing
+same-origin apiClient. Keep specialized handlers for cookies, OAuth, streams,
+proofs and compensation; they own session selection and response parsing.
+
+Use the existing `handleLogout` from `shared/api/bff/logout-handler` for ordinary
+product logout. It checks browser origin, selects the scoped vault session,
+revokes upstream without refresh, deletes that vault entry and clears the browser
+cookie even when upstream fails. Host Console retains its separate handler and 204.
+The following example explains only transport; it is not a replacement logout flow.
+
+A specialized server handler sends through `fetchBackendResponse`:
+
+```ts
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
+
+const response = await fetchBackendResponse('/api/v1/auth/logout', request.headers, {
+  method: 'POST',
+  headers: { Cookie: `refresh_token=${serverHeldRefreshToken}` },
+  signal: AbortSignal.timeout(5000),
+})
+```
+
+Pass original request headers as the required second argument. Server Components
+obtain them with `await headers()` from next/headers. Select outgoing headers
+explicitly; do not copy all inbound headers. The sender clones that selection,
+strips IP lookalikes, then adds the configured visitor claim. It preserves selected
+cookies/proofs, streams, signals and cache options. Use `getBackendBaseUrl()` for
+existing domain URL builders; do not read API_URL elsewhere.
+
+The target must be a root-relative path or same-API-origin HTTP(S) URL. Request
+objects, URL credentials, scheme-relative URLs and other origins are rejected.
+Redirect following is forbidden, including same-origin redirects. The default is
+`redirect: 'error'`; handlers return their controlled availability response on an
+unexpected redirect. Only the existing OAuth proxy and queue board use `manual`
+and handle the response themselves. Never follow Location with internal headers.
+
+### Enforced scope and limits
+
+Paired lint guards runtime source in `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs`. Only test/spec/
+stories files, declaration files and src/test are excluded. Direct global fetch,
+static `.fetch` access/destructuring, API_URL property reads, common alternate HTTP
+imports and literal loaders fail. Importing the safe helper does not exempt a
+second raw fetch. A local function named fetch remains legal; a local `.fetch`
+property is deliberately reserved.
+
+Run `node scripts/lint.mjs --scope web` to see diagnostics. ESLint reports
+`no-restricted-globals`, `no-restricted-properties`, `no-restricted-imports` or
+`no-restricted-syntax`, naming the safe helper and this guide.
+
+The exact raw-fetch adapters live in apps/web/network-policy.mjs. Only the backend
+sender reads API_URL. Browser adapter exceptions relax fetch alone, retain all
+other guards and require review for changes. A new external SDK adapter needs a
+narrow reviewed exception and tests; never send internal claims/auth to it.
+
+Lint does not trace arbitrary SDKs, cross-file aliases, computed module/property
+names, injected functions or source-header provenance. It is a diagnostic guard,
+not a network sandbox. Review deployment trust and each specialized handler.
+
 ## Client-IP relay to `apps/api` (ADR-072)
 
 The generic authenticated proxy (`authenticated-proxy.ts`) never relays a
@@ -202,9 +265,9 @@ identical to pre-ADR-072 behavior; a request that never went through
 `WEB_TRUSTED_CLIENT_IP_HEADER` (which inbound header `apps/web` trusts) and
 `TRUSTED_WEB_PEERS` (which socket peer `apps/api` trusts) are independent
 knobs on independent trust boundaries, not one setting. `getClientIp()`/
-audit-log IP and invite-abuse/password-login/step-up limiters are **not** wired to this — they
-remain scoped to `req.ip` exactly as before; extending them is a deliberate,
-separately-reviewed future decision, not an implicit side effect.
+audit-log IP and invite-abuse remain scoped to their existing inputs. Password login
+and step-up explicitly use the peer-verified visitor address, then req.ip/socket
+fallback. This does not rewrite global req.ip or expand audit/invite trust.
 
 Safe use also requires every edge in front of `apps/api` to strip
 `X-AMCore-Client-Ip`, and `TRUSTED_WEB_PEERS` to name the exact `apps/web`
@@ -219,8 +282,8 @@ sessions handler and console helper). It never copies an inbound internal claim.
 A missing UA is explicitly empty on transport and null in storage, avoiding
 Node fetch's default device label. Refresh metadata comes from the request that
 wins the vault lock; waiting requests reuse the resulting generation. Password
-login has a separate Session address field and retains its previous req.ip
-limiter contract. None of this metadata authorizes a request.
+login keeps a separate Session metadata address field; password accounting
+uses the explicitly selected verified visitor address. None of this metadata authorizes a request.
 
 The reference `docker-compose.yml` supports this: `api`'s published port
 binds to `127.0.0.1` by default (not `0.0.0.0`, ADR-072), so the only path

@@ -15,6 +15,11 @@ export async function start(m) {
   m.state = 'configured'
   await save(m)
   await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres', 'redis'])
+  if (m.fixtureProfile === 'client-ip') {
+    const { clientIpPeer } = await import('./client-ip-fixture.mjs')
+    await clientIpPeer(m)
+    await configuration(m)
+  }
   await initializeMarker(m)
   m.markerInitialized = true
   m.state = 'infrastructure-ready'

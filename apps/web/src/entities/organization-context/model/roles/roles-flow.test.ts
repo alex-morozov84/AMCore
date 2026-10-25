@@ -3,6 +3,7 @@
 import type { SaveRoleDefinition } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { contextRoute } from '@/shared/api/bff/context-route'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
@@ -22,6 +23,10 @@ import { createOrganizationAccessController } from '../access-controller'
 import { ROLE_REJECTION_CODES } from './outcomes'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/backend-transport', () => ({
+  fetchBackendResponse: vi.fn(),
+  getBackendBaseUrl: () => 'http://api.test',
+}))
 vi.mock('client-only', () => ({}))
 vi.mock('@/shared/api/bff/product-context-deps', () => ({ productContextDeps: vi.fn() }))
 
@@ -58,7 +63,7 @@ function harness(upstream: (url: string, init?: RequestInit) => Response) {
   store.seed('session-x', entry)
   const binding = contextSessionBinding('session-x', entry)
   const calls: { method: string; url: string }[] = []
-  const deps: ContextExecutorDeps = {
+  const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
     upstreamRefresh: vi.fn(freshRefresh),
@@ -69,6 +74,7 @@ function harness(upstream: (url: string, init?: RequestInit) => Response) {
       return upstream(url, init)
     }) as typeof fetch,
   }
+  vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => deps.fetch(url, init))
   vi.mocked(productContextDeps).mockReturnValue(deps)
   // The browser's relative `/api/...` call is served by the real route handlers, with a trusted Origin.
   vi.stubGlobal('fetch', async (path: string, init: RequestInit) => {

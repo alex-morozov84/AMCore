@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 import { parseRetryAfterSeconds } from '../retry-after'
 import { classifyThrown } from '../server/classify'
 
@@ -59,7 +60,7 @@ async function fetchInvitationResponse(
     headers.set('x-invitation-handoff-key', options.handoff.cleanupKey)
   }
   try {
-    return await fetch(`${process.env.API_URL ?? 'http://localhost:5002'}/api/v1${path}`, {
+    return await fetchBackendResponse(`${getBackendBaseUrl()}/api/v1${path}`, options.source, {
       method: options.method,
       headers,
       signal: options.signal,

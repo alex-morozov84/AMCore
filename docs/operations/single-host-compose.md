@@ -304,9 +304,9 @@ socket address ([BFF client-IP relay](deployment.md#bff-client-ip-relay-appsweb-
   drops that header before it calls the API. Keep both if you change the edge; do not
   add `trusted_proxies` without a security review.
 - Supported: one web container, IPv4.
-- Known gap: the generic BFF proxy relays the visitor address, but some dedicated
-  web handlers call the API without it, for example the own-sessions list. Those
-  endpoints still share one rate-limit bucket for all visitors.
+- Dedicated handlers, server reads, logout and compensation use the same required-source
+  transport as the generic proxy. Password login/step-up also select the verified
+  visitor budget; audit/invite inputs remain unchanged.
 - To change the subnet or address of a running deployment, plan a short downtime
   and take a backup first. Edit `.env`, check `docker compose config --quiet`, then
   run `docker compose down` followed by `docker compose up -d`. The network is
@@ -552,10 +552,15 @@ before restore step 5 re-run the `setup-roles.sql` Step 3 command from
 
 ## Troubleshooting
 
-| Symptom                                                     | Action                                                                                                                                                                         |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A service logs a certificate or `self-signed` error         | Check `POSTGRES_TLS_CA_DIR` holds the `ca.crt` that signed the server certificate, and the certificate date.                                                                   |
-| `no pg_hba.conf entry` or `rejects connection`              | The URL uses a role other than `amcore_migrator`/`amcore_runtime`/`amcore_backup`, or `sslmode` is not set.                                                                    |
-| `system-seed` prints `invalid_input`                        | `MIGRATION_DATABASE_URL` is empty or lacks `sslmode=verify-full`.                                                                                                              |
-| `up` fails with `Pool overlaps with other one on this host` | Choose another `COMPOSE_NETWORK_SUBNET` and a matching `COMPOSE_WEB_IPV4`.                                                                                                     |
-| All visitors get `429` together                             | `bff-relay.yml` is not in `COMPOSE_FILE`, or a command used explicit `-f` files. On the own-sessions list and other dedicated handlers this is the known gap (see Visitor IP). |
+| Symptom                                                     | Action                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A service logs a certificate or `self-signed` error         | Check `POSTGRES_TLS_CA_DIR` holds the `ca.crt` that signed the server certificate, and the certificate date.                                                                                                                                                                                                           |
+| `no pg_hba.conf entry` or `rejects connection`              | The URL uses a role other than `amcore_migrator`/`amcore_runtime`/`amcore_backup`, or `sslmode` is not set.                                                                                                                                                                                                            |
+| `system-seed` prints `invalid_input`                        | `MIGRATION_DATABASE_URL` is empty or lacks `sslmode=verify-full`.                                                                                                                                                                                                                                                      |
+| `up` fails with `Pool overlaps with other one on this host` | Choose another `COMPOSE_NETWORK_SUBNET` and a matching `COMPOSE_WEB_IPV4`.                                                                                                                                                                                                                                             |
+| All visitors get `429` together                             | Check that the active Compose configuration includes `bff-relay.yml`; explicit `-f` files replace `COMPOSE_FILE`. Verify the exact trusted web peer and that the trusted edge overwrites the visitor header; see [Visitor IP](#visitor-ip-through-the-web-bff). Visitors sharing one public IP still share its budget. |
+
+Password login and step-up use the same verified relay identity. Deploy this
+accounting change with the [stopped-writer upgrade and rollback](deployment.md#password-limiter-upgrade-and-rollback).
+The change can grant a fresh budget when the visitor key does not yet exist;
+retaining old shared web-peer keys does not preserve per-visitor attribution.

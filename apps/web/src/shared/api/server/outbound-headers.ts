@@ -1,13 +1,11 @@
 import { headers as nextHeaders } from 'next/headers'
-import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
-
-import { resolveTrustedClientIp } from '../bff/trusted-client-ip'
 
 import { type BackendAuthMode, resolveAuthHeader, type TokenResolver } from './auth-header'
 
 import 'server-only'
 
-export type OutboundHeadersResult = { headers: Headers } | { authUnavailable: true }
+export type OutboundHeadersResult =
+  { headers: Headers; source: Headers } | { authUnavailable: true }
 
 /**
  * Never the inbound request's own headers verbatim - only the specific,
@@ -20,7 +18,6 @@ export async function buildOutboundHeaders(
   tokenResolver?: TokenResolver
 ): Promise<OutboundHeadersResult> {
   const inbound = await nextHeaders()
-  const trustedIp = resolveTrustedClientIp(inbound)
   const authResult = await resolveAuthHeader(authMode, tokenResolver)
   if ('unavailable' in authResult) return { authUnavailable: true }
 
@@ -29,6 +26,5 @@ export async function buildOutboundHeaders(
     'X-Correlation-Id': correlationId,
   })
   if (authResult.header) outbound.set('Authorization', authResult.header)
-  if (trustedIp) outbound.set(AMCORE_CLIENT_IP_HEADER, trustedIp)
-  return { headers: outbound }
+  return { headers: outbound, source: inbound }
 }

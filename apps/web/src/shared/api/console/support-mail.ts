@@ -10,13 +10,14 @@ import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-erro
 import { readContextJson } from '@/shared/api/bff/context-body-budget'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 type Operation = 'status' | 'prepare' | 'send' | 'receipt'
 /** Every operation selects its own fixed upstream. A browser supplies no URL or recipient. */
 export async function handleSupportMail(
@@ -69,18 +70,15 @@ export async function handleSupportMail(
         ? '/prepare'
         : `/${encodeURIComponent(attemptId!)}${operation === 'send' ? '/send' : ''}`
   try {
-    const response = await fetch(
+    const response = await fetchBackendResponse(
       `${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}/support-mail${suffix}`,
+      request.headers,
       {
         method: mutation ? 'POST' : 'GET',
         body,
         cache: 'no-store',
         signal: AbortSignal.timeout(operation === 'send' ? 25_000 : 5000),
-        headers: forwardRequestHeaders(
-          request.headers,
-          resolved.token,
-          resolveTrustedClientIp(request.headers)
-        ),
+        headers: forwardRequestHeaders(request.headers, resolved.token),
       }
     )
     const headers = forwardResponseHeaders(response.headers)

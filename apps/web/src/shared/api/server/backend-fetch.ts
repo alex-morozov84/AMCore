@@ -1,5 +1,6 @@
 import type { ZodType } from 'zod'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 import { parseRetryAfterSeconds } from '../retry-after'
 
 import { type BackendAuthMode, type TokenResolver } from './auth-header'
@@ -13,7 +14,7 @@ import type { DataOutcome, UnavailableReason } from './types'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const DEFAULT_TIMEOUT_MS = 5_000
 
 export interface BackendFetchOptions {
@@ -101,7 +102,7 @@ async function performRequest(
       return { kind: 'outcome', outcome: unavailableOutcome('upstream', correlationId) }
     }
 
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetchBackendResponse(`${API_URL}${path}`, headersResult.source, {
       method: opts.method ?? 'GET',
       ...(opts.cache !== undefined ? { cache: opts.cache } : {}),
       headers: headersResult.headers,

@@ -1,9 +1,12 @@
 import { cache } from 'react'
+import { headers } from 'next/headers'
 import { oauthProvidersResponseSchema } from '@amcore/shared'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 /**
  * Server-side read of the backend's configured-OAuth-providers list
@@ -18,7 +21,10 @@ const API_URL = process.env.API_URL ?? 'http://localhost:5002'
  */
 export const getOAuthProviders = cache(async (): Promise<string[]> => {
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/oauth/providers`)
+    const response = await fetchBackendResponse(
+      `${API_URL}/api/v1/auth/oauth/providers`,
+      await headers()
+    )
     if (!response.ok) return []
 
     const parsed = oauthProvidersResponseSchema.safeParse(await response.json())

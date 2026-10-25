@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { removalFailure } from '@/entities/organization-context/api/member-removal-client'
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { contextRoute } from '@/shared/api/bff/context-route'
 import {
@@ -30,11 +31,15 @@ const route = {
     }),
 }
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/backend-transport', () => ({
+  fetchBackendResponse: vi.fn(),
+  getBackendBaseUrl: () => 'http://api.test',
+}))
 vi.mock('@/shared/api/bff/product-context-deps', () => ({ productContextDeps: vi.fn() }))
 const base = 'http://localhost:3002/api/product-access/organizations/org/members/user'
 const params = { params: Promise.resolve({ id: 'org', userId: 'user' }) }
 let binding: string
-let upstream: ReturnType<typeof vi.fn>
+let upstream: ReturnType<typeof vi.fn<typeof fetch>>
 function request(query = 'expectedMemberId=member', extra: RequestInit = {}) {
   return new Request(`${base}?${query}`, {
     method: 'DELETE',
@@ -47,14 +52,14 @@ beforeEach(() => {
   const store = new FakeVaultStore()
   store.seed('session', entry)
   binding = contextSessionBinding('session', entry)
-  upstream = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+  upstream = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
+  vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => upstream(url, init))
   vi.mocked(productContextDeps).mockReturnValue({
     store,
     lock: new SimpleLock(),
     upstreamRefresh: freshRefresh,
     readSessionId: async () => 'session',
     apiBase: 'http://api.test',
-    fetch: upstream,
   } as never)
 })
 describe('bodyless removal API -> DAL -> BFF contract', () => {
@@ -75,9 +80,10 @@ describe('bodyless removal API -> DAL -> BFF contract', () => {
     expect(await result.json()).toEqual({ binding, data: { removed: true } })
     const [url, options] = upstream.mock.calls[0]!
     expect(url).toContain('/organizations/org/members/user?expectedMemberId=member')
-    expect(options.headers.get('authorization')).not.toBe('Bearer caller-bound-token')
-    expect(options.headers.get('x-amcore-organization-id')).toBe('org')
-    expect(options.body).toBeUndefined()
+    const headers = new Headers(options?.headers)
+    expect(headers.get('authorization')).not.toBe('Bearer caller-bound-token')
+    expect(headers.get('x-amcore-organization-id')).toBe('org')
+    expect(options?.body).toBeUndefined()
   })
   it.each([
     '',
