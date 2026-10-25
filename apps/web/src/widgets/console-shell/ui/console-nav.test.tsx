@@ -1,8 +1,11 @@
+import { hydrateRoot } from 'react-dom/client'
+import { renderToString } from 'react-dom/server'
 import { NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE } from '@amcore/shared'
-import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import {
   getConsoleBackgroundWorkHref,
   getConsoleIntegrationsHref,
@@ -83,4 +86,32 @@ describe('Console navigation', () => {
     expect(screen.getByText('OPS / Background work')).toBeInTheDocument()
     expect(screen.queryByText(/Scheduled jobs/)).not.toBeInTheDocument()
   })
+})
+
+const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as { mode: string; slug: string }
+const originalConfig = { ...mutableConfig }
+afterEach(() => Object.assign(mutableConfig, originalConfig))
+it('hydrates rewritten host navigation with stable fallback before selecting the browser page', async () => {
+  mutableConfig.mode = 'host'
+  mutableConfig.slug = 'control'
+  pathname.mockReturnValue('/control')
+  const tree = () => (
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
+      <ConsoleBreadcrumb />
+    </NextIntlClientProvider>
+  )
+  const container = document.createElement('div')
+  container.innerHTML = renderToString(tree())
+  expect(container.textContent).toBe('OPS')
+  document.body.append(container)
+  pathname.mockReturnValue('/')
+  const recover = vi.fn()
+  let root!: ReturnType<typeof hydrateRoot>
+  await act(async () => {
+    root = hydrateRoot(container, tree(), { onRecoverableError: recover })
+  })
+  expect(container.textContent).toBe('OPS / Overview')
+  expect(recover).not.toHaveBeenCalled()
+  await act(async () => root.unmount())
+  container.remove()
 })

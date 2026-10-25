@@ -40,16 +40,17 @@ test('reports every stale Console exact count together', () => {
   // Integrations add a feature root, a stand fixture and an e2e spec: three more deletes.
   // Login diagnostics adds the two stand fixture files; its UI/browser helper use existing roots.
   // Support mail adds one closed root, verification removals and mixed script/doc operations.
+  // Account MFA adds one closed-root deletion and one pending-route extraction.
   // The exact network-exception seam adds one content fact/removal step, with no new root/delete.
   assert.equal(
     factFor(disabled.consoleFacts, 'console.network-exceptions')?.path,
     'apps/web/network-policy.mjs'
   )
   assertExactScaffoldCounts([
-    { name: 'console roots', expected: 26, actual: operationsConsoleOwnership.facts.roots.length },
+    { name: 'console roots', expected: 27, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 109,
+      expected: 110,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
@@ -57,12 +58,12 @@ test('reports every stale Console exact count together', () => {
       expected: 72,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 163, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 164, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
       name: 'console single-locale moves',
-      expected: 3,
+      expected: 4,
       actual: count(singleHost.consoleFacts, 'move'),
     },
     {
@@ -74,7 +75,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 109,
+      expected: 110,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {

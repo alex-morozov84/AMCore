@@ -183,3 +183,11 @@ export function getConsoleIntegrationsHref(): string {
 export function getConsoleAccountSecurityHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/account/security`
 }
+
+/** Display-only normalization of the host edge's physical rewrite target. Never an auth selector. */
+export function getConsolePublicPathname(pathname: string | null): string | null {
+  if (pathname === null || ADMIN_CONSOLE_CONFIG.mode !== 'host') return pathname
+  const physical = `/${ADMIN_CONSOLE_CONFIG.slug}`
+  if (pathname === physical) return '/'
+  return pathname.startsWith(`${physical}/`) ? pathname.slice(physical.length) : pathname
+}

@@ -11,6 +11,8 @@ The website has `/mfa` for pending authentication and `/account/security` for
 signed-in self-service. Product administration retains the same logical suffixes.
 Use its [placement helpers](../product-admin/placement-and-sessions.md), not a
 hardcoded administration prefix. Multi-locale builds prefix pages with the locale.
+The standalone language switcher changes only the browser URL/cookie. It never
+reads or updates a product profile during pending authentication.
 Signed-in settings require the selected frontend session. Pending pages do not
 grant a session or access to protected pages.
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { LocaleSwitcher } from '@/features/locale-switcher'
+import { AuthLocaleSwitcher as LocaleSwitcher } from '@/features/locale-switcher'
 
 /** Content is injected by the app layer; no backend credentials cross this boundary. */
 export function AccountSecurityPage({

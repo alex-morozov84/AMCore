@@ -9,6 +9,7 @@ import {
   getConsoleDetailAuditHref,
   getConsoleOrganizationsHref,
   getConsoleOverviewHref,
+  getConsolePublicPathname,
   getConsoleQueueBoardBasePath,
   getConsoleQueueBoardHref,
   getConsoleScheduledJobsHref,
@@ -221,4 +222,18 @@ it('keeps account security inside the selected Console topology', () => {
   expect(getConsoleAccountSecurityHref()).toBe('/operations/account/security')
   mutableConfig.mode = 'host'
   expect(getConsoleAccountSecurityHref()).toBe('/account/security')
+})
+
+it('normalizes only the selected physical host prefix for display', () => {
+  mutableConfig.mode = 'host'
+  mutableConfig.slug = 'control'
+  for (const [source, expected] of [
+    ['/control', '/'],
+    ['/control/account/security', '/account/security'],
+    ['/account/security', '/account/security'],
+    ['/controller', '/controller'],
+  ])
+    expect(getConsolePublicPathname(source)).toBe(expected)
+  mutableConfig.mode = 'path'
+  expect(getConsolePublicPathname('/control/account/security')).toBe('/control/account/security')
 })

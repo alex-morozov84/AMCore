@@ -1,15 +1,26 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { usePathname } from '@/i18n/navigation'
+import { getConsolePublicPathname } from '@/shared/lib/console-public-href'
 
 import { useConsoleNavItems } from './console-nav-items'
 
 /** "OPS / <SECTION>" - falls back to the eyebrow-less bare prefix on an unrecognized/root path. */
+const noSubscription = () => () => {}
+const serverPathname = () => null
+
 export function ConsoleBreadcrumb() {
   const t = useTranslations('console')
-  const pathname = usePathname()
+  const sourcePathname = usePathname()
+  // Rewritten paths may differ during hydration. Keep SSR and first client markup stable.
+  const pathname = useSyncExternalStore(
+    noSubscription,
+    () => getConsolePublicPathname(sourcePathname),
+    serverPathname
+  )
   const items = useConsoleNavItems()
   const current = items.find((item) => item.href === pathname)
 
