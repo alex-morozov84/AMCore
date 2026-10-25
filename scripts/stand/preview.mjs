@@ -17,6 +17,7 @@ export async function preview(m, profile = 'default') {
   const profiles = [
     'default',
     'client-ip',
+    'account-mfa-ui',
     'user',
     'organization',
     'organization-roles',
@@ -25,6 +26,8 @@ export async function preview(m, profile = 'default') {
     'product-admin-three-host',
     'product-admin-console-path',
   ]
+  if (profile === 'account-mfa-ui' && (m.purpose !== 'preview' || m.fixtureProfile !== profile))
+    throw new Error('Account MFA UI needs its own managed preview profile')
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_START
   profiles.push('notification-work')
   if (profile === 'notification-work' && m.fixtureProfile !== profile)
@@ -245,6 +248,10 @@ export async function preview(m, profile = 'default') {
           }
         }
         // AMCORE_CONSOLE_PREVIEW_ACCESS_END
+        if (profile === 'account-mfa-ui' && account.role === 'SUPER_ADMIN') {
+          const { accountMfaPreview } = await import('./account-mfa-preview.mjs')
+          await accountMfaPreview(page, m)
+        }
         await page.screenshot({
           path: `${m.worktree}/.amcore/stands/${m.id}/preview-${account.role}.png`,
         })

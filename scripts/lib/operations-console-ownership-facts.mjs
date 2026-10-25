@@ -4,6 +4,7 @@ const many = (glob) => ({ glob, kind: 'file', cardinality: 'one-or-more' })
 const module = (path, tests = []) => one(path, { tests })
 
 const roots = [
+  'apps/web/src/_app/console-account-security',
   'apps/web/src/app/[locale]/admin',
   'apps/web/src/app/api/console',
   'apps/web/src/_pages/console',

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 import {
+  getConsoleAccountSecurityHref,
   getConsoleAuditHref,
   getConsoleBackgroundWorkHref,
   getConsoleDetailAuditHref,
@@ -212,4 +213,12 @@ describe('recorded security views', () => {
       expect(Date.parse(access.to!) - Date.parse(access.from!)).toBe(31 * 86400000)
     }
   )
+})
+
+it('keeps account security inside the selected Console topology', () => {
+  mutableConfig.mode = 'path'
+  mutableConfig.slug = 'operations'
+  expect(getConsoleAccountSecurityHref()).toBe('/operations/account/security')
+  mutableConfig.mode = 'host'
+  expect(getConsoleAccountSecurityHref()).toBe('/account/security')
 })

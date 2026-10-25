@@ -178,3 +178,8 @@ export function parseConsoleReturnHref(value: unknown): string | null {
 export function getConsoleIntegrationsHref(): string {
   return `${getConsoleOverviewHref().replace(/\/$/, '')}/integrations`
 }
+
+/** Account settings follow Console topology; account MFA itself survives Console removal. */
+export function getConsoleAccountSecurityHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/account/security`
+}

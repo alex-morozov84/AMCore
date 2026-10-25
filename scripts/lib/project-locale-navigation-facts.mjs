@@ -13,6 +13,7 @@ const facts = {
   ],
   'locale.navigation-dal': ['apps/web/src/shared/api/bff/dal.ts'],
   'locale.navigation-switcher': [
+    'apps/web/src/_pages/account-security/index.tsx',
     'apps/web/src/widgets/app-shell/ui/AppShell.tsx',
     'apps/web/src/_pages/auth/AuthFrame.tsx',
   ],

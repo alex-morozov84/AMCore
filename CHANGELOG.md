@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Prepared account-security browser screens and dedicated unavailable BFF entries,
+  with local QR rendering, transient secret containment and a managed UI simulation.
+  MFA enrollment, second-factor login and activation remain unavailable.
+
 - Dormant account MFA storage and internal TOTP/backup-code verification primitives,
   with an incomplete-deployment startup check. Enrollment and second-factor login
   remain unavailable in this foundation.

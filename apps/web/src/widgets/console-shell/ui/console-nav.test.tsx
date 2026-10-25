@@ -27,6 +27,7 @@ const messages = {
     organizations: 'Organizations',
     apiKeys: { title: 'API keys' },
     auditTitle: 'Audit',
+    accountSecurity: 'Sign-in protection',
   },
 }
 
@@ -49,7 +50,7 @@ const inProvider = (node: React.ReactNode) =>
 beforeEach(() => pathname.mockReturnValue('/admin'))
 
 describe('Console navigation', () => {
-  it('lists eight sections with Scheduled jobs after Background work and Integrations before Users', () => {
+  it('lists nine sections with Scheduled jobs after Background work and Integrations before Users', () => {
     inProvider(<Items />)
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Overview',
@@ -59,6 +60,7 @@ describe('Console navigation', () => {
       'Users',
       'Organizations',
       'API keys',
+      'Sign-in protection',
       'Audit',
     ])
   })

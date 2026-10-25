@@ -26,6 +26,15 @@ const retained = [
   'apps/api/test/mfa-proof.e2e-spec.ts',
   'apps/api/test/mfa-proof.fixture.ts',
   'packages/shared/src/schemas/mfa.ts',
+  'packages/shared/src/schemas/mfa-browser.ts',
+  'apps/web/src/features/account-mfa/model/account-mfa-controller.ts',
+  'apps/web/src/features/account-mfa/ui/enrollment.tsx',
+  'apps/web/src/features/account-mfa/ui/backup-codes.tsx',
+  'apps/web/src/features/account-mfa/ui/emergency-recovery.tsx',
+  'apps/web/src/_app/account-security/server/handlers.ts',
+  'apps/web/src/app/api/auth/mfa/route.ts',
+  'apps/web/src/app/api/product-admin/auth/mfa/route.ts',
+  'docs/auth/mfa-browser.md',
   'docs/auth/mfa-foundation.md',
 ]
 
@@ -42,6 +51,10 @@ const recipes = [
     ],
   ]),
   ['Console host', ['--admin-console=host']],
+  [
+    'single-ru Console host custom slug',
+    ['--mode=single', '--locale=ru', '--admin-console=host', '--admin-console-slug=control'],
+  ],
   ['Console custom path', ['--admin-console=path', '--admin-console-slug=control']],
 ]
 
@@ -64,6 +77,33 @@ for (const [name, flags] of recipes) {
       assert.match(read('docs/auth/README.md'), /\(mfa-foundation\.md\)/)
       assert.match(read('docs/auth/reference.md'), /MFA_ENCRYPTION_KEYS/)
       assert.match(read('CHANGELOG.md'), /Dormant account MFA storage/)
+      const single = flags.includes('--mode=single')
+      const app = `apps/web/src/app/${single ? '' : '[locale]/'}`
+      for (const route of [
+        '(auth)/mfa/page.tsx',
+        '(dashboard)/account/security/page.tsx',
+        '(product-admin)/manage/(auth)/mfa/page.tsx',
+        '(product-admin)/manage/(protected)/account/security/page.tsx',
+      ]) {
+        const source = read(`${app}${route}`)
+        if (single) assert.doesNotMatch(source, /resolveLocaleParam|setRequestLocale/)
+        else assert.match(source, /resolveLocaleParam/)
+      }
+      const frame = read('apps/web/src/_pages/account-security/index.tsx')
+      if (single) assert.doesNotMatch(frame, /LocaleSwitcher/)
+      else assert.match(frame, /LocaleSwitcher/)
+      assert.match(read('apps/web/src/app/globals.css'), /--qr-foreground/)
+      assert.match(read('apps/web/package.json'), /"qrcode": "1\.5\.4"/)
+      if (flags.includes('--admin-console=disabled')) {
+        assert.equal(
+          existsSync(path.join(root, 'apps/web/src/_app/console-account-security')),
+          false
+        )
+      } else {
+        const slug = flags.some((flag) => flag.includes('slug=control')) ? 'control' : 'admin'
+        for (const route of ['(auth)/mfa/page.tsx', '(protected)/account/security/page.tsx'])
+          assert.match(read(`${app}${slug}/${route}`), /ConsoleAccountSecurityMount/)
+      }
       if (flags.includes('--admin-console=disabled')) {
         assert.equal(existsSync(path.join(root, 'docs/operations-console')), false)
       }

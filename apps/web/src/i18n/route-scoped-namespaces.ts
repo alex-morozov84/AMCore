@@ -7,6 +7,7 @@
  * `getTranslations`; this list only narrows what reaches client components.
  */
 export const ROUTE_SCOPED_NAMESPACES: readonly string[] = [
+  'accountMfa',
   // AMCORE_CONSOLE_CLIENT_MESSAGES_START
   'console',
   // AMCORE_CONSOLE_CLIENT_MESSAGES_END
