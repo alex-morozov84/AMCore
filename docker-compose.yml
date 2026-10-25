@@ -40,7 +40,7 @@
 # real JWT secret >= 32 chars) is documented in docs/operations/deployment.md.
 #
 # Production image-pull rollout: apply docker/compose/prod.yml on top of this
-# file (`-f docker-compose.yml -f docker/compose/prod.yml`) to pin api/worker/
+# file through the saved complete COMPOSE_FILE to pin api/worker/
 # web/migrate to immutable registry digests instead of building locally, add
 # restart policies, and bound/rotate container logs. See deployment.md →
 # "Production rollout via registry (image-pull path)".

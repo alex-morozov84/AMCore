@@ -22,6 +22,10 @@ Use [Deployment & migrations](deployment.md) for rollback and other topologies, 
 - SSH limited to your own addresses in the provider firewall. Bots probe public SSH
   continuously; allow key login only.
 - An email provider for production mail; see [Email](../email/README.md).
+- For registry images: the publisher's expected deployment version and three digests.
+- Before account actions: approved mail budget, diagnostic authority and the
+  [mail prerequisites](../email/delivery.md#verify-delivery-on-a-deployed-stack),
+  including tracking, log redaction and queued-mail clock qualification.
 
 In the commands below, `/srv/amcore` is the source checkout and `/srv/amcore-tls`
 holds certificates. Replace the example domains and addresses with yours.

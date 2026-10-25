@@ -5,8 +5,11 @@
 Runbooks and contracts for deploying, running, and operating AMCore in
 production.
 
-**Setting up production for the first time?** Work through these six in order —
-each one assumes the previous is done:
+**One server, with approved registry images or building on the host?** Follow
+[Single-host production with Docker Compose](single-host-compose.md) end to end,
+and size the host with [Capacity](capacity.md).
+
+The following guides cover deployment contracts and operating concerns:
 
 1. [Production deploy profile](production-deploy-profile.md) — the
    build-once/promote-by-digest contract and the GitHub Environments/secrets
@@ -21,10 +24,6 @@ each one assumes the previous is done:
 5. [Secret rotation](secret-rotation.md) — before you need it, not during.
 6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
    VPS.
-
-**One server, with approved registry images or building on the host?** Follow
-[Single-host production with Docker Compose](single-host-compose.md) end to end,
-and size the host with [Capacity](capacity.md).
 
 Already running? Reach for whichever concern below applies.
 
