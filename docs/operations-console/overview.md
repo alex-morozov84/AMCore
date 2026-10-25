@@ -2,19 +2,69 @@
 
 [Operations Console](README.md) → Overview
 
-Overview answers whether the responding API is ready, whether files work, and
-whether its local resources need attention. It describes one instance, without
-fleet totals, historical charts or an automatic page refresh.
+Overview gathers recorded problems from API/file checks, queues, background
+processing, scheduled jobs and integrations. Open **Needs attention** to find the
+next item to investigate. Each result keeps its own time and scope; observations
+can describe different servers. The page has no automatic refresh or incident history.
 
-If a card reports a problem, start with the named dependency or file-check
-failure. Use the [file storage runbook](../operations/runbooks/storage.md) for
-file failures, and the [operations guide](../operations/README.md)
-for database, Redis and resource problems. Refresh after remediation to see a
-new snapshot; a healthy card does not certify other instances.
+## Find what needs checking
+
+1. Open **Needs attention** at the top of Overview. Read the item's explanation
+   and observation time. A saved error can remain after the service recovers.
+2. Follow **Open job**, **Open errors**, **Open processing**, **Open queue**,
+   **Open integration**, **Open files** or **Open API checks**, as offered.
+   The destination selects or focuses that item. It does not start recovery.
+3. Use **What to check** for the relevant public diagnostic guide. If the source
+   no longer lists the item, the page explains that; inspect its current list.
+4. After investigation or remediation, return and choose **Refresh** to read the
+   latest stored results. This does not run a provider test, retry work or resend mail.
+
+```text
+Needs attention -> open the named source -> inspect its result
+                                        -> follow What to check
+                                        -> Refresh Overview after remediation
+```
+
+The first five groups are visible. **Show … more** reveals the remaining groups.
+A job with a failed result and no recent success appears once, with both facts.
+The order puts private-file exposure first, followed by failures, partial results
+or missing required success, unresolved actions, then paused processing with waiting
+work. A pause can be intentional. Waiting or eligible work alone is not a failure.
+
+| Message concerns    | What it establishes                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Files/API           | A recorded check result. Resource numbers do not establish why that check failed.                                     |
+| Queue errors        | Saved failed queue jobs. Failed processing signals are not counts of undelivered messages.                            |
+| Delivery/run errors | Saved records, not a current outage, recent error rate or number of affected people. A lower bound says **at least**. |
+| Unresolved actions  | The outcome is not confirmed. These can overlap failed records; do not add the counts.                                |
+| Scheduled jobs      | Last result and freshness are separate. An enabled job can have an earlier success but unknown freshness.             |
+| Integrations        | Only the named check: Telegram token checks, for example, do not prove delivery. Old failures remain visibly old.     |
+
+**Open errors** opens the existing failed-record list only when the counts establish
+that no unresolved outcomes remain. **Open processing** opens the work summary when
+outcomes are unresolved. The existing lists and filters cannot enumerate every
+unknown outcome. Follow [unknown-results recovery](background-work.md#unknown-results-and-recovery).
+
+**Could not verify** lists missing or old confirmations separately. Other confirmed
+problems remain visible. With partial data, the empty message refers only to the
+available data. If every source is unavailable, the page says it could not read the
+summary. It never certifies that everything works. Off, unconfigured, simulated and
+request-only services have a neutral note with a link to Integrations.
+
+File checks use the Overview source first. If it is unavailable, an Integrations
+observation can describe only the private-file check; public access remains unknown.
+Different results from these sources remain qualified, since they can concern
+different servers or times. Detailed queues own queue results; an aggregate queue
+observation is only qualified coverage, not a replacement count.
+
+If configured, **Metrics around this time** opens a Grafana dashboard with an
+absolute interval of 15 minutes before and after the observation. This is not the
+failure's duration or start time. A missing time or dashboard hides the link;
+**What to check** and source links still work. See [configuration](configuration.md#metrics-around-an-observation).
 
 ## External tools
 
-The **External tools** card sits under the page title. It holds links to the
+The **External tools** card sits below Needs attention. It holds links to the
 Metrics, Logs and Alerts tools that the operator who deployed the Console
 configured, and an always-present **Recovery instructions** link to the runbooks
 of the upstream repository (a fork can change this base). Each link opens in a new tab. A tool that is not configured is listed
@@ -30,8 +80,9 @@ for the variables, the accepted addresses and the start-up check, and
 
 ## Snapshot and readiness
 
-One top timestamp is completion of the whole API snapshot, displayed in the
-selected Console time zone. Readiness and each resource still have independent
+**API snapshot completed** beside the API checks is completion of that API
+snapshot, displayed in the selected Console time zone. It is not the time of
+the combined summary. Readiness and each resource still have independent
 measurement timestamps in the API contract: the numbers need not equal those
 that caused a readiness check to fail. Choose **Refresh** for a new snapshot.
 The fetch uses `no-store` and the existing five-second whole-request deadline;
@@ -41,8 +92,12 @@ Readiness checks identify the affected dependency: database, Redis, memory or
 disk, plus file storage if its separate readiness option is enabled. Expected
 not-ready/degraded results are observation data, not a failed Overview request.
 Resource values do not override the readiness verdict.
-If Overview says **Temporarily unavailable**, use **Retry**. If it persists,
-inspect API and web logs. Other request errors use the normal Console error
+When a summary source is unavailable, use the same **Refresh** button. If the
+server asks you to wait, the button shows the remaining wait before another click.
+The countdown sends no requests. If the problem persists, ask the service operator to inspect API and web logs
+for the observation time. With bundled Compose, use `docker compose logs api web`
+with the same Compose files used to start the stack. Other deployments use their
+operator-provided log access. See [troubleshooting](configuration.md#troubleshooting). Other request errors use the normal Console error
 page. Runtime mode and manually supplied labels do not attest whether the
 deployment is production; no inferred environment badge
 is displayed.

@@ -55,7 +55,12 @@ export function WorkCard({
   return (
     <Card role="article">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-        <CardTitle as="h3" className="break-all font-console-mono">
+        <CardTitle
+          tabIndex={-1}
+          data-console-source={`work:${work.id}`}
+          as="h3"
+          className="scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-ring break-all font-console-mono"
+        >
           {workLabel(work.presentation?.name, locale, work.id)}
           {work.presentation && (
             <span className="mt-1 block text-xs font-normal text-muted-foreground">{work.id}</span>

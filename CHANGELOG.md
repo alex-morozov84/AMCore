@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+<!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_START -->
+
+- Operations Console Overview gathers recorded problems with original observation
+  times, qualified missing data and links to their source and recovery guide.
+  Optional Grafana dashboard links open the interval around an observation.
+
+<!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_END -->
+
 <!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_START -->
 
 - Operations Console user details can send audited verification and password

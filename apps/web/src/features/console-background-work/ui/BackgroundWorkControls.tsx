@@ -8,6 +8,7 @@ import { ApiRequestError } from '@/shared/api'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
+import type { ConsoleSourceSelection } from '@/shared/ui/console-detail/console-source-selection'
 import { ConsoleStepUpDialog } from '@/shared/ui/console-step-up-dialog'
 import {
   Dialog,
@@ -33,18 +34,36 @@ export function BackgroundWorkControls({
   initial,
   error,
   onRefresh,
+  sourceSelection,
 }: {
+  sourceSelection?: ConsoleSourceSelection
   initial: WorkSummary[]
   error?: unknown
   onRefresh?(): void
 }) {
   const t = useTranslations('console.backgroundWork.control')
   const common = useTranslations('common')
+  const problemCopy = useTranslations('console.problems')
   const [closedResultId, setClosedResultId] = useState<string | null>(null)
   const notified = useRef<string | null>(null)
   const [confirmationSubmitted, setConfirmationSubmitted] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const [openWork, setOpenWork] = useState<string | null>(null)
+  const initialOpen =
+    sourceSelection?.kind === 'work' &&
+    sourceSelection.state === 'failed' &&
+    initial.some((item) => item.id === sourceSelection.id)
+      ? sourceSelection.id
+      : null
+  const [openWork, setOpenWork] = useState<string | null>(initialOpen)
+  const sourceKey = sourceSelection
+    ? `${sourceSelection.kind}:${sourceSelection.id}:${sourceSelection.state ?? ''}`
+    : ''
+  const lastSourceKey = useRef(sourceKey)
+  useEffect(() => {
+    if (lastSourceKey.current === sourceKey) return
+    lastSourceKey.current = sourceKey
+    setOpenWork(initialOpen)
+  }, [sourceKey, initialOpen])
   const returnFocus = useRef<HTMLButtonElement | null>(null)
   const command = useBackgroundCommand()
   const router = useRouteProgressRouter()
@@ -99,6 +118,15 @@ export function BackgroundWorkControls({
       </div>
       <p className="text-sm text-muted-foreground">{t('sectionDescription')}</p>
       <ApiErrorAlert error={error} />
+      {sourceSelection?.kind === 'work' &&
+        !sourceSelection.state &&
+        initial.some(
+          (item) => item.id === sourceSelection.id && (item.counts?.unresolved.value ?? 0) > 0
+        ) && (
+          <p className="rounded-md border p-3 text-sm text-muted-foreground">
+            {problemCopy('unresolvedHelp')}
+          </p>
+        )}
       <div className="grid gap-3 sm:grid-cols-2">
         {!accessLost &&
           initial.map((work) => (
@@ -123,6 +151,13 @@ export function BackgroundWorkControls({
             <WorkJobs
               key={work.id}
               work={work}
+              focusOnOpen={
+                !(
+                  sourceSelection?.kind === 'work' &&
+                  sourceSelection.id === work.id &&
+                  sourceSelection.state === 'failed'
+                )
+              }
               blocked={busy || !!error || (pendingWorkId === work.id && !!uncertainWork)}
               onCapture={(operation, targets, trigger) => {
                 returnFocus.current = trigger

@@ -68,7 +68,13 @@ export function IntegrationName({ item, now }: { item: IntegrationItem; now: num
   const key = `names.${item.id}` as Parameters<typeof t.has>[0]
   return (
     <div className="space-y-1">
-      <p className="font-medium">{t.has(key) ? t(key) : item.name}</p>
+      <p
+        data-console-source={`integration:${item.id}`}
+        tabIndex={-1}
+        className="scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium"
+      >
+        {t.has(key) ? t(key) : item.name}
+      </p>
       <IntegrationHeadline item={item} now={now} />
     </div>
   )

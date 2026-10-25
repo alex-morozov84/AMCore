@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as DeploymentIdentity from '@/shared/lib/deployment-version/identity'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/ui/route-progress-link', () => ({
+  RouteProgressLink: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}))
 // The editor's query and mutation behavior is covered in its feature tests.
 vi.mock('@/features/console-storage-setting', () => ({
   StorageProbeIntervalEditor: ({ observedInterval }: { observedInterval: number }) => (
@@ -19,12 +24,21 @@ vi.mock('@/shared/lib/deployment-version/identity', async (importOriginal) => ({
 }))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/admin' }))
 
+import { fetchConsoleBackgroundWork } from '@/shared/api/console/background-work'
+import { fetchConsoleIntegrations } from '@/shared/api/console/integrations'
 import { fetchConsoleOverview } from '@/shared/api/console/overview'
+import { fetchConsoleQueues } from '@/shared/api/console/queues'
+import { fetchConsoleScheduledJobs } from '@/shared/api/console/scheduled-jobs'
 import { BackendRequestError } from '@/shared/api/server/errors'
 
 import { overviewFixture } from './overview-fixture'
+import { sources } from './overview-problem-fixtures'
 import { OverviewPage } from './OverviewPage'
 
+vi.mock('@/shared/api/console/queues', () => ({ fetchConsoleQueues: vi.fn() }))
+vi.mock('@/shared/api/console/background-work', () => ({ fetchConsoleBackgroundWork: vi.fn() }))
+vi.mock('@/shared/api/console/scheduled-jobs', () => ({ fetchConsoleScheduledJobs: vi.fn() }))
+vi.mock('@/shared/api/console/integrations', () => ({ fetchConsoleIntegrations: vi.fn() }))
 vi.mock('@/shared/api/console/overview', () => ({ fetchConsoleOverview: vi.fn() }))
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => ({ refresh: vi.fn() }),
@@ -89,19 +103,25 @@ const messages = {
 // components (`OverviewNotReadyAlert`, `PrimaryUnavailableFallback`) get via
 // `NextIntlClientProvider`, so both layers render consistent, real text.
 vi.mock('next-intl/server', () => ({
+  getLocale: vi.fn().mockResolvedValue('en'),
   getFormatter: vi.fn().mockResolvedValue({
     number: (value: number, options?: Intl.NumberFormatOptions) =>
       new Intl.NumberFormat('en', options).format(value),
   }),
-  getTranslations: vi.fn().mockResolvedValue((key: string, values?: Record<string, unknown>) => {
-    let text = (consoleMessages as Record<string, string>)[key] ?? key
-    if (values) {
-      for (const [name, value] of Object.entries(values)) {
-        text = text.replace(`{${name}}`, String(value))
-      }
-    }
-    return text
-  }),
+  getTranslations: vi.fn().mockResolvedValue(
+    Object.assign(
+      (key: string, values?: Record<string, unknown>) => {
+        let text = (consoleMessages as Record<string, string>)[key] ?? key
+        if (values) {
+          for (const [name, value] of Object.entries(values)) {
+            text = text.replace(`{${name}}`, String(value))
+          }
+        }
+        return text
+      },
+      { has: () => false }
+    )
+  ),
 }))
 
 function renderPage(page: ReactElement) {
@@ -114,6 +134,17 @@ function renderPage(page: ReactElement) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  const data = sources()
+  vi.mocked(fetchConsoleQueues).mockResolvedValue({ status: 'success', data: data.queues! })
+  vi.mocked(fetchConsoleBackgroundWork).mockResolvedValue({ status: 'success', data: data.works! })
+  vi.mocked(fetchConsoleScheduledJobs).mockResolvedValue({
+    status: 'success',
+    data: data.scheduled!,
+  })
+  vi.mocked(fetchConsoleIntegrations).mockResolvedValue({
+    status: 'success',
+    data: data.integrations!,
+  })
 })
 
 afterEach(() => {
@@ -136,9 +167,7 @@ describe('OverviewPage', () => {
     renderPage(await OverviewPage())
 
     expect(screen.getByText('API instance not ready')).toBeInTheDocument()
-    expect(
-      screen.queryByText('This is temporarily unavailable. Please try again.')
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText('sourceUnavailable')).not.toBeInTheDocument()
   })
 
   it('renders fulfilled degraded readiness without claiming not-ready or unavailable', async () => {
@@ -168,9 +197,7 @@ describe('OverviewPage', () => {
 
     renderPage(await OverviewPage())
 
-    expect(
-      screen.getByText('This is temporarily unavailable. Please try again.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('sourceUnavailable')).toBeInTheDocument()
     expect(screen.queryByText('API instance not ready')).not.toBeInTheDocument()
     expect(screen.getByText('web-artifact-123')).toBeInTheDocument()
   })
@@ -185,9 +212,7 @@ describe('OverviewPage', () => {
       'href',
       'https://grafana.example.com/d/amcore'
     )
-    expect(
-      screen.getByText('This is temporarily unavailable. Please try again.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('sourceUnavailable')).toBeInTheDocument()
   })
 
   it('shows the external tools card with the loaded snapshot too, and no link when unset', async () => {

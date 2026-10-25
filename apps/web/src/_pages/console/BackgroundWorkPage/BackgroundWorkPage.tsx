@@ -4,7 +4,12 @@ import { BackgroundWorkControls } from '@/features/console-background-work'
 import { fetchConsoleBackgroundWork } from '@/shared/api/console/background-work'
 import { fetchConsoleQueues } from '@/shared/api/console/queues'
 import { resolvePrimary } from '@/shared/api/server'
+import { ConsoleSourceFocus } from '@/shared/ui/console-detail/ConsoleSourceFocus'
 import { LogSearchNote } from '@/shared/ui/console-detail/LogSearchLink'
+import {
+  type ConsoleSourceParams,
+  parseConsoleSource,
+} from '@/shared/ui/console-detail/parse-console-source'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import { QueueSummaryLive } from './QueueSummaryLive'
@@ -18,7 +23,9 @@ import { QueueSummaryLive } from './QueueSummaryLive'
  */
 export async function BackgroundWorkPage({
   boardOpenFailed = false,
-}: { boardOpenFailed?: boolean } = {}) {
+  sourceParams = {},
+}: { boardOpenFailed?: boolean; sourceParams?: ConsoleSourceParams } = {}) {
+  const request = parseConsoleSource(sourceParams, 'background')
   const t = await getTranslations('console.backgroundWork')
   // Rejected 4xx or malformed 2xx deliberately propagate to the real error boundary.
   const [queues, registered] = await Promise.all([
@@ -28,7 +35,16 @@ export async function BackgroundWorkPage({
   const outcome = resolvePrimary(queues, { source: 'console-queues' })
   const work = resolvePrimary(registered, { source: 'console-background-work' })
   return (
-    <section className="flex flex-col gap-4">
+    <section id="console-background-source" className="flex flex-col gap-4">
+      <ConsoleSourceFocus
+        rootId="console-background-source"
+        request={request}
+        available={
+          request.selection?.kind === 'work'
+            ? work.status === 'available'
+            : outcome.status === 'available'
+        }
+      />
       <header>
         <p className="font-console-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
           {t('eyebrow')}
@@ -43,7 +59,7 @@ export async function BackgroundWorkPage({
         <>
           <PrimaryUnavailableFallback reason={outcome.reason} />
           {work.status === 'available' ? (
-            <BackgroundWorkControls initial={work.data} />
+            <BackgroundWorkControls initial={work.data} sourceSelection={request.selection} />
           ) : (
             <PrimaryUnavailableFallback reason={work.reason} />
           )}
@@ -56,6 +72,7 @@ export async function BackgroundWorkPage({
           workUnavailable={work.status === 'unavailable' ? work.reason : undefined}
           initialUpdatedAt={Date.parse(outcome.data.checkedAt)}
           boardOpenFailed={boardOpenFailed}
+          sourceSelection={request.selection}
         />
       )}
     </section>

@@ -30,9 +30,11 @@ const states = ['failed', 'waiting', 'active', 'delayed', 'prioritized', 'comple
 export function WorkJobs({
   work,
   blocked,
+  focusOnOpen = true,
   onCapture,
 }: {
   work: WorkSummary
+  focusOnOpen?: boolean
   blocked: boolean
   onCapture(operation: JobAction, rows: WorkJob[], trigger: HTMLButtonElement): void
 }) {
@@ -43,6 +45,7 @@ export function WorkJobs({
   const instance = useId()
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
+    if (!focusOnOpen) return
     heading.current?.focus({ preventScroll: true })
     heading.current?.scrollIntoView?.({
       block: 'start',
@@ -50,7 +53,7 @@ export function WorkJobs({
         ? 'instant'
         : 'smooth',
     })
-  }, [])
+  }, [focusOnOpen])
   const [query, setQuery] = useState<WorkListQuery>({
     state: 'failed',
     page: 1,
@@ -88,6 +91,7 @@ export function WorkJobs({
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3
+            data-console-source={`work-errors:${work.id}`}
             ref={heading}
             tabIndex={-1}
             className="scroll-mt-24 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"

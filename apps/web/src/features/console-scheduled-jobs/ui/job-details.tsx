@@ -20,7 +20,13 @@ export function JobName({ job }: { job: ScheduledJob }) {
   const known = t.has(nameKey)
   return (
     <div className="space-y-0.5">
-      <p className="font-medium">{known ? t(nameKey) : job.id}</p>
+      <p
+        data-console-source={`scheduled:${job.id}`}
+        tabIndex={-1}
+        className="scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium"
+      >
+        {known ? t(nameKey) : job.id}
+      </p>
       {known && <p className="text-xs text-muted-foreground">{t(purposeKey)}</p>}
     </div>
   )

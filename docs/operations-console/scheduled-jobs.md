@@ -15,6 +15,10 @@ this screen, and an organization role does not grant access. The page is at
 after the locale prefix (for example `/en/admin/scheduled-jobs`). The screen only
 reads: it has no button that starts, stops or edits a job.
 
+A link from Overview uses `?focus=<job>` to focus the matching job name. It does
+not expand history or start a run. An invalid or disappeared selection has an
+explanation above the current list; ordinary refresh does not repeat the focus.
+
 ## What you see
 
 One row per job (one card per job on a narrow screen). Above the rows, **Data as
@@ -53,12 +57,17 @@ They answer different questions, so a job can show both **Partly done** and
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **On time**    | A success has been recorded for the latest due time, or the next one is not due yet.                                                                                                                                |
 | **Overdue**    | No success was recorded by the time one was due plus a grace period (30 minutes for daily jobs). For jobs that run every few seconds: no successful pass for 5 minutes (10 minutes for jobs that run every minute). |
-| **Not known**  | Nobody has reported the job, so there is nothing to judge.                                                                                                                                                          |
+| **Not known**  | Freshness cannot be established: for example, no worker configuration or no usable due time is available. An enabled job can still have an earlier success.                                                         |
 | **Turned off** | A worker reported the job as turned off by configuration, for example GeoIP when `GEOIP_ENABLED` is `false`. The note says why.                                                                                     |
 
 **Overdue** means no fresh confirmation was recorded. It can sit beside a last result
 of **Success**: that success is older than the one that was due. It does not prove the
 job stopped: a pass that takes unusually long also shows it.
+
+When freshness is **Not known**, do not assume an overdue run or a stopped worker.
+Check the row's configuration and observation notes. Overview shows this as a
+missing confirmation, including when the last recorded result was successful.
+It never invents an expected completion time.
 
 A **skipped** run appears as a note (**Last skipped run: …**) only when it is newer
 than the result shown. It never makes a job look fresh. The reasons are: the lock
@@ -80,6 +89,12 @@ last rows. Jobs that run every few seconds have no history: their row is a summa
 the latest completed pass.
 
 ## What to do
+
+When an enabled job shows **Not known** freshness, inspect its configuration and
+observation notes first. An earlier success does not establish a new deadline.
+If the notes give no cause, ask the service operator to check worker configuration
+and result recording, using the job name and observation times. Refresh after that
+investigation; do not assume the job stopped or start recovery based on this state alone.
 
 1. **Overdue, last result Failed or Partly done.** The job ran and did not
    complete. Read the note and the history, then search the worker logs around the

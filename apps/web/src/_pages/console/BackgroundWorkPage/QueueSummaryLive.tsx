@@ -5,6 +5,7 @@ import type { AdminQueuesResponse, WorkSummary } from '@amcore/shared'
 
 import { BackgroundWorkControls } from '@/features/console-background-work'
 import { getConsoleQueueBoardHref } from '@/shared/lib/console-public-href'
+import type { ConsoleSourceSelection } from '@/shared/ui/console-detail/console-source-selection'
 import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 import {
   PrimaryUnavailableFallback,
@@ -32,7 +33,9 @@ export function QueueSummaryLive({
   boardOpenFailed = false,
   initialWork,
   workUnavailable,
+  sourceSelection,
 }: {
+  sourceSelection?: ConsoleSourceSelection
   initialWork?: WorkSummary[]
   workUnavailable?: PrimaryUnavailableFallbackProps['reason']
   initial: AdminQueuesResponse
@@ -87,6 +90,7 @@ export function QueueSummaryLive({
       {summary.works && (
         <BackgroundWorkControls
           initial={summary.works}
+          sourceSelection={sourceSelection}
           error={summary.workError}
           onRefresh={() => void summary.refresh()}
         />

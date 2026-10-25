@@ -14,7 +14,7 @@ export interface ManagedTarget {
   worktree: string
   snapshot: string
   ports: { web: number; api: number; redis: number; tls: number }
-  origins: { product: string; console: string; api: string; staff?: string }
+  origins: { product: string; console: string; api: string; staff?: string; metrics?: string }
   hostnames: { product: string; console: string; api: string; staff?: string }
   caFile?: string
   relay: string

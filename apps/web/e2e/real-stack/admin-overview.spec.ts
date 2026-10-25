@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { summaryFaultJourney, summaryMetricsJourney } from '../shared/overview-summary-journey'
+import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
@@ -54,7 +56,8 @@ test('path-mode Overview panel renders real readiness, version and process role 
     'rel',
     'noopener noreferrer'
   )
-  const observed = page.locator('header time').last()
+  await expect(page.getByRole('heading', { name: 'Needs attention', exact: true })).toBeVisible()
+  const observed = page.locator('#overview-api-checks time').first()
   const before = await observed.getAttribute('datetime')
   const refresh = page.getByRole('button', { name: 'Refresh', exact: true })
   await refresh.focus()
@@ -106,4 +109,113 @@ test('path-mode console locale switcher preserves the current page and its query
 
   await expect(page).toHaveURL(/\/ru\/admin\/organizations\?page=2$/)
   await expect(page.getByRole('heading', { name: 'Организации' })).toBeVisible()
+})
+
+test.describe('summary fixture', () => {
+  test.skip(
+    activeTarget().fixtureProfile !== 'console-summary',
+    'Requires owned fault/Grafana fixture'
+  )
+  test.describe.configure({ mode: 'default' })
+  const mode = (value: string) => {
+    guardedExec('redis', 'redis-cli', 'DEL', 'amcore:console-summary-fixture:reads')
+    return guardedExec('redis', 'redis-cli', 'SET', 'amcore:console-summary-fixture', value)
+  }
+  async function operator(page: Parameters<typeof registerViaUi>[0]) {
+    const email = uniqueEmail('summary')
+    await registerViaUi(page, email)
+    setSystemRole(email, 'SUPER_ADMIN')
+    await page.context().clearCookies()
+    await loginViaUi(page, email)
+    await expect(page).toHaveURL(/\/en\/?$/)
+    return email
+  }
+  test('stored delivery failure opens the existing failed list; unresolved outcomes open the summary', async ({
+    page,
+  }) => {
+    const email = await operator(page)
+    mode('pass')
+    const id = 'summary-failed-delivery'
+    guardedSql(
+      `
+      INSERT INTO notifications.notifications (id,"recipientUserId",type,category,"schemaVersion",payload,"idempotencyKey","idempotencyFingerprint","occurredAt","createdAt")
+      SELECT :'parent',id,'account.password_changed','security',1,jsonb_build_object('changedAt',clock_timestamp()),:'parent',:'parent',clock_timestamp(),clock_timestamp() FROM core.users WHERE "emailCanonical"=:'email';
+      INSERT INTO notifications.notification_deliveries (id,"notificationId",channel,"targetKey",locale,status,"maxAttempts","attemptCount","terminalReasonCode","lastErrorCode","terminalAt","updatedAt")
+      VALUES (:'id',:'parent','telegram','111004','en','FAILED',5,1,'permanent_failure','telegram_blocked',clock_timestamp(),clock_timestamp());
+    `,
+      { id, parent: 'summary-event', email }
+    )
+    const effects: string[] = []
+    page.on('request', (r) => {
+      if (r.method() !== 'GET' && /background-work/.test(r.url())) effects.push(r.url())
+    })
+    await page.goto('/en/admin')
+    const row = page
+      .locator('[aria-labelledby="overview-attention-title"] li')
+      .filter({ hasText: 'Saved deliveries with an error' })
+    await expect(row).toHaveCount(1)
+    await expect(row.getByRole('link', { name: /What to check/ })).toHaveAttribute(
+      'href',
+      /background-work.md#notification-deliveries$/
+    )
+    await row.getByRole('link', { name: 'Open errors', exact: true }).click()
+    await expect(page).toHaveURL(/work=notification-deliveries&state=failed/)
+    await expect(
+      page.locator('[data-console-source="work-errors:notification-deliveries"]')
+    ).toBeFocused()
+    await expect(page.getByText(id, { exact: true })).toBeVisible()
+    await expect(page.getByText('Telegram destination blocked', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+    await expect(
+      page.locator('[data-console-source="work-errors:notification-deliveries"]')
+    ).not.toBeFocused()
+    guardedSql(
+      `UPDATE notifications.notification_deliveries SET "unresolvedEffectCount"=1 WHERE id=:'id';`,
+      { id }
+    )
+    await page.goto('/en/admin')
+    const unresolved = page
+      .locator('[aria-labelledby="overview-attention-title"] li')
+      .filter({ hasText: 'Saved deliveries with an error' })
+    await expect(unresolved).toContainText('Actions whose result is not confirmed')
+    await unresolved.getByRole('link', { name: 'Open processing', exact: true }).click()
+    await expect(page).toHaveURL(/work=notification-deliveries$/)
+    await expect(page.locator('[data-console-source="work:notification-deliveries"]')).toBeFocused()
+    await expect(page.getByText(/not all unknown outcomes/i)).toBeVisible()
+    await expect(
+      page.locator('[data-console-source="work-errors:notification-deliveries"]')
+    ).toHaveCount(0)
+    expect(effects).toEqual([])
+  })
+  test('partial and unavailable source results, manual wait and slow refresh preserve truthful UI', async ({
+    page,
+  }) => {
+    await operator(page)
+    await summaryFaultJourney(page, mode, () => {
+      const rows = guardedExec(
+        'redis',
+        'redis-cli',
+        'HGETALL',
+        'amcore:console-summary-fixture:reads'
+      )
+        .trim()
+        .split('\n')
+      expect(rows.filter((_, i) => i % 2 === 0).sort()).toEqual(
+        [
+          '/api/v1/admin/overview',
+          '/api/v1/admin/background-work/queues',
+          '/api/v1/admin/background-work/works',
+          '/api/v1/admin/background-work/scheduled-jobs',
+          '/api/v1/admin/integrations',
+        ].sort()
+      )
+      expect(rows.filter((_, i) => i % 2 === 1)).toEqual(['1', '1', '1', '1', '1'])
+    })
+  })
+  test('large summary, focus, languages, narrow layout and real Grafana time navigation', async ({
+    page,
+  }) => {
+    await operator(page)
+    await summaryMetricsJourney(page, mode, activeTarget().origins.metrics!)
+  })
 })

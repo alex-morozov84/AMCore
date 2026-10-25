@@ -79,7 +79,10 @@ test('host-mode Overview panel renders real readiness, version and process role,
   ]) {
     await expect(consolePage.getByRole('heading', { name, exact: true })).toBeVisible()
   }
-  const observed = consolePage.locator('header time').last()
+  await expect(
+    consolePage.getByRole('heading', { name: 'Needs attention', exact: true })
+  ).toBeVisible()
+  const observed = consolePage.locator('#overview-api-checks time').first()
   const before = await observed.getAttribute('datetime')
   await consolePage.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(observed).not.toHaveAttribute('datetime', before!)

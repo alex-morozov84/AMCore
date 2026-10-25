@@ -20,6 +20,9 @@ if (edge && (edge !== 'nginx' || action !== 'e2e' || lane !== 'product-admin-rea
 if (
   args.includes('--fixture') &&
   (![
+    // AMCORE_CONSOLE_SUMMARY_PROFILE_START
+    'console-summary',
+    // AMCORE_CONSOLE_SUMMARY_PROFILE_END
     'organization-setup',
     'organization-shop',
     'organization-provisioning',

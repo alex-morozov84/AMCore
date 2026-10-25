@@ -1,6 +1,39 @@
 # Database runbooks
 
-Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-db` group.
+Start here when an API database check fails. The later sections cover
+`docs/operations/prometheus/amcore-alerts.yml`'s `amcore-db` alerts.
+
+## Database check failed
+
+A failed database check does not identify its cause. The API tests a small query
+and the number of requests waiting for a connection. Either can fail the check.
+A separate resource measurement can describe a different moment; it does not
+explain why the earlier check failed.
+
+1. Record when the check ran. Ask the deployment operator to identify the answering
+   API server from diagnostic records. If it cannot be identified, keep that unknown;
+   do not substitute a successful query from another server. Operators without
+   approved deployment/database access should pass this information to that person.
+2. From that API environment, check whether its configured database can be reached
+   and a read-only query can complete. Use the existing approved database access.
+   Do not print connection strings, passwords or credentials. A successful query
+   from another computer does not establish access from the affected API.
+3. If a query cannot complete, check database availability, the network path and the
+   API's connection settings. Do not change the connection pool size as a general
+   response to a failed database check.
+4. If queries complete and independent evidence confirms requests waiting for pool
+   connections, follow [Pool waiting](#pool-waiting). Keep the observation times
+   separate. A later pool measurement does not establish the earlier failure's cause.
+5. If the cause remains unclear, keep it unknown and inspect the server's diagnostic
+   records around the check time. After remediation, request a new API readiness check. In an operations screen,
+   use its Refresh control to read the next result.
+
+```text
+Database check failed -> check from the affected API environment
+                         |-> query cannot complete -> connection/database diagnosis
+                         |-> query completes + waiting confirmed -> Pool waiting
+                         |-> no cause confirmed -> investigate; keep cause unknown
+```
 
 ## Pool waiting
 
@@ -24,8 +57,9 @@ for 5m).
    stays near zero and `total` is already at its configured max confirms
    genuine saturation rather than a transient blip.
 2. Check the **"Slow query rate"** panel (Database row) for the same window — a correlated
-   rise means slow queries are the root cause, not pool sizing.
-3. Query directly to see whether `waiting` recovers on its own or keeps
+   rise suggests slow queries may contribute. Confirm the query or lock evidence
+   before changing pool size.
+3. Query the metric in Prometheus to see whether `waiting` recovers or keeps
    climbing:
 
    ```promql

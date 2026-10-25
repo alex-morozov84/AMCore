@@ -301,6 +301,17 @@ For the Console Scheduled jobs screen, use `pnpm stand preview --id scheduled-jo
 adds a result history to the daily jobs, which otherwise show "No runs yet" until 02:00:
 cleanup partly done and overdue, notification cleanup failed and overdue, invitation cleanup
 with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the owner's changes.
+<!-- AMCORE_CONSOLE_SUMMARY_GUIDE_START -->
+
+For isolated Overview source-failure and chart-navigation checks, run
+`pnpm stand e2e --lane real-stack --fixture console-summary -- admin-overview.spec.ts -g 'summary fixture'`.
+This E2E-only fixture retains real authorization, stores a prepared failed delivery,
+and provides controlled source responses through an internal proxy. Its local,
+pinned Grafana has an offline dashboard with no metrics. The test proves navigation
+and time selection, not monitoring history or real provider delivery. It uses a
+fresh stand and cannot reuse an owner preview; managed cleanup owns all resources.
+<!-- AMCORE_CONSOLE_SUMMARY_GUIDE_END -->
+
 For the Console Integrations screen, use `pnpm stand preview --id integrations --profile integrations`.
 The profile marks the demo `SUPER_ADMIN` address verified (a demo-only mailbox substitute), because
 the test email goes only to the operator's own verified address. A stand uses the mock email

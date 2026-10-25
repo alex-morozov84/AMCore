@@ -83,6 +83,40 @@ artifact identity local to the web build. Console UI, stories and adapters under
 closed Console roots are removed with the feature; shared schemas, backend
 sampling, deployment inputs and the generic fetch option remain reusable core.
 
+### Overview problem composition
+
+The server page reads the five existing typed adapters once each, in parallel:
+Overview, queues, work catalogue, scheduled jobs and integrations. The same
+Overview payload supplies its summary and existing cards. No extra SQL, provider
+probe, new backend endpoint, global cache or polling loop is introduced.
+Only known availability failures degrade per source. Authorization, malformed
+success and unexpected not-found errors retain their error boundary.
+
+The page model owns ordering, known duplicate suppression and qualified coverage.
+Keep result/freshness separate and preserve original times. Do not treat failed
+saved records as active incidents, sum failed/unresolved counts, or infer a shared
+root cause. Detailed queue results own their counts; storage sources can represent
+different replicas. Extend the typed source contracts and diagnostic destinations
+together when adding a signal, with predicate/ownership tests.
+
+Registration validation limits the composed work graph to 64 entries before
+composition; each entry owns at most one queue. Wire limits are 64 works,
+64 scheduled jobs and 32 integrations. Overview defensively projects at most
+64 queues and explicitly reports overflow. At most 226 object groups and six
+source/overflow notices are possible. These are cardinality limits, not HTTP body
+byte limits, a global concurrent-read cap, or SQL cancellation guarantees.
+Existing endpoint read admission and request deadlines remain independent.
+
+Capture Retry-After before secondary degradation drops it. The Overview button
+honours the maximum active expiry, including a full-day parsed delay, without
+using the generic five-minute automatic-backoff clamp. Hydration starts a
+conservative remaining countdown; timers only enable the manual button.
+
+Source query values use shared ID schemas and the current rendered inventory.
+They focus a visible name once per navigation, never issue a mutation or an
+arbitrary lookup. Only the supported failed-work view opens a list. Keep the
+focus owner outside timestamp-keyed live subtrees so refresh cannot steal focus.
+
 ### Interactive session data inside a server-rendered page
 
 The User Detail Sessions card is an interactive client leaf. Its Query calls a

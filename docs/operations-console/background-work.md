@@ -19,6 +19,19 @@ this screen, and an organization role does not grant access. The page is at
 `/admin/background-work` in path mode and at `/background-work` on the Console
 host, after the locale prefix (for example `/en/admin/background-work`).
 
+## Arrive from Overview
+
+A **Needs attention** link focuses the matching queue or work name. It uses
+`?focus=<queue>` for queues and `?work=<work>` for processing summaries. The
+`&state=failed` form also opens the existing failed-record list (page 1, 25 records).
+It does not change work or open a confirmation.
+
+An unresolved outcome opens the summary without a list. Failed records and
+unresolved outcomes can overlap; the list's existing filters do not cover every
+unknown state. Follow [Unknown results and recovery](#unknown-results-and-recovery).
+If the item disappeared or the link is invalid, the page explains that and leaves
+the current list available. Ordinary refresh does not move focus back to the item.
+
 ## What you see
 
 The page starts with shared Refresh, Auto-refresh and read-only Bull Board actions.
