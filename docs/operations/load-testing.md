@@ -58,7 +58,8 @@ scp ~/lt-work/fixture-password <user>@<host>:/srv/amcore-loadtest/secrets/      
 ## 2. Prepare the host
 
 Follow single-host steps 1–4. On a disposable host you may delete the database CA key.
-Before step 5, set these keys in `.env` (this `COMPOSE_FILE` replaces the one of step 1):
+Set these keys together with single-host step 3, before its `docker compose config`
+check (this `COMPOSE_FILE` replaces the one of step 1; no other mail keys are needed):
 
 ```bash
 LOAD_TEST_RUN_ID=lt20261025a        # 4–32 lowercase letters or digits, new per campaign
@@ -192,7 +193,8 @@ cookie or password.
 On the host, also after any failure or lost generator connection:
 
 ```bash
-sh scripts/load-test/recover.sh        # removes the overlay, recreates Caddy; repeatable
+sh scripts/load-test/recover.sh        # drops load-test.yml from COMPOSE_FILE, recreates Caddy
+                                       # (the stack keeps running; repeatable)
 sh scripts/load-test/remove-check.sh   # only PASS lines, incl. ":8443 refuses connections"
 ```
 
@@ -217,19 +219,23 @@ docker volume ls --filter label=com.docker.compose.project=amcore-loadtest-<run 
 sudo rm -rf /srv/amcore-loadtest && rm -rf ~/amcore-load-test   # recover backups, samples
 ```
 
-Also delete `~/lt-work` on the generator (keep `out` if you want it) and the password copy
-on the `outside` machine. Still on the host: the checkout with its `.env` (this run's
-secrets), `/srv/amcore-tls`, the built images, `/swapfile` and the DNS records. Delete the
-VMs if they were created for the test; before anyone else reuses the host, remove `.env`
-(or the checkout), the swap file (`sudo rm /swapfile`) and the images you built
-(`docker image rm` by name). Never run `docker system prune` on a shared host.
+Also delete `~/lt-work` on the generator (copy `out` away first if you want it) and the
+password copy on the `outside` machine. Still on the host: the checkout with its `.env`
+(this run's secrets), `/srv/amcore-tls`, the built images
+(`amcore-loadtest-<run id>-*`), `/swapfile` and the DNS records. Then either:
+
+- **measure again later** on the same VMs — keep them and follow section 8; or
+- **hand the host to someone else** — remove `.env` (or the checkout), `sudo rm /swapfile`
+  and `docker image rm` the `amcore-loadtest-<run id>-*` images; or
+- **finish** — delete the VMs.
+
+Never run `docker system prune` on a shared host.
 
 ## 8. The next campaign on the same VMs
 
 For a new commit or a repeat, start like a new host but keep the VMs:
 
-1. Finish section 7 for the previous run; keep its `out` elsewhere and
-   `mv ~/lt-work ~/lt-work-<old run id>` on the generator.
+1. Finish section 7 for the previous run (its `out` copied away, `~/lt-work` deleted).
 2. Check out the new commit on both VMs and repeat section 1 (new certificates and
    password; section 7 deleted the host copies).
 3. Set a new `LOAD_TEST_RUN_ID` and `COMPOSE_PROJECT_NAME`, rebuild the images (single-host
