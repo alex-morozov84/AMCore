@@ -1,5 +1,9 @@
 import { NextIntlClientProvider } from 'next-intl'
-import type { SupportMailFact, SupportMailReceipt } from '@amcore/shared'
+import {
+  coerceSupportedLocale,
+  type SupportMailFact,
+  type SupportMailReceipt,
+} from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -27,7 +31,7 @@ const fact: SupportMailFact = {
 }
 function show(locale: keyof typeof catalogues, receipt: SupportMailReceipt) {
   render(
-    <NextIntlClientProvider locale={locale} messages={catalogues[locale]}>
+    <NextIntlClientProvider locale={coerceSupportedLocale(locale)} messages={catalogues[locale]}>
       <SupportMailDialog
         phase={{ kind: 'result', mailKind: 'password_recovery', receipt }}
         onClose={vi.fn()}

@@ -115,7 +115,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     const content = await readFile(path, 'utf8')
     if (!content.includes('enabled: true'))
       throw new Error('Console host lane unavailable in this fork')
-    await writeFile(path, content.replace(/mode: '(?:path|host)'/, `mode: '${consoleTopology}'`))
+    await writeFile(path, content.replace("mode: 'path'", "mode: 'host'"))
   }
   // AMCORE_CONSOLE_HOST_SNAPSHOT_END
   await prepareProductAdminSource(m)

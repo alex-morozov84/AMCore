@@ -1,5 +1,10 @@
 import { NextIntlClientProvider } from 'next-intl'
-import type { SupportMailPreparation, SupportMailStatus } from '@amcore/shared'
+import {
+  coerceSupportedLocale,
+  SUPPORTED_LOCALES,
+  type SupportMailPreparation,
+  type SupportMailStatus,
+} from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,7 +51,10 @@ let client: QueryClient
 function card(locale: 'en' | 'ru' = 'en', actorId = 'operator', userId = 'recipient') {
   return (
     <QueryClientProvider client={client}>
-      <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : ru}>
+      <NextIntlClientProvider
+        locale={coerceSupportedLocale(locale)}
+        messages={locale === 'en' ? en : ru}
+      >
         <UserSupportMailCard
           actorId={actorId}
           userId={userId}
@@ -72,42 +80,43 @@ describe('support mail context and loading accessibility', () => {
     )
   })
 
-  it.each([
-    ['actor', 'en', 'other-operator', 'recipient'],
-    ['target', 'en', 'operator', 'other-recipient'],
-    ['locale', 'ru', 'operator', 'recipient'],
-  ] as const)(
-    'discards a late preparation when %s changes',
-    async (_change, locale, actor, target) => {
-      let finish!: (value: SupportMailPreparation) => void
-      vi.mocked(consoleApi.prepareSupportMail).mockReturnValue(
-        new Promise((resolve) => {
-          finish = resolve
-        })
-      )
-      const view = render(card())
-      const action = await screen.findByRole('button', {
-        name: en.console.supportMail.password_recovery.button,
+  it.each(
+    (
+      [
+        ['actor', 'en', 'other-operator', 'recipient'],
+        ['target', 'en', 'operator', 'other-recipient'],
+        ['locale', 'ru', 'operator', 'recipient'],
+      ] as const
+    ).filter(([change]) => change !== 'locale' || SUPPORTED_LOCALES.length > 1)
+  )('discards a late preparation when %s changes', async (_change, locale, actor, target) => {
+    let finish!: (value: SupportMailPreparation) => void
+    vi.mocked(consoleApi.prepareSupportMail).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
       })
-      await waitFor(() => expect(action).toBeEnabled())
-      fireEvent.click(action)
-      await waitFor(() => expect(consoleApi.prepareSupportMail).toHaveBeenCalledTimes(1))
-      view.rerender(card(locale, actor, target))
-      await act(async () => finish(preparation))
-      const copy = locale === 'en' ? en : ru
-      await waitFor(() =>
-        expect(
-          screen.getByRole('button', { name: copy.console.supportMail.password_recovery.button })
-        ).toBeEnabled()
-      )
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-      expect(screen.queryByText(preparation.recipient)).not.toBeInTheDocument()
-      expect(consoleApi.sendSupportMail).not.toHaveBeenCalled()
-      expect(toast.add).not.toHaveBeenCalled()
-      expect(consoleApi.getSupportMailStatus).toHaveBeenLastCalledWith(
-        target,
-        expect.any(AbortSignal)
-      )
-    }
-  )
+    )
+    const view = render(card())
+    const action = await screen.findByRole('button', {
+      name: en.console.supportMail.password_recovery.button,
+    })
+    await waitFor(() => expect(action).toBeEnabled())
+    fireEvent.click(action)
+    await waitFor(() => expect(consoleApi.prepareSupportMail).toHaveBeenCalledTimes(1))
+    view.rerender(card(locale, actor, target))
+    await act(async () => finish(preparation))
+    const copy = locale === 'en' ? en : ru
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: copy.console.supportMail.password_recovery.button })
+      ).toBeEnabled()
+    )
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByText(preparation.recipient)).not.toBeInTheDocument()
+    expect(consoleApi.sendSupportMail).not.toHaveBeenCalled()
+    expect(toast.add).not.toHaveBeenCalled()
+    expect(consoleApi.getSupportMailStatus).toHaveBeenLastCalledWith(
+      target,
+      expect.any(AbortSignal)
+    )
+  })
 })

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,6 +13,9 @@ import {
 } from './organization-setup-fixture.mjs'
 import { executeSetupCommand } from './setup-command.mjs'
 import { productAdminProfiles } from './product-admin-source.mjs'
+import { create } from './create.mjs'
+import { configuration } from './config.mjs'
+import { directory } from './state.mjs'
 
 for (const profile of ['support-mail-path', 'support-mail-host']) {
   test(`${profile} uses internal mail only and preserves the final transport fence`, async () => {
@@ -121,3 +125,19 @@ for (const profile of ['support-mail-path', 'support-mail-host']) {
     assert.match(config, /config.retries = 0/)
   })
 }
+
+test('ordinary host rehearsal projects the Console login independently of the checkout default', async () => {
+  const id = `host-config-${randomUUID()}`
+  try {
+    const m = await create(id, 'e2e', 'host', false, 'organization-setup')
+    const source = await readFile(
+      join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts'),
+      'utf8'
+    )
+    assert.match(source, /mode: 'host'/)
+    await configuration(m)
+    assert.equal(m.model.services.web.environment.ADMIN_CONSOLE_ORIGIN, m.origins.console)
+  } finally {
+    await rm(directory(id), { recursive: true, force: true })
+  }
+})
