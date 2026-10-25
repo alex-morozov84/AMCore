@@ -66,3 +66,18 @@ test('migrator preflight examples retain the complete installation overlay selec
   assert.doesNotMatch(text, /^docker compose -f /m)
   assert.match(text, /docker compose run --rm --no-deps migrate/)
 })
+
+test('production overlay delegates to the complete canonical rollout procedure', () => {
+  const overlay = read('docker/compose/prod.yml')
+  assert.doesNotMatch(overlay, /docker compose -f /)
+  assert.match(overlay, /saved complete COMPOSE_FILE/)
+  assert.match(overlay, /docs\/operations\/deployment.md/)
+})
+
+test('migration evidence stops before removal when execution or inspection fails', () => {
+  const proof = section(deployment, 'docker compose run --name amcore-migration-proof', '\n```')
+  const commands = proof.split('\n')
+  assert.match(commands[0], /migrate \|\| exit 1$/)
+  assert.match(commands[1], /amcore-migration-proof \|\| exit 1$/)
+  assert.equal(commands[2], 'docker rm amcore-migration-proof')
+})

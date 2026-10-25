@@ -512,11 +512,33 @@ requires inspection before another step. Migration failure uses the
 Record the source revision, platform and three registry digests. API and worker
 use the same API image. A multi-platform index digest, platform manifest digest
 and local image ID identify different objects; do not compare their strings as
-equal. Inspect only selected fields, because full container inspection exposes secrets:
+equal. Inspect only selected fields, because full container inspection exposes secrets.
+
+Obtain only the nonsecret image references from the selected installation. Compose
+reads its environment file; your shell does not. Run this in Bash with Python 3
+available. Keep the same Compose selection used for the rollout:
 
 ```bash
-docker buildx imagetools inspect "$COMPOSE_API_IMAGE"
-docker image inspect --format '{{.Id}} {{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$COMPOSE_API_IMAGE"
+set -o pipefail
+image_refs=$(docker compose config --format json | python3 -c '
+import json, re, sys
+services = json.load(sys.stdin)["services"]
+refs = [services[name]["image"] for name in ("api", "web", "migrate")]
+if any(not re.fullmatch(r"[^\s]+@sha256:[0-9a-fA-F]{64}", ref) for ref in refs):
+    sys.exit("Expected three immutable image references")
+if services["worker"]["image"] != refs[0]:
+    sys.exit("API and worker must use the same image")
+print(" ".join(refs))
+') || exit 1
+read -r resolved_api_image resolved_web_image resolved_migrator_image <<< "$image_refs"
+```
+
+These shell variables contain references only. Do not source the private environment
+file or print the full resolved configuration. Inspect the selected API image:
+
+```bash
+docker buildx imagetools inspect "$resolved_api_image"
+docker image inspect --format '{{.Id}} {{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$resolved_api_image"
 docker inspect --format '{{.Config.Image}} {{.Image}}' "$(docker compose ps -q api)"
 docker inspect --format '{{.Config.Image}} {{.Image}}' "$(docker compose ps -q worker)"
 ```
@@ -524,6 +546,7 @@ docker inspect --format '{{.Config.Image}} {{.Image}}' "$(docker compose ps -q w
 Match the requested registry reference to the pulled `RepoDigests` and match each
 container's `Image` to the pulled image's `Id`. Repeat for web and migrator; retain
 the one-shot migrator's image/exit result before removal if collecting evidence.
+Use `$resolved_web_image` and `$resolved_migrator_image` for their image inspections.
 For the web image, also compare `/api/deployment-version` with its baked build ID.
 The build ID alone is not image attestation.
 
@@ -531,8 +554,8 @@ When collecting migrator evidence, replace the usual `run --rm` step with this
 sequence, using an unused task-specific container name. Do not run both variants:
 
 ```bash
-docker compose run --name amcore-migration-proof --no-deps migrate
-docker inspect --format '{{.Config.Image}} {{.Image}} {{.State.ExitCode}}' amcore-migration-proof
+docker compose run --name amcore-migration-proof --no-deps migrate || exit 1
+docker inspect --format '{{.Config.Image}} {{.Image}} {{.State.ExitCode}}' amcore-migration-proof || exit 1
 docker rm amcore-migration-proof
 ```
 
