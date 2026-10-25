@@ -137,10 +137,17 @@ Expected results: the probe `PASS`es; `preflight live: ok`; the loader prints
 `SUPER_ADMIN`), one organization, 200 members (members 1–20 are organization admins)
 and 1,000 audit rows. A second `fixture.sh` of the same run prints `reused`.
 
-The loader refuses, without writing, a volume not labelled for this run, a database
-that is not new, another run's fixtures or partial fixtures. The remedy is always a new
-start of this run's project: `docker compose down -v`, then single-host step 5 again.
-Never relabel or adopt an existing volume.
+Before the first write, `fixture.sh` proves the target: the database volume carries this
+run's label, every rendered database URL (API, worker, migration, loader) points at this
+project's `postgres` over `verify-full` TLS, and the running postgres container stores
+its data in that volume. The scripts read the project, files and URLs only from `.env`;
+variables exported in your shell (for example `COMPOSE_PROJECT_NAME`) are ignored, with a
+warning that names them.
+
+The loader refuses, without writing, a target that fails this proof, a database that is
+not new, another run's fixtures or partial fixtures. The remedy is always a new start of
+this run's project: `docker compose down -v`, then single-host step 5 again. Never
+relabel or adopt an existing volume.
 
 ## 4. Admission
 
@@ -150,19 +157,25 @@ Every check must pass before any load. On the generator:
 sh scripts/load-test/admission.sh run
 ```
 
-It proves that a missing or foreign client certificate is refused, that each request
-needs exactly one synthetic IPv4 visitor address, that one visitor is limited after
-about the default burst of 50 requests while another visitor is not (API and web app),
-and that `X-AMCore-Client-Ip` and `X-Real-IP` are ignored. From a third machine (your
-laptop, with an AMCore checkout and a copy of `load-test.env` whose `LT_WORK` is any
-existing directory; no certificate or password):
+It proves, on both test domains, that a missing or foreign client certificate is
+refused; that each request needs exactly one synthetic IPv4 visitor address; that one
+visitor is limited after about the default burst of 50 requests while another visitor
+is not (API and web app); and that `X-AMCore-Client-Ip` and `X-Real-IP` are ignored.
+
+Then, from a machine that is not the generator (for example your laptop, with an AMCore
+checkout), check the normal edge through public DNS. Create a directory with a copy of
+`fixture-password`, and a `load-test.env` with only `LT_WORK=<that directory>`,
+`LT_WEB_HOST`, `LT_API_HOST` and `LT_PREFIX` (no `LT_SERVER_IP`, so the names resolve
+publicly):
 
 ```bash
-sh scripts/load-test/admission.sh outside
+LT_ENV=<path>/load-test.env sh scripts/load-test/admission.sh outside
 ```
 
-proves that the test entry refuses connections without a certificate and that the
-normal edge ignores forged address headers. Each command waits 90 s at the end so the
+It proves that forged address headers on the normal edge change no rate budget, for the
+API and through the web app (member 197 signs in). Its first line only shows that the
+test entry is not open to this machine: the firewall drop or a TLS refusal both pass
+there; the certificate proof is `run` above. Each command waits 90 s at the end so the
 spent rate budgets refill.
 
 ## 5. Measure
@@ -176,12 +189,19 @@ sh scripts/load-test/protocol.sh campaign    # about 45 minutes
 ```
 
 `prepare` keeps the members' live session cookies in `~/lt-work/sessions.json`; delete
-it with `~/lt-work` at the end. The campaign prints the recovery commands first (also
-in `~/lt-work/out/RECOVERY.txt`).
-It runs a 60 s warm-up at 5 iterations/s (not reported), then 5, 10, 20, 30 and 40
-iterations/s for 120 s each, three repeats, 30 s apart, with admin reads at 0.2
-iterations/s. The first repeat that is not `valid` stops the ladder; a 5 iterations/s
-control step follows after 120 s idle. Do not change these values for runs you compare.
+it with `~/lt-work` at the end. `smoke` writes to `~/lt-work/out-smoke` and can run any
+number of times; it never blocks the campaign. A smoke step is `valid` only when every
+action answered with its expected status. The campaign writes to `~/lt-work/out` and
+prints the recovery commands first (also in `~/lt-work/out/RECOVERY.txt`). A second
+campaign needs a new `LT_WORK` (and, to be comparable, a fresh host).
+
+The campaign runs a 60 s warm-up at 5 iterations/s (in the report, not compared), then
+5, 10, 20, 30 and 40 iterations/s for 120 s each, three repeats, 30 s apart, with admin
+reads at 0.2 iterations/s. A warm-up that is not `valid` stops before any step; the
+first repeat that is not `valid` stops the ladder; a 5 iterations/s control step
+follows after 120 s idle. Iterations still running when a step ends are interrupted,
+so the counted requests and the server log cover the same window. Do not change these
+values for runs you compare.
 
 One iteration is one visitor action, about 3 HTTP requests. Per 1,200 iterations: 780
 authenticated page browses through the web app, 180 public pages, 120 profile updates
@@ -190,15 +210,22 @@ team-page reads by organization admins and 60 avatar uploads.
 
 ## 6. Read the report
 
-`~/lt-work/out/report.md` has one row per step; `manifest.json` records the commit,
-image digests, host size, swap and the protocol hash. The `out` directory never
-contains the client key, cookies or the fixture password, so you can share it.
+`~/lt-work/out/report.md` has one row per step. Its header names the run id and the
+commit, and states whether host and generator ran the same commit and the same harness
+(scripts, k6 scenarios, avatar file); a `NO` there makes the campaign unusable.
+`manifest.json` adds image digests, host and generator size, swap and the protocol
+parameters. Whether the host class and data match Capacity is your comparison of those
+fields, not something the scripts prove. The `out` directory never contains the client
+key, cookies or the fixture password, so you can share it.
 
-| Class                 | Meaning                                                                                                                                                | Use it as                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `valid`               | No stop condition, complete data                                                                                                                       | A measured result                                                  |
-| `invalid measurement` | Data are missing or broken, the generator CPU saturated, or k6 and the server log disagree beyond 2 %                                                  | Nothing. Fix the cause and repeat the campaign on a fresh host     |
-| `observed overload`   | Server p95 above 1 s, more than 1 % failed requests, dropped iterations, a container restart or OOM, or less than 100 MiB available memory on the host | The achieved rate under overload, not capacity at the offered rate |
+| Class                 | Meaning                                                                                                                                                                                                                                                                | Use it as                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `valid`               | No stop condition, complete data                                                                                                                                                                                                                                       | A measured result                                                  |
+| `invalid measurement` | Data are missing or broken: host or generator samples do not cover the whole step, an action has no server records, k6 and the server log disagree by more than the requests in flight and the measured clock skew allow, or the generator CPU saturated (idle < 10 %) | Nothing. Fix the cause and repeat the campaign on a fresh host     |
+| `observed overload`   | Server p95 above 1 s, more than 1 % failed requests overall or of the admin reads, dropped iterations, a container restart, recreation or OOM, or less than 100 MiB available memory on the host                                                                       | The achieved rate under overload, not capacity at the offered rate |
+
+The report also lists failed checks per action (an unexpected status) and every status
+code the server saw.
 
 The **Reference** column compares valid ladder steps with the upper bound published
 in Capacity, which counts requests: 5, 10 and 20 iterations/s are about 16, 31 and 61
@@ -237,12 +264,13 @@ generator is unreachable. When it is reachable, prove it from there too, through
 same address the load used (the firewall admits only the generator on 8443):
 
 ```bash
-curl -m 10 --resolve app.example.com:8443:<LT_SERVER_IP> https://app.example.com:8443/   # exit 7
-curl -m 10 -o /dev/null -w '%{http_code}\n' https://app.example.com/                       # answers
+sh scripts/load-test/admission.sh removed      # generator
 ```
 
-The first must end with `Failed to connect` (curl exit code 7). A TLS or certificate
-error on 8443 means the test entry still runs. Close port 8443 in the provider
+It must print only `PASS` lines: 8443 refuses the connection (curl exit code 7, a closed
+port; a TLS or certificate error would mean the test entry still runs), the normal site
+answers (so the host is reachable), and forged address headers on the normal edge
+change no rate budget for the API and the web app. Close port 8443 in the provider
 firewall; doing this first, as soon as something goes wrong, is also safe.
 
 Then delete what belongs to this run only, after `remove-check.sh` has passed:

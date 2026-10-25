@@ -1,67 +1,175 @@
 // Classifies one load step from the facts run-step.sh collected (docs/operations/load-testing.md).
-//   node classify.mjs <facts.json>   → JSON { class, reasons, figures } on stdout
+//   node classify.mjs <step-dir>   → JSON { class, reasons, figures } on stdout
 // valid               no stop condition and complete data
 // invalid measurement data incomplete or the generator, not the server, limited the step;
 //                     never reported as capacity, and it wins over every other class
 // observed overload   a server-side stop condition with a healthy generator; reported with the
 //                     achieved rate, not as sustained capacity at the offered rate
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+// k6 runs both scenarios with gracefulStop 0: iterations still running at the end are
+// interrupted, so k6's scenario counters and the server log cover the same window.
 import { pathToFileURL } from 'node:url'
 
-export const LIMITS = { p95Ms: 1000, failedRate: 0.01, memAvailableMiB: 100, generatorIdlePct: 10 }
-const metric = (summary, name) => summary?.metrics?.[name]?.values ?? summary?.metrics?.[name]
+import { factsFromDir } from './step-facts.mjs'
 
-// Allowed gap between k6 and the server log: requests in flight at the window edges and
-// transport failures that never reached Caddy.
-export const reconcileAllowance = (k6Requests) => Math.max(5, Math.ceil(k6Requests * 0.02))
+export const LIMITS = {
+  p95Ms: 1000,
+  failedRate: 0.01,
+  memAvailableMiB: 100,
+  generatorIdlePct: 10,
+  sampleEdgeS: 15, // first/last sample within this distance of the window edges
+  sampleGapS: 30,
+}
+// Route classes every step must reach (locale prefix folded); a reconciliation allowance
+// must never hide a whole missing action.
+export const REQUIRED_ROUTES = [
+  '/api/auth/me',
+  '/api/product-access/organizations',
+  '/api/product-access/organizations/:id/context',
+  '/settings/sessions',
+  '/api/product-access/organizations/:id/members',
+  '/login',
+  '/api/notifications/unread-count',
+  '/api/auth/me/avatar',
+  '/api/v1/admin/users',
+  '/api/v1/admin/audit-logs',
+]
+export const SMOKE_CHECKS = [
+  'bff_me',
+  'bff_orgs',
+  'bff_context',
+  'ssr_sessions',
+  'bff_members',
+  'ssr_login',
+  'bff_profile',
+  'bff_unread',
+  'bff_avatar',
+  'admin_users',
+  'admin_audit',
+]
+
+const values = (s, name) => s?.metrics?.[name]?.values
+// Requests that may differ between k6 and the server log: one in flight per VU at each
+// edge, plus the requests of the measured clock skew at both edges.
+export const reconcileAllowance = (vusMax, requestRate, skewS) =>
+  vusMax + Math.ceil(requestRate * 2 * (skewS + 0.1))
+
+function coverage(label, times, start, end) {
+  if (!times.length) return [`${label} produced no samples`]
+  const problems = []
+  if (times[0] > start + LIMITS.sampleEdgeS) problems.push(`${label} samples start late`)
+  if (times.at(-1) < end - LIMITS.sampleEdgeS)
+    problems.push(`${label} samples stop before the window ends`)
+  const gap = Math.max(0, ...times.slice(1).map((t, i) => t - times[i]))
+  if (gap > LIMITS.sampleGapS) problems.push(`${label} samples have a ${gap} s gap`)
+  return problems
+}
+
+function workload(s) {
+  const site = values(s, 'http_reqs{scenario:site}')?.count
+  const admin = values(s, 'http_reqs{scenario:admin}')?.count
+  const siteFailed = values(s, 'http_req_failed{scenario:site}')?.rate
+  const adminFailed = values(s, 'http_req_failed{scenario:admin}')?.rate
+  if ([site, admin, siteFailed, adminFailed].some((v) => typeof v !== 'number')) return undefined
+  const requests = site + admin
+  const failedRate = requests ? (site * siteFailed + admin * adminFailed) / requests : 0
+  const checks = s.root_group?.checks ?? []
+  const checkFails = Object.fromEntries(checks.filter((c) => c.fails).map((c) => [c.name, c.fails]))
+  return { requests, failedRate, siteFailed, adminFailed, checks, checkFails }
+}
+
+function dataProblems(f, w) {
+  const invalid = []
+  if (f.k6Exit !== 0) invalid.push(`k6 exited with ${f.k6Exit}`)
+  if (!f.k6Summary?.metrics) invalid.push('k6 summary missing')
+  else if (!w) invalid.push('k6 summary lacks a required metric')
+  if (f.statsError || !f.server) invalid.push(`server stats unusable: ${f.statsError ?? 'missing'}`)
+  if (f.samplerExit !== 0) invalid.push('host sampler failed')
+  if (f.containersMissing)
+    invalid.push('container list before and after the step differs or is missing')
+  if (typeof f.skewS !== 'number') invalid.push('clock skew was not measured')
+  if (!(f.window?.start > 0 && f.window.end > f.window.start)) {
+    invalid.push('measured window missing')
+    return invalid
+  }
+  const { start, end } = f.window
+  invalid.push(
+    ...coverage(
+      'host',
+      f.samples.map((x) => x.ts),
+      start,
+      end
+    )
+  )
+  invalid.push(
+    ...coverage(
+      'generator',
+      f.generator.map((x) => x.ts),
+      start,
+      end
+    )
+  )
+  const idle = f.generator.length ? Math.min(...f.generator.map((x) => x.idlePct)) : undefined
+  if (idle !== undefined && idle < LIMITS.generatorIdlePct)
+    invalid.push(`generator CPU saturated (idle ${idle} %)`)
+  if (f.server?.routes) {
+    const seen = new Set(Object.keys(f.server.routes).map((r) => r.replace(/^\/:locale(?=\/)/, '')))
+    const missing = REQUIRED_ROUTES.filter((r) => !seen.has(r))
+    if (missing.length) invalid.push(`no server records for ${missing.join(', ')}`)
+  }
+  if (w && f.server && typeof f.skewS === 'number') {
+    const vusMax = values(f.k6Summary, 'vus_max')?.value ?? values(f.k6Summary, 'vus_max')?.max ?? 0
+    const allowed = reconcileAllowance(vusMax, w.requests / (end - start), Math.abs(f.skewS))
+    if (Math.abs(w.requests - f.server.requests) > allowed)
+      invalid.push(
+        `k6 counted ${w.requests} requests in the window, the server ${f.server.requests} (allowed ${allowed})`
+      )
+  }
+  if (f.window.smoke && w) {
+    const names = new Set(w.checks.map((c) => c.name))
+    const missing = SMOKE_CHECKS.filter((n) => !names.has(n))
+    if (missing.length) invalid.push(`smoke did not run ${missing.join(', ')}`)
+    if (Object.keys(w.checkFails).length)
+      invalid.push(`smoke checks failed: ${Object.keys(w.checkFails).join(', ')}`)
+  }
+  return invalid
+}
 
 export function classify(f) {
-  const invalid = []
-  const overload = []
   const s = f.k6Summary
-  if (f.k6Exit !== 0) invalid.push(`k6 exited with ${f.k6Exit}`)
-  if (!s?.metrics) invalid.push('k6 summary missing')
-  if (!(f.window?.start > 0 && f.window.end > f.window.start))
-    invalid.push('measured window missing')
-  if (f.statsError || !f.server) invalid.push(`server stats unusable: ${f.statsError ?? 'missing'}`)
-  if (f.samplerExit !== 0 || !(f.samples?.length > 0))
-    invalid.push('host sampler failed or produced no samples')
-  if (f.containersMissing) invalid.push('container state before or after the step missing')
-  if (f.generatorIdleMinPct === undefined) invalid.push('generator CPU was not sampled')
-  else if (f.generatorIdleMinPct < LIMITS.generatorIdlePct)
-    invalid.push(`generator CPU saturated (idle ${f.generatorIdleMinPct} %)`)
-  const seconds = f.window ? f.window.end - f.window.start : 0
-  const site = metric(s, 'iterations{scenario:site}')?.count
-  const admin = metric(s, 'iterations{scenario:admin}')?.count
-  const requests = metric(s, 'http_reqs')?.count
-  const failed = metric(s, 'http_req_failed{scenario:site}')?.rate
-  const dropped = metric(s, 'dropped_iterations')?.count ?? 0
-  if (s?.metrics && [site, admin, requests, failed].some((v) => typeof v !== 'number'))
-    invalid.push('k6 summary lacks a required metric')
-  if (typeof requests === 'number' && f.server) {
-    const gap = Math.abs(requests - f.server.requests)
-    if (gap > reconcileAllowance(requests))
-      invalid.push(`k6 sent ${requests} requests, the server logged ${f.server.requests}`)
-  }
-  if (f.server && f.server.all.p95 > LIMITS.p95Ms)
+  const windowOk = f.window?.start > 0 && f.window.end > f.window.start
+  const w = s?.metrics ? workload(s) : undefined
+  const invalid = dataProblems(f, w)
+  const overload = []
+  if (f.server?.all && f.server.all.p95 > LIMITS.p95Ms)
     overload.push(`server p95 ${Math.round(f.server.all.p95)} ms`)
-  if (failed > LIMITS.failedRate) overload.push(`failed requests ${(failed * 100).toFixed(2)} %`)
+  if (w && w.failedRate > LIMITS.failedRate)
+    overload.push(`failed requests ${(w.failedRate * 100).toFixed(2)} %`)
+  if (w && w.adminFailed > LIMITS.failedRate)
+    overload.push(`failed admin requests ${(w.adminFailed * 100).toFixed(2)} %`)
+  const dropped = values(s, 'dropped_iterations')?.count ?? 0
   if (dropped > 0) overload.push(`${dropped} dropped iterations`)
   if (f.restarts > 0 || f.oomKilled) overload.push('a container restarted or was OOM-killed')
+  if (f.recreated?.length) overload.push(`recreated during the step: ${f.recreated.join(', ')}`)
   const memMin = f.samples?.length
     ? Math.min(...f.samples.map((x) => x.memAvailableMiB))
     : undefined
   if (memMin !== undefined && memMin < LIMITS.memAvailableMiB)
     overload.push(`MemAvailable ${memMin} MiB`)
+  const seconds = windowOk ? f.window.end - f.window.start : 0
+  const rate = (name) => {
+    const count = values(s, name)?.count
+    return seconds > 0 && typeof count === 'number' ? count / seconds : undefined
+  }
   const figures = {
     offeredRate: f.window?.rate,
-    achievedRate: seconds > 0 && typeof site === 'number' ? site / seconds : undefined,
-    adminAchievedRate: seconds > 0 && typeof admin === 'number' ? admin / seconds : undefined,
-    requests,
+    achievedRate: rate('iterations{scenario:site}'),
+    adminAchievedRate: rate('iterations{scenario:admin}'),
+    requests: w?.requests,
     serverRequests: f.server?.requests,
-    serverP95Ms: f.server?.all.p95,
-    failedRate: failed,
+    serverP95Ms: f.server?.all?.p95,
+    failedRate: w?.failedRate,
+    adminFailedRate: w?.adminFailed,
+    checkFails: w?.checkFails,
     dropped,
     memAvailableMinMiB: memMin,
     status: f.server?.status,
@@ -69,83 +177,6 @@ export function classify(f) {
   if (invalid.length) return { class: 'invalid measurement', reasons: invalid, figures }
   if (overload.length) return { class: 'observed overload', reasons: overload, figures }
   return { class: 'valid', reasons: [], figures }
-}
-
-const read = (dir, name) => {
-  try {
-    return readFileSync(join(dir, name), 'utf8')
-  } catch {
-    return undefined
-  }
-}
-const json = (text) => {
-  try {
-    return text === undefined ? undefined : JSON.parse(text)
-  } catch {
-    return undefined
-  }
-}
-
-// Host sampler lines: "<epoch> host avail=<MiB>"; other line kinds are kept for the report.
-export const parseSamples = (text = '') =>
-  text
-    .split('\n')
-    .map((l) => l.match(/^(\d+) host avail=(\d+)$/))
-    .filter(Boolean)
-    .map((m) => ({ ts: Number(m[1]), memAvailableMiB: Number(m[2]) }))
-
-// Lowest "id" (idle) value of `vmstat <n>` output, first report (since boot) skipped.
-export function generatorIdleMin(text = '') {
-  const lines = text.split('\n').map((l) => l.trim().split(/\s+/))
-  const header = lines.find((cols) => cols.includes('id'))
-  if (!header) return undefined
-  const col = header.indexOf('id')
-  const rows = lines
-    .filter((cols) => cols.length === header.length && /^\d+$/.test(cols[col]))
-    .slice(1)
-  return rows.length ? Math.min(...rows.map((cols) => Number(cols[col]))) : undefined
-}
-
-// Containers file: "<name> <restart-count> <oom-killed>" per line, before and after the step.
-export function containerChange(before = '', after = '') {
-  const parse = (t) =>
-    new Map(
-      t
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => l.split(' '))
-        .map(([n, r, o]) => [n, { r: Number(r), o }])
-    )
-  const a = parse(before)
-  const b = parse(after)
-  if (!a.size || a.size !== b.size)
-    return { restarts: 0, oomKilled: false, containersMissing: true }
-  let restarts = 0
-  let oomKilled = false
-  for (const [name, x] of b) {
-    restarts += x.r - (a.get(name)?.r ?? x.r + 1)
-    oomKilled ||= x.o === 'true'
-  }
-  return { restarts, oomKilled }
-}
-
-export function factsFromDir(dir) {
-  const exit = (name) => {
-    const t = read(dir, name)?.trim()
-    return t && /^\d+$/.test(t) ? Number(t) : -1
-  }
-  const containers = containerChange(read(dir, 'containers.before'), read(dir, 'containers.after'))
-  return {
-    k6Exit: exit('k6.exit'),
-    k6Summary: json(read(dir, 'summary.json')),
-    window: json(read(dir, 'window.json')),
-    server: json(read(dir, 'server.json')),
-    statsError: read(dir, 'server.err')?.trim() || undefined,
-    samplerExit: exit('sampler.exit'),
-    samples: parseSamples(read(dir, 'samples.txt')),
-    generatorIdleMinPct: generatorIdleMin(read(dir, 'generator-vmstat.txt')),
-    ...containers,
-  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

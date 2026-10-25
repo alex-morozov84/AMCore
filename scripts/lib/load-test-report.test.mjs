@@ -28,14 +28,18 @@ test('report lists every step, stamps smoke runs and keeps a missing result visi
   writeFileSync(join(d, 'steps/r5-1/result.json'), JSON.stringify(result('valid', 5, 5, 20)))
   writeFileSync(
     join(d, 'host-manifest.txt'),
-    'commit=abc\nswap=off\ncontainer=x-api-1 image=api digest=sha256:1 mem_limit=0 nano_cpus=0\n'
+    'commit=abc\nrun_id=lt1\nharness_sha256=h1\nswap=off\ncontainer=x-api-1 image=api digest=sha256:1 mem_limit=0 nano_cpus=0\n'
   )
+  writeFileSync(join(d, 'generator-manifest.txt'), 'commit=abc\nharness_sha256=h2\n')
   const text = report(d, 'smoke')
-  assert.match(text, /Not comparable/)
+  assert.match(text, /not the reference protocol; never compare it with capacity.md/)
+  assert.match(text, /Run `lt1`/)
+  assert.match(text, /same commit as the host: yes; same harness: NO/)
   assert.match(text, /\| r5-1 \| valid \|/)
   assert.match(text, /\| r10-1 \| invalid measurement \|.*result missing/)
   assert.ok(text.indexOf('r5-1') < text.indexOf('r10-1'), 'numeric step order')
   const manifest = JSON.parse(readFileSync(join(d, 'manifest.json'), 'utf8'))
-  assert.equal(manifest.comparable, false)
+  assert.equal(manifest.referenceProtocol, false)
+  assert.equal(manifest.sameHarness, false)
   assert.equal(manifest.containers[0].digest, 'sha256:1')
 })

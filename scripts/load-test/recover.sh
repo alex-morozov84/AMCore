@@ -28,5 +28,5 @@ if [ "$NEW" != "$FILES" ]; then
 else
   echo "recover: COMPOSE_FILE has no load-test overlay"
 fi
-docker compose up -d --force-recreate --no-deps caddy
+lt_compose up -d --force-recreate --no-deps caddy
 echo "recover: caddy recreated with the normal config; now run scripts/load-test/remove-check.sh"

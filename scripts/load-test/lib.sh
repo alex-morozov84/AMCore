@@ -36,3 +36,55 @@ run_id_ok() {
 }
 
 now() { date +%s; }
+
+# lt_compose [KEY=value ...] <compose args>: docker compose for the deployment .env only.
+# Shell variables override .env during interpolation, so the environment is cleared: every
+# script acts on the project, files and database URLs that .env names, never on inherited
+# ones. Leading KEY=value words (no spaces) are the only additions.
+lt_compose() {
+  extra=
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      [A-Z]*=*)
+        extra="$extra $1"
+        shift
+        ;;
+      *) break ;;
+    esac
+  done
+  # shellcheck disable=SC2086 # extra is a list of KEY=value words
+  env -i PATH="$PATH" HOME="$HOME" ${DOCKER_HOST:+DOCKER_HOST="$DOCKER_HOST"} \
+    ${DOCKER_CONTEXT:+DOCKER_CONTEXT="$DOCKER_CONTEXT"} $extra \
+    docker compose --project-directory "$PWD" -p "$(envval COMPOSE_PROJECT_NAME)" "$@"
+}
+
+# Tell the operator which inherited variables lt_compose ignores.
+warn_overrides() {
+  names=$(env | grep -E '^(COMPOSE_[A-Z_]*|LOAD_TEST_[A-Z_]*|[A-Z_]*DATABASE_URL|POSTGRES_[A-Z_]*)=' | cut -d= -f1 | tr '\n' ' ')
+  [ -z "$names" ] || echo "load-test: ignoring environment variables (the deployment .env decides): $names" >&2
+}
+
+# check_target <project> <run> [running]: the effective configuration (and, with
+# "running", the running postgres container) belongs to this run's own deployment.
+# The rendered configuration holds secrets; it stays in a private temporary directory.
+check_target() {
+  target_dir=$(mktemp -d)
+  chmod 700 "$target_dir"
+  target_status=0
+  lt_compose COMPOSE_PROFILES="$(envval COMPOSE_PROFILES),load-test" config --format json > "$target_dir/config.json" ||
+    target_status=1
+  set -- /d/config.json "$1" "$2" "${3:-}"
+  if [ "$target_status" -eq 0 ] && [ "$4" = running ]; then
+    pg=$(lt_compose ps -q postgres)
+    if [ -n "$pg" ]; then docker inspect "$pg" > "$target_dir/postgres.json" || target_status=1; else target_status=1; fi
+    set -- "$1" "$2" "$3" /d/postgres.json
+  else
+    set -- "$1" "$2" "$3"
+  fi
+  if [ "$target_status" -eq 0 ]; then
+    docker run --rm -v "$target_dir:/d:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" node /lt/target-check.mjs "$@" ||
+      target_status=1
+  fi
+  rm -rf "$target_dir"
+  [ "$target_status" -eq 0 ] || die "the effective deployment is not this run's own project (see above)"
+}

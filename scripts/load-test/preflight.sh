@@ -53,7 +53,9 @@ check_config() { # check_config <json-file>
 
 case "$MODE" in
   plan)
-    docker compose config --quiet || die "docker compose config failed"
+    warn_overrides
+    lt_compose config --quiet || die "docker compose config failed"
+    check_target "$PROJECT" "$RUN"
     TMP=$(mktemp)
     trap 'rm -f "$TMP"' EXIT
     adapted validate > /dev/null 2>&1 || die "caddy validate failed for Caddyfile.load-test"
@@ -62,17 +64,19 @@ case "$MODE" in
     echo "preflight plan: ok (run $RUN, project $PROJECT, route prefix '${PREFIX}', generator $GEN)"
     ;;
   live)
+    warn_overrides
     VOLUME="${PROJECT}_postgres_data_pg18"
     LABEL=$(docker volume inspect "$VOLUME" --format '{{index .Labels "org.amcore.load-test"}}' 2> /dev/null) ||
       die "volume $VOLUME not found"
     [ "$LABEL" = "$RUN" ] || die "volume $VOLUME is not labelled for run $RUN (found '$LABEL'); never adopt it"
-    ACTUAL_WEB=$(docker inspect "${PROJECT}-web-1" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+    check_target "$PROJECT" "$RUN" running
+    ACTUAL_WEB=$(docker inspect "$(lt_compose ps -q web)" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
     [ "$ACTUAL_WEB" = "$WEB_IP" ] || die "web address $ACTUAL_WEB differs from COMPOSE_WEB_IPV4 $WEB_IP"
     TMP=$(mktemp)
     trap 'rm -f "$TMP"' EXIT
-    docker compose exec -T caddy wget -qO- http://127.0.0.1:2019/config/ > "$TMP" || die "cannot read the running Caddy config"
+    lt_compose exec -T caddy wget -qO- http://127.0.0.1:2019/config/ > "$TMP" || die "cannot read the running Caddy config"
     check_config "$TMP"
-    PEER=$(docker compose exec -T caddy sh -c 'tail -n 50 /data/load-test-access.log 2>/dev/null' |
+    PEER=$(lt_compose exec -T caddy sh -c 'tail -n 50 /data/load-test-access.log 2>/dev/null' |
       sed -n 's/.*"remote_ip":"\([^"]*\)".*/\1/p' | sort -u)
     [ "$PEER" = "$GEN" ] || die "test-entry peers '$PEER' differ from $GEN; run 'admission.sh probe' from the generator first"
     echo "preflight live: ok (volume $VOLUME labelled $RUN, web $ACTUAL_WEB, generator peer $GEN)"

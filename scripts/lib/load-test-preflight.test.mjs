@@ -70,7 +70,10 @@ function preflight(d, mode = 'plan') {
 }
 
 const mutating = (calls) =>
-  calls.filter((c) => !/^compose config\b/.test(c) && !c.startsWith('run --rm '))
+  calls.filter(
+    (c) =>
+      !/^compose (--project-directory \S+ -p \S+ )?config\b/.test(c) && !c.startsWith('run --rm ')
+  )
 
 test('plan accepts the supported path topologies and never mutates', () => {
   for (const [label, context, prefix] of [
@@ -185,6 +188,21 @@ test('trust-boundary checker accepts the intended shape and names each violation
       'claim kept',
       (c) => (c.apps.http.servers.srv1.routes[0].handle = [{ handler: 'reverse_proxy' }]),
       /does not strip/,
+    ],
+    [
+      // Agent 2 reproduction: app and api routed, mTLS policy only for app, empty fallback.
+      'routed host without client-certificate policy',
+      (c) =>
+        c.apps.http.servers.srv1.routes.push({
+          match: [{ host: ['api.example.test'] }],
+          handle: [strip],
+        }),
+      /routes api.example.test without a client-certificate policy/,
+    ],
+    [
+      'route without host matcher',
+      (c) => c.apps.http.servers.srv1.routes.push({ handle: [strip] }),
+      /route without a host matcher/,
     ],
     [
       'client auth on :443',

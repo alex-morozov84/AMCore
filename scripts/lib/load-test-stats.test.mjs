@@ -58,6 +58,23 @@ test('percentiles are nearest-rank in milliseconds and status codes are counted'
   assert.deepEqual(s.status, { 200: 95, 429: 5 })
 })
 
+test('exact fractional window edges: requests just outside count nowhere', () => {
+  // The run-step passes the k6 window unrounded; a record at the edge stays out.
+  const lines = [
+    rec(100.2, '/x', 0.9), // finished before the window (e.g. the setup sign-in)
+    rec(100.3, '/x', 0.01),
+    rec(110.7, '/x', 0.03),
+    rec(110.8, '/x', 0.9), // finished after the end: an interrupted iteration's request
+  ]
+  const s = windowStats(
+    readRecords(dir({ 'load-test-access.log': lines.join('\n') })),
+    100.25,
+    110.75
+  )
+  assert.equal(s.requests, 2)
+  assert.equal(Math.round(s.all.p95), 30)
+})
+
 test('route classes fold query, organization ids and the locale prefix', () => {
   assert.equal(
     routeClass('/api/product-access/organizations/cmabc123/context?x=1'),

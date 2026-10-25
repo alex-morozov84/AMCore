@@ -42,6 +42,20 @@ export function checkLoadTestConfig(config, generatorIp) {
     for (const p of policies.filter((x) => !x.match) ?? [])
       if (p.client_authentication?.mode && p.client_authentication.mode !== 'require_and_verify')
         problems.push(':8443 default TLS policy weakens client authentication')
+    // Every host the test entry routes must be served only with a verified client
+    // certificate; strict_sni_host ties Host to SNI but creates no client auth itself.
+    const verified = new Set(
+      named
+        .filter((p) => p.client_authentication?.mode === 'require_and_verify')
+        .flatMap((p) => p.match.sni)
+    )
+    const routed = (t.routes ?? []).flatMap((r) => (r.match ?? []).flatMap((m) => m.host ?? []))
+    if (!routed.length) problems.push(':8443 routes match no host')
+    for (const host of routed)
+      if (!verified.has(host))
+        problems.push(`:8443 routes ${host} without a client-certificate policy`)
+    if ((t.routes ?? []).some((r) => !(r.match ?? []).some((m) => m.host?.length)))
+      problems.push(':8443 has a route without a host matcher')
     for (const route of t.routes ?? []) {
       const text = JSON.stringify(route)
       const proxies = (text.match(/"handler":"reverse_proxy"/g) ?? []).length

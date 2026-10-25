@@ -29,6 +29,7 @@ if (!/^[0-9]+s$/.test(DURATION) || !(RATE > 0))
   throw new Error('LT_DURATION must be <n>s and LT_RATE positive')
 const ADMIN_RATE = Number(__ENV.LT_ADMIN_RATE ?? 0.2)
 const SMOKE = __ENV.LT_SMOKE === '1'
+const OUT = SMOKE ? 'out-smoke' : 'out'
 const {
   sessions: SESSIONS,
   bindings: BINDINGS,
@@ -54,14 +55,19 @@ export const options = {
   hosts: HOSTS,
   discardResponseBodies: true,
   summaryTrendStats: ['avg', 'p(50)', 'p(95)', 'p(99)', 'max', 'count'],
-  // Always-true thresholds only expose per-scenario counts; stop rules are applied by
-  // classify.mjs afterwards, so k6 never aborts a step on its own.
+  // Always-true thresholds only expose per-scenario counters (setup requests carry no
+  // scenario tag, so they stay out); stop rules are applied by classify.mjs afterwards,
+  // so k6 never aborts a step on its own.
   thresholds: {
     'iterations{scenario:site}': ['count>=0'],
     'iterations{scenario:admin}': ['count>=0'],
+    'http_reqs{scenario:site}': ['count>=0'],
+    'http_reqs{scenario:admin}': ['count>=0'],
     'http_req_failed{scenario:site}': ['rate>=0'],
     'http_req_failed{scenario:admin}': ['rate>=0'],
   },
+  // gracefulStop 0: iterations still running at the end are interrupted, so every counted
+  // iteration and request finished inside the measured window (no drain to account for).
   scenarios: {
     site: {
       executor: 'constant-arrival-rate',
@@ -69,6 +75,7 @@ export const options = {
       rate: Math.round(RATE * 10),
       timeUnit: '10s',
       duration: DURATION,
+      gracefulStop: '0s',
       preAllocatedVUs: Math.max(20, Math.ceil(RATE * 2)),
       maxVUs: Math.max(60, Math.ceil(RATE * 8)),
     },
@@ -78,6 +85,7 @@ export const options = {
       rate: Math.max(1, Math.round(ADMIN_RATE * 10)),
       timeUnit: '10s',
       duration: DURATION,
+      gracefulStop: '0s',
       preAllocatedVUs: 2,
       maxVUs: 5,
     },
@@ -103,7 +111,8 @@ const bff = (i, extra = {}) => ({
   cookies: { amcore_session: SESSIONS[i] },
   redirects: 0,
 })
-const ok = (res, name) => check(res, { [`${name} 2xx`]: (r) => r.status >= 200 && r.status < 300 })
+// One check per action, named like the request tag, for the exact expected status.
+const ok = (res, name, status = 200) => check(res, { [name]: (r) => r.status === status })
 const get = (url, params, name) => ok(http.get(url, { ...params, tags: { name } }), name)
 
 export function site() {
@@ -144,7 +153,8 @@ export function site() {
     const form = { file: http.file(AVATAR, 'avatar.png', 'image/png') }
     ok(
       http.post(`${WEB}/api/auth/me/avatar`, form, { ...bff(i), tags: { name: 'bff_avatar' } }),
-      'bff_avatar'
+      'bff_avatar',
+      201
     )
   }
 }
@@ -168,9 +178,10 @@ export function handleSummary(data) {
     rate: RATE,
     adminRate: ADMIN_RATE,
     duration: DURATION,
+    smoke: SMOKE,
   }
   return {
-    [`/work/out/${step}.summary.json`]: JSON.stringify(summary),
-    [`/work/out/${step}.window.json`]: JSON.stringify(window),
+    [`/work/${OUT}/${step}.summary.json`]: JSON.stringify(summary),
+    [`/work/${OUT}/${step}.window.json`]: JSON.stringify(window),
   }
 }
