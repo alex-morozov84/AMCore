@@ -65,7 +65,8 @@ warn_overrides() {
 }
 
 # check_target <project> <run> [running]: the effective configuration (and, with
-# "running", the running postgres container) belongs to this run's own deployment.
+# "running", the running postgres, api, worker and web containers) belongs to this run's
+# own deployment.
 # The rendered configuration holds secrets; it stays in a private temporary directory.
 check_target() {
   target_dir=$(mktemp -d)
@@ -75,9 +76,16 @@ check_target() {
     target_status=1
   set -- /d/config.json "$1" "$2" "${3:-}"
   if [ "$target_status" -eq 0 ] && [ "$4" = running ]; then
-    pg=$(lt_compose ps -q postgres)
-    if [ -n "$pg" ]; then docker inspect "$pg" > "$target_dir/postgres.json" || target_status=1; else target_status=1; fi
-    set -- "$1" "$2" "$3" /d/postgres.json
+    # The running containers, not only the rendered files: a container created from an
+    # older .env keeps its old database URL until it is recreated.
+    running=$(lt_compose ps -q postgres api worker web)
+    if [ -n "$running" ]; then
+      # shellcheck disable=SC2086 # one argument per container id
+      docker inspect $running > "$target_dir/running.json" || target_status=1
+    else
+      target_status=1
+    fi
+    set -- "$1" "$2" "$3" /d/running.json
   else
     set -- "$1" "$2" "$3"
   fi

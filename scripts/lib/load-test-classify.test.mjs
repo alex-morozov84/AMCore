@@ -128,6 +128,22 @@ test('a missing required metric or route class is invalid', () => {
     run({ files: { 'summary.json': JSON.stringify(s) } }).reasons.join(';'),
     /lacks a required metric/
   )
+  // Agent 2 C4b: iteration counters are required too, and a broken value is not a number.
+  for (const [label, change] of [
+    ['site iterations missing', (m) => delete m['iterations{scenario:site}']],
+    ['admin iterations missing', (m) => delete m['iterations{scenario:admin}']],
+    ['site iterations corrupt', (m) => (m['iterations{scenario:site}'].values.count = 'x')],
+    [
+      'admin failure rate corrupt',
+      (m) => (m['http_req_failed{scenario:admin}'].values.rate = null),
+    ],
+  ]) {
+    const broken = { metrics: metrics() }
+    change(broken.metrics)
+    const r = run({ files: { 'summary.json': JSON.stringify(broken) } })
+    assert.equal(r.class, 'invalid measurement', label)
+    assert.match(r.reasons.join(';'), /lacks a required metric/, label)
+  }
   const { '/api/auth/me/avatar': _gone, ...withoutUpload } = routes
   assert.match(
     run({ routes: withoutUpload }).reasons.join(';'),

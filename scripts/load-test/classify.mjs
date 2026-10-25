@@ -69,7 +69,11 @@ function workload(s) {
   const admin = values(s, 'http_reqs{scenario:admin}')?.count
   const siteFailed = values(s, 'http_req_failed{scenario:site}')?.rate
   const adminFailed = values(s, 'http_req_failed{scenario:admin}')?.rate
-  if ([site, admin, siteFailed, adminFailed].some((v) => typeof v !== 'number')) return undefined
+  const siteIterations = values(s, 'iterations{scenario:site}')?.count
+  const adminIterations = values(s, 'iterations{scenario:admin}')?.count
+  // Every measured value the result uses must be present and finite; none defaults to 0.
+  const required = [site, admin, siteFailed, adminFailed, siteIterations, adminIterations]
+  if (required.some((v) => typeof v !== 'number' || !Number.isFinite(v) || v < 0)) return undefined
   const requests = site + admin
   const failedRate = requests ? (site * siteFailed + admin * adminFailed) / requests : 0
   const checks = s.root_group?.checks ?? []

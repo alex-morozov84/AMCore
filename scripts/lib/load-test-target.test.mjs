@@ -1,5 +1,5 @@
 // C1: the write target is the effective project of the deployment .env, proved from the
-// rendered configuration and the running postgres container, whatever the shell exports.
+// rendered configuration and the running postgres, api, worker and web, whatever the shell exports.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -30,16 +30,27 @@ const config = (o = {}) => ({
     postgres_data_pg18: { name: o.volumeName ?? VOLUME, labels: { 'org.amcore.load-test': RUN } },
   },
 })
-const inspect = (o = {}) => [
-  {
-    Config: {
-      Labels: {
-        'com.docker.compose.project': o.project ?? PROJECT,
-        'com.docker.compose.service': 'postgres',
-      },
+const NET = `${PROJECT}_default`
+const container = (service, env = [], o = {}) => ({
+  Config: {
+    Labels: {
+      'com.docker.compose.project': o.project ?? PROJECT,
+      'com.docker.compose.service': service,
     },
-    Mounts: [{ Type: 'volume', Name: o.mount ?? VOLUME, Destination: '/var/lib/postgresql' }],
+    Env: env,
   },
+  NetworkSettings: { Networks: { [o.network ?? NET]: {} } },
+  Mounts: o.mounts ?? [],
+})
+// The running postgres, api, worker and web as `docker inspect` reports them.
+const inspect = (o = {}) => [
+  container('postgres', [], {
+    project: o.project,
+    mounts: [{ Type: 'volume', Name: o.mount ?? VOLUME, Destination: '/var/lib/postgresql' }],
+  }),
+  container('api', [`DATABASE_URL=${o.runningApiUrl ?? db('runtime')}`], { network: o.apiNetwork }),
+  container('worker', [`DATABASE_URL=${db('runtime')}`]),
+  container('web', ['API_URL=http://api:5002']),
 ]
 
 test('target check accepts the run project and names every mismatch', () => {
@@ -80,6 +91,28 @@ test('target check accepts the run project and names every mismatch', () => {
       PROJECT,
       inspect({ mount: 'amcore_postgres_data_pg18' }),
       /stores \/var\/lib\/postgresql in amcore_postgres_data_pg18/,
+    ],
+    [
+      // Agent 2 C1b: .env fixed to the local database, the API still runs with the old URL.
+      'stale running API',
+      config(),
+      PROJECT,
+      inspect({ runningApiUrl: db('runtime', 'db.example.com') }),
+      /running api uses another DATABASE_URL than the configuration; recreate it/,
+    ],
+    [
+      'running API on another network',
+      config(),
+      PROJECT,
+      inspect({ apiNetwork: 'other_default' }),
+      /running api shares no network with this project's postgres/,
+    ],
+    [
+      'service not running',
+      config(),
+      PROJECT,
+      inspect().filter((c) => c.Config.Labels['com.docker.compose.service'] !== 'worker'),
+      /no running worker container/,
     ],
   ]
   for (const [label, c, project, i, message] of cases)
@@ -129,6 +162,7 @@ test('fixture.sh refuses before the loader when the target is not the run projec
   for (const [label, options] of [
     ['external app database', { config: config({ apiUrl: db('runtime', 'db.example.com') }) }],
     ['mismatched running mount', { inspect: inspect({ mount: 'amcore_postgres_data_pg18' }) }],
+    ['stale running API', { inspect: inspect({ runningApiUrl: db('runtime', 'db.example.com') }) }],
     ['foreign volume label', { volumeLabel: 'other' }],
   ]) {
     const w = fixtureWorld(options)

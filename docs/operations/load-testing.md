@@ -139,8 +139,11 @@ and 1,000 audit rows. A second `fixture.sh` of the same run prints `reused`.
 
 Before the first write, `fixture.sh` proves the target: the database volume carries this
 run's label, every rendered database URL (API, worker, migration, loader) points at this
-project's `postgres` over `verify-full` TLS, and the running postgres container stores
-its data in that volume. The scripts read the project, files and URLs only from `.env`;
+project's `postgres` over `verify-full` TLS, the running postgres container stores its
+data in that volume, and the running API, worker and web containers use exactly the
+configured database and API URLs on the same network. A container created from an older
+`.env` fails this check: recreate it (`docker compose up -d --force-recreate <service>`)
+before loading fixtures. The scripts read the project, files and URLs only from `.env`;
 variables exported in your shell (for example `COMPOSE_PROJECT_NAME`) are ignored, with a
 warning that names them.
 
@@ -174,10 +177,11 @@ LT_ENV=<path>/load-test.env sh scripts/load-test/admission.sh outside
 ```
 
 It proves that forged address headers on the normal edge change no rate budget, for the
-API and through the web app (member 197 signs in). Its first line only shows that the
-test entry is not open to this machine: the firewall drop or a TLS refusal both pass
-there; the certificate proof is `run` above. Each command waits 90 s at the end so the
-spent rate budgets refill.
+API and through the web app (member 197 signs in). Both paths reach the same API
+handler, so one real address may have one shared budget for both: the web check starts
+after a 45 s refill pause. Its first line only shows that the test entry is not open to
+this machine: the firewall drop or a TLS refusal both pass there; the certificate proof
+is `run` above. Each command waits 90 s at the end so the spent rate budgets refill.
 
 ## 5. Measure
 

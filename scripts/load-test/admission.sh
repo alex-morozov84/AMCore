@@ -70,17 +70,38 @@ budget_hit() {
   fi
 }
 
-# Normal edge (:443): every request forges a visitor in all three headers, yet API and web
-# app keep one bucket per real address.
+# still_limited <label> <expected-code>: right after a spent budget, a short burst stays
+# limited. Refill allows a few admissions (100/min), a fresh bucket would admit all ten.
+still_limited() {
+  ok=$(grep -c "^$2\$" "$TMP/$1" || true)
+  limited=$(grep -c '^429$' "$TMP/$1" || true)
+  other=$(grep -vc -e "^$2\$" -e '^429$' "$TMP/$1" || true)
+  if [ "$other" -eq 0 ] && [ "$limited" -ge 5 ] && [ "$ok" -le 5 ]; then
+    pass "$1: same bucket ($limited × 429, $ok × $2 from refill)"
+  else
+    fail "$1: $ok × $2, $limited × 429, $other other — forged headers chose another bucket?"
+  fi
+}
+
+# Normal edge (:443): forged visitor headers must not choose the rate-limit bucket. The API
+# reads me through the same handler whether a client calls it directly or through the web
+# app, so both paths may share one bucket per real address: the web check therefore starts
+# only after the API bucket refilled (default burst 50 at 100/min: full again within 30 s).
+REFILL_S=${LT_REFILL_S:-45} # tests shorten it
 edge_spoof() {
   F='-H X-Forwarded-For:198.18.4.7 -H X-Real-IP:198.18.4.8 -H X-AMCore-Client-Ip:198.18.4.9'
+  G='-H X-Forwarded-For:198.18.4.70 -H X-Real-IP:198.18.4.71 -H X-AMCore-Client-Ip:198.18.4.72'
   burst edge-api 90 $F "https://$LT_API_HOST/api/v1/auth/me"
+  burst edge-api-other 10 $G "https://$LT_API_HOST/api/v1/auth/me"
   budget_hit edge-api 401
-  expect "normal API, other forged address, same bucket" 429 "$(code -H 'X-Forwarded-For: 198.18.4.70' -H 'X-AMCore-Client-Ip: 198.18.4.71' "https://$LT_API_HOST/api/v1/auth/me")"
+  still_limited edge-api-other 401
   expect "member 197 sign-in on the normal edge" 200 "$(login "$TMP/jar197" 197 "https://$LT_WEB_HOST")"
+  echo "admission: waiting ${REFILL_S} s for the shared budget to refill before the web app check"
+  sleep "$REFILL_S"
   burst edge-web 90 -b "$TMP/jar197" -H "Origin: $ORIGIN" $F "https://$LT_WEB_HOST/api/auth/me"
+  burst edge-web-other 10 -b "$TMP/jar197" -H "Origin: $ORIGIN" $G "https://$LT_WEB_HOST/api/auth/me"
   budget_hit edge-web 200
-  expect "normal web app, other forged address, same bucket" 429 "$(code -b "$TMP/jar197" -H "Origin: $ORIGIN" -H 'X-Forwarded-For: 198.18.4.70' -H 'X-AMCore-Client-Ip: 198.18.4.71' "https://$LT_WEB_HOST/api/auth/me")"
+  still_limited edge-web-other 200
 }
 
 refusals() { # mTLS on one test domain: no certificate and a foreign CA never reach a site
@@ -147,6 +168,6 @@ esac
 
 if [ "$FAILS" -gt 0 ]; then die "$FAILS check(s) failed"; fi
 if [ "$MODE" != probe ]; then
-  echo "admission: all checks passed; waiting 90 s for the spent rate budgets to refill"
-  sleep 90
+  echo "admission: all checks passed; waiting $((REFILL_S * 2)) s for the spent rate budgets to refill"
+  sleep $((REFILL_S * 2))
 fi
