@@ -368,12 +368,16 @@ socket address ([BFF client-IP relay](deployment.md#bff-client-ip-relay-appsweb-
 
 ## Database TLS
 
-Clients verify the server certificate against `ca.crt` and the name `postgres`
-(`sslmode=verify-full`). Do not lower `sslmode` to work around an error. Only `ca.key`
-leaves the host after step 2; `ca.srl` and `san.ext` stay in `ca-private/` for renewals.
+Every client must verify the server certificate against `ca.crt` and the name
+`postgres`. Application, seed and restore clients use `sslmode=verify-full` and
+`sslrootcert`; the native migration CLI uses the
+[private strict-TLS override](#native-migration-cli-connection). Do not weaken either
+client's verification to work around an error. Only `ca.key` leaves the host after
+step 2; `ca.srl` and `san.ext` stay in `ca-private/` for renewals.
 
-Both procedures below use `docker compose run --rm migrate` as the connection test: it
-connects with `verify-full` and ends with `No pending migrations to apply.`. Run them
+Both procedures below use `docker compose run --rm migrate` as the connection test.
+Keep the private native-CLI override in `COMPOSE_FILE`: it selects `require`,
+`strict` and `sslcert`. Expect `No pending migrations to apply.`. Run these procedures
 when no upgrade is in progress; finish a pending upgrade first.
 
 ### Renew the server certificate

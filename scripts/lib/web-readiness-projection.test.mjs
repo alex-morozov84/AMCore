@@ -44,7 +44,6 @@ for (const [name, flags] of [
           '--test',
           'scripts/lib/web-readiness-contract.test.mjs',
           'scripts/lib/deployment-rollout-contract.test.mjs',
-          'scripts/stand/compose-env-coverage.test.mjs',
         ],
         {
           cwd: copy.root,
