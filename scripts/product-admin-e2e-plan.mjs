@@ -34,6 +34,16 @@ export const productAdminE2ePlans = {
     fixture: 'product-admin-oauth-path',
     files: ['product-admin-oauth-path.spec.ts'],
   },
+  'support-mail-path': {
+    lane: 'product-admin-real-stack',
+    fixture: 'support-mail-path',
+    files: ['console-support-mail.spec.ts'],
+  },
+  'support-mail-host': {
+    lane: 'product-admin-real-stack',
+    fixture: 'support-mail-host',
+    files: ['console-support-mail.spec.ts'],
+  },
   // AMCORE_CONSOLE_STAFF_CI_END
 }
 

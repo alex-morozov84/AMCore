@@ -654,3 +654,15 @@ When changing this boundary, omit the provider handler in an explicit-empty scen
 run that whole test command with retries disabled, and require a missing-handler failure.
 Restore the handler and verify success. Repeat the signup-policy absence check. Preserve
 the negative result separately; startup errors are not missing-handler evidence.
+
+<!-- AMCORE_CONSOLE_SUPPORT_MAIL_TESTING_START -->
+
+The support-mail journey has two isolated recipient-completion profiles:
+`support-mail-path` and `support-mail-host` in the product-admin real-stack lane.
+Both run `console-support-mail.spec.ts` against actual rendered fake-recipient
+mail in the internal collector. The source-copy transport retains its final
+admission callback; the original Resend SDK has a separate contract test.
+See [commands and artifact restrictions](../operations/local-stands.md#support-mail-recipient-completion).
+The mock `support-mail` preview cannot prove recipient completion.
+
+<!-- AMCORE_CONSOLE_SUPPORT_MAIL_TESTING_END -->

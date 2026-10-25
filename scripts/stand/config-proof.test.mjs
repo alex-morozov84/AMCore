@@ -68,3 +68,32 @@ test('actual Compose rendering replaces poisoned ports/environment with owned lo
     await rm(directory(id), { recursive: true, force: true })
   }
 })
+
+// AMCORE_CONSOLE_SUPPORT_MAIL_CONFIG_PROOF_START
+for (const mode of ['path', 'host']) {
+  test(`support-mail-${mode} renders its closed, internal-mail topology`, async () => {
+    const id = `support-mail-config-${randomUUID()}`
+    try {
+      const m = await create(id, 'e2e', undefined, false, `support-mail-${mode}`)
+      await configuration(m)
+      assert.equal(m.consoleTopology, mode)
+      assert.equal(m.topology, 'host')
+      assert.equal(m.productAdminHost, true)
+      assert.equal(Boolean(m.origins.console), mode === 'host')
+      for (const name of ['api', 'worker']) {
+        const env = m.model.services[name].environment
+        assert.equal(env.NODE_ENV, 'development')
+        assert.equal(env.EMAIL_PROVIDER, 'resend')
+        assert.equal(env.RESEND_API_KEY, '<fake-e2e-provider-key>')
+        assert.equal(env.AUTH_PUBLIC_SIGNUP_ENABLED, 'false')
+        assert.equal(env.ORG_SELF_SERVICE_CREATION_ENABLED, 'false')
+        assert.equal(env.AMCORE_SETUP_MAIL_CAPTURE_KEY, m.mailCaptureKey)
+      }
+      assert.equal(m.model.services['mail-capture'].ports, undefined)
+      assert.equal(m.model.services['mail-capture'].volumes, undefined)
+    } finally {
+      await rm(directory(id), { recursive: true, force: true })
+    }
+  })
+}
+// AMCORE_CONSOLE_SUPPORT_MAIL_CONFIG_PROOF_END

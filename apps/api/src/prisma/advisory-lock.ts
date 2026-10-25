@@ -16,3 +16,8 @@ type PrismaTx = Prisma.TransactionClient
 export async function acquireXactLock(tx: PrismaTx, key: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0)::bigint)`
 }
+
+/** Shares admission with readers while role changes retain the exclusive key. */
+export async function acquireSharedXactLock(tx: PrismaTx, key: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtextextended(${key}, 0)::bigint)`
+}

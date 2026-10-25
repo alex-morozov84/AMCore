@@ -15,6 +15,50 @@ const section = (start, end) => ({ start, end, retainEnd: true })
 const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
+  // Existing changelog history is retained; only this feature's marked entry is removed.
+  ...[
+    'ADMIN_CONSOLE_METRICS_URL',
+    'ADMIN_CONSOLE_LOGS_URL',
+    'ADMIN_CONSOLE_ALERTS_URL',
+    'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
+    '__Host-amcore_console_session',
+  ].map((identifier) =>
+    entry(
+      `console.changelog-history.${identifier}`,
+      'CHANGELOG.md',
+      { text: identifier },
+      [identifier],
+      { disposition: 'retain', operationKey: undefined }
+    )
+  ),
+  ...[
+    [
+      'support-mail-stand',
+      'docs/operations/local-stands.md',
+      'SUPPORT_MAIL_STAND',
+      'console.stand-commands',
+    ],
+    [
+      'support-mail-testing',
+      'docs/frontend/testing.md',
+      'SUPPORT_MAIL_TESTING',
+      'console.sessions-readability-guide',
+    ],
+    [
+      'support-mail-changelog',
+      'CHANGELOG.md',
+      'SUPPORT_MAIL_CHANGELOG',
+      'console.support-mail-changelog',
+    ],
+  ].map(([id, path, marker, operationKey]) =>
+    entry(
+      `console.${id}`,
+      path,
+      block(`<!-- AMCORE_CONSOLE_${marker}_START -->`, `<!-- AMCORE_CONSOLE_${marker}_END -->`),
+      [`AMCORE_CONSOLE_${marker}_START`],
+      { operationKey }
+    )
+  ),
   entry(
     'console.integrations-email-guide',
     'docs/email/README.md',

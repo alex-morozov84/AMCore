@@ -17,6 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js'
 
 import { AuthController } from './auth.controller.js'
 import { AuthService } from './auth.service.js'
+import { AuthMailModule } from './auth-mail.module.js'
 import { AvatarService } from './avatar.service.js'
 import { AbilityFactory } from './casl/ability.factory.js'
 import { EmailIdentityService } from './email-identity.service.js'
@@ -47,12 +48,12 @@ import { PrivilegedRoleService } from './privileged-role.service.js'
 import { SessionService } from './session.service.js'
 import { JwtStrategy } from './strategies/jwt.strategy.js'
 import { TokenService } from './token.service.js'
-import { TokenManagerService } from './token-manager.service.js'
 import { UserCacheService } from './user-cache.service.js'
 
 @Module({
   imports: [
     FrontendContextModule,
+    AuthMailModule,
     PrismaModule,
     InvitationAuthorityModule,
     PassportModule,
@@ -86,7 +87,6 @@ import { UserCacheService } from './user-cache.service.js'
     OAuthService,
     OAuthStateService,
     TokenService,
-    TokenManagerService,
     SessionService,
     JwtStrategy,
     OriginCheckGuard,

@@ -30,9 +30,15 @@ export async function preview(m, profile = 'default') {
     throw new Error('Notification work preview needs a fresh stand created with this profile')
   // AMCORE_CONSOLE_NOTIFICATION_PROFILE_END
   // AMCORE_CONSOLE_AI_PROFILE_START
-  profiles.push('ai-run-control', 'scheduled-jobs', 'integrations', 'login-diagnostics')
+  profiles.push(
+    'ai-run-control',
+    'scheduled-jobs',
+    'integrations',
+    'login-diagnostics',
+    'support-mail'
+  )
   if (
-    profile === 'login-diagnostics' &&
+    ['login-diagnostics', 'support-mail'].includes(profile) &&
     (!m.consoleEnabled || m.purpose !== 'preview' || m.fixtureProfile !== profile)
   )
     throw new Error('Login diagnostics needs a fresh enabled-Console stand with this profile')
@@ -131,6 +137,12 @@ export async function preview(m, profile = 'default') {
       const { loginDiagnosticsFixture } = await import('./login-diagnostics-fixture.mjs')
       await loginDiagnosticsFixture(m)
     }
+    if (profile === 'support-mail') {
+      const { supportMailFixture, supportMailFeedbackFixture } =
+        await import('./support-mail-fixture.mjs')
+      await supportMailFixture(m)
+      await supportMailFeedbackFixture(m)
+    }
     // AMCORE_CONSOLE_AI_FIXTURE_END
     for (const account of m.accounts) {
       const existing = await sql(
@@ -209,6 +221,10 @@ export async function preview(m, profile = 'default') {
           if (profile === 'notification-work') {
             const { notificationWorkPreview } = await import('./notification-work-fixture.mjs')
             await notificationWorkPreview(page, m, SUPPORTED_LOCALES)
+          }
+          if (profile === 'support-mail') {
+            const { supportMailPreview } = await import('./support-mail-preview.mjs')
+            await supportMailPreview(page, m, SUPPORTED_LOCALES)
           }
           if (profile === 'ai-run-control') {
             const { aiRunControlPreview } = await import('./ai-run-control-fixture.mjs')

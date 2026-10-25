@@ -1,3 +1,3 @@
-export { acquireXactLock } from './advisory-lock.js'
+export { acquireSharedXactLock, acquireXactLock } from './advisory-lock.js'
 export { PrismaModule } from './prisma.module.js'
 export { PrismaService } from './prisma.service.js'

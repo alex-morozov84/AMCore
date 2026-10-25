@@ -16,6 +16,7 @@ import {
 import { JobName, QueueName } from '../queue/constants/queues.constant.js'
 import { QueueService } from '../queue/queue.service.js'
 
+import { type DirectSecretResult, directSecretResult } from './direct-secret-result.js'
 import { sendEmailJobDataSchema } from './email.schema.js'
 import type {
   EmailProvider,
@@ -63,6 +64,38 @@ export class EmailService {
       { provider: emailProvider.constructor.name },
       `Email service initialized with ${emailProvider.constructor.name}`
     )
+  }
+
+  get supportsDirectSecretFence(): boolean {
+    return this.emailProvider.supportsDirectSecretFence === true
+  }
+
+  /** Already rendered secret mail. Caller retains the body in memory only and owns the durable attempt. */
+  async sendDirectSecret(
+    params: SendEmailParams,
+    template: RenderableEmailTemplate,
+    beforeTransport: () => void
+  ): Promise<DirectSecretResult> {
+    let entered = false
+    try {
+      if (!this.supportsDirectSecretFence) return { outcome: 'not_started', reason: 'precheck' }
+      const result = await this.send(
+        {
+          ...params,
+          beforeTransport: () => {
+            beforeTransport()
+            entered = true
+          },
+        },
+        { template, mode: 'direct' }
+      )
+      return directSecretResult(result, this.env.get('EMAIL_PROVIDER') === 'mock', entered)
+    } catch {
+      return {
+        outcome: entered ? 'unknown' : 'not_started',
+        reason: entered ? 'provider_failure' : 'precheck',
+      }
+    }
   }
 
   /** Frozen queued-email recipe; transport credentials and idempotency key are not serialized. */

@@ -1,9 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
-import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
 import type {
@@ -49,6 +47,8 @@ import {
 } from '../invitations/invitation-locks.js'
 import { NotificationsService } from '../notifications/notifications.service.js'
 
+import { AuthMailLimiter } from './auth-mail-limiter.service.js'
+import { lockAuthMailTokens } from './auth-mail-token-lock.js'
 import { avatarUrlOf } from './avatar-url.js'
 import { EmailIdentityService } from './email-identity.service.js'
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
@@ -87,13 +87,13 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
     private readonly tokenManager: TokenManagerService,
+    private readonly authMailLimiter: AuthMailLimiter,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
     private readonly userCacheService: UserCacheService,
     private readonly env: EnvService,
     private readonly emailIdentity: EmailIdentityService,
     private readonly auditLog: AuditLogService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache,
     private readonly loginRateLimiter: LoginRateLimiterService,
     private readonly notifications: NotificationsService,
     private readonly logger: PinoLogger,
@@ -580,7 +580,7 @@ export class AuthService {
   /** Send password reset email (silent fail for unknown emails) */
   async forgotPassword(email: string, frontend?: BrowserFrontendContext): Promise<void> {
     const emailCanonical = this.emailIdentity.canonicalize(email)
-    await this.checkRateLimit(`forgot:${emailCanonical}`, 3)
+    await this.authMailLimiter.reserve(emailCanonical, 'password_recovery')
 
     const user = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!user) return // Silent fail — prevent email enumeration
@@ -637,39 +637,15 @@ export class AuthService {
     const passwordHash = await argon2.hash(newPassword)
     const changedAt = new Date()
 
-    const consumed = await this.prisma.$transaction(async (tx) => {
-      // Atomic single-use consumption (closes the verify→update TOCTOU). The CAS
-      // predicate (`used: false` + not expired) re-evaluates under the row lock, so two
-      // concurrent resets serialize: the first matches 1 row and consumes the token; the
-      // second, after the first commits, matches 0 and is rejected. This keeps the reset
-      // — and the `account.password_changed:<id>` idempotency key — genuinely one per
-      // consumed token, not merely one sequentially.
-      const { count } = await tx.passwordResetToken.updateMany({
-        where: { id: resetTokenId, used: false, expiresAt: { gt: changedAt } },
-        data: { used: true, usedAt: changedAt },
-      })
-      if (count !== 1) return false
-
-      await tx.user.update({
-        where: { id: userId },
-        // Promote emailVerified: the reset token was delivered to and returned from
-        // the account email, proving control of that mailbox (OWASP Forgot Password /
-        // NIST 800-63B). This is done in the reset transaction so the verified-only
-        // notification-email resolver materializes the password-changed alert below
-        // even for a previously unverified account.
-        data: { passwordHash, emailVerified: true },
-      })
-      return true
-    })
-
-    if (!consumed) {
-      // A racing reset won the token between verify and the CAS — reject this one.
-      throw new AppException(
-        'Invalid or expired token',
-        HttpStatus.UNAUTHORIZED,
-        AuthErrorCode.TOKEN_INVALID
-      )
-    }
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SET LOCAL lock_timeout = '1000ms'`
+        await lockAuthMailTokens(tx, userId)
+        await this.tokenManager.consumeLocked(tx, token, 'password-reset', frontend)
+        await tx.user.update({ where: { id: userId }, data: { passwordHash, emailVerified: true } })
+      },
+      { maxWait: 2000, timeout: 4000 }
+    )
 
     await this.sessionService.deleteAllByUserId(userId)
     await this.userCacheService.invalidateUser(userId)
@@ -701,22 +677,16 @@ export class AuthService {
 
   /** Verify email address using token */
   async verifyEmail(token: string, frontend?: BrowserFrontendContext): Promise<void> {
-    const { userId, tokenHash } = await this.tokenManager.verifyEmailVerificationToken(
-      token,
-      frontend
+    const { userId } = await this.tokenManager.verifyEmailVerificationToken(token, frontend)
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SET LOCAL lock_timeout = '1000ms'`
+        await lockAuthMailTokens(tx, userId)
+        await this.tokenManager.consumeLocked(tx, token, 'email-verification', frontend)
+        await tx.user.update({ where: { id: userId }, data: { emailVerified: true } })
+      },
+      { maxWait: 2000, timeout: 4000 }
     )
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.emailVerificationToken.update({
-        where: { tokenHash },
-        data: { used: true, usedAt: new Date() },
-      })
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { emailVerified: true },
-      })
-    })
 
     await this.userCacheService.invalidateUser(userId)
 
@@ -726,12 +696,19 @@ export class AuthService {
   /** Resend verification email (silent fail if already verified) */
   async resendVerificationEmail(email: string, frontend?: BrowserFrontendContext): Promise<void> {
     const emailCanonical = this.emailIdentity.canonicalize(email)
-    await this.checkRateLimit(`resend-verification:${emailCanonical}`, 3)
+    await this.authMailLimiter.reserve(emailCanonical, 'email_verification')
 
     const user = await this.prisma.user.findUnique({ where: { emailCanonical } })
     if (!user || user.emailVerified) return // Silent fail
 
-    const { token } = await this.tokenManager.generateEmailVerificationToken(user.id, frontend)
+    let token: string
+    try {
+      ;({ token } = await this.tokenManager.generateEmailVerificationToken(user.id, frontend))
+    } catch (error) {
+      // Verification may finish while this request waits on the common token lock.
+      if (error instanceof AppException && error.errorCode === AuthErrorCode.TOKEN_INVALID) return
+      throw error
+    }
 
     const userLocale = coerceSupportedLocale(user.locale)
     const verificationUrl = localizedFrontendUrl(
@@ -763,22 +740,6 @@ export class AuthService {
         'Failed to send verification email'
       )
     }
-  }
-
-  /** Rate limit by key: max N requests per hour */
-  private async checkRateLimit(key: string, max: number): Promise<void> {
-    const cacheKey = `rate:${key}`
-    const count = ((await this.cache.get<number>(cacheKey)) ?? 0) + 1
-
-    if (count > max) {
-      throw new AppException(
-        'Too many requests. Please try again later.',
-        HttpStatus.TOO_MANY_REQUESTS,
-        AuthErrorCode.RATE_LIMIT_EXCEEDED
-      )
-    }
-
-    await this.cache.set(cacheKey, count, 3600 * 1000) // 1 hour TTL in ms
   }
 
   /** Map Prisma user to API response */

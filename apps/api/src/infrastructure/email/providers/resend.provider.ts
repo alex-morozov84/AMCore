@@ -47,6 +47,7 @@ const DETERMINISTIC_RESEND_ERROR_CODES: ReadonlySet<string> = new Set([
  */
 @Injectable()
 export class ResendEmailProvider implements EmailProvider {
+  readonly supportsDirectSecretFence = true as const
   private readonly resend: Resend
   readonly queuedEmail: QueuedEmailProvider = {
     recipeVersion: 1,
@@ -163,31 +164,27 @@ export class ResendEmailProvider implements EmailProvider {
   }
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
-    const { to, subject, html, text, from, replyTo, idempotencyKey, signal } = params
+    const { to, subject, html, text, from, replyTo, idempotencyKey, signal, beforeTransport } =
+      params
 
     try {
-      const { data, error, headers } = await this.resend.emails.send(
-        {
-          from: from || this.env.get('EMAIL_FROM'),
-          to: [to],
-          subject,
-          html,
-          text,
-          replyTo,
-        },
-        // The SECOND argument of `emails.send(payload, options)` — spread into `fetch`. The
-        // `Idempotency-Key` header lets retries de-duplicate at Resend (EQS-03); `signal` lets
-        // the delivery attempt's timeout/shutdown abort the request. `signal` is untyped in the
-        // SDK's `PostOptions` (hence the cast) and undocumented, so capacity correctness never
-        // depends on it — the dispatcher holds its slot until the call settles regardless.
-        // Undefined when neither is set.
+      const payload = {
+        from: from || this.env.get('EMAIL_FROM'),
+        to: [to],
+        subject,
+        html,
+        text,
+        replyTo,
+      }
+      // Installed SDK forwards these options to its immediate fetch; no retry is enabled here.
+      const options =
         idempotencyKey || signal
-          ? ({
-              ...(idempotencyKey ? { idempotencyKey } : {}),
-              ...(signal ? { signal } : {}),
-            } as { idempotencyKey?: string })
+          ? ({ ...(idempotencyKey ? { idempotencyKey } : {}), ...(signal ? { signal } : {}) } as {
+              idempotencyKey?: string
+            })
           : undefined
-      )
+      beforeTransport?.()
+      const { data, error, headers } = await this.resend.emails.send(payload, options)
 
       if (error) {
         const retryable = !DETERMINISTIC_RESEND_ERROR_CODES.has(error.name)
@@ -220,7 +217,9 @@ export class ResendEmailProvider implements EmailProvider {
         }
       }
 
-      this.logger.info({ id: data?.id, to: redactEmail(to) }, 'Email sent successfully via Resend')
+      if (typeof data?.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(data.id))
+        return { id: '', success: false, error: 'provider_failure', retryable: true }
+      this.logger.info({ id: data.id, to: redactEmail(to) }, 'Email sent successfully via Resend')
 
       return {
         id: data?.id || '',

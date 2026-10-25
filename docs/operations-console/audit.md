@@ -42,6 +42,12 @@ Storage interval changes appear as **Runtime setting changed**, with target
 baseline means the override was absent; the responding process's actual baseline
 is not stored as a fleet value. A matching no-op creates no change event.
 
+Support-mail events record link creation, transport admission and the settled
+attempt outcome. Their summary names the email type, bounded result/reason and
+whether issuance cancelled a previous same-type link. Provider acceptance does
+not establish inbox delivery or recipient completion. The current identity is
+not a historical recipient address. See [Help someone sign in](users.md#help-someone-sign-in).
+
 ## Narrow the events
 
 1. Choose up to ten values under **Event type**. An event matches when its

@@ -9,6 +9,10 @@ export const productAdminProfiles = [
   'product-admin-console-path',
   'product-admin-closed-signup',
   'product-admin-oauth',
+  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
+  'support-mail-path',
+  'support-mail-host',
+  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
 ]
 
 /** Copy-only topology rehearsal; never modifies the authoring checkout or runtime policy. */

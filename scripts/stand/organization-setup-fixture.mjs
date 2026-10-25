@@ -1,10 +1,18 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export const isOrganizationMailFixture = (m) =>
-  ['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-    m.fixtureProfile
-  )
+const mailFixtures = new Map([
+  ['organization-setup', 'mock'],
+  ['organization-provisioning', 'resend'],
+  ['product-admin-closed-signup', 'mock'],
+  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
+  ['support-mail-path', 'resend'],
+  ['support-mail-host', 'resend'],
+  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
+])
+
+export const isOrganizationMailFixture = (m) => mailFixtures.has(m.fixtureProfile)
+export const usesResendMailFixture = (m) => mailFixtures.get(m.fixtureProfile) === 'resend'
 
 export function assertOrganizationSetupFixture(m) {
   if (m.fixtureProfile === 'organization-shop' && (m.purpose !== 'e2e' || m.mocked))
@@ -18,7 +26,7 @@ export function assertOrganizationSetupFixture(m) {
 export async function prepareOrganizationSetupSource(m) {
   if (!isOrganizationMailFixture(m)) return
   assertOrganizationSetupFixture(m)
-  const provisioning = m.fixtureProfile === 'organization-provisioning'
+  const provisioning = usesResendMailFixture(m)
   const provider = provisioning ? 'resend' : 'mock'
   const path = join(
     m.snapshot,
@@ -43,11 +51,14 @@ export async function prepareOrganizationSetupSource(m) {
     if (!credential || !/^[a-f0-9]{64}$/.test(credential) || !/^[a-z0-9._+-]+@e2e\\.amcore\\.test$/i.test(params.to))
       return { success: false, id: '', retryable: false, error: 'Fixture delivery refused' }
     try {
-      const response = await fetch('http://mail-capture:8099/deliver', {
+      const destination = 'http://mail-capture:8099/deliver'
+      const options = {
         method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + credential },
         body: JSON.stringify({ to: params.to, html: params.html, text: params.text ?? '' }),
-        signal: AbortSignal.timeout(3000),
-      })
+        signal: params.signal ? AbortSignal.any([params.signal, AbortSignal.timeout(3000)]) : AbortSignal.timeout(3000),
+      }
+      params.beforeTransport?.()
+      const response = await fetch(destination, options)
       return { success: response.ok, id: response.ok ? 'fixture-captured' : '', retryable: false }
     } catch { return { success: false, id: '', retryable: false, error: 'Fixture delivery unavailable' } }
   }`

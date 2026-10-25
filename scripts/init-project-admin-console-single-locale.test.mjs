@@ -6,6 +6,8 @@ import { afterEach, describe, it } from 'node:test'
 import { INIT_PROJECT, commit, runInitProject } from './lib/init-project-test-helpers.mjs'
 import { createRealRepoCopy, git } from './lib/test-fixture.mjs'
 
+import { assertSupportMailProjection } from './lib/support-mail-scaffold-assertions.mjs'
+
 const copies = []
 const OTHER_LOCALE = { en: 'ru', ru: 'en' }
 
@@ -14,8 +16,10 @@ afterEach(() => copies.splice(0).forEach((fixture) => fixture.cleanup()))
 function copy() {
   const fixture = createRealRepoCopy()
   // Exercise the matching current proxy input alongside the current transform.
-  writeFileSync(path.join(fixture.root, "docker/caddy/Caddyfile.console-host"),
-    readFileSync(new URL("../docker/caddy/Caddyfile.console-host", import.meta.url)))
+  writeFileSync(
+    path.join(fixture.root, 'docker/caddy/Caddyfile.console-host'),
+    readFileSync(new URL('../docker/caddy/Caddyfile.console-host', import.meta.url))
+  )
   commit(fixture.root)
   copies.push(fixture)
   return fixture.root
@@ -27,6 +31,13 @@ function apply(root, args) {
 }
 
 function assertSingleLocale(root, locale, { mode = 'path', slug = 'admin' } = {}) {
+  assertSupportMailProjection(root, mode !== 'disabled', locale)
+  const apiTest = readFileSync(
+    path.join(root, 'apps/api/test/admin-support-mail.e2e-spec.ts'),
+    'utf8'
+  )
+  assert.ok(apiTest.includes("toContain('/reset-password?token=')"))
+  assert.ok(apiTest.includes(`locale: '${locale}'`))
   assert.equal(existsSync(path.join(root, 'apps/web/src/app/[locale]')), false)
   assert.equal(existsSync(path.join(root, `apps/web/messages/${locale}.json`)), true)
   assert.equal(existsSync(path.join(root, `apps/web/messages/${OTHER_LOCALE[locale]}.json`)), false)

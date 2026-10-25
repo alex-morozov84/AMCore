@@ -11,6 +11,7 @@ import { allocate } from './ports.mjs'
 import { engine } from './docker.mjs'
 import {
   assertOrganizationSetupFixture,
+  isOrganizationMailFixture,
   prepareOrganizationSetupSource,
 } from './organization-setup-fixture.mjs'
 
@@ -21,8 +22,14 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     throw new Error('Path OAuth HTTPS fixture requires the enabled Console rehearsal')
   const productAdminHost =
     !pathOAuth && (choices.productAdminHost || productAdminProfiles.includes(fixtureProfile))
-  const consoleTopology =
+  let consoleTopology =
     fixtureProfile === 'product-admin-three-host' ? 'host' : choices.consoleTopology
+  // AMCORE_CONSOLE_SUPPORT_MAIL_POLICY_START
+  if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
+    if (!choices.consoleEnabled) throw new Error('Support mail E2E requires enabled Console')
+    consoleTopology = fixtureProfile === 'support-mail-host' ? 'host' : 'path'
+  }
+  // AMCORE_CONSOLE_SUPPORT_MAIL_POLICY_END
   topology ??= pathOAuth ? 'host' : productAdminHost ? 'host' : choices.topology
   if (productAdminHost && topology !== 'host')
     throw new Error('Staff rehearsal requires HTTPS transport')
@@ -66,9 +73,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     consoleTopology,
     fixtureVersion: 2,
     fixtureProfile,
-    ...(['organization-setup', 'organization-provisioning', 'product-admin-closed-signup'].includes(
-      fixtureProfile
-    )
+    ...(isOrganizationMailFixture({ fixtureProfile })
       ? { mailCaptureKey: randomBytes(32).toString('hex') }
       : {}),
     mocked,
@@ -96,6 +101,12 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   m.sourceHash = await snapshot(root, m.snapshot)
   await prepareOrganizationSetupSource(m)
   // AMCORE_CONSOLE_HOST_SNAPSHOT_START
+  if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
+    const file = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')
+    const value = await readFile(file, 'utf8')
+    if (!value.includes('enabled: true')) throw new Error('Support mail Console disabled')
+    await writeFile(file, value.replace(/mode: '(?:path|host)'/, `mode: '${consoleTopology}'`))
+  }
   if (
     topology === 'host' &&
     (!productAdminHost || (choices.consoleEnabled && consoleTopology === 'host'))

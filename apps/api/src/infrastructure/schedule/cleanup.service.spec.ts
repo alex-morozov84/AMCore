@@ -19,6 +19,10 @@ describe('CleanupService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
+    prisma.$transaction.mockImplementation(
+      async (action: unknown) => (action as (tx: PrismaClient) => Promise<unknown>)(prisma) as never
+    )
+    prisma.$executeRaw.mockResolvedValue(0)
     retention = { prune: jest.fn().mockResolvedValue({ count: 0 }) }
     // Default: behave like the lock was won — execute the task immediately so the
     // sweep runs. The lock orchestration itself is covered in the executor's spec.
@@ -48,7 +52,21 @@ describe('CleanupService', () => {
   }
 
   describe('runCleanup', () => {
-    it('deletes all six types of expired records and returns counts', async () => {
+    it('reports support-mail deletion counts and isolates its database failure', async () => {
+      zeroAll()
+      prisma.$executeRaw.mockResolvedValueOnce(0).mockResolvedValueOnce(1000)
+      expect((await service.runCleanup()).expiredSupportMailAttempts).toBe(1000)
+      prisma.$executeRaw.mockRejectedValue(new Error('timeout'))
+      prisma.session.deleteMany.mockResolvedValue({ count: 2 })
+      expect(await service.runCleanup()).toEqual(
+        expect.objectContaining({
+          expiredSupportMailAttempts: 0,
+          expiredSessions: 2,
+          failures: ['expiredSupportMailAttempts'],
+        })
+      )
+    })
+    it('deletes all seven types of expired records and returns counts', async () => {
       prisma.session.deleteMany.mockResolvedValue({ count: 5 })
       prisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 3 })
       prisma.emailVerificationToken.deleteMany.mockResolvedValue({ count: 7 })
@@ -66,6 +84,7 @@ describe('CleanupService', () => {
         staleTerminalApiKeys: 2,
         expiredPendingInvites: 4,
         staleTerminalInvites: 1,
+        expiredSupportMailAttempts: 0,
         failures: [],
       })
     })
@@ -112,6 +131,7 @@ describe('CleanupService', () => {
         staleTerminalApiKeys: 0,
         expiredPendingInvites: 0,
         staleTerminalInvites: 0,
+        expiredSupportMailAttempts: 0,
         failures: [],
       })
     })
@@ -141,10 +161,11 @@ describe('CleanupService', () => {
       prisma.emailVerificationToken.deleteMany.mockRejectedValue(new Error('x'))
       prisma.apiKey.deleteMany.mockRejectedValue(new Error('x'))
       retention.prune.mockRejectedValue(new Error('x'))
+      prisma.$executeRaw.mockRejectedValue(new Error('x'))
 
       const result = await service.runCleanup()
 
-      expect(result.failures).toHaveLength(6)
+      expect(result.failures).toHaveLength(7)
       expect(result.expiredSessions).toBe(0)
     })
   })
@@ -180,6 +201,7 @@ describe('CleanupService', () => {
       prisma.emailVerificationToken.deleteMany.mockRejectedValue(new Error('db'))
       prisma.apiKey.deleteMany.mockRejectedValue(new Error('db'))
       retention.prune.mockRejectedValue(new Error('db'))
+      prisma.$executeRaw.mockRejectedValue(new Error('db'))
       await service.scheduledCleanup()
       expect(scheduled.results[1]).toEqual(
         expect.objectContaining({ outcome: 'failed', code: 'all_buckets_failed' })

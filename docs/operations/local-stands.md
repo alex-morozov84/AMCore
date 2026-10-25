@@ -96,6 +96,31 @@ to this fixture. It cannot reuse a preview or send mail to ordinary addresses.
 
 <!-- AMCORE_CONSOLE_PROVISIONING_STAND_END -->
 
+<!-- AMCORE_CONSOLE_SUPPORT_MAIL_STAND_START -->
+
+### Support-mail recipient completion
+
+Use fresh, separate website/staff/Console fixtures:
+
+```sh
+pnpm stand e2e --lane product-admin-real-stack --fixture support-mail-path -- console-support-mail.spec.ts
+pnpm stand e2e --lane product-admin-real-stack --fixture support-mail-host -- console-support-mail.spec.ts
+```
+
+Both fixtures use fake Resend credentials and redirect every supported provider
+entry path inside the source snapshot to the internal collector. The direct
+replacement preserves the final synchronous transport callback. These runs
+prove rendered links and recipient completion, not external inbox delivery.
+They retain only step-free list results, with trace/video/screenshots disabled.
+
+For manual inspection use a separate mock preview:
+`pnpm stand preview --id support-mail-review --profile support-mail`.
+It prepares fake targets and labelled historical examples, preserves later owner
+actions on refresh, and sends no real email. It has no collector. Do not use
+preview examples as retention, elapsed-time or recipient-completion proof.
+
+<!-- AMCORE_CONSOLE_SUPPORT_MAIL_STAND_END -->
+
 <!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_START -->
 
 Test the same lifecycle through the HTTPS Console with:

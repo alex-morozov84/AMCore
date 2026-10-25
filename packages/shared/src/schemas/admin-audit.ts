@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import { CORRELATION_ID_PATTERN } from '../constants/correlation-id'
 
+import { SUPPORT_MAIL_KINDS } from './admin-support-mail'
+
 export const auditDisplayIdSchema = z
   .string()
   .min(1)
@@ -83,6 +85,12 @@ const summaryCode = z
   .string()
   .max(64)
   .regex(/^[a-z][a-z0-9_]*$/)
+export const auditMailSummarySchema = z.strictObject({
+  attemptId: z.uuid().optional(),
+  kind: z.enum(SUPPORT_MAIL_KINDS).optional(),
+  provider: z.enum(['resend', 'mock']).optional(),
+  tokenIssued: z.boolean().optional(),
+})
 export const auditSummarySchema = z
   .object({
     beforeIntervalSeconds: z.number().int().min(30).max(3600).nullable().optional(),
@@ -95,6 +103,7 @@ export const auditSummarySchema = z
     decision: summaryCode.optional(),
     reasonCode: summaryCode.optional(),
     outcome: summaryCode.optional(),
+    mail: auditMailSummarySchema.optional(),
   })
   .strict()
 

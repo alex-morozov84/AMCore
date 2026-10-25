@@ -80,6 +80,19 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one('apps/web/src/features/console-user-support-mail/model/use-support-mail.test.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/console-user-support-mail/ui/SupportMailDialog.test.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.test.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+
     one('apps/web/src/shared/ui/alert.stories.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/shared/ui/role-checklist.test.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/shared/ui/role-checklist.stories.tsx', { disposition: 'rewrite' }),
@@ -144,6 +157,7 @@ export const localeSurfaceRoots = [
   'scripts/fixtures/lint/web.json',
   'apps/api/prisma/user.prisma',
   'apps/api/prisma/migrations/20260801103725_default_locale_en_timezone_utc/migration.sql',
+  'apps/api/test/admin-support-mail.e2e-spec.ts',
   'apps/api/test/auth.e2e-spec.ts',
   'apps/api/test/oauth.e2e-spec.ts',
   'apps/api/src',

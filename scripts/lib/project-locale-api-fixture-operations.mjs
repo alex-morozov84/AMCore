@@ -1,5 +1,6 @@
 import { claim, localeParams } from './project-locale-ast-helpers.mjs'
 import {
+  dropLocalePrefixLiterals,
   normalizeLocaleLiterals,
   normalizeRussianFixtureLiterals,
   rewriteAuthServiceSpecialCase,
@@ -11,6 +12,7 @@ import {
 
 const variants = [
   'simple',
+  'unprefixed-links',
   'all-locales',
   'auth-service',
   'password-definition',
@@ -24,8 +26,10 @@ const paramsSchema = (params) =>
 function apiFixture(model, { locale, variant }, ctx) {
   if (variant === 'password-definition') return rewritePasswordDefinition(model, locale, ctx)
   if (variant === 'definition-registry') return rewriteRegistryDefinition(model, locale, ctx)
-  if (variant === 'simple') normalizeRussianFixtureLiterals(model, locale, ctx)
+  if (['simple', 'unprefixed-links'].includes(variant))
+    normalizeRussianFixtureLiterals(model, locale, ctx)
   else normalizeLocaleLiterals(model, locale, ctx)
+  if (variant === 'unprefixed-links') dropLocalePrefixLiterals(model, ctx)
   if (variant === 'auth-service') rewriteAuthServiceSpecialCase(model, ctx)
 }
 

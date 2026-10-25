@@ -1,6 +1,7 @@
 import { localeContent } from './project-locale-fact-helpers.mjs'
 
 const simple = [
+  'apps/api/src/core/admin/support-mail/support-mail-dispatch.service.spec.ts',
   'apps/api/src/core/auth/auth.controller.spec.ts',
   'apps/api/src/core/admin/admin.service.spec.ts',
   'apps/api/src/core/auth/session.service.spec.ts',
@@ -9,6 +10,7 @@ const simple = [
 ]
 
 const fixtures = [
+  ['apps/api/test/admin-support-mail.e2e-spec.ts', 'locale.api-fixture', 'unprefixed-links'],
   ['apps/api/src/core/auth/oauth/oauth.service.spec.ts', 'locale.api-fixture', 'all-locales'],
   [
     'apps/api/src/core/notifications/channels/email-channel.deliverer.spec.ts',

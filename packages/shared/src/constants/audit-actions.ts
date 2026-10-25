@@ -1,5 +1,9 @@
 /** Current semantic actions offered by the Console selector. Historical codes remain queryable. */
 export const AUDIT_ACTIONS = [
+  'admin.user.support_mail_requested',
+  'admin.user.support_mail_dispatching',
+  'admin.user.support_mail_settled',
+  'admin.user.support_mail_refused',
   'org.administrator_invitation_created',
   'org.administrator_invitation_reissued',
   'org.administrator_invitation_replaced',

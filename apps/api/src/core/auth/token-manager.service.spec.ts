@@ -42,6 +42,14 @@ describe('TokenManagerService', () => {
 
   beforeEach(() => {
     mockCtx = createMockContext()
+    ;(mockCtx.prisma.$transaction as jest.Mock).mockImplementation(
+      (fn: (tx: typeof mockCtx.prisma) => Promise<unknown>) => fn(mockCtx.prisma)
+    )
+    ;(mockCtx.prisma.$queryRaw as jest.Mock).mockImplementation(async (query: unknown) =>
+      String(query).includes('clock_timestamp') ? [{ now: new Date() }] : []
+    )
+    mockCtx.prisma.$executeRaw.mockResolvedValue(1)
+    mockCtx.prisma.user.findUnique.mockResolvedValue({ emailVerified: false } as never)
 
     envService = {
       get: jest.fn((key: string) => {
@@ -139,17 +147,15 @@ describe('TokenManagerService', () => {
 
   describe('consumePasswordResetToken()', () => {
     it('should mark token as used', async () => {
-      mockCtx.prisma.passwordResetToken.update.mockResolvedValue({
-        ...mockResetToken,
-        used: true,
-      })
+      mockCtx.prisma.passwordResetToken.findUnique.mockResolvedValue(mockResetToken)
 
       await service.consumePasswordResetToken('a'.repeat(64))
 
-      expect(mockCtx.prisma.passwordResetToken.update).toHaveBeenCalledWith({
-        where: expect.objectContaining({ tokenHash: expect.any(String) }),
-        data: { used: true, usedAt: expect.any(Date) },
-      })
+      const updates = mockCtx.prisma.$executeRaw.mock.calls.filter(([sql]) =>
+        String(sql).includes('UPDATE core.password_reset_tokens')
+      )
+      expect(updates).toHaveLength(1)
+      expect(String(updates[0]![0])).toContain('"expiresAt">clock_timestamp()')
     })
   })
 
@@ -225,17 +231,15 @@ describe('TokenManagerService', () => {
 
   describe('consumeEmailVerificationToken()', () => {
     it('should mark token as used', async () => {
-      mockCtx.prisma.emailVerificationToken.update.mockResolvedValue({
-        ...mockVerificationToken,
-        used: true,
-      })
+      mockCtx.prisma.emailVerificationToken.findUnique.mockResolvedValue(mockVerificationToken)
 
       await service.consumeEmailVerificationToken('a'.repeat(64))
 
-      expect(mockCtx.prisma.emailVerificationToken.update).toHaveBeenCalledWith({
-        where: expect.objectContaining({ tokenHash: expect.any(String) }),
-        data: { used: true, usedAt: expect.any(Date) },
-      })
+      const updates = mockCtx.prisma.$executeRaw.mock.calls.filter(([sql]) =>
+        String(sql).includes('UPDATE core.email_verification_tokens')
+      )
+      expect(updates).toHaveLength(1)
+      expect(String(updates[0]![0])).toContain('"expiresAt">clock_timestamp()')
     })
   })
 

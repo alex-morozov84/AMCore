@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+<!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_START -->
+
+- Operations Console user details can send audited verification and password
+  recovery mail to the saved address, with confirmation, recent authentication,
+  shared recipient limits and recoverable results.
+
+<!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_END -->
+
 - CI fails a change that pushes any web page's first-load JavaScript over its
   per-page budget (`pnpm check:route-budgets`, also run in generated scaffold
   variants). The check fails closed when Next's build measurement is incomplete.

@@ -14,6 +14,7 @@ import {
   ResourceErrorCode,
   RoleDefinitionErrorCode,
   SUPPORTED_LOCALES,
+  SupportMailErrorCode,
   WORK_REASONS,
 } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
@@ -36,6 +37,7 @@ const backendCodes = [
   ...Object.values(ResourceErrorCode),
   ...Object.values(InfrastructureErrorCode),
   ...Object.values(IntegrationErrorCode),
+  ...Object.values(SupportMailErrorCode),
   ...Object.values(ApiKeyScopeErrorCode),
   ...Object.values(MemberApiKeyErrorCode),
   ...Object.values(InviteErrorCode),

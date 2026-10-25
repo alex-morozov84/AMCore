@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 import { activeTarget, outputPaths, testOptions } from './e2e/support/managed-target.mjs'
 
-export default defineConfig({
+const config = defineConfig({
   ...outputPaths(),
   testDir: './e2e/product-admin-real-stack',
   testMatch:
@@ -26,7 +26,18 @@ export default defineConfig({
     ...testOptions(),
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    video: 'off',
     serviceWorkers: 'block',
   },
   projects: [{ name: 'product-admin-real-stack', use: { ...devices['Desktop Chrome'] } }],
 })
+
+// AMCORE_CONSOLE_SUPPORT_MAIL_OPTIONS_START
+if (['support-mail-path', 'support-mail-host'].includes(activeTarget().fixtureProfile ?? '')) {
+  config.testMatch = '**/console-support-mail.spec.ts'
+  config.retries = 0
+  config.use = { ...config.use, trace: 'off', screenshot: 'off', video: 'off' }
+}
+// AMCORE_CONSOLE_SUPPORT_MAIL_OPTIONS_END
+
+export default config
