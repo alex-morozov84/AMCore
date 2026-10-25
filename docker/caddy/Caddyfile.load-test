@@ -1,0 +1,72 @@
+# Temporary load-test edge for a disposable deployment only. Never use it in production.
+# Selected by docker/compose/load-test.yml; see docs/operations/load-testing.md.
+#
+# :443 sites are the ordinary product-web path edge, identical to Caddyfile.web (a static
+# test compares them). :8443 is the test entry: every request needs a client certificate
+# from LOAD_TEST_CLIENT_CA_DIR, and only there does Caddy accept one synthetic visitor
+# address in X-Forwarded-For from the generator's exact address. The certificate holder
+# can therefore choose visitor addresses; that is the purpose and the risk of this file.
+{
+	email {$CADDY_EMAIL}
+	servers :8443 {
+		trusted_proxies static {$LOAD_TEST_GENERATOR_IP}/32
+		trusted_proxies_strict
+		# The Host header must match the certificate-checked TLS name, so a connection made
+		# under another name cannot reach these sites without the client certificate.
+		strict_sni_host on
+	}
+}
+
+{$CADDY_DOMAIN} {
+	reverse_proxy api:5002 {
+		# The API trusts this header only from TRUSTED_WEB_PEERS (the web BFF relay). A client
+		# must never deliver it through the edge, whatever that setting is.
+		header_up -X-AMCore-Client-Ip
+	}
+}
+
+{$CADDY_WEB_DOMAIN} {
+	reverse_proxy web:3000 {
+		header_up Host {hostport}
+	}
+}
+
+(load_test_entry) {
+	tls {
+		client_auth {
+			mode require_and_verify
+			trust_pool file /etc/caddy/load-test-ca/ca.crt
+		}
+	}
+	log {
+		output file /data/load-test-access.log {
+			roll_size 100MiB
+			roll_keep 10
+		}
+		format json
+	}
+	# Exactly one IPv4 visitor address from the benchmark range 198.18.0.0/15. The placeholder
+	# joins repeated headers with commas, so a second X-Forwarded-For line fails the match
+	# (header_regexp would test the first line only).
+	@not_synthetic not vars_regexp {http.request.header.X-Forwarded-For} ^198\.1[89]\.(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])$
+	respond @not_synthetic "load test: one synthetic X-Forwarded-For required" 400
+}
+
+{$CADDY_DOMAIN}:8443 {
+	import load_test_entry
+	reverse_proxy api:5002 {
+		header_up X-Forwarded-For {client_ip}
+		header_up -X-AMCore-Client-Ip
+	}
+}
+
+{$CADDY_WEB_DOMAIN}:8443 {
+	import load_test_entry
+	reverse_proxy web:3000 {
+		# The web app sees its ordinary public host; the relay reads X-Forwarded-For.
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-For {client_ip}
+		header_up -X-AMCore-Client-Ip
+	}
+}

@@ -107,4 +107,5 @@ not be separated from the variation between runs.
 
 Measure again before relying on these numbers after a Next.js or NestJS major
 upgrade, a new always-on module or background job, a change of process roles, a
-failed route budget check, or a different host class.
+failed route budget check, or a different host class. [Load testing](load-testing.md)
+repeats this measurement with the same mix, steps and result rules.

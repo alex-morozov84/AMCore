@@ -60,6 +60,72 @@ test('shipped Caddy sources never trust forwarded client addresses', () => {
   for (const path of CADDY_SOURCES) assert.doesNotMatch(read(path), /trusted_proxies/, path)
 })
 
+// The load-test edge is the one file allowed to trust a forwarded address. Its adapted
+// JSON is checked against the pinned Caddy by `scripts/load-test/preflight.sh plan`
+// (caddy-check.mjs); this fast test pins the source text, so the normal edge cannot drift.
+const LOAD_TEST = 'docker/caddy/Caddyfile.load-test'
+const siteBlocks = (text) =>
+  text.replace(/^#.*\n/gm, '').match(/^\{\$CADDY_(?:WEB_)?DOMAIN\} \{\n[\s\S]*?\n\}$/gm)
+
+test('the load-test edge keeps the normal :443 sites and limits trust to :8443', () => {
+  const text = read(LOAD_TEST)
+  assert.deepEqual(siteBlocks(text), siteBlocks(read('docker/caddy/Caddyfile.web')))
+  const global = text.match(/^\{\n([\s\S]*?)\n\}$/m)[1]
+  const server = global.match(/servers :8443 \{([\s\S]*?)\n\t\}/)?.[1] ?? ''
+  assert.match(server, /trusted_proxies static \{\$LOAD_TEST_GENERATOR_IP\}\/32\n/)
+  assert.match(server, /trusted_proxies_strict\n/)
+  assert.match(server, /strict_sni_host on$/m)
+  assert.equal(text.match(/trusted_proxies /g).length, 1, 'one trust setting only')
+  assert.equal(global.match(/servers/g).length, 1, 'no other server options block')
+  const tests = text.match(/^\{\$CADDY_(?:WEB_)?DOMAIN\}:8443 \{[\s\S]*?\n\}$/gm)
+  assert.equal(tests.length, 2)
+  for (const site of tests) {
+    assert.match(site, /^\timport load_test_entry$/m)
+    assert.match(site, /header_up X-Forwarded-For \{client_ip\}/)
+    assert.match(site, /header_up -X-AMCore-Client-Ip/)
+  }
+  const entry = text.match(/^\(load_test_entry\) \{[\s\S]*?\n\}$/m)[0]
+  assert.match(
+    entry,
+    /mode require_and_verify\n\t\t\ttrust_pool file \/etc\/caddy\/load-test-ca\/ca\.crt/
+  )
+  assert.match(entry, /respond @not_synthetic .* 400/)
+  assert.equal(
+    (text.match(/:8443 \{/g) ?? []).length,
+    3,
+    'only the two test sites and the server option use :8443'
+  )
+})
+
+test('the load-test overlay is opt-in, pinned and labels its database volume', () => {
+  const overlay = compose('docker/compose/load-test.yml')
+  const lib = read('scripts/load-test/lib.sh')
+  assert.match(overlay.services.caddy.image, /^caddy:[0-9.]+-alpine@sha256:[0-9a-f]{64}$/)
+  assert.ok(
+    lib.includes(`CADDY_IMAGE=${overlay.services.caddy.image}\n`),
+    'lib.sh pins the same Caddy'
+  )
+  assert.match(lib, /^K6_IMAGE=grafana\/k6@sha256:[0-9a-f]{64}$/m)
+  assert.match(overlay.services.caddy.volumes[1], /^\$\{LOAD_TEST_CLIENT_CA_DIR:\?/)
+  assert.match(
+    overlay.volumes.postgres_data_pg18.labels['org.amcore.load-test'],
+    /^\$\{LOAD_TEST_RUN_ID:\?/
+  )
+  assert.deepEqual(overlay.services['load-fixture'].profiles, ['load-test'])
+  assert.equal(overlay.services['load-fixture'].restart, 'no')
+  assert.equal(overlay.services['load-fixture'].build.target, 'build')
+  for (const path of [
+    'docs/operations/single-host-compose.md',
+    'docker-compose.yml',
+    '.env.example',
+  ])
+    assert.doesNotMatch(
+      read(path),
+      /load-test\.yml/,
+      `${path} must not enable the load-test overlay`
+    )
+})
+
 test('reference nginx API locations strip the BFF relay claim', () => {
   const doc = read('docs/operations/deployment.md')
   const locations = doc.match(/location [^{]+\{[^}]*proxy_pass http:\/\/api:5002;[^}]*\}/g)
