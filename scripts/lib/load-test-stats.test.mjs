@@ -109,3 +109,13 @@ test('only test-entry records count: same-name requests on other entries are rep
     /no test-entry records/
   )
 })
+
+test("Caddy's real rolled file name is read (fresh-host control step)", () => {
+  // Caddy names a size-rolled file with a reason suffix; the control step lost its first
+  // seconds when an earlier pattern skipped it.
+  const d = dir({
+    'load-test-access-2026-10-25T16-15-38.142-size.log.gz': gzipSync(`${rec(100.5, '/a')}\n`),
+    'load-test-access.log': `${rec(101.5, '/a')}\n`,
+  })
+  assert.equal(windowStats(readRecords(d), 100, 102).requests, 2)
+})

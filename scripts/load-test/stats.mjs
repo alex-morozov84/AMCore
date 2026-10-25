@@ -7,7 +7,10 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
 
-const LOG = /^load-test-access(-[0-9T.:-]+)?\.log(\.gz)?$/
+// Current file and Caddy's rolled files, e.g. load-test-access-2026-10-25T16-15-38.142-size.log.gz
+// (the roll suffix names the reason; a fresh-host control step once lost its first seconds
+// because an earlier pattern did not accept "-size").
+const LOG = /^load-test-access(-[0-9T.:-]+(-[a-z]+)?)?\.log(\.gz)?$/
 
 export function readRecords(dir) {
   const records = []
