@@ -179,12 +179,10 @@ and the public HTTPS `FRONTEND_URL` on both API and worker through the deploymen
 configuration. Keep secret-link tracking disabled and redact token query strings
 at ingress before sending. Use the production provider settings, not the mock.
 
-Agree on recipients and a send limit before starting. One registration sends two
-messages: a non-secret welcome through the worker and direct email verification.
-A password-recovery request sends one further direct message. Expect three
-messages per supported language: six for two languages, three for a single-locale
-fork. Use only the deployment's retained languages and approved mailbox aliases;
-do not send to unrelated addresses or perform a bulk campaign.
+Approve recipients and a send limit before starting. The complete scenario sends
+four messages per language: welcome, verification, reset link and an automatic
+password-change alert. Allow eight for EN/RU or four for a single-locale fork.
+Use only retained languages and approved recipients.
 
 1. Register a test account in the first supported language. Observe both welcome and verification mail.
    Correlate the welcome's worker job completion with the provider message and receipt.
@@ -192,24 +190,28 @@ do not send to unrelated addresses or perform a bulk campaign.
    language and verified account state. Never copy the live URL into logs or reports.
 3. Request password recovery. Check the received link's origin and language, set
    a new test password, and verify sign-in. Reusing the consumed token must fail.
+   Confirm the automatic password-change alert from the notification worker.
 4. Repeat with a separate account for each other supported language.
 
 ```text
-Registration -> API direct verification -> provider -> recipient mail server -> mailbox
-             -> queue -> worker welcome -> provider -> recipient mail server -> mailbox
+Registration -> API -> verification email
+             -> email queue -> worker -> welcome email
+Password recovery -> API -> reset-link email
+Password changed -> notification worker -> security email
 ```
 
-Record these results separately: application response, worker completion for welcome,
-provider acceptance/message ID, provider delivery event, actual mailbox receipt,
-language/link checks and successful account action. Resend `delivered` means the
-recipient mail server accepted the message; it does not prove inbox placement.
+Record these results separately: application response, welcome job completion,
+security-notification delivery, provider acceptance/message ID, provider delivery
+event, actual mailbox receipt, language/link checks and successful account action.
+Resend `delivered` means the recipient mail server accepted the message; it does not prove inbox placement.
 Check spam separately. A product HTTP 200/201 does not prove any mail arrived.
 
 Observe the provider and mailbox for up to ten minutes. Missing receipt is unresolved,
 not proof that no message was sent. Do not automatically resend after timeout or
 connection loss. Inspect the existing attempt before approving another send; obey
 the agreed limit. Test provider failure with local doubles instead of deliberately
-sending invalid mail through a real account. The direct route has no queue retry.
+sending invalid mail through a real account. Direct verification and reset mail
+have no queue retry.
 
 Keep only allowlisted IDs, status codes, timestamps and test outcomes in evidence.
 A full provider retrieve response includes recipient data, rendered bodies and live
