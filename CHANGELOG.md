@@ -100,6 +100,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Password login/step-up preserve aggregate IP failure debt on success and record
+  parallel failures atomically. Verified visitor IP selects their budget when
+  configured; protection failures return503 without issuing credentials.
+- Server-to-API calls share a required-source IP relay and reject automatic
+  redirects. Lint diagnoses bypasses in new runtime web source.
+
 - Headless administration examples preserve initialized project choices, replace
   existing mounts and keep unknown results locked until explicit safe recovery.
 

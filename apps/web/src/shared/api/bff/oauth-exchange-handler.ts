@@ -78,11 +78,11 @@ export async function handleOAuthExchange(
   try {
     user = await fetchCurrentUser(exchange.accessToken, request.headers, undefined, context)
   } catch (error) {
-    if (!exchange.invitation) await revokeBackendSession(refreshToken)
+    if (!exchange.invitation) await revokeBackendSession(refreshToken, request.headers)
     return failureRedirect(request, locale, error, context)
   }
   if (!user) {
-    if (!exchange.invitation) await revokeBackendSession(refreshToken)
+    if (!exchange.invitation) await revokeBackendSession(refreshToken, request.headers)
     return failureRedirect(request, locale, undefined, context)
   }
 
@@ -138,7 +138,7 @@ export async function handleOAuthExchange(
       throw error
     }
   } catch (error) {
-    await revokeBackendSession(refreshToken)
+    await revokeBackendSession(refreshToken, request.headers)
     return failureRedirect(request, locale, error, context)
   }
 

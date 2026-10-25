@@ -16,6 +16,7 @@ import {
 export async function preview(m, profile = 'default') {
   const profiles = [
     'default',
+    'client-ip',
     'user',
     'organization',
     'organization-roles',
@@ -59,7 +60,10 @@ export async function preview(m, profile = 'default') {
   const { SUPPORTED_LOCALES } = require('@amcore/shared')
   const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
   await mkdir(tmp, { recursive: true, mode: 0o700 })
-  const proxy = await relay(Object.values(m.origins))
+  const proxy = await relay(
+    Object.values(m.origins),
+    profile === 'client-ip' ? { origin: m.origins.product, visitorIp: '203.0.113.75' } : undefined
+  )
   let api, browser
   try {
     api = await request.newContext({
@@ -144,6 +148,15 @@ export async function preview(m, profile = 'default') {
       await supportMailFeedbackFixture(m)
     }
     // AMCORE_CONSOLE_AI_FIXTURE_END
+    if (profile === 'client-ip') {
+      const { clientIpPreview } = await import('./client-ip-fixture.mjs')
+      const context = await browser.newContext({ baseURL: m.origins.product })
+      try {
+        await clientIpPreview(await context.newPage(), m, m.accounts[0], labels)
+      } finally {
+        await context.close()
+      }
+    }
     for (const account of m.accounts) {
       const existing = await sql(
         m,

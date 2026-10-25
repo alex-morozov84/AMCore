@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createServer, type Server } from 'node:http'
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { withinContextDeadline } from './context-deadline'
@@ -11,6 +11,7 @@ import { FakeVaultStore, makeEntry } from './test-fakes'
 import { SimpleLock } from './test-lock-fakes'
 
 vi.mock('server-only', () => ({}))
+afterEach(() => vi.unstubAllEnvs())
 
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve, reject) => {
@@ -35,6 +36,7 @@ describe('context deadline native waiting/cancellation', () => {
       response.write('{"name":')
     })
     const apiBase = await listen(server)
+    vi.stubEnv('API_URL', apiBase)
     const entry = makeEntry({ userSnapshot: { id: 'actor' } as never })
     const store = new FakeVaultStore()
     store.seed('owned-session', entry)

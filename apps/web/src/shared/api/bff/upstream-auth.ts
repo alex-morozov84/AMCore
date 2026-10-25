@@ -1,10 +1,12 @@
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import { extractCookieValue } from './set-cookie'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const REFRESH_COOKIE_NAME = 'refresh_token'
 
 /** The backend's own `ApiErrorResponse` shape, forwarded verbatim (status + body). */
@@ -38,17 +40,17 @@ export interface UpstreamAuthResult<TUser> {
 export async function callUpstreamAuth<TUser>(
   path: string,
   body: unknown,
-  originalRequest?: Request,
+  originalRequest: Request,
   context?: ProductWebContext
 ): Promise<UpstreamAuthResult<TUser>> {
-  const acceptLanguage = originalRequest?.headers.get('accept-language')
+  const acceptLanguage = originalRequest.headers.get('accept-language')
 
-  const response = await fetch(`${API_URL}/api/v1${path}`, {
+  const response = await fetchBackendResponse(`${API_URL}/api/v1${path}`, originalRequest.headers, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
-      ...sessionMetadataHeaders(originalRequest?.headers ?? new Headers()),
+      ...sessionMetadataHeaders(originalRequest.headers),
       ...context?.apiHeaders,
     },
     body: JSON.stringify(body),

@@ -293,3 +293,5 @@ The API uses Fastify. Follow [HTTP runtime](docs/backend/http-runtime.md) when
 adding plugins, cookies, uploads, raw responses or middleware. Run affected HTTP
 contract fixtures and API typecheck; full API E2E and generated consumer checks
 remain required CI.
+
+Web server requests must use the [enforced transport boundary](docs/frontend/api-consumption.md#server-request-boundary). Preserve original request headers and exact adapter exceptions.

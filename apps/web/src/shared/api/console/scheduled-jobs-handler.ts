@@ -2,13 +2,14 @@ import { scheduledJobIdSchema } from '@amcore/shared'
 
 import { apiErrorResponse } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const TIMEOUT_MS = 4_000
 const BASE = '/api/v1/admin/background-work/scheduled-jobs'
 
@@ -34,14 +35,10 @@ async function read(request: Request, path: string): Promise<Response> {
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetchBackendResponse(`${API_URL}${path}`, request.headers, {
       method: 'GET',
       cache: 'no-store',
-      headers: forwardRequestHeaders(
-        request.headers,
-        resolved.token,
-        resolveTrustedClientIp(request.headers)
-      ),
+      headers: forwardRequestHeaders(request.headers, resolved.token),
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(TIMEOUT_MS)]),
     })
     const headers = forwardResponseHeaders(response.headers)

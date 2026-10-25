@@ -9,7 +9,10 @@ import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
 
 import { createHttpAdapter } from '../src/bootstrap/create-http-adapter'
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
-import { resolveSessionIpAddress } from '../src/common/utils/verified-visitor-ip'
+import {
+  resolveSessionIpAddress,
+  resolveVerifiedVisitorIp,
+} from '../src/common/utils/verified-visitor-ip'
 import type { EnvService } from '../src/env/env.service'
 import { resolveTracker } from '../src/infrastructure/throttling/client-tracker'
 
@@ -21,6 +24,7 @@ class PeerProbeController {
     const env = { get: () => peers } as unknown as EnvService
     return {
       session: resolveSessionIpAddress(req, env),
+      password: resolveVerifiedVisitorIp(req, env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
       tracker: resolveTracker(req, env),
       peer: req.socket.remoteAddress,
       ip: req.ip,
@@ -99,6 +103,7 @@ for (const [name, makeAdapter] of [
         .set('x-forwarded-for', '9.9.9.9')
       expect(result.status).toBe(200)
       expect(result.body.session).toBe(accepted ? claim : result.body.peer)
+      expect(result.body.password).toBe(accepted ? claim : result.body.peer)
       expect(result.body.tracker).toBe(accepted ? claim : result.body.peer)
       expect(result.body.peer).not.toBe('9.9.9.9')
     })

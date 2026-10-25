@@ -4,6 +4,8 @@ import { apiErrorResponse } from '@/shared/api/bff/api-error-response'
 import { AMCORE_CLIENT_IP_HEADER } from '@/shared/api/bff/proxy-headers'
 import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { resolveConsoleAccessToken } from './authenticated-proxy'
 import { consoleBackgroundWorkPath } from './board-locale'
 import {
@@ -14,7 +16,7 @@ import {
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const TIMEOUT_MS = 10_000
 
 /** Request headers the board needs from the browser; everything else is dropped, never forwarded. */
@@ -118,7 +120,7 @@ export async function handleConsoleBoard(
   if (!context) return failure(request, document, 503)
 
   try {
-    const upstream = await fetch(upstreamUrl, {
+    const upstream = await fetchBackendResponse(upstreamUrl, request.headers, {
       method: request.method,
       redirect: 'manual',
       cache: 'no-store',

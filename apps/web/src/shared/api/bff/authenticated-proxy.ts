@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers'
 import { AuthErrorCode, type OrganizationContextFamily } from '@amcore/shared'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { apiErrorResponse } from './api-error-response'
 import { authFailureResponse } from './auth-failure-response'
 import { isControlPlaneRoute, isCredentialRoute } from './credential-route'
@@ -17,12 +19,11 @@ import { isQueueBoardRoute } from './queue-board-route'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultLock } from './session-lock'
 import { redisVaultStore } from './session-vault-store'
-import { resolveTrustedClientIp } from './trusted-client-ip'
 import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 /**
@@ -80,20 +81,24 @@ export async function proxyToBackend(
   }
 
   const hasBody = !SAFE_METHODS.has(request.method) && request.body !== null
-  const trustedClientIp = resolveTrustedClientIp(request.headers)
 
-  const upstreamResponse = await fetch(upstreamUrl.toString(), {
-    method: request.method,
-    headers: context
-      ? frontendApiHeaders(
-          context,
-          forwardRequestHeaders(request.headers, accessToken, trustedClientIp)
-        )
-      : forwardRequestHeaders(request.headers, accessToken, trustedClientIp),
-    body: hasBody ? request.body : undefined,
-    // Required by Node's fetch (undici) whenever `body` is a stream.
-    ...(hasBody ? { duplex: 'half' } : {}),
-  })
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetchBackendResponse(upstreamUrl.toString(), request.headers, {
+      method: request.method,
+      headers: context
+        ? frontendApiHeaders(context, forwardRequestHeaders(request.headers, accessToken))
+        : forwardRequestHeaders(request.headers, accessToken),
+      body: hasBody ? request.body : undefined,
+      // Required by Node's fetch (undici) whenever `body` is a stream.
+      ...(hasBody ? { duplex: 'half' } : {}),
+    })
+  } catch {
+    return apiErrorResponse(request, {
+      statusCode: 503,
+      message: 'Backend temporarily unavailable',
+    })
+  }
 
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,

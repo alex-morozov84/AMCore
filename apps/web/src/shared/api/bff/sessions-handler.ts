@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers'
 import { AuthErrorCode } from '@amcore/shared'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { apiErrorResponse } from './api-error-response'
 import { authFailureResponse } from './auth-failure-response'
 import { ensureFreshSession } from './ensure-fresh-session'
@@ -19,7 +21,7 @@ import { createUpstreamRefresh } from './upstream-refresh'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 const REFRESH_COOKIE_NAME = 'refresh_token'
 
 /**
@@ -86,11 +88,19 @@ export async function handleGetSessions(
   const upstream = new URL(`${API_URL}/api/v1/auth/sessions`)
   upstream.search = new URL(request.url).search
 
-  const upstreamResponse = await fetch(upstream, {
-    headers: context
-      ? frontendApiHeaders(context, authHeaders(entry, request.headers.get('accept-language')))
-      : authHeaders(entry, request.headers.get('accept-language')),
-  })
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
+      headers: context
+        ? frontendApiHeaders(context, authHeaders(entry, request.headers.get('accept-language')))
+        : authHeaders(entry, request.headers.get('accept-language')),
+    })
+  } catch {
+    return apiErrorResponse(request, {
+      statusCode: 503,
+      message: 'Backend temporarily unavailable',
+    })
+  }
   return relay(upstreamResponse)
 }
 
@@ -116,10 +126,18 @@ export async function handleDeleteSession(
   if (entry instanceof Response) return entry
 
   const upstream = `${API_URL}/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`
-  const upstreamResponse = await fetch(upstream, {
-    method: 'DELETE',
-    headers: context ? frontendApiHeaders(context, authHeaders(entry)) : authHeaders(entry),
-  })
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
+      method: 'DELETE',
+      headers: context ? frontendApiHeaders(context, authHeaders(entry)) : authHeaders(entry),
+    })
+  } catch {
+    return apiErrorResponse(request, {
+      statusCode: 503,
+      message: 'Backend temporarily unavailable',
+    })
+  }
   return relay(upstreamResponse)
 }
 
@@ -143,9 +161,21 @@ export async function handleDeleteOtherSessions(
   const entry = await getVaultEntryOrFailure(request, context)
   if (entry instanceof Response) return entry
 
-  const upstreamResponse = await fetch(`${API_URL}/api/v1/auth/sessions`, {
-    method: 'DELETE',
-    headers: context ? frontendApiHeaders(context, authHeaders(entry)) : authHeaders(entry),
-  })
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetchBackendResponse(
+      `${API_URL}/api/v1/auth/sessions`,
+      request.headers,
+      {
+        method: 'DELETE',
+        headers: context ? frontendApiHeaders(context, authHeaders(entry)) : authHeaders(entry),
+      }
+    )
+  } catch {
+    return apiErrorResponse(request, {
+      statusCode: 503,
+      message: 'Backend temporarily unavailable',
+    })
+  }
   return relay(upstreamResponse)
 }

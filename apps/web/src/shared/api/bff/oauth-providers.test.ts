@@ -1,3 +1,4 @@
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -29,7 +30,10 @@ describe('getOAuthProviders', () => {
 
     await getOAuthProviders()
 
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:5002/api/v1/auth/oauth/providers')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:5002/api/v1/auth/oauth/providers',
+      expect.objectContaining({ redirect: 'error' })
+    )
   })
 
   it('degrades to an empty list on a non-2xx response', async () => {

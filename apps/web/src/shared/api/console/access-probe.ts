@@ -1,8 +1,12 @@
+import { headers } from 'next/headers'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { getConsoleAwareAccessToken } from './access-token'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 export type ConsoleAccessProbe =
   | { kind: 'admitted' }
@@ -14,7 +18,7 @@ export type ConsoleAccessProbe =
 export async function probeConsoleAccess(): Promise<ConsoleAccessProbe> {
   try {
     const accessToken = await getConsoleAwareAccessToken()
-    return await probeConsoleAccessWithToken(accessToken)
+    return await probeConsoleAccessWithToken(accessToken, await headers())
   } catch {
     return { kind: 'indeterminate' }
   }
@@ -22,11 +26,12 @@ export async function probeConsoleAccess(): Promise<ConsoleAccessProbe> {
 
 /** Evaluates one server-held bearer credential without returning any identity data. */
 export async function probeConsoleAccessWithToken(
-  accessToken: string | null
+  accessToken: string | null,
+  source: Headers
 ): Promise<ConsoleAccessProbe> {
   try {
     if (!accessToken) return { kind: 'denied', status: 401 }
-    const upstream = await fetch(`${API_URL}/api/v1/admin/access`, {
+    const upstream = await fetchBackendResponse(`${API_URL}/api/v1/admin/access`, source, {
       cache: 'no-store',
       headers: { Authorization: `Bearer ${accessToken}` },
     })

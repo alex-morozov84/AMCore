@@ -55,7 +55,7 @@ const CLIENT_IP_LOOKALIKE_HEADERS = new Set([
   AMCORE_CLIENT_IP_HEADER,
 ])
 
-function isSpoofableForwardingHeader(name: string): boolean {
+export function isSpoofableForwardingHeader(name: string): boolean {
   return name.startsWith(FORWARDED_HEADER_PREFIX) || CLIENT_IP_LOOKALIKE_HEADERS.has(name)
 }
 
@@ -76,18 +76,8 @@ const STRIP_RESPONSE_HEADERS = new Set([
   'set-cookie',
 ])
 
-/** Request headers to send upstream: the browser's own, minus hop-by-hop/
- * cookie/forwarded-header ones, plus the vault-derived bearer token (never
- * the browser's) and — when `trustedClientIp` was resolved from a
- * configured trusted source (ADR-072) — the internal client-IP header. This
- * is the only place `AMCORE_CLIENT_IP_HEADER` is ever set on an outgoing
- * request; it runs after stripping, so a browser-supplied copy of the same
- * header name is discarded first, never merged with or overridden by it. */
-export function forwardRequestHeaders(
-  source: Headers,
-  accessToken: string,
-  trustedClientIp?: string | null
-): Headers {
+/** Selective proxy headers. The backend transport sets the visitor claim at send time. */
+export function forwardRequestHeaders(source: Headers, accessToken: string): Headers {
   const headers = new Headers()
   for (const [name, value] of source.entries()) {
     const lower = name.toLowerCase()
@@ -95,9 +85,6 @@ export function forwardRequestHeaders(
     headers.set(name, value)
   }
   headers.set('Authorization', `Bearer ${accessToken}`)
-  if (trustedClientIp) {
-    headers.set(AMCORE_CLIENT_IP_HEADER, trustedClientIp)
-  }
   return headers
 }
 

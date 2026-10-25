@@ -2,13 +2,14 @@ import { AuthErrorCode } from '@amcore/shared'
 
 import { apiErrorResponse } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 function originRejected(request: Request): Response {
   return apiErrorResponse(request, {
@@ -39,14 +40,13 @@ export async function handleConsoleUserSessionsList(request: Request, userId: st
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
 
-  const trustedClientIp = resolveTrustedClientIp(request.headers)
   const upstream = new URL(`${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}/sessions`)
   upstream.search = new URL(request.url).search
 
   let upstreamResponse: Response
   try {
-    upstreamResponse = await fetch(upstream, {
-      headers: forwardRequestHeaders(request.headers, resolved.token, trustedClientIp),
+    upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
+      headers: forwardRequestHeaders(request.headers, resolved.token),
     })
   } catch {
     return apiErrorResponse(request, {
@@ -67,16 +67,15 @@ export async function handleConsoleUserSessionRevoke(
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
 
-  const trustedClientIp = resolveTrustedClientIp(request.headers)
   const upstream =
     `${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}` +
     `/sessions/${encodeURIComponent(sessionId)}`
 
   let upstreamResponse: Response
   try {
-    upstreamResponse = await fetch(upstream, {
+    upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
       method: 'DELETE',
-      headers: forwardRequestHeaders(request.headers, resolved.token, trustedClientIp),
+      headers: forwardRequestHeaders(request.headers, resolved.token),
     })
   } catch {
     return apiErrorResponse(request, {
@@ -93,14 +92,13 @@ export async function handleConsoleUserSessionsRevokeAll(request: Request, userI
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
 
-  const trustedClientIp = resolveTrustedClientIp(request.headers)
   const upstream = `${API_URL}/api/v1/admin/users/${encodeURIComponent(userId)}/sessions`
 
   let upstreamResponse: Response
   try {
-    upstreamResponse = await fetch(upstream, {
+    upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
       method: 'DELETE',
-      headers: forwardRequestHeaders(request.headers, resolved.token, trustedClientIp),
+      headers: forwardRequestHeaders(request.headers, resolved.token),
     })
   } catch {
     return apiErrorResponse(request, {

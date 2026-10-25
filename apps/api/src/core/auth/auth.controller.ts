@@ -27,7 +27,9 @@ import {
   ApiOperation,
   ApiQuery,
   ApiSecurity,
+  ApiServiceUnavailableResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
 import type { FastifyReply } from 'fastify'
@@ -47,7 +49,10 @@ import {
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
-import { resolveSessionIpAddress } from '../../common/utils/verified-visitor-ip.js'
+import {
+  resolveSessionIpAddress,
+  resolveVerifiedVisitorIp,
+} from '../../common/utils/verified-visitor-ip.js'
 import { EnvService } from '../../env/env.service.js'
 import type { User } from '../../generated/prisma/client.js'
 import { AVATAR_VALIDATION, FileValidationPipe } from '../../infrastructure/storage/index.js'
@@ -180,6 +185,13 @@ export class AuthController {
     summary: 'Login user; optional scoped invitation handoff requires explicit confirmation',
   })
   @SchemaResponse({ type: AuthResponseDto, status: 200, description: 'Login successful' })
+  @ApiTooManyRequestsResponse({
+    description: 'Password attempt limit reached; Retry-After is 900 or 86400 seconds',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'Login protection unavailable; no new session or step-up refresh is issued. A sent counter update may already have executed.',
+  })
   async login(
     @Body({ schema: LoginDto.schema }) dto: LoginDto,
     @Req() req: Request,
@@ -187,7 +199,8 @@ export class AuthController {
   ): Promise<AuthResponse> {
     const result = await this.authService.login(dto, {
       userAgent: req.headers['user-agent'],
-      ipAddress: req.ip,
+      ipAddress:
+        resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
       sessionIpAddress: resolveSessionIpAddress(req, this.env),
       handoff: invitationHandoffProof(
         req.headers['x-invitation-auth-attempt-id'],
@@ -349,20 +362,31 @@ export class AuthController {
    * Step-up re-authentication (OB-06b / ADR-037). Bearer-only: the caller
    * re-enters their password to refresh the current session's recent-auth
    * window, so they can perform destructive admin operations guarded by
-   * `@RequireFreshAuth`. No new session, no refresh-token rotation. `req.ip`
-   * is threaded through for the shared login brute-force limiter.
+   * `@RequireFreshAuth`. No new session, no refresh-token rotation. The peer-verified visitor address, with req.ip/socket fallback,
+   * selects the shared password limiter identity.
    */
   @Post('step-up')
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Re-verify password to refresh step-up freshness' })
   @SchemaResponse({ type: RefreshResponseDto, status: 200, description: 'Step-up token issued' })
+  @ApiTooManyRequestsResponse({
+    description: 'Password attempt limit reached; Retry-After is 900 or 86400 seconds',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'Login protection unavailable; no new session or step-up refresh is issued. A sent counter update may already have executed.',
+  })
   async stepUp(
     @CurrentUser() principal: RequestPrincipal,
     @Body({ schema: StepUpDto.schema }) dto: StepUpDto,
     @Req() req: Request
   ): Promise<RefreshResponse> {
-    return this.authService.stepUp(principal, dto.password, req.ip ?? '')
+    return this.authService.stepUp(
+      principal,
+      dto.password,
+      resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? ''
+    )
   }
 
   // Session-management routes are bearer-only — API keys must not be able to

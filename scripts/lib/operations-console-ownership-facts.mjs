@@ -172,6 +172,7 @@ export const operationsConsoleSurfaceRoots = [
   'apps/web/e2e',
   'apps/web/messages',
   'apps/web/package.json',
+  'apps/web/network-policy.mjs',
   'apps/web/playwright.real-stack.config.ts',
   'apps/web/playwright.console-real-stack.config.ts',
   'docs',

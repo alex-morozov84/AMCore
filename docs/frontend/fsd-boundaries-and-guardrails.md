@@ -311,3 +311,7 @@ and mounts, `index.client.ts` for interactive composition, and `index.config.ts`
 for serializable placement. These named entries have the same narrow ESLint
 exception; they do not permit arbitrary composition slices or deep imports.
 The headless browser contract is the public `entities/invitation-flow` API.
+
+## Server network boundary
+
+Runtime TS/JS source uses the [API sender contract](api-consumption.md#server-request-boundary). ESLint owns global/property/import/loader restrictions. Exact browser adapters remain trusted reviewed surfaces; dynamic data flow still needs review.

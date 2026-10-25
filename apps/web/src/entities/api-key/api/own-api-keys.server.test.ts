@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
@@ -16,6 +17,10 @@ import {
 } from './own-api-keys.server'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/backend-transport', () => ({
+  fetchBackendResponse: vi.fn(),
+  getBackendBaseUrl: () => 'http://api.test',
+}))
 vi.mock('@/shared/api/bff/product-context-deps', () => ({ productContextDeps: vi.fn() }))
 const inputBody = {
   name: 'Export',
@@ -34,7 +39,7 @@ function setup(response: () => Response) {
   const store = new FakeVaultStore()
   store.seed('session-a', entry)
   const fetch = vi.fn(async () => response())
-  const deps: ContextExecutorDeps = {
+  const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
     upstreamRefresh: vi.fn(freshRefresh),
@@ -42,6 +47,7 @@ function setup(response: () => Response) {
     apiBase: 'http://api.test',
     fetch,
   }
+  vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => deps.fetch(url, init))
   vi.mocked(productContextDeps).mockReturnValue(deps)
   const input = {
     expectedSession: contextSessionBinding('session-a', entry),

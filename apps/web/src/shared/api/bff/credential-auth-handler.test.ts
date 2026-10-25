@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
+import { revokeBackendSession } from './backend-session-revocation'
 import { handleCredentialAuth } from './credential-auth-handler'
 import { mintSession } from './mint-session'
 import { isTrustedOrigin } from './origin-guard'
@@ -9,6 +10,7 @@ import type * as UpstreamAuthModule from './upstream-auth'
 import { callUpstreamAuth, UpstreamAuthError } from './upstream-auth'
 
 vi.mock('server-only', () => ({}))
+vi.mock('./backend-session-revocation', () => ({ revokeBackendSession: vi.fn() }))
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 vi.mock('./upstream-auth', async () => {
   const actual = await vi.importActual<typeof UpstreamAuthModule>('./upstream-auth')
@@ -81,6 +83,31 @@ describe('handleCredentialAuth', () => {
     await expect(response.json()).resolves.toEqual(errorBody)
   })
 
+  it('returns controlled503 when the upstream transport rejects a redirect', async () => {
+    vi.mocked(callUpstreamAuth).mockRejectedValueOnce(new TypeError('fetch failed'))
+    const response = await handleCredentialAuth(jsonRequest({ email: 'a', password: 'b' }), {
+      schema,
+      backendPath: '/auth/login',
+      successStatus: 200,
+    })
+    expect(response.status).toBe(503)
+    expect((await response.json()).message).toBe('Backend temporarily unavailable')
+  })
+  it('revokes with original request headers when mint fails, preserving the failure', async () => {
+    const request = jsonRequest({ email: 'a', password: 'b' })
+    request.headers.set('x-real-ip', '203.0.113.75')
+    vi.mocked(callUpstreamAuth).mockResolvedValue({
+      user: { id: 'u1' },
+      accessToken: 'at',
+      refreshToken: 'rt',
+    } as never)
+    const failure = new Error('vault unavailable')
+    vi.mocked(mintSession).mockRejectedValueOnce(failure)
+    await expect(
+      handleCredentialAuth(request, { schema, backendPath: '/auth/login', successStatus: 200 })
+    ).rejects.toBe(failure)
+    expect(revokeBackendSession).toHaveBeenCalledWith('rt', request.headers)
+  })
   it('on success, mints a session, sets the cookie, and returns only the user', async () => {
     vi.mocked(callUpstreamAuth).mockResolvedValue({
       user: { id: 'u1' },

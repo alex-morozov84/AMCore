@@ -1,3 +1,4 @@
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -32,7 +33,7 @@ describe('Console audit server fetch', () => {
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain('/api/v1/admin/audit-logs?actorId=user1&limit=25')
     expect(options.cache).toBe('no-store')
-    expect(options.headers).toMatchObject({ Authorization: 'Bearer console-token' })
+    expect(new Headers(options.headers).get('authorization')).toBe('Bearer console-token')
   })
 
   it('does not fetch if the console token source is unavailable', async () => {

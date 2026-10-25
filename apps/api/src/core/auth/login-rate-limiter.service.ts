@@ -1,79 +1,81 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'
-import type { Cache } from 'cache-manager'
+import { HttpStatus, Injectable, type OnModuleDestroy } from '@nestjs/common'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions/index.js'
+import { AppException, ServiceUnavailableException } from '../../common/exceptions/index.js'
+import { EnvService } from '../../env/env.service.js'
 
-const IP_MAX = 100
-const USER_IP_MAX = 5
-const IP_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
-const USER_IP_TTL_MS = 60 * 60 * 1000 // 1 hour
-const BLOCK_TTL_MS = 15 * 60 * 1000 // 15 minutes
+import { LoginLimitConnection } from './login-limit-connection.js'
+import { LOGIN_LIMIT_SCRIPT } from './login-rate-limits.lua.js'
 
-/**
- * Login brute-force protection via two Redis counters:
- * - Per-IP: 100 failed attempts / 24h
- * - Per-canonical-email+IP: 5 failed attempts / 1h → 15-min block
- */
+/** Atomic recorded-failure accounting; admission does not reserve a password check. */
 @Injectable()
-export class LoginRateLimiterService {
-  constructor(@Inject(CACHE_MANAGER) private readonly cache: Cache) {}
+export class LoginRateLimiterService implements OnModuleDestroy {
+  private stopped = false
+  private readonly operations = new Set<LoginLimitConnection>()
+  constructor(private readonly env: EnvService) {}
 
-  /** Check limits before attempting login. Throws 429 if exceeded. */
   async check(emailCanonical: string, ip: string): Promise<void> {
-    const blocked = await this.cache.get<number>(this.blockedKey(emailCanonical, ip))
-    if (blocked) {
+    const [allowed, retryAfterSeconds] = await this.command('check', emailCanonical, ip)
+    if (allowed === 0)
       throw new AppException(
-        'Too many failed login attempts. Please try again in 15 minutes.',
+        retryAfterSeconds === 900
+          ? 'Too many failed login attempts. Please try again in 15 minutes.'
+          : 'Too many login attempts from this IP. Please try again later.',
         HttpStatus.TOO_MANY_REQUESTS,
         AuthErrorCode.RATE_LIMIT_EXCEEDED,
-        { retryAfterSeconds: 900 }
+        { retryAfterSeconds }
       )
-    }
-
-    const ipCount = (await this.cache.get<number>(this.ipKey(ip))) ?? 0
-    if (ipCount >= IP_MAX) {
-      throw new AppException(
-        'Too many login attempts from this IP. Please try again later.',
-        HttpStatus.TOO_MANY_REQUESTS,
-        AuthErrorCode.RATE_LIMIT_EXCEEDED,
-        { retryAfterSeconds: 86400 }
-      )
-    }
   }
 
-  /** Record a failed login attempt. Sets 15-min block after USER_IP_MAX failures. */
   async consume(emailCanonical: string, ip: string): Promise<void> {
-    const ipCount = ((await this.cache.get<number>(this.ipKey(ip))) ?? 0) + 1
-    await this.cache.set(this.ipKey(ip), ipCount, IP_TTL_MS)
+    await this.command('consume', emailCanonical, ip)
+  }
 
-    const userIpCount =
-      ((await this.cache.get<number>(this.userIpKey(emailCanonical, ip))) ?? 0) + 1
-    await this.cache.set(this.userIpKey(emailCanonical, ip), userIpCount, USER_IP_TTL_MS)
+  /** Clear only the successful pair/block; preserve aggregate IP debt and TTL. */
+  async reset(emailCanonical: string, ip: string): Promise<void> {
+    await this.command('reset', emailCanonical, ip)
+  }
 
-    if (userIpCount >= USER_IP_MAX) {
-      await this.cache.set(this.blockedKey(emailCanonical, ip), 1, BLOCK_TTL_MS)
+  private async command(
+    mode: 'check' | 'consume' | 'reset',
+    email: string,
+    ip: string
+  ): Promise<[number, number]> {
+    let operation: LoginLimitConnection | undefined
+    try {
+      if (this.stopped) throw new Error('Login limiter stopped')
+      operation = LoginLimitConnection.acquire()
+      this.operations.add(operation)
+      const result = await operation.run(
+        () => this.env.get('REDIS_URL'),
+        LOGIN_LIMIT_SCRIPT,
+        [
+          `rate:login_ip:${ip}`,
+          `rate:login_user_ip:${email}:${ip}`,
+          `rate:login_blocked:${email}:${ip}`,
+        ],
+        mode
+      )
+      if (
+        !Array.isArray(result) ||
+        result.length !== 2 ||
+        !(
+          (result[0] === 1 && result[1] === 0) ||
+          (mode === 'check' && result[0] === 0 && [900, 86400].includes(result[1]))
+        )
+      )
+        throw new Error('Invalid login limiter reply')
+      return result as [number, number]
+    } catch {
+      throw new ServiceUnavailableException('Login protection temporarily unavailable')
+    } finally {
+      if (operation) this.operations.delete(operation)
     }
   }
 
-  /** Reset counters after successful login. */
-  async reset(emailCanonical: string, ip: string): Promise<void> {
-    await this.cache.del(this.ipKey(ip))
-    await this.cache.del(this.userIpKey(emailCanonical, ip))
-    await this.cache.del(this.blockedKey(emailCanonical, ip))
-  }
-
-  private ipKey(ip: string): string {
-    return `rate:login_ip:${ip}`
-  }
-
-  private userIpKey(emailCanonical: string, ip: string): string {
-    return `rate:login_user_ip:${emailCanonical}:${ip}`
-  }
-
-  private blockedKey(emailCanonical: string, ip: string): string {
-    return `rate:login_blocked:${emailCanonical}:${ip}`
+  async onModuleDestroy(): Promise<void> {
+    this.stopped = true
+    await Promise.allSettled([...this.operations].map((operation) => operation.stop()))
   }
 }

@@ -51,7 +51,7 @@ export async function handleLogout(
   const current = await readCurrentSessionSafely(context)
   if (current) {
     await Promise.all([
-      revokeBackendSession(current.entry.refreshToken),
+      revokeBackendSession(current.entry.refreshToken, request.headers),
       deleteVaultEntry(current.sessionId, context),
     ])
   }

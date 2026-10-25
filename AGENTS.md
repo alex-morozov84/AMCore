@@ -317,6 +317,7 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   is the subject). Direct axe runtime imports outside this helper fail web lint. Do not disable contrast checks or add fixed sleeps.
   For full CI E2E reproduction use `node scripts/e2e-ci.mjs --all`; it runs the
   same applicable isolated lanes with CI settings (locally sequential).
+- **Frontend server requests:** use the [required-source backend transport](docs/frontend/api-consumption.md#server-request-boundary). Preserve original request headers, no-follow redirects and exact browser-adapter exceptions. New runtime raw fetch fails paired lint.
 - **Frontend server/client boundary — two separate decisions.** Server
   Components are the default; add `'use client'` only at the interactive leaf
   that owns events, effects, browser APIs, a Zustand store or a Query hook —

@@ -40,11 +40,16 @@ renew access, including through repeated exchanges. See [RBAC](./rbac.md).
 
 ### Refresh token (opaque)
 
-Think of it as a **membership card**. It's long-lived (7 days), stored in an `httpOnly` cookie (invisible to JavaScript), and the only thing it can do is get you a new access token.
+Think of it as a **membership card**. It lasts 7 days and obtains a new access token.
+Direct API clients receive an httpOnly refresh cookie. AMCore web instead keeps
+the refresh token in its server-side Redis vault; the browser receives an opaque
+session cookie and never receives the backend token in JavaScript.
 
 When you use it, the old one is immediately revoked and a new one is issued. This is called **token rotation** — if someone steals an old refresh token, it's already worthless.
 
-The server stores a SHA-256 hash of your refresh token in the database. The raw token never touches disk.
+The API stores a SHA-256 hash of the refresh token in SQL. The web vault stores
+the raw token in Redis. Redis persistence and backups can therefore contain vault
+credentials; protect their access and storage accordingly.
 
 ---
 
@@ -155,7 +160,25 @@ The login endpoint is rate-limited at two levels simultaneously:
 
 The combination matters: the per-IP limit catches credential stuffing (many accounts, one IP), while the per-canonical-email+IP limit catches targeted attacks on a specific account.
 
-On a successful login, both counters reset.
+Login and password step-up use the peer-verified visitor IP when configured,
+then `req.ip`/socket fallback. A successful password clears only that email+IP
+counter and block. It preserves the aggregate IP count and its remaining expiry.
+A correct password does not bypass an already reached IP limit. Once the
+aggregate reaches 100, subsequent checks refuse until that key expires 24 hours
+after its last recorded failure. Retry-After 86400 is a constant refusal hint,
+not a measurement of the key's remaining lifetime. Already admitted failures
+can still finish and renew that window.
+
+Each Redis check, failure update and pair/block reset executes atomically.
+Concurrent recorded failures do not lose increments. The windows renew on failure;
+check and success do not renew the aggregate window. Already admitted password
+checks may finish after another request reaches the limit; there is no reservation
+cap on in-flight checks. Shared NAT users share an IP budget.
+
+If protection is unavailable, the API returns503/SERVICE_UNAVAILABLE without issuing
+a new session or step-up token. A timeout after sending a Redis command can leave
+its effect unknown. The limiter never retries that command or clears counters to
+hide uncertainty. See the [coordinated upgrade](../operations/deployment.md#password-limiter-upgrade-and-rollback).
 
 ---
 

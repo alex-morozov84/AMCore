@@ -8,6 +8,7 @@ import {
 } from '@amcore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { revokeBackendSession } from './backend-session-revocation'
 import { publishInvitedOAuth } from './invitation-oauth-exchange'
 import { recoverPublishedInvitedOAuth } from './invitation-oauth-recovery'
 import { mintSession } from './mint-session'
@@ -16,6 +17,7 @@ import { resolveProductWebContext } from './product-web-context.server'
 import { callUpstreamOAuthExchange, fetchCurrentUser, UpstreamOAuthError } from './upstream-oauth'
 
 vi.mock('server-only', () => ({}))
+vi.mock('./backend-session-revocation', () => ({ revokeBackendSession: vi.fn() }))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
 vi.mock('./upstream-oauth', () => ({
   callUpstreamOAuthExchange: vi.fn(),
@@ -69,6 +71,24 @@ async function runExchange(request: Request, locale: string) {
 }
 
 describe('handleOAuthExchange — failure paths redirect to login with an error code, never throw', () => {
+  it.each(['read-failure', 'absent-user', 'mint-failure'])(
+    'threads original source into %s compensation',
+    async (branch) => {
+      mockRefreshCookie('rt-1')
+      vi.mocked(callUpstreamOAuthExchange).mockResolvedValue({ accessToken: 'at-1' } as never)
+      if (branch === 'read-failure')
+        vi.mocked(fetchCurrentUser).mockRejectedValueOnce(new Error('read'))
+      else
+        vi.mocked(fetchCurrentUser).mockResolvedValue(
+          branch === 'absent-user' ? (null as never) : ({ id: 'u1' } as never)
+        )
+      if (branch === 'mint-failure') vi.mocked(mintSession).mockRejectedValueOnce(new Error('mint'))
+      const request = makeRequest('en/auth/callback?ticket=t1')
+      request.headers.set('x-real-ip', '203.0.113.75')
+      await runExchange(request, 'en')
+      expect(revokeBackendSession).toHaveBeenCalledWith('rt-1', request.headers)
+    }
+  )
   it('redirects when the temporary refresh_token cookie is missing', async () => {
     mockRefreshCookie(undefined)
 

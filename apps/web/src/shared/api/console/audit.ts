@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import {
   type AdminAuditQuery,
   type AdminAuditResponse,
@@ -9,11 +10,13 @@ import { resolveAuthHeader } from '@/shared/api/server/auth-header'
 import { classifyStatus, classifyThrown } from '@/shared/api/server/classify'
 import { BackendRequestError } from '@/shared/api/server/errors'
 
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+
 import { getConsoleAwareAccessToken } from './access-token'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 /** Domain-owned query grammar; it never accepts an arbitrary backend path. */
 export function auditQueryString(query: Partial<AdminAuditQuery>): string {
@@ -47,11 +50,15 @@ export async function fetchConsoleAudit(
   if ('unavailable' in auth) return { status: 'unavailable', reason: 'upstream', correlationId }
   let response: Response
   try {
-    response = await fetch(`${API_URL}/api/v1/admin/audit-logs?${auditQueryString(query)}`, {
-      headers: { Authorization: auth.header!, 'X-Correlation-Id': correlationId },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(5_000),
-    })
+    response = await fetchBackendResponse(
+      `${API_URL}/api/v1/admin/audit-logs?${auditQueryString(query)}`,
+      await headers(),
+      {
+        headers: { Authorization: auth.header!, 'X-Correlation-Id': correlationId },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5_000),
+      }
+    )
   } catch (error) {
     const reason = classifyThrown(error)
     if (!reason) throw error

@@ -2,13 +2,14 @@ import { adminQueueNameSchema, workJobIdSchema, workListWireQuerySchema } from '
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 /** Reads use the Console vault; this fixed discovery path never accepts a client upstream URL. */
 export async function handleConsoleWorkCatalogue(request: Request): Promise<Response> {
@@ -51,16 +52,16 @@ async function read(request: Request, path: string): Promise<Response> {
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
   try {
-    const upstream = await fetch(`${API_URL}/api/v1/admin/background-work${path}`, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: forwardRequestHeaders(
-        request.headers,
-        resolved.token,
-        resolveTrustedClientIp(request.headers)
-      ),
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
-    })
+    const upstream = await fetchBackendResponse(
+      `${API_URL}/api/v1/admin/background-work${path}`,
+      request.headers,
+      {
+        method: 'GET',
+        cache: 'no-store',
+        headers: forwardRequestHeaders(request.headers, resolved.token),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
+      }
+    )
     const headers = forwardResponseHeaders(upstream.headers)
     headers.set('Cache-Control', 'private, no-store')
     return new Response(upstream.body, { status: upstream.status, headers })

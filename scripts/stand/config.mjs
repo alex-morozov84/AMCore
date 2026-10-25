@@ -116,6 +116,10 @@ export async function configuration(m) {
       // AMCORE_CONSOLE_WEB_ENV_END
     },
   }
+  if (m.fixtureProfile === 'client-ip' && m.clientIpPeer) {
+    environments.api.TRUSTED_WEB_PEERS = m.clientIpPeer
+    environments.web.WEB_TRUSTED_CLIENT_IP_HEADER = 'x-real-ip'
+  }
   // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_START
   let fixtureService
   if (m.fixtureProfile === 'notification-work') {
@@ -197,6 +201,8 @@ export async function configuration(m) {
         .split('\n')
         .slice(1)
         .join('\n')
+    if (service === 'web' && m.fixtureProfile === 'client-ip' && m.clientIpPeer)
+      yaml += `    networks:\n      default:\n        ipv4_address: ${m.clientIpPeer}\n`
     if (ports[service]) yaml += `    ports: ${overridden(ports[service])}\n`
     if (
       service === 'api' &&

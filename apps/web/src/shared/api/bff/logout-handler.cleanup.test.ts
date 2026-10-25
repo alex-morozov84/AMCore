@@ -33,7 +33,7 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     expect(response.cookies.get('amcore_session')?.value).toBe('')
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:5002/api/v1/auth/logout')
-    expect((init.headers as Record<string, string>).Cookie).toBe('refresh_token=rt-1')
+    expect(new Headers(init.headers).get('cookie')).toBe('refresh_token=rt-1')
     expect(redisVaultStore.delete).toHaveBeenCalledWith('sess-1')
   })
 

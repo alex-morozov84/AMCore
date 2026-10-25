@@ -81,7 +81,7 @@ describe('handleConsoleLogin', () => {
 
     expect(response.status).toBe(403)
     expect(mintConsoleSession).not.toHaveBeenCalled()
-    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token')
+    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token', expect.any(Headers))
   })
 
   it('fails closed when the live policy probe is unavailable', async () => {

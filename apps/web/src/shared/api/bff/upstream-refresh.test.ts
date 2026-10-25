@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { upstreamRefresh } from './upstream-refresh'
+import { createUpstreamRefresh } from './upstream-refresh'
+const upstreamRefresh = createUpstreamRefresh(new Headers())
 
 // See ensure-fresh-session.basic.test.ts for why `server-only` needs mocking.
 vi.mock('server-only', () => ({}))
@@ -22,6 +23,7 @@ function fakeResponse(options: {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('upstreamRefresh', () => {
@@ -42,9 +44,29 @@ describe('upstreamRefresh', () => {
     expect(result.refreshToken).toBe('rt-new')
     expect(result.accessTokenExpiresAt).toBeGreaterThan(Date.now())
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect((init.headers as Record<string, string>).Cookie).toBe('refresh_token=rt-old')
+    expect(new Headers(init.headers).get('cookie')).toBe('refresh_token=rt-old')
   })
 
+  it('snapshots the original edge source together with UA before a refresh waits for its lock', async () => {
+    vi.stubEnv('WEB_TRUSTED_CLIENT_IP_HEADER', 'x-real-ip')
+    const source = new Headers({ 'x-real-ip': '203.0.113.75', 'user-agent': 'original device' })
+    const refresh = createUpstreamRefresh(source)
+    source.set('x-real-ip', '9.9.9.9')
+    source.set('user-agent', 'later device')
+    const send = vi.fn().mockResolvedValue(
+      fakeResponse({
+        ok: true,
+        status: 200,
+        body: { accessToken: 'at' },
+        setCookieHeaders: ['refresh_token=rt; Path=/; HttpOnly'],
+      })
+    )
+    vi.stubGlobal('fetch', send)
+    await refresh('old', new AbortController().signal)
+    const headers = new Headers(send.mock.calls[0]?.[1]?.headers)
+    expect(headers.get('x-amcore-client-ip')).toBe('203.0.113.75')
+    expect(headers.get('user-agent')).toBe('original device')
+  })
   it('maps a 401 to code "invalid" (the backend collapses expired/invalid/reused)', async () => {
     vi.stubGlobal(
       'fetch',

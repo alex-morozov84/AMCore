@@ -66,3 +66,33 @@ test('real Chromium and APIRequest route loopback through relay, deny foreign se
     await close(sentinel)
   }
 })
+
+test('owned HTTP edge overwrites visitor headers and blocks a tunnel bypass', async () => {
+  const owned = createServer((req, res) => res.end(JSON.stringify(req.headers)))
+  await listen(owned)
+  const origin = `http://app-edge.localhost:${owned.address().port}`
+  const proxy = await relay([origin], { origin, visitorIp: '203.0.113.75' })
+  const browser = await chromium.launch({
+    proxy: { server: proxy.url },
+    args: ['--proxy-bypass-list=<-loopback>'],
+  })
+  try {
+    const context = await browser.newContext({
+      extraHTTPHeaders: { 'x-real-ip': '9.9.9.9', 'x-amcore-client-ip': '8.8.8.8' },
+    })
+    try {
+      const page = await context.newPage()
+      const response = await page.goto(origin)
+      const headers = await response.json()
+      assert.equal(headers['x-real-ip'], '203.0.113.75')
+      assert.equal(headers['x-amcore-client-ip'], undefined)
+      assert.equal((await context.request.get(origin)).status(), 403)
+    } finally {
+      await context.close()
+    }
+  } finally {
+    await browser.close()
+    await proxy.close()
+    await close(owned)
+  }
+})

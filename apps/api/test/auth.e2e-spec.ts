@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals'
 import type { INestApplication } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'supertest'
@@ -5,7 +6,11 @@ import request from 'supertest'
 
 import { AuthErrorCode } from '@amcore/shared'
 
+import { ServiceUnavailableException } from '../src/common/exceptions'
+import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
+import { LoginRateLimiterService } from '../src/core/auth/login-rate-limiter.service'
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
+import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -71,6 +76,74 @@ describe('Auth (e2e)', () => {
     // Clean org-scoped data first (respects FK order; see helpers.ts).
     await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
+  })
+
+  describe('password limiter HTTP boundary', () => {
+    afterEach(() => jest.restoreAllMocks())
+    it('uses a peer-verified visitor key and preserves aggregate debt on successful login', async () => {
+      const env = app.get(EnvService)
+      const get = env.get.bind(env)
+      jest
+        .spyOn(env, 'get')
+        .mockImplementation((key) =>
+          key === 'TRUSTED_WEB_PEERS' ? (resolveTrustedWebPeers('loopback') as never) : get(key)
+        )
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'relay@e2e.amcore.test', password: 'StrongP@ss123' })
+        .expect(201)
+      const visitor = '203.0.113.75'
+      const key = `rate:login_ip:${visitor}`
+      await context.cache.set(key, 99, 100000)
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .set('x-amcore-client-ip', visitor)
+        .send({ email: 'relay@e2e.amcore.test', password: 'StrongP@ss123' })
+        .expect(200)
+      expect(await context.cache.get(key)).toBe(99)
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .set('x-amcore-client-ip', visitor)
+        .send({ email: 'relay@e2e.amcore.test', password: 'WrongP@ss123' })
+        .expect(401)
+      expect(await context.cache.get(key)).toBe(100)
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .set('x-amcore-client-ip', visitor)
+        .send({ email: 'relay@e2e.amcore.test', password: 'StrongP@ss123' })
+        .expect(429)
+    })
+    it.each(['check', 'consume', 'reset'] as const)(
+      '%s failure issues neither login credentials nor step-up refresh',
+      async (mode) => {
+        const registered = await request(app.getHttpServer())
+          .post('/auth/register')
+          .send({ email: 'unavailable@e2e.amcore.test', password: 'StrongP@ss123' })
+          .expect(201)
+        const limiter = app.get(LoginRateLimiterService)
+        jest
+          .spyOn(limiter, mode)
+          .mockRejectedValue(
+            new ServiceUnavailableException('Login protection temporarily unavailable')
+          )
+        const sessions = await prisma.session.count()
+        const password = mode === 'consume' ? 'WrongP@ss123' : 'StrongP@ss123'
+        const response = await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: 'unavailable@e2e.amcore.test', password })
+          .expect(503)
+        expect(response.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(hasRefreshTokenCookie(response)).toBe(false)
+        expect(response.body.accessToken).toBeUndefined()
+        expect(await prisma.session.count()).toBe(sessions)
+        const step = await request(app.getHttpServer())
+          .post('/auth/step-up')
+          .set('Authorization', `Bearer ${registered.body.accessToken}`)
+          .send({ password })
+          .expect(503)
+        expect(step.body.accessToken).toBeUndefined()
+      }
+    )
   })
 
   describe('POST /auth/register', () => {

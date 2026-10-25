@@ -22,6 +22,9 @@ npm distribution from a checksum-pinned archive; its remaining toolchain risk is
 separate from the final migrator inventory. Existing deployed images need a rebuild
 and rollout to receive the update.
 
+For password-accounting upgrades, the [stopped-writer procedure](#password-limiter-upgrade-and-rollback)
+overrides general rolling/blue-green examples below.
+
 ## Branch, release & environments model
 
 AMCore uses **GitHub Flow**: a single protected trunk `main`, short-lived PR
@@ -987,16 +990,10 @@ config below strip it. Set `TRUSTED_WEB_PEERS` to the exact web address only; wi
 the reference Compose stack, `docker/compose/bff-relay.yml` does this (see
 [Single-host production](single-host-compose.md#visitor-ip-through-the-web-bff)).
 
-`getClientIp()`/audit-log
-IP, invite-abuse, password-login and step-up limiters are not wired to
-this relay. Its consumers are the existing global throttler and Session
-metadata capture only. Credential register/login, OAuth login callbacks and
-refresh generations use a valid peer-verified claim for stored Session IP;
-otherwise they retain req.ip/socket fallback. Password-login check/consume/
-reset continue using the existing req.ip-derived address. Global req.ip and
-TRUST_PROXY remain unchanged. Full contract and current status:
-[`docs/frontend/api-consumption.md`](../frontend/api-consumption.md) →
-"Client-IP relay to `apps/api`".
+The relay consumers are the global throttler, Session metadata, password login
+and password step-up. Password accounting resolves the verified visitor address
+once per attempt, then falls back to req.ip/socket. Audit/getClientIp and invite
+abuse keep their existing inputs; global req.ip is not rewritten.
 
 ### CSP nonce propagation — preserve the Proxy-added request header
 
@@ -1397,3 +1394,57 @@ failed build. See [API build and ESM runtime](../backend/api-build.md).
 ## Operator organization provisioning
 
 After trusted SUPER_ADMIN access, migrations and guarded role initialization, use [organization provisioning](../product-admin/organization-provisioning.md) for the first or later organization. In production configure `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM` and public product `FRONTEND_URL`; the reference Compose forwards these to API and worker. Apply configuration to every API replica. `production` with `mock` rejects new operator administrator invitations before commit. Real-provider failure after commit retains the organization for explicit recovery. Console-disabled installations use the same protected backend API.
+
+## Password limiter upgrade and rollback
+
+This auth change retains existing Redis key names, Keyv JSON envelopes and expiry
+policy. It replaces get/set writers with atomic scripts. Mixed old/new writers are
+unsafe: old success still clears aggregate debt and old failures can lose updates.
+
+For the reference Compose deployment, take the web/API entry routes out of service
+and allow active auth requests to finish. Record the old container IDs first.
+Then use `docker compose stop web api worker`; keep automatic restarts disabled
+for those old artifacts. Confirm all recorded old processes are stopped and their
+Redis connections have closed. If you cannot establish that boundary, keep traffic
+closed and resolve it before replacing writers. A health check alone is not drain
+proof. Other deployment platforms must provide equivalent stop/drain evidence.
+
+1. Temporarily stop new auth/session mutations at the deployment boundary.
+2. Drain in-flight web/API auth work.
+3. Replace all old web/API writers with the reviewed compatible artifacts.
+4. Start the compatible set (`docker compose up -d --no-deps api worker web` in
+   the reference stack). Verify readiness before reopening traffic. Use a safe
+   account to check login 200 and step-up 200; use an isolated test fixture for
+   password-limit 429 and protection-unavailable 503. Both rejections must return
+   no new credentials. Do not exhaust real users' budgets as a rollout probe.
+
+Do not flush Redis, reseed keys or run background conversion. Same-address counts
+and blocks remain readable without a new namespace. For BFF traffic that changes
+identity from web peer to visitor, old shared debt cannot be attributed per visitor.
+An existing visitor key retains its debt; an absent visitor key starts a fresh
+budget. Old peer blocks no longer apply to those newly identified visitors.
+Let old keys expire normally; do not copy shared debt to every visitor.
+
+Rollback also stops/drains writers before replacing binaries. Old binaries can
+read the compatible envelopes but restore the old accounting/reset behavior.
+They do not inherit debt stored only under new visitor identities. If deployment
+requires uninterrupted conservative debt continuity, postpone rollout for a
+separately reviewed migration design. Automatic retries cannot repair attribution.
+
+Here, “debt” means retained failed-attempt counts and blocks.
+
+Redis operations have a 500 ms total async budget, including cleanup, under a
+progressing event loop. The process-wide 32-operation cap includes closing clients.
+Unconfirmed closures retain capacity; exhaustion fails closed with 503 until closure
+or process recovery. A timeout after dispatch can leave counter effects unknown;
+no session/step-up token is issued and no Redis update is replayed. These bounds
+apply per limiter operation, not the entire HTTP/password request.
+
+For continuing limiter 503 responses, first check API readiness and Redis connectivity
+using the existing health/runbook procedures. Readiness does not prove free limiter
+capacity. This change adds no limiter-specific production metric. Inspect 503 rates
+and Redis client connections before restarting anything. If Redis is healthy but
+unconfirmed client closures still exhaust capacity, stop/drain the affected API
+process and restart the same compatible artifact. Verify login/step-up recovery.
+Restarting releases process resources; it does not undo an already executed update.
+Never clear Redis to recover capacity or replay an uncertain counter update.

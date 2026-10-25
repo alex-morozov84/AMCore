@@ -1,3 +1,4 @@
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -95,9 +96,12 @@ describe('probeConsoleAccess', () => {
     await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'admitted' })
 
     expect(mockedAccessToken).not.toHaveBeenCalled()
+    expect(new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer console-token'
+    )
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost:5002/api/v1/admin/access',
-      expect.objectContaining({ headers: { Authorization: 'Bearer console-token' } })
+      expect.objectContaining({ headers: expect.any(Headers), redirect: 'error' })
     )
   })
 

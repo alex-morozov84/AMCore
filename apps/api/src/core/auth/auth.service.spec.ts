@@ -1140,7 +1140,9 @@ describe('AuthService', () => {
         )
       const success = outcome === 'success',
         limited = outcome === 'limited'
-      const limiterIp = req.ip ?? ''
+      const limiterIp = ['disabled', 'untrusted'].includes(trust)
+        ? (req.ip ?? req.socket?.remoteAddress ?? '')
+        : '8.8.8.8'
       expect(result).toBe(success ? 'success' : 'failure')
       expect(mockLoginRateLimiter.check.mock.calls).toEqual([['test@example.com', limiterIp]])
       expect(mockLoginRateLimiter.reset.mock.calls).toEqual(

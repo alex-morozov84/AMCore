@@ -3,13 +3,14 @@ import { z } from 'zod'
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
 import { forwardRequestHeaders, forwardResponseHeaders } from '@/shared/api/bff/proxy-headers'
-import { resolveTrustedClientIp } from '@/shared/api/bff/trusted-client-ip'
+
+import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 
 import 'server-only'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5002'
+const API_URL = getBackendBaseUrl()
 
 export async function handleConsoleApiKeyRevoke(request: Request, id?: string) {
   const response = await revoke(request, id)
@@ -37,16 +38,13 @@ async function revoke(request: Request, id?: string) {
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
   try {
-    const upstream = await fetch(
+    const upstream = await fetchBackendResponse(
       `${API_URL}/api/v1/admin/api-keys/${id !== undefined ? encodeURIComponent(id) : 'revoke'}`,
+      request.headers,
       {
         method: id !== undefined ? 'DELETE' : 'POST',
         cache: 'no-store',
-        headers: forwardRequestHeaders(
-          request.headers,
-          resolved.token,
-          resolveTrustedClientIp(request.headers)
-        ),
+        headers: forwardRequestHeaders(request.headers, resolved.token),
         ...(id === undefined ? { body: JSON.stringify(parsed.data) } : {}),
       }
     )

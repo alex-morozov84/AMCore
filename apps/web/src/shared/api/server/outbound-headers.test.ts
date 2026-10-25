@@ -47,12 +47,13 @@ describe('buildOutboundHeaders', () => {
     expect('headers' in result && result.headers.has('Authorization')).toBe(false)
   })
 
-  it('relays the trusted client IP header when resolved', async () => {
-    vi.mocked(resolveTrustedClientIp).mockReturnValue('203.0.113.9')
+  it('returns original source for the transport to resolve the claim', async () => {
+    vi.mocked(headers).mockResolvedValue(new Headers({ 'x-real-ip': '203.0.113.9' }) as never)
 
     const result = await buildOutboundHeaders('corr-1', 'none')
 
-    expect('headers' in result && result.headers.get('x-amcore-client-ip')).toBe('203.0.113.9')
+    expect('headers' in result && result.headers.has('x-amcore-client-ip')).toBe(false)
+    expect('source' in result && result.source.get('x-real-ip')).toBe('203.0.113.9')
   })
 
   it('forwards a custom tokenResolver through to resolveAuthHeader', async () => {
