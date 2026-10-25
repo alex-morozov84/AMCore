@@ -188,16 +188,25 @@ public `Host` unchanged (the bundled Caddy profile does) and keep the API's `FRO
 
 ### Upgrades (new migrations in a release)
 
-The `migrate` service is one-shot; `docker compose up` does not re-run a container
-that already exited successfully. Re-run it explicitly **before** recreating the app:
+Use the same project, environment file and `COMPOSE_FILE` overlays as the running
+installation. Build the new images (or pull approved digests), then run the
+[migrator endpoint preflight](migrator-image.md#endpoint-preflight) against the existing database.
+Stop after any failed command. Apply migrations before recreating application services:
 
 ```bash
 git pull
 docker compose build
-docker compose run --rm migrate                 # apply new migrations once
-docker compose up -d --no-deps worker           # workers first: they must read every job the API can write
-docker compose up -d --no-deps api web          # then recreate the API and web with the new image
+docker compose run --rm --no-deps migrate
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
 ```
+
+Each application step waits for health before the next step. `run --rm` uses a
+separate one-off migrator container. Keep `--no-deps` on later commands so they
+do not start the ordinary `migrate` service after the application starts.
+The 180-second limit bounds health waiting, not image pulls, builds or migrations.
+A timeout stops this procedure; inspect the service state and safe logs before retrying.
+An interrupted migration has an unknown outcome until inspected; never retry it blindly.
 
 Workers go first because the queued-job envelope is a strict contract: a worker that
 does not know a newer key fails that job terminally. Rollback runs in the opposite
@@ -420,25 +429,119 @@ explicit restart policy to every long-running service, and bounds/rotates
 container logs. It changes nothing else — ports, volumes, environment, and
 profiles all stay exactly as defined in the base file.
 
-```bash
-export COMPOSE_API_IMAGE="ghcr.io/<org>/<repo>/api@sha256:..."
-export COMPOSE_API_MIGRATOR_IMAGE="ghcr.io/<org>/<repo>/api-migrator@sha256:..."
-export COMPOSE_WEB_IMAGE="ghcr.io/<org>/<repo>/web@sha256:..."
+Set the three image references in the installation's private environment file:
 
-docker compose -f docker-compose.yml -f docker/compose/prod.yml pull
-docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate
-docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps worker
-docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api web
+```bash
+COMPOSE_API_IMAGE="ghcr.io/<org>/<repo>/api@sha256:<64-hex-digest>"
+COMPOSE_API_MIGRATOR_IMAGE="ghcr.io/<org>/<repo>/api-migrator@sha256:<64-hex-digest>"
+COMPOSE_WEB_IMAGE="ghcr.io/<org>/<repo>/web@sha256:<64-hex-digest>"
 ```
 
-`pull` fails loudly if a digest is missing or unreachable — it never falls
-back to building locally, the same "never silently rebuild" rule
-`.github/workflows/deploy-template.yml`'s promote path already enforces.
-`run --rm migrate` re-runs the one-shot migration step against the new image
-before any app container restarts, same as the local-build "Upgrades" path
-above. The two `up` commands recreate the worker before the API and web (see the
-envelope rule in [Upgrades](#upgrades-new-migrations-in-a-release)). `--no-deps` avoids
-bouncing `postgres`/`redis` just to recreate `api`/`worker`/`web`.
+The placeholders require real registry digests. Before pulling, check all three
+references: each must name a repository and `@sha256:` followed by 64 hexadecimal
+characters. **This is an operator check:** Compose accepts any nonempty reference,
+including a mutable tag. Log in to a private registry using its approved credentials.
+
+Keep the installation's project name, environment file and complete overlay list.
+In `COMPOSE_FILE`, replace `docker/compose/supervise.yml` with `docker/compose/prod.yml`,
+or add `prod.yml` directly after `docker-compose.yml` when supervision is absent.
+Retain TLS, the private native-CLI URL override, web routing and relay overlays; see the
+[single-host registry selection](single-host-compose.md#images-from-a-registry).
+Explicit `-f` options replace `COMPOSE_FILE`, so a shortened command can drop them.
+
+### First registry startup
+
+Follow the [single-host setup](single-host-compose.md) through database roles and
+certificates. Pull before any migration or application start:
+
+```bash
+docker compose config --quiet
+docker compose pull
+docker compose up -d --no-build --wait --wait-timeout 180 postgres redis
+```
+
+The last line is only for the bundled `local-infra` profile. With managed services,
+skip it and verify the admitted database/Redis endpoints instead. Run the
+[migrator endpoint preflight](migrator-image.md#endpoint-preflight) with the promoted
+migrator image and exact migration credential. Then:
+
+```bash
+docker compose run --rm --no-deps migrate
+```
+
+For a new database, apply runtime grants and guarded system seed as described in
+[single-host setup step 6](single-host-compose.md#6-migrate-grant-and-seed).
+Pull `system-seed` with `--profile seed` first if using that profile. Then start
+services in this order, stopping after any failure:
+
+```bash
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 caddy
+```
+
+The last line applies only when the bundled `edge` profile is selected. API/web
+are already healthy; `--no-deps` prevents another migration through Caddy's
+API dependency. Caddy has no healthcheck: its `--wait` proves running, not HTTPS.
+Complete the [HTTP readiness verification](#web-container-readiness) below.
+
+### Registry upgrades
+
+With existing healthy infrastructure, set the new digests, preserve all overlays,
+and run the endpoint preflight after pulling:
+
+```bash
+docker compose config --quiet
+docker compose pull
+# Run the promoted migrator's endpoint preflight before the next command.
+docker compose run --rm --no-deps migrate
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
+```
+
+Worker readiness precedes the new API producer. Keep the existing Caddy running;
+apply a changed proxy configuration deliberately and repeat the HTTPS checks.
+The 180-second limit applies to health waiting, not the complete rollout.
+A failed pull, missing credential or missing digest stops the procedure before
+migration or replacement; do not fall back to a local build. Failed health waiting
+requires inspection before another step. Migration failure uses the
+[rollback inspection](#rollback), not an automatic downgrade.
+
+### Verify the deployed artifact
+
+Record the source revision, platform and three registry digests. API and worker
+use the same API image. A multi-platform index digest, platform manifest digest
+and local image ID identify different objects; do not compare their strings as
+equal. Inspect only selected fields, because full container inspection exposes secrets:
+
+```bash
+docker buildx imagetools inspect "$COMPOSE_API_IMAGE"
+docker image inspect --format '{{.Id}} {{json .RepoDigests}} {{.Os}}/{{.Architecture}}' "$COMPOSE_API_IMAGE"
+docker inspect --format '{{.Config.Image}} {{.Image}}' "$(docker compose ps -q api)"
+docker inspect --format '{{.Config.Image}} {{.Image}}' "$(docker compose ps -q worker)"
+```
+
+Match the requested registry reference to the pulled `RepoDigests` and match each
+container's `Image` to the pulled image's `Id`. Repeat for web and migrator; retain
+the one-shot migrator's image/exit result before removal if collecting evidence.
+For the web image, also compare `/api/deployment-version` with its baked build ID.
+The build ID alone is not image attestation.
+
+When collecting migrator evidence, replace the usual `run --rm` step with this
+sequence, using an unused task-specific container name. Do not run both variants:
+
+```bash
+docker compose run --name amcore-migration-proof --no-deps migrate
+docker inspect --format '{{.Config.Image}} {{.Image}} {{.State.ExitCode}}' amcore-migration-proof
+docker rm amcore-migration-proof
+```
+
+Require migration success and exit code zero before application startup. On failure,
+retain the container for inspection instead of removing or repeating it blindly.
+
+Prove pull/run on an isolated target
+without cached application images or build sources before calling a deployment
+path tested; `compose config` alone proves neither registry access nor runtime.
 
 Every `*_IMAGE` var is **required** by the overlay (no default) — leaving one
 unset fails `pull`/`up` immediately with a clear message rather than
@@ -458,6 +561,36 @@ and fails at container **start**, not at `compose config` time. Requires a
 Compose CLI supporting the `!reset` merge tag — available since Compose CLI
 v2.17.3, below this repo's documented v2.20.2+ minimum, and already relied
 on by this repo's own CI (`.github/compose.boot-smoke.override.yml`).
+
+### Web container readiness
+
+The web healthcheck requests `http://127.0.0.1:3000/api/deployment-version` inside
+the container. Success requires HTTP 200 and a valid build-version JSON response;
+redirects, missing routes and malformed responses fail. The probe uses no session,
+page rendering or backend request. It proves local Next HTTP availability, not
+successful login or availability of the API, database, Redis or email provider.
+
+Node limits the request and body to three seconds. Docker's five-second timeout
+also bounds a blocked Node event loop. Probes run every ten seconds with three
+failures required for unhealthy status and a thirty-second startup grace period.
+The product-web overlays wait for healthy web before initially starting Caddy;
+the default API-only edge has no dependency on web. These dependencies do not stop
+an already running proxy from forwarding to a later unhealthy service, and Docker
+does not restart a container merely because it reports unhealthy.
+
+After startup or replacement, verify both the actual HTTPS host and login page.
+For the version request, require HTTP 200, valid JSON and the expected build ID:
+
+```bash
+curl --fail --silent --show-error --max-time 10 https://app.example.com/api/deployment-version
+```
+
+The command does not follow redirects. A 3xx, 404, 502, invalid JSON or unexpected
+build ID fails verification even if the command exits zero. Allow up to 180 seconds
+for first HTTPS/certificate setup, checking at most every five seconds. If it still
+fails, inspect the owned service and TLS logs; do not continue rollout. Do not log
+credentials or query-token URLs. A local healthy signal does not replace this check.
+Plain Compose replacement can return 502 until the new service is ready.
 
 ### Zero/low-downtime rollout — stated honestly
 

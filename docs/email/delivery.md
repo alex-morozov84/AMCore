@@ -170,3 +170,49 @@ development/tests and logs metadata only.
 ## First-administrator invitation recovery
 
 [Organization provisioning](../product-admin/organization-provisioning.md) commits the organization before direct invitation mail. It records only a safe last-attempt outcome, never a secret body/link in a queue. Provider acknowledgment is not delivery. An unknown send leaves the organization saved; explicit reissue rotates the invitation. Production mock blocks new operator invitation sends before commit, while reads and exact replay remain available. The global mock default and ordinary email APIs are unchanged.
+
+## Verify delivery on a deployed stack
+
+Use a disposable deployment with approved Resend credentials, a verified sender
+and a mailbox you control. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM`
+and the public HTTPS `FRONTEND_URL` on both API and worker through the deployment
+configuration. Keep secret-link tracking disabled and redact token query strings
+at ingress before sending. Use the production provider settings, not the mock.
+
+Agree on recipients and a send limit before starting. One registration sends two
+messages: a non-secret welcome through the worker and direct email verification.
+A password-recovery request sends one further direct message. For English and
+Russian test accounts, this is six expected messages. Use mailbox aliases approved
+for the test; do not send to unrelated addresses or perform a bulk campaign.
+
+1. Register the English test account. Observe both welcome and verification mail.
+   Correlate the welcome's worker job completion with the provider message and receipt.
+2. Open the verification link on the intended HTTPS origin. Confirm the English
+   screen and verified account state. Never copy the live URL into logs or reports.
+3. Request password recovery. Check the received link's origin and language, set
+   a new test password, and verify sign-in. Reusing the consumed token must fail.
+4. Repeat with a Russian test account and Russian messages/screens.
+
+```text
+Registration -> API direct verification -> provider -> recipient mail server -> mailbox
+             -> queue -> worker welcome -> provider -> recipient mail server -> mailbox
+```
+
+Record these results separately: application response, worker completion for welcome,
+provider acceptance/message ID, provider delivery event, actual mailbox receipt,
+language/link checks and successful account action. Resend `delivered` means the
+recipient mail server accepted the message; it does not prove inbox placement.
+Check spam separately. A product HTTP 200/201 does not prove any mail arrived.
+
+Observe the provider and mailbox for up to ten minutes. Missing receipt is unresolved,
+not proof that no message was sent. Do not automatically resend after timeout or
+connection loss. Inspect the existing attempt before approving another send; obey
+the agreed limit. Test provider failure with local doubles instead of deliberately
+sending invalid mail through a real account. The direct route has no queue retry.
+
+Keep only allowlisted IDs, status codes, timestamps and test outcomes in evidence.
+A full provider retrieve response includes recipient data, rendered bodies and live
+links; never dump it. Mailbox inspection needs its own authorization. A direct provider
+test message proves API provider acceptance only, not the worker or account links.
+For artifact identity and HTTPS checks, use the
+[registry rollout](../operations/deployment.md#production-rollout-via-registry-image-pull-path).

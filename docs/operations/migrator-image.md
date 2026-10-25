@@ -128,6 +128,14 @@ Here the URL contains `sslcert=/run/secrets/migration-ca.pem`. The non-root imag
 user must be able to read the mounted file. Preserve the same network, CA mount,
 URL and digest when running deploy. Do not disable TLS verification on refusal.
 
+Do not reuse a `pg`/libpq URL as proof of strict native-CLI verification.
+`sslmode=verify-full&sslrootcert=...` can connect here without rejecting a wrong
+CA or hostname. The application, seed and restore clients still use their own
+verified PostgreSQL settings. The [single-host CLI override](single-host-compose.md#native-migration-cli-connection)
+keeps those settings separate while selecting `require`, `strict` and `sslcert`
+for the native migrator. A successful endpoint preflight proves its startup
+setting; it does not independently test certificate or hostname rejection.
+
 For Compose with a custom CA, create a local overlay such as
 `migration-ca.override.yml`. Replace the absolute host path with your CA file:
 

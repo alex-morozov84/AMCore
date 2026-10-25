@@ -3,10 +3,12 @@
 # base file, never in place of it:
 #
 #   docker compose -f docker-compose.yml -f docker/compose/prod.yml pull
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps worker
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api web
+#   docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm --no-deps migrate
+#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-build --no-deps --wait --wait-timeout 180 worker
+#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-build --no-deps --wait --wait-timeout 180 api web
 #
+# Preserve all installation overlays and run endpoint preflight first; stop on failure.
+# Full first-start/proxy verification: docs/operations/deployment.md.
 # The worker is recreated first: the queued-job envelope is a strict contract, so a worker
 # must read every job the new API can write (docs/backend/background-work.md).
 #

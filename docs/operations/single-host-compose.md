@@ -141,6 +141,42 @@ must show no overlapping range, including a VPN. The web address must lie inside
 the subnet and must not be its first address (the gateway). Then
 `docker compose config --quiet` must finish without output.
 
+### Native migration CLI connection
+
+The application, system seed and restore tools use PostgreSQL client parameters.
+Keep their `MIGRATION_DATABASE_URL` and `COMPOSE_DATABASE_URL` above unchanged.
+The migration image uses Prisma's native CLI, which needs its own strict TLS URL.
+A successful CLI connection with `sslmode=verify-full&sslrootcert=...` does not
+prove certificate verification: the native CLI can accept a wrong CA or hostname.
+
+Have your secret manager create `/srv/amcore-secrets/migration-cli.override.yml`
+outside the repository. Restrict its directory to mode `0700` and file to `0600`.
+Replace the password placeholder with the same migrator credential used above;
+the endpoint and database must also match. The file contains a secret, so do not
+commit it or print the resolved configuration:
+
+```yaml
+services:
+  migrate:
+    environment:
+      DATABASE_URL: 'postgresql://amcore_migrator:<migrator-password>@postgres:5432/amcore?sslmode=require&sslaccept=strict&sslcert=/etc/amcore/db-ca/ca.crt'
+```
+
+The existing `postgres-tls.yml` mounts `ca.crt` at this container path. This override
+changes only the migrator's selected URL, keeping its Prisma configuration and
+Tini entrypoint. It does not change API/worker credentials or the seed/restore URL.
+Persist the complete file selection in `.env`, including this final override:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker/compose/supervise.yml:docker/compose/postgres-tls.yml:docker/compose/web.yml:docker/compose/bff-relay.yml:/srv/amcore-secrets/migration-cli.override.yml
+```
+
+For registry images, replace only `supervise.yml` with `prod.yml`. Preserve the
+private CLI override during preflight, deployment, status checks and upgrades.
+When rotating the migrator credential or CA path, update both client-specific
+configurations. Repeat the [exact-endpoint preflight](migrator-image.md#endpoint-preflight)
+before deployment. Never disable certificate verification to make it pass.
+
 ## 4. Build the images
 
 On a host with less than about 6 GB of RAM, add swap and a build-only heap size
@@ -198,8 +234,17 @@ ALTER ROLE amcore_runtime LOGIN;
 
 ## 6. Migrate, grant and seed
 
+With Postgres healthy, run the [endpoint preflight](migrator-image.md#endpoint-preflight)
+using this installation's complete `COMPOSE_FILE` and migration credential:
+
 ```bash
-docker compose run --rm migrate
+docker compose run --rm --no-deps migrate ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+```
+
+Stop on failure. After a successful preflight:
+
+```bash
+docker compose run --rm --no-deps migrate
 sed -n '/^-- Step 3:/,/^-- Optional query-statistics observer/p' docker/postgres/setup-roles.sql \
   | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
 docker compose --profile seed run --rm system-seed
@@ -213,14 +258,17 @@ the host. See [Seeding](deployment.md#seeding) for refusals and repeated runs.
 ## 7. Start the stack
 
 ```bash
-docker compose up -d --wait
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 caddy
 docker compose ps
 ```
 
-Expected result: `api` and `worker` are `healthy`; `web`, `caddy`, `postgres` and
-`redis` are running. `migrate` runs again and exits with code 0. Caddy obtains
-certificates on the first requests. `web` has no health check, so `--wait` can return
-before it serves: a `502` in the first seconds means it is still starting.
+Stop after any failure. API, worker and web must be `healthy`; Caddy, Postgres
+and Redis must be running. `--no-deps` prevents another migration after step 6.
+The timeout bounds health waiting, not the whole operation. Caddy has no healthcheck;
+verify HTTPS in step 8. Web health proves local Next HTTP only; see
+[web container readiness](deployment.md#web-container-readiness).
 
 ## 8. Verify
 
@@ -283,13 +331,19 @@ Read the release notes for maintenance stops. Then build every service as in ste
 (or set the new digests and pull), and follow the order in
 [Upgrades](deployment.md#upgrades-new-migrations-in-a-release) — migrate, then the
 worker, then api and web — with plain `docker compose` commands instead of the `-f`
-forms shown there:
+forms shown there. Run the endpoint preflight first. Stop on any error; a failed
+worker readiness check must prevent the API/web step:
 
 ```bash
-docker compose run --rm migrate
-docker compose up -d --no-deps worker
-docker compose up -d --no-deps api web
+docker compose config --quiet
+# Run the exact-endpoint migrator preflight before migration.
+docker compose run --rm --no-deps migrate
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
 ```
+
+Caddy can return 502 during replacement; readiness waiting does not provide
+continuous service. Keep Caddy running and verify the HTTPS host after replacement.
 
 ## Visitor IP through the web BFF
 
