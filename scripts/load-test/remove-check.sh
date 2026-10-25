@@ -2,9 +2,10 @@
 # Prove the load-test entry is gone (host, deployment checkout). An unfinished or failed
 # check means the cleanup is unfinished.
 #   remove-check.sh   effective config and the open ports seen from this host
-# From any other machine, also run `admission.sh outside`'s first check, or:
-#   curl -m 10 https://<web-domain>:8443/   (must exit 7 or 28; a TLS error means still open)
-#   curl -m 10 https://<web-domain>/        (must answer) — a closed port, not a lost host.
+# When the generator is reachable, also prove it there (the firewall admits only it on 8443):
+#   curl -m 10 --resolve <web-domain>:8443:<host address> https://<web-domain>:8443/
+#     must exit 7 (connection refused); a TLS error means the entry still runs
+#   curl -m 10 https://<web-domain>/   must answer: a closed port, not a lost host
 # shellcheck disable=SC2016,SC2034 # check() evaluates its condition later, on purpose
 set -eu
 . "$(dirname "$0")/lib.sh"
