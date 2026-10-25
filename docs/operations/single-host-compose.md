@@ -91,8 +91,8 @@ cd /srv/amcore
 ```
 
 The mounted directories now hold only `ca/ca.crt` and `server/server.{crt,key}`.
-Copy `ca-private/ca.key` to safe offline storage and delete it from the host
-(`rm ca-private/ca.key`); you bring it back only to renew the certificate (see
+Verify a safe offline copy of `/srv/amcore-tls/ca-private/ca.key` before deleting
+it from the host (`rm /srv/amcore-tls/ca-private/ca.key`); you bring it back only to renew the certificate (see
 [Database TLS](#database-tls)). `ca.srl` and `san.ext` stay in `ca-private/`.
 Set in `.env`:
 
@@ -205,10 +205,10 @@ seconds. Build every service on each upgrade too: `up` builds only images that a
 missing, so it would keep running an old `worker` image. The web build takes the
 longest (about 18 minutes on the reference host).
 
-## 5. Start Postgres and create the roles
+## 5. Start infrastructure and create the roles
 
 ```bash
-docker compose up -d --wait postgres
+docker compose up -d --no-build --wait --wait-timeout 180 postgres redis
 sed -n '1,/^-- Step 2:/p' docker/postgres/setup-roles.sql \
   | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
 docker compose exec postgres psql -U amcore -d amcore
@@ -272,7 +272,8 @@ verify HTTPS in step 8. Web health proves local Next HTTP only; see
 
 ## 8. Verify
 
-1. `https://app.example.com/` opens the sign-in page, and you can register and sign in.
+1. `https://app.example.com/` opens the sign-in page. Before registration or recovery,
+   approve recipients and the [mail verification budget](../email/delivery.md#verify-delivery-on-a-deployed-stack).
    `curl -s -o /dev/null -w '%{http_code}\n' https://api.example.com/api/v1/health/ready`
    prints `200`.
 2. On the host, `sudo ss -tlnp` shows ports 5432, 6379, 5002 and 3000 only on
@@ -285,7 +286,7 @@ verify HTTPS in step 8. Web health proves local Next HTTP only; see
    ends with `pg_hba.conf rejects connection`.
 
 Then create the first organization: [Initial organization and administrator](deployment.md#initial-organization-and-administrator),
-and turn on backups ([Backup & restore](backup-restore.md)). The runtime role cannot
+and choose a [backup strategy](backup-restore.md) before enabling scheduled dumps. The runtime role cannot
 read Prisma's history table, so backups use the read-only `amcore_backup` role:
 
 ```bash

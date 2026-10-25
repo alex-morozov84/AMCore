@@ -52,6 +52,12 @@ possible-call reservation. Deployment requires PG, Redis and worker wall clocks
 each within±2 seconds of the provider reference. Opposite timestamp offsets can
 differ by4 seconds; the checks reserve that allowance at both ends.
 
+The deployment operator must supply evidence for that external clock bound. AMCore
+does not attest the provider clock; health checks and local NTP status alone do not
+prove it. If the provider reference cannot be qualified, stop queued-mail
+verification and do not authorize retries. Obtain a supported deployment/provider
+clock contract before proceeding; do not infer it from dashboard timestamps.
+
 Immediately before transport, the shared helper requires
 `max(redisTime + elapsed, wallTime) + 94000 < nominalDeadline`. The94 seconds
 include4 seconds of timestamp uncertainty,1 second of scheduling allowance,

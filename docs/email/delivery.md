@@ -173,7 +173,9 @@ development/tests and logs metadata only.
 
 ## Verify delivery on a deployed stack
 
-Use a disposable deployment with approved Resend credentials, a verified sender
+Use a disposable deployment or a new installation before production traffic.
+Keep closed production signup closed; use a separately approved test target instead.
+Provide approved Resend credentials, a verified sender
 and a mailbox you control. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM`
 and the public HTTPS `FRONTEND_URL` on both API and worker through the deployment
 configuration. Keep secret-link tracking disabled and redact token query strings
@@ -182,7 +184,14 @@ at ingress before sending. Use the production provider settings, not the mock.
 Approve recipients and a send limit before starting. The complete scenario sends
 four messages per language: welcome, verification, reset link and an automatic
 password-change alert. Allow eight for EN/RU or four for a single-locale fork.
-Use only retained languages and approved recipients.
+Use only retained languages and approved recipients. Include earlier bootstrap or
+provider-test messages separately unless they are the same actions counted below.
+Keep test accounts until their login, link-reuse and evidence checks are complete.
+
+Before triggering queued mail, satisfy the [clock prerequisites](queued-safety.md#retry-window-and-cooldown).
+Arrange authorized worker/notification diagnostics; platform administration
+[requires explicit bootstrap authority](../auth/rbac.md#administering-super_admin).
+Account bootstrap mail also needs the approved budget above.
 
 1. Register a test account in the first supported language. Observe both welcome and verification mail.
    Correlate the welcome's worker job completion with the provider message and receipt.

@@ -22,7 +22,7 @@ each one assumes the previous is done:
 6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
    VPS.
 
-**One server, building on the host?** Follow
+**One server, with approved registry images or building on the host?** Follow
 [Single-host production with Docker Compose](single-host-compose.md) end to end,
 and size the host with [Capacity](capacity.md).
 

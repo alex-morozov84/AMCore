@@ -81,3 +81,13 @@ test('migration evidence stops before removal when execution or inspection fails
   assert.match(commands[1], /amcore-migration-proof \|\| exit 1$/)
   assert.equal(commands[2], 'docker rm amcore-migration-proof')
 })
+
+test('single-host starts bundled Redis before no-deps worker startup', () => {
+  const infrastructure = section(singleHost, '## 5. Start infrastructure', '## 6. Migrate')
+  const starts = infrastructure.split('\n').filter((line) => /^docker compose up /.test(line))
+  assert.equal(starts.length, 1)
+  assert.match(starts[0], /--no-build --wait --wait-timeout 180 postgres redis$/)
+  assert.throws(() =>
+    assert.match(starts[0].replace(' postgres redis', ' postgres'), /postgres redis$/)
+  )
+})

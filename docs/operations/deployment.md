@@ -605,14 +605,17 @@ an already running proxy from forwarding to a later unhealthy service, and Docke
 does not restart a container merely because it reports unhealthy.
 
 After startup or replacement, verify both the actual HTTPS host and login page.
-For the version request, require HTTP 200, valid JSON and the expected build ID:
+For the version request, require HTTP 200 and valid JSON. Compare its `version`
+with the build-time `NEXT_DEPLOYMENT_ID` recorded by the image publisher (or their
+recorded generated deployment version when that argument was omitted), not
+`.next/BUILD_ID`. Obtain that value before declaring artifact verification complete:
 
 ```bash
-curl --fail --silent --show-error --max-time 10 https://app.example.com/api/deployment-version
+curl --fail --silent --show-error --max-time 10 --write-out '\nHTTP %{http_code}\n' https://app.example.com/api/deployment-version
 ```
 
 The command does not follow redirects. A 3xx, 404, 502, invalid JSON or unexpected
-build ID fails verification even if the command exits zero. Allow up to 180 seconds
+deployment version fails verification even if the command exits zero. Allow up to 180 seconds
 for first HTTPS/certificate setup, checking at most every five seconds. If it still
 fails, inspect the owned service and TLS logs; do not continue rollout. Do not log
 credentials or query-token URLs. A local healthy signal does not replace this check.
@@ -941,7 +944,9 @@ with `--env-file`; the common backend environment forwards it to `api` and `work
 An omitted setting defaults to `true`. A one-off setup command using the `api`
 service inherits the same policy; it does not reconfigure existing API replicas.
 Roll out that policy consistently before admitting traffic or running initial setup.
-Prepare an ordinary account, complete normal mailbox proof, then assign
+Approve [recipients and a send budget](../email/delivery.md#verify-delivery-on-a-deployed-stack)
+before creating an account or requesting recovery. Prepare an ordinary account,
+complete normal mailbox proof, then assign
 its verified ID as organization `ADMIN`. Run `organization-setup.js` from the runner;
 migrations use the migrator. The explicit seed runs from the API image, as described
 under [Seeding](#seeding). First platform `SUPER_ADMIN` trust
@@ -1280,13 +1285,10 @@ TRUST_PROXY=1                    # Caddy is exactly one hop in front of the app
 ```
 
 The base `docker/caddy/Caddyfile` remains API-only and therefore preserves the
-existing edge contract. Select product-web path mode explicitly when needed:
-
-```bash
-CADDY_WEB_DOMAIN="app.example.com" \
-docker compose --profile edge \
-  -f docker-compose.yml -f docker/compose/web.yml up -d
-```
+existing edge contract. For product-web path mode, set `CADDY_WEB_DOMAIN=app.example.com`
+in `.env` and append `docker/compose/web.yml` to the installation's saved `COMPOSE_FILE`.
+Keep its production, TLS and private overrides. Start or update through the
+[ordered rollout](#production-rollout-via-registry-image-pull-path).
 
 `docker/caddy/Caddyfile.web` fronts the product web host but creates no
 console hostname. All bundled Caddyfiles strip `X-AMCore-Client-Ip` toward the API
@@ -1301,14 +1303,17 @@ fronting only `api:5002` leaves OAuth's callback URL unreachable.
 ### Operations Console host-mode reference
 
 When the generated console config selects `host`, select the matching Caddy
-configuration explicitly and set both hostnames:
+configuration explicitly: use `docker/compose/console-host.yml` instead of `web.yml`
+in the saved `COMPOSE_FILE`, preserving every other overlay. Set both hostnames
+in `.env`:
 
 ```bash
-CADDY_WEB_DOMAIN="app.example.com" \
-ADMIN_CONSOLE_HOSTNAME="console.example.com" \
-docker compose --profile edge \
-  -f docker-compose.yml -f docker/compose/console-host.yml up -d
+CADDY_WEB_DOMAIN="app.example.com"
+ADMIN_CONSOLE_HOSTNAME="console.example.com"
 ```
+
+Use the [ordered rollout](#production-rollout-via-registry-image-pull-path), not a
+shortened `-f` selection that drops production or TLS settings.
 
 The override mounts `docker/caddy/Caddyfile.console-host`; it is the only
 reference Caddyfile that creates a console host. An absent hostname makes that
