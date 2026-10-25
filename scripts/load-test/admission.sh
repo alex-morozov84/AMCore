@@ -135,17 +135,22 @@ case "$MODE" in
     done
     expect "two X-Forwarded-For headers refused" 400 "$(code $CERT -H 'X-Forwarded-For: 198.18.0.1' -H 'X-Forwarded-For: 198.18.0.2' "$API8/auth/me")"
     # API: one identity is limited at the default budget, another is not; claims change nothing.
+    # A claim burst right after the spent budget: ignored claims meet that bucket (mostly
+    # 429), an honoured claim would get a fresh one (all admitted). A single request cannot
+    # tell, because refill (100/min) may admit it (fresh host: one 401 after the burst).
     burst api-a 90 $CERT -H 'X-Forwarded-For: 198.18.3.10' "$API8/auth/me"
+    burst api-claim 10 $CERT -H 'X-Forwarded-For: 198.18.3.10' -H 'X-AMCore-Client-Ip: 198.18.3.12' -H 'X-Real-IP: 198.18.3.12' "$API8/auth/me"
     budget_hit api-a 401
+    still_limited api-claim 401
     expect "API other identity unaffected" 401 "$(code $CERT -H 'X-Forwarded-For: 198.18.3.11' "$API8/auth/me")"
-    expect "API claim header ignored" 429 "$(code $CERT -H 'X-Forwarded-For: 198.18.3.10' -H 'X-AMCore-Client-Ip: 198.18.3.12' -H 'X-Real-IP: 198.18.3.12' "$API8/auth/me")"
     # Web app: two members, two addresses, two buckets.
     expect "member 199 sign-in" 200 "$(login "$TMP/jar199" 199 "$WEB8" $CERT -H 'X-Forwarded-For: 198.18.0.199')"
     expect "member 200 sign-in" 200 "$(login "$TMP/jar200" 200 "$WEB8" $CERT -H 'X-Forwarded-For: 198.18.0.200')"
     burst bff-a 90 $CERT -b "$TMP/jar199" -H "Origin: $ORIGIN" -H 'X-Forwarded-For: 198.18.0.199' "$WEB8/api/auth/me"
+    burst bff-claim 10 $CERT -b "$TMP/jar199" -H "Origin: $ORIGIN" -H 'X-Forwarded-For: 198.18.0.199' -H 'X-AMCore-Client-Ip: 198.18.0.201' -H 'X-Real-IP: 198.18.0.201' "$WEB8/api/auth/me"
     budget_hit bff-a 200
+    still_limited bff-claim 200
     expect "web other identity unaffected" 200 "$(code $CERT -b "$TMP/jar200" -H "Origin: $ORIGIN" -H 'X-Forwarded-For: 198.18.0.200' "$WEB8/api/auth/me")"
-    expect "web claim header ignored" 429 "$(code $CERT -b "$TMP/jar199" -H "Origin: $ORIGIN" -H 'X-Forwarded-For: 198.18.0.199' -H 'X-AMCore-Client-Ip: 198.18.0.201' -H 'X-Real-IP: 198.18.0.201' "$WEB8/api/auth/me")"
     ;;
   outside)
     # From here the firewall may drop 8443 (a timeout) or Caddy may refuse the missing

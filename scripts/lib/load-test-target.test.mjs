@@ -171,3 +171,13 @@ test('fixture.sh refuses before the loader when the target is not the run projec
     assert.doesNotMatch(w.log(), / run --rm .*load-fixture/, `${label}: loader never started`)
   }
 })
+
+test('a check that could not run says so instead of blaming the target', () => {
+  // Fresh host: Docker Hub timed out, and the old message said "not this run's own project".
+  const w = fixtureWorld({ nodeRunExit: 125 })
+  const r = w.run()
+  assert.notEqual(r.status, 0)
+  assert.match(r.stderr, /the target check could not run \(exit 125/)
+  assert.doesNotMatch(r.stderr, /not this run's own project/)
+  assert.doesNotMatch(w.log(), / run --rm .*load-fixture/)
+})

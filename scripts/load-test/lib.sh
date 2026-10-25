@@ -73,7 +73,7 @@ check_target() {
   chmod 700 "$target_dir"
   target_status=0
   lt_compose COMPOSE_PROFILES="$(envval COMPOSE_PROFILES),load-test" config --format json > "$target_dir/config.json" ||
-    target_status=1
+    target_status=2
   set -- /d/config.json "$1" "$2" "${3:-}"
   if [ "$target_status" -eq 0 ] && [ "$4" = running ]; then
     # The running containers, not only the rendered files: a container created from an
@@ -81,7 +81,7 @@ check_target() {
     running=$(lt_compose ps -q postgres api worker web)
     if [ -n "$running" ]; then
       # shellcheck disable=SC2086 # one argument per container id
-      docker inspect $running > "$target_dir/running.json" || target_status=1
+      docker inspect $running > "$target_dir/running.json" || target_status=2
     else
       target_status=1
     fi
@@ -90,9 +90,15 @@ check_target() {
     set -- "$1" "$2" "$3"
   fi
   if [ "$target_status" -eq 0 ]; then
+    # Exit 1 is a found violation; any other failure (for example 125: the image could not
+    # be pulled) means the check did not run, which is not a statement about the target.
     docker run --rm -v "$target_dir:/d:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" node /lt/target-check.mjs "$@" ||
-      target_status=1
+      target_status=$?
   fi
   rm -rf "$target_dir"
-  [ "$target_status" -eq 0 ] || die "the effective deployment is not this run's own project (see above)"
+  case "$target_status" in
+    0) ;;
+    1) die "the effective deployment is not this run's own project (see above)" ;;
+    *) die "the target check could not run (exit $target_status, see above); nothing was written" ;;
+  esac
 }

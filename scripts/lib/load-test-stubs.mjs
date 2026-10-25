@@ -77,6 +77,7 @@ if (args[0] === 'run') {
     fs.writeFileSync(path.join(out, env.LT_STEP + '.window.json'), JSON.stringify({ start, end: start + Number(cfg.k6Seconds || 3), rate: Number(env.LT_RATE), smoke: env.LT_SMOKE === '1' }))
     return
   }
+  if (cfg.nodeRunExit) process.exit(cfg.nodeRunExit) // e.g. 125: the image could not be pulled
   const mapped = cmd.map(map)
   const r = spawnSync(mapped[0], mapped.slice(1), { stdio: 'inherit' })
   process.exit(r.status ?? 1)
