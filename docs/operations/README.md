@@ -24,7 +24,8 @@ each one assumes the previous is done:
 
 **One server, building on the host?** Follow
 [Single-host production with Docker Compose](single-host-compose.md) end to end,
-and size the host with [Capacity](capacity.md).
+and size the host with [Capacity](capacity.md). To measure your own build the same
+way, use [Load testing](load-testing.md) on a disposable host.
 
 Already running? Reach for whichever concern below applies.
 

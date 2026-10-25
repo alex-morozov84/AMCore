@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_END -->
 
+- A reproducible load test for a disposable single-host deployment
+  (`scripts/load-test/`, `docker/compose/load-test.yml`): a client-certificate test
+  entry with per-visitor synthetic addresses, guarded fixtures, admission checks, the
+  reference protocol from Capacity with valid/invalid/overload results, and removal
+  checks. See `docs/operations/load-testing.md`.
+
 - CI fails a change that pushes any web page's first-load JavaScript over its
   per-page budget (`pnpm check:route-budgets`, also run in generated scaffold
   variants). The check fails closed when Next's build measurement is incomplete.
