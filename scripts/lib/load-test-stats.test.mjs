@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib'
 import { readRecords, routeClass, windowStats } from '../load-test/stats.mjs'
 
 const rec = (ts, uri, duration = 0.01, status = 200) =>
-  JSON.stringify({ ts, duration, status, request: { uri } })
+  JSON.stringify({ ts, duration, status, request: { uri, tls: { client_common_name: 'k6' } } })
 const dir = (files) => {
   const d = mkdtempSync(join(tmpdir(), 'lt-stats-'))
   for (const [name, body] of Object.entries(files)) writeFileSync(join(d, name), body)
@@ -83,4 +83,29 @@ test('route classes fold query, organization ids and the locale prefix', () => {
   assert.equal(routeClass('/en/settings/sessions'), '/:locale/settings/sessions')
   assert.equal(routeClass('/settings/sessions'), '/settings/sessions')
   assert.equal(routeClass('/api/v1/admin/users?limit=20'), '/api/v1/admin/users')
+})
+
+test('only test-entry records count: same-name requests on other entries are reported apart', () => {
+  // Real fresh host: Let's Encrypt validation on :80 for the same names landed in the file.
+  const acme = JSON.stringify({
+    ts: 100.5,
+    duration: 0.001,
+    status: 200,
+    request: { uri: '/.well-known/acme-challenge/x', host: 'app.example.test' },
+  })
+  const plain443 = JSON.stringify({
+    ts: 100.6,
+    duration: 0.5,
+    status: 200,
+    request: { uri: '/x', tls: { server_name: 'app.example.test' } },
+  })
+  const lines = [acme, plain443, rec(100.7, '/x', 0.02)]
+  const s = windowStats(readRecords(dir({ 'load-test-access.log': lines.join('\n') })), 100, 101)
+  assert.equal(s.requests, 1)
+  assert.equal(s.otherEntryRecords, 2)
+  assert.equal(Math.round(s.all.p95), 20)
+  assert.throws(
+    () => windowStats(readRecords(dir({ 'load-test-access.log': acme })), 100, 101),
+    /no test-entry records/
+  )
 })

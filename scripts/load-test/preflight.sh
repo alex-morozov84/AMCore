@@ -76,7 +76,10 @@ case "$MODE" in
     trap 'rm -f "$TMP"' EXIT
     lt_compose exec -T caddy wget -qO- http://127.0.0.1:2019/config/ > "$TMP" || die "cannot read the running Caddy config"
     check_config "$TMP"
-    PEER=$(lt_compose exec -T caddy sh -c 'tail -n 50 /data/load-test-access.log 2>/dev/null' |
+    # Only records with a verified client certificate are test-entry requests; the same file
+    # also receives :80 requests for these names (ACME validation, redirects).
+    PEER=$(lt_compose exec -T caddy sh -c 'cat /data/load-test-access.log 2>/dev/null' |
+      grep '"client_common_name":"[^"]' | tail -n 50 |
       sed -n 's/.*"remote_ip":"\([^"]*\)".*/\1/p' | sort -u)
     [ "$PEER" = "$GEN" ] || die "test-entry peers '$PEER' differ from $GEN; run 'admission.sh probe' from the generator first"
     echo "preflight live: ok (volume $VOLUME labelled $RUN, web $ACTUAL_WEB, generator peer $GEN)"

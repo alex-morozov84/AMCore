@@ -50,9 +50,15 @@ export function percentiles(values) {
   return { n: a.length, p50: at(50) * 1000, p95: at(95) * 1000, p99: at(99) * 1000 }
 }
 
+// Caddy routes access logs by host name, not by port, so the same file also receives the
+// :80 requests for these names (ACME validation, HTTP redirects). Only a request with a
+// verified client certificate came through the :8443 test entry.
+export const isTestEntry = (r) => Boolean(r.request?.tls?.client_common_name)
+
 export function windowStats(records, from, to) {
   if (!(from < to)) throw new Error('measured window is empty or reversed')
-  const inWindow = records.filter((r) => r.ts >= from && r.ts < to)
+  const timed = records.filter((r) => r.ts >= from && r.ts < to)
+  const inWindow = timed.filter(isTestEntry)
   if (!inWindow.length) throw new Error(`no test-entry records between ${from} and ${to}`)
   const status = {}
   const byRoute = {}
@@ -69,6 +75,8 @@ export function windowStats(records, from, to) {
     from,
     to,
     requests: inWindow.length,
+    // Same names on another entry (port 80) in the window: reported, never counted.
+    otherEntryRecords: timed.length - inWindow.length,
     status,
     all: percentiles(inWindow.map((r) => r.duration)),
     routes,

@@ -28,7 +28,7 @@ if (args[0] === 'compose') {
   if (sub === 'cp') {
     const routes = (cfg.routes || '').split(',')
     const t = Number(fs.readFileSync(cfg.windowStart, 'utf8'))
-    const lines = routes.map((uri, i) => JSON.stringify({ ts: t + 0.5 + i * 0.01, duration: 0.02, status: 200, request: { uri } }))
+    const lines = routes.map((uri, i) => JSON.stringify({ ts: t + 0.5 + i * 0.01, duration: 0.02, status: 200, request: { uri, tls: { client_common_name: 'k6' } } }))
     fs.writeFileSync(args.at(-1), lines.join('\\n') + '\\n')
     return
   }
