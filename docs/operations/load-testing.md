@@ -17,14 +17,15 @@ you rely on the published numbers for another host class.
 - **Host:** a disposable Linux host with the prerequisites of the
   [single-host guide](single-host-compose.md#before-you-start). Comparable with Capacity:
   2 vCPU with a 100 % share, 2 GiB RAM, not preemptible, swap off while measuring.
-- **Generator:** a second Linux VM in the same private network with Docker, `curl`,
-  `openssl`, `tmux`, access to Docker Hub, SSH key access to the host and an AMCore checkout
-  of the same commit. 2 vCPU is enough.
+- **Generator:** a second Linux VM in the same private network with Docker (anonymous
+  Docker Hub pulls), `curl`, `openssl`, `tmux`, an SSH key that logs in to the host, and
+  `git clone` of AMCore checked out at the same commit as the host. 2 vCPU is enough.
 - **Time:** NTP on both VMs.
-- **Topology:** path mode with the bundled Postgres, as in the single-host guide.
-  `PROJECT_CONTEXT.md` shows `admin_console_mode: path` or no Console; host mode and
-  external databases are refused.
-- **Firewall:** TCP 8443 on the host open to the generator only.
+- **Topology:** path mode with the bundled Postgres, as in the single-host guide. The
+  checkout's `PROJECT_CONTEXT.md` shows `admin_console_mode: path` or no Console; host
+  mode and external databases are refused.
+- **Firewall:** TCP 8443 on the host open to the generator only, in the provider firewall
+  (ports Docker publishes bypass a firewall on the host itself).
 
 Host commands run in the deployment checkout (`/srv/amcore`), generator commands in the
 generator's checkout. The scripts are in [`scripts/load-test/`](../../scripts/load-test/).
@@ -39,8 +40,8 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 7 \
   -subj /CN=amcore-load-test-ca -keyout ca.key -out ca.crt
 openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj /CN=k6 \
   -keyout client.key -out client.csr
-openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -days 7 -out client.crt
-rm ca.key client.csr
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 7 -out client.crt
+rm ca.key ca.srl client.csr
 printf 'Lt%s9' "$(openssl rand -hex 12)" > fixture-password
 chmod 600 client.key fixture-password
 ```
@@ -151,13 +152,13 @@ sh scripts/load-test/protocol.sh campaign    # about 45 minutes
 `prepare` keeps live session cookies in `~/lt-work/sessions.json`. `smoke` writes to
 `~/lt-work/out-smoke`; it is valid only if every action answered as expected. The
 campaign writes to `~/lt-work/out` and first prints the recovery commands (also in
-`out/RECOVERY.txt`). A second campaign needs a new `LT_WORK` and, to be comparable, a fresh
-host or project (section 7).
+`out/RECOVERY.txt`). For the next campaign see section 8.
 
 Protocol (do not change it between compared runs): 60 s warm-up at 5 iterations/s, then 5,
 10, 20, 30 and 40 iterations/s for 120 s each, three repeats, 30 s apart, admin reads at
-0.2 iterations/s. A warm-up or repeat that is not `valid` stops the ladder; a 5
-iterations/s control step follows after 120 s idle. One iteration is one visitor action,
+0.2 iterations/s; step `r20-2` is 20 iterations/s, repeat 2. A repeat that is not `valid`
+stops the ladder; a 5 iterations/s `control` step still follows after 120 s idle (not
+after an invalid warm-up). One iteration is one visitor action,
 about 3 requests; per 1,200 iterations: 780 page browses, 180 public pages, 120 profile
 updates (synchronous in-app notification), 60 team-page reads, 60 avatar uploads.
 
@@ -213,21 +214,38 @@ Delete what belongs to this run only, from the deployment checkout, exactly as w
 docker compose ls                     # amcore-loadtest-<run id>
 docker compose down -v
 docker volume ls --filter label=com.docker.compose.project=amcore-loadtest-<run id>   # empty
-sudo rm -rf /srv/amcore-loadtest && rm -rf ~/amcore-load-test
+sudo rm -rf /srv/amcore-loadtest && rm -rf ~/amcore-load-test   # recover backups, samples
 ```
 
-Also delete `~/lt-work` on the generator (keep `out` if you want it), the password copy on
-the `outside` machine, and the VMs if they were created for the test. Never run
-`docker system prune` on a shared host.
+Also delete `~/lt-work` on the generator (keep `out` if you want it) and the password copy
+on the `outside` machine. Still on the host: the checkout with its `.env` (this run's
+secrets), `/srv/amcore-tls`, the built images, `/swapfile` and the DNS records. Delete the
+VMs if they were created for the test; before anyone else reuses the host, remove `.env`
+(or the checkout), the swap file (`sudo rm /swapfile`) and the images you built
+(`docker image rm` by name). Never run `docker system prune` on a shared host.
+
+## 8. The next campaign on the same VMs
+
+For a new commit or a repeat, start like a new host but keep the VMs:
+
+1. Finish section 7 for the previous run; keep its `out` elsewhere and
+   `mv ~/lt-work ~/lt-work-<old run id>` on the generator.
+2. Check out the new commit on both VMs and repeat section 1 (new certificates and
+   password; section 7 deleted the host copies).
+3. Set a new `LOAD_TEST_RUN_ID` and `COMPOSE_PROJECT_NAME`, rebuild the images (single-host
+   step 4 and `fixture.sh build`), reboot, `preflight.sh plan`. The database certificates
+   and role passwords in `.env` can stay.
+4. Continue with section 3 (single-host steps 5–7 on the empty new project, not the
+   upgrade procedure), then sections 4–7.
 
 ## Troubleshooting
 
-| Symptom                                                               | Cause and action                                                                                                                                                                                   |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preflight live`: test-entry peers differ                             | The host sees another generator address (NAT, public address). Set it as `LOAD_TEST_GENERATOR_IP`, `docker compose up -d --force-recreate --no-deps caddy`, then probe and `preflight live` again. |
-| `fixture.sh`: running service uses another URL than the configuration | The container was created from an older `.env`: `docker compose up -d --force-recreate <service>`.                                                                                                 |
-| `fixture.sh`: not a fresh database or partial fixtures                | `docker compose down -v` in this project and repeat from single-host step 5.                                                                                                                       |
-| No certificate, or Docker Hub times out, on a new host                | That public address may have poor outward connectivity. Give the host another address, update names and `.env`, then `docker compose up -d --wait`.                                                |
-| `clock offset … not provably within 1 s`                              | Enable NTP on both VMs; if the offset is small but its bound is large, check the generator–host connection.                                                                                        |
-| Admission: another identity gets `429`                                | The visitor address does not reach the limiter: `bff-relay.yml` must be in `COMPOSE_FILE` and `COMPOSE_WEB_IPV4` must match `web`.                                                                 |
-| `invalid measurement` with `generator CPU`                            | Use a generator with twice the vCPUs and a new campaign on a fresh host.                                                                                                                           |
+| Symptom                                                               | Cause and action                                                                                                                                                                                                         |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `preflight live`: test-entry peers differ                             | The host sees another generator address (NAT, public address); the message names it. Set it as `LOAD_TEST_GENERATOR_IP`, `docker compose up -d --force-recreate --no-deps caddy`, then probe and `preflight live` again. |
+| `fixture.sh`: running service uses another URL than the configuration | The container was created from an older `.env`: `docker compose up -d --force-recreate <service>`.                                                                                                                       |
+| `fixture.sh`: not a fresh database or partial fixtures                | `docker compose down -v` in this project and repeat from single-host step 5.                                                                                                                                             |
+| No certificate, or Docker Hub times out, on a new host                | That public address may have poor outward connectivity. Give the host another address, update names and `.env`, then `docker compose up -d --wait`.                                                                      |
+| `clock offset … not provably within 1 s`                              | Enable NTP on both VMs; if the offset is small but its bound is large, check the generator–host connection.                                                                                                              |
+| Admission: another identity gets `429`                                | The visitor address does not reach the limiter: `bff-relay.yml` must be in `COMPOSE_FILE` and `COMPOSE_WEB_IPV4` must match `web`.                                                                                       |
+| `invalid measurement` with `generator CPU`                            | Use a generator with twice the vCPUs and a new campaign on a fresh host.                                                                                                                                                 |
