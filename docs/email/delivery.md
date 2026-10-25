@@ -178,8 +178,9 @@ Keep closed production signup closed; use a separately approved test target inst
 Provide approved Resend credentials, a verified sender
 and a mailbox you control. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM`
 and the public HTTPS `FRONTEND_URL` on both API and worker through the deployment
-configuration. Keep secret-link tracking disabled and redact token query strings
-at ingress before sending. Use the production provider settings, not the mock.
+configuration. Keep secret-link tracking disabled and apply
+[edge log redaction](security.md#caddy-secret-link-logs) before sending.
+Use the production provider settings, not the mock.
 In Resend, open **Domains → your sending domain → Configuration**. Keep click
 and open tracking disabled; an unconfigured tracking domain needs no setup.
 See [Resend tracking settings](https://resend.com/blog/introducing-custom-tracking-domain).
