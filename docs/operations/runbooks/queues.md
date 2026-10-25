@@ -197,9 +197,10 @@ escalate per your organization's on-call process.
    ```
 
 2. Branch on the `queue` label and structured event. For `email`, the view-only
-   Bull Board may list the retained failed job for 24h or 1000 jobs (it shows
-   that it failed, when and after how many attempts, not why: use the worker
-   logs for the cause). For `notifications`,
+   Bull Board may list the retained failed job (default retention:24 hours and
+   1,000 jobs, trimmed when other jobs finish; individual settings can differ).
+   This is not a strict24-hour window. It shows failure time and attempts; use
+   worker logs for the cause. For `notifications`,
    distinguish `notification.delivery.dead_letter` (a durable DB delivery,
    not a BullMQ job) from `notification.dispatch_job_failed`. For `ai-runs`,
    inspect `ai.run.wake_job_failed`; the view-only Bull Board lists the queue

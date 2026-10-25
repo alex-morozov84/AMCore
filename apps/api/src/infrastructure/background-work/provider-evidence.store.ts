@@ -79,7 +79,7 @@ export interface ProviderOutcome {
 export interface ProviderOutcomeWitness {
   readonly attemptId: string
   readonly incarnation: string
-  readonly kind: 'reported' | 'denied-before-call'
+  readonly kind: 'reported' | 'denied-before-call' | 'accepted-transport'
   readonly brokerRevision?: number
 }
 
@@ -443,7 +443,9 @@ export class ProviderEvidenceStore {
       witness.incarnation !== attempt.row.incarnation ||
       (witness.kind === 'denied-before-call'
         ? outcome.certainty !== 'none' || outcome.code !== 'NO_CALL'
-        : !Number.isSafeInteger(witness.brokerRevision) || witness.brokerRevision! < 1)
+        : witness.kind === 'accepted-transport'
+          ? outcome.certainty !== 'accepted' || !isConservativeEvidence(attempt.row)
+          : !Number.isSafeInteger(witness.brokerRevision) || witness.brokerRevision! < 1)
     )
       throw new WorkPolicyError('OUTCOME_UNRECORDED')
     await backgroundControlTransaction(this.prisma, async (ctx) => {
@@ -460,7 +462,7 @@ export class ProviderEvidenceStore {
           isConservativeEvidence(row) &&
           row.certainty === 'unknown' &&
           outcome.certainty === 'accepted' &&
-          witness.kind === 'reported'
+          (witness.kind === 'reported' || witness.kind === 'accepted-transport')
         ) {
           if (
             row.providerScope !== attempt.row.providerScope ||

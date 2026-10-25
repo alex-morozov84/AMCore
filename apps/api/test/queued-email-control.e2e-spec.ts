@@ -1060,4 +1060,89 @@ describe('Queued-email immutable request and independent provider evidence', () 
     expect(retained.nextEvidenceCursor).toBeNull()
     expect(JSON.stringify(retained)).not.toContain('requestDigest')
   })
+
+  it('persists adapter acceptance after broker report loss and suppresses submission after restart', async () => {
+    let calls = 0
+    let renders = 0
+    let first = true
+    let finish!: () => void
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const identity = await new ManagedProducer(definition, queue, readiness).add(
+      'send',
+      { reference: 'accepted-late' },
+      { attempts: 3 }
+    )
+    const provider: EmailProvider = {
+      send: async () => {
+        throw new Error('FORBIDDEN')
+      },
+      sendPrepared: async () => {
+        throw new Error('FORBIDDEN')
+      },
+      queuedEmail: {
+        provider: 'mock',
+        recipeVersion: 2,
+        transportTimeoutMs: 30000,
+        scope: () => 'a'.repeat(64),
+        send: async (_body, _key, _signal, admit) => {
+          admit()
+          calls += 1
+          // The provider has accepted. The broker acknowledgment path then fails.
+          await redis.del(`${queue.toKey(identity.jobId)}:lock`)
+          return { certainty: 'accepted', retryable: false, code: 'COMPLETED' }
+        },
+      },
+    }
+    const policy = new QueuedEmailExecution(provider, evidence, control, buffer, readiness)
+    policy.onModuleInit()
+    const execution = new WorkExecutionService(readiness, policy)
+    const handler: WorkHandler = {
+      prepareRequest: async () => {
+        renders += 1
+        return '{}'
+      },
+      run: async (_payload, ctx) => ctx.effect!.send(),
+    }
+    const worker = new Worker(
+      queue.name,
+      async (job, token) => {
+        try {
+          await execution.run(definition, queue, job, token!, handler)
+        } finally {
+          if (first) {
+            first = false
+            finish()
+          }
+        }
+      },
+      {
+        prefix: 'amcore',
+        connection: buildBullConnection(broker.getConnectionUrl()),
+        autorun: false,
+      }
+    )
+    worker.on('error', () => undefined)
+    workers.push(worker)
+    void worker.run().catch(() => undefined)
+    await finished
+    await worker.close()
+    policy.onModuleDestroy()
+    const row = (await evidence.read(definition.id, identity.incarnation))!
+    expect(row).toMatchObject({ certainty: 'accepted', unresolvedCount: 0, autoStartsUsed: 1 })
+    // A new execution owner sees the retained acceptance before render or transport.
+    const next = new QueuedEmailExecution(
+      provider,
+      evidence,
+      control,
+      new PgOutcomeBuffer(),
+      readiness
+    )
+    const job = (await queue.getJob(identity.jobId))!
+    await next.run(definition, queue, job, 'replacement-owner', job.data.payload, handler)
+    expect(calls).toBe(1)
+    expect(renders).toBe(1)
+    next.onModuleDestroy()
+  })
 })

@@ -82,7 +82,7 @@ const pendingSchema = z.strictObject({
   witness: z.strictObject({
     attemptId: z.uuidv7(),
     incarnation: z.uuidv7(),
-    kind: z.enum(['reported', 'denied-before-call']),
+    kind: z.enum(['reported', 'denied-before-call', 'accepted-transport']),
     brokerRevision: z.number().int().positive().optional(),
   }),
 })
@@ -506,24 +506,37 @@ export class QueuedEmailExecution
         }
     }
     if (!outcome) throw new UnrecoverableError('OUTCOME_UNRECORDED')
-    const witness = await this.control.withClient((client) =>
-      reportManagedInvocation(client, key, {
+    const witness = await this.control
+      .withClient((client) =>
+        reportManagedInvocation(client, key, {
+          incarnation: envelope.incarnation,
+          invocationId: attempt.attemptId,
+          revision,
+          lockToken: token,
+          report: !handlerFailure && outcome!.certainty === 'accepted' ? 'success' : 'failure',
+          code: handlerFailure
+            ? handlerFailure.permanent
+              ? 'PERMANENT_FAILURE'
+              : 'TRANSIENT_FAILURE'
+            : outcome!.certainty === 'unknown'
+              ? 'EFFECT_UNKNOWN'
+              : outcome!.code,
+          failureCode: handlerFailure ? workFailureCode(definition, handlerFailure) : undefined,
+        })
+      )
+      .catch(() => ({ recorded: false as const }))
+    if (!witness.recorded) {
+      // Acceptance only suppresses effects. A lost broker lease cannot turn an
+      // authoritative adapter acceptance into permission for another submission.
+      if (outcome.certainty !== 'accepted') throw new UnrecoverableError('OUTCOME_UNRECORDED')
+      await this.persist(attempt, outcome, {
         incarnation: envelope.incarnation,
-        invocationId: attempt.attemptId,
-        revision,
-        lockToken: token,
-        report: !handlerFailure && outcome!.certainty === 'accepted' ? 'success' : 'failure',
-        code: handlerFailure
-          ? handlerFailure.permanent
-            ? 'PERMANENT_FAILURE'
-            : 'TRANSIENT_FAILURE'
-          : outcome!.certainty === 'unknown'
-            ? 'EFFECT_UNKNOWN'
-            : outcome!.code,
-        failureCode: handlerFailure ? workFailureCode(definition, handlerFailure) : undefined,
+        attemptId: attempt.attemptId,
+        kind: 'accepted-transport',
       })
-    )
-    if (!witness.recorded) throw new UnrecoverableError('OUTCOME_UNRECORDED')
+      if (handlerFailure) throw handlerFailure
+      return
+    }
     await this.persist(attempt, outcome, {
       incarnation: envelope.incarnation,
       attemptId: attempt.attemptId,

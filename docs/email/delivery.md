@@ -40,8 +40,9 @@ EmailService.queue()
 
 Queued jobs are runtime-validated with Zod after Redis deserialization, use
 an incarnation-derived provider key and immutable request bytes. Finite retries
-must satisfy recorded certainty, cooldown and the original horizon. A recycled
-job ID does not renew an old delivery's window. See
+require aggregate authoritative none, a supported result and the saved cooldown.
+Unknown or accepted welcome results cannot retry. A recycled job ID does not prove
+that an old delivery failed. See
 [queued safety and recovery](queued-safety.md) for conservative recovery, legacy handling
 and independent evidence retention.
 

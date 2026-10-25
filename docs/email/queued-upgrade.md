@@ -7,7 +7,7 @@ The command changes only proven untouched jobs. It never sends mail.
 ## Prerequisites
 
 Use the approved API image containing `dist/cli/welcome-upgrade.js` and the additive
-migration for recipe/cooldown fields. Retain your complete Compose selection and
+migration `20261026000000_conservative_welcome` for recipe/cooldown fields. Retain your complete Compose selection and
 private environment. Arrange a maintenance window and authorized DB/Redis access.
 This procedure does not authorize a deployment or a business reissue.
 
