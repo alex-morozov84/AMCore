@@ -97,7 +97,8 @@ export const FailedOverviewOldSuccess: Story = {
     await checkTimes(canvasElement)
   },
 }
-const russianLocale = new Set<string>(SUPPORTED_LOCALES).has('ru') ? 'ru' : DEFAULT_LOCALE
+const russianLocale =
+  SUPPORTED_LOCALES.find((locale: string): boolean => locale === 'ru') ?? DEFAULT_LOCALE
 const ruCopy = createTranslator({
   locale: russianLocale,
   messages: ru,
