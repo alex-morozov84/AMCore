@@ -499,7 +499,9 @@ few minutes; announce a maintenance window.
    sudo install -m 644 /srv/amcore-tls/rotate/server.crt /srv/amcore-tls/server/server.crt
    sudo install -m 644 /srv/amcore-tls/rotate/ca.crt /srv/amcore-tls/ca/ca.crt
    docker compose exec postgres psql -U amcore -c 'SELECT pg_reload_conf()'
-   docker compose run --rm migrate
+   docker compose run --rm --no-deps migrate ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+   # Continue only after the preflight exits zero.
+   docker compose run --rm --no-deps migrate
    ```
 
 4. If `migrate` ends with `No pending migrations to apply.`, start the clients with
@@ -514,7 +516,9 @@ few minutes; announce a maintenance window.
    sudo install -m 644 /srv/amcore-tls/rotate/old-server.crt /srv/amcore-tls/server/server.crt
    sudo install -m 644 /srv/amcore-tls/rotate/old-ca.crt /srv/amcore-tls/ca/ca.crt
    docker compose exec postgres psql -U amcore -c 'SELECT pg_reload_conf()'
-   docker compose run --rm migrate
+   docker compose run --rm --no-deps migrate ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
+   # Continue only after the preflight exits zero.
+   docker compose run --rm --no-deps migrate
    docker compose up -d --wait
    ```
 

@@ -89,21 +89,24 @@ docker run --rm -e DATABASE_URL <amcore-api-migrator-image>@sha256:<digest> \
 ```
 
 For a hostname reachable only inside Compose, run through the existing service.
-Use the same project name, environment file and profiles as the rollout. The
-following commands run from the repository root using the production overlay;
-its required image variables must contain the promoted digests. The target
+Use the same project name, environment file, profiles and complete `COMPOSE_FILE`
+as the rollout. Select `docker-compose.yml` plus `docker/compose/prod.yml` and retain
+all installation-specific TLS, routing and private URL overrides. Do not replace
+that list with shortened `-f` options. Its required image variables must contain
+the promoted digests. The target
 PostgreSQL service must already be running and healthy: `--no-deps` does not
 start infrastructure.
 
 ```sh
-docker compose -f docker-compose.yml -f docker/compose/prod.yml \
-  run --rm --no-deps migrate \
+docker compose run --rm --no-deps migrate \
   ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
 ```
 
 The service joins its configured Compose network and selects
 `MIGRATION_DATABASE_URL`, falling back to `COMPOSE_DATABASE_URL` or the bundled
-PostgreSQL URL. Do not substitute an API/runtime credential or an unrelated
+PostgreSQL URL in the base configuration. A deployment's private override can
+replace `migrate.environment.DATABASE_URL`; update that file too when rotating
+credentials or changing the endpoint. Do not substitute an API/runtime credential or an unrelated
 host URL to make this check pass. Do not print `docker compose config` output
 containing secrets into logs or review material.
 
@@ -149,16 +152,16 @@ services:
         read_only: true
 ```
 
-Set the selected migration URL's `sslcert` to that container path. Apply the
-same overlay to preflight and deploy, preserving the other rollout settings:
+Set the selected migration URL's `sslcert` to that container path. Append the CA
+overlay's absolute path to the installation's saved `COMPOSE_FILE`, after its
+existing files. Keep every TLS, routing and private URL override. Use that same
+selection for both commands:
 
 ```sh
-docker compose -f docker-compose.yml -f docker/compose/prod.yml \
-  -f migration-ca.override.yml run --rm --no-deps migrate \
+docker compose run --rm --no-deps migrate \
   ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
 # Only after the preflight exits zero:
-docker compose -f docker-compose.yml -f docker/compose/prod.yml \
-  -f migration-ca.override.yml run --rm --no-deps migrate
+docker compose run --rm --no-deps migrate
 ```
 
 ```text

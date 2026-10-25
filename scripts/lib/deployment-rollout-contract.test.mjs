@@ -59,3 +59,10 @@ test('single-host first start waits without revisiting completed migration', () 
     'caddy',
   ])
 })
+
+test('migrator preflight examples retain the complete installation overlay selection', () => {
+  const guide = read('docs/operations/migrator-image.md')
+  const text = guide.slice(guide.indexOf('### Endpoint preflight'))
+  assert.doesNotMatch(text, /^docker compose -f /m)
+  assert.match(text, /docker compose run --rm --no-deps migrate/)
+})

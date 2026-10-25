@@ -181,17 +181,18 @@ at ingress before sending. Use the production provider settings, not the mock.
 
 Agree on recipients and a send limit before starting. One registration sends two
 messages: a non-secret welcome through the worker and direct email verification.
-A password-recovery request sends one further direct message. For English and
-Russian test accounts, this is six expected messages. Use mailbox aliases approved
-for the test; do not send to unrelated addresses or perform a bulk campaign.
+A password-recovery request sends one further direct message. Expect three
+messages per supported language: six for two languages, three for a single-locale
+fork. Use only the deployment's retained languages and approved mailbox aliases;
+do not send to unrelated addresses or perform a bulk campaign.
 
-1. Register the English test account. Observe both welcome and verification mail.
+1. Register a test account in the first supported language. Observe both welcome and verification mail.
    Correlate the welcome's worker job completion with the provider message and receipt.
-2. Open the verification link on the intended HTTPS origin. Confirm the English
-   screen and verified account state. Never copy the live URL into logs or reports.
+2. Open the verification link on the intended HTTPS origin. Confirm the matching
+   language and verified account state. Never copy the live URL into logs or reports.
 3. Request password recovery. Check the received link's origin and language, set
    a new test password, and verify sign-in. Reusing the consumed token must fail.
-4. Repeat with a Russian test account and Russian messages/screens.
+4. Repeat with a separate account for each other supported language.
 
 ```text
 Registration -> API direct verification -> provider -> recipient mail server -> mailbox
