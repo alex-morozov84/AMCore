@@ -1,9 +1,12 @@
 import type { ScheduledJob } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
+import { getConsoleOverviewHref } from '@/shared/lib/console-public-href'
+
 import { overviewFixture } from './overview-fixture'
 import {
   count,
+  fileConflictSources,
   integration,
   job,
   OBSERVED,
@@ -387,5 +390,59 @@ describe('integrations retain probe scope', () => {
     expect(result.attention).toHaveLength(64)
     expect(result.gaps.map((e) => e.key)).toContain('queues:overflow')
     expect(result.attention.map((e) => e.key)).not.toContain('queue:queue-64')
+  })
+})
+
+describe('C1 private-file disagreement', () => {
+  it.each([false, true])(
+    'retains both named observations and secondary age (primary failed=%s)',
+    (primaryFailed) => {
+      const data = fileConflictSources(primaryFailed)
+      const result = model(data)
+      expect(result.attention).toHaveLength(1)
+      expect(result.gaps).toHaveLength(0)
+      const entry = result.attention[0]!
+      expect(entry).toMatchObject({
+        key: 'files',
+        priority: 1,
+        href: `${getConsoleOverviewHref()}#overview-files`,
+        action: 'openFiles',
+      })
+      const primary = entry.facts.find((f) => f.at === '2026-10-25T12:10:00.000Z')!
+      const secondary = entry.facts.find((f) => f.at === '2026-10-24T12:00:00.000Z')!
+      expect(primary?.text).toContain('fileOverviewResult')
+      expect(primary?.text).toContain(primaryFailed ? 'privateFailed' : 'privatePassed')
+      expect(primary?.text).not.toContain('old:')
+      expect(secondary?.text).toContain('fileIntegrationResult')
+      expect(secondary?.text).toContain(primaryFailed ? 'privatePassed' : 'privateFailed')
+      expect(secondary?.text).toContain('old:')
+      expect(entry.facts.filter((f) => f.at === primary.at)).toHaveLength(1)
+      expect(entry.facts.filter((f) => f.at === secondary.at)).toHaveLength(1)
+      expect(entry.guide).toBe('docs/operations/runbooks/storage.md#file-diagnostic')
+      expect(entry.metricAt).toBe(primaryFailed ? primary.at : secondary.at)
+    }
+  )
+  it('retains exposure priority, destination and guide while adding both private observations', () => {
+    const data = fileConflictSources()
+    data.overview = {
+      ...data.overview!,
+      publicDelivery: {
+        ...data.overview!.publicDelivery,
+        state: 'stale',
+        failure: 'private_exposed',
+        checkedAt: '2026-10-23T12:00:00.000Z',
+      },
+    }
+    const result = model(data)
+    expect(result.attention).toHaveLength(1)
+    expect(result.attention[0]).toMatchObject({
+      priority: 0,
+      href: `${getConsoleOverviewHref()}#overview-files`,
+      guide: 'docs/operations/runbooks/storage.md#private-exposure',
+      metricAt: '2026-10-23T12:00:00.000Z',
+    })
+    expect(
+      result.attention[0]!.facts.filter((f) => f.text.includes('fileIntegrationResult'))
+    ).toHaveLength(1)
   })
 })

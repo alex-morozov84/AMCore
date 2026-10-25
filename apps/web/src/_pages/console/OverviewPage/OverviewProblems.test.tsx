@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { createTranslator, NextIntlClientProvider } from 'next-intl'
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
 
-import { job, OBSERVED, sources } from './overview-problem-fixtures'
+import { fileConflictSources, job, OBSERVED, sources } from './overview-problem-fixtures'
 import type { OverviewSources } from './overview-problem-model'
 import { overviewProblems } from './overview-problems'
 import { OverviewProblems } from './OverviewProblems'
@@ -21,14 +21,22 @@ const messages = JSON.parse(
   readFileSync(resolve(__dirname, '../../../../messages', `${DEFAULT_LOCALE}.json`), 'utf8')
 )
 const t = createTranslator({ locale: DEFAULT_LOCALE, messages, namespace: 'console.problems' })
-function view(over: Partial<OverviewSources>, metrics: string | null = null) {
+function view(
+  over: Partial<OverviewSources>,
+  metrics: string | null = null,
+  locale = DEFAULT_LOCALE
+) {
+  const messages = JSON.parse(
+    readFileSync(resolve(__dirname, '../../../../messages', `${locale}.json`), 'utf8')
+  )
+  const t = createTranslator({ locale, messages, namespace: 'console.problems' })
   const model = overviewProblems(sources(over), {
     t,
-    locale: DEFAULT_LOCALE,
+    locale,
     name: (_kind, id) => id,
   })
   return render(
-    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages} timeZone="UTC">
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
       <ConsoleTimeZoneProvider>
         <OverviewProblems model={model} t={t} metrics={metrics} newTabLabel="new tab" />
       </ConsoleTimeZoneProvider>
@@ -98,4 +106,39 @@ describe('problem summary presentation', () => {
       String(Date.parse(OBSERVED) - 900000)
     )
   })
+})
+
+describe('C1 visible private-file observations', () => {
+  it.each(
+    SUPPORTED_LOCALES.flatMap((locale) =>
+      [false, true].map((primaryFailed) => ({ locale, primaryFailed }))
+    )
+  )(
+    '$locale: preserves two named results and labels only the secondary as old ($primaryFailed)',
+    ({ locale, primaryFailed }) => {
+      const messages = JSON.parse(
+        readFileSync(resolve(__dirname, '../../../../messages', `${locale}.json`), 'utf8')
+      )
+      const copy = createTranslator({ locale, messages, namespace: 'console.problems' })
+      const { container } = view(fileConflictSources(primaryFailed), null, locale)
+      const primary = copy('fileOverviewResult', {
+        result: copy(primaryFailed ? 'privateFailed' : 'privatePassed'),
+      })
+      const secondary =
+        copy('fileIntegrationResult', {
+          result: copy(primaryFailed ? 'privatePassed' : 'privateFailed'),
+        }) +
+        ' ' +
+        copy('old')
+      expect(screen.getByText(primary, { exact: true })).toBeInTheDocument()
+      expect(screen.getByText(secondary, { exact: true })).toBeInTheDocument()
+      expect(container.querySelectorAll('li')).toHaveLength(1)
+      for (const stamp of ['2026-10-25T12:10:00.000Z', '2026-10-24T12:00:00.000Z'])
+        expect(container.querySelectorAll(`time[datetime="${stamp}"]`)).toHaveLength(1)
+      expect(screen.getByRole('link', { name: copy('openFiles') })).toHaveAttribute(
+        'href',
+        expect.stringContaining('#overview-files')
+      )
+    }
+  )
 })

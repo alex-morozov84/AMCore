@@ -86,3 +86,37 @@ export function sources(over: Partial<OverviewSources> = {}): OverviewSources {
     ...over,
   }
 }
+
+/** Two independent private-file observations, using the C1 review timestamps. */
+export function fileConflictSources(primaryFailed = false): OverviewSources {
+  const at = '2026-10-25T12:10:00.000Z'
+  const old = '2026-10-24T12:00:00.000Z'
+  return sources({
+    overview: {
+      ...overviewFixture,
+      storage: {
+        ...overviewFixture.storage,
+        checkedAt: at,
+        state: primaryFailed ? 'failed' : 'healthy',
+        failure: primaryFailed ? 'access_denied' : null,
+      },
+    },
+    integrations: {
+      readAt: at,
+      items: [
+        integration({
+          id: 'storage',
+          evidence: {
+            result: primaryFailed ? 'ok' : 'failed',
+            freshness: 'stale',
+            scope: 'private_file_write_read_delete',
+            instance: 'answering_instance',
+            checkedAt: old,
+            staleAfterSeconds: 1800,
+            failure: primaryFailed ? null : 'access_denied',
+          },
+        }),
+      ],
+    },
+  })
+}

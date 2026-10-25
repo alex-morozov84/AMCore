@@ -1958,8 +1958,10 @@
       "focusInvalid": "Could not identify the selected record. The full list is shown.",
       "focusMissing": "This record is no longer shown in the current list. Check the list or refresh the data.",
       "unresolvedHelp": "The count includes records in different states. The job list shows the selected state, not all unknown outcomes. Use the checking instructions.",
-      "privatePassed": "Another private-file check completed successfully.",
-      "queueName": "Background queue"
+      "privatePassed": "The private-file write, read and cleanup check passed.",
+      "queueName": "Background queue",
+      "fileOverviewResult": "Overview: {result}",
+      "fileIntegrationResult": "Integrations: {result}"
     }
   },
   "auth": {

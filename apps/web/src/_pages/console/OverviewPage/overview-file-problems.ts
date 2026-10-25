@@ -47,18 +47,17 @@ export function fileProblems(
       })
     if (storage.state === 'failed' || storage.failure)
       add(1, 'file-diagnostic', {
-        text: ctx.t('privateFailed'),
+        text: privateObservation(ctx, 'overview', 'privateFailed', storage.state === 'stale'),
         at: storage.checkedAt,
         time: 'checked',
       })
     else if (storage.state === 'stale' || storage.state === 'unknown')
       add(null, 'file-diagnostic', {
-        text: ctx.t('filesUnknown'),
+        text: privateObservation(ctx, 'overview', 'filesUnknown', storage.state === 'stale'),
         at: storage.checkedAt,
         time: 'checked',
       })
-    if (pub.state === 'stale' || storage.state === 'stale')
-      add(null, 'file-diagnostic', { text: ctx.t('old') })
+    if (pub.state === 'stale') add(null, 'file-diagnostic', { text: ctx.t('old') })
     if (data.storageHealthEnabled) {
       const dependency = data.dependencies.find((item) => item.name === 'storage')
       if (!dependency || dependency.status !== 'up') {
@@ -93,13 +92,20 @@ export function fileProblems(
           ? primaryFailed
           : false
     if (different) {
+      if (!primaryFailed && data.storage.state === 'healthy')
+        add(null, 'file-diagnostic', {
+          text: privateObservation(ctx, 'overview', 'privatePassed'),
+          at: data.storage.checkedAt,
+          time: 'checked',
+        })
+      add(null, 'file-diagnostic', { text: ctx.t('different') })
       add(evidence.result === 'failed' ? 1 : null, 'file-diagnostic', {
-        text: ctx.t('different'),
-        at: evidence.checkedAt,
-        time: 'checked',
-      })
-      add(null, 'file-diagnostic', {
-        text: ctx.t(evidence.result === 'failed' ? 'privateFailed' : 'privatePassed'),
+        text: privateObservation(
+          ctx,
+          'integrations',
+          evidence.result === 'failed' ? 'privateFailed' : 'privatePassed',
+          evidence.freshness === 'stale'
+        ),
         at: evidence.checkedAt,
         time: 'checked',
       })
@@ -107,23 +113,31 @@ export function fileProblems(
     return
   }
   add(evidence.result === 'failed' ? 1 : null, 'file-diagnostic', {
-    text: ctx.t(evidence.result === 'failed' ? 'privateFailed' : 'privateFallback'),
+    text: privateObservation(
+      ctx,
+      'integrations',
+      evidence.result === 'failed'
+        ? 'privateFailed'
+        : evidence.result === 'ok'
+          ? 'privatePassed'
+          : 'filesUnknown',
+      evidence.freshness === 'stale'
+    ),
     at: evidence.checkedAt,
     time: 'checked',
   })
   add(null, 'file-diagnostic', { text: ctx.t('privateFallback') })
-  if (evidence.result === 'ok')
-    add(null, 'file-diagnostic', {
-      text: ctx.t('privatePassed'),
-      at: evidence.checkedAt,
-      time: 'checked',
-    })
-  else if (evidence.result !== 'failed')
-    add(null, 'file-diagnostic', {
-      text: ctx.t('filesUnknown'),
-      at: evidence.checkedAt,
-      time: 'checked',
-    })
   add(null, 'file-diagnostic', { text: ctx.t('publicMissing') })
-  if (evidence.freshness === 'stale') add(null, 'file-diagnostic', { text: ctx.t('old') })
+}
+
+function privateObservation(
+  ctx: ProblemContext,
+  source: 'overview' | 'integrations',
+  result: 'privatePassed' | 'privateFailed' | 'filesUnknown',
+  stale = false
+) {
+  const text = ctx.t(source === 'overview' ? 'fileOverviewResult' : 'fileIntegrationResult', {
+    result: ctx.t(result),
+  })
+  return stale ? `${text} ${ctx.t('old')}` : text
 }
