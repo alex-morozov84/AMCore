@@ -9,6 +9,7 @@ import { AuthErrorCode } from '@amcore/shared'
 import { ServiceUnavailableException } from '../src/common/exceptions'
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
 import { LoginRateLimiterService } from '../src/core/auth/login-rate-limiter.service'
+import { mfaCredential } from '../src/core/auth/mfa/mfa-secrets.js'
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
@@ -76,6 +77,18 @@ describe('Auth (e2e)', () => {
     // Clean org-scoped data first (respects FK order; see helpers.ts).
     await cleanOrgData(prisma)
     await cleanDatabase(prisma, context.cache, context.throttlerStorage)
+  })
+
+  it('rejects opaque MFA continuations as ordinary bearer and refresh credentials', async () => {
+    const continuation = mfaCredential()
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${continuation}`)
+      .expect(401)
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', `refresh_token=${continuation}`)
+      .expect(401)
   })
 
   describe('password limiter HTTP boundary', () => {

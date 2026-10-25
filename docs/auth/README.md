@@ -15,6 +15,9 @@ revocation, member removal and bounded operator recovery.
 
 ## What's included
 
+[Dormant MFA foundation](mfa-foundation.md) describes internal storage and
+verification primitives. It does not enable second-factor login or enrollment.
+
 | Topic                                                 | What it covers                                                                     |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | [Concepts](./concepts.md)                             | How tokens, sessions, and the security model work                                  |

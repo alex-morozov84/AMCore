@@ -2,6 +2,12 @@ import { z } from 'zod'
 
 // JWT sessions, step-up recent-auth window, and legacy RBAC setting.
 export const authEnv = z.object({
+  // Optional while prepared; activation requires a configured dedicated keyring.
+  MFA_ACTIVE_KEY_ID: z
+    .string()
+    .regex(/^[a-zA-Z0-9_-]{1,64}$/)
+    .optional(),
+  MFA_ENCRYPTION_KEYS: z.string().optional(),
   AUTH_PUBLIC_SIGNUP_ENABLED: z.stringbool().default(true),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRATION: z.string().default('15m'),
