@@ -162,8 +162,9 @@ refused; that each request needs exactly one synthetic IPv4 visitor address; tha
 visitor is limited after about the default burst of 50 requests while another visitor
 is not (API and web app); and that `X-AMCore-Client-Ip` and `X-Real-IP` are ignored.
 
-Then, from a machine that is not the generator (for example your laptop, with an AMCore
-checkout), check the normal edge through public DNS. Create a directory with a copy of
+Then, from a machine that is not the generator (for example your laptop with `curl` and
+an AMCore checkout of the same commit; macOS and Linux shells both work), check the
+normal edge through public DNS. Create a private directory with a copy of
 `fixture-password`, and a `load-test.env` with only `LT_WORK=<that directory>`,
 `LT_WEB_HOST`, `LT_API_HOST` and `LT_PREFIX` (no `LT_SERVER_IP`, so the names resolve
 publicly):
@@ -190,8 +191,9 @@ sh scripts/load-test/protocol.sh campaign    # about 45 minutes
 
 `prepare` keeps the members' live session cookies in `~/lt-work/sessions.json`; delete
 it with `~/lt-work` at the end. `smoke` writes to `~/lt-work/out-smoke` and can run any
-number of times; it never blocks the campaign. A smoke step is `valid` only when every
-action answered with its expected status. The campaign writes to `~/lt-work/out` and
+number of times; each run adds a step `smoke-<time>` to that report, and it never blocks
+the campaign. It uses the prepared sessions (no new `prepare`) and adds only a few dozen
+rows. A smoke step is `valid` only when every action answered with its expected status. The campaign writes to `~/lt-work/out` and
 prints the recovery commands first (also in `~/lt-work/out/RECOVERY.txt`). A second
 campaign needs a new `LT_WORK` (and, to be comparable, a fresh host).
 
@@ -270,8 +272,10 @@ sh scripts/load-test/admission.sh removed      # generator
 It must print only `PASS` lines: 8443 refuses the connection (curl exit code 7, a closed
 port; a TLS or certificate error would mean the test entry still runs), the normal site
 answers (so the host is reachable), and forged address headers on the normal edge
-change no rate budget for the API and the web app. Close port 8443 in the provider
-firewall; doing this first, as soon as something goes wrong, is also safe.
+change no rate budget for the API and the web app. Then close port 8443 in the provider
+firewall. If something goes wrong you may close it first, as soon as possible; `removed`
+then sees a timeout instead of a refused connection and fails its first check, so rely
+on `remove-check.sh` on the host for that proof.
 
 Then delete what belongs to this run only, after `remove-check.sh` has passed:
 
@@ -281,9 +285,11 @@ docker compose down -v                                  # its containers, networ
 docker volume ls --filter label=com.docker.compose.project=amcore-loadtest-<run id>   # empty
 ```
 
-Also delete `/srv/amcore-loadtest` and `~/amcore-load-test` on the host, `~/lt-work` on
-the generator (keep a copy of `~/lt-work/out` if you want the results), and the VMs if
-they were created for the test. Do not use `docker system prune` on a shared host.
+Run these from the deployment checkout: `recover.sh` keeps `COMPOSE_PROJECT_NAME` in
+`.env`, so `docker compose` still names this run's project. Also delete
+`/srv/amcore-loadtest` and `~/amcore-load-test` on the host, `~/lt-work` on the generator
+(keep a copy of `~/lt-work/out` if you want the results), the `fixture-password` copy on
+the machine that ran `outside`, and the VMs if they were created for the test. Do not use `docker system prune` on a shared host.
 
 ## Troubleshooting
 
