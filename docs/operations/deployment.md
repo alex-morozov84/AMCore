@@ -547,8 +547,11 @@ Match the requested registry reference to the pulled `RepoDigests` and match eac
 container's `Image` to the pulled image's `Id`. Repeat for web and migrator; retain
 the one-shot migrator's image/exit result before removal if collecting evidence.
 Use `$resolved_web_image` and `$resolved_migrator_image` for their image inspections.
-For the web image, also compare `/api/deployment-version` with its baked build ID.
-The build ID alone is not image attestation.
+For the web image, compare `/api/deployment-version` with its baked deployment
+version (`deploymentId` / `NEXT_PUBLIC_DEPLOYMENT_VERSION` in the standalone
+configuration). Record the build-time `NEXT_DEPLOYMENT_ID` with the image digest.
+This is separate from Next.js's `.next/BUILD_ID`, which can be constant when a
+deployment ID is set. The deployment version alone is not image attestation.
 
 When collecting migrator evidence, replace the usual `run --rm` step with this
 sequence, using an unused task-specific container name. Do not run both variants:

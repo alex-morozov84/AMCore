@@ -32,6 +32,7 @@ interface ResetPasswordFormProps {
    * the page is opened without one — a mistyped/stale link, not a
    * validation failure the form itself can recover from. */
   token?: string
+  onSuccess?: () => void
   actionBase?: AuthActionBase
   loginHref?: string
   forgotPasswordHref?: string
@@ -49,6 +50,7 @@ export function ResetPasswordForm({
   actionBase = '/auth',
   loginHref = '/login',
   forgotPasswordHref = '/forgot-password',
+  onSuccess,
 }: ResetPasswordFormProps) {
   const passwordT = useTranslations('common')
   const t = useTranslations('auth')
@@ -84,7 +86,15 @@ export function ResetPasswordForm({
   }
 
   const onSubmit = (data: NewPasswordInput) => {
-    mutate({ ...data, token }, { onSuccess: () => setSubmitted(true) })
+    mutate(
+      { ...data, token },
+      {
+        onSuccess: () => {
+          setSubmitted(true)
+          onSuccess?.()
+        },
+      }
+    )
   }
 
   return (

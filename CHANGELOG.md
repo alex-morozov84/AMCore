@@ -100,6 +100,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Password reset replaces the form heading after success and removes stale input
+  instructions in English and Russian.
+
 - Compose waits for web HTTP readiness before starting a web-facing Caddy proxy.
   Deployment recipes wait for worker and API/web health without rerunning migrations.
 - The single-host deployment guide separates strict native-migrator TLS settings

@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { ResetPasswordForm } from '@/features/auth-reset-password'
@@ -14,17 +17,18 @@ interface ResetPasswordPageProps {
 
 export function ResetPasswordPage(props: ResetPasswordPageProps) {
   const t = useTranslations('auth')
+  const [submitted, setSubmitted] = useState(false)
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <CardTitle as="h1" className="text-2xl">
-          {t('resetPasswordTitle')}
+          {t(submitted ? 'resetPasswordSuccessTitle' : 'resetPasswordTitle')}
         </CardTitle>
-        <CardDescription>{t('resetPasswordSubtitle')}</CardDescription>
+        {!submitted && <CardDescription>{t('resetPasswordSubtitle')}</CardDescription>}
       </CardHeader>
       <CardContent>
-        <ResetPasswordForm {...props} />
+        <ResetPasswordForm {...props} onSuccess={() => setSubmitted(true)} />
       </CardContent>
     </Card>
   )
