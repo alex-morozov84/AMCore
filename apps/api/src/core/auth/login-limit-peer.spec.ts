@@ -3,6 +3,7 @@ import { createServer, type Socket } from 'node:net'
 import { performance } from 'node:perf_hooks'
 
 import { LoginLimitConnection } from './login-limit-connection'
+import { LoginRateLimiterService } from './login-rate-limiter.service'
 
 /** Local RESP lifecycle probe, not a storage or Lua correctness substitute. */
 async function peer(reply: (command: string[], socket: Socket) => void) {
@@ -96,6 +97,22 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
     } finally {
       for (const socket of sockets) socket.destroy()
       await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+  it('shutdown cancels an admitted operation before connect and never admits a late command', async () => {
+    const p = await peer(() => undefined)
+    const limiter = new LoginRateLimiterService({ get: () => p.url } as never)
+    try {
+      const pending = limiter.check('shutdown@example.test', '203.0.113.1').catch((error) => error)
+      await limiter.onModuleDestroy()
+      expect(await pending).toMatchObject({ status: 503 })
+      await expect(limiter.check('shutdown@example.test', '203.0.113.1')).rejects.toMatchObject({
+        status: 503,
+      })
+      expect(p.commands).toHaveLength(0)
+      expect(p.sockets.size).toBe(0)
+    } finally {
+      await p.close()
     }
   })
   it('bounds timeout waves and recovers without a closing-client tail', async () => {

@@ -109,3 +109,31 @@ for (const [name, makeAdapter] of [
     })
   })
 }
+
+describe('password identity across actual IPv4/IPv6 web peers', () => {
+  it('keeps one visitor identity across two peers and separates two visitors through one peer', async () => {
+    const adapter = new FastifyAdapter({ trustProxy: false })
+    const app = await NestFactory.create(PeerProbeModule, adapter, { logger: false })
+    try {
+      await app.listen(0, '::')
+      const address = app.getHttpServer().address()
+      if (!address || typeof address === 'string') throw new Error('Missing dual-stack listener')
+      const via = async (host: string, claim: string) =>
+        request(`http://${host}:${address.port}`)
+          .get('/peer-probe')
+          .set('x-probe-trusted', 'yes')
+          .set(AMCORE_CLIENT_IP_HEADER, claim)
+          .expect(200)
+      const first = await via('127.0.0.1', '203.0.113.75')
+      const second = await via('[::1]', '203.0.113.75')
+      expect(first.body.peer).not.toBe(second.body.peer)
+      expect(first.body.password).toBe('203.0.113.75')
+      expect(second.body.password).toBe(first.body.password)
+      const other = await via('127.0.0.1', '203.0.113.76')
+      expect(other.body.peer).toBe(first.body.peer)
+      expect(other.body.password).toBe('203.0.113.76')
+    } finally {
+      await app.close()
+    }
+  })
+})

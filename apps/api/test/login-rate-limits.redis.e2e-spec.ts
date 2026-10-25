@@ -1,3 +1,6 @@
+import { once } from 'node:events'
+import { connect, createServer, type Socket } from 'node:net'
+
 import { jest } from '@jest/globals'
 import KeyvRedis from '@keyv/redis'
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager'
@@ -139,7 +142,12 @@ describe('Login atomic accounting with installed CacheModule and Redis7', () => 
     await first.consume(email, ip)
     expect(await cache.get(keys()[0])).toBe(1)
     expect(await client.pTTL(keys()[0])).toBeGreaterThan(86399000)
-    await client.pExpireAt(keys()[0], Date.now() - 1)
+    // Native expiry uses Redis's clock; the host and Docker clock can differ by milliseconds.
+    const [seconds, micros] = (await client.sendCommand(['TIME'])) as string[]
+    await client.pExpireAt(
+      keys()[0],
+      Number(seconds) * 1000 + Math.floor(Number(micros) / 1000) - 1000
+    )
     expect(await client.pTTL(keys()[0])).toBe(-2)
   })
   it('roundtrips exact safe integers, rejects overflow before any write', async () => {
@@ -182,6 +190,74 @@ describe('Login atomic accounting with installed CacheModule and Redis7', () => 
     } finally {
       await limited.onModuleDestroy()
       await client.sendCommand(['ACL', 'DELUSER', 'login-fixture'])
+    }
+  })
+  it('fails closed under actual Redis noeviction/OOM without repairing or clearing debt', async () => {
+    await cache.set(keys()[0], 7, 100000)
+    const before = await client.mGet(keys())
+    const limits = await client.configGet('maxmemory')
+    const policy = await client.configGet('maxmemory-policy')
+    try {
+      await client.configSet('maxmemory-policy', 'noeviction')
+      await client.configSet('maxmemory', '1')
+      // Verify the fixture really rejects memory-growing commands, independently of the mapped503.
+      await expect(client.set('oom-probe', 'x')).rejects.toThrow(/OOM/)
+      await expect(first.consume(email, ip)).rejects.toMatchObject({
+        status: 503,
+        errorCode: 'SERVICE_UNAVAILABLE',
+      })
+      expect(await client.mGet(keys())).toEqual(before)
+    } finally {
+      await client.configSet('maxmemory', limits.maxmemory!)
+      await client.configSet('maxmemory-policy', policy['maxmemory-policy']!)
+    }
+    await first.consume(email, ip)
+    expect(await cache.get(keys()[0])).toBe(8)
+  })
+  it('retains an executed consume after its real Redis reply is lost, with no replay on recovery', async () => {
+    const target = new URL(broker.getConnectionUrl())
+    const sockets = new Set<Socket>()
+    const commands: Buffer[] = []
+    let replies = 0
+    const proxy = createServer((incoming) => {
+      const upstream = connect(Number(target.port), target.hostname)
+      for (const socket of [incoming, upstream]) {
+        sockets.add(socket)
+        socket.on('close', () => sockets.delete(socket))
+        socket.on('error', () => undefined)
+      }
+      incoming.on('data', (bytes) => {
+        commands.push(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes))
+        upstream.write(bytes)
+      })
+      upstream.on('data', (bytes) => {
+        replies += bytes.length
+      }) // Deliberately lose the completed reply.
+      incoming.on('close', () => upstream.destroy())
+    })
+    proxy.listen(0, '127.0.0.1')
+    await once(proxy, 'listening')
+    const address = proxy.address()
+    if (!address || typeof address === 'string') throw new Error('Missing owned proxy')
+    const limited = new LoginRateLimiterService(
+      new EnvService(new ConfigService({ REDIS_URL: `redis://127.0.0.1:${address.port}` }))
+    )
+    try {
+      await expect(limited.consume(email, ip)).rejects.toMatchObject({ status: 503 })
+      expect(replies).toBeGreaterThan(0)
+      expect(
+        Buffer.concat(commands)
+          .toString()
+          .match(/\$4\r\neval\r\n/gi)
+      ).toHaveLength(1)
+      expect(await cache.get(keys()[0])).toBe(1)
+      expect(await cache.get(keys()[1])).toBe(1)
+      await first.consume(email, ip)
+      expect(await cache.get(keys()[0])).toBe(2)
+    } finally {
+      await limited.onModuleDestroy()
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) => proxy.close(() => resolve()))
     }
   })
   it('records isolated limiter connection cost on sequential and moderate parallel paths', async () => {

@@ -84,6 +84,14 @@ describe('handleConsoleLogin', () => {
     expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token', expect.any(Headers))
   })
 
+  it('threads original source through mint-failure compensation', async () => {
+    const incoming = request()
+    vi.mocked(mintConsoleSession).mockRejectedValueOnce(new Error('vault unavailable'))
+    const response = await handleConsoleLogin(incoming)
+    expect(response.status).toBe(503)
+    expect(probeConsoleAccessWithToken).toHaveBeenCalledWith('access-token', incoming.headers)
+    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token', incoming.headers)
+  })
   it('fails closed when the live policy probe is unavailable', async () => {
     vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'upstream-unavailable' })
 
