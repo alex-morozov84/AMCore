@@ -1,3 +1,5 @@
+import { authResponseSchema, type UserResponse } from '@amcore/shared'
+
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import type { ProductWebContext } from './product-web-context.server'
@@ -43,18 +45,7 @@ export async function callUpstreamAuth<TUser>(
   originalRequest: Request,
   context?: ProductWebContext
 ): Promise<UpstreamAuthResult<TUser>> {
-  const acceptLanguage = originalRequest.headers.get('accept-language')
-
-  const response = await fetchBackendResponse(`${API_URL}/api/v1${path}`, originalRequest.headers, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
-      ...sessionMetadataHeaders(originalRequest.headers),
-      ...context?.apiHeaders,
-    },
-    body: JSON.stringify(body),
-  })
+  const response = await postUpstream(path, body, originalRequest, context)
 
   if (!response.ok) {
     throw new UpstreamAuthError(response.status, await safeJson(response))
@@ -67,6 +58,61 @@ export async function callUpstreamAuth<TUser>(
   }
 
   return { user: data.user, accessToken: data.accessToken, refreshToken }
+}
+
+/**
+ * Outcome of the explicit registration call. `created` is the only evidence that
+ * the account exists: the API answered exactly `201` AND the body is a valid auth
+ * response. Anything else that arrives as a success (200/202/204, `201` with an
+ * unusable body) is `unknown` — the BFF must not claim the account was created.
+ * `refreshToken` is read from the headers BEFORE the body so cleanup can still
+ * revoke the session when the body is unusable; it is server-only and never put
+ * in an error or a log.
+ */
+export type UpstreamRegisterResult =
+  | { outcome: 'created'; user: UserResponse; accessToken: string; refreshToken: string | null }
+  | { outcome: 'unknown'; refreshToken: string | null }
+
+/** Same transport and failures as `callUpstreamAuth`, but classifies creation evidence. */
+export async function callUpstreamRegister(
+  path: string,
+  body: unknown,
+  originalRequest: Request,
+  context?: ProductWebContext
+): Promise<UpstreamRegisterResult> {
+  const response = await postUpstream(path, body, originalRequest, context)
+  if (!response.ok) throw new UpstreamAuthError(response.status, await safeJson(response))
+
+  const refreshToken = extractCookieValue(response, REFRESH_COOKIE_NAME)
+  if (response.status !== 201) return { outcome: 'unknown', refreshToken }
+  const parsed = authResponseSchema.safeParse(await safeJson(response))
+  if (!parsed.success) return { outcome: 'unknown', refreshToken }
+  return {
+    outcome: 'created',
+    user: parsed.data.user,
+    accessToken: parsed.data.accessToken,
+    refreshToken,
+  }
+}
+
+async function postUpstream(
+  path: string,
+  body: unknown,
+  originalRequest: Request,
+  context?: ProductWebContext
+): Promise<Response> {
+  const acceptLanguage = originalRequest.headers.get('accept-language')
+
+  return fetchBackendResponse(`${API_URL}/api/v1${path}`, originalRequest.headers, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(acceptLanguage ? { 'Accept-Language': acceptLanguage } : {}),
+      ...sessionMetadataHeaders(originalRequest.headers),
+      ...context?.apiHeaders,
+    },
+    body: JSON.stringify(body),
+  })
 }
 
 async function safeJson(response: Response): Promise<unknown> {
