@@ -14,6 +14,10 @@ import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 const t = JSON.parse(
   readFileSync(join(activeTarget().snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
 ).console
+const telegramBlockedTitle = {
+  en: 'Telegram destination blocked',
+  ru: 'Получатель Telegram заблокирован',
+}[DEFAULT_LOCALE]
 
 /**
  * Path mode reuses the ordinary product session for the console (no
@@ -172,7 +176,7 @@ test.describe('summary fixture', () => {
       page.locator('[data-console-source="work-errors:notification-deliveries"]')
     ).toBeFocused()
     await expect(page.getByText(id, { exact: true })).toBeVisible()
-    await expect(page.getByText('Telegram destination blocked', { exact: true })).toBeVisible()
+    await expect(page.getByText(telegramBlockedTitle, { exact: true })).toBeVisible()
     await page.getByRole('button', { name: t.overviewRefresh, exact: true }).click()
     await expect(
       page.locator('[data-console-source="work-errors:notification-deliveries"]')
