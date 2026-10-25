@@ -238,10 +238,14 @@ For a new commit or a repeat, start like a new host but keep the VMs:
 1. Finish section 7 for the previous run (its `out` copied away, `~/lt-work` deleted).
 2. Check out the new commit on both VMs and repeat section 1 (new certificates and
    password; section 7 deleted the host copies).
-3. Set a new `LOAD_TEST_RUN_ID` and `COMPOSE_PROJECT_NAME`, rebuild the images (single-host
-   step 4 and `fixture.sh build`), reboot, `preflight.sh plan`. The database certificates
-   and role passwords in `.env` can stay.
-4. Continue with section 3 (single-host steps 5–7 on the empty new project, not the
+3. Restore the load-test settings in `.env` before any build: `recover.sh` removed
+   `load-test.yml` from `COMPOSE_FILE`, so set `COMPOSE_FILE` again exactly as in
+   section 2, check the other section 2 keys, and set a new `LOAD_TEST_RUN_ID` and
+   `COMPOSE_PROJECT_NAME`. The database certificates and role passwords can stay.
+4. Rebuild the images (single-host step 4 and `fixture.sh build`), reboot,
+   `preflight.sh plan`.
+5. Open TCP 8443 in the provider firewall again, to the generator only.
+6. Continue with section 3 (single-host steps 5–7 on the empty new project, not the
    upgrade procedure), then sections 4–7.
 
 ## Troubleshooting
