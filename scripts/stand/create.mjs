@@ -47,6 +47,13 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     hostnames.console = `console.${hostnames.product}`
     hostnames.api = `api.${hostnames.product}`
   }
+  // AMCORE_CONSOLE_SUMMARY_POLICY_START
+  if (
+    fixtureProfile === 'console-summary' &&
+    (purpose !== 'e2e' || mocked || topology !== 'path' || !choices.consoleEnabled)
+  )
+    throw new Error('Console summary fixture requires isolated path E2E')
+  // AMCORE_CONSOLE_SUMMARY_POLICY_END
   const ports = await allocate(uuid)
   const origins =
     topology === 'host'
@@ -61,6 +68,9 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
         }
   if (productAdminHost && (consoleTopology !== 'host' || !choices.consoleEnabled))
     delete origins.console
+  // AMCORE_CONSOLE_SUMMARY_ORIGIN_START
+  if (fixtureProfile === 'console-summary') origins.metrics = `http://127.0.0.1:${ports.tls}`
+  // AMCORE_CONSOLE_SUMMARY_ORIGIN_END
   if (mocked) {
     origins.product = `http://127.0.0.1:${ports.web}`
     delete origins.api

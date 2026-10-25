@@ -15,6 +15,18 @@ export function OverviewPageSkeleton() {
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
+      <div className="rounded-xl border bg-card p-6">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="mt-2 h-4 w-72 max-w-full" />
+        {[0, 1].map((row) => (
+          <div key={row} className="mt-5 space-y-2 border-t pt-4">
+            <Skeleton className="h-5 w-56 max-w-full" />
+            <Skeleton className="h-4 w-80 max-w-full" />
+            <Skeleton className="h-3 w-44" />
+            <Skeleton className="h-4 w-60 max-w-full" />
+          </div>
+        ))}
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <SkeletonCard rows={ROWS} />
         <SkeletonCard rows={[0, 1]} />

@@ -2,8 +2,13 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
+import ts from 'typescript'
+
+import { findAllNodes } from './path-algebra-ast-query.mjs'
+import { parseStructuralModel } from './path-algebra-ast-model.mjs'
 
 import { commit, runInitProject } from './init-project-test-helpers.mjs'
+import { checkSummaryProjection } from './project-console-summary-contract.mjs'
 import { checkLoginDiagnostics } from './project-console-login-diagnostics-contract.mjs'
 import {
   checkRetainedSettings,
@@ -78,6 +83,7 @@ for (const [name, flags] of scenarios) {
       commit(fixture.root)
       const result = runInitProject(fixture.root, [...flags, '--yes'])
       assert.equal(result.status, 0, result.stderr)
+      checkSummaryProjection(fixture.root, flags)
       checkRetainedSettings(process.cwd(), fixture.root)
       checkLoginDiagnostics(process.cwd(), fixture.root, flags)
       if (flags.includes('--admin-console=disabled')) {
@@ -97,5 +103,35 @@ for (const [name, flags] of scenarios) {
     } finally {
       fixture.cleanup()
     }
+  })
+}
+
+for (const locale of ['en', 'ru']) {
+  test(`file-observation story locale type fits single-${locale}`, () => {
+    const pathname = 'apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx'
+    const model = parseStructuralModel(pathname, readFileSync(pathname, 'utf8'))
+    const declarations = findAllNodes(
+      model,
+      (node) => ts.isVariableDeclaration(node) && node.name.getText() === 'russianLocale'
+    )
+    assert.equal(declarations.length, 1)
+    const virtual = path.resolve('story-locale-type-proof.ts')
+    const source = `const SUPPORTED_LOCALES = ['${locale}'] as const;
+const DEFAULT_LOCALE = SUPPORTED_LOCALES[0];
+const russianLocale = ${declarations[0].initializer.getText()};
+const selected: (typeof SUPPORTED_LOCALES)[number] = russianLocale;`
+    const options = { noEmit: true, strict: true, target: ts.ScriptTarget.ES2022, types: [] }
+    const host = ts.createCompilerHost(options)
+    const original = host.getSourceFile.bind(host)
+    host.getSourceFile = (name, ...args) =>
+      name === virtual
+        ? ts.createSourceFile(name, source, options.target, true)
+        : original(name, ...args)
+    const program = ts.createProgram([virtual], options, host)
+    const diagnostics = ts.getPreEmitDiagnostics(program)
+    assert.deepEqual(
+      diagnostics.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')),
+      []
+    )
   })
 }

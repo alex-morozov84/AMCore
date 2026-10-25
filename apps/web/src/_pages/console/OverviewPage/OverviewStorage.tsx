@@ -43,7 +43,11 @@ export function OverviewStorage({
 }) {
   const { storage, publicDelivery } = overview
   return (
-    <section className="rounded-lg border bg-surface-elevated p-6 shadow-md">
+    <section
+      id="overview-files"
+      tabIndex={-1}
+      className="scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg border bg-surface-elevated p-6 shadow-md"
+    >
       <OverviewExposureBanner check={publicDelivery} t={t} />
       <div className="flex items-center gap-2">
         <h2 className="text-lg font-semibold">{t('overviewFilesTitle')}</h2>

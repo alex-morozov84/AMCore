@@ -56,7 +56,7 @@ test('actual Compose rendering replaces poisoned ports/environment with owned lo
         delete s.build.labels['org.amcore.attempt']
       },
     ]) {
-      const changed = globalThis.structuredClone(m)
+      const changed = globalThis.globalThis.structuredClone(m)
       mutate(changed.model.services.seed)
       assert.throws(() => validateModel(changed))
     }
@@ -97,3 +97,35 @@ for (const mode of ['path', 'host']) {
   })
 }
 // AMCORE_CONSOLE_SUPPORT_MAIL_CONFIG_PROOF_END
+
+// AMCORE_CONSOLE_SUMMARY_CONFIG_PROOF_START
+test('console summary E2E owns its internal fault source and loopback offline Grafana', async () => {
+  const id = `summary-config-${randomUUID()}`
+  try {
+    const m = await create(id, 'e2e', 'path', false, 'console-summary')
+    await configuration(m)
+    assert.equal(m.model.services.web.environment.API_URL, 'http://summary-source:8098')
+    assert.equal(
+      m.model.services.web.environment.ADMIN_CONSOLE_METRICS_GRAFANA_URL,
+      `${m.origins.metrics}/d/console-summary/fixture`
+    )
+    assert.equal(m.origins.metrics, `http://127.0.0.1:${m.ports.tls}`)
+    assert.equal(m.model.services['summary-source'].ports, undefined)
+    const grafana = m.model.services['summary-grafana']
+    assert.match(grafana.image, /grafana:13\.2\.1@sha256:/)
+    assert.equal(grafana.ports[0].host_ip, '127.0.0.1')
+    assert.equal(grafana.environment.GF_PLUGINS_PREINSTALL_DISABLED, 'true')
+    const wrong = globalThis.structuredClone(m)
+    wrong.origins.metrics = 'https://foreign.invalid'
+    assert.throws(() => validateModel(wrong))
+    const wrongApi = globalThis.structuredClone(m)
+    wrongApi.model.services.web.environment.API_URL = 'http://foreign.invalid'
+    assert.throws(() => validateModel(wrongApi))
+    await assert.rejects(() =>
+      create(`summary-preview-${randomUUID()}`, 'preview', 'path', false, 'console-summary')
+    )
+  } finally {
+    await rm(directory(id), { recursive: true, force: true })
+  }
+})
+// AMCORE_CONSOLE_SUMMARY_CONFIG_PROOF_END

@@ -48,6 +48,20 @@ describe('separate Console hostname startup invariant', () => {
     )
   })
 
+  it('rejects an incompatible contextual metrics target without leaking its value', () => {
+    vi.stubEnv(
+      'ADMIN_CONSOLE_METRICS_GRAFANA_URL',
+      'https://metrics.example.test/explore?private=example'
+    )
+    expect(() => validateAdminConsoleStartupOrExit()).toThrow('startup refused')
+    expect(process.stderr.write).toHaveBeenCalledWith(
+      expect.stringContaining('ADMIN_CONSOLE_METRICS_GRAFANA_URL')
+    )
+    expect(process.stderr.write).not.toHaveBeenCalledWith(
+      expect.stringContaining('private=example')
+    )
+  })
+
   it('accepts three distinct hostnames with one shared TLS port', () => {
     expect(() => validateAdminConsoleStartupOrExit()).not.toThrow()
     expect(process.exit).not.toHaveBeenCalled()

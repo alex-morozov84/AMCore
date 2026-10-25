@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
+import { runInNewContext } from 'node:vm'
+import ts from 'typescript'
+
+import { findAllNodes } from './path-algebra-ast-query.mjs'
 
 import {
   applyStructuralPlan,
@@ -50,7 +54,7 @@ function outputs(locale) {
   )
 }
 
-test('token-aware source inventory has the approved 206-reference denominator', () => {
+test('token-aware source inventory has the approved 240-reference denominator', () => {
   const retained = surfaces.reduce(
     (total, [pathname]) =>
       total + routeReferenceInventory(parseStructuralModel(pathname, source(pathname))).count,
@@ -62,7 +66,7 @@ test('token-aware source inventory has the approved 206-reference denominator', 
     0
   )
   assert.equal(retained + deleted, E2E_ROUTE_DENOMINATOR)
-  assert.equal(E2E_ROUTE_DENOMINATOR, 206)
+  assert.equal(E2E_ROUTE_DENOMINATOR, 240)
 })
 
 test('EN and RU retain shared verification with identical prefixless topology', () => {
@@ -149,3 +153,68 @@ test('OAuth fixtures fail closed when selected-locale anchors drift', () => {
     assert.throws(() => applyStructuralPlan(registry, plan, changed))
   }
 })
+
+test('removes Overview locale-switch tests before rewriting their nested root assertions', () => {
+  for (const locale of ['en', 'ru']) {
+    for (const [pathname, count, unavailable] of surfaces.filter(([name]) =>
+      /(?:admin-overview|console-real-stack\/overview)/.test(name)
+    )) {
+      const after = apply(pathname, count, locale, unavailable)
+      assert.doesNotMatch(after, /locale switcher|locale switch preserves/)
+      assert.doesNotMatch(after, /selectOption\('ru'\)|name: 'Русский'/)
+      assert.match(after, /toHaveURL\(/)
+      assert.doesNotMatch(after, /\\\/\?\$\//)
+    }
+  }
+})
+
+for (const [locale, title] of [
+  ['en', 'Telegram destination blocked'],
+  ['ru', 'Получатель Telegram заблокирован'],
+]) {
+  test(`Overview projected diagnostic assertion uses the concrete ${locale} reason`, async () => {
+    const pathname = 'apps/web/e2e/real-stack/admin-overview.spec.ts'
+    const [, count, unavailable] = surfaces.find(([name]) => name === pathname)
+    const after = apply(pathname, count, locale, unavailable)
+    const model = parseStructuralModel(pathname, after)
+    const declarations = findAllNodes(
+      model,
+      (node) => ts.isVariableDeclaration(node) && node.name.getText() === 'telegramBlockedTitle'
+    )
+    assert.ok(declarations.length <= 1)
+    const context = { DEFAULT_LOCALE: locale }
+    if (declarations.length)
+      context.telegramBlockedTitle = runInNewContext(
+        `(${declarations[0].initializer.getText()})`,
+        context
+      )
+    const calls = findAllNodes(
+      model,
+      (node) =>
+        ts.isCallExpression(node) &&
+        node.expression.getText() === 'page.getByText' &&
+        ["'Telegram destination blocked'", 'telegramBlockedTitle'].includes(
+          node.arguments[0]?.getText()
+        )
+    )
+    assert.equal(calls.length, 1, 'retain exactly one concrete diagnostic assertion')
+    let statement = calls[0]
+    while (!ts.isExpressionStatement(statement)) statement = statement.parent
+    let visible = false
+    context.page = {
+      getByText: (text, options) => {
+        assert.equal(text, title)
+        assert.equal(options.exact, true)
+        return text
+      },
+    }
+    context.expect = (text) => ({
+      toBeVisible: () => {
+        assert.equal(text, title)
+        visible = true
+      },
+    })
+    await runInNewContext(`(async () => { ${statement.getText()} })()`, context)
+    assert.equal(visible, true, 'the concrete reason must be asserted visible')
+  })
+}

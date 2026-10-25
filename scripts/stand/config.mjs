@@ -1,3 +1,6 @@
+// AMCORE_CONSOLE_SUMMARY_IMPORT_START
+import { consoleSummaryServices } from './console-summary-fixture.mjs'
+// AMCORE_CONSOLE_SUMMARY_IMPORT_END
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createHash, createHmac } from 'node:crypto'
@@ -106,6 +109,7 @@ export async function configuration(m) {
       ADMIN_CONSOLE_ORIGIN: m.origins.console ?? '',
       // External tool links for the Overview card; empty unless the CLI shell sets them.
       ADMIN_CONSOLE_METRICS_URL: process.env.AMCORE_STAND_CONSOLE_METRICS_URL ?? '',
+      ADMIN_CONSOLE_METRICS_GRAFANA_URL: process.env.AMCORE_STAND_CONSOLE_METRICS_GRAFANA_URL ?? '',
       ADMIN_CONSOLE_LOGS_URL: process.env.AMCORE_STAND_CONSOLE_LOGS_URL ?? '',
       ADMIN_CONSOLE_ALERTS_URL: process.env.AMCORE_STAND_CONSOLE_ALERTS_URL ?? '',
       ADMIN_CONSOLE_LOGS_GRAFANA_URL: process.env.AMCORE_STAND_CONSOLE_LOGS_GRAFANA_URL ?? '',
@@ -149,6 +153,15 @@ export async function configuration(m) {
     caddy: [`127.0.0.1:${m.ports.tls}:443`],
   }
   Object.assign(environments.api, await appleOAuthEnvironment(m))
+  // AMCORE_CONSOLE_SUMMARY_CONFIG_START
+  const summaryServices = consoleSummaryServices(m)
+  if (summaryServices) {
+    for (const [name, service] of Object.entries(summaryServices))
+      environments[name] = service.environment ?? {}
+    environments.web.API_URL = 'http://summary-source:8098'
+    environments.web.ADMIN_CONSOLE_METRICS_GRAFANA_URL = `${m.origins.metrics}/d/console-summary/fixture`
+  }
+  // AMCORE_CONSOLE_SUMMARY_CONFIG_END
   let yaml = 'services:\n'
   for (const [service, environment] of Object.entries(environments)) {
     yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${labelLines(m, '      ')}`
@@ -168,6 +181,16 @@ export async function configuration(m) {
         .slice(1)
         .join('\n')
     // AMCORE_CONSOLE_NOTIFICATION_SERVICE_END
+    // AMCORE_CONSOLE_SUMMARY_SERVICE_START
+    if (summaryServices?.[service]) {
+      const { environment: _environment, ...definition } = summaryServices[service]
+      yaml += stringify({ services: { [service]: definition } })
+        .replace(/^services:\n/, '')
+        .split('\n')
+        .slice(1)
+        .join('\n')
+    }
+    // AMCORE_CONSOLE_SUMMARY_SERVICE_END
     if (service === 'mail-capture')
       yaml += stringify({ services: { [service]: setupMailCollectorService(m) } })
         .replace(/^services:\n/, '')
@@ -292,6 +315,10 @@ export function validateModel(m) {
           product: `http://${m.hostnames.product}:${m.ports.web}`,
           api: `http://127.0.0.1:${m.ports.api}`,
         }
+  // AMCORE_CONSOLE_SUMMARY_ORIGIN_CHECK_START
+  if (m.fixtureProfile === 'console-summary')
+    wantedOrigins.metrics = `http://127.0.0.1:${m.ports.tls}`
+  // AMCORE_CONSOLE_SUMMARY_ORIGIN_CHECK_END
   if (m.productAdminHost && (!m.consoleEnabled || m.consoleTopology !== 'host'))
     delete wantedOrigins.console
   if (JSON.stringify(m.origins) !== JSON.stringify(wantedOrigins))
@@ -360,7 +387,13 @@ export function validateModel(m) {
   for (const name of ['api', 'worker', 'web'])
     if (m.model.services[name].environment.REDIS_URL !== 'redis://redis:6379')
       throw new Error('Foreign Redis target')
-  if (m.model.services.web.environment.API_URL !== 'http://api:5002')
+  const apiTargets = {
+    // AMCORE_CONSOLE_SUMMARY_API_CHECK_START
+    'console-summary': 'http://summary-source:8098',
+    // AMCORE_CONSOLE_SUMMARY_API_CHECK_END
+  }
+  const expectedApi = apiTargets[m.fixtureProfile] ?? 'http://api:5002'
+  if (m.model.services.web.environment.API_URL !== expectedApi)
     throw new Error('Foreign API target')
   const invitationHttpOrigin = m.origins.product.startsWith('http:') ? m.origins.product : ''
   if (m.model.services.web.environment.WEB_INVITATION_LOCAL_HTTP_ORIGIN !== invitationHttpOrigin)

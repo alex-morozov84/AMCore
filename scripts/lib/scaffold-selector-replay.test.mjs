@@ -21,6 +21,14 @@ function fixtureFor(glob) {
 }
 
 const samples = [
+  ['summary fixture ownership', ['scripts/lib/operations-console-ownership-facts.mjs'], true],
+  ['summary managed fixture', ['scripts/stand/console-summary-fixture.mjs'], true],
+  [
+    'summary locale story',
+    ['apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx'],
+    true,
+    'A',
+  ],
   ['support mail changelog seam', ['CHANGELOG.md'], true],
   ['support mail ownership', ['scripts/lib/operations-console-stand-seams.mjs'], true],
   ['support mail profiles', ['scripts/stand/organization-setup-fixture.mjs'], true],

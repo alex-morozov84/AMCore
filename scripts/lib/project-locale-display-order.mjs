@@ -3,6 +3,9 @@ import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
 import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
 
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/.storybook/preview.tsx',
+  'apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx',
+  'apps/web/src/_pages/console/OverviewPage/OverviewProblems.stories.tsx',
   'apps/web/src/features/console-user-support-mail/model/use-support-mail.test.tsx',
   'apps/web/src/features/console-user-support-mail/ui/SupportMailDialog.test.tsx',
   'apps/web/src/features/console-user-support-mail/ui/UserSupportMailCard.test.tsx',

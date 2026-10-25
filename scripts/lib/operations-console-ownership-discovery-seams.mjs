@@ -15,6 +15,13 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDiscoverySeams = [
   entry(
+    'console.docs-overview-summary',
+    'docs/README.md',
+    { text: '(operations-console/overview.md#find-what-needs-checking)' },
+    undefined,
+    { operationKey: 'docs-index-console' }
+  ),
+  entry(
     'console.docs-support-mail',
     'docs/README.md',
     { text: '(operations-console/users.md#help-someone-sign-in)' },

@@ -46,6 +46,10 @@ export async function start(m) {
   // AMCORE_CONSOLE_NOTIFICATION_START_END
   if (isOrganizationMailFixture(m))
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'mail-capture'])
+  // AMCORE_CONSOLE_SUMMARY_START_START
+  if (m.fixtureProfile === 'console-summary')
+    await compose(m, ['up', '-d', '--no-deps', 'summary-source', 'summary-grafana'])
+  // AMCORE_CONSOLE_SUMMARY_START_END
   await compose(m, [
     'up',
     '-d',

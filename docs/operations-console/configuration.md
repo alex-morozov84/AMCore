@@ -257,6 +257,41 @@ What the card does and does not prove:
 The links carry no Console session or token, and the browser sends no `Referer`
 to the tool. Single sign-on between the Console and these tools is not provided.
 
+### Metrics around an observation
+
+To open charts around a summary result, set the optional web variable
+`ADMIN_CONSOLE_METRICS_GRAFANA_URL` to an existing Grafana dashboard URL:
+
+```bash
+ADMIN_CONSOLE_METRICS_GRAFANA_URL=https://grafana.example.com/d/amcore-overview/overview
+```
+
+This is separate from `ADMIN_CONSOLE_METRICS_URL`, the plain **Metrics** link.
+That link can still point to a tool home page. The contextual address must have
+`/d/<uid>` or `/d/<uid>/<slug>` after any Grafana subpath. A home page, Explore
+or `/d-solo/` is incompatible. The same safe-address rules above apply.
+An empty value hides contextual links; an invalid configured value stops web at
+startup and names the variable. It does not reveal its configured value.
+
+1. Copy a dashboard URL from the Grafana your operators can access. Remove
+   credentials or secrets from its path, query and fragment.
+2. Set the variable in the web environment. With bundled Compose, run
+   `docker compose up -d web` with your usual Compose files to recreate web.
+3. Open a timed result under **Needs attention** and select **Metrics around this time**.
+   Grafana opens in a new tab and uses its own login.
+4. Check the selected interval: 15 minutes before and after that result's time.
+   An old result can have no retained chart data. Missing data does not prove recovery.
+
+```text
+Stored observation time -> absolute 30-minute interval -> Grafana dashboard
+```
+
+The Console replaces `from`/`to` with epoch milliseconds and removes conflicting
+`time`/`time.window`. It preserves other dashboard parameters and the fragment.
+It adds no user, job or delivery identifiers and sends no credentials. The web
+server never contacts Grafana. A missing or unrepresentable observation time hides
+the contextual link. No monitoring stack is installed by setting this variable.
+
 ### Find in logs links
 
 Start the [log-search overlay](../operations/log-search.md#install) first. Then the Console can open the log

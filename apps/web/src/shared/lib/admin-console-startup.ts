@@ -1,6 +1,7 @@
 import { getConsoleOrigin, validateAdminConsoleStartup } from './admin-console-config'
 import { assertConsoleExternalLinks } from './console-external-links'
 import { assertConsoleLogSearchTarget } from './console-log-search-target'
+import { assertConsoleMetricsTarget } from './console-metrics-target'
 import { productAdminOrigins } from './product-admin-config.server'
 
 import 'server-only'
@@ -18,6 +19,7 @@ export function validateAdminConsoleStartupOrExit(): void {
     }
     assertConsoleExternalLinks()
     assertConsoleLogSearchTarget()
+    assertConsoleMetricsTarget()
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Invalid Operations Console configuration'

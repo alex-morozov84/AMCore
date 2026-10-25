@@ -1,10 +1,15 @@
 import { ConsolePageFrame } from '@/_pages/console'
 import { IntegrationsPage, IntegrationsPageSkeleton } from '@/_pages/console/IntegrationsPage'
 
-export default function IntegrationsRoute() {
+export default async function IntegrationsRoute({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const sourceParams = await searchParams
   return (
     <ConsolePageFrame fallback={<IntegrationsPageSkeleton />}>
-      <IntegrationsPage />
+      <IntegrationsPage sourceParams={sourceParams} />
     </ConsolePageFrame>
   )
 }

@@ -32,8 +32,8 @@ documented hooks for consuming media, notifications, and AI through the BFF.
 Feature-specific admin surfaces remain intentionally product-owned.
 
 The optional [Operations Console](docs/operations-console/README.md) is a
-separate `SUPER_ADMIN` control plane. It ships **Overview** for instance
-readiness, deployment identity, local resource snapshots and storage probe interval editing, **Background work** safe diagnostics and audited queue/job controls, **Scheduled jobs** recorded results of periodic jobs, **Integrations** safe state of outside services and a self-addressed test email, **Users** inventory, sign-in setup diagnostics, verification/recovery mail, system-role changes and session revocation, **Organizations** inventory, first-admin provisioning, and bounded **Audit** browsing. Path/host topology,
+separate `SUPER_ADMIN` control plane. It ships **Overview** for
+recorded problems with diagnostic links, instance readiness, deployment identity, local resource snapshots and storage probe interval editing, **Background work** safe diagnostics and audited queue/job controls, **Scheduled jobs** recorded results of periodic jobs, **Integrations** safe state of outside services and a self-addressed test email, **Users** inventory, sign-in setup diagnostics, verification/recovery mail, system-role changes and session revocation, **Organizations** inventory, first-admin provisioning, and bounded **Audit** browsing. Path/host topology,
 isolated host sessions, downstream scaffolding, deployment guidance, and a
 safe extension recipe are included. Session views show parsed devices and
 approximate IP locations; see [session management](docs/operations-console/users.md#manage-sessions)

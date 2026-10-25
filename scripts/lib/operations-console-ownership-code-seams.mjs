@@ -97,6 +97,7 @@ export const operationsConsoleCodeSeams = [
       'ADMIN_CONSOLE_LOGS_URL',
       'ADMIN_CONSOLE_ALERTS_URL',
       'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
+      'ADMIN_CONSOLE_METRICS_GRAFANA_URL',
     ]
   ),
   seam(
@@ -144,6 +145,14 @@ export const operationsConsoleCodeSeams = [
     'structural-operation',
     { text: 'ADMIN_CONSOLE_LOGS_GRAFANA_URL: ${ADMIN_CONSOLE_LOGS_GRAFANA_URL:-}' },
     ['ADMIN_CONSOLE_LOGS_GRAFANA_URL'],
+    { operationKey: 'console.compose-env' }
+  ),
+  seam(
+    'console.compose-metrics-grafana-url',
+    'docker-compose.yml',
+    'structural-operation',
+    { text: 'ADMIN_CONSOLE_METRICS_GRAFANA_URL: ${ADMIN_CONSOLE_METRICS_GRAFANA_URL:-}' },
+    ['ADMIN_CONSOLE_METRICS_GRAFANA_URL'],
     { operationKey: 'console.compose-env' }
   ),
   seam(

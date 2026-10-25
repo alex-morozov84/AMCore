@@ -5,12 +5,13 @@ import { BackgroundWorkPage, BackgroundWorkPageSkeleton } from '@/_pages/console
 export default async function BackgroundWorkRoute({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string | string[] }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const boardOpenFailed = (await searchParams).board === 'unavailable'
+  const query = await searchParams
+  const boardOpenFailed = query.board === 'unavailable'
   return (
     <ConsolePageFrame fallback={<BackgroundWorkPageSkeleton />}>
-      <BackgroundWorkPage boardOpenFailed={boardOpenFailed} />
+      <BackgroundWorkPage boardOpenFailed={boardOpenFailed} sourceParams={query} />
     </ConsolePageFrame>
   )
 }

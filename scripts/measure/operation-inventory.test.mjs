@@ -26,7 +26,9 @@ describe('operation inventory against the real plans', () => {
       // Shared/Console inventories can describe the same final edit; semantic claims count separately.
       // Support mail adds locale fixture edits and Console removals/seams across these recipes.
       // Providers, manifests, scenarios and exact-copy edges remain unchanged.
-      { name: 'measured operations', expected: 920, actual: inventory.operations.length },
+      // Summary ownership includes metrics helpers, its offline fixture and stand seams.
+      // Locale verification includes Overview stories, the provider and browser routes.
+      { name: 'measured operations', expected: 946, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -45,17 +47,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1269,
+        expected: 1298,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2079,
+        expected: 2141,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 896,
+        expected: 920,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

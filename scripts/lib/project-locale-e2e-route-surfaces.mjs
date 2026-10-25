@@ -4,6 +4,9 @@ export const LOCALE_ONLY_E2E_PATHS = [
 ]
 
 export const E2E_ROUTE_SURFACES = [
+  ['apps/web/e2e/real-stack/admin-overview.spec.ts', 12, 1],
+  ['apps/web/e2e/console-real-stack/overview.spec.ts', 11, 1],
+  ['apps/web/e2e/shared/overview-summary-journey.ts', 11],
   ['apps/web/e2e/real-stack/admin-users.spec.ts', 16],
   ['apps/web/e2e/console-real-stack/users.spec.ts', 4],
   ['apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts', 2],

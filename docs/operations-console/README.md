@@ -9,7 +9,7 @@ their organization role.
 
 | Screen                                | Use it to                                                                                                                                   |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Overview](overview.md)               | Check API readiness, storage and resources; open monitoring tools; edit probe interval.                                                     |
+| [Overview](overview.md)               | Find recorded problems and open diagnostics; check API/files/resources, open monitoring tools and edit probe interval.                      |
 | [Background work](background-work.md) | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup.                                                  |
 | [Scheduled jobs](scheduled-jobs.md)   | Check that nightly cleanups, the GeoIP update and recovery passes keep running (view-only).                                                 |
 | [Integrations](integrations.md)       | See which outside services are set up and last confirmed, including whether the workers reach Telegram; send a test email to yourself.      |

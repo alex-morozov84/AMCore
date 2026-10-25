@@ -25,7 +25,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   // Provisioning owns two feature roots and a browser-scenario root; Scheduled jobs owns one feature root.
   // Nested files inherit ownership without individual registration.
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 25)
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 26)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -67,13 +67,13 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // stand fixture, browser spec and operator guide. Login diagnostics adds three detail UI/test
       // files, a Console API adapter test and the shared host/path browser helper under existing roots.
       // Support mail adds its closed feature root and route/adapter files.
-      expected: 525,
+      expected: 549,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {
       name: 'console dead shared modules',
       // The shared poll policy and cooldown hook are used only by Console panels.
-      expected: 19,
+      expected: 21,
       actual: projection.deadSharedModules.size,
     },
     {

@@ -1,0 +1,28 @@
+{
+  "uid": "console-summary",
+  "title": "Console observation fixture",
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Navigation fixture",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "This fixture proves time-range navigation only. It contains no metrics or external data sources."
+      }
+    }
+  ],
+  "timezone": "utc"
+}

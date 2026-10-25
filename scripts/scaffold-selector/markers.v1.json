@@ -12,6 +12,7 @@
         "ADMIN_CONSOLE_LOGS_GRAFANA_URL",
         "ADMIN_CONSOLE_LOGS_URL",
         "ADMIN_CONSOLE_METRICS_URL",
+        "ADMIN_CONSOLE_METRICS_GRAFANA_URL",
         "ADMIN_CONSOLE_ORIGIN",
         "ALTER COLUMN \"locale\" SET DEFAULT 'en'",
         "EmailVerificationEmail(baseProps)",

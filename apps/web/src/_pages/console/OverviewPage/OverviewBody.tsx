@@ -1,6 +1,7 @@
 import type { AdminOverviewResponse } from '@amcore/shared'
 
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { ConsoleTimestamp } from '@/shared/ui/console-detail/ConsoleTimestamp'
 
 import type { OverviewFormatter, OverviewTranslations } from './overview-types'
 import { OverviewDetails } from './OverviewDetails'
@@ -21,32 +22,44 @@ export function OverviewBody({
 }) {
   return (
     <>
-      {overview.readiness === 'ready' && (
-        <Alert>
-          <AlertTitle>{t('overviewReadyTitle')}</AlertTitle>
-          <AlertDescription>{t('overviewReadyHelp')}</AlertDescription>
-        </Alert>
-      )}
       <p className="text-sm text-muted-foreground">{t('overviewIndependentSamplesHelp')}</p>
       <OverviewResources overview={overview} t={t} format={format} />
       <OverviewStorage overview={overview} t={t} format={format} />
-      {overview.readiness !== 'ready' && (
-        <Alert variant={overview.readiness === 'not_ready' ? 'destructive' : 'default'}>
-          <AlertTitle>
-            {t(
-              overview.readiness === 'not_ready'
-                ? 'overviewNotReadyTitle'
-                : 'overviewDependencyStatusDegraded'
-            )}
-          </AlertTitle>
-          <AlertDescription>
-            {t(
-              overview.readiness === 'not_ready' ? 'overviewNotReadyHelp' : 'overviewDegradedNotice'
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-      <OverviewDetails overview={overview} t={t} />
+      <section
+        id="overview-api-checks"
+        tabIndex={-1}
+        className="scroll-mt-24 space-y-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <p className="text-sm text-muted-foreground">
+          {t('overviewCheckedAt')}:{' '}
+          <ConsoleTimestamp value={overview.completedAt} variant="inline" seconds />
+        </p>
+        {overview.readiness !== 'ready' && (
+          <Alert variant={overview.readiness === 'not_ready' ? 'destructive' : 'default'}>
+            <AlertTitle>
+              {t(
+                overview.readiness === 'not_ready'
+                  ? 'overviewNotReadyTitle'
+                  : 'overviewDependencyStatusDegraded'
+              )}
+            </AlertTitle>
+            <AlertDescription>
+              {t(
+                overview.readiness === 'not_ready'
+                  ? 'overviewNotReadyHelp'
+                  : 'overviewDegradedNotice'
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+        {overview.readiness === 'ready' && (
+          <Alert>
+            <AlertTitle>{t('overviewReadyTitle')}</AlertTitle>
+            <AlertDescription>{t('overviewReadyHelp')}</AlertDescription>
+          </Alert>
+        )}
+        <OverviewDetails overview={overview} t={t} />
+      </section>
       <details className="rounded-lg border bg-surface-elevated p-6 shadow-md">
         <summary className="cursor-pointer font-semibold">{t('overviewTechnicalDetails')}</summary>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">

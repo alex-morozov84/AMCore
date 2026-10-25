@@ -14,6 +14,11 @@ screen, and an organization role does not grant access. The page is at
 `/admin/integrations` in path mode and at `/integrations` on the Console host, after
 the locale prefix (for example `/en/admin/integrations`).
 
+A link from Overview uses `?focus=<integration>` to focus the matching name.
+It does not start a test or open its confirmation. If the selection is invalid
+or no longer listed, an explanation leaves the current list available. Ordinary
+refresh does not move focus back to the item.
+
 ## What you see
 
 One row per integration (one card per integration on a narrow screen). **Data read**

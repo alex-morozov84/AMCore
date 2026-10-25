@@ -3,6 +3,11 @@ import { getTranslations } from 'next-intl/server'
 import { IntegrationsLive } from '@/features/console-integrations'
 import { fetchConsoleIntegrations } from '@/shared/api/console/integrations'
 import { resolvePrimary } from '@/shared/api/server'
+import { ConsoleSourceFocus } from '@/shared/ui/console-detail/ConsoleSourceFocus'
+import {
+  type ConsoleSourceParams,
+  parseConsoleSource,
+} from '@/shared/ui/console-detail/parse-console-source'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 /**
@@ -11,14 +16,22 @@ import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fall
  * that snapshot is the explicit primary-unavailable state and keeps the heading. Reading never starts
  * a check; the only action is the operator test email inside the live leaf.
  */
-export async function IntegrationsPage() {
+export async function IntegrationsPage({
+  sourceParams = {},
+}: { sourceParams?: ConsoleSourceParams } = {}) {
+  const request = parseConsoleSource(sourceParams, 'integration')
   const t = await getTranslations('console.integrations')
   // Rejected 4xx or malformed 2xx deliberately propagate to the real error boundary.
   const outcome = resolvePrimary(await fetchConsoleIntegrations(), {
     source: 'console-integrations',
   })
   return (
-    <section className="flex flex-col gap-4">
+    <section id="console-integration-source" className="flex flex-col gap-4">
+      <ConsoleSourceFocus
+        rootId="console-integration-source"
+        request={request}
+        available={outcome.status === 'available'}
+      />
       <header>
         <p className="font-console-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">
           {t('eyebrow')}

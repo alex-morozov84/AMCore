@@ -32,7 +32,13 @@ export function QueueIdentity({
   const text = (part: Part) => (t.has(own(part)) ? t(own(part)) : t(`kinds.${queue.kind}.${part}`))
   return (
     <div>
-      <p className="font-medium">{title ?? text('title')}</p>
+      <p
+        data-console-source={`queue:${queue.name}`}
+        tabIndex={-1}
+        className="scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium"
+      >
+        {title ?? text('title')}
+      </p>
       <p className="font-console-mono text-xs text-muted-foreground">{queue.name}</p>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">{text('description')}</p>
       {hint && <p className="mt-1 text-sm">{hint}</p>}
