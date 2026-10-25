@@ -66,6 +66,8 @@ export function factsFromDir(dir) {
     k6Summary: json(read(dir, 'summary.json')),
     window: json(read(dir, 'window.json')),
     skewS: typeof clock?.skewS === 'number' ? clock.skewS : undefined,
+    skewUncertaintyS:
+      typeof clock?.skewUncertaintyS === 'number' ? clock.skewUncertaintyS : undefined,
     server: json(read(dir, 'server.json')),
     statsError: read(dir, 'server.err')?.trim() || undefined,
     samplerExit: exit('sampler.exit'),

@@ -89,15 +89,52 @@ test('smoke then campaign: separate outputs, and an invalid warm-up stops before
   assert.equal(manifest.referenceProtocol, true)
 })
 
-test('a slow SSH connection setup is not reported as clock skew', () => {
-  // Fresh host: the middle-of-round-trip estimate turned 1.2 s of SSH setup on a busy host
-  // into "clock skew" and refused the control step.
-  const world = stubWorld()
-  world.stub({ routes: ROUTES })
-  const r = sh(world, 'run-step.sh', ['r5-1', '5', '3'], { STUB_SSH_DELAY: '1.5' })
+const clockOf = (world) =>
+  JSON.parse(readFileSync(join(world.work, 'out/steps/r5-1/clock.json'), 'utf8'))
+
+test('clock: slow SSH setup is no skew; a small real offset is measured with its bound', () => {
+  // Fresh host: 1.2 s of SSH setup on a busy host was once reported as skew.
+  const slow = stubWorld()
+  slow.stub({ routes: ROUTES })
+  const r = sh(slow, 'run-step.sh', ['r5-1', '5', '3'], { STUB_SSH_DELAY: '1.5' })
   assert.equal(r.status, 0, r.stderr)
-  const clock = JSON.parse(readFileSync(join(world.work, 'out/steps/r5-1/clock.json'), 'utf8'))
-  assert.ok(Math.abs(clock.skewS) < 0.3, `skew ${clock.skewS}`)
-  assert.ok(clock.rttMs >= 1500)
-  assert.equal(result(world, 'out', 'r5-1').class, 'valid')
+  assert.ok(Math.abs(clockOf(slow).skewS) < 0.1, `skew ${clockOf(slow).skewS}`)
+  assert.equal(result(slow, 'out', 'r5-1').class, 'valid')
+  const ahead = stubWorld()
+  ahead.stub({ routes: ROUTES })
+  assert.equal(
+    sh(ahead, 'run-step.sh', ['r5-1', '5', '3'], { STUB_CLOCK_OFFSET_MS: '300' }).status,
+    0
+  )
+  const c = clockOf(ahead)
+  assert.ok(Math.abs(c.skewS - 0.3) <= c.skewUncertaintyS + 0.05, JSON.stringify(c))
+})
+
+test('clock: an offset above 1 s is refused, also when the answer is held (FH2-2)', () => {
+  for (const [label, env] of [
+    ['host 1.6 s ahead', { STUB_CLOCK_OFFSET_MS: '1600' }],
+    ['host 1.6 s behind', { STUB_CLOCK_OFFSET_MS: '-1600' }],
+    // Agent 2 probe: +1.6 s with the reply held 1.6 s after the timestamp was read.
+    ['ahead and held', { STUB_CLOCK_OFFSET_MS: '1600', STUB_CLOCK_HOLD_MS: '1600' }],
+  ]) {
+    const world = stubWorld()
+    world.stub({ routes: ROUTES })
+    const r = sh(world, 'run-step.sh', ['r5-1', '5', '3'], env)
+    assert.notEqual(r.status, 0, label)
+    assert.match(r.stderr, /not provably within 1 s/, label)
+  }
+})
+
+test('a failing log source or a broken archive makes the step invalid (FH2-1)', () => {
+  for (const [mode, reason] of [
+    ['fail-after-tar', /fetching the host access logs failed/],
+    ['truncated', /archive is incomplete or corrupt/],
+  ]) {
+    const world = stubWorld()
+    world.stub({ routes: ROUTES, logs: mode })
+    sh(world, 'run-step.sh', ['r5-1', '5', '3'])
+    const res = result(world, 'out', 'r5-1')
+    assert.equal(res.class, 'invalid measurement', mode)
+    assert.match(res.reasons.join(';'), reason, mode)
+  }
 })

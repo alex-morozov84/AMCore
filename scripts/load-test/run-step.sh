@@ -32,22 +32,41 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-# Clock skew. The host reads its clock at the END of an SSH call (after the connection
-# setup, which takes most of the round trip), so the estimate is host time minus local time
-# on return; of three calls the one with the shortest round trip counts. Measuring against
-# the middle of the round trip reported a busy host's slow SSH setup as skew (fresh host).
-best_rtt=
-for _ in 1 2 3; do
-  t0=$(ms)
-  remote=$(srv sh scripts/load-test/server-stats.sh clock)
-  t1=$(ms)
-  if [ -z "$best_rtt" ] || [ $((t1 - t0)) -lt "$best_rtt" ]; then
-    best_rtt=$((t1 - t0))
-    skew_ms=$((remote - t1))
-  fi
-done
-echo "{\"skewS\":$(awk -v v="$skew_ms" 'BEGIN {printf "%.3f", v / 1000}'),\"rttMs\":$best_rtt}" > "$DIR/clock.json"
-[ "${skew_ms#-}" -le 1000 ] || die "clock skew to the host is ${skew_ms} ms; synchronise time (NTP) first"
+# Clock offset over ONE established SSH session: the host answers each line with its clock,
+# so its timestamp lies between sending (t0) and receiving (t1). Offset = host - midpoint,
+# with a proven error of at most (t1 - t0) / 2; the shortest of five exchanges counts. The
+# SSH connection setup is outside the timed exchanges (a busy host's slow setup was once
+# reported as skew), and delays before or after the host's timestamp only widen the bound.
+clock_offset() {
+  fifo=$(mktemp -d)
+  mkfifo "$fifo/in" "$fifo/out"
+  timeout 60 ssh -o BatchMode=yes -o ConnectTimeout=20 "$LT_SERVER_SSH" \
+    'while read -r _; do date +%s%3N; done' < "$fifo/in" > "$fifo/out" 2> /dev/null &
+  exec 3> "$fifo/in" 4< "$fifo/out"
+  if ! { echo >&3 && read -r _ <&4; }; then die "clock: no answer from the host"; fi
+  span=
+  for _ in 1 2 3 4 5; do
+    t0=$(ms)
+    echo >&3
+    read -r remote <&4 || die "clock: the host connection closed"
+    t1=$(ms)
+    if [ -z "$span" ] || [ $((t1 - t0)) -lt "$span" ]; then
+      span=$((t1 - t0))
+      offset=$((remote - (t0 + t1) / 2))
+    fi
+  done
+  exec 3>&- 4<&-
+  wait 2> /dev/null || true
+  rm -rf "$fifo"
+  bound=$(((span + 1) / 2))
+}
+clock_offset
+json_s() { awk -v v="$1" 'BEGIN {printf "%.3f", v / 1000}'; }
+echo "{\"skewS\":$(json_s "$offset"),\"skewUncertaintyS\":$(json_s "$bound")}" > "$DIR/clock.json"
+# Accept only when the whole interval offset ± bound lies within 1 s: a larger offset is
+# skew; a large bound means the clock could not be measured precisely enough.
+[ $((${offset#-} + bound)) -le 1000 ] ||
+  die "clock offset to the host is ${offset} ± ${bound} ms, not provably within 1 s; synchronise time (NTP) or check the generator-host connection"
 
 srv sh scripts/load-test/server-stats.sh containers > "$DIR/containers.before"
 srv sh scripts/load-test/sampler.sh start "$REMOTE"
@@ -83,13 +102,25 @@ set -e
 # fetched and the statistics computed here on the generator, never on the measured host.
 WINDOW=$(sed -n 's/.*"start":\([0-9.]*\),"end":\([0-9.]*\).*/\1 \2/p' "$DIR/window.json" 2> /dev/null || true)
 mkdir -p "$DIR/logs"
-# shellcheck disable=SC2086 # WINDOW is "<from> <to>", two arguments
-if [ -n "$WINDOW" ] && srv sh scripts/load-test/server-stats.sh logs 2> "$DIR/server.err" | tar xf - -C "$DIR/logs" &&
-  docker run --rm -v "$DIR/logs:/logs:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" node /lt/stats.mjs /logs $WINDOW > "$DIR/server.json" 2>> "$DIR/server.err"; then
-  rm -rf "$DIR/server.err" "$DIR/logs"
-else
+# Three separate stages, each with its own status (a pipeline would report only tar's):
+# fetch the archive, unpack it, compute. A failure of any stage leaves server.err, and the
+# step is invalid even if part of the data arrived.
+stats_failed() {
   rm -f "$DIR/server.json"
-  [ -s "$DIR/server.err" ] || echo "measured window or server stats unavailable" > "$DIR/server.err"
+  echo "$1" >> "$DIR/server.err"
+}
+: > "$DIR/server.err"
+# shellcheck disable=SC2086 # WINDOW is "<from> <to>", two arguments
+if [ -z "$WINDOW" ]; then
+  stats_failed "measured window unavailable"
+elif ! srv sh scripts/load-test/server-stats.sh logs > "$DIR/logs.tar" 2>> "$DIR/server.err"; then
+  stats_failed "fetching the host access logs failed"
+elif ! tar xf "$DIR/logs.tar" -C "$DIR/logs" 2>> "$DIR/server.err"; then
+  stats_failed "the fetched access-log archive is incomplete or corrupt"
+elif ! docker run --rm -v "$DIR/logs:/logs:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" node /lt/stats.mjs /logs $WINDOW > "$DIR/server.json" 2>> "$DIR/server.err"; then
+  stats_failed "computing the server statistics failed"
+else
+  rm -rf "$DIR/server.err" "$DIR/logs" "$DIR/logs.tar"
 fi
 docker run --rm -v "$DIR:/d" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" sh -c 'node /lt/classify.mjs /d > /d/result.json' ||
   die "classification failed for step $NAME"

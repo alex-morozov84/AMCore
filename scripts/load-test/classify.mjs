@@ -49,7 +49,7 @@ export const SMOKE_CHECKS = [
 
 const values = (s, name) => s?.metrics?.[name]?.values
 // Requests that may differ between k6 and the server log: one in flight per VU at each
-// edge, plus the requests of the measured clock skew at both edges.
+// edge, plus the requests of the clock skew bound (|offset| + measurement error) at both edges.
 export const reconcileAllowance = (vusMax, requestRate, skewS) =>
   vusMax + Math.ceil(requestRate * 2 * (skewS + 0.1))
 
@@ -90,7 +90,8 @@ function dataProblems(f, w) {
   if (f.samplerExit !== 0) invalid.push('host sampler failed')
   if (f.containersMissing)
     invalid.push('container list before and after the step differs or is missing')
-  if (typeof f.skewS !== 'number') invalid.push('clock skew was not measured')
+  if (typeof f.skewS !== 'number' || typeof f.skewUncertaintyS !== 'number')
+    invalid.push('clock skew was not measured')
   if (!(f.window?.start > 0 && f.window.end > f.window.start)) {
     invalid.push('measured window missing')
     return invalid
@@ -120,9 +121,13 @@ function dataProblems(f, w) {
     const missing = REQUIRED_ROUTES.filter((r) => !seen.has(r))
     if (missing.length) invalid.push(`no server records for ${missing.join(', ')}`)
   }
-  if (w && f.server && typeof f.skewS === 'number') {
+  if (w && f.server && typeof f.skewS === 'number' && typeof f.skewUncertaintyS === 'number') {
     const vusMax = values(f.k6Summary, 'vus_max')?.value ?? values(f.k6Summary, 'vus_max')?.max ?? 0
-    const allowed = reconcileAllowance(vusMax, w.requests / (end - start), Math.abs(f.skewS))
+    const allowed = reconcileAllowance(
+      vusMax,
+      w.requests / (end - start),
+      Math.abs(f.skewS) + f.skewUncertaintyS
+    )
     if (Math.abs(w.requests - f.server.requests) > allowed)
       invalid.push(
         `k6 counted ${w.requests} requests in the window, the server ${f.server.requests} (allowed ${allowed})`

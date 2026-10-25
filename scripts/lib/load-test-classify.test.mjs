@@ -36,7 +36,7 @@ function files(o = {}) {
     'k6.exit': '0',
     'summary.json': JSON.stringify({ metrics: metrics(o), root_group: { checks: o.checks ?? [] } }),
     'window.json': JSON.stringify({ ...W, rate: 10, smoke: Boolean(o.smoke) }),
-    'clock.json': JSON.stringify({ skewS: 0.02 }),
+    'clock.json': JSON.stringify({ skewS: 0.02, skewUncertaintyS: 0.005 }),
     'server.json': JSON.stringify({
       requests: o.serverRequests ?? 3700,
       status: { 200: 3700 },
@@ -152,8 +152,8 @@ test('a missing required metric or route class is invalid', () => {
 })
 
 test('reconciliation allows in-flight requests and measured skew only', () => {
-  const allowed = reconcileAllowance(20, 3700 / 120, 0.02)
-  assert.equal(allowed, 20 + Math.ceil((3700 / 120) * 2 * 0.12))
+  const allowed = reconcileAllowance(20, 3700 / 120, 0.025)
+  assert.equal(allowed, 20 + Math.ceil((3700 / 120) * 2 * 0.125))
   assert.equal(run({ serverRequests: 3700 - allowed }).class, 'valid')
   assert.equal(run({ serverRequests: 3700 - allowed - 1 }).class, 'invalid measurement')
 })

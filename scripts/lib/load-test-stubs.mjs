@@ -31,8 +31,15 @@ if (args[0] === 'compose') {
     const lines = routes.map((uri, i) => JSON.stringify({ ts: t + 0.5 + i * 0.01, duration: 0.02, status: 200, request: { uri, tls: { client_common_name: 'k6' } } }))
     const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'lt-caddy-'))
     fs.writeFileSync(path.join(dir, 'load-test-access.log'), lines.join('\\n') + '\\n')
-    const tar = spawnSync('tar', ['cf', '-', '-C', dir, 'load-test-access.log'])
-    process.stdout.write(tar.stdout)
+    const tar = spawnSync('tar', ['cf', '-', '-C', dir, 'load-test-access.log']).stdout
+    // cfg.logs: 'fail-after-tar' = readable archive, then the source fails; 'truncated' =
+    // the stream breaks off half-way while the source reports success.
+    if (cfg.logs === 'truncated') return process.stdout.write(tar.subarray(0, 700))
+    process.stdout.write(tar)
+    if (cfg.logs === 'fail-after-tar') {
+      process.stderr.write('stub: source failed after the archive\\n')
+      process.exitCode = 23
+    }
     return
   }
   return
@@ -90,12 +97,17 @@ if (args[0] === 'run') {
 const SCRIPTS = {
   // Remote commands run locally: the last argument is the command line. STUB_SSH_DELAY
   // models a slow connection setup before the remote command starts.
-  ssh: '#!/bin/sh\nsleep "${STUB_SSH_DELAY:-0}"\nfor last in "$@"; do :; done\nexec sh -c "$last"\n',
+  ssh: '#!/bin/sh\nsleep "${STUB_SSH_DELAY:-0}"\nfor last in "$@"; do :; done\nSTUB_REMOTE=1 exec sh -c "$last"\n',
   timeout: '#!/bin/sh\nshift\nexec "$@"\n',
   vmstat:
     '#!/bin/sh\necho "procs ---memory---"\necho " r b swpd free buff cache si so bi bo in cs us sy id wa st"\necho " 0 0 0 1 1 1 0 0 0 0 1 1 5 5 90 0 0"\n',
   // GNU date's %3N (milliseconds) is missing on some systems; tests need only that form.
-  date: '#!/bin/sh\nif [ "${1:-}" = "+%s%3N" ]; then node -e "console.log(Date.now())"; else exec /bin/date "$@"; fi\n',
+  // On the "host" side (STUB_REMOTE) the clock can run STUB_CLOCK_OFFSET_MS ahead, and the
+  // answer can be held STUB_CLOCK_HOLD_MS after the timestamp was read.
+  date:
+    '#!/bin/sh\nif [ "${1:-}" = "+%s%3N" ]; then\n' +
+    '  if [ -n "${STUB_REMOTE:-}" ]; then node -e "const t=Date.now()+Number(process.env.STUB_CLOCK_OFFSET_MS||0);setTimeout(()=>console.log(t),Number(process.env.STUB_CLOCK_HOLD_MS||0))"\n' +
+    '  else node -e "console.log(Date.now())"; fi\nelse exec /bin/date "$@"; fi\n',
   nproc: '#!/bin/sh\necho 2\n',
 }
 
