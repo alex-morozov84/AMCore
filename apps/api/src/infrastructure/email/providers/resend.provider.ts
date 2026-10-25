@@ -50,8 +50,9 @@ export class ResendEmailProvider implements EmailProvider {
   readonly supportsDirectSecretFence = true as const
   private readonly resend: Resend
   readonly queuedEmail: QueuedEmailProvider = {
-    recipeVersion: 1,
+    recipeVersion: 2,
     provider: 'resend',
+    transportTimeoutMs: 30_000,
     scope: () => this.queuedScope(),
     send: (body, key, signal, beforeTransport) =>
       this.sendQueued(body, key, signal, beforeTransport),
@@ -122,7 +123,7 @@ export class ResendEmailProvider implements EmailProvider {
       .digest('hex')
     return createHash('sha256')
       .update(
-        JSON.stringify({ provider: 'resend', slot: 'RESEND_API_KEY', credential, recipeVersion: 1 })
+        JSON.stringify({ provider: 'resend', slot: 'RESEND_API_KEY', credential, recipeVersion: 2 })
       )
       .digest('hex')
   }

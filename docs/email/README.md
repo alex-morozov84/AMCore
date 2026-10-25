@@ -53,7 +53,7 @@ redact initial query tokens in ingress logs; see
 | Need                                                        | Use                                            |
 | ----------------------------------------------------------- | ---------------------------------------------- |
 | In-app feed, preferences, mandatory channels, retry history | `NotificationsService.notify()` / `notifyTx()` |
-| Non-secret transactional email with async retry             | `EmailService.queue()`                         |
+| Non-secret transactional email with bounded recovery        | `EmailService.queue()`                         |
 | Email with a token URL or other secret payload              | `EmailService.sendNow()`                       |
 | Worker adapter with already-rendered safe content           | `EmailService.send()`                          |
 
@@ -84,3 +84,7 @@ changes. The Console shows only closed codes, never the provider's own error tex
 - Auth email flows — [`docs/auth/email-auth.md`](../auth/email-auth.md)
 - Organization invites — [`docs/auth/invites.md`](../auth/invites.md)
 - Email source — [`apps/api/src/infrastructure/email/`](../../apps/api/src/infrastructure/email/)
+
+Welcome unknown results stop automatic recovery, including current Resend429 results.
+See [queued safety](queued-safety.md) and the [offline policy upgrade](queued-upgrade.md).
+Direct-secret and notification delivery retain their separate recovery contracts.

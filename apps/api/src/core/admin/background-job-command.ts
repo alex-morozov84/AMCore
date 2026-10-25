@@ -14,6 +14,7 @@ import { ProviderEvidenceStore } from '../../infrastructure/background-work/prov
 import { readQueueSnapshot } from '../../infrastructure/background-work/queue-snapshot.js'
 import { applyIdempotentCommand } from '../../infrastructure/background-work/scripts/idempotent-command.js'
 import { applyProviderWindowCommand } from '../../infrastructure/background-work/scripts/idempotent-command.js'
+import { usesProviderEvidence } from '../../infrastructure/background-work/work-definition.js'
 import { type WorkDefinition } from '../../infrastructure/background-work/work-definition.js'
 import { WorkPolicyError } from '../../infrastructure/background-work/work-policy-error.js'
 
@@ -81,7 +82,7 @@ export function ordinaryJobCommandPort(
             const snapshot = jobCommandSnapshot(definition, target.id, result.snapshot)
             const matches =
               snapshot.incarnation === target.incarnation &&
-              (snapshot.snapshot.replay === 'provider-window' ||
+              (usesProviderEvidence(snapshot.snapshot.replay) ||
                 result.snapshot.revision === target.revision)
             observed.push(
               matches
@@ -107,7 +108,7 @@ export function ordinaryJobCommandPort(
       for (const target of observations) {
         const snapshot = { ...target.snapshot }
         results.push({ ...target, snapshot })
-        if (snapshot.replay !== 'provider-window' || snapshot.preflightReason) continue
+        if (!usesProviderEvidence(snapshot.replay) || snapshot.preflightReason) continue
         if (!provider) {
           snapshot.preflightReason = 'ACTION_UNAVAILABLE'
           continue
@@ -132,7 +133,7 @@ export function ordinaryJobCommandPort(
             for (const target of observed) {
               const snapshot = { ...target.snapshot }
               results.push({ ...target, snapshot })
-              if (snapshot.replay !== 'provider-window' || snapshot.preflightReason) continue
+              if (!usesProviderEvidence(snapshot.replay) || snapshot.preflightReason) continue
               try {
                 const row = await provider.evidence.reserveControl(
                   ctx,
@@ -203,16 +204,15 @@ export function ordinaryJobCommandPort(
             : {}),
         }
         const policy = target.snapshot as Record<string, unknown>
-        const result =
-          policy.replay === 'provider-window'
-            ? await applyProviderWindowCommand(client, queue, request, {
-                revision: Number(policy.providerRevision),
-                digest: z.string().nullable().parse(policy.providerDigest),
-                scope: z.string().nullable().parse(policy.providerScope),
-                nominalDeadline: z.number().nullable().parse(policy.providerDeadline),
-                floorUpper: Number(policy.providerFloor),
-              })
-            : await applyIdempotentCommand(client, queue, request)
+        const result = usesProviderEvidence(policy.replay)
+          ? await applyProviderWindowCommand(client, queue, request, {
+              revision: Number(policy.providerRevision),
+              digest: z.string().nullable().parse(policy.providerDigest),
+              scope: z.string().nullable().parse(policy.providerScope),
+              nominalDeadline: z.number().nullable().parse(policy.providerDeadline),
+              floorUpper: Number(policy.providerFloor),
+            })
+          : await applyIdempotentCommand(client, queue, request)
         return result.status === 'applied'
           ? { state: 'applied' }
           : { state: 'rejected', reason: result.reason }

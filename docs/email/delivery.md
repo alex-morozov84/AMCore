@@ -42,7 +42,7 @@ Queued jobs are runtime-validated with Zod after Redis deserialization, use
 an incarnation-derived provider key and immutable request bytes. Finite retries
 must satisfy recorded certainty, cooldown and the original horizon. A recycled
 job ID does not renew an old delivery's window. See
-[queued safety and recovery](queued-safety.md) for clock assumptions, legacy handling
+[queued safety and recovery](queued-safety.md) for conservative recovery, legacy handling
 and independent evidence retention.
 
 ## Direct Secret Email
@@ -120,7 +120,13 @@ Providers implement `EmailProvider.send(params)` and
 `EmailProvider.sendPrepared(body, idempotencyKey, signal)` from `email.types.ts`.
 Direct email uses `send`; durable notification deliveries use `sendPrepared`.
 Queued email additionally requires the closed `queuedEmail` recipe port with
-frozen scope, certainty mapping and a synchronous actual-transport fence. The
+frozen scope, certainty mapping and a synchronous actual-transport fence.
+Recipe2 permits one recipient and one submission per attempt, with no hidden
+submission retries. Each adapter declares its own client timeout. A remote key,
+retention window and provider-clock qualification are not required for first send
+or authoritative-none recovery. Unknown welcome results stop; notification
+recovery remains separate. Passing an idempotency key does not establish a
+universal duplicate-prevention guarantee. No production SMTP adapter is included. The
 prepared notification port must send
 `body` unchanged with the required `idempotencyKey`, attach credentials at send
 time and propagate the live abort signal. Do not parse and re-render its content.
@@ -192,7 +198,8 @@ Use only retained languages and approved recipients. Include earlier bootstrap o
 provider-test messages separately unless they are the same actions counted below.
 Keep test accounts until their login, link-reuse and evidence checks are complete.
 
-Before triggering queued mail, satisfy the [clock prerequisites](queued-safety.md#retry-window-and-cooldown).
+Before triggering queued mail, review [uncertainty stops and cooldown](queued-safety.md#retry-window-and-cooldown).
+For an existing policy1 installation, complete the [offline upgrade](queued-upgrade.md) first.
 Arrange authorized worker/notification diagnostics; platform administration
 [requires explicit bootstrap authority](../auth/rbac.md#administering-super_admin).
 Account bootstrap mail also needs the approved budget above.

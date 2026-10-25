@@ -15,11 +15,16 @@ export type WorkKind = 'ordinary' | 'wake' | 'external' | 'durable'
 export type ReplayPolicy =
   | { readonly kind: 'idempotent'; readonly policyVersion: number }
   | {
-      readonly kind: 'provider-window'
+      readonly kind: 'provider-window' | 'conservative'
       readonly policyVersion: number
       readonly recipe: 'queued-email'
     }
   | { readonly kind: 'unsupported'; readonly policyVersion: number }
+
+/** These two closed recipes own durable external-effect evidence. */
+export function usesProviderEvidence(kind: unknown): kind is 'provider-window' | 'conservative' {
+  return kind === 'provider-window' || kind === 'conservative'
+}
 
 export interface JobBinding<
   S extends z.ZodType = z.ZodType,

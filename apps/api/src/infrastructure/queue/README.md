@@ -14,7 +14,7 @@ and provides shared read/control adapters. Do not add a second inventory entry,
 raw `@Processor`, custom administration controller or UI.
 
 Choose business idempotency for ordinary replayable jobs. Use the approved
-provider-window recipe for queued email. Durable work retains its database
+conservative recipe for queued welcome email. Durable work retains its database
 business authority and implements the common transactional adapter. Real
 notification/AI domain control adapters are separate extensions.
 

@@ -1,11 +1,18 @@
 import { performance } from 'node:perf_hooks'
 
-import { Inject, Injectable, type OnModuleInit, Optional } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+  Optional,
+} from '@nestjs/common'
 import type { Job, Queue } from 'bullmq'
 import { DelayedError, UnrecoverableError } from 'bullmq'
 import { z } from 'zod'
 
 import { readBoundedJob } from '../background-work/bounded-job-reader.js'
+import { assertConservativeAdmission } from '../background-work/conservative-evidence.js'
 import { ControlConnection } from '../background-work/control-connection.js'
 import { managedJobKey } from '../background-work/managed-job-key.js'
 import { parseManagedJob } from '../background-work/managed-job-profile.js'
@@ -21,6 +28,7 @@ import { readQueueSnapshot } from '../background-work/queue-snapshot.js'
 import { reportManagedInvocation } from '../background-work/scripts/invocation-report.js'
 import { deferProviderCooldown } from '../background-work/scripts/provider-defer.js'
 import { fenceProviderAttempt } from '../background-work/scripts/provider-fence.js'
+import { proveStaleProviderOwner } from '../background-work/scripts/stale-provider-owner.js'
 import type {
   WorkDefinition,
   WorkHandler,
@@ -36,6 +44,7 @@ import { WorkPolicyError } from '../background-work/work-policy-error.js'
 import { WorkReadiness } from '../background-work/work-readiness.js'
 import { type EmailMetricsTemplate, MetricsService } from '../observability/index.js'
 
+import { ConservativeCooldown } from './conservative-cooldown.js'
 import { type EmailProvider, EmailTemplate, SECRET_EMAIL_TEMPLATES } from './email.types.js'
 import { applyLegacyQueuedEmail, prepareLegacyQueuedEmail } from './legacy-queued-email.js'
 import type { QueuedEmailOutcome } from './queued-email-provider.js'
@@ -80,7 +89,14 @@ const pendingSchema = z.strictObject({
 
 /** Approved queued-email policy. Ordinary idempotent handlers do not enter this PG safety owner. */
 @Injectable()
-export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleInit {
+export class QueuedEmailExecution
+  implements ProviderWindowExecution, OnModuleInit, OnModuleDestroy
+{
+  private readonly cooldown = new ConservativeCooldown()
+
+  onModuleDestroy(): void {
+    this.cooldown.close()
+  }
   constructor(
     @Inject('EmailProvider') private readonly email: EmailProvider,
     private readonly evidence: ProviderEvidenceStore,
@@ -180,14 +196,26 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
     const startedAt = performance.now()
     try {
       this.readiness.assertReady()
-      if (!this.email.queuedEmail || !handler.prepareRequest)
+      if (
+        !this.email.queuedEmail ||
+        this.email.queuedEmail.recipeVersion !== 2 ||
+        !handler.prepareRequest
+      )
         throw new UnrecoverableError('ACTION_UNAVAILABLE')
       await this.execute(definition, queue, job, token, payload, handler)
       this.observeProcess(payload, 'success', undefined, startedAt)
     } catch (error) {
       // A cooldown deferral has no business attempt/result, and is not a failed send.
-      if (!(error instanceof DelayedError))
-        this.observeProcess(payload, 'error', !isPermanentWorkFailure(error), startedAt)
+      if (!(error instanceof DelayedError)) {
+        this.cooldown.forget(`${definition.id}:${job.data?.incarnation}`)
+        this.observeProcess(
+          payload,
+          'error',
+          !(error instanceof WorkPolicyError) && !isPermanentWorkFailure(error),
+          startedAt
+        )
+      }
+      if (error instanceof WorkPolicyError) throw new UnrecoverableError(error.reason)
       if (error instanceof WorkFailure) {
         if (error.permanent) throw new UnrecoverableError('PERMANENT_FAILURE')
         throw new Error('TRANSIENT_FAILURE')
@@ -261,20 +289,49 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
     if (!existing && observation.fields.amEvidenceInitialized)
       throw new UnrecoverableError('OUTCOME_UNRECORDED')
     if (existing?.certainty === 'accepted') return
-    if (existing && !existing.outcomeRecorded) throw new UnrecoverableError('OUTCOME_UNRECORDED')
-    if (existing?.floorUpper && existing.nominalDeadline) {
-      const deferred = await this.control.withClient((client) =>
-        deferProviderCooldown(client, queue, {
-          id: job.id!,
-          lockToken: token,
-          incarnation: envelope.incarnation,
-          revision: Number(observation.fields.amRevision ?? 0),
-          floorUpper: Number(existing!.floorUpper),
-          nominalDeadline: existing.nominalDeadline!.getTime(),
-        })
+    if (existing && !existing.outcomeRecorded) {
+      if (existing.activeAttemptId && existing.recipeVersion === 2) {
+        await this.evidence.recoverStale(
+          definition.id,
+          envelope.incarnation,
+          existing.revision,
+          () =>
+            this.control.withClient((client) =>
+              proveStaleProviderOwner(
+                client,
+                key,
+                token,
+                envelope.incarnation,
+                existing.activeAttemptId!
+              )
+            )
+        )
+        throw new UnrecoverableError('EFFECT_UNKNOWN')
+      }
+      throw new UnrecoverableError('OUTCOME_UNRECORDED')
+    }
+    if (existing) {
+      assertConservativeAdmission(existing)
+      const waitMs = this.cooldown.remaining(
+        `${definition.id}:${envelope.incarnation}`,
+        existing.cooldownRevision,
+        existing.cooldownDelayMs ?? 0
       )
-      if (deferred === 'deferred') throw new DelayedError()
-      if (deferred !== 'eligible') throw new UnrecoverableError(deferred.reason)
+      if (waitMs > 0) {
+        const deferred = await this.control.withClient((client) =>
+          deferProviderCooldown(client, queue, {
+            id: job.id!,
+            lockToken: token,
+            incarnation: envelope.incarnation,
+            revision: Number(observation.fields.amRevision ?? 0),
+            floorUpper: 0,
+            nominalDeadline: 0,
+            waitMs,
+          })
+        )
+        if (deferred === 'deferred') throw new DelayedError()
+        throw new UnrecoverableError(deferred === 'eligible' ? 'STATE_CHANGED' : deferred.reason)
+      }
     }
     const scope = provider.scope()
     const identity = { incarnation: envelope.incarnation, lockToken: token, providerScope: scope }
@@ -315,6 +372,7 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
         jobName: job.name,
         wireVersion: envelope.jobVersion,
         policyVersion: envelope.executionPolicyVersion,
+        cooldownRevision: existing?.cooldownRevision ?? 0,
         automaticLimit: z
           .number()
           .int()
@@ -329,7 +387,7 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
         if (
           !(error instanceof WorkPolicyError) ||
           error.reason !== 'COMMAND_CONFLICT' ||
-          !existing?.nominalDeadline ||
+          !existing ||
           existing.manualGrant !== 'reserved' ||
           existing.commandFence !== observation.fields.amManualCommandId
         )
@@ -341,7 +399,8 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
             incarnation: envelope.incarnation,
             revision: Number(observation.fields.amRevision ?? 0),
             floorUpper: Number(existing.floorUpper),
-            nominalDeadline: existing.nominalDeadline!.getTime(),
+            nominalDeadline: existing.nominalDeadline?.getTime() ?? 0,
+            ...(existing.recipeVersion === 2 ? { waitMs: 1000 } : {}),
             commandId: existing.commandFence!,
           })
         )
@@ -394,7 +453,7 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
         pgTime: attempt.pgTime,
         beforeEval,
         beforePg,
-        nominalDeadline: attempt.row.nominalDeadline!.getTime(),
+        nominalDeadline: attempt.row.nominalDeadline?.getTime() ?? 0,
         floorUpper: Number(attempt.row.floorUpper),
       }
     }
@@ -458,7 +517,9 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
           ? handlerFailure.permanent
             ? 'PERMANENT_FAILURE'
             : 'TRANSIENT_FAILURE'
-          : outcome!.code,
+          : outcome!.certainty === 'unknown'
+            ? 'EFFECT_UNKNOWN'
+            : outcome!.code,
         failureCode: handlerFailure ? workFailureCode(definition, handlerFailure) : undefined,
       })
     )
@@ -469,7 +530,19 @@ export class QueuedEmailExecution implements ProviderWindowExecution, OnModuleIn
       kind: 'reported',
       brokerRevision: witness.revision,
     })
+    if (outcome.certainty === 'unknown') throw new UnrecoverableError('EFFECT_UNKNOWN')
+    if (outcome.certainty === 'none' && existing?.unresolvedCount)
+      throw new UnrecoverableError('EFFECT_UNKNOWN')
+    if (
+      outcome.retryAfter &&
+      (outcome.retryAfter.kind !== 'duration' ||
+        !Number.isSafeInteger(outcome.retryAfter.milliseconds) ||
+        outcome.retryAfter.milliseconds < 0 ||
+        outcome.retryAfter.milliseconds > 86400000)
+    )
+      throw new UnrecoverableError('CONTENT_UNSUPPORTED')
     if (handlerFailure) throw handlerFailure
+    this.cooldown.forget(`${definition.id}:${envelope.incarnation}`)
     if (outcome.certainty !== 'accepted') {
       if (!outcome.retryable) throw new UnrecoverableError(outcome.code)
       throw new Error(outcome.code)

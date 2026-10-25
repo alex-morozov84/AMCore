@@ -1,29 +1,26 @@
 import { once } from 'node:events'
-import { performance } from 'node:perf_hooks'
 
 import { jest } from '@jest/globals'
 import { ConfigService } from '@nestjs/config'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
-import { DelayedError, Queue, Worker } from 'bullmq'
+import { Queue, Worker } from 'bullmq'
 import type { Redis } from 'ioredis'
 import type { PinoLogger } from 'nestjs-pino'
 import { v7 as uuidv7 } from 'uuid'
 import { z } from 'zod'
 
 import { EnvService } from '../src/env/env.service'
-import { type Prisma, PrismaClient } from '../src/generated/prisma/client'
+import { PrismaClient } from '../src/generated/prisma/client'
 import { ControlConnection } from '../src/infrastructure/background-work/control-connection'
+import { backgroundControlTransaction } from '../src/infrastructure/background-work/control-transaction'
 import { managedProcessor } from '../src/infrastructure/background-work/managed-processor'
 import { ManagedProducer } from '../src/infrastructure/background-work/managed-producer'
 import { PgOutcomeBuffer } from '../src/infrastructure/background-work/pg-outcome-buffer'
-import { preparedBody } from '../src/infrastructure/background-work/prepared-body.store'
 import { ProviderEvidenceStore } from '../src/infrastructure/background-work/provider-evidence.store'
-import { PROVIDER_WINDOW_CLOCK } from '../src/infrastructure/background-work/provider-window-clock'
 import { initializeManagedQueue } from '../src/infrastructure/background-work/scripts/initialize-queue'
-import { PROVIDER_DEFER_LUA } from '../src/infrastructure/background-work/scripts/provider-defer.lua'
-import { PROVIDER_FENCE_LUA } from '../src/infrastructure/background-work/scripts/provider-fence.lua'
+import { proveStaleProviderOwner } from '../src/infrastructure/background-work/scripts/stale-provider-owner'
 import {
   defineOrdinaryWork,
   type WorkHandler,
@@ -36,6 +33,8 @@ import { EmailTemplate } from '../src/infrastructure/email/email.types'
 import { emailWork } from '../src/infrastructure/email/email.work'
 import { MockEmailProvider } from '../src/infrastructure/email/providers/mock.provider'
 import { QueuedEmailExecution } from '../src/infrastructure/email/queued-email-execution'
+import { upgradeWelcomeJob } from '../src/infrastructure/email/upgrade-welcome-job'
+import { welcomeUpgradeInventory } from '../src/infrastructure/email/welcome-upgrade-inventory'
 import type { MetricsService } from '../src/infrastructure/observability'
 import { DEFAULT_JOB_OPTIONS } from '../src/infrastructure/queue/interfaces/job-options.interface'
 import { buildBullConnection } from '../src/infrastructure/queue/redis-connection.config'
@@ -52,7 +51,7 @@ const definition = defineOrdinaryWork({
     send: {
       wireVersion: 1,
       schema: z.strictObject({ reference: z.string() }),
-      replay: { kind: 'provider-window', policyVersion: 1, recipe: 'queued-email' },
+      replay: { kind: 'conservative', policyVersion: 2, recipe: 'queued-email' },
       project: (payload: { reference: string }) => ({ reference: payload.reference }),
       retention: { completedMs: 3600000, failedMs: 86400000 },
     },
@@ -111,478 +110,6 @@ describe('Queued-email immutable request and independent provider evidence', () 
     await broker?.stop()
     await postgres?.stop()
   }, 60_000)
-
-  it.each([
-    {
-      name: 'opposite initial/current offsets: horizon equality',
-      gap: 98000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      calls: 0,
-      reason: 'HORIZON_EXPIRED',
-    },
-    {
-      name: 'opposite initial/current offsets: horizon plus 1ms',
-      gap: 98001,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      calls: 1,
-    },
-    {
-      name: 'worker upper bound wins at equality',
-      gap: 98000,
-      initial: -2000,
-      pg: -2000,
-      broker: -2000,
-      wall: 2000,
-      calls: 0,
-      reason: 'CLOCK_UNCERTAIN',
-      refences: 1,
-    },
-    {
-      name: 'worker upper bound wins with 1ms remaining',
-      gap: 98001,
-      initial: -2000,
-      pg: -2000,
-      broker: -2000,
-      wall: 2000,
-      calls: 1,
-    },
-    {
-      name: 'Redis upper bound wins with 1ms remaining',
-      gap: 98001,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: -2000,
-      calls: 1,
-    },
-    {
-      name: 'freshness 999ms',
-      gap: 99001,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      age: 999,
-      calls: 1,
-    },
-    {
-      name: 'inclusive freshness 1000ms',
-      gap: 99001,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      age: 1000,
-      calls: 1,
-    },
-    {
-      name: 'stale twice at 1001ms',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      age: 1001,
-      calls: 0,
-      reason: 'CLOCK_UNCERTAIN',
-    },
-    {
-      name: 'same-attempt fresh refence after 1001ms',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      age: 1001,
-      freshRefence: true,
-      calls: 1,
-    },
-    {
-      name: 'floor cannot call 1ms early after offset change',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      floorOffset: -2000,
-      advance: -1,
-      calls: 0,
-      reason: 'DEFERRED',
-    },
-    {
-      name: 'inclusive real floor after offset change',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      floorOffset: -2000,
-      advance: 0,
-      calls: 1,
-    },
-    {
-      name: 'opposite floor offsets remain conservative at 7999ms',
-      gap: 200000,
-      initial: 2000,
-      pg: -2000,
-      broker: -2000,
-      wall: -2000,
-      floorOffset: 2000,
-      advance: 7999,
-      calls: 0,
-      reason: 'DEFERRED',
-    },
-    {
-      name: 'opposite floor offsets admit at 8000ms',
-      gap: 200000,
-      initial: 2000,
-      pg: -2000,
-      broker: -2000,
-      wall: -2000,
-      floorOffset: 2000,
-      advance: 8000,
-      calls: 1,
-    },
-    {
-      name: 'ambiguous applied broker fence',
-      gap: 200000,
-      initial: -2000,
-      pg: 0,
-      broker: 0,
-      wall: 0,
-      ambiguous: true,
-      calls: 0,
-      reason: 'WORK_UNAVAILABLE',
-    },
-    {
-      name: 'failed same-attempt PG refence',
-      gap: 200000,
-      initial: -2000,
-      pg: 0,
-      broker: 0,
-      wall: 0,
-      age: 1001,
-      failRefence: true,
-      calls: 0,
-      reason: 'INJECTED_REFENCE_FAILURE',
-    },
-    {
-      name: 'absolute date floor 1ms early',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      floorOffset: -2000,
-      absolute: true,
-      advance: -1,
-      calls: 0,
-      reason: 'DEFERRED',
-    },
-    {
-      name: 'absolute date floor equality',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      floorOffset: -2000,
-      absolute: true,
-      calls: 1,
-    },
-    {
-      name: 'Retry-After beyond 24h remains beyond horizon',
-      gap: 200000,
-      initial: -2000,
-      pg: 0,
-      broker: 0,
-      wall: 0,
-      floorOffset: 0,
-      duration: 86400001,
-      calls: 0,
-      reason: 'HORIZON_EXPIRED',
-    },
-    {
-      name: 'unsupported Retry-After never grants another possible call',
-      gap: 200000,
-      initial: -2000,
-      pg: 0,
-      broker: 0,
-      wall: 0,
-      unsupported: true,
-      calls: 0,
-      reason: 'CLOCK_UNCERTAIN',
-    },
-    {
-      name: 'elapsed rounding 999.01ms remains within ceiling',
-      gap: 99001,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      age: 999.01,
-      calls: 1,
-    },
-    {
-      name: 'elapsed rounding 1000.01ms is stale',
-      gap: 200000,
-      initial: -2000,
-      pg: 2000,
-      broker: 2000,
-      wall: 2000,
-      age: 1000.01,
-      calls: 0,
-      reason: 'CLOCK_UNCERTAIN',
-    },
-    {
-      name: 'PG/Redis skew beyond contract',
-      gap: 200000,
-      initial: -2000,
-      pg: -2000,
-      broker: 2000,
-      wall: 2000,
-      calls: 0,
-      reason: 'CLOCK_UNCERTAIN',
-    },
-  ])(
-    'runs an actual worker with independent clock injection: $name',
-    async (example) => {
-      // Only clock sources are injected: real PG transactions, Redis Lua predicates,
-      // stock worker claims and the production email execution/transport owners run.
-      const producer = new ManagedProducer(definition, queue, readiness)
-      const identity = await producer.add('send', { reference: 'clock-fixture' }, { attempts: 3 })
-      const anchor = Date.now()
-      let elapsed = example.advance ?? 0
-      let phase: 'initial' | 'floor' | 'current' = 'initial'
-      const pgNow = (): number =>
-        phase === 'initial'
-          ? anchor - PROVIDER_WINDOW_CLOCK.providerDedupHorizonMs + example.gap + example.initial
-          : phase === 'floor'
-            ? anchor - 60000 + (example.floorOffset ?? 0)
-            : anchor + elapsed + example.pg
-      const clockedDb = new Proxy(prisma, {
-        get(target, property) {
-          if (property !== '$transaction') return Reflect.get(target, property)
-          return <T>(
-            action: (tx: Prisma.TransactionClient) => Promise<T>,
-            options?: { timeout?: number; maxWait?: number }
-          ) =>
-            target.$transaction(
-              (tx) =>
-                action(
-                  new Proxy(tx, {
-                    get(transaction, key) {
-                      if (key !== '$queryRaw') return Reflect.get(transaction, key)
-                      return (parts: TemplateStringsArray, ...values: unknown[]) =>
-                        parts.join('').trim() === 'SELECT clock_timestamp() AS now'
-                          ? Promise.resolve([{ now: new Date(pgNow()) }])
-                          : transaction.$queryRaw(parts, ...values)
-                    },
-                  })
-                ),
-              options
-            )
-        },
-      })
-      const clockedEvidence = new ProviderEvidenceStore(clockedDb as unknown as PrismaService)
-      const rawWithClient = control.withClient.bind(control)
-      const lease = jest.spyOn(control, 'withClient').mockImplementation((action) =>
-        rawWithClient((client) =>
-          action(
-            new Proxy(client, {
-              get(target, property) {
-                if (property !== 'eval') {
-                  const value = Reflect.get(target, property)
-                  return typeof value === 'function' ? value.bind(target) : value
-                }
-                return (script: string, keys: number, ...args: (string | number)[]) => {
-                  const loseReply = example.ambiguous && script === PROVIDER_FENCE_LUA
-                  if (script === PROVIDER_FENCE_LUA || script === PROVIDER_DEFER_LUA) {
-                    const sample = Math.floor(anchor + elapsed + example.broker)
-                    script = script.replace(
-                      "local time = redis.call('TIME')",
-                      `local time = {'${Math.floor(sample / 1000)}','${(sample % 1000) * 1000}'}`
-                    )
-                  }
-                  const result = target.eval(script, keys, ...args)
-                  return loseReply
-                    ? result.then(() => {
-                        throw new Error('INJECTED_FENCE_REPLY_LOSS')
-                      })
-                    : result
-                }
-              },
-            })
-          )
-        )
-      )
-      const wall = jest
-        .spyOn(Date, 'now')
-        .mockImplementation(() => Math.floor(anchor + elapsed + example.wall))
-      const monotonic = jest.spyOn(performance, 'now').mockImplementation(() => 10000 + elapsed)
-      let calls = 0
-      let entrances = 0
-      let storedDeadline = 0
-      let storedFirst = 0
-      let finishedAt = 0
-      let executionFailure: string | undefined
-      const refences = jest.spyOn(clockedEvidence, 'refence')
-      if (example.failRefence) refences.mockRejectedValue(new Error('INJECTED_REFENCE_FAILURE'))
-      const email: EmailProvider = {
-        send: async () => {
-          throw new Error('DIRECT_SEND_FORBIDDEN')
-        },
-        sendPrepared: async () => {
-          throw new Error('DIRECT_SEND_FORBIDDEN')
-        },
-        queuedEmail: {
-          provider: 'mock',
-          recipeVersion: 1,
-          scope: () => 'a'.repeat(64),
-          send: async (body, key, _signal, beforeTransport) => {
-            elapsed += example.freshRefence && entrances > 0 ? 0 : (example.age ?? 0)
-            entrances += 1
-            beforeTransport()
-            if (body !== '{"frozen":true}' || key !== `email:${identity.incarnation}`)
-              throw new Error('FROZEN_REQUEST_CHANGED')
-            calls += 1
-            // Virtual time covers the complete accepted S1s/T30s hard allowances.
-            elapsed += 31000
-            finishedAt = anchor + elapsed
-            return { certainty: 'accepted', retryable: false, code: 'COMPLETED' }
-          },
-        },
-      }
-      const policy = new QueuedEmailExecution(email, clockedEvidence, control, buffer, readiness)
-      const execution = new WorkExecutionService(readiness, policy)
-      let done!: () => void
-      const ran = new Promise<void>((resolve) => {
-        done = resolve
-      })
-      const worker = new Worker(
-        queue.name,
-        async (job, token) => {
-          try {
-            const frozen = await rawWithClient((client) =>
-              preparedBody(
-                client,
-                queue,
-                job.id!,
-                {
-                  incarnation: identity.incarnation,
-                  lockToken: token!,
-                  providerScope: 'a'.repeat(64),
-                },
-                '{"frozen":true}'
-              )
-            )
-            if (frozen.status !== 'prepared') throw new Error('PREPARATION_FAILED')
-            const seed = await clockedEvidence.reserve({
-              workId: definition.id,
-              incarnation: identity.incarnation,
-              jobId: identity.jobId,
-              queueEpoch: (await redis.hget(queue.toKey('meta'), 'amQueueEpoch'))!,
-              jobName: 'send',
-              wireVersion: 1,
-              policyVersion: 1,
-              automaticLimit: 3,
-              requestDigest: frozen.digest,
-              providerScope: frozen.providerScope,
-            })
-            if ('accepted' in seed) throw new Error('INVALID_SEED')
-            storedDeadline = seed.row.nominalDeadline!.getTime()
-            storedFirst = seed.row.firstDispatchAt!.getTime()
-            if (example.floorOffset !== undefined) phase = 'floor'
-            await clockedEvidence.finalize(
-              seed,
-              {
-                certainty: 'none',
-                code: 'NO_CALL',
-                ...(example.unsupported
-                  ? { retryAfter: { kind: 'unsupported' as const } }
-                  : example.floorOffset !== undefined
-                    ? {
-                        retryAfter: example.absolute
-                          ? { kind: 'absolute' as const, timestamp: anchor + example.floorOffset }
-                          : { kind: 'duration' as const, milliseconds: example.duration ?? 60000 },
-                      }
-                    : {}),
-              },
-              {
-                incarnation: identity.incarnation,
-                attemptId: seed.attemptId,
-                kind: 'denied-before-call',
-              }
-            )
-            phase = 'current'
-            await execution.run(definition, queue, job, token!, {
-              prepareRequest: async () => {
-                throw new Error('REQUEST_RERENDERED')
-              },
-              run: async (_payload, invocation) => {
-                await invocation.effect!.send()
-              },
-            })
-          } catch (error) {
-            executionFailure = error instanceof DelayedError ? 'DEFERRED' : (error as Error).message
-            throw error
-          } finally {
-            done()
-          }
-        },
-        {
-          prefix: 'amcore',
-          connection: buildBullConnection(broker.getConnectionUrl()),
-          autorun: false,
-        }
-      )
-      workers.push(worker)
-      worker.on('error', () => undefined)
-      try {
-        void worker.run().catch(() => undefined)
-        await ran
-        await worker.pause()
-        expect(calls).toBe(example.calls)
-        expect(executionFailure).toBe(example.reason)
-        const row = await evidence.read(definition.id, identity.incarnation)
-        expect(row?.nominalDeadline?.getTime()).toBe(storedDeadline)
-        expect(row?.firstDispatchAt?.getTime()).toBe(storedFirst)
-        expect(row?.manualGrant).toBe('none')
-        expect(row?.autoStartsUsed).toBeLessThanOrEqual(2)
-        expect(refences.mock.calls.length).toBe(
-          example.refences ?? ((example.age ?? 0) > 1000 ? 1 : 0)
-        )
-        expect(row?.outcomeRecorded).toBe(!example.failRefence)
-        expect(row?.certainty).toBe(
-          example.failRefence ? 'unknown' : example.calls ? 'accepted' : 'none'
-        )
-        for (const [attempt] of refences.mock.calls) {
-          expect(attempt.row.firstDispatchAt?.getTime()).toBe(storedFirst)
-          expect(attempt.row.nominalDeadline?.getTime()).toBe(storedDeadline)
-          expect(attempt.row.autoStartsUsed).toBe(2)
-          expect(await redis.hget(queue.toKey(identity.jobId), 'amEffectAttempt')).toBe(
-            attempt.attemptId
-          )
-        }
-        if (example.calls === 1) {
-          if (storedDeadline - example.initial - finishedAt <= 59000)
-            throw new Error('RESERVED_SAFETY_MARGIN_LOST')
-        }
-      } finally {
-        lease.mockRestore()
-        wall.mockRestore()
-        monotonic.mockRestore()
-        refences.mockRestore()
-      }
-    },
-    30000
-  )
 
   it('completes legacy and enveloped secret-bearing jobs before validation/render/provider admission', async () => {
     let businessCalls = 0
@@ -657,7 +184,7 @@ describe('Queued-email immutable request and independent provider evidence', () 
     expect(await (await queue.getJob('enveloped-secret'))!.getState()).toBe('completed')
   })
 
-  it('adopts only a first-start legacy WELCOME and quarantines previously started work without rendering or sending it', async () => {
+  it('quarantines raw legacy WELCOME even on its first current claim without implicit v2 admission', async () => {
     const legacyDefinition = { ...emailWork, queue: { ...emailWork.queue!, name: queue.name } }
     await initializeManagedQueue(redis, queue.toKey('meta'))
     let renders = 0
@@ -671,7 +198,8 @@ describe('Queued-email immutable request and independent provider evidence', () 
       },
       queuedEmail: {
         provider: 'mock',
-        recipeVersion: 1,
+        recipeVersion: 2,
+        transportTimeoutMs: 30000,
         scope: () => 'a'.repeat(64),
         send: async (_body, key, _signal, beforeTransport) => {
           beforeTransport()
@@ -732,18 +260,18 @@ describe('Queued-email immutable request and independent provider evidence', () 
     void worker.run().catch(() => undefined)
     expect(await outcomes).toEqual(
       new Map([
-        ['legacy-fresh', 'completed'],
+        ['legacy-fresh', 'EFFECT_UNKNOWN'],
         ['legacy-started', 'EFFECT_UNKNOWN'],
         ['legacy-malformed', 'PERMANENT_FAILURE'],
         ['legacy-unsupported', 'CONTENT_UNSUPPORTED'],
       ])
     )
-    expect(renders).toBe(1)
+    expect(renders).toBe(0)
     const fresh = (await queue.getJob('legacy-fresh'))!
-    expect(requests).toEqual([`email:${fresh.data.incarnation}`])
+    expect(requests).toEqual([])
     expect(await evidence.read('email', fresh.data.incarnation)).toMatchObject({
-      certainty: 'accepted',
-      autoStartsUsed: 1,
+      certainty: 'unknown',
+      autoStartsUsed: 0,
     })
     const started = (await queue.getJob('legacy-started'))!
     expect(await evidence.read('email', started.data.incarnation)).toMatchObject({
@@ -960,7 +488,8 @@ describe('Queued-email immutable request and independent provider evidence', () 
       },
       queuedEmail: {
         provider: 'mock',
-        recipeVersion: 1,
+        recipeVersion: 2,
+        transportTimeoutMs: 30000,
         scope: () => 'a'.repeat(64),
         send: async (body, _key, _signal, beforeTransport) => {
           beforeTransport()
@@ -1024,7 +553,7 @@ describe('Queued-email immutable request and independent provider evidence', () 
     await completed
     expect(claims).toBeGreaterThanOrEqual(3)
     expect(calls).toHaveLength(2)
-    expect(calls[1]! - calls[0]!).toBeGreaterThanOrEqual(4010)
+    expect(calls[1]! - calls[0]!).toBeGreaterThanOrEqual(2000)
     expect(bodies).toEqual(['{"cooldown":true}', '{"cooldown":true}'])
     expect(renders).toBe(1)
     expect(await evidence.read(definition.id, identity.incarnation)).toMatchObject({
@@ -1062,7 +591,8 @@ describe('Queued-email immutable request and independent provider evidence', () 
         },
         queuedEmail: {
           provider: 'mock',
-          recipeVersion: 1,
+          recipeVersion: 2,
+          transportTimeoutMs: 30000,
           scope: () => 'a'.repeat(64),
           send: async (_body, _key, _signal, beforeTransport) => {
             beforeTransport()
@@ -1103,7 +633,13 @@ describe('Queued-email immutable request and independent provider evidence', () 
       const failed = once(worker, 'failed')
       void worker.run().catch(() => undefined)
       const [, error] = await failed
-      expect(error.message).toBe(permanent ? 'PERMANENT_FAILURE' : 'TRANSIENT_FAILURE')
+      expect(error.message).toBe(
+        certainty === 'unknown'
+          ? 'EFFECT_UNKNOWN'
+          : permanent
+            ? 'PERMANENT_FAILURE'
+            : 'TRANSIENT_FAILURE'
+      )
       expect(calls).toBe(expectedCalls)
       expect(await evidence.read(work.id, identity.incarnation)).toMatchObject({
         certainty,
@@ -1135,12 +671,13 @@ describe('Queued-email immutable request and independent provider evidence', () 
         },
         queuedEmail: {
           provider: 'mock',
-          recipeVersion: 1,
+          recipeVersion: 2,
+          transportTimeoutMs: 30000,
           scope: () => scope,
           send: async (_body, _key, _signal, beforeTransport) => {
             beforeTransport()
             calls += 1
-            return { certainty: 'unknown', retryable: true, code: 'TRANSIENT_FAILURE' }
+            return { certainty: 'none', retryable: true, code: 'TRANSIENT_FAILURE' }
           },
         },
       }
@@ -1182,8 +719,8 @@ describe('Queued-email immutable request and independent provider evidence', () 
             await worker.pause(true)
             const beforeFault = await evidence.read(definition.id, identity.incarnation)
             if (
-              beforeFault?.certainty !== 'unknown' ||
-              beforeFault.unresolvedCount !== 1 ||
+              beforeFault?.certainty !== 'none' ||
+              beforeFault.unresolvedCount !== 0 ||
               beforeFault.autoStartsUsed !== 1
             )
               throw new Error('MISSING_PROTECTED_UNCERTAINTY')
@@ -1201,8 +738,8 @@ describe('Queued-email immutable request and independent provider evidence', () 
       expect(renders).toBe(1)
       expect(await redis.hget(queue.toKey(identity.jobId), 'amEvidenceInitialized')).toBe('1')
       const retainedUncertainty = expect.objectContaining({
-        certainty: 'unknown',
-        unresolvedCount: 1,
+        certainty: 'none',
+        unresolvedCount: 0,
         autoStartsUsed: 1,
       })
       expect(await evidence.read(definition.id, identity.incarnation)).toEqual(
@@ -1211,90 +748,316 @@ describe('Queued-email immutable request and independent provider evidence', () 
     }
   )
 
-  it('retries an acknowledged-unknown effect with the same frozen body/key and accepts exactly once', async () => {
-    const accepted = new Map<string, string>()
-    const requests: Array<{ key: string; body: string }> = []
-    let renders = 0
-    const email: EmailProvider = {
+  it('stops after an unknown outcome despite remaining native retries and provider dedup', async () => {
+    let calls = 0
+    const provider: EmailProvider = {
       send: async () => {
-        throw new Error('DIRECT_SEND_FORBIDDEN')
+        throw new Error('FORBIDDEN')
       },
       sendPrepared: async () => {
-        throw new Error('DIRECT_SEND_FORBIDDEN')
+        throw new Error('FORBIDDEN')
       },
       queuedEmail: {
         provider: 'mock',
-        recipeVersion: 1,
+        recipeVersion: 2,
+        transportTimeoutMs: 30000,
         scope: () => 'a'.repeat(64),
-        send: async (body, key, _signal, beforeTransport) => {
-          beforeTransport()
-          requests.push({ key, body })
-          if (!accepted.has(key)) {
-            accepted.set(key, body)
-            return { certainty: 'unknown', retryable: true, code: 'TRANSIENT_FAILURE' }
+        send: async (_body, _key, _signal, admit) => {
+          admit()
+          calls += 1
+          return {
+            certainty: 'unknown',
+            retryable: true,
+            code: 'RATE_LIMITED',
+            retryAfter: { kind: 'unsupported' },
           }
-          if (accepted.get(key) !== body) throw new Error('BODY_CHANGED')
-          return { certainty: 'accepted', retryable: false, code: 'COMPLETED' }
         },
       },
     }
-    const observeEmailOperation = jest.fn()
-    const policy = new QueuedEmailExecution(email, evidence, control, buffer, readiness, {
-      observeEmailOperation,
-    } as unknown as MetricsService)
+    const policy = new QueuedEmailExecution(provider, evidence, control, buffer, readiness)
     policy.onModuleInit()
     const execution = new WorkExecutionService(readiness, policy)
-    const handler: WorkHandler = {
-      prepareRequest: async () => {
-        renders += 1
-        return JSON.stringify({ render: renders })
-      },
-      run: async (_payload, context) => {
-        await context.effect!.send()
-      },
-    }
-    for (let index = 0; index < 2; index += 1) {
-      const worker = new Worker(
-        'email-fixture',
-        async (job, token) => execution.run(definition, queue, job, token!, handler),
-        {
-          prefix: 'amcore',
-          connection: buildBullConnection(broker.getConnectionUrl()),
-          autorun: false,
-        }
-      )
-      worker.on('error', () => undefined)
-      workers.push(worker)
-    }
-    const completed = Promise.race(workers.map((worker) => once(worker, 'completed')))
-    const producer = new ManagedProducer(definition, queue, readiness)
-    const identity = await producer.add(
+    const identity = await new ManagedProducer(definition, queue, readiness).add(
       'send',
-      { reference: 'welcome' },
-      { jobId: 'email-job', attempts: 2 }
+      { reference: 'unknown' },
+      { attempts: 3 }
     )
-    await Promise.all(workers.map((worker) => worker.waitUntilReady()))
-    for (const worker of workers) void worker.run().catch(() => undefined)
-    await completed
-    expect(renders).toBe(1)
-    expect(accepted.size).toBe(1)
-    expect(requests).toEqual(
-      Array.from({ length: 2 }, () => ({
-        key: `email:${identity.incarnation}`,
-        body: '{"render":1}',
-      }))
+    const worker = new Worker(
+      queue.name,
+      (job, token) =>
+        execution.run(definition, queue, job, token!, {
+          prepareRequest: async () => '{}',
+          run: async (_payload, ctx) => ctx.effect!.send(),
+        }),
+      {
+        prefix: 'amcore',
+        connection: buildBullConnection(broker.getConnectionUrl()),
+        autorun: false,
+      }
     )
-    expect(await evidence.read(definition.id, identity.incarnation)).toMatchObject({
-      certainty: 'accepted',
-      outcomeRecorded: true,
-      unresolvedCount: 0,
-      autoStartsUsed: 2,
+    workers.push(worker)
+    const failed = once(worker, 'failed')
+    void worker.run().catch(() => undefined)
+    const [job, error] = await failed
+    expect(error.message).toBe('EFFECT_UNKNOWN')
+    expect(await job.getState()).toBe('failed')
+    expect(calls).toBe(1)
+    const row = await evidence.read(definition.id, identity.incarnation)
+    expect(row).toMatchObject({
+      certainty: 'unknown',
+      unresolvedCount: 1,
+      autoStartsUsed: 1,
+      cooldownSupported: false,
+      recipeVersion: 2,
+      nominalDeadline: null,
     })
-    const budget = await prisma.backgroundBudget.findUniqueOrThrow({ where: { key: 'global' } })
-    expect(budget.unresolvedRows).toBe(0)
-    expect(observeEmailOperation.mock.calls.map(([labels]) => labels)).toEqual([
-      expect.objectContaining({ operation: 'process', result: 'error', retryable: 'true' }),
-      expect.objectContaining({ operation: 'process', result: 'success', retryable: 'unknown' }),
+    expect(evidence.controlReason(row, 'retry', Date.now())).toBe('EFFECT_UNKNOWN')
+    // Adversarial stock requeue cannot bypass PG authority, even when native attempts reset.
+    await worker.pause(true)
+    const refusedAgain = once(worker, 'failed')
+    await job.retry()
+    worker.resume()
+    const [, secondError] = await refusedAgain
+    expect(secondError.message).toBe('EFFECT_UNKNOWN')
+    expect(calls).toBe(1)
+    expect((await evidence.read(definition.id, identity.incarnation))!.autoStartsUsed).toBe(1)
+    expect(
+      (await prisma.backgroundBudget.findUniqueOrThrow({ where: { key: 'global' } })).unresolvedRows
+    ).toBe(1)
+    policy.onModuleDestroy()
+  })
+
+  async function reservedFixture() {
+    const identity = await new ManagedProducer(definition, queue, readiness).add('send', {
+      reference: 'evidence',
+    })
+    const input = {
+      workId: definition.id,
+      jobId: identity.jobId,
+      incarnation: identity.incarnation,
+      queueEpoch: (await redis.hget(queue.toKey('meta'), 'amQueueEpoch'))!,
+      jobName: 'send',
+      wireVersion: 1,
+      policyVersion: 2,
+      automaticLimit: 3,
+      requestDigest: 'a'.repeat(64),
+      providerScope: 'b'.repeat(64),
+      cooldownRevision: 0,
+    }
+    const result = await evidence.reserve(input)
+    if ('accepted' in result) throw new Error('UNEXPECTED_ACCEPTANCE')
+    return {
+      input,
+      attempt: result,
+      witness: {
+        incarnation: identity.incarnation,
+        attemptId: result.attemptId,
+        kind: 'reported' as const,
+        brokerRevision: 1,
+      },
+    }
+  }
+
+  it('retains aggregate unknown across unsupported delay, acknowledgment, compaction and late acceptance', async () => {
+    const { input, attempt, witness } = await reservedFixture()
+    await evidence.finalize(
+      attempt,
+      { certainty: 'unknown', code: 'RATE_LIMITED', retryAfter: { kind: 'unsupported' } },
+      witness
+    )
+    let row = (await evidence.read(input.workId, input.incarnation))!
+    expect(evidence.controlReason(row, 'retry', Date.now())).toBe('EFFECT_UNKNOWN')
+    await expect(
+      evidence.reserve({ ...input, cooldownRevision: row.cooldownRevision })
+    ).rejects.toThrow('EFFECT_UNKNOWN')
+    await backgroundControlTransaction(prisma as PrismaService, async (ctx) => {
+      await evidence.acknowledge(ctx, input.workId, input.jobId, {
+        incarnation: input.incarnation,
+        revision: row.revision,
+        disposition: 'acknowledged_unknown',
+        reason: 'Reviewed ambiguous attempt',
+        references: ['incident-fixture'],
+      })
+    })
+    await prisma.backgroundEffectEvidence.update({
+      where: { workId_incarnation: { workId: input.workId, incarnation: input.incarnation } },
+      data: { createdAt: new Date(Date.now() - 31 * 86400000) },
+    })
+    await backgroundControlTransaction(prisma as PrismaService, async (ctx) => {
+      expect(await evidence.purge(ctx, input.workId, input.incarnation)).toBe(false)
+      expect(await evidence.compactUnknown(ctx, input.workId, input.incarnation)).toBe(true)
+    })
+    row = (await evidence.read(input.workId, input.incarnation))!
+    expect(row).toMatchObject({
+      certainty: 'unknown',
+      disposition: 'acknowledged_unknown',
+      unresolvedCount: 1,
+      logicalBytes: 512,
+      autoStartsUsed: 1,
+      recipeVersion: 2,
+    })
+    await evidence.finalize(attempt, { certainty: 'accepted', code: 'COMPLETED' }, witness)
+    row = (await evidence.read(input.workId, input.incarnation))!
+    expect(row.certainty).toBe('accepted')
+    expect(row.unresolvedCount).toBe(0)
+    await evidence.finalize(attempt, { certainty: 'none', code: 'TRANSIENT_FAILURE' }, witness)
+    expect((await evidence.read(input.workId, input.incarnation))!.certainty).toBe('accepted')
+  })
+
+  it('does not grant v2 privileges to retained v1 or relabelled evidence', async () => {
+    const { input } = await reservedFixture()
+    await prisma.backgroundEffectEvidence.update({
+      where: { workId_incarnation: { workId: input.workId, incarnation: input.incarnation } },
+      data: {
+        policyVersion: 1,
+        recipeVersion: null,
+        activeAttemptId: null,
+        outcomeRecorded: true,
+        certainty: 'none',
+        unresolvedCount: 0,
+      },
+    })
+    await expect(evidence.reserve(input)).rejects.toThrow('VERSION_UNSUPPORTED')
+    const row = (await evidence.read(input.workId, input.incarnation))!
+    expect(evidence.controlReason(row, 'retry', Date.now())).toBe('VERSION_UNSUPPORTED')
+    await prisma.backgroundEffectEvidence.update({
+      where: { workId_incarnation: { workId: input.workId, incarnation: input.incarnation } },
+      data: { policyVersion: 2 },
+    })
+    await expect(evidence.reserve(input)).rejects.toThrow('VERSION_UNSUPPORTED')
+  })
+
+  it('requires revoked ownership proof before recovering or acknowledging an unrecorded v2 attempt', async () => {
+    const { input, attempt } = await reservedFixture()
+    expect(evidence.dispositionReason(attempt.row, Date.now() + 2 * 86400000)).toBe(
+      'OUTCOME_UNRECORDED'
+    )
+    await expect(
+      evidence.recoverStale(
+        input.workId,
+        input.incarnation,
+        attempt.row.revision,
+        async () => false
+      )
+    ).rejects.toThrow('OUTCOME_UNRECORDED')
+    expect((await evidence.read(input.workId, input.incarnation))!.activeAttemptId).toBe(
+      attempt.attemptId
+    )
+  })
+
+  it('converts only untouched v1 work offline, resumes idempotently and preserves old effects', async () => {
+    const old = {
+      ...emailWork,
+      queue: { ...emailWork.queue!, name: queue.name },
+      jobs: {
+        'send-email': {
+          ...emailWork.jobs['send-email'],
+          replay: {
+            kind: 'provider-window' as const,
+            policyVersion: 1,
+            recipe: 'queued-email' as const,
+          },
+        },
+      },
+    }
+    const payload = {
+      template: EmailTemplate.WELCOME as const,
+      to: 'fake@example.invalid',
+      data: { name: 'Fixture', email: 'fake@example.invalid' },
+    }
+    const fresh = await new ManagedProducer(old, queue, readiness).add('send-email', payload)
+    const started = await new ManagedProducer(old, queue, readiness).add('send-email', payload)
+    expect(await upgradeWelcomeJob(redis, prisma, queue, fresh.jobId, true)).toMatchObject({
+      status: 'blocked',
+      reason: 'ACTIVE_JOB',
+    })
+    await queue.pause()
+    await redis.hset(queue.toKey(started.jobId), 'ats', '1')
+    const prior = await redis.hget(queue.toKey(fresh.jobId), 'data')
+    expect(await upgradeWelcomeJob(redis, prisma, queue, fresh.jobId, false)).toEqual({
+      status: 'eligible',
+    })
+    expect(await redis.hget(queue.toKey(fresh.jobId), 'data')).toBe(prior)
+    expect(await upgradeWelcomeJob(redis, prisma, queue, fresh.jobId, true)).toMatchObject({
+      status: 'converted',
+      incarnation: fresh.incarnation,
+      fromPolicy: 1,
+      toPolicy: 2,
+    })
+    expect(await upgradeWelcomeJob(redis, prisma, queue, fresh.jobId, true)).toEqual({
+      status: 'already_v2',
+    })
+    expect(await prisma.backgroundEffectEvidence.count()).toBe(0)
+    const data = JSON.parse((await redis.hget(queue.toKey(fresh.jobId), 'data'))!)
+    expect(data).toMatchObject({
+      incarnation: fresh.incarnation,
+      executionPolicyVersion: 2,
+      payload,
+    })
+    expect(await upgradeWelcomeJob(redis, prisma, queue, started.jobId, true)).toMatchObject({
+      status: 'blocked',
+      reason: 'OUTCOME_UNRECORDED',
+    })
+    expect(
+      JSON.parse((await redis.hget(queue.toKey(started.jobId), 'data'))!).executionPolicyVersion
+    ).toBe(1)
+  })
+
+  it('recovers a stale v2 owner only after fencing proof and keeps late acceptance on the original attempt', async () => {
+    const { input, attempt, witness } = await reservedFixture()
+    const key = queue.toKey(input.jobId)
+    const token = 'replacement-owner'
+    await redis.set(`${key}:lock`, token, 'PX', 30000)
+    await redis.hset(
+      key,
+      'amIncarnation',
+      input.incarnation,
+      'amEffectAttempt',
+      attempt.attemptId,
+      'amMetadata',
+      JSON.stringify({ invocationId: attempt.attemptId, report: 'unrecorded' })
+    )
+    const proof = () =>
+      control.withClient((client) =>
+        proveStaleProviderOwner(client, key, token, input.incarnation, attempt.attemptId)
+      )
+    expect(await proof()).toBe(true)
+    await evidence.recoverStale(input.workId, input.incarnation, attempt.row.revision, proof)
+    const row = (await evidence.read(input.workId, input.incarnation))!
+    expect(row).toMatchObject({
+      certainty: 'unknown',
+      activeAttemptId: null,
+      outcomeRecorded: true,
+      autoStartsUsed: 1,
+      unresolvedCount: 1,
+    })
+    expect(evidence.dispositionReason(row, Date.now())).toBeUndefined()
+    await expect(evidence.refence(attempt)).rejects.toThrow('OUTCOME_UNRECORDED')
+    await evidence.finalize(attempt, { certainty: 'accepted', code: 'COMPLETED' }, witness)
+    expect((await evidence.read(input.workId, input.incarnation))!.certainty).toBe('accepted')
+  })
+
+  it('inventories trimmed PG uncertainty without loading message bodies', async () => {
+    const { input, attempt, witness } = await reservedFixture()
+    await evidence.finalize(attempt, { certainty: 'unknown', code: 'TRANSIENT_FAILURE' }, witness)
+    await redis.del(queue.toKey(input.jobId))
+    const inventory = await welcomeUpgradeInventory(redis, prisma, queue, '0')
+    // This fixture's work ID is deliberately separate from the production EMAIL inventory.
+    expect(inventory.evidence).toEqual([])
+    await prisma.backgroundEffectEvidence.update({
+      where: { workId_incarnation: { workId: input.workId, incarnation: input.incarnation } },
+      data: { workId: 'email' },
+    })
+    const retained = await welcomeUpgradeInventory(redis, prisma, queue, '0')
+    expect(retained.evidence).toEqual([
+      expect.objectContaining({
+        incarnation: input.incarnation,
+        jobId: input.jobId,
+        certainty: 'unknown',
+        recipeVersion: 2,
+      }),
     ])
+    expect(retained.nextEvidenceCursor).toBeNull()
+    expect(JSON.stringify(retained)).not.toContain('requestDigest')
   })
 })

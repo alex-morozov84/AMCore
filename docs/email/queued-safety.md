@@ -1,137 +1,108 @@
 # Queued email safety and recovery
 
-Queued email uses the registered `email` work and the approved provider-window
-recipe. Only explicitly queueable non-secret templates enter this path. Password
-reset, verification and invitation links stay in direct sends.
+Welcome email uses the registered `email` work and conservative queued recipe2.
+Verification, reset and invitation links use direct-secret sends. Password-change
+alerts use notification delivery. Those paths retain separate recovery contracts.
 
 ## Immutable request
 
-The worker validates the payload and renders once before its first possible send.
-It freezes the exact sender, recipient, subject, HTML, plaintext and reply-to bytes,
-their digest, provider scope/version and idempotency key `email:<incarnation>`.
-Retries reuse these bytes and key. Changing the deployed template, sender or
-credentials cannot silently replace the request.
+The worker renders before its first possible send. It freezes sender, recipient,
+subject, HTML, plaintext, reply-to, digest, provider scope and internal identity.
+The Resend adapter also forwards the stable key `email:<incarnation>`.
+A forwarded key alone does not establish safe replay for another transport.
 
-The private Redis body is bounded at128KiB. Its fixed quota is1,024 reservations
-and64MiB; expiry is at most24 hours from preparation. Expired/missing body refuses
-another send instead of re-rendering. PG retains only safety metadata and digests,
-not addresses, rendered bodies or credentials. Do not log or expose the private body.
-Eligible terminal cleanup atomically removes the matching incarnation's private
-body and its count, byte, expiry and size reservation. Capacity becomes available
-immediately. Cleanup never removes independent PG uncertainty or refunds a lifetime
-grant. Corrupt reservation accounting refuses before any write.
+The private Redis body is limited to128KiB,1,024 reservations and64MiB total.
+Its24-hour expiry is a local storage limit, not a provider retry guarantee.
+Missing or expired content refuses sending; an admitted request is never re-rendered.
+Changing the sender, credentials or template cannot replace a frozen request.
+PG stores safety metadata and digests, not recipients, bodies or credentials.
 
-A recycled BullMQ job ID receives a new incarnation. It does not renew an old
-request's provider window or prove that an old delivery failed. Business reissue
-must be an explicit domain decision, with its own durable duplicate/loss policy.
+Eligible terminal cleanup removes only the matching private body and reservation.
+It does not delete independent uncertainty or refund an execution grant.
+A new BullMQ incarnation does not prove that an earlier business email failed.
 
 ## Delivery certainty
 
-| Certainty  | Meaning                                                                                                    |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| `none`     | Every recorded admitted attempt has authoritative no-effect evidence; no older unresolved attempt remains. |
-| `unknown`  | A call may have been accepted, is in flight, or lacks a valid fenced outcome.                              |
-| `accepted` | The exact immutable request was authoritatively accepted under its frozen provider scope/key/body.         |
+| Certainty  | Meaning and action                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `none`     | All possible effects have authoritative nonacceptance evidence. A transient failure may qualify for bounded retry.        |
+| `unknown`  | Acceptance remains possible. Stop automatic and manual submission.                                                        |
+| `accepted` | The exact request was accepted by the provider or relay. Suppress further submission. This does not prove inbox delivery. |
 
-A timeout or network failure after transport admission is unknown. A current
-rejection cannot clear an earlier unknown attempt. A job completion, failed state,
-missing hash or elapsed time is not delivery evidence. Accepted certainty is
-monotonic and suppresses further sends, including after a lost worker acknowledgement.
+PG reserves an attempt before transport. A crash after reservation can leave an
+unsent welcome permanently blocked. Timeout, disconnect or a lost final reply
+cannot establish nonacceptance. A later `none` result cannot clear older uncertainty.
+Current unsuccessful Resend SDK results, including429, remain `unknown` and stop
+recovery. Do not infer authoritative HTTP status from parsed provider error fields.
 
-PG records a possible-call reservation before each send. The current worker must
-then pass its broker lock/incarnation/attempt and time fence. Each incarnation has
-a finite automatic budget (the declared1–10 attempts) and one lifetime manual
-grant. Counters, the first reservation time and request identity are never reset.
-Ordinary idempotent work uses business deduplication instead of this PG mechanism;
-see [background-work policies](../backend/background-work.md).
+Unknown results fail with `EFFECT_UNKNOWN`. Unrecorded live-owner results use
+`OUTCOME_UNRECORDED`. Stale-owner recovery requires a new broker claim, revoked
+refencing authority and expiry of the old cached local fence. A timeout alone does
+not prove remote cancellation. A late verified acceptance updates the original attempt.
 
 ## Retry window and cooldown
 
-The provider recipe uses an immutable24-hour horizon measured from the first PG
-possible-call reservation. Deployment requires PG, Redis and worker wall clocks
-each within±2 seconds of the provider reference. Opposite timestamp offsets can
-differ by4 seconds; the checks reserve that allowance at both ends.
+Recipe2 requires no provider-relative clock qualification or deduplication window.
+It preserves local worker ownership and fresh PG/Redis checks before transport.
+Local wall/monotonic disagreement or a stale sample can refuse admission.
+Client abort limits waiting; it cannot recall a provider's accepted request.
 
-The deployment operator must supply evidence for that external clock bound. AMCore
-does not attest the provider clock; health checks and local NTP status alone do not
-prove it. If the provider reference cannot be qualified, stop queued-mail
-verification and do not authorize retries. Obtain a supported deployment/provider
-clock contract before proceeding; do not infer it from dashboard timestamps.
+Each intent has its frozen automatic budget: default3, supported1–10 attempts.
+One lifetime manual grant remains available only for eligible aggregate `none`.
+Counters, first reservation, request identity and grants never reset on restart.
 
-Immediately before transport, the shared helper requires
-`max(redisTime + elapsed, wallTime) + 94000 < nominalDeadline`. The94 seconds
-include4 seconds of timestamp uncertainty,1 second of scheduling allowance,
-30 seconds of maximum transport lifetime and59 seconds of residual safety margin.
-Redis and PG samples must be at most1 second old. Wall/monotonic disagreement
-above200ms, negative elapsed time or unsupported clock arithmetic refuses a call.
-After a stale pre-call fence, one refresh may re-fence the same attempt; it does
-not spend another start or renew the deadline.
+A supported transient `none` result persists the minimum delay. It is the larger
+of ordinary exponential backoff (1000ms base) and the adapter's reviewed duration.
+The queued Resend recipe supports decimal `Retry-After` seconds, up to24 hours.
+A present date, malformed value or longer duration blocks retry with
+`CONTENT_UNSUPPORTED`; it does not become ordinary backoff. Unknown certainty
+still takes precedence over that input error. SMTP does not require HTTP headers.
 
-An abort signal is set to30 seconds. This does not establish a remote provider's
-acceptance bound. Operations must maintain the stated clock, scheduling and
-transport assumptions. Suspend/descheduling or clock corrections can cause safe
-refusals; inspect synchronization and provider/network health before reissue.
-Do not consume the59-second safety margin to excuse an assumption violation.
+A worker waits the full saved duration using process-local monotonic time.
+Restart, changed worker, lost anchor or detected discontinuity starts the full
+wait again. Repeated restarts can prevent progress indefinitely. Broker due time
+and wall-clock jumps cannot satisfy the delay. Cooldown claims spend neither an
+automatic attempt nor a manual grant and do not report a failed send.
 
-`Retry-After` duration or absolute-date constraints become a monotonic latest-safe
-PG floor. A call requires the current lower time bound to reach that floor;
-opposite offsets cannot authorize an early call. A waiting cooldown moves the
-locked job to delayed without recording a provider call or spending a start.
-Unsupported retry-clock information blocks further calls. A delay beyond the
-immutable horizon expires the request rather than extending its window.
+Manual retry also requires original content/scope, supported transient evidence
+and an available grant. The worker waits for the committed ADMIN receipt before
+spending its reserved grant. Unknown ADMIN commands are never dispatched again.
 
-Manual retry additionally requires aggregate `none`, a supported transient result,
-the original body/scope, available grant and satisfied floor/horizon. Unknown or
-accepted delivery is not manually retryable. An ADMIN retry reserves its grant
-and command fence before Redis dispatch; the worker waits for the committed
-receipt or an audited uncertainty disposition. Unknown ADMIN commands are never
-redispatched.
+The approved queued adapter performs one application submission per attempt to
+one recipient. An adapter without remote deduplication can support first submission
+and proven-none retry. It must classify ambiguity and disable hidden submission
+retries. No production SMTP adapter is included; a protocol fixture tests this boundary.
+See the [provider contract](delivery.md#provider-contract) before extending it.
 
-While an applied broker retry awaits receipt commit or audited disposition, its
-actual worker claims are deferred by the existing bounded delayed transition,
-with a1-second broker recheck. These claims spend no possible-call ordinal or
-manual grant and do not increment completed failed attempts. They retain the
-original floor, horizon and command identity; reaching the horizon refuses the
-request rather than extending the wait into new effect authority.
+## Inspect a stopped welcome
 
-The registered handler emits terminal `email.job.dead_letter` and worker
-`queue.worker_error` signals with bounded labels, without raw payloads or provider
-exception text. Process-duration/result metrics cover admitted provider-policy
-execution and known-secret discard; cooldown/receipt deferral is not a failed
-send. Pre-policy malformed input is reported through terminal failure observation.
+1. Read authorized job and PG evidence diagnostics. Record identity, certainty,
+   safe reason and provider ID when present. Do not dump bodies or token links.
+2. Preserve active/unrecorded attempts. Establish owner termination before recovery.
+   Missing provider search results or elapsed time do not prove nonacceptance.
+3. Acknowledge retained unknown only through the audited metadata action when
+   eligible. This preserves uncertainty, history, execution grants and quota.
+4. Leave delivery unresolved by default. A separate business reissue requires
+   explicit approval of duplicate risk and a link to the original intent.
+   This recipe provides no automatic reissue or override-to-`none` action.
 
-## Legacy queue entries
+The worker emits existing bounded dead-letter/error signals. Cooldown is not an
+error loop. Monitor those signals through your existing operations tooling.
+No alert email is generated by this policy.
 
-Known secret-bearing legacy input completes without rendering or sending, before
-wire/schema validation. Malformed non-secret input fails permanently.
-The closed WELCOME compatibility path supports the original bounded options
-profile; unsupported options are refused without rewriting request/options.
+## Retention and upgrades
 
-A first current claim with `ats=1`, `atm=0`, no prior managed evidence and no
-failure witness may adopt a new incarnation under the worker lock. Its request
-is then frozen and admitted through the normal PG/broker gates before any effect.
-Counters are not reset. A previously started legacy request receives independent
-`LEGACY_REQUEST_UNKNOWN` evidence before changing its broker format. It has no
-reproducible provider body/scope or newly inferred first-send time, so it cannot
-send or acquire a safe retry horizon. Quota failure prevents the format change
-and effect. Inspect original business/worker records before any domain reissue.
+Unknown evidence survives broker trimming, acknowledgment and body expiry.
+It remains quota-accounted: up to10,000 unresolved rows globally and2,000 per work.
+Capacity exhaustion refuses new effects; cleanup cannot erase uncertainty to
+admit another send. Unknown rows compact within the existing512-byte logical limit.
+Definitive unfenced evidence retains the existing30-day cleanup policy.
 
-## Retention and recovery
+Initialized broker markers without PG evidence refuse with `OUTCOME_UNRECORDED`.
+A bounded result buffer retries PG recording only; eviction cannot authorize sending.
+PG or broker outage refuses new admission.
 
-Independent evidence survives stock BullMQ completion/failure trimming. Missing
-PG evidence for an initialized broker marker is `OUTCOME_UNRECORDED`, not permission
-to resend. A bounded in-memory result buffer may retry recording an outcome;
-eviction or restart cannot establish certainty or authorize a provider call.
-
-Recorded unknown effects can receive an audited metadata disposition with captured
-incarnation/revision, reason and bounded incident references. An active/unrecorded
-attempt must remain protected until its original horizon is certainly past.
-Disposition preserves uncertainty, starts, grant, fence and unresolved/row quotas.
-It is not proof of acceptance or nonacceptance.
-
-Definitive unfenced evidence is eligible for30-day retention cleanup. Unknown
-evidence, including acknowledged unknown, is compacted and retained within finite
-quotas; it is not evicted to admit more sends. See
-[capacity and maintenance](../backend/background-work.md#retained-uncertainty-and-capacity).
-PG outage refuses new possible effects. Broker outage prevents broker admission;
-PG diagnostics and metadata recovery remain independently available to the backend.
+Old version1 records are not relabelled as safe version2 work. Raw legacy WELCOME
+claims quarantine before any render/send; known secret-bearing legacy input still
+completes without sending. Use the [offline upgrade procedure](queued-upgrade.md)
+for untouched version1 jobs. Keep retained unknown evidence and its original limits.

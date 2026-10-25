@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Welcome-email delivery stops automatic recovery after uncertain provider results, including current Resend429 responses. Conservative policy2 removes provider-clock qualification and adds an offline upgrade procedure. Direct-secret and notification recovery remain separate.
+
 - Installations use pnpm 12.15, including its registry package-name validation.
   Updated lint parents select Handlebars 4.7.10; email tests use Happy DOM 21
   with CSS and iframe loading disabled by default. API parsing uses the ESM

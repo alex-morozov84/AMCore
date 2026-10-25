@@ -25,7 +25,7 @@ Use [Deployment & migrations](deployment.md) for rollback and other topologies, 
 - For registry images: the publisher's expected deployment version and three digests.
 - Before account actions: approved mail budget, diagnostic authority and the
   [mail prerequisites](../email/delivery.md#verify-delivery-on-a-deployed-stack),
-  including tracking, log redaction and queued-mail clock qualification.
+  including tracking, log redaction and queued-mail uncertainty and recovery.
 
 In the commands below, `/srv/amcore` is the source checkout and `/srv/amcore-tls`
 holds certificates. Replace the example domains and addresses with yours.

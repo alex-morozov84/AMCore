@@ -1001,9 +1001,9 @@ stock queue mutation methods.
 Broker control failure leaves PG-owned durable control available when its other
 request dependencies are healthy. Total Redis failure can also affect authentication,
 the pre-auth rate-limit backstop and the frontend session vault; a PG-only business
-transaction does not promise browser availability during that outage. Provider-window
+transaction does not promise browser availability during that outage. Conservative welcome
 execution additionally requires independent PG evidence and an immutable Redis
-request. See [queued-email safety](../email/queued-safety.md) for clock bounds,
+request. See [queued-email safety](../email/queued-safety.md) for local freshness checks,
 transport limits, retention and non-evicting uncertainty capacity.
 
 Multi-instance safety is already in place, and the two cron flavors are

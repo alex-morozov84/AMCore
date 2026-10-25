@@ -181,7 +181,8 @@ provide an operator interface for admin session management.
   hints](auth/capability-catalogue.md), [API keys](auth/api-keys.md), [invitations](auth/invites.md),
   CSRF, and the [auth contracts reference](auth/reference.md).
 - **[Email](email/README.md)** — `EmailService` vs `NotificationsService`, React
-  Email templates, delivery classes, and secret-link rules.
+  Email templates, delivery classes, and secret-link rules. Existing installations
+  use the [welcome policy upgrade](email/queued-upgrade.md) for offline conversion.
 - **[Notifications](notifications/README.md)** — the per-user feed, preferences,
   durable email/Telegram channels, and the realtime SSE stream.
 - **[AI capability layer](ai/README.md)** — conversations, durable runs,
