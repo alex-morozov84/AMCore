@@ -41,18 +41,18 @@ test('reports every stale Console exact count together', () => {
   // Login diagnostics adds the two stand fixture files; its UI/browser helper use existing roots.
   // Support mail adds one closed root, verification removals and mixed script/doc operations.
   assertExactScaffoldCounts([
-    { name: 'console roots', expected: 25, actual: operationsConsoleOwnership.facts.roots.length },
+    { name: 'console roots', expected: 26, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 102,
+      expected: 109,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
       name: 'console disabled content',
-      expected: 70,
+      expected: 71,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 154, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 162, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -69,12 +69,12 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 102,
+      expected: 109,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {
       name: 'console single-locale content',
-      expected: 69,
+      expected: 70,
       actual: count(singleDisabled.consoleFacts, 'content'),
     },
   ])

@@ -33,6 +33,12 @@ export const operationsConsoleDocSeams = [
   ),
   ...[
     [
+      'summary-changelog',
+      'CHANGELOG.md',
+      'PROBLEM_SUMMARY_CHANGELOG',
+      'console.support-mail-changelog',
+    ],
+    [
       'support-mail-stand',
       'docs/operations/local-stands.md',
       'SUPPORT_MAIL_STAND',

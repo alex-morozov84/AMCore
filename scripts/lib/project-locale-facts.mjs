@@ -24,7 +24,13 @@ export function buildProjectLocaleFacts(state) {
     ...buildLocaleWebTestFacts(locale),
     ...buildLocaleE2eRouteFacts(locale),
     ...buildLocaleE2eUiFacts(locale),
-  ].filter((fact) => !(state.storybook === 'disabled' && fact.path?.includes('.stories.')))
+  ].filter(
+    (fact) =>
+      !(
+        state.storybook === 'disabled' &&
+        (fact.path?.includes('.stories.') || fact.path?.startsWith('apps/web/.storybook/'))
+      )
+  )
   if (state.adminConsole?.enabled !== false) return facts
   const removed = operationsConsoleFacts.verification
   return facts.filter(

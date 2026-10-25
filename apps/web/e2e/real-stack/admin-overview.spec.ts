@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -6,6 +10,10 @@ import { activeTarget, guardedExec, guardedSql } from '../support/managed-target
 
 import { setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
+
+const t = JSON.parse(
+  readFileSync(join(activeTarget().snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
+).console
 
 /**
  * Path mode reuses the ordinary product session for the console (no
@@ -32,41 +40,41 @@ test('path-mode Overview panel renders real readiness, version and process role 
   await page.goto('/en/admin')
   // A fresh docker-compose stack is healthy - assert the ready state, not
   // the not-ready one, and confirm it never says the console is unhealthy.
-  await expect(page.getByText('API instance not ready')).not.toBeVisible()
-  await expect(page.getByText('Database', { exact: true })).toBeVisible()
-  await expect(page.getByText('Cache (Redis)')).toBeVisible()
-  await expect(page.getByText('API is ready', { exact: true })).toBeVisible()
-  await expect(page.getByText('Working', { exact: true })).toBeVisible()
-  await page.getByText('Build details', { exact: true }).click()
-  await expect(page.getByText('API version')).toBeVisible()
-  await expect(page.getByText('Process role')).not.toBeVisible()
+  await expect(page.getByText(t.overviewNotReadyTitle)).not.toBeVisible()
+  await expect(page.getByText(t.overviewDependencyLabelDatabase, { exact: true })).toBeVisible()
+  await expect(page.getByText(t.overviewDependencyLabelRedis)).toBeVisible()
+  await expect(page.getByText(t.overviewReadyTitle, { exact: true })).toBeVisible()
+  await expect(page.getByText(t.overviewFilesHealthy, { exact: true })).toBeVisible()
+  await page.getByText(t.overviewTechnicalDetails, { exact: true }).click()
+  await expect(page.getByText(t.overviewVersionLabel)).toBeVisible()
+  await expect(page.getByText(t.overviewProcessRoleLabel)).not.toBeVisible()
 
   for (const name of [
-    'Responding web server build',
-    'Database connections',
-    'JavaScript memory',
-    'API disk space',
+    t.overviewWebTitle,
+    t.overviewPoolTitle,
+    t.overviewMemoryTitle,
+    t.overviewDiskTitle,
   ]) {
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   // The stack sets no external tool address, so the card says so and still offers the guide.
-  await expect(page.getByRole('heading', { name: 'External tools', exact: true })).toBeVisible()
-  await expect(page.getByText('External tools are not configured.')).toBeVisible()
-  await expect(page.getByRole('link', { name: /Recovery instructions/ })).toHaveAttribute(
+  await expect(page.getByRole('heading', { name: t.externalToolsTitle, exact: true })).toBeVisible()
+  await expect(page.getByText(t.externalToolsNone)).toBeVisible()
+  await expect(page.getByRole('link', { name: t.externalToolsRecovery })).toHaveAttribute(
     'rel',
     'noopener noreferrer'
   )
-  await expect(page.getByRole('heading', { name: 'Needs attention', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: t.problems.title, exact: true })).toBeVisible()
   const observed = page.locator('#overview-api-checks time').first()
   const before = await observed.getAttribute('datetime')
-  const refresh = page.getByRole('button', { name: 'Refresh', exact: true })
+  const refresh = page.getByRole('button', { name: t.overviewRefresh, exact: true })
   await refresh.focus()
   await expect(refresh).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(observed).not.toHaveAttribute('datetime', before!)
   await expect(refresh).toBeEnabled()
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(page.getByRole('heading', { name: 'API disk space', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: t.overviewDiskTitle, exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )
@@ -86,7 +94,7 @@ test('path-mode Overview panel denies a demoted session with a live re-check', a
   await expect(page).toHaveURL(/\/en\/?$/)
 
   await page.goto('/en/admin')
-  await expect(page.getByRole('heading', { name: 'Operations Console' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: t.title })).toBeVisible()
 
   setSystemRole(email, 'USER')
   const response = await page.goto('/en/admin')
@@ -152,20 +160,20 @@ test.describe('summary fixture', () => {
     await page.goto('/en/admin')
     const row = page
       .locator('[aria-labelledby="overview-attention-title"] li')
-      .filter({ hasText: 'Saved deliveries with an error' })
+      .filter({ hasText: t.problems.notificationFailed.split('{count}')[0] })
     await expect(row).toHaveCount(1)
-    await expect(row.getByRole('link', { name: /What to check/ })).toHaveAttribute(
+    await expect(row.getByRole('link', { name: t.problems.guide })).toHaveAttribute(
       'href',
       /background-work.md#notification-deliveries$/
     )
-    await row.getByRole('link', { name: 'Open errors', exact: true }).click()
+    await row.getByRole('link', { name: t.problems.openErrors, exact: true }).click()
     await expect(page).toHaveURL(/work=notification-deliveries&state=failed/)
     await expect(
       page.locator('[data-console-source="work-errors:notification-deliveries"]')
     ).toBeFocused()
     await expect(page.getByText(id, { exact: true })).toBeVisible()
     await expect(page.getByText('Telegram destination blocked', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+    await page.getByRole('button', { name: t.overviewRefresh, exact: true }).click()
     await expect(
       page.locator('[data-console-source="work-errors:notification-deliveries"]')
     ).not.toBeFocused()
@@ -176,12 +184,12 @@ test.describe('summary fixture', () => {
     await page.goto('/en/admin')
     const unresolved = page
       .locator('[aria-labelledby="overview-attention-title"] li')
-      .filter({ hasText: 'Saved deliveries with an error' })
-    await expect(unresolved).toContainText('Actions whose result is not confirmed')
-    await unresolved.getByRole('link', { name: 'Open processing', exact: true }).click()
+      .filter({ hasText: t.problems.notificationFailed.split('{count}')[0] })
+    await expect(unresolved).toContainText(t.problems.unresolved.split('{count}')[0])
+    await unresolved.getByRole('link', { name: t.problems.openWork, exact: true }).click()
     await expect(page).toHaveURL(/work=notification-deliveries$/)
     await expect(page.locator('[data-console-source="work:notification-deliveries"]')).toBeFocused()
-    await expect(page.getByText(/not all unknown outcomes/i)).toBeVisible()
+    await expect(page.getByText(t.problems.unresolvedHelp)).toBeVisible()
     await expect(
       page.locator('[data-console-source="work-errors:notification-deliveries"]')
     ).toHaveCount(0)

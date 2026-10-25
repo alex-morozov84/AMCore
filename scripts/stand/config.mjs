@@ -387,10 +387,12 @@ export function validateModel(m) {
   for (const name of ['api', 'worker', 'web'])
     if (m.model.services[name].environment.REDIS_URL !== 'redis://redis:6379')
       throw new Error('Foreign Redis target')
-  // AMCORE_CONSOLE_SUMMARY_API_CHECK_START
-  const expectedApi =
-    m.fixtureProfile === 'console-summary' ? 'http://summary-source:8098' : 'http://api:5002'
-  // AMCORE_CONSOLE_SUMMARY_API_CHECK_END
+  const apiTargets = {
+    // AMCORE_CONSOLE_SUMMARY_API_CHECK_START
+    'console-summary': 'http://summary-source:8098',
+    // AMCORE_CONSOLE_SUMMARY_API_CHECK_END
+  }
+  const expectedApi = apiTargets[m.fixtureProfile] ?? 'http://api:5002'
   if (m.model.services.web.environment.API_URL !== expectedApi)
     throw new Error('Foreign API target')
   const invitationHttpOrigin = m.origins.product.startsWith('http:') ? m.origins.product : ''

@@ -56,35 +56,37 @@ test('host-mode Overview panel renders real readiness, version and process role,
 
   // A fresh docker-compose stack is healthy — assert the ready state, not
   // the not-ready one, and confirm it never says the console is unhealthy.
-  await expect(consolePage.getByText('API instance not ready')).not.toBeVisible()
-  await expect(consolePage.getByText('Database', { exact: true })).toBeVisible()
-  await expect(consolePage.getByText('Cache (Redis)')).toBeVisible()
-  await expect(consolePage.getByText('API is ready', { exact: true })).toBeVisible()
-  await expect(consolePage.getByText('Working', { exact: true })).toBeVisible()
+  await expect(consolePage.getByText(t.overviewNotReadyTitle)).not.toBeVisible()
+  await expect(
+    consolePage.getByText(t.overviewDependencyLabelDatabase, { exact: true })
+  ).toBeVisible()
+  await expect(consolePage.getByText(t.overviewDependencyLabelRedis)).toBeVisible()
+  await expect(consolePage.getByText(t.overviewReadyTitle, { exact: true })).toBeVisible()
+  await expect(consolePage.getByText(t.overviewFilesHealthy, { exact: true })).toBeVisible()
   // The stand uses the local driver, so the public-files row is off and says why.
   for (const name of [t.overviewPrivateFilesTitle, t.overviewPublicFilesTitle]) {
     await expect(consolePage.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   await expect(consolePage.getByText(t.overviewPublicOff, { exact: true })).toBeVisible()
   await expect(consolePage.getByText(t.overviewPublicOffLocal, { exact: true })).toBeVisible()
-  await consolePage.getByText('Build details', { exact: true }).click()
-  await expect(consolePage.getByText('API version')).toBeVisible()
-  await expect(consolePage.getByText('Process role')).not.toBeVisible()
+  await consolePage.getByText(t.overviewTechnicalDetails, { exact: true }).click()
+  await expect(consolePage.getByText(t.overviewVersionLabel)).toBeVisible()
+  await expect(consolePage.getByText(t.overviewProcessRoleLabel)).not.toBeVisible()
 
   for (const name of [
-    'Responding web server build',
-    'Database connections',
-    'JavaScript memory',
-    'API disk space',
+    t.overviewWebTitle,
+    t.overviewPoolTitle,
+    t.overviewMemoryTitle,
+    t.overviewDiskTitle,
   ]) {
     await expect(consolePage.getByRole('heading', { name, exact: true })).toBeVisible()
   }
   await expect(
-    consolePage.getByRole('heading', { name: 'Needs attention', exact: true })
+    consolePage.getByRole('heading', { name: t.problems.title, exact: true })
   ).toBeVisible()
   const observed = consolePage.locator('#overview-api-checks time').first()
   const before = await observed.getAttribute('datetime')
-  await consolePage.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await consolePage.getByRole('button', { name: t.overviewRefresh, exact: true }).click()
   await expect(observed).not.toHaveAttribute('datetime', before!)
 
   const html = await consolePage.content()

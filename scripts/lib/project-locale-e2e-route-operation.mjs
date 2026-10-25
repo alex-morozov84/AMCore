@@ -63,7 +63,7 @@ function rewriteExactRootAssertions(model, ctx) {
         Boolean(managedRoot(argument)))
     )
   })
-  for (const call of matches) {
+  for (const call of matches.filter((call) => !model.isRemoved(call))) {
     const [argument] = call.arguments
     const managed = managedRoot(argument)
     model.replaceNode(
@@ -109,20 +109,28 @@ function e2eRoutes(model, params, ctx) {
       `${ctx.operationKey}: expected ${params.expectedReferences} route references, found ${inventory.count}`
     )
   }
-  const claimed =
-    params.surface === 'oauth' ? rewriteOAuthAssertions(model, params.locale, ctx) : []
+  const claimed = removeUnavailableUiCase(model, params.unavailableUiCases, ctx)
+  if (params.surface === 'oauth') claimed.push(...rewriteOAuthAssertions(model, params.locale, ctx))
   claimed.push(...rewriteExactRootAssertions(model, ctx))
-  const originReferences = findAllNodes(model, (node) =>
-    ts.isIdentifier(node) && node.text === 'escapeOrigin'
+  const originReferences = findAllNodes(
+    model,
+    (node) => ts.isIdentifier(node) && node.text === 'escapeOrigin' && !model.isRemoved(node)
   )
-  if (originReferences.length > 0 && originReferences.every((node) =>
-    (ts.isFunctionDeclaration(node.parent) && node.parent.name === node) || covered(node, claimed)
-  )) {
-    const helper = findUniqueNode(model, (node) =>
-      ts.isFunctionDeclaration(node) && node.name?.text === 'escapeOrigin', ctx)
+  if (
+    originReferences.length > 0 &&
+    originReferences.every(
+      (node) =>
+        (ts.isFunctionDeclaration(node.parent) && node.parent.name === node) ||
+        covered(node, claimed)
+    )
+  ) {
+    const helper = findUniqueNode(
+      model,
+      (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'escapeOrigin',
+      ctx
+    )
     model.removeNode(helper, ctx)
   }
-  claimed.push(...removeUnavailableUiCase(model, params.unavailableUiCases, ctx))
   for (const reference of inventory.references) {
     const node = reference.kind === 'comment' ? commentRange(reference) : reference.node
     if (covered(node, claimed) || model.isRemoved(node)) continue

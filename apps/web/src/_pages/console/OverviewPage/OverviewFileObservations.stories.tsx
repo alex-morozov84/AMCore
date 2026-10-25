@@ -1,9 +1,11 @@
 import { createTranslator, NextIntlClientProvider, useLocale, useTranslations } from 'next-intl'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, within } from 'storybook/test'
 
 import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
 
+import en from '../../../../messages/en.json'
 import ru from '../../../../messages/ru.json'
 
 import { fileConflictSources } from './overview-problem-fixtures'
@@ -49,17 +51,26 @@ async function checkTimes(canvasElement: HTMLElement) {
   const card = canvasElement.querySelector('[data-slot="card"]')!
   await expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth)
 }
+const catalogues: Record<string, typeof en> = { en, ru }
+const baseMessages = catalogues[DEFAULT_LOCALE]
+const baseCopy = createTranslator({
+  locale: DEFAULT_LOCALE,
+  messages: baseMessages,
+  namespace: 'console.problems',
+})
 export const HealthyOverviewOldFailure: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(
-      canvas.getByText('Overview: The private-file write, read and cleanup check passed.', {
+      canvas.getByText(baseCopy('fileOverviewResult', { result: baseCopy('privatePassed') }), {
         exact: true,
       })
     ).toBeVisible()
     await expect(
       canvas.getByText(
-        'Integrations: The private-file write, read or cleanup check failed. This is an old observation. It does not confirm the current state.',
+        baseCopy('fileIntegrationResult', { result: baseCopy('privateFailed') }) +
+          ' ' +
+          baseCopy('old'),
         { exact: true }
       )
     ).toBeVisible()
@@ -71,23 +82,30 @@ export const FailedOverviewOldSuccess: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(
-      canvas.getByText('Overview: The private-file write, read or cleanup check failed.', {
+      canvas.getByText(baseCopy('fileOverviewResult', { result: baseCopy('privateFailed') }), {
         exact: true,
       })
     ).toBeVisible()
     await expect(
       canvas.getByText(
-        'Integrations: The private-file write, read and cleanup check passed. This is an old observation. It does not confirm the current state.',
+        baseCopy('fileIntegrationResult', { result: baseCopy('privatePassed') }) +
+          ' ' +
+          baseCopy('old'),
         { exact: true }
       )
     ).toBeVisible()
     await checkTimes(canvasElement)
   },
 }
-const ruCopy = createTranslator({ locale: 'ru', messages: ru, namespace: 'console.problems' })
+const russianLocale = new Set<string>(SUPPORTED_LOCALES).has('ru') ? 'ru' : DEFAULT_LOCALE
+const ruCopy = createTranslator({
+  locale: russianLocale,
+  messages: ru,
+  namespace: 'console.problems',
+})
 const russian: NonNullable<Story['decorators']> = [
   (Story) => (
-    <NextIntlClientProvider locale="ru" messages={ru} timeZone="UTC">
+    <NextIntlClientProvider locale={russianLocale} messages={ru} timeZone="UTC">
       <Story />
     </NextIntlClientProvider>
   ),

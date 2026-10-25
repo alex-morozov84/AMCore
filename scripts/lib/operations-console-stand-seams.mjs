@@ -12,6 +12,7 @@ const entry = (path, key) => ({
     'ADMIN_CONSOLE_LOGS_URL',
     'ADMIN_CONSOLE_ALERTS_URL',
     'ADMIN_CONSOLE_LOGS_GRAFANA_URL',
+    'ADMIN_CONSOLE_METRICS_GRAFANA_URL',
     'console-real-stack',
     'feature-import',
   ],
@@ -20,6 +21,17 @@ const entry = (path, key) => ({
 })
 
 export const operationsConsoleStandSeams = [
+  entry('scripts/stand.mjs', 'SUMMARY_PROFILE'),
+  entry('scripts/stand/config-proof.test.mjs', 'SUMMARY_CONFIG_PROOF'),
+  entry('scripts/stand/config.mjs', 'SUMMARY_IMPORT'),
+  entry('scripts/stand/config.mjs', 'SUMMARY_CONFIG'),
+  entry('scripts/stand/config.mjs', 'SUMMARY_SERVICE'),
+  entry('scripts/stand/config.mjs', 'SUMMARY_ORIGIN_CHECK'),
+  entry('scripts/stand/config.mjs', 'SUMMARY_API_CHECK'),
+  entry('scripts/stand/create.mjs', 'SUMMARY_POLICY'),
+  entry('scripts/stand/create.mjs', 'SUMMARY_ORIGIN'),
+  entry('scripts/stand/start.mjs', 'SUMMARY_START'),
+  entry('apps/web/e2e/support/managed-target.d.mts', 'SUMMARY_METRICS_ORIGIN'),
   entry('scripts/lib/product-admin-e2e-inventory.test.mjs', 'SUPPORT_MAIL_INVENTORY'),
   entry('scripts/stand/config-proof.test.mjs', 'SUPPORT_MAIL_CONFIG_PROOF'),
   entry('scripts/stand/product-admin-source.mjs', 'SUPPORT_MAIL_PROFILES'),

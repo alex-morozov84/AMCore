@@ -29,6 +29,7 @@ const roots = [
   'apps/web/e2e/organization-provisioning',
   'apps/web/e2e/real-stack/admin-sessions',
   'docs/operations-console',
+  'docker/testing/console-summary',
 ].map(dir)
 
 const sharedModules = [
@@ -38,6 +39,8 @@ const sharedModules = [
   module('apps/web/src/shared/lib/console-cooldown-ticks.ts'),
   module('apps/web/src/shared/lib/console-poll-policy.ts', ['console-poll-policy.test.ts']),
   module('apps/web/src/shared/lib/console-docs-links.ts', ['console-docs-links.test.ts']),
+  module('apps/web/src/shared/lib/console-metrics-target.ts', ['console-metrics-target.test.ts']),
+  module('apps/web/src/shared/lib/console-metrics-link.ts', ['console-metrics-link.test.ts']),
   module('apps/web/src/shared/lib/console-external-links.ts', ['console-external-links.test.ts']),
   module('apps/web/src/shared/lib/console-log-search-target.ts', [
     'console-log-search-target.test.ts',
@@ -77,6 +80,8 @@ const verification = [
   'scripts/stand/ai-run-control-fixture.mjs',
   'scripts/stand/scheduled-jobs-fixture.mjs',
   'scripts/stand/integrations-fixture.mjs',
+  'scripts/stand/console-summary-fixture.mjs',
+  'apps/web/e2e/shared/overview-summary-journey.ts',
   'scripts/stand/login-diagnostics-fixture.mjs',
   'scripts/stand/support-mail-fixture.mjs',
   'scripts/stand/support-mail-fixture.test.mjs',

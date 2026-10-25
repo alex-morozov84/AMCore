@@ -25,6 +25,9 @@ const linkedTests = [
 ].map(([path, module]) => one(path, { module }))
 
 const e2eVerification = [
+  'apps/web/e2e/real-stack/admin-overview.spec.ts',
+  'apps/web/e2e/console-real-stack/overview.spec.ts',
+  'apps/web/e2e/shared/overview-summary-journey.ts',
   'apps/web/e2e/real-stack/admin-background-work.spec.ts',
   'apps/web/e2e/console-real-stack/background-work.spec.ts',
   'apps/web/e2e/shared/background-work-journey.ts',
@@ -80,6 +83,13 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one('apps/web/.storybook/preview.tsx', { disposition: 'rewrite' }),
+    one('apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx', {
+      disposition: 'rewrite',
+    }),
+    one('apps/web/src/_pages/console/OverviewPage/OverviewProblems.stories.tsx', {
+      disposition: 'rewrite',
+    }),
     one('apps/web/src/features/console-user-support-mail/model/use-support-mail.test.tsx', {
       disposition: 'rewrite',
     }),
@@ -161,6 +171,7 @@ export const localeSurfaceRoots = [
   'apps/api/test/auth.e2e-spec.ts',
   'apps/api/test/oauth.e2e-spec.ts',
   'apps/api/src',
+  'apps/web/.storybook',
   'apps/web/eslint.config.mjs',
   'apps/web/messages',
   'apps/web/e2e',

@@ -1,8 +1,11 @@
-import { useLocale, useTranslations } from 'next-intl'
+import { createTranslator, useLocale, useTranslations } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, userEvent, within } from 'storybook/test'
 
 import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
+
+import en from '../../../../messages/en.json'
 
 import { count, job, OBSERVED, sources, work } from './overview-problem-fixtures'
 import type { OverviewSources } from './overview-problem-model'
@@ -18,6 +21,11 @@ function Summary({ data }: { data: OverviewSources }) {
     </ConsoleTimeZoneProvider>
   )
 }
+const copy = createTranslator({
+  locale: DEFAULT_LOCALE,
+  messages: en,
+  namespace: 'console.problems',
+})
 const meta = {
   title: 'pages/console/Overview problems',
   component: Summary,
@@ -71,7 +79,7 @@ export const MoreProblems: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(canvas.getByText('Show 2 more'))
+    await userEvent.click(canvas.getByText(copy('more', { count: 2 })))
     await expect(canvas.getByText('daily-job-6')).toBeVisible()
   },
 }

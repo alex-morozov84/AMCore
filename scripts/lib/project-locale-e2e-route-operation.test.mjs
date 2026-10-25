@@ -50,7 +50,7 @@ function outputs(locale) {
   )
 }
 
-test('token-aware source inventory has the approved 206-reference denominator', () => {
+test('token-aware source inventory has the approved 240-reference denominator', () => {
   const retained = surfaces.reduce(
     (total, [pathname]) =>
       total + routeReferenceInventory(parseStructuralModel(pathname, source(pathname))).count,
@@ -62,7 +62,7 @@ test('token-aware source inventory has the approved 206-reference denominator', 
     0
   )
   assert.equal(retained + deleted, E2E_ROUTE_DENOMINATOR)
-  assert.equal(E2E_ROUTE_DENOMINATOR, 206)
+  assert.equal(E2E_ROUTE_DENOMINATOR, 240)
 })
 
 test('EN and RU retain shared verification with identical prefixless topology', () => {
@@ -147,5 +147,19 @@ test('OAuth fixtures fail closed when selected-locale anchors drift', () => {
       },
     ])
     assert.throws(() => applyStructuralPlan(registry, plan, changed))
+  }
+})
+
+test('removes Overview locale-switch tests before rewriting their nested root assertions', () => {
+  for (const locale of ['en', 'ru']) {
+    for (const [pathname, count, unavailable] of surfaces.filter(([name]) =>
+      /(?:admin-overview|console-real-stack\/overview)/.test(name)
+    )) {
+      const after = apply(pathname, count, locale, unavailable)
+      assert.doesNotMatch(after, /locale switcher|locale switch preserves/)
+      assert.doesNotMatch(after, /selectOption\('ru'\)|name: 'Русский'/)
+      assert.match(after, /toHaveURL\(/)
+      assert.doesNotMatch(after, /\\\/\?\$\//)
+    }
   }
 })

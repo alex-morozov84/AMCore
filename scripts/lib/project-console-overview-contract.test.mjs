@@ -4,6 +4,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 
 import { commit, runInitProject } from './init-project-test-helpers.mjs'
+import { checkSummaryProjection } from './project-console-summary-contract.mjs'
 import { checkLoginDiagnostics } from './project-console-login-diagnostics-contract.mjs'
 import {
   checkRetainedSettings,
@@ -78,6 +79,7 @@ for (const [name, flags] of scenarios) {
       commit(fixture.root)
       const result = runInitProject(fixture.root, [...flags, '--yes'])
       assert.equal(result.status, 0, result.stderr)
+      checkSummaryProjection(fixture.root, flags)
       checkRetainedSettings(process.cwd(), fixture.root)
       checkLoginDiagnostics(process.cwd(), fixture.root, flags)
       if (flags.includes('--admin-console=disabled')) {
