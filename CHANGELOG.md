@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Dormant account MFA storage and internal TOTP/backup-code verification primitives,
+  with an incomplete-deployment startup check. Enrollment and second-factor login
+  remain unavailable in this foundation.
+
 <!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_START -->
 
 - Operations Console Overview gathers recorded problems with original observation

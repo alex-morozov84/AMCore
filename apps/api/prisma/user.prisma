@@ -99,6 +99,12 @@ model User {
   systemRole SystemRole @default(USER)
 
   // Relations
+  mfaAccount              MfaAccount?
+  mfaFactor               MfaFactor?
+  mfaRecoveryCodes        MfaRecoveryCode[]
+  authFamilies            AuthSessionFamily[]
+  mfaFlows                MfaFlow[]
+  mfaBudget               MfaAttemptBudget?
   accounts                OAuthAccount[]
   sessions                Session[]
   settings                UserSettings?
