@@ -92,12 +92,24 @@ docker compose run --rm --no-deps api node dist/cli/welcome-upgrade.js \
 
 Save each ID/result and conversion identity/version in your private manifest.
 After an interruption, classify the same IDs again. A failed or ambiguous command
-is not a completed conversion. Started policy1 work with only `none` results still
-requires a separate decision; this helper does not reinterpret its old timing proof.
+is not a completed conversion. Started policy1 work with stored `none` results
+returns `protected` with `VERSION_UNSUPPORTED`. Record `retain-blocked/no-reissue`
+in the manifest and retain its PG evidence. This default disposition needs no
+database update and does not block restart. It is not proof of failed delivery.
+The helper does not reinterpret old timing evidence. A new business email still
+requires separate duplicate-risk approval.
+
+An actual CLI `blocked` result is different. Missing/corrupt evidence or ambiguous
+command state keeps maintenance active. Restore authoritative original evidence
+under an approved incident-recovery procedure, or escalate the incident. This
+helper does not provide restore/reissue authority. Never invent `none` history.
 
 ## Resume or stop
 
-Verify every item is version2 or explicitly retained and blocked/protected.
+Verify every broker item is version2 or has a recorded `protected` result.
+Retain PG-only evidence without recreating its missing broker job. A protected
+record remains execution-disabled; it does not block the maintenance exit.
+Any actual CLI `blocked` or `unconfirmed` result keeps maintenance active.
 The new consumer refuses remaining policy1 execution. Do not reset firstDispatchAt,
 key, body, manual grant or unknown counts. Preserve PG uncertainty after broker TTL.
 
