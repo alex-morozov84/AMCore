@@ -88,3 +88,16 @@ test('smoke then campaign: separate outputs, and an invalid warm-up stops before
   assert.equal(manifest.sameHarness, true)
   assert.equal(manifest.referenceProtocol, true)
 })
+
+test('a slow SSH connection setup is not reported as clock skew', () => {
+  // Fresh host: the middle-of-round-trip estimate turned 1.2 s of SSH setup on a busy host
+  // into "clock skew" and refused the control step.
+  const world = stubWorld()
+  world.stub({ routes: ROUTES })
+  const r = sh(world, 'run-step.sh', ['r5-1', '5', '3'], { STUB_SSH_DELAY: '1.5' })
+  assert.equal(r.status, 0, r.stderr)
+  const clock = JSON.parse(readFileSync(join(world.work, 'out/steps/r5-1/clock.json'), 'utf8'))
+  assert.ok(Math.abs(clock.skewS) < 0.3, `skew ${clock.skewS}`)
+  assert.ok(clock.rttMs >= 1500)
+  assert.equal(result(world, 'out', 'r5-1').class, 'valid')
+})

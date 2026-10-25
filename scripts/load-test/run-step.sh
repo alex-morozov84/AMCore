@@ -32,12 +32,21 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-# Clock skew in seconds, measured against the middle of the round trip.
-t0=$(ms)
-remote=$(srv sh scripts/load-test/server-stats.sh clock)
-t1=$(ms)
-skew_ms=$((remote - (t0 + t1) / 2))
-echo "{\"skewS\":$(awk -v v="$skew_ms" 'BEGIN {printf "%.3f", v / 1000}')}" > "$DIR/clock.json"
+# Clock skew. The host reads its clock at the END of an SSH call (after the connection
+# setup, which takes most of the round trip), so the estimate is host time minus local time
+# on return; of three calls the one with the shortest round trip counts. Measuring against
+# the middle of the round trip reported a busy host's slow SSH setup as skew (fresh host).
+best_rtt=
+for _ in 1 2 3; do
+  t0=$(ms)
+  remote=$(srv sh scripts/load-test/server-stats.sh clock)
+  t1=$(ms)
+  if [ -z "$best_rtt" ] || [ $((t1 - t0)) -lt "$best_rtt" ]; then
+    best_rtt=$((t1 - t0))
+    skew_ms=$((remote - t1))
+  fi
+done
+echo "{\"skewS\":$(awk -v v="$skew_ms" 'BEGIN {printf "%.3f", v / 1000}'),\"rttMs\":$best_rtt}" > "$DIR/clock.json"
 [ "${skew_ms#-}" -le 1000 ] || die "clock skew to the host is ${skew_ms} ms; synchronise time (NTP) first"
 
 srv sh scripts/load-test/server-stats.sh containers > "$DIR/containers.before"

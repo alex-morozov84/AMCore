@@ -59,7 +59,8 @@ the two directories as the user who runs `docker compose`, then copy the files f
 the generator:
 
 ```bash
-mkdir -p -m 700 /srv/amcore-loadtest/ca /srv/amcore-loadtest/secrets      # host
+sudo mkdir -p /srv/amcore-loadtest/ca /srv/amcore-loadtest/secrets          # host
+sudo chown -R "$USER": /srv/amcore-loadtest && chmod -R 700 /srv/amcore-loadtest   # host
 scp ~/lt-work/ca.crt <user>@<host>:/srv/amcore-loadtest/ca/                # generator
 scp ~/lt-work/fixture-password <user>@<host>:/srv/amcore-loadtest/secrets/  # generator
 ```
@@ -289,9 +290,11 @@ docker compose down -v                                  # its containers, networ
 docker volume ls --filter label=com.docker.compose.project=amcore-loadtest-<run id>   # empty
 ```
 
-Run these from the deployment checkout: `recover.sh` keeps `COMPOSE_PROJECT_NAME` in
-`.env`, so `docker compose` still names this run's project. Also delete
-`/srv/amcore-loadtest` and `~/amcore-load-test` on the host, `~/lt-work` on the generator
+Run these from the deployment checkout, exactly as written: `recover.sh` keeps
+`COMPOSE_PROJECT_NAME` in `.env`, so `docker compose` still names this run's project. Do
+not add `--profile` flags: they replace `COMPOSE_PROFILES` from `.env`, and Postgres,
+Redis and Caddy would stay with their volumes. Also delete
+`/srv/amcore-loadtest` (`sudo rm -rf`, `/srv` belongs to root) and `~/amcore-load-test` on the host, `~/lt-work` on the generator
 (keep a copy of `~/lt-work/out` if you want the results), the `fixture-password` copy on
 the machine that ran `outside`, and the VMs if they were created for the test. Do not use `docker system prune` on a shared host.
 

@@ -84,8 +84,9 @@ if (args[0] === 'run') {
 `
 
 const SCRIPTS = {
-  // Remote commands run locally: the last argument is the command line.
-  ssh: '#!/bin/sh\nfor last in "$@"; do :; done\nexec sh -c "$last"\n',
+  // Remote commands run locally: the last argument is the command line. STUB_SSH_DELAY
+  // models a slow connection setup before the remote command starts.
+  ssh: '#!/bin/sh\nsleep "${STUB_SSH_DELAY:-0}"\nfor last in "$@"; do :; done\nexec sh -c "$last"\n',
   timeout: '#!/bin/sh\nshift\nexec "$@"\n',
   vmstat:
     '#!/bin/sh\necho "procs ---memory---"\necho " r b swpd free buff cache si so bi bo in cs us sy id wa st"\necho " 0 0 0 1 1 1 0 0 0 0 1 1 5 5 90 0 0"\n',

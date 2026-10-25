@@ -67,7 +67,7 @@ function row(name, r) {
     fmt(f.offeredRate, 1),
     fmt(f.achievedRate, 2),
     fmt(f.adminAchievedRate, 2),
-    fmt(f.serverP95Ms),
+    fmt(f.serverP95Ms, 1),
     pct(f.failedRate),
     pct(f.adminFailedRate),
     checks || 'none',
