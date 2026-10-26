@@ -48,7 +48,8 @@ Official fixed release -> remove local patch -> frozen installs
 ```
 
 After editing the reviewed dependency version, patch registration and files, use
-`pnpm install --lockfile-only` to regenerate the lock. Then run:
+`pnpm install --lockfile-only --ignore-scripts` to regenerate the lock without
+running installation hooks. The following frozen install runs the normal hooks:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -100,7 +101,5 @@ reviewed dependency manifest, workspace patch registration, lock, patch files an
 install inputs as one coherent change. Preserve unrelated edits. Reinstall frozen and
 rebuild production outputs; do not reuse output from the failed candidate.
 
-Development-server results do not prove production cache behavior. If the proposed
-release still needs a patch, review its exact compatibility and maintenance cost
-before carrying it forward. See [frontend testing](testing.md) and
-[the upstream issue](https://github.com/vercel/next.js/issues/96714).
+For check selection, see [frontend testing](testing.md).
+The [upstream issue](https://github.com/vercel/next.js/issues/96714) tracks the defect.

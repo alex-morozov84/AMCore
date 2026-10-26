@@ -86,7 +86,7 @@ in runtime modules. Keep legitimate `.cjs` test/configuration boundaries.
 
 Prisma generates ESM with `.js` imports. Change its generator configuration and
 regenerate the current schema together; do not copy generated files from another
-checkout. The generator format change does not change database models/migrations.
+checkout.
 SWC preserves legacy decorator metadata, class names and React JSX transformation.
 
 ## Operator commands
@@ -100,8 +100,14 @@ node dist/cli/storage-check.js
 node dist/cli/organization-setup.js status
 ```
 
-The application entrypoint is `node dist/main.js`. Operator commands retain their
-existing environment, permissions, refusal and cleanup contracts.
+The application entrypoint is `node dist/main.js`. Before running an operator
+command, follow its setup and permission guide:
+
+- [GeoIP setup](../operations/geoip-setup.md).
+- [Telegram webhook deployment](../operations/deployment.md#telegram-webhook-registration-one-shot-optional).
+- [Storage checks](../storage/README.md).
+- [First organization setup](../product-admin/organization-establishment.md).
+
 Telegram, storage and organization-setup commands compare canonical file URLs
 before execution. Importing these modules does not run their commands.
 Invocation through a symlink remains supported. GeoIP always runs as an executable command.
@@ -132,12 +138,9 @@ required. Starter transforms alone do not prove a generated project builds.
 
 ## Choice and rollback
 
-SWC retains the maintained Nest integration with fewer additional dependencies
-than the admitted Rspack alternative. Small local measurements favored SWC for
-one edit-to-response scenario. They did not establish a full-build, application
-throughput or hosted-CI winner. Rspack remains an alternative when a concrete
-bundling requirement justifies it. TypeScript 7 checking is independent of this
-emitter decision; frontend/compiler-API tooling is not migrated by this change.
+SWC uses the maintained Nest compilation integration. TypeScript 7 checking remains
+independent of the JavaScript emitter. Keep frontend and compiler-API tooling on
+their declared compiler versions.
 
 Rollback must restore package mode, imports, Prisma generator, compiler/Jest
 configuration, build/cache/Docker inputs and instructions together. Regenerate

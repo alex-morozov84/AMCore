@@ -149,9 +149,7 @@ A code that only the web BFF emits (`REGISTRATION_SIGN_IN_REQUIRED`, see
 needs the same enum entry and catalogue entries; the BFF builds the response, not the API.
 
 Step 3 is not optional: `src/shared/api/error-messages.test.ts` derives its
-expectations from those enums, so a code without a translation fails the build.
-That guard exists because the original contract rotted exactly this way — the
-codes were defined, the frontend never translated them, and nothing complained.
+expectations from those enums, so a code without a translation fails the required tests.
 
 Render failures with `<ApiErrorAlert error={error} />`, or call `useApiError()`
 for `{ code, message, correlationId, isUnknown }`.
@@ -235,7 +233,7 @@ React Email templates live in `.tsx`.
    every key; add the CLDR plural categories that language requires.
 3. Add a message block for it in `apps/api/src/infrastructure/email/messages.ts`.
 4. Add the locale's display name under `locale.<code>` in every catalogue.
-5. Run `pnpm --filter @amcore/web test:run` and `pnpm --filter api test` — the
+5. Run `pnpm --filter web test:run` and `pnpm --filter api test` — the
    parity and coverage guards will name anything missing.
 
 No routing change is needed: routes, the switcher, and `generateStaticParams`
@@ -288,7 +286,7 @@ page would redirect to itself forever in production while working fine under
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | `pnpm typecheck`                             | A translation key that does not exist in `en.json`                           |
 | `src/i18n/messages.test.ts`                  | Catalogues out of sync, empty values, missing plurals, `.` inside a key      |
-| `e2e/mocked/message-payload.spec.ts`         | Route-scoped messages leaking into public page HTML                          |
+| `e2e/mocked/message-payload.spec.ts`         | Unexpected namespaces in serialized client message payloads                  |
 | `src/shared/api/error-messages.test.ts`      | A shared error code with no translation, or an orphaned message              |
 | `apps/api/.../messages.spec.ts`              | The same, for email copy                                                     |
 | `apps/api/.../frontend-url-coverage.spec.ts` | A backend module building a link from `FRONTEND_URL` without a locale prefix |

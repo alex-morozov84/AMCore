@@ -1,11 +1,8 @@
 # Frontend Testing
 
-`apps/web`'s test surface (Track 7, **ADR-069**; Storybook layer added in
-Track 8, **ADR-070**). The pyramid has five families — Vitest unit/component,
-Vitest integration, Playwright E2E, accessibility scanning, and Storybook —
-with infra integration called out separately because it has a Docker cost.
-This guide says which layer a new test belongs in and why, not just how to
-run the suite.
+Choose the test layer that proves the changed behavior: unit/component,
+integration, browser E2E, accessibility or Storybook. Infrastructure integration
+uses a separate command because it needs Docker.
 
 ## Production typechecking
 
@@ -37,7 +34,8 @@ Both commands remain strict. Excluded files can reenter through imports.
 
 Next additionally filters `.next/dev/types` roots during production typechecking.
 The standalone command retains those roots, and imports can reintroduce them into Next.
-Keep these memberships distinct when diagnosing a development-to-build failure.
+Next also filters test-file diagnostics; the complete standalone typecheck does not.
+Keep these memberships and diagnostics distinct when investigating different results.
 The independent build command stores its incremental state in
 `.amcore/typescript/build.tsbuildinfo`; Next manages its own build cache.
 
@@ -199,8 +197,7 @@ still require review and browser verification.
 
 ## Unit and component tests
 
-Unchanged, already the largest layer (55+ files). Two established mocking
-shapes, kept side by side rather than merged:
+Use the mocking pattern that matches the boundary under test:
 
 - **Hook/query tests** mock the typed client module:
   `vi.mock('@/shared/api', () => ({ authApi: { ... } }))`.
@@ -213,9 +210,8 @@ closes.
 
 A `catchError` (`next/error`) boundary's actual catch-and-fallback behavior
 is a third gap this layer can't close: its real implementation reaches
-into Next's app-router client runtime (confirmed by a real `TypeError`
-reading an internal pending-navigation field when tried directly), which
-plain Vitest + Testing Library never initializes. Test that nothing throws
+into Next's app-router client runtime, which plain Vitest + Testing Library
+does not initialize. Test that nothing throws
 in the healthy case here; prove the thrown-child → fallback → `retry()`
 path in Storybook instead (`@storybook/nextjs-vite`'s
 `parameters.nextjs.appDirectory` mock supplies the context) — see
@@ -332,55 +328,29 @@ gate on two protected routes; and the dashboard app shell — the mobile
 (`375px`) Sheet variant and the sidebar's collapsed state surviving a
 reload through the `sidebar_state` cookie.
 
-That last one earns its place here rather than in a cheaper layer: the
-cookie is written client-side and read **server-side** in a layout, so
-only a real server closes the loop. It caught a real defect — the constant
-naming the cookie was exported from a `'use client'` module, which Next
-turns into a client reference on the server, so the read silently always
-missed (see [Boundaries & guardrails](./fsd-boundaries-and-guardrails.md#a-shared-constant-does-not-survive-a-use-client-boundary)).
-Typecheck, lint, unit tests and the Storybook a11y gate were all green
-throughout.
+The sidebar cookie is written by the client and read by a server layout.
+Use real-stack E2E to prove that complete path. A unit test of either side alone
+cannot establish cookie persistence across a reload.
 
-**Not automated yet, named rather than silently skipped:** a BFF SSE smoke
-test. Track 6 proved `EventSource` survives the standalone proxy manually;
-automating a real Redis Pub/Sub publish + browser receive in E2E is a
-real harness cost, deferred to a later slice.
+BFF SSE delivery has no automated browser smoke test. Do not claim browser
+Pub/Sub coverage from the existing real-stack lane.
 
-Async Server Components are why the real-stack lane exists at all, not
-just a preference: Next's own bundled Vitest guide
-(`node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`) states
-Vitest does not support testing `async` Server Components — exactly the
-shape of `requireSession()`-gated pages and BFF DAL reads — and recommends
-E2E for them.
+Use real-stack E2E for `requireSession()`, cookies, Redis and request-bound
+Server Component behavior. Next's bundled Vitest guide
+(`node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`) recommends E2E
+for async Server Components because Vitest cannot render them directly.
 
-**Narrow exception: a page whose only `async` work is data already
-resolved by a mock, with no nested `async` children.** The limitation the
-doc above states is specific: RTL's `render()` itself can't invoke
-`<AsyncComponent />` as part of its own tree reconciliation — it never
-awaits a component function that returns a `Promise`. It is not a claim
-that an already-resolved async component's output can't be rendered. Calling
-the page function yourself first — `render(await OverviewPage())` — never
-asks `render()` to do the unsupported thing: you resolve the `async` call in
-plain JS (ordinary `await`, nothing Vitest-specific), and `render()` only
-ever sees an already-resolved, fully synchronous element tree — indistinguishable
-from testing a sync component. This is **not a documented Vitest capability**;
-it follows from plain JS/React semantics, not from anything the guide above
-endorses, so don't cite it as "the docs allow this." It is also **not** a way
-to prove `requireSession()`/cookie/Redis
-behavior (those still need the real-stack lane — nothing else runs a real
-request), but it is a legitimate way to unit-test pure conditional
-branching over an already-mocked `DataOutcome` (e.g. "does this page render
-card A or card B for this outcome"), the kind of thing that doesn't depend
-on any per-request server context. It requires every component in the
-returned tree to be synchronous — a page that composes an `async` _child_
-(not just the page itself) needs that child flattened to a plain function
-receiving its data/translator as props first (see `OverviewDetails` in
-`_pages/console/OverviewPage/`, which dropped its own `getTranslations`
-call in favor of receiving `t` from the already-`async` parent). If a
-future child component gets _real_ async work of its own (its own data
-fetch, not just a translator the parent already resolved), this stops
-being flattenable and the test belongs in the real-stack lane instead —
-don't stretch this technique to cover that case.
+A narrow unit-test case can render already-resolved output:
+
+```tsx
+render(await OverviewPage())
+```
+
+Use this only when all server collaborators are mocked and every returned child
+is synchronous. It tests conditional composition over the mocked result. It does
+not prove auth/BFF behavior or provide general async-component support. A child
+with its own real asynchronous work belongs in E2E; do not restructure production
+components solely to make this unit-test technique apply.
 
 ## Accessibility
 
@@ -409,26 +379,22 @@ test('login page has no axe violations', async ({ page }) => {
 })
 ```
 
-WCAG A/AA tags through 2.2 (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`,
-`wcag22aa` — confirmed present in the installed `axe-core` version before
-being added; don't assume a tag exists, check `axe-core`'s bundled tag
-list). Scanned today: login (default + API-error state), register, the
-authenticated dashboard, and the sessions page including with the
-row-actions dropdown open.
+The shared helper checks WCAG A/AA tags through 2.2: `wcag2a`, `wcag2aa`,
+`wcag21a`, `wcag21aa` and `wcag22aa`. Check installed axe tag support when changing
+this set.
 
-**Popups need a settled-animation check before scanning.** A dropdown/
-dialog fading/zooming in over a CSS entrance animation can make axe sample
-a partially-transparent frame and report a false `color-contrast`
-violation — confirmed live via `getComputedStyle` on the settled element
-before concluding either way. Use `waitForAnimationsToFinish()` (polls the
-Web Animations API, not a fixed sleep) after opening a popup and before
-scanning it:
+For a popup, assert its intended open state and call the same helper:
 
 ```ts
 await page.getByRole('button', { name: /actions/i }).click()
-await waitForAnimationsToFinish(page, '[data-slot="dropdown-menu-content"]')
+await expect(page.getByRole('menu')).toBeVisible()
 await expectNoAxeViolations(page)
 ```
+
+The helper already waits for visual stability. Follow
+[Stable accessibility scans](#stable-accessibility-scans); do not add a second
+animation wait just for axe. Explicit settled-state assertions may still use
+`waitForAnimationsToFinish()` from the same shared module.
 
 **Session scans distinguish readiness from retained content.** For a settled
 scan, first assert the expected rows/current-session badge, `aria-busy="false"`
@@ -441,7 +407,8 @@ check.
 The real-stack retained-refetch regressions hold an actual authenticated list
 response without changing its data. Before releasing it, they assert preserved
 row content and counts, `aria-busy="true"` and the existing control feedback,
-then run the full-page axe scan while the response is still held. After release,
+then call `expectNoAxeViolations(page, { allowBusy: true })` while the response
+is still held. After release,
 they assert the settled content and scan again. Settings covers both themes. Release and join held
 requests, unregister handlers and close additional contexts in `finally`.
 Auth, cookies and persistence remain real in this lane.
@@ -665,8 +632,7 @@ there are no independent endpoint overrides. See
   policy the "CSP and security headers" section above tests.
 - [API consumption](./api-consumption.md) — the hooks the integration
   layer's contract tests target.
-- [Storybook](./storybook.md) — the fifth pyramid layer added in Track 8:
-  component-isolation states and its own accessibility gate.
+- [Storybook](./storybook.md) — component-isolation states and their accessibility gate.
 - [Route bundle budgets](./bundle-budget.md) — the CI check that limits each
   page's first-load JavaScript, run after every web build.
 

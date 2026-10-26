@@ -379,7 +379,7 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
      `docs/frontend/route-progress.md`.
   3. **Translate API failures by `errorCode`**, never the backend's `message`
      (English, developer-facing). Use `<ApiErrorAlert>` / `useApiError()`. A new
-     shared error code with no translation fails the build.
+     shared error code with no translation fails the required translation tests.
   4. **Build forms with `useLocalizedForm()`**, never a global Zod locale.
      Any backend link shown to a user (email CTA, notification, OAuth redirect)
      must be built with `localizedFrontendUrl()` from `@amcore/shared`, never
