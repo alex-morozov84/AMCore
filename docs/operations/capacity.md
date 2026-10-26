@@ -65,20 +65,16 @@ reference run, Redis was filled to its limit on purpose:
   API readiness check reported `503`. No service crashed or restarted.
 - Two welcome emails queued before the limit stayed queued and were sent after
   memory was freed. Everything recovered without restarts.
-- Registration has three results under this pressure. Which one a person gets depends
-  on when Redis refuses the write:
-  - Refused before the account is created: nothing exists and registering again is safe.
-  - Refused after the API created the account: the web application answers `503` with
-    `REGISTRATION_SIGN_IN_REQUIRED` and shows that the account was created and that
-    the person should sign in later with the same email and password. The account,
-    its first session and its verification token were committed together. Registering
-    again returns `EMAIL_ALREADY_EXISTS`; signing in works once Redis accepts writes.
-  - No usable answer (a lost connection or a server error): the account may or may not
-    exist. Try signing in with the same email and password before registering again.
-- The welcome email is queued in Redis and is best-effort. It is lost when the queue
-  refuses it or the process stops first, and there is no resend. The verification
-  email is sent directly and can be requested again. See
-  [registration results in the web application](../frontend/api-consumption.md#registration-results-in-the-web-application).
+- Registration under this pressure ends in one of two ways. The web application shows the
+  created-account notice (`REGISTRATION_SIGN_IN_REQUIRED`) when the API confirmed the
+  account but the session could not be stored: sign in with the chosen password once
+  Redis accepts writes; registering again returns `EMAIL_ALREADY_EXISTS`. Every other
+  failure is an unknown result, including a refusal before the account was created, which
+  the person cannot tell apart: try signing in with the same email and password before
+  registering again.
+- The welcome email is queued in Redis and is best-effort: with Redis full the queue refuses it,
+  so it is lost, and it has no resend. The verification email is sent directly and can be
+  requested again; see [queued email](../email/delivery.md#queued-email).
 
 ## Container memory limits
 

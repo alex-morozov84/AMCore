@@ -92,36 +92,38 @@ or add a response scanner that buffers uploads or SSE.
 
 ## Registration results in the web application
 
-`POST /api/auth/register` first calls the API, then stores the new session in the
-Redis session vault. Those are two systems, so the browser can see a refusal after
-the account exists. The handler reports only what it can prove:
+`POST /api/auth/register` calls the API, then publishes the browser session: it
+stores the session in the Redis vault and retires earlier invitation flows. The API
+commit and the publication are separate, so publication can fail after the account
+exists.
 
-| What the BFF observed                                                             | Response                                                         | What it proves                                                      |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
-| API answered exactly `201` with a valid body, and the session was stored          | `201 { user }` and the session cookie                            | The person is signed in                                             |
-| API answered exactly `201` with a valid body, but the session could not be stored | `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`, no cookie | The account exists; sign-in is temporarily unavailable              |
-| API answered `409 EMAIL_ALREADY_EXISTS`                                           | `409` with that code                                             | The email is taken; this does not say who created the account       |
-| No usable answer: network failure, timeout, `5xx`, or `201` with an unusable body | The existing failure response (`503` backend or authentication)  | Unknown: the account may or may not exist. Never say it was created |
+| What the BFF observed                                                                                                                                                                       | Response                                                         | Meaning                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
+| The API answered exactly `201` with a valid body and the session was published                                                                                                              | `201 { user }` and the session cookie                            | The person is signed in                    |
+| The API answered exactly `201` with a valid body, but publication failed (vault write, flow retirement) or the API sent no refresh cookie                                                   | `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`, no cookie | The account exists; sign-in is unavailable |
+| The API answered `409 EMAIL_ALREADY_EXISTS`                                                                                                                                                 | `409` with that code                                             | The email is taken                         |
+| Anything else: a network failure, a timeout, an API error (forwarded with its own status, for example `500`) or a success that is not a valid `201` (`200`, `202`, `204`, an unusable body) | The API error status, or `503`                                   | Unknown: the account may or may not exist  |
 
-`REGISTRATION_SIGN_IN_REQUIRED` is emitted only by the web BFF, never by the API,
-so it is not in the OpenAPI document. A custom registration form must:
+`REGISTRATION_SIGN_IN_REQUIRED` is emitted only by the web BFF, so it is not in the
+OpenAPI document. A custom registration form must:
 
-1. not repeat the POST after this code (it can only return `409`);
-2. clear the password field, show that the account was created, and link to sign-in;
+1. not submit the registration again after this code;
+2. clear the password field, say that the account was created, and link to sign-in;
 3. not write the user into the authenticated cache or navigate as if signed in;
-4. on an unknown result, ask the person to try signing in with the same email and
-   password, without claiming the account exists.
+4. after an unknown result, ask the person to try signing in with the same email and
+   password, or to reset the password, without saying that the account exists.
+   Registering again is harmless (an existing account answers `EMAIL_ALREADY_EXISTS`)
+   but is not the first step.
 
-Sign-in can also be unavailable while the vault is full, so the person should try
-again after the service recovers. The same code is returned by
-`POST /api/invitation-flows/{flowId}/register` when the API confirmed the invited
-account but the invitation session could not be published; the recipient page then
-reads the flow context again and offers invitation sign-in
-([invitation recovery](../auth/invites.md#browser-bff-contract)). A browser that
-disconnects before the response cannot be notified: use sign-in or password reset.
+Sign-in can stay unavailable until the service recovers. A browser that disconnects
+before the response gets no notice: sign in or reset the password.
 
-See [Redis memory](../operations/capacity.md#redis-memory) for what an operator
-sees, and [registration](../auth/email-auth.md#registration) for the API contract.
+`POST /api/invitation-flows/{flowId}/register` returns the same code when the API
+confirmed the invited account but the invitation session could not be published. The
+recipient page keeps a notice and reads the flow context without replaying
+credentials; the outcome is described in
+[invitation recovery](../auth/invites.md#browser-bff-contract). For what an operator
+sees, see [Redis memory](../operations/capacity.md#redis-memory).
 
 ## Invitation adapters
 

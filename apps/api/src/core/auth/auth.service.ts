@@ -163,9 +163,9 @@ export class AuthService {
     // must never be overridden by the header (MDN Accept-Language guidance).
     const locale = input.locale ?? requestInfo.acceptedLocale
 
-    // User, session and verification token commit together: a `2xx` means all three exist, and
-    // a failure leaves none of them. Hashing above and mail below stay outside the transaction;
-    // nothing inside waits on Redis, a provider or another HTTP call.
+    // User, session and verification token commit together; if the transaction fails, its writes
+    // roll back. Hashing above and mail below stay outside it; nothing inside waits on Redis, a
+    // provider or another HTTP call.
     const created = await this.prisma
       .$transaction(
         async (tx) => {

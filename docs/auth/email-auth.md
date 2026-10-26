@@ -67,21 +67,19 @@ unsupported body `locale` is a `400` validation error.
 2. Password is hashed with Argon2id (~100ms intentionally)
 3. One database transaction creates the user (`systemRole: USER`,
    `emailVerified: false`, the resolved `locale`), its first session and its
-   email-verification token, and prepares the access token and verification link.
-   A `2xx` means all of them exist; a failure leaves none of them. If two
+   email-verification token. If the transaction fails, its writes roll back. When
    requests race for one canonical email, one wins and the others get
    `EMAIL_ALREADY_EXISTS`
-4. After the commit, two emails are started. The welcome email is queued and
-   best-effort: it is lost if the queue refuses it or the process stops first, and
-   it has no resend. The verification email is sent directly (the raw token exists
-   only in the email link) and can be requested again
-   ([resend](#email-verification)). A failed email never undoes the signup
+4. After the commit, the welcome email is queued and the verification email is
+   sent directly; see [queued email](../email/delivery.md#queued-email). A failed
+   email never undoes the signup
 5. The access token and the `refresh_token` cookie are returned
 
-The transaction does not include Redis, email or any other HTTP call. A lost
-response after the commit is still possible: sign in or reset the password rather
-than submitting the registration again. The web application adds its own session
-step after this call; see
+The transaction contains no Redis, email or other HTTP call. An error after the
+commit, or a lost response, can hide a committed account: sign in or reset the
+password instead of submitting the registration again. The web application adds
+a session step; see
+[registration results in the web application](../frontend/api-consumption.md#registration-results-in-the-web-application).
 [registration results in the web application](../frontend/api-consumption.md#registration-results-in-the-web-application).
 
 **Success response** `201 Created`:

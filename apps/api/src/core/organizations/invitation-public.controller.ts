@@ -93,7 +93,7 @@ export class InvitationPublicController {
   @ApiOperation({
     summary: 'Create an unverified ordinary account for the fixed invitation email; never join',
     description:
-      'The user, its first session, the authentication handoff and its email-verification token are committed in one transaction, and the invitation expiry is checked last, so a link that expires during issuance commits nothing. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS. If a 2xx response is lost, sign in or reset the password; do not submit the registration again.',
+      'The user, its first session, the authentication handoff and its email-verification token are created in one transaction; the invitation expiry is checked last. If it fails, its writes roll back. After the commit the response can still be lost: sign in or reset the password instead of submitting again. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS.',
   })
   @SchemaResponse({ type: AuthResponseDto, status: 201 })
   async register(
