@@ -3,6 +3,7 @@ import { OWN_KEY_QUERY_BYTES, ownKeyQuerySchema } from '@amcore/shared'
 
 import { OwnApiKeysPage } from '@/_pages/own-api-keys'
 import { readOwnApiKeyAdmission } from '@/entities/api-key/index.server'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import {
@@ -50,11 +51,13 @@ export async function OwnApiKeysMount({
     !parsed.success
   const query = parsed.success ? parsed.data : { page: 1, limit: 20, status: 'all' as const }
   return (
-    <OwnApiKeysPage
-      admission={admission}
-      query={query}
-      invalidQuery={invalidQuery}
-      baseHref={placement.ownApiKeysPath ?? '/settings/api-keys'}
-    />
+    <ClientMessages namespaces={['memberApiKeys', 'apiKeyPresentation', 'organizationRoles']}>
+      <OwnApiKeysPage
+        admission={admission}
+        query={query}
+        invalidQuery={invalidQuery}
+        baseHref={placement.ownApiKeysPath ?? '/settings/api-keys'}
+      />
+    </ClientMessages>
   )
 }

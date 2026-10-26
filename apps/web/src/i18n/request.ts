@@ -3,6 +3,8 @@ import { getRequestConfig } from 'next-intl/server'
 
 import { routing } from './routing'
 
+import 'server-only'
+
 /**
  * Shared format definitions. Declaring them once here (rather than passing
  * options at each call site) keeps date/number rendering consistent and makes

@@ -8,7 +8,10 @@ import {
   useMessages,
 } from 'next-intl'
 
-export function AccountMfaMessages({
+import { mergeClientMessages } from './message-selection'
+
+/** Private adapter: server composition passes selected additions, never a full catalogue. */
+export function ClientMessageProvider({
   messages,
   children,
 }: {
@@ -18,7 +21,7 @@ export function AccountMfaMessages({
   const inherited = useMessages()
   const locale = useLocale()
   return (
-    <NextIntlClientProvider locale={locale} messages={{ ...inherited, accountMfa: messages }}>
+    <NextIntlClientProvider locale={locale} messages={mergeClientMessages(inherited, messages)}>
       {children}
     </NextIntlClientProvider>
   )

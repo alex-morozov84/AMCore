@@ -14,14 +14,13 @@ export const storybookTestingSeams = [
   owned(
     'storybook.testing-intro',
     block(
-      "`apps/web`'s test surface (Track 7, **ADR-069**;",
-      'with infra integration called out separately because it has a Docker cost.',
+      'Choose the test layer that proves the changed behavior: unit/component,',
+      'uses a separate command because it needs Docker.',
       {
         replacement:
-          "`apps/web`'s test surface (Track 7, **ADR-069**). The pyramid has four\n" +
-          'families — Vitest unit/component, Vitest integration, Playwright E2E, and\n' +
-          'accessibility scanning — with infra integration called out separately\n' +
-          'because it has a Docker cost.\n',
+          'Choose the test layer that proves the changed behavior: unit/component,\n' +
+          'integration, browser E2E or accessibility. Infrastructure integration\n' +
+          'uses a separate command because it needs Docker.\n',
       }
     )
   ),
@@ -40,13 +39,9 @@ export const storybookTestingSeams = [
       '  experimental and deliberately not enabled here.'
     )
   ),
-  owned(
-    'storybook.testing-see-also',
-    block(
-      '- [Storybook](./storybook.md)',
-      '  component-isolation states and its own accessibility gate.'
-    )
-  ),
+  owned('storybook.testing-see-also', {
+    text: '- [Storybook](./storybook.md) — component-isolation states and their accessibility gate.',
+  }),
   owned(
     'storybook.testing-error-boundary',
     block(

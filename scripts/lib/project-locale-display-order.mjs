@@ -1,4 +1,4 @@
-import { E2E_ROUTE_SURFACES } from './project-locale-e2e-route-surfaces.mjs'
+import { E2E_ROUTE_SURFACES, LOCALE_ONLY_E2E_PATHS } from './project-locale-e2e-route-surfaces.mjs'
 import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
 import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
 
@@ -124,6 +124,9 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/i18n/navigation.ts',
   'apps/web/src/i18n/params.ts',
   'apps/web/src/features/locale-switcher',
+  'apps/web/src/shared/ui/locale-selector.tsx',
+  'apps/web/src/shared/ui/locale-selector.stories.tsx',
+  ...LOCALE_ONLY_E2E_PATHS,
   'apps/web/src/i18n/request.ts',
   'apps/web/src/global.d.ts',
   'apps/web/src/i18n/messages.test.ts',

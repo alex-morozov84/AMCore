@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { isOrganizationContextId } from '@amcore/shared'
 
 import { readOrganizationContext } from '@/entities/organization-context/index.server'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import { SessionNotFoundError } from '@/shared/api/bff/errors'
@@ -56,15 +57,17 @@ export async function OrganizationAccessMount({
       ? requested
       : 1
   return (
-    <OrganizationAccessClientMount
-      deniedContent={deniedContent}
-      placement={placement}
-      admission={admission}
-      id={id}
-      initialOrganizationName={initialOrganizationName}
-      initialCanManageTeamAccess={initialCanManageTeamAccess}
-      page={page}
-      explicitList={search.view === 'list'}
-    />
+    <ClientMessages namespaces={['organizationCreation', 'organizationNav']}>
+      <OrganizationAccessClientMount
+        deniedContent={deniedContent}
+        placement={placement}
+        admission={admission}
+        id={id}
+        initialOrganizationName={initialOrganizationName}
+        initialCanManageTeamAccess={initialCanManageTeamAccess}
+        page={page}
+        explicitList={search.view === 'list'}
+      />
+    </ClientMessages>
   )
 }

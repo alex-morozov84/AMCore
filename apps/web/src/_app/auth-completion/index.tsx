@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { AuthErrorCode, type SupportedLocale } from '@amcore/shared'
 
 import { OAuthCompletionPage } from '@/_pages/auth'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { redirect } from '@/i18n/navigation'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { oauthCompletionQuerySchema } from '@/shared/api/bff/oauth-completion-input'
@@ -34,14 +35,16 @@ export async function OAuthCompletionMount({
       locale,
     })
   return (
-    <OAuthCompletionPage
-      {...parsed.data}
-      locale={locale}
-      action={
-        kind === 'admin-auth'
-          ? '/api/product-admin/auth/oauth/complete'
-          : '/api/auth/oauth/complete'
-      }
-    />
+    <ClientMessages namespaces={['auth']}>
+      <OAuthCompletionPage
+        {...parsed.data}
+        locale={locale}
+        action={
+          kind === 'admin-auth'
+            ? '/api/product-admin/auth/oauth/complete'
+            : '/api/auth/oauth/complete'
+        }
+      />
+    </ClientMessages>
   )
 }

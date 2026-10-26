@@ -1,4 +1,11 @@
 import { networkPolicy, NETWORK_IMPORTS, NETWORK_LOADERS } from './network-policy.mjs'
+import {
+  CATALOGUE_SYNTAX,
+  PROVIDER_SYNTAX,
+  PRIVATE_MESSAGE_SYNTAX,
+  MESSAGE_BOUNDARY_FILES,
+  MESSAGE_FIXTURES,
+} from './message-policy.mjs'
 import { residualConfig } from '@amcore/eslint-config/hybrid'
 import javascriptRules from '@amcore/eslint-config/javascript-recommended' with { type: 'json' }
 import tseslint from 'typescript-eslint'
@@ -639,4 +646,29 @@ policy.push({
   ignores: networkIgnores,
   rules: { 'no-restricted-syntax': [...syntax.rules['no-restricted-syntax'], ...NETWORK_LOADERS] },
 })
+// Compose with the same base/network rules; flat-config syntax arrays replace,
+// rather than concatenate, so every specialization carries the complete policy.
+for (const [name, files, ignores, extra] of [
+  [
+    'runtime',
+    ['src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'],
+    [...MESSAGE_BOUNDARY_FILES, 'src/i18n/request.ts'],
+    [...CATALOGUE_SYNTAX, ...PROVIDER_SYNTAX, ...PRIVATE_MESSAGE_SYNTAX],
+  ],
+  ['request', ['src/i18n/request.ts'], [], [...PROVIDER_SYNTAX, ...PRIVATE_MESSAGE_SYNTAX]],
+  ['adapter', MESSAGE_BOUNDARY_FILES, [], CATALOGUE_SYNTAX],
+]) {
+  policy.push({
+    name: `project/message-boundary-${name}`,
+    files,
+    ignores: [...MESSAGE_FIXTURES, ...ignores],
+    rules: {
+      'no-restricted-syntax': [
+        ...syntax.rules['no-restricted-syntax'],
+        ...NETWORK_LOADERS,
+        ...extra,
+      ],
+    },
+  })
+}
 export default residualConfig(policy)

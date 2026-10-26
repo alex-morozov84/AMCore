@@ -4,6 +4,7 @@ import { invitationFlowIdSchema } from '@amcore/shared'
 
 import { RecipientFrame } from '@/_pages/invitation-recipient'
 import { readInvitationRecipientAdmission } from '@/entities/invitation-flow/index.server'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { invitationRenderRequest } from '@/shared/api/bff/invitation-render-request'
 import { resolvePrimary } from '@/shared/api/server'
 import { SectionErrorBoundary } from '@/shared/ui/section-error-boundary'
@@ -31,9 +32,11 @@ export async function InvitationRecipientMount({
   let admission
   if (!invitationFlowIdSchema.safeParse(flowId).success)
     return (
-      <RecipientFrame>
-        <InvitationUnavailableClient placement={placement} />
-      </RecipientFrame>
+      <ClientMessages namespaces={['invitationRecipient']}>
+        <RecipientFrame>
+          <InvitationUnavailableClient placement={placement} />
+        </RecipientFrame>
+      </ClientMessages>
     )
   try {
     const id = invitationFlowIdSchema.parse(flowId)
@@ -42,35 +45,41 @@ export async function InvitationRecipientMount({
   } catch (error) {
     if (isExpectedInvitationState(error))
       return (
-        <RecipientFrame>
-          <InvitationUnavailableClient flowId={flowId} placement={placement} />
-        </RecipientFrame>
+        <ClientMessages namespaces={['invitationRecipient']}>
+          <RecipientFrame>
+            <InvitationUnavailableClient flowId={flowId} placement={placement} />
+          </RecipientFrame>
+        </ClientMessages>
       )
     const outcome = invitationUnavailableOutcome(error)
     if (!outcome) throw error
     resolvePrimary(outcome, { source: 'invitation-recipient' })
     return (
-      <RecipientFrame>
-        <InvitationUnavailableClient flowId={flowId} unavailable placement={placement} />
-      </RecipientFrame>
+      <ClientMessages namespaces={['invitationRecipient']}>
+        <RecipientFrame>
+          <InvitationUnavailableClient flowId={flowId} unavailable placement={placement} />
+        </RecipientFrame>
+      </ClientMessages>
     )
   }
   return (
-    <RecipientFrame>
-      <RecipientClient
-        binding={admission.binding}
-        user={admission.user}
-        providers={[]}
-        placement={placement}
-        oauthContent={
-          <Suspense fallback={null}>
-            <SectionErrorBoundary>
-              <RecipientOAuthSection />
-            </SectionErrorBoundary>
-          </Suspense>
-        }
-      />
-    </RecipientFrame>
+    <ClientMessages namespaces={['invitationRecipient']}>
+      <RecipientFrame>
+        <RecipientClient
+          binding={admission.binding}
+          user={admission.user}
+          providers={[]}
+          placement={placement}
+          oauthContent={
+            <Suspense fallback={null}>
+              <SectionErrorBoundary>
+                <RecipientOAuthSection />
+              </SectionErrorBoundary>
+            </Suspense>
+          }
+        />
+      </RecipientFrame>
+    </ClientMessages>
   )
 }
 
@@ -82,8 +91,10 @@ export function InvitationUnusableMount({
   placement?: InvitationPlacement
 }) {
   return (
-    <RecipientFrame>
-      <InvitationUnavailableClient unavailable={unavailable} placement={placement} />
-    </RecipientFrame>
+    <ClientMessages namespaces={['invitationRecipient']}>
+      <RecipientFrame>
+        <InvitationUnavailableClient unavailable={unavailable} placement={placement} />
+      </RecipientFrame>
+    </ClientMessages>
   )
 }

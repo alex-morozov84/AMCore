@@ -302,8 +302,9 @@ Stated so nobody assumes coverage that does not exist:
 Next route wiring may enter `_app/organization-access/index.server.ts` (ready
 content mount without AppShell), `index.client.ts` (menu), and `index.config.ts`
 (serializable placement). These are exact ESLint boundary exceptions for this
-slice; lower layers and arbitrary deep imports remain forbidden. The existing
-slice index preserves compatibility but has a mixed module graph. See
+slice; lower layers and arbitrary deep imports remain forbidden. The default
+slice index exposes the shell frame, menu and placement; content mounts use
+`index.server.ts` so shell imports do not pull page-only client dependencies. See
 [product integration](../product-admin/integration.md).
 
 Invitation routes enter `_app/invitation-flow/index.server.ts` for server handlers

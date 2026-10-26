@@ -54,7 +54,7 @@ function outputs(locale) {
   )
 }
 
-test('token-aware source inventory has the approved 240-reference denominator', () => {
+test('token-aware source inventory has the approved 246-reference denominator', () => {
   const retained = surfaces.reduce(
     (total, [pathname]) =>
       total + routeReferenceInventory(parseStructuralModel(pathname, source(pathname))).count,
@@ -66,7 +66,7 @@ test('token-aware source inventory has the approved 240-reference denominator', 
     0
   )
   assert.equal(retained + deleted, E2E_ROUTE_DENOMINATOR)
-  assert.equal(E2E_ROUTE_DENOMINATOR, 240)
+  assert.equal(E2E_ROUTE_DENOMINATOR, 246)
 })
 
 test('EN and RU retain shared verification with identical prefixless topology', () => {
@@ -104,7 +104,7 @@ test('root navigation assertions remain exact after removing the locale segment'
   }
 })
 
-test('deletes only the two locale-only verification suites', () => {
+test('deletes only the registered locale-only verification surfaces', () => {
   const facts = buildLocaleE2eRouteFacts('en')
   const deleted = facts.filter((fact) => fact.kind === 'delete').map((fact) => fact.path)
   assert.deepEqual(deleted, LOCALE_ONLY_E2E_PATHS)
@@ -218,3 +218,27 @@ for (const [locale, title] of [
     assert.equal(visible, true, 'the concrete reason must be asserted visible')
   })
 }
+
+// Native keyboard selection is a locale-only case; unrelated navigation survives.
+test('removes immediate native and keyboard cases without deleting unrelated tests', () => {
+  for (const action of [
+    "await page.getByRole('combobox', { name: /language/i }).selectOption('en')",
+    "await page.getByRole('combobox', { name: /language/i }).press('ArrowDown')",
+  ]) {
+    const pathname = 'apps/web/e2e/mocked/example.spec.ts'
+    const registry = createProjectStructuralRegistry()
+    const [plan] = planStructuralComposition(registry, [
+      {
+        kind: 'structural',
+        dimension: 'locale',
+        path: pathname,
+        operationKey: 'locale.e2e-route-topology',
+        params: { locale: 'en', surface: 'web', expectedReferences: 0, unavailableUiCases: 1 },
+      },
+    ])
+    const source = `test('locale choice', async () => { ${action} });\ntest('unrelated navigation', () => { expect(true).toBe(true) })`
+    const projected = applyStructuralPlan(registry, plan, source)
+    assert.doesNotMatch(projected, /locale choice|selectOption|ArrowDown/)
+    assert.match(projected, /unrelated navigation/)
+  }
+})

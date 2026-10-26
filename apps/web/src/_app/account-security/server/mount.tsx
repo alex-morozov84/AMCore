@@ -1,13 +1,12 @@
 import { headers } from 'next/headers'
-import { getMessages } from 'next-intl/server'
 import { productAdminPath } from '@amcore/shared'
 
 import { AccountSecurityPage } from '@/_pages/account-security'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { getOptionalSession, redirectToLogin, requireSession } from '@/shared/api/bff/dal'
 import { resolveProductWebContext } from '@/shared/api/bff/product-web-context.server'
 
 import { AccountSecurityClient } from '../ui/client'
-import { AccountMfaMessages } from '../ui/message-scope'
 
 import 'server-only'
 
@@ -27,8 +26,8 @@ export async function AccountSecurityMount({
     else if (!(await getOptionalSession('admin-auth'))) await redirectToLogin(context.loginPath)
   }
   return (
-    <AccountSecurityPage>
-      <AccountMfaMessages messages={(await getMessages()).accountMfa}>
+    <ClientMessages namespaces={['accountMfa']}>
+      <AccountSecurityPage>
         <AccountSecurityClient
           key={`${context.audience}:${frontend}`}
           placement={{
@@ -40,7 +39,7 @@ export async function AccountSecurityMount({
             completeHref: frontend === 'site' ? '/' : productAdminPath('/organizations'),
           }}
         />
-      </AccountMfaMessages>
-    </AccountSecurityPage>
+      </AccountSecurityPage>
+    </ClientMessages>
   )
 }

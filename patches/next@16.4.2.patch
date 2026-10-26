@@ -1,0 +1,34 @@
+diff --git a/dist/client/components/segment-cache/optimistic-routes.js b/dist/client/components/segment-cache/optimistic-routes.js
+index 308e9caaceeb680b3570f5211e47a94c8b1fdab7..5a0bd99c15c573e9b3e1bb813b230811124a859a 100644
+--- a/dist/client/components/segment-cache/optimistic-routes.js
++++ b/dist/client/components/segment-cache/optimistic-routes.js
+@@ -107,6 +107,12 @@ function createEmptyPart() {
+ // The root of the known route tree.
+ let knownRouteTreeRoot = createEmptyPart();
+ function discoverKnownRoute(now, pathname, search, nextUrl, pendingEntry, root, couldBeIntercepted, canonicalUrl, renderedSearch, supportsPerSegmentPrefetching, hasDynamicRewrite) {
++    // Route-cache entries are shared across fragments. Readers append the
++    // destination hash, so the stored canonical URL must be hashless.
++    const hashIndex = canonicalUrl.indexOf('#');
++    if (hashIndex !== -1) {
++        canonicalUrl = canonicalUrl.slice(0, hashIndex);
++    }
+     const tree = root.tree;
+     const pathnameParts = (0, _cachekey.splitPathnameIntoParts)(pathname);
+     if (pendingEntry !== null) {
+diff --git a/dist/esm/client/components/segment-cache/optimistic-routes.js b/dist/esm/client/components/segment-cache/optimistic-routes.js
+index daddd3709fbd1947bd3b9886ef988beafd343b71..199c68f50f8c1a7637e5b8dcc8858bf9ae852680 100644
+--- a/dist/esm/client/components/segment-cache/optimistic-routes.js
++++ b/dist/esm/client/components/segment-cache/optimistic-routes.js
+@@ -98,6 +98,12 @@ let knownRouteTreeRoot = createEmptyPart();
+  *
+  * Returns the fulfilled route cache entry.
+  */ export function discoverKnownRoute(now, pathname, search, nextUrl, pendingEntry, root, couldBeIntercepted, canonicalUrl, renderedSearch, supportsPerSegmentPrefetching, hasDynamicRewrite) {
++    // Route-cache entries are shared across fragments. Readers append the
++    // destination hash, so the stored canonical URL must be hashless.
++    const hashIndex = canonicalUrl.indexOf('#');
++    if (hashIndex !== -1) {
++        canonicalUrl = canonicalUrl.slice(0, hashIndex);
++    }
+     const tree = root.tree;
+     const pathnameParts = splitPathnameIntoParts(pathname);
+     if (pendingEntry !== null) {

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { LocaleSwitcher } from '@/features/locale-switcher'
+import { AuthLocaleSwitcher as LocaleSwitcher } from '@/features/locale-switcher'
 
 export function AuthFrame({ children }: { children: ReactNode }) {
   return (

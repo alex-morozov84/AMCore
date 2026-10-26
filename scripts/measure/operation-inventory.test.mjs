@@ -32,7 +32,7 @@ describe('operation inventory against the real plans', () => {
       // Account MFA adds four retained page move/rewrite pairs, a switcher removal,
       // one Console root deletion and one pending-route extraction in applicable recipes.
       // Providers, manifests and scenario counts remain unchanged.
-      { name: 'measured operations', expected: 967, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 995, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -51,17 +51,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1332,
+        expected: 1364,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2187,
+        expected: 2219,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 941,
+        expected: 968,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])
