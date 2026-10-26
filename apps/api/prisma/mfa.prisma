@@ -58,8 +58,10 @@ model AuthSessionFamily {
   securityVersion       Int
   primaryMethod         String    @default("password")
   primaryAt             DateTime?
+  primaryProofId        String?
   mfaMethod             String?
   mfaAt                 DateTime?
+  mfaProofId            String?
   factorVersion         Int?
   recoveryGeneration    Int?
   publicationState      String    @default("pending")

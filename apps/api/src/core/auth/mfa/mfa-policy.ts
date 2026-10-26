@@ -3,7 +3,9 @@ import type { MfaMethod } from '@amcore/shared'
 /** These are assurance methods, never role or organization grants. */
 export interface MfaEvidence {
   primaryAt: Date | null
+  primaryProofId: string | null
   mfaAt: Date | null
+  mfaProofId: string | null
   mfaMethod: string | null
   factorVersion: number | null
 }
@@ -25,8 +27,9 @@ export function requiredMfaProofs(
   now: Date
 ): Array<'password' | 'second_factor'> {
   const required: Array<'password' | 'second_factor'> = []
-  if (!fresh(evidence.primaryAt, now)) required.push('password')
+  if (!evidence.primaryProofId || !fresh(evidence.primaryAt, now)) required.push('password')
   if (
+    !evidence.mfaProofId ||
     !acceptedMfaMethod(evidence.mfaMethod) ||
     evidence.factorVersion !== factorVersion ||
     !fresh(evidence.mfaAt, now)

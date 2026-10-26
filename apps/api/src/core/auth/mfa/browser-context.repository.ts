@@ -7,17 +7,12 @@ import {
 
 import type { BrowserAuthContext, Prisma } from '../../../generated/prisma/client.js'
 
-import { mfaCredential, mfaHash } from './mfa-secrets.js'
+import { hashBrowserBinding } from './browser-binding.js'
+import { mfaCredential } from './mfa-secrets.js'
 import { mfaDatabaseClock } from './mfa-transaction.js'
 
 type ContextReader = Pick<Prisma.TransactionClient, 'browserAuthContext'>
 type BootstrapDatabase = ContextReader & Pick<Prisma.TransactionClient, '$queryRaw'>
-
-function bindingHash(binding: string): string | null {
-  return /^[A-Za-z0-9_-]{43}$/.test(binding)
-    ? mfaHash(JSON.stringify(['browser-binding-v1', binding]))
-    : null
-}
 
 /** Caller charges the source start budget first. No account or credential is issued here. */
 export async function bootstrapBrowserContext(
@@ -28,7 +23,7 @@ export async function bootstrapBrowserContext(
   const now = await mfaDatabaseClock(db)
   const context = await db.browserAuthContext.create({
     data: {
-      bindingHash: bindingHash(binding)!,
+      bindingHash: hashBrowserBinding(binding)!,
       audience,
       expiresAt: new Date(now.getTime() + 900_000),
     },
@@ -50,7 +45,7 @@ export async function readBrowserContext(
   binding: string,
   audience: BrowserAudience
 ): Promise<BrowserAuthContext | null> {
-  const hash = bindingHash(binding)
+  const hash = hashBrowserBinding(binding)
   if (!hash) return null
   const context = await db.browserAuthContext.findUnique({ where: { bindingHash: hash } })
   return context?.audience === audience ? context : null

@@ -2,7 +2,13 @@ import { createHash, randomUUID } from 'node:crypto'
 
 import { type JwtPayload, SystemRole } from '@amcore/shared'
 
+import {
+  type BrowserRequestBinding,
+  browserRequestBinding,
+  hashBrowserBinding,
+} from '../src/core/auth/mfa/browser-binding.js'
 import { MfaAuthorityReader } from '../src/core/auth/mfa/mfa-authority-reader.service.js'
+import { mfaCredential } from '../src/core/auth/mfa/mfa-secrets.js'
 import { createTotpSecret } from '../src/core/auth/mfa/mfa-totp.js'
 import { mfaDatabaseClock } from '../src/core/auth/mfa/mfa-transaction.js'
 import type {
@@ -32,6 +38,7 @@ export async function createAuthorityAccount(
   session: Session
   flow: MfaFlow
   claims: JwtPayload
+  requestBinding: BrowserRequestBinding
 }> {
   const db = fixture.clients[0]!
   const now = await mfaDatabaseClock(db)
@@ -63,9 +70,10 @@ export async function createAuthorityAccount(
       },
     })
   }
-  const bindingHash = hash(`fixture-browser:${user.id}`)
+  const binding = mfaCredential()
+  const bindingHash = hashBrowserBinding(binding)!
   const context = await db.browserAuthContext.create({
-    data: { bindingHash, audience: 'site', generation: 1, state: 'published', expiresAt },
+    data: { bindingHash, audience: 'product', generation: 1, state: 'published', expiresAt },
   })
   const family = await db.authSessionFamily.create({
     data: {
@@ -74,7 +82,10 @@ export async function createAuthorityAccount(
       securityVersion: 3,
       primaryMethod: 'password',
       primaryAt: now,
-      ...(protectedAccount ? { mfaMethod: 'totp', mfaAt: now, factorVersion: 1 } : {}),
+      primaryProofId: 'password-fixture-event',
+      ...(protectedAccount
+        ? { mfaMethod: 'totp', mfaAt: now, mfaProofId: 'factor-fixture-event', factorVersion: 1 }
+        : {}),
       publicationState: 'published',
       browserContextId: context.id,
       publicationGeneration: 1,
@@ -100,7 +111,7 @@ export async function createAuthorityAccount(
       credentialHash: hash(`fixture-flow:${user.id}`),
       purpose: 'reauthenticate',
       authorityKind: 'session',
-      audience: 'site',
+      audience: 'product',
       bindingHash,
       securityVersion: 3,
       sourceFamilyId: family.id,
@@ -117,5 +128,15 @@ export async function createAuthorityAccount(
     securityVersion: 3,
     browserBound: true,
   }
-  return { user, family, session, flow, claims }
+  return {
+    user,
+    family,
+    session,
+    flow,
+    claims,
+    requestBinding: browserRequestBinding(binding, 'product', {
+      contextId: context.id,
+      generation: 1,
+    })!,
+  }
 }

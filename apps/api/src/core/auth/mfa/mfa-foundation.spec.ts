@@ -105,8 +105,18 @@ describe('Dormant MFA security primitives', () => {
 
   it('reuses fresh backup proof and independently requests only stale evidence', () => {
     const now = new Date('2026-01-01T12:00:00Z')
-    const evidence = { primaryAt: now, mfaAt: now, mfaMethod: 'recovery_code', factorVersion: 1 }
+    const evidence = {
+      primaryAt: now,
+      primaryProofId: 'password-event',
+      mfaAt: now,
+      mfaProofId: 'second-factor-event',
+      mfaMethod: 'recovery_code',
+      factorVersion: 1,
+    }
     expect(requiredMfaProofs(evidence, 1, now)).toEqual([])
+    expect(
+      requiredMfaProofs({ ...evidence, primaryProofId: null, mfaProofId: null }, 1, now)
+    ).toEqual(['password', 'second_factor'])
     expect(
       requiredMfaProofs({ ...evidence, primaryAt: new Date(now.getTime() - 600_001) }, 1, now)
     ).toEqual(['password'])

@@ -1,5 +1,7 @@
 import { type JwtPayload, type SystemRole as Role, SystemRole } from '@amcore/shared'
 
+import type { BrowserRequestBinding } from './browser-binding.js'
+import { accountRequiresMfa } from './mfa-account-policy.js'
 import {
   acceptedMfaMethod,
   type FamilyAuthority,
@@ -25,6 +27,8 @@ export interface SessionFamilyAuthority extends FamilyAuthority, MfaEvidence {
 }
 
 export interface BrowserPublicationAuthority {
+  bindingHash: string
+  audience: string
   id: string
   generation: number
   currentFamilyId: string | null
@@ -48,11 +52,17 @@ export type SessionAdmission =
 function currentBrowser(
   family: SessionFamilyAuthority | null,
   context: BrowserPublicationAuthority | null,
-  now: Date
+  now: Date,
+  binding: BrowserRequestBinding | null
 ): boolean {
   return (
     family !== null &&
     context !== null &&
+    binding !== null &&
+    binding.contextId === context.id &&
+    binding.generation === context.generation &&
+    binding.bindingHash === context.bindingHash &&
+    binding.audience === context.audience &&
     family.browserContextId === context.id &&
     family.publicationGeneration === context.generation &&
     context.currentFamilyId === family.id &&
@@ -61,7 +71,7 @@ function currentBrowser(
   )
 }
 
-function completedProofs(
+export function hasCompletedMfaProofs(
   family: SessionFamilyAuthority,
   factorVersion: number | null,
   now: Date
@@ -69,10 +79,12 @@ function completedProofs(
   return (
     factorVersion !== null &&
     family.primaryMethod === 'password' &&
+    !!family.primaryProofId &&
     family.primaryAt !== null &&
     family.primaryAt <= now &&
     family.mfaAt !== null &&
     family.mfaAt <= now &&
+    !!family.mfaProofId &&
     acceptedMfaMethod(family.mfaMethod) &&
     family.factorVersion === factorVersion
   )
@@ -103,20 +115,19 @@ export function admitSessionAuthority(
   account: AccountAuthority | null,
   family: SessionFamilyAuthority | null,
   context: BrowserPublicationAuthority | null,
-  now: Date
+  now: Date,
+  binding: BrowserRequestBinding | null = null
 ): SessionAdmission {
   if (!account || account.userId !== claims.sub)
     return { kind: 'denied', reason: 'account_missing' }
   if (claims.browserBound !== undefined && claims.browserBound !== true)
     return { kind: 'denied', reason: 'browser_context_changed' }
-  if (claims.browserBound && !currentBrowser(family, context, now))
+  if (claims.browserBound && !currentBrowser(family, context, now, binding))
     return { kind: 'denied', reason: 'browser_context_changed' }
-  if (!claims.browserBound && family?.browserContextId)
+  if (!claims.browserBound && (binding || family?.browserContextId))
     return { kind: 'denied', reason: 'browser_context_changed' }
   const protectedAccount =
-    account.required ||
-    account.systemRole === SystemRole.SuperAdmin ||
-    claims.systemRole === SystemRole.SuperAdmin
+    accountRequiresMfa(account) || claims.systemRole === SystemRole.SuperAdmin
   // Preserve residual access JWTs only for never-protected independent ordinary clients.
   if (!protectedAccount && !claims.browserBound) return { kind: 'admitted', operator: false }
   if (
@@ -127,7 +138,7 @@ export function admitSessionAuthority(
   if (!currentFamily(claims, account, family, now))
     return { kind: 'denied', reason: 'session_changed' }
   if (!protectedAccount) return { kind: 'admitted', operator: false }
-  if (!completedProofs(family, account.factorVersion, now))
+  if (!hasCompletedMfaProofs(family, account.factorVersion, now))
     return { kind: 'denied', reason: 'mfa_required' }
   return {
     kind: 'admitted',

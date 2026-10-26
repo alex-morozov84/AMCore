@@ -25,13 +25,19 @@ describe('Account epoch and primary admission on isolated PostgreSQL', () => {
     const db = fixture.clients[0]!
     const f = await createAuthorityAccount(fixture)
     const reader = authorityReader(fixture.clients[1]!)
-    expect(await reader.read(f.claims)).toEqual({ kind: 'admitted', operator: true })
+    expect(await reader.read(f.claims, f.requestBinding)).toEqual({
+      kind: 'admitted',
+      operator: true,
+    })
     await db.$transaction(async (tx) => {
       await lockMfaAccounts(tx, [f.user.id])
       await tx.user.update({ where: { id: f.user.id }, data: { passwordHash: 'new-fixture-hash' } })
       expect(await advanceAccountSecurity(tx, f.user.id)).toBe(4)
     })
-    expect(await reader.read(f.claims)).toEqual({ kind: 'denied', reason: 'session_changed' })
+    expect(await reader.read(f.claims, f.requestBinding)).toEqual({
+      kind: 'denied',
+      reason: 'session_changed',
+    })
     expect(await db.mfaAccount.findUnique({ where: { userId: f.user.id } })).toMatchObject({
       required: true,
       setupComplete: true,
@@ -65,7 +71,7 @@ describe('Account epoch and primary admission on isolated PostgreSQL', () => {
         throw new Error('enclosing security effect failed')
       })
     ).rejects.toThrow('enclosing security effect failed')
-    expect(await authorityReader(fixture.clients[1]!).read(f.claims)).toEqual({
+    expect(await authorityReader(fixture.clients[1]!).read(f.claims, f.requestBinding)).toEqual({
       kind: 'admitted',
       operator: true,
     })
@@ -87,12 +93,12 @@ describe('Account epoch and primary admission on isolated PostgreSQL', () => {
     const db = fixture.clients[0]!
     const f = await createAuthorityAccount(fixture, false)
     const reader = authorityReader(fixture.clients[1]!)
-    expect((await reader.read(f.claims)).kind).toBe('admitted')
+    expect((await reader.read(f.claims, f.requestBinding)).kind).toBe('admitted')
     await db.$transaction(async (tx) => {
       await lockMfaAccounts(tx, [f.user.id])
       await advanceAccountSecurity(tx, f.user.id)
     })
-    expect((await reader.read(f.claims)).kind).toBe('denied')
+    expect((await reader.read(f.claims, f.requestBinding)).kind).toBe('denied')
     expect(
       await reader.read({ sub: f.user.id, email: f.user.email, systemRole: SystemRole.User })
     ).toEqual({ kind: 'admitted', operator: false })

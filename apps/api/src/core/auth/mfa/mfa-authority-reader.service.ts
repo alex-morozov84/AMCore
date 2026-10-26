@@ -5,6 +5,8 @@ import { type JwtPayload, SystemRole } from '@amcore/shared'
 import type { MfaAccount, MfaFactor, User } from '../../../generated/prisma/client.js'
 import { PrismaService } from '../../../prisma/index.js'
 
+import type { BrowserRequestBinding } from './browser-binding.js'
+import { accountRequiresMfa } from './mfa-account-policy.js'
 import {
   admitSessionAuthority,
   type BrowserPublicationAuthority,
@@ -26,7 +28,10 @@ type CurrentFamily = SessionFamilyAuthority & { browserContext: BrowserPublicati
 export class MfaAuthorityReader {
   constructor(private readonly prisma: PrismaService) {}
 
-  async read(claims: JwtPayload): Promise<SessionAdmission> {
+  async read(
+    claims: JwtPayload,
+    binding: BrowserRequestBinding | null = null
+  ): Promise<SessionAdmission> {
     if (typeof claims.sub !== 'string' || !claims.sub)
       return { kind: 'denied', reason: 'account_missing' }
     if (claims.fid !== undefined && (typeof claims.fid !== 'string' || !claims.fid))
@@ -34,8 +39,12 @@ export class MfaAuthorityReader {
     const user = await this.readAccount(claims.sub)
     if (!user) return { kind: 'denied', reason: 'account_missing' }
     if (
-      user.mfaAccount?.required ||
-      user.systemRole === SystemRole.SuperAdmin ||
+      accountRequiresMfa({
+        systemRole: user.systemRole,
+        required: user.mfaAccount?.required ?? false,
+        emergencyRequired: user.mfaAccount?.emergencyRequired ?? false,
+        factorVersion: user.mfaFactor?.version ?? null,
+      }) ||
       claims.systemRole === SystemRole.SuperAdmin
     ) {
       const protocol = await this.prisma.mfaProtocol.findUnique({ where: { id: 'platform' } })
@@ -58,7 +67,8 @@ export class MfaAuthorityReader {
       },
       family,
       family?.browserContext ?? null,
-      clock.now
+      clock.now,
+      binding
     )
   }
 
@@ -94,13 +104,17 @@ export class MfaAuthorityReader {
             publicationState: true,
             primaryMethod: true,
             primaryAt: true,
+            primaryProofId: true,
             mfaMethod: true,
             mfaAt: true,
+            mfaProofId: true,
             factorVersion: true,
             browserContextId: true,
             publicationGeneration: true,
             browserContext: {
               select: {
+                bindingHash: true,
+                audience: true,
                 id: true,
                 generation: true,
                 currentFamilyId: true,

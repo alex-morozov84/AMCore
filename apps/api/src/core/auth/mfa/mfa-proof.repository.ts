@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { Injectable } from '@nestjs/common'
 
 import { type MfaMethod, type MfaProof, mfaProofSchema } from '@amcore/shared'
@@ -7,9 +9,10 @@ import type { Prisma } from '../../../generated/prisma/client.js'
 import { MfaEncryptionService } from './mfa-encryption.service.js'
 import { backupCodeHash, generateBackupCodes } from './mfa-secrets.js'
 import { verifyTotp } from './mfa-totp.js'
-import { lockMfaAccounts } from './mfa-transaction.js'
+import { lockMfaAccounts, mfaDatabaseClock } from './mfa-transaction.js'
 
 export interface VerifiedMfaProof {
+  eventId: string
   method: MfaMethod
   verifiedAt: Date
   factorVersion: number
@@ -30,8 +33,19 @@ export class MfaProofRepository {
     expectedSecurityVersion: number,
     proof: MfaProof
   ): Promise<VerifiedMfaProof | null> {
+    await lockMfaAccounts(tx, [userId])
+    return this.consumeLocked(tx, userId, expectedSecurityVersion, proof)
+  }
+
+  /** Caller already holds context/account/flow locks in the declared order. */
+  async consumeLocked(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    expectedSecurityVersion: number,
+    proof: MfaProof
+  ): Promise<VerifiedMfaProof | null> {
     mfaProofSchema.parse(proof)
-    const now = await lockMfaAccounts(tx, [userId])
+    const now = await mfaDatabaseClock(tx)
     const account = await tx.mfaAccount.findUnique({ where: { userId } })
     const factor = await tx.mfaFactor.findUnique({ where: { userId } })
     if (
@@ -55,6 +69,7 @@ export class MfaProofRepository {
       })
       return consumed.count === 1
         ? {
+            eventId: randomUUID(),
             method: proof.method,
             verifiedAt: now,
             factorVersion: factor.version,
@@ -71,6 +86,7 @@ export class MfaProofRepository {
     })
     return advanced.count === 1
       ? {
+          eventId: randomUUID(),
           method: proof.method,
           verifiedAt: now,
           factorVersion: factor.version,
@@ -86,6 +102,16 @@ export class MfaProofRepository {
     expectedGeneration: number
   ): Promise<{ codes: string[]; generation: number } | null> {
     await lockMfaAccounts(tx, [userId])
+    return this.replaceBackupCodesLocked(tx, userId, expectedSecurityVersion, expectedGeneration)
+  }
+
+  /** Caller authorizes current fresh proof after taking its ordered locks. */
+  async replaceBackupCodesLocked(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    expectedSecurityVersion: number,
+    expectedGeneration: number
+  ): Promise<{ codes: string[]; generation: number } | null> {
     const generation = expectedGeneration + 1
     const updated = await tx.mfaAccount.updateMany({
       where: {

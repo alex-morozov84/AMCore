@@ -17,7 +17,7 @@ function fixture() {
       setupComplete: true,
       emergencyRequired: false,
     },
-    mfaFactor: { version: 2 },
+    mfaFactor: { version: 2 } as { version: number } | null,
   }
   const family = {
     id: 'family',
@@ -28,12 +28,16 @@ function fixture() {
     publicationState: 'published',
     primaryMethod: 'password',
     primaryAt: now,
+    primaryProofId: 'password-event',
     mfaMethod: 'totp',
     mfaAt: now,
+    mfaProofId: 'second-factor-event',
     factorVersion: 2,
     browserContextId: 'browser',
     publicationGeneration: 4,
     browserContext: {
+      bindingHash: 'binding-hash',
+      audience: 'product',
       id: 'browser',
       generation: 4,
       currentFamilyId: 'family',
@@ -61,6 +65,12 @@ function fixture() {
     $queryRaw: clock,
   } as unknown as PrismaService
   return {
+    requestBinding: {
+      contextId: 'browser',
+      generation: 4,
+      audience: 'product' as const,
+      bindingHash: 'binding-hash',
+    },
     account,
     family,
     claims,
@@ -77,31 +87,40 @@ describe('Primary MFA authority reads without a stale cache fallback', () => {
   it('refuses missing accounts, missing family rows and an absent active protocol', async () => {
     const f = fixture()
     f.userRead.mockResolvedValueOnce(null)
-    expect(await f.reader.read(f.claims)).toEqual({ kind: 'denied', reason: 'account_missing' })
+    expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
+      kind: 'denied',
+      reason: 'account_missing',
+    })
     f.protocolRead.mockResolvedValueOnce(null)
-    expect(await f.reader.read(f.claims)).toEqual({
+    expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
       kind: 'denied',
       reason: 'enforcement_unavailable',
     })
     f.familyRead.mockResolvedValueOnce(null)
-    expect((await f.reader.read(f.claims)).kind).toBe('denied')
+    expect((await f.reader.read(f.claims, f.requestBinding)).kind).toBe('denied')
   })
 
   it('rechecks the account epoch on the next request after reset', async () => {
     const f = fixture()
-    expect(await f.reader.read(f.claims)).toEqual({ kind: 'admitted', operator: true })
+    expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
+      kind: 'admitted',
+      operator: true,
+    })
     f.account.mfaAccount.securityVersion++
-    expect(await f.reader.read(f.claims)).toEqual({ kind: 'denied', reason: 'session_changed' })
+    expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
+      kind: 'denied',
+      reason: 'session_changed',
+    })
     expect(f.userRead).toHaveBeenCalledTimes(2)
   })
 
   it('refuses a revoked family and a superseded publication on subsequent requests', async () => {
     const f = fixture()
     f.family.revokedAt = new Date()
-    expect((await f.reader.read(f.claims)).kind).toBe('denied')
+    expect((await f.reader.read(f.claims, f.requestBinding)).kind).toBe('denied')
     f.family.revokedAt = null
     f.family.browserContext.generation++
-    expect(await f.reader.read(f.claims)).toEqual({
+    expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
       kind: 'denied',
       reason: 'browser_context_changed',
     })
@@ -112,7 +131,7 @@ describe('Primary MFA authority reads without a stale cache fallback', () => {
     async (state) => {
       const f = fixture()
       f.protocol.state = state
-      expect(await f.reader.read(f.claims)).toEqual({
+      expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
         kind: 'denied',
         reason: 'enforcement_unavailable',
       })
@@ -123,7 +142,7 @@ describe('Primary MFA authority reads without a stale cache fallback', () => {
   it('refuses a different active protocol version', async () => {
     const f = fixture()
     f.protocol.version = 2
-    expect(await f.reader.read(f.claims)).toEqual({
+    expect(await f.reader.read(f.claims, f.requestBinding)).toEqual({
       kind: 'denied',
       reason: 'enforcement_unavailable',
     })
@@ -133,6 +152,7 @@ describe('Primary MFA authority reads without a stale cache fallback', () => {
     const f = fixture()
     f.account.systemRole = SystemRole.User
     f.account.mfaAccount.required = false
+    f.account.mfaFactor = null
     const direct: JwtPayload = {
       sub: f.claims.sub,
       email: f.claims.email,
@@ -147,8 +167,10 @@ describe('Primary MFA authority reads without a stale cache fallback', () => {
   it('propagates DB and clock failures rather than admitting from previous state', async () => {
     const f = fixture()
     f.userRead.mockRejectedValueOnce(new Error('primary unavailable'))
-    await expect(f.reader.read(f.claims)).rejects.toThrow('primary unavailable')
+    await expect(f.reader.read(f.claims, f.requestBinding)).rejects.toThrow('primary unavailable')
     f.clock.mockResolvedValueOnce([])
-    await expect(f.reader.read(f.claims)).rejects.toThrow('MFA admission clock unavailable')
+    await expect(f.reader.read(f.claims, f.requestBinding)).rejects.toThrow(
+      'MFA admission clock unavailable'
+    )
   })
 })

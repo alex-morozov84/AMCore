@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { BrowserRevision } from '@amcore/shared'
 
+import { browserRequestBinding } from '../src/core/auth/mfa/browser-binding.js'
 import {
   bootstrapBrowserContext,
   matchesBrowserRevision,
@@ -40,6 +41,10 @@ async function boundFixture(fixture: MfaProofFixture): Promise<BoundFixture> {
   })
   return {
     ...f,
+    requestBinding: browserRequestBinding(bootstrap.binding, 'product', {
+      contextId: bootstrap.view.contextId,
+      generation: 1,
+    })!,
     binding: bootstrap.binding,
     expected: { contextId: bootstrap.view.contextId, generation: 1 },
   }
@@ -80,12 +85,19 @@ describe('Browser generation reservation on primary PostgreSQL', () => {
     const f = await boundFixture(fixture)
     const reader = authorityReader(fixture.clients[1]!)
     const independent = await db.authSessionFamily.create({
-      data: { ...f.family, id: randomUUID(), browserContextId: null, publicationGeneration: null },
+      data: {
+        ...f.family,
+        id: randomUUID(),
+        primaryProofId: randomUUID(),
+        mfaProofId: randomUUID(),
+        browserContextId: null,
+        publicationGeneration: null,
+      },
     })
     const other = await db.user.create({
       data: { email: 'other@example.test', emailCanonical: 'other@example.test' },
     })
-    expect((await reader.read(f.claims)).kind).toBe('admitted')
+    expect((await reader.read(f.claims, f.requestBinding)).kind).toBe('admitted')
     await db.$transaction(
       async (tx) => {
         const locked = await lockBrowserLogin(tx, f.binding, 'product', f.expected, other.id)
@@ -102,7 +114,7 @@ describe('Browser generation reservation on primary PostgreSQL', () => {
       },
       { maxWait: 2000, timeout: 4000 }
     )
-    expect(await reader.read(f.claims)).toEqual({
+    expect(await reader.read(f.claims, f.requestBinding)).toEqual({
       kind: 'denied',
       reason: 'browser_context_changed',
     })
@@ -143,7 +155,7 @@ describe('Browser generation reservation on primary PostgreSQL', () => {
         throw new Error('new auth operation failed')
       })
     ).rejects.toThrow('new auth operation failed')
-    expect(await authorityReader(fixture.clients[1]!).read(f.claims)).toEqual({
+    expect(await authorityReader(fixture.clients[1]!).read(f.claims, f.requestBinding)).toEqual({
       kind: 'admitted',
       operator: true,
     })
