@@ -40,9 +40,10 @@ EmailService.queue()
 
 Queued jobs are runtime-validated with Zod after Redis deserialization, use
 an incarnation-derived provider key and immutable request bytes. Finite retries
-must satisfy recorded certainty, cooldown and the original horizon. A recycled
-job ID does not renew an old delivery's window. See
-[queued safety and recovery](queued-safety.md) for clock assumptions, legacy handling
+require aggregate authoritative none, a supported result and the saved cooldown.
+Unknown or accepted welcome results cannot retry. A recycled job ID does not prove
+that an old delivery failed. See
+[queued safety and recovery](queued-safety.md) for conservative recovery, legacy handling
 and independent evidence retention.
 
 ## Direct Secret Email
@@ -120,7 +121,13 @@ Providers implement `EmailProvider.send(params)` and
 `EmailProvider.sendPrepared(body, idempotencyKey, signal)` from `email.types.ts`.
 Direct email uses `send`; durable notification deliveries use `sendPrepared`.
 Queued email additionally requires the closed `queuedEmail` recipe port with
-frozen scope, certainty mapping and a synchronous actual-transport fence. The
+frozen scope, certainty mapping and a synchronous actual-transport fence.
+Recipe2 permits one recipient and one submission per attempt, with no hidden
+submission retries. Each adapter declares its own client timeout. A remote key,
+retention window and provider-clock qualification are not required for first send
+or authoritative-none recovery. Unknown welcome results stop; notification
+recovery remains separate. Passing an idempotency key does not establish a
+universal duplicate-prevention guarantee. No production SMTP adapter is included. The
 prepared notification port must send
 `body` unchanged with the required `idempotencyKey`, attach credentials at send
 time and propagate the live abort signal. Do not parse and re-render its content.
@@ -170,3 +177,68 @@ development/tests and logs metadata only.
 ## First-administrator invitation recovery
 
 [Organization provisioning](../product-admin/organization-provisioning.md) commits the organization before direct invitation mail. It records only a safe last-attempt outcome, never a secret body/link in a queue. Provider acknowledgment is not delivery. An unknown send leaves the organization saved; explicit reissue rotates the invitation. Production mock blocks new operator invitation sends before commit, while reads and exact replay remain available. The global mock default and ordinary email APIs are unchanged.
+
+## Verify delivery on a deployed stack
+
+Use a disposable deployment or a new installation before production traffic.
+Keep closed production signup closed; use a separately approved test target instead.
+Provide approved Resend credentials, a verified sender
+and a mailbox you control. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM`
+and the public HTTPS `FRONTEND_URL` on both API and worker through the deployment
+configuration. Keep secret-link tracking disabled and apply
+[edge log redaction](security.md#caddy-secret-link-logs) before sending.
+Use the production provider settings, not the mock.
+In Resend, open **Domains → your sending domain → Configuration**. Keep click
+and open tracking disabled; an unconfigured tracking domain needs no setup.
+See [Resend tracking settings](https://resend.com/blog/introducing-custom-tracking-domain).
+
+Approve recipients and a send limit before starting. The complete scenario sends
+four messages per language: welcome, verification, reset link and an automatic
+password-change alert. Allow eight for EN/RU or four for a single-locale fork.
+Use only retained languages and approved recipients. Include earlier bootstrap or
+provider-test messages separately unless they are the same actions counted below.
+Keep test accounts until their login, link-reuse and evidence checks are complete.
+
+Before triggering queued mail, review [uncertainty stops and cooldown](queued-safety.md#retry-window-and-cooldown).
+For an existing policy1 installation, complete the [offline upgrade](queued-upgrade.md) first.
+Arrange authorized worker/notification diagnostics; platform administration
+[requires explicit bootstrap authority](../auth/rbac.md#administering-super_admin).
+If those diagnostics are unavailable, stop verification and contact the authorized
+deployment administrator. Do not infer a missing send or reissue mail to fill the gap.
+Account bootstrap mail also needs the approved budget above.
+
+1. Register a test account in the first supported language. Observe both welcome and verification mail.
+   Correlate the welcome's worker job completion with the provider message and receipt.
+2. Open the verification link on the intended HTTPS origin. Confirm the matching
+   language and verified account state. Never copy the live URL into logs or reports.
+3. Request password recovery. Check the received link's origin and language, set
+   a new test password, and verify sign-in. Reusing the consumed token must fail.
+   Confirm the automatic password-change alert from the notification worker.
+4. Repeat with a separate account for each other supported language.
+
+```text
+Registration -> API -> verification email
+             -> email queue -> worker -> welcome email
+Password recovery -> API -> reset-link email
+Password changed -> notification worker -> security email
+```
+
+Record these results separately: application response, welcome job completion,
+security-notification delivery, provider acceptance/message ID, provider delivery
+event, actual mailbox receipt, language/link checks and successful account action.
+Resend `delivered` means the recipient mail server accepted the message; it does not prove inbox placement.
+Check spam separately. A product HTTP 200/201 does not prove any mail arrived.
+
+Observe the provider and mailbox for up to ten minutes. Missing receipt is unresolved,
+not proof that no message was sent. Do not automatically resend after timeout or
+connection loss. Inspect the existing attempt before approving another send; obey
+the agreed limit. Test provider failure with local doubles instead of deliberately
+sending invalid mail through a real account. Direct verification and reset mail
+have no queue retry.
+
+Keep only allowlisted IDs, status codes, timestamps and test outcomes in evidence.
+A full provider retrieve response includes recipient data, rendered bodies and live
+links; never dump it. Mailbox inspection needs its own authorization. A direct provider
+test message proves API provider acceptance only, not the worker or account links.
+For artifact identity and HTTPS checks, use the
+[registry rollout](../operations/deployment.md#production-rollout-via-registry-image-pull-path).

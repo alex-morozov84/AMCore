@@ -246,42 +246,45 @@ describe('native registered job selection', () => {
     expect(screen.queryByRole('button', { name: 'Retry · 0' })).not.toBeInTheDocument()
   })
 
-  it('opens independent safety evidence during a broker outage without inventing completed attempts', async () => {
-    vi.mocked(consoleApi.getBackgroundWorkJobs).mockResolvedValue({
-      workId: work.id,
-      sampledAt: work.sampledAt,
-      windowTruncated: false,
-      rows: [
-        {
-          ...job,
-          attemptsMade: undefined,
-          state: 'unavailable',
-          source: 'PG_evidence',
-          replay: 'provider-window',
-          certainty: 'unknown',
-          capabilities: job.capabilities.map((item) => ({ ...item, allowed: false })),
-        },
-      ],
-    })
-    view({ ...work, status: 'unavailable', providerEvidence: true })
-    await screen.findByText(messages.console.backgroundWork.control.evidenceMeaning)
-    expect(consoleApi.getBackgroundWorkJobs).toHaveBeenCalledWith(
-      work.id,
-      expect.objectContaining({ source: 'PG_evidence' }),
-      expect.any(AbortSignal)
-    )
-    expect(await screen.findByRole('checkbox', { name: 'job_1' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    )
-    expect(
-      screen.getByText(messages.console.backgroundWork.control.jobStates.unavailable, {
-        exact: false,
+  it.each(['provider-window', 'conservative'] as const)(
+    'opens %s evidence during a broker outage without inventing completed attempts',
+    async (replay) => {
+      vi.mocked(consoleApi.getBackgroundWorkJobs).mockResolvedValue({
+        workId: work.id,
+        sampledAt: work.sampledAt,
+        windowTruncated: false,
+        rows: [
+          {
+            ...job,
+            attemptsMade: undefined,
+            state: 'unavailable',
+            source: 'PG_evidence',
+            replay,
+            certainty: 'unknown',
+            capabilities: job.capabilities.map((item) => ({ ...item, allowed: false })),
+          },
+        ],
       })
-    ).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Failed' })).not.toBeInTheDocument()
-    expect(screen.getAllByText(/not observed/).length).toBeGreaterThan(0)
-  })
+      view({ ...work, status: 'unavailable', providerEvidence: true })
+      await screen.findByText(messages.console.backgroundWork.control.evidenceMeaning)
+      expect(consoleApi.getBackgroundWorkJobs).toHaveBeenCalledWith(
+        work.id,
+        expect.objectContaining({ source: 'PG_evidence' }),
+        expect.any(AbortSignal)
+      )
+      expect(await screen.findByRole('checkbox', { name: 'job_1' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      expect(
+        screen.getByText(messages.console.backgroundWork.control.jobStates.unavailable, {
+          exact: false,
+        })
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Failed' })).not.toBeInTheDocument()
+      expect(screen.getAllByText(/not observed/).length).toBeGreaterThan(0)
+    }
+  )
 })
 
 describe('find in logs', () => {

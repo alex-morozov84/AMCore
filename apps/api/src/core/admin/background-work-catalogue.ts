@@ -20,6 +20,7 @@ import type {
   WorkDefinition,
   WorkRegistration,
 } from '../../infrastructure/background-work/work-definition.js'
+import { usesProviderEvidence } from '../../infrastructure/background-work/work-definition.js'
 import { QUEUE_REGISTRY } from '../../infrastructure/queue/constants/queue-inventory.constant.js'
 import { PrismaService } from '../../prisma/index.js'
 
@@ -68,8 +69,8 @@ export class BackgroundWorkCatalogue {
       ...(definition.presentation ? { presentation: definition.presentation } : {}),
       kind: definition.kind,
       definitionVersion: definition.definitionVersion,
-      providerEvidence: Object.values(definition.jobs).some(
-        (job) => job.replay.kind === 'provider-window'
+      providerEvidence: Object.values(definition.jobs).some((job) =>
+        usesProviderEvidence(job.replay.kind)
       ),
       sampledAt: new Date().toISOString(),
     }

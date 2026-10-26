@@ -10,6 +10,7 @@ import { ProviderEvidenceStore } from '../../infrastructure/background-work/prov
 import { PROVIDER_WINDOW_CLOCK } from '../../infrastructure/background-work/provider-window-clock.js'
 import { WORK_REGISTRATIONS } from '../../infrastructure/background-work/registration.js'
 import type { WorkRegistration } from '../../infrastructure/background-work/work-definition.js'
+import { usesProviderEvidence } from '../../infrastructure/background-work/work-definition.js'
 import type { EmailProvider } from '../../infrastructure/email/email.types.js'
 import { QUEUE_REGISTRY } from '../../infrastructure/queue/constants/queue-inventory.constant.js'
 
@@ -54,7 +55,7 @@ export class BackgroundWorkService {
               queue,
               definition,
               input,
-              Object.values(definition.jobs).some((job) => job.replay.kind === 'provider-window')
+              Object.values(definition.jobs).some((job) => usesProviderEvidence(job.replay.kind))
                 ? {
                     evidence: this.modules.get(ProviderEvidenceStore, { strict: false }),
                     scope: () => {
@@ -77,7 +78,7 @@ export class BackgroundWorkService {
     if (
       definition &&
       !['pause', 'resume'].includes(input.operation) &&
-      Object.values(definition.jobs).some((job) => job.replay.kind === 'provider-window')
+      Object.values(definition.jobs).some((job) => usesProviderEvidence(job.replay.kind))
     )
       port.reserve = (ctx, targets) => {
         if (!selected?.reserve) throw new Error('MISSING_POLICY_RESERVATION')
@@ -141,7 +142,7 @@ export class BackgroundWorkService {
     const definition = this.entries.find((entry) => entry.definition.id === workId)?.definition
     const supported =
       definition?.kind === 'ordinary' &&
-      Object.values(definition.jobs).some((job) => job.replay.kind === 'provider-window')
+      Object.values(definition.jobs).some((job) => usesProviderEvidence(job.replay.kind))
     return this.commands.reconcileEvidence(
       principal,
       workId,

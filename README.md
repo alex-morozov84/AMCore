@@ -301,9 +301,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 ## Going to production
 
-The Quick Start above is a development stack. Production is a documented path,
-not a single command — work through it in this order. Each step is a runbook,
-and each states plainly what it does **not** give you.
+The Quick Start above is a development stack. For one production server, follow
+[Single-host setup](docs/operations/single-host-compose.md), including its registry
+branch when images are already approved. The references below cover each concern.
 
 1. **[Production deploy profile](docs/operations/production-deploy-profile.md)** —
    the contract everything else assumes: build the image once, promote the same
@@ -312,8 +312,8 @@ and each states plainly what it does **not** give you.
    A non-active workflow template implementing it ships at
    [`.github/workflows/deploy-template.yml`](.github/workflows/deploy-template.yml).
 2. **[VPS/Compose rollout](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path)** —
-   apply `docker/compose/prod.yml` over the base file to pin every service to an
-   immutable digest, add restart policies, and bound container logs. The same
+   apply `docker/compose/prod.yml` over the base file to pin application services to
+   immutable digests, add restart policies, and bound container logs. The same
    page covers TLS/reverse proxy, process roles, the one-shot migration
    contract, the [migration image endpoint preflight](docs/operations/migrator-image.md#process-and-database-lifecycle),
    and [what "zero-downtime" honestly

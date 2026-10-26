@@ -115,7 +115,7 @@ async function apply(
     evidence?.revision ?? '',
     evidence?.digest ?? '',
     evidence?.scope ?? '',
-    evidence?.nominalDeadline ?? '',
+    evidence?.nominalDeadline ?? (input.policyVersion === 2 ? 0 : ''),
     evidence?.floorUpper ?? ''
   )
   if (!Array.isArray(result)) throw new Error('INVALID_BROKER_REPLY')

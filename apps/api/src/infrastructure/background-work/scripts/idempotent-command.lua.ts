@@ -111,8 +111,8 @@ if operation == 'retry' then
   if redis.call('PTTL',KEYS[20]) <= 0 or expiry <= now then
     return deny('REQUEST_EXPIRED')
   end
-  if now-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs} < floor then return deny('COOLDOWN') end
-  if now+${HORIZON_CHECK_OVERHEAD_MS} >= deadline then return deny('HORIZON_EXPIRED') end
+  if tonumber(ARGV[6]) ~= 2 and now-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs} < floor then return deny('COOLDOWN') end
+  if tonumber(ARGV[6]) ~= 2 and now+${HORIZON_CHECK_OVERHEAD_MS} >= deadline then return deny('HORIZON_EXPIRED') end
   `
       : `if values[18] ~= ARGV[4] or not metadata or
     (metadata.report ~= 'unrecorded' and

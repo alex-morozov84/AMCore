@@ -1,8 +1,7 @@
 # Production opt-in: relay the real visitor IP from the web BFF to the API (ADR-072).
 # docs/operations/single-host-compose.md -> "Visitor IP through the web BFF".
 #
-#   docker compose -f docker-compose.yml -f docker/compose/web.yml \
-#     -f docker/compose/bff-relay.yml up -d
+# Append this file to the saved complete COMPOSE_FILE; keep prod/TLS/private overlays.
 #
 # Without it, every browser request through the BFF reaches the API from the web
 # container, so all visitors share one rate-limit bucket per handler.

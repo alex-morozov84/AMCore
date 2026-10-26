@@ -46,6 +46,13 @@ export async function sendFrozenQueuedEmail(
   initialFence: QueuedTransportFence,
   refresh: () => Promise<QueuedTransportFence>
 ): Promise<QueuedTransportResult> {
+  if (
+    provider.recipeVersion === 2 &&
+    (!Number.isInteger(provider.transportTimeoutMs) ||
+      provider.transportTimeoutMs! < 1 ||
+      provider.transportTimeoutMs! > 2147483647)
+  )
+    return { status: 'not-called', reason: 'WORK_UNAVAILABLE' }
   let fence = initialFence
   for (let pass = 0; pass < 2; pass += 1) {
     let called = false
@@ -53,7 +60,9 @@ export async function sendFrozenQueuedEmail(
       const outcome = await provider.send(
         body,
         key,
-        AbortSignal.timeout(PROVIDER_WINDOW_CLOCK.maxTransportLifetimeMs),
+        AbortSignal.timeout(
+          provider.transportTimeoutMs ?? PROVIDER_WINDOW_CLOCK.maxTransportLifetimeMs
+        ),
         () => {
           if (called) throw new TransportRefused('CLOCK_UNCERTAIN')
           if (provider.scope() !== scope) throw new TransportRefused('PROVIDER_CHANGED')
@@ -72,21 +81,28 @@ export async function sendFrozenQueuedEmail(
             Math.max(Math.abs(nominalSkew), Math.abs(nominalSkew - pgAge)) >
               PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs ||
             Math.abs(monotonicAge - wallAge) > PROVIDER_WINDOW_CLOCK.maxDualClockDisagreementMs ||
-            !transportFenceEligible({
-              redisTime: fence.redisTime,
-              wallTime: current.wall,
-              monotonicElapsedMs: current.monotonic - fence.beforeEval.monotonic,
-              wallElapsedMs: current.wall - fence.beforeEval.wall,
-              pgSampleAgeMs: pgAge,
-              nominalDeadline: fence.nominalDeadline,
-              floorUpper: fence.floorUpper,
-            })
+            pgAge > PROVIDER_WINDOW_CLOCK.maxPgSampleAgeMs ||
+            Math.max(
+              current.monotonic - fence.beforeEval.monotonic,
+              current.wall - fence.beforeEval.wall
+            ) > PROVIDER_WINDOW_CLOCK.maxFenceAgeMs ||
+            (provider.recipeVersion !== 2 &&
+              !transportFenceEligible({
+                redisTime: fence.redisTime,
+                wallTime: current.wall,
+                monotonicElapsedMs: current.monotonic - fence.beforeEval.monotonic,
+                wallElapsedMs: current.wall - fence.beforeEval.wall,
+                pgSampleAgeMs: pgAge,
+                nominalDeadline: fence.nominalDeadline,
+                floorUpper: fence.floorUpper,
+              }))
           )
             throw new TransportRefused('CLOCK_UNCERTAIN')
           called = true
         }
       )
-      if (!called) return { status: 'not-called', reason: 'CLOCK_UNCERTAIN' }
+      if (!called && outcome.certainty !== 'none')
+        return { status: 'not-called', reason: 'CLOCK_UNCERTAIN' }
       return { status: 'outcome', outcome }
     } catch (error) {
       // A timeout/abort/network error after fetch admission never proves provider nonacceptance.

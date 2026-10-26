@@ -287,7 +287,7 @@ ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
   IDs, job IDs, payloads, and error messages are never labels.
 
 Registered queued-email `process` results cover the admitted policy execution,
-including uncertainty failures; a provider-window retry is not counted as success
+including uncertainty failures; a queued-email retry is not counted as success
 merely because rendering or the handler returned. Before-entry cooldown/manual
 receipt deferrals do not count as failed sends or consume another possible call.
 Secret-bearing legacy jobs emit `discarded` before rendering or provider access.

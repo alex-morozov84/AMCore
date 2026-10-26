@@ -8,6 +8,7 @@ import { validateWorkRegistrations, WORK_REGISTRATIONS } from './registration.js
 import { verifyInstalledScriptProvenance } from './script-provenance.js'
 import { initializeManagedQueue } from './scripts/initialize-queue.js'
 import type { WorkHandler, WorkRegistration } from './work-definition.js'
+import { usesProviderEvidence } from './work-definition.js'
 import { PROVIDER_WINDOW_EXECUTION } from './work-execution.service.js'
 import { WorkReadiness } from './work-readiness.js'
 
@@ -95,13 +96,13 @@ export class WorkCoordinator implements OnApplicationBootstrap {
         if (
           typeof handler.run !== 'function' ||
           (definition.legacy && typeof handler.runLegacyWake !== 'function') ||
-          (definition.jobs[key.slice(0, key.lastIndexOf('@'))]?.replay.kind === 'provider-window' &&
+          (usesProviderEvidence(definition.jobs[key.slice(0, key.lastIndexOf('@'))]?.replay.kind) &&
             typeof handler.prepareRequest !== 'function')
         )
           throw new Error(`INVALID_WORK_HANDLER:${definition.id}:${key}`)
       }
       if (
-        Object.values(definition.jobs).some((job) => job.replay.kind === 'provider-window') &&
+        Object.values(definition.jobs).some((job) => usesProviderEvidence(job.replay.kind)) &&
         !this.modules.get(PROVIDER_WINDOW_EXECUTION, { strict: false })
       )
         throw new Error('MISSING_PROVIDER_WINDOW_EXECUTION')

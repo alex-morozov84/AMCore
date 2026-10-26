@@ -209,7 +209,7 @@ const workJobFieldsSchema = z.strictObject({
   wireVersion: z.number().int().positive(),
   sampledAt: z.iso.datetime(),
   source: z.enum(['broker', 'PG_evidence', 'domain']),
-  replay: z.enum(['idempotent', 'provider-window', 'unsupported', 'durable']),
+  replay: z.enum(['idempotent', 'provider-window', 'conservative', 'unsupported', 'durable']),
   failure: workFailureDiagnosticSchema.optional(),
   report: z.enum(['none', 'success', 'failure', 'unrecorded']).optional(),
   certainty: z.enum(['none', 'accepted', 'unknown']).optional(),

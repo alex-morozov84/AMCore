@@ -462,19 +462,30 @@ describe('One registration → shared privileged HTTP observation/control', () =
     // Simulates a worker dying after durable possible-call reservation: absence cannot prove no effect.
     const id = 'recycled-evidence-job'
     const incarnations = [uuidv7(), uuidv7()]
-    for (const incarnation of incarnations)
-      await store.reserve({
+    for (const incarnation of incarnations) {
+      const attempt = await store.reserve({
         workId: emailWork.id,
         jobId: id,
         incarnation,
         queueEpoch: uuidv7(),
         jobName: JobName.SEND_EMAIL,
         wireVersion: 1,
-        policyVersion: 1,
+        policyVersion: 2,
         automaticLimit: 1,
         requestDigest: 'a'.repeat(64),
         providerScope: 'b'.repeat(64),
       })
+      if ('accepted' in attempt) throw new Error('UNEXPECTED_ACCEPTANCE')
+      // Retained v1 fixture: production v2 admission cannot manufacture old privileges.
+      await context.prisma.backgroundEffectEvidence.update({
+        where: { workId_incarnation: { workId: emailWork.id, incarnation } },
+        data: {
+          policyVersion: 1,
+          recipeVersion: null,
+          nominalDeadline: new Date(attempt.row.firstDispatchAt!.getTime() + 86400000),
+        },
+      })
+    }
     const connection = jest
       .spyOn(context.app.get(ControlConnection), 'withClient')
       .mockRejectedValue(new Error('Injected broker outage'))

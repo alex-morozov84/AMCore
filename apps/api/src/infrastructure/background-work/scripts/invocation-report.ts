@@ -12,6 +12,7 @@ const reportSchema = z.strictObject({
     'CONTENT_UNSUPPORTED',
     'RATE_LIMITED',
     'NO_CALL',
+    'EFFECT_UNKNOWN',
   ]),
   failureCode: workFailureCodeSchema.optional(),
   incarnation: z.uuid(),

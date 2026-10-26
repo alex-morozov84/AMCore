@@ -12,13 +12,13 @@ export const emailWork = defineOrdinaryWork({
       userId: { en: 'User ID', ru: 'Идентификатор пользователя' },
     },
   },
-  definitionVersion: 1,
+  definitionVersion: 2,
   queue: { name: QueueName.EMAIL, enabled: true },
   jobs: {
     [JobName.SEND_EMAIL]: {
       wireVersion: 1,
       schema: sendEmailJobDataSchema,
-      replay: { kind: 'provider-window', policyVersion: 1, recipe: 'queued-email' },
+      replay: { kind: 'conservative', policyVersion: 2, recipe: 'queued-email' },
       project: (payload: SendEmailJobData) => ({
         template: payload.template,
         ...(payload.userId ? { userId: payload.userId } : {}),

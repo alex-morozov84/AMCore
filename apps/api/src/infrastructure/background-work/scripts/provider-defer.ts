@@ -20,7 +20,8 @@ const schema = z.strictObject({
     .nonnegative()
     .max(Number.MAX_SAFE_INTEGER - 1),
   floorUpper: z.number().int().nonnegative(),
-  nominalDeadline: z.number().int().positive(),
+  nominalDeadline: z.number().int().nonnegative(),
+  waitMs: z.number().int().positive().max(86400000).optional(),
   commandId: z.uuidv7().optional(),
 })
 
@@ -41,7 +42,8 @@ export async function deferProviderCooldown(
     input.revision,
     input.floorUpper,
     input.nominalDeadline,
-    input.commandId ?? ''
+    input.commandId ?? '',
+    input.waitMs ?? ''
   )
   if (!Array.isArray(result)) throw new Error('INVALID_BROKER_REPLY')
   if (result[0] === 'deferred') return 'deferred'
