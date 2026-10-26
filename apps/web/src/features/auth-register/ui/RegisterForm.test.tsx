@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, DEFAULT_LOCALE } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -44,7 +44,7 @@ const failure = (status: number, errorCode?: string) =>
 function renderForm() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
   return render(
-    <NextIntlClientProvider locale="en" messages={enMessages}>
+    <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={enMessages}>
       <QueryClientProvider client={client}>
         <RegisterForm />
       </QueryClientProvider>
