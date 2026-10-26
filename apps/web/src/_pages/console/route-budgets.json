@@ -2,11 +2,13 @@
   "$comment": "Per-route first-load JS limits in raw bytes (route-bundle-stats.json). Contract and update rule: docs/frontend/bundle-budget.md.",
   "routes": {
     "admin-console:/": 1304831,
+    "admin-console:/account/security": 1121051,
     "admin-console:/api-keys": 1346913,
     "admin-console:/audit": 1461215,
     "admin-console:/background-work": 1411262,
     "admin-console:/integrations": 1341489,
     "admin-console:/login": 1304831,
+    "admin-console:/mfa": 1121051,
     "admin-console:/organizations": 1304831,
     "admin-console:/organizations/[id]": 1312400,
     "admin-console:/scheduled-jobs": 1342814,
