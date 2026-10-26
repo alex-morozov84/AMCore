@@ -1,8 +1,10 @@
 import type { SystemRole } from '../enums/roles'
 
+import type { SessionAuthorityClaims } from './jwt'
+
 // Unified identity on request.user — populated by any auth strategy
 // Validated pattern: "IdentityBill" in @eropple/nestjs-auth, request.user in Passport
-export interface RequestPrincipal {
+export interface RequestPrincipal extends SessionAuthorityClaims {
   type: 'jwt' | 'api_key'
   sub: string // userId
   email?: string // always present for JWT; undefined for API keys

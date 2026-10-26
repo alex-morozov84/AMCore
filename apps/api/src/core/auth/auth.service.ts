@@ -53,6 +53,8 @@ import { lockAuthMailTokens } from './auth-mail-token-lock.js'
 import { avatarUrlOf } from './avatar-url.js'
 import { EmailIdentityService } from './email-identity.service.js'
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
+import { advanceAccountSecurity } from './mfa/mfa-invalidation.js'
+import { lockMfaAccounts } from './mfa/mfa-transaction.js'
 import { prepareRegistrationMail, type RegistrationMail } from './registration-mail.js'
 import { SessionService } from './session.service.js'
 import { TokenService } from './token.service.js'
@@ -666,10 +668,11 @@ export class AuthService {
 
     await this.prisma.$transaction(
       async (tx) => {
-        await tx.$executeRaw`SET LOCAL lock_timeout = '1000ms'`
+        await lockMfaAccounts(tx, [userId])
         await lockAuthMailTokens(tx, userId)
         await this.tokenManager.consumeLocked(tx, token, 'password-reset', frontend)
         await tx.user.update({ where: { id: userId }, data: { passwordHash, emailVerified: true } })
+        await advanceAccountSecurity(tx, userId)
       },
       { maxWait: 2000, timeout: 4000 }
     )

@@ -1036,6 +1036,15 @@ describe('AuthService', () => {
           new AppException('Invalid token', 401, AuthErrorCode.TOKEN_INVALID)
         )
       mockCtx.prisma.user.update.mockResolvedValue(mockUser)
+      mockCtx.prisma.$queryRaw.mockResolvedValue([{ now: new Date() }])
+      mockCtx.prisma.mfaAccount.upsert.mockResolvedValue({
+        userId: mockUser.id,
+        securityVersion: 1,
+        required: false,
+        setupComplete: false,
+        emergencyRequired: false,
+        codeGeneration: 0,
+      })
       mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
     }
 
@@ -1107,6 +1116,11 @@ describe('AuthService', () => {
           data: { passwordHash: 'new-hashed-password', emailVerified: true },
         })
         expect(mockCtx.prisma.$transaction).toHaveBeenCalledTimes(1)
+        expect(mockCtx.prisma.authSessionFamily.updateMany).toHaveBeenCalledWith({
+          where: { userId: mockUser.id, revokedAt: null },
+          data: { revokedAt: expect.any(Date) },
+        })
+        expect(mockCtx.prisma.mfaAccount.upsert).toHaveBeenCalledTimes(1)
         expect(mockNotifications.notify).not.toHaveBeenCalled()
         expect(mockUserCacheService.invalidateUser).toHaveBeenCalledTimes(
           failure === 'sessions' ? 0 : 1
