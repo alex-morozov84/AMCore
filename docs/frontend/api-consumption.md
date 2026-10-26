@@ -97,12 +97,12 @@ stores the session in the Redis vault and retires earlier invitation flows. The 
 commit and the publication are separate, so publication can fail after the account
 exists.
 
-| What the BFF observed                                                                                                                                                                       | Response                                                         | Meaning                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
-| The API answered exactly `201` with a valid body and the session was published                                                                                                              | `201 { user }` and the session cookie                            | The person is signed in                    |
-| The API answered exactly `201` with a valid body, but publication failed (vault write, flow retirement) or the API sent no refresh cookie                                                   | `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`, no cookie | The account exists; sign-in is unavailable |
-| The API answered `409 EMAIL_ALREADY_EXISTS`                                                                                                                                                 | `409` with that code                                             | The email is taken                         |
-| Anything else: a network failure, a timeout, an API error (forwarded with its own status, for example `500`) or a success that is not a valid `201` (`200`, `202`, `204`, an unusable body) | The API error status, or `503`                                   | Unknown: the account may or may not exist  |
+| What the BFF observed                                                                                                                                                                | Response                                                         | Meaning                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| The API answered exactly `201` with a valid body and the session was published                                                                                                       | `201 { user }` and the session cookie                            | The person is signed in                                                                                                          |
+| The API answered exactly `201` with a valid body, but publication failed (vault write, flow retirement) or the API sent no refresh cookie                                            | `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`, no cookie | The account exists; sign-in is unavailable                                                                                       |
+| The API refused the request with a `4xx` (`400` invalid fields, `403 PUBLIC_SIGNUP_DISABLED`, `409 EMAIL_ALREADY_EXISTS`, `429`)                                                     | The same status and body                                         | A known refusal: this request created nothing; handle it by its code. `409` says the email is taken, not who created the account |
+| A network failure or timeout; an API `5xx` (forwarded with its own status, for example `500`); an upstream success that is not a valid `201` (`200`, `202`, `204`, an unusable body) | `503` or the forwarded `5xx`                                     | Unknown: the account may or may not exist                                                                                        |
 
 `REGISTRATION_SIGN_IN_REQUIRED` is emitted only by the web BFF, so it is not in the
 OpenAPI document. A custom registration form must:
@@ -110,13 +110,14 @@ OpenAPI document. A custom registration form must:
 1. not submit the registration again after this code;
 2. clear the password field, say that the account was created, and link to sign-in;
 3. not write the user into the authenticated cache or navigate as if signed in;
-4. after an unknown result, ask the person to try signing in with the same email and
-   password, or to reset the password, without saying that the account exists.
-   Registering again is harmless (an existing account answers `EMAIL_ALREADY_EXISTS`)
-   but is not the first step.
+4. after an unknown result, ask the person to wait for the service to recover and then
+   try the same email and password, or reset the password. A failed sign-in or a reset
+   acknowledgement does not show whether the account exists (sign-in answers the same for
+   a missing account and a wrong password). Do not repeat the registration automatically. A repeat started by the person cannot
+   create a duplicate: an existing account answers `EMAIL_ALREADY_EXISTS`.
 
-Sign-in can stay unavailable until the service recovers. A browser that disconnects
-before the response gets no notice: sign in or reset the password.
+A browser that disconnects before the response gets no notice: sign in or reset the
+password.
 
 `POST /api/invitation-flows/{flowId}/register` returns the same code when the API
 confirmed the invited account but the invitation session could not be published. The

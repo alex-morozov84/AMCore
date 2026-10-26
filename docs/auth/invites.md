@@ -239,8 +239,8 @@ and no cookie ([results](../frontend/api-consumption.md#registration-results-in-
 Do not submit the registration again. The recipient page keeps a notice and reads
 the flow context, which is in exactly one of these states:
 
-- A current binding enables invitation sign-in with the chosen password. Membership
-  still needs explicit acceptance.
+- An active flow (current binding) enables invitation sign-in with the chosen
+  password. Membership still needs explicit acceptance.
 - A pending attempt keeps the "Signing in" recovery screen until it settles or its
   window (about a minute) closes.
 - An expired attempt shows "This invitation session has changed": reopen the original

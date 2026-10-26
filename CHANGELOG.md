@@ -126,13 +126,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compose forwards database, authentication, media and AI runtime settings from
   the environment to backend roles while retaining their defaults and secret boundaries.
 
-- Registration no longer ends in a misleading error after the account was created. The API
-  writes the user, first session and verification token in one transaction (ordinary and
-  invited signup); only a canonical-email conflict answers `EMAIL_ALREADY_EXISTS`. When
-  Redis cannot store the browser session after the API confirmed the account, the web
-  application answers `503` with `REGISTRATION_SIGN_IN_REQUIRED` and the page says to sign
-  in later with the same email and password. The welcome email stays best-effort without
-  resend. See Capacity, "Redis memory".
+- When Redis cannot store the browser session after the API confirmed a registration, the web
+  application answers `503` with `REGISTRATION_SIGN_IN_REQUIRED` and the page says to sign in
+  later with the same email and password. The API writes the user, first session and
+  verification token in one transaction (ordinary and invited signup); only a canonical-email
+  conflict answers `EMAIL_ALREADY_EXISTS`. Unknown results remain possible (lost responses,
+  errors after the commit). The welcome email stays best-effort without resend. See Capacity,
+  "Redis memory".
 - Password login/step-up preserve aggregate IP failure debt on success and record
   parallel failures atomically. Verified visitor IP selects their budget when
   configured; protection failures return503 without issuing credentials.

@@ -80,7 +80,6 @@ commit, or a lost response, can hide a committed account: sign in or reset the
 password instead of submitting the registration again. The web application adds
 a session step; see
 [registration results in the web application](../frontend/api-consumption.md#registration-results-in-the-web-application).
-[registration results in the web application](../frontend/api-consumption.md#registration-results-in-the-web-application).
 
 **Success response** `201 Created`:
 
