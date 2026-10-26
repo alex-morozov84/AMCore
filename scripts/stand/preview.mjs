@@ -248,7 +248,7 @@ export async function preview(m, profile = 'default') {
           }
         }
         // AMCORE_CONSOLE_PREVIEW_ACCESS_END
-        if (profile === 'account-mfa-ui' && account.role === 'SUPER_ADMIN') {
+        if (profile === 'account-mfa-ui' && account.role === 'USER') {
           const { accountMfaPreview } = await import('./account-mfa-preview.mjs')
           await accountMfaPreview(page, m)
         }
