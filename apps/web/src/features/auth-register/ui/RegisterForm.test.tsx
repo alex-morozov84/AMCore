@@ -8,8 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '@/shared/api/auth-api'
 import { ApiNetworkError, ApiRequestError } from '@/shared/api/http-client'
 
-import enMessages from '../../../../messages/en.json'
-
+import { registerFormMessages as enMessages } from './register-form-test-messages'
 import { RegisterForm } from './RegisterForm'
 
 vi.mock('@/shared/api/auth-api', () => ({ authApi: { register: vi.fn() } }))
