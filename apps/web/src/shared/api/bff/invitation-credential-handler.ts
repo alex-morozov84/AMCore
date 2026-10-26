@@ -19,6 +19,7 @@ import { invitationOwnerStore } from './invitation-owner-store'
 import { captureInvitationRequest } from './invitation-request-snapshot'
 import { invitationRoute } from './invitation-route'
 import { invitationBackend } from './invitation-upstream'
+import { withCreatedOutcome } from './registration-outcome'
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from './session-cookie'
 
 import 'server-only'
@@ -30,95 +31,103 @@ export async function invitationCredentialHandler(
   deps: ContextExecutorDeps
 ) {
   let publishedSessionId: string | undefined
+  // Request-local evidence: set only after the API confirmed registration (exact 201,
+  // valid body, signal alive). Read by the wrapper OUTSIDE the deadline race.
+  let created = false
   const response = await invitationRoute(
     request,
     () =>
-      withinContextDeadline(
-        request.signal,
-        async (signal) => {
-          if (new URL(request.url).search) throw new ContextRequestError(400, 'BAD_REQUEST')
-          // Authenticate owner/origin before consuming credentials; recapture under the lease before effects.
-          const first = await captureInvitationRequest(request, flowId, deps, true)
-          const raw = await readContextJson(request.body, 16384)
-          const input =
-            kind === 'login'
-              ? invitationFlowLoginSchema.parse(raw)
-              : invitationFlowRegisterSchema.parse(raw)
-          const { binding, ...body } = input
-          if (binding.flowId !== flowId) throw invitationFlowChanged()
-          return withInvitationOwnerLease(
-            first.ownerHash,
-            signal,
-            async () => {
-              const snapshot = await captureInvitationRequest(request, flowId, deps, true)
-              const reserved = reserveInvitationAuth(
-                snapshot.owner,
-                binding,
-                snapshot.session?.binding ?? null,
-                kind,
-                null,
-                Date.now()
-              )
-              signal.throwIfAborted()
-              if (
-                !(await invitationOwnerStore.compareAndSet(
-                  snapshot.ownerHash,
-                  snapshot.owner.version,
-                  reserved.owner,
-                  deps.webContext
-                ))
-              )
-                throw invitationFlowChanged()
-              try {
-                signal.throwIfAborted()
-                const credentials = await invitationBackend(
-                  kind === 'login' ? '/auth/login' : '/auth/invites/register',
-                  authResponseSchema,
-                  {
-                    context: deps.webContext,
-                    source: request.headers,
-                    signal,
-                    method: 'POST',
-                    expectedStatus: kind === 'login' ? 200 : 201,
-                    body,
-                    credential: snapshot.flow.credential,
-                    handoff: {
-                      attemptId: reserved.attempt.id,
-                      cleanupKey: reserved.attempt.cleanupKey,
-                    },
+      withCreatedOutcome(
+        () => created,
+        () =>
+          withinContextDeadline(
+            request.signal,
+            async (signal) => {
+              if (new URL(request.url).search) throw new ContextRequestError(400, 'BAD_REQUEST')
+              // Authenticate owner/origin before consuming credentials; recapture under the lease before effects.
+              const first = await captureInvitationRequest(request, flowId, deps, true)
+              const raw = await readContextJson(request.body, 16384)
+              const input =
+                kind === 'login'
+                  ? invitationFlowLoginSchema.parse(raw)
+                  : invitationFlowRegisterSchema.parse(raw)
+              const { binding, ...body } = input
+              if (binding.flowId !== flowId) throw invitationFlowChanged()
+              return withInvitationOwnerLease(
+                first.ownerHash,
+                signal,
+                async () => {
+                  const snapshot = await captureInvitationRequest(request, flowId, deps, true)
+                  const reserved = reserveInvitationAuth(
+                    snapshot.owner,
+                    binding,
+                    snapshot.session?.binding ?? null,
+                    kind,
+                    null,
+                    Date.now()
+                  )
+                  signal.throwIfAborted()
+                  if (
+                    !(await invitationOwnerStore.compareAndSet(
+                      snapshot.ownerHash,
+                      snapshot.owner.version,
+                      reserved.owner,
+                      deps.webContext
+                    ))
+                  )
+                    throw invitationFlowChanged()
+                  try {
+                    signal.throwIfAborted()
+                    const credentials = await invitationBackend(
+                      kind === 'login' ? '/auth/login' : '/auth/invites/register',
+                      authResponseSchema,
+                      {
+                        context: deps.webContext,
+                        source: request.headers,
+                        signal,
+                        method: 'POST',
+                        expectedStatus: kind === 'login' ? 200 : 201,
+                        body,
+                        credential: snapshot.flow.credential,
+                        handoff: {
+                          attemptId: reserved.attempt.id,
+                          cleanupKey: reserved.attempt.cleanupKey,
+                        },
+                      }
+                    )
+                    if (kind === 'register') created = true
+                    const published = await publishInvitedCredentials({
+                      snapshot,
+                      attempt: reserved.attempt,
+                      credentials,
+                      signal,
+                    })
+                    // The deadline wrapper may discard a late response. It must never emit its cookie on that error.
+                    signal.throwIfAborted()
+                    const safe = invitationFlowAuthResponseSchema.parse({
+                      binding: published.binding,
+                      data: { user: published.user },
+                      handoff: { attemptId: published.attemptId },
+                    })
+                    publishedSessionId = published.sessionId
+                    return safe
+                  } catch (error) {
+                    await recoverFailedInvitationAuth({
+                      request,
+                      snapshot,
+                      attempt: reserved.attempt,
+                      error,
+                      store: deps.store,
+                    }).catch(() => undefined)
+                    throw error
                   }
-                )
-                const published = await publishInvitedCredentials({
-                  snapshot,
-                  attempt: reserved.attempt,
-                  credentials,
-                  signal,
-                })
-                // The deadline wrapper may discard a late response. It must never emit its cookie on that error.
-                signal.throwIfAborted()
-                const safe = invitationFlowAuthResponseSchema.parse({
-                  binding: published.binding,
-                  data: { user: published.user },
-                  handoff: { attemptId: published.attemptId },
-                })
-                publishedSessionId = published.sessionId
-                return safe
-              } catch (error) {
-                await recoverFailedInvitationAuth({
-                  request,
-                  snapshot,
-                  attempt: reserved.attempt,
-                  error,
-                  store: deps.store,
-                }).catch(() => undefined)
-                throw error
-              }
+                },
+                undefined,
+                deps.webContext
+              )
             },
-            undefined,
-            deps.webContext
+            15000
           )
-        },
-        15000
       ),
     kind === 'login' ? 200 : 201
   )

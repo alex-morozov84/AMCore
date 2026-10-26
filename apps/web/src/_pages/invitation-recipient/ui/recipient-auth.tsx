@@ -5,7 +5,11 @@ import { useTranslations } from 'next-intl'
 
 import { LoginForm, type LoginFormProps } from '@/features/auth-login'
 import { OAuthProviderActions, type OAuthProviderActionsProps } from '@/features/auth-oauth'
-import { RegisterForm, type RegisterFormProps } from '@/features/auth-register'
+import {
+  RegisterForm,
+  type RegisterFormProps,
+  RegistrationCreatedNotice,
+} from '@/features/auth-register'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
@@ -15,6 +19,8 @@ export interface RecipientAuthProps {
   oauthContent?: ReactNode
   busy: boolean
   error?: unknown
+  /** The account exists but no session was published: sign-in only, with a notice. */
+  created?: boolean
   login: NonNullable<LoginFormProps['adapter']>
   register: Extract<RegisterFormProps, { fixedEmail: string }>['adapter']
   oauth: Omit<OAuthProviderActionsProps, 'busy'>
@@ -26,6 +32,7 @@ export function RecipientAuth({
   email,
   busy,
   error,
+  created = false,
   login,
   register,
   oauth,
@@ -43,9 +50,10 @@ export function RecipientAuth({
         <p className="text-sm text-muted-foreground">{t('explicitConsentHelp')}</p>
       </div>
       {oauthContent ?? <OAuthProviderActions {...oauth} busy={busy} />}
+      {created && <RegistrationCreatedNotice />}
       <ApiErrorAlert error={error} />
       <Tabs
-        value={mode}
+        value={created ? 'login' : mode}
         onValueChange={(value) => {
           if (!busy && (value === 'login' || value === 'register')) setMode(value)
         }}
@@ -54,7 +62,7 @@ export function RecipientAuth({
           <TabsTrigger value="login" disabled={busy}>
             {auth('login')}
           </TabsTrigger>
-          <TabsTrigger value="register" disabled={busy}>
+          <TabsTrigger value="register" disabled={busy || created}>
             {auth('register')}
           </TabsTrigger>
         </TabsList>

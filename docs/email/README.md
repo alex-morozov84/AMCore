@@ -35,7 +35,7 @@ attempt history. Use `EmailService` for transactional email infrastructure.
 
 | Template             | Class                                              |
 | -------------------- | -------------------------------------------------- |
-| `welcome`            | Queueable, non-secret                              |
+| `welcome`            | Queueable, non-secret; best-effort, no resend      |
 | `password-reset`     | Secret-bearing direct (`resetUrl`)                 |
 | `email-verification` | Secret-bearing direct (`verificationUrl`)          |
 | `org-invite`         | Secret-bearing direct (`acceptUrl`)                |
