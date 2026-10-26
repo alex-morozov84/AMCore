@@ -19,13 +19,14 @@ removing the optional frontend does not remove the backend control API.
 
 ## Choose the business authority
 
-| Work                | Authority and retry requirement                                                                                                                                                     |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ordinary idempotent | BullMQ owns scheduling; the handler owns durable business deduplication. A repeated handler invocation must return the same business result.                                        |
-| Provider-window     | BullMQ owns scheduling; independent PG evidence protects provider certainty, immutable requests, finite starts and the provider retry window. The supported recipe is queued email. |
-| Durable             | Business tables own state and eligibility. The adapter changes business state using the framework's transaction, together with receipt and strict audit.                            |
-| Wake hint           | The queue only wakes a database-owned subsystem. A hint is not the business result.                                                                                                 |
-| External            | Observed queue without the managed producer/handler contract; unsupported commands remain disabled.                                                                                 |
+| Work                | Authority and retry requirement                                                                                                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ordinary idempotent | BullMQ owns scheduling; the handler owns durable business deduplication. A repeated handler invocation must return the same business result.                                                                                 |
+| Provider-window     | BullMQ owns scheduling; independent PG evidence protects provider certainty, immutable requests, finite starts and the provider retry window. Retained queued-email policy1 uses this decoder; it is not new-send authority. |
+| Conservative        | BullMQ schedules; independent PG evidence permits submission only with aggregate authoritative none. Welcome email uses this policy; unknown stops replay.                                                                   |
+| Durable             | Business tables own state and eligibility. The adapter changes business state using the framework's transaction, together with receipt and strict audit.                                                                     |
+| Wake hint           | The queue only wakes a database-owned subsystem. A hint is not the business result.                                                                                                                                          |
+| External            | Observed queue without the managed producer/handler contract; unsupported commands remain disabled.                                                                                                                          |
 
 Ordinary handler replay and administrative command replay are different. Business
 idempotency permits re-entry after a lost worker acknowledgement. An administrative
@@ -302,7 +303,7 @@ state contains more than512 records, before the ID search. The witness survives
 empty searched pages and is never projected as a row. Provider evidence has an independent PG source that survives queue
 hash removal; unavailable broker state is explicitly unobserved.
 
-PG failure prevents new administrative effects and provider-window admissions.
+PG failure prevents new administrative effects and external-effect admissions.
 Ordinary idempotent execution relies on its own business dependencies rather than
 framework PG execution rows. Durable control uses PG business authority without
 broker access; frontend session-vault failure can still prevent browser access.
@@ -334,7 +335,7 @@ replay is permitted; stock queue history retention cannot provide that guarantee
 A job started during an HTTP request stores that request's `correlationId` in its
 envelope. The worker runs the job in a log context, so every worker log line of the
 run carries `correlationId`, `workId` and `jobId`. Idempotent and wake runs also carry
-`invocationId` inside the handler; a queued email (`provider-window`) does not.
+`invocationId` inside the handler; a queued email (`conservative`) does not.
 Searching the log store for the request ID therefore finds the API lines and the
 worker lines of the same job.
 

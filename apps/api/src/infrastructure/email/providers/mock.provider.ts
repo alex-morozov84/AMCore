@@ -38,8 +38,9 @@ export class MockEmailProvider implements EmailProvider {
     this.logger.setContext(MockEmailProvider.name)
     if (env && control)
       this.queuedEmail = {
-        recipeVersion: 1,
+        recipeVersion: 2,
         provider: 'mock',
+        transportTimeoutMs: 30_000,
         scope: () =>
           createHash('sha256')
             .update(
@@ -47,7 +48,7 @@ export class MockEmailProvider implements EmailProvider {
                 provider: 'mock',
                 slot: 'REDIS_URL',
                 credential: createHash('sha256').update(env.get('REDIS_URL')).digest('hex'),
-                recipeVersion: 1,
+                recipeVersion: 2,
               })
             )
             .digest('hex'),

@@ -9,8 +9,10 @@ export interface QueuedEmailOutcome {
 
 /** Approved immutable recipe only; beforeTransport is synchronous at the actual SDK/fetch seam. */
 export interface QueuedEmailProvider {
-  readonly recipeVersion: 1
+  readonly recipeVersion: 1 | 2
   readonly provider: 'resend' | 'mock'
+  /** Per-adapter client wait bound; not a remote cancellation guarantee. */
+  readonly transportTimeoutMs?: number
   scope(): string
   send(
     body: string,

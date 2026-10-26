@@ -43,9 +43,8 @@ deploys matching code and schema, and configures mail, Redis and the public fron
 URL. The initial-setup command itself needs only the database configuration and
 creation policy. It does not start the API, workers or listeners.
 
-Use the CLI-capable **migrator** image for migration. Explicit seed uses a matching
-prepared source checkout; see [Seeding](../operations/deployment.md#seeding). Use the **runner**
-image for organization setup. The runner contains compiled commands and runtime
+Use the CLI-capable **migrator** image for migration and the matching **runner**
+image for guarded seed and organization setup; see [Seeding](../operations/deployment.md#seeding). The runner contains compiled commands and runtime
 dependencies; it does not contain pnpm, tsx or the Prisma migration CLI.
 
 For the reference Compose deployment, set `ORG_SELF_SERVICE_CREATION_ENABLED=false`
@@ -55,9 +54,9 @@ in `.env` first. With its owned infrastructure already running:
 docker compose run --rm --no-deps migrate
 ```
 
-Before initial setup, follow [Seeding](../operations/deployment.md#seeding) to prepare
-the matching source checkout and run its explicit guarded seed on the selected
-database. The final migrator cannot run seed. Then return to the same Compose deployment:
+Before initial setup, run the [guarded seed from the API image](../operations/deployment.md#seed-from-the-api-image-deployment)
+on the selected database. No host Node/pnpm installation is needed. The migrator
+cannot run seed. Then use the same Compose deployment:
 
 ```sh
 docker compose run --rm --no-deps api node dist/cli/organization-setup.js status
@@ -296,7 +295,7 @@ recipient substitution, permission repair or grant restoration occurs.
 | Problem                                                       | Recovery                                                                                                                                                   |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Misspelled email                                              | While eligible, deliberately choose the correct recipient; the typo account remains ordinary                                                               |
-| No email                                                      | Check spam, sender/provider configuration and public frontend URL; request a fresh normal link                                                             |
+| No email                                                      | Check spam, sender/provider configuration and public frontend URL; follow [mail recovery rules][mail-recovery] before requesting another link              |
 | Expired/used link                                             | Request a new link; wait for actual verification before granting access                                                                                    |
 | Redis/auth outage                                             | Restore the existing login/recovery prerequisites; do not bypass verification                                                                              |
 | Preparation reply lost                                        | Read installation status first; only an eligible installation permits the same-email repeat                                                                |
@@ -304,6 +303,8 @@ recipient substitution, permission repair or grant restoration occurs.
 | Busy operation                                                | Respect `Retry-After`, then read status; ordinary operators do not stop database writers                                                                   |
 | Selected account deleted before completion                    | While setup is still open and no request has an unknown result, deliberately select another verified user ID and keep the company details for that request |
 | Account, organization or ADMIN grant deleted after completion | Inspect the retained original IDs; exact replay reports changed state and never restores them                                                              |
+
+[mail-recovery]: ../email/delivery.md#verify-delivery-on-a-deployed-stack
 
 The short database lock protects initial check-and-create. It does not permanently
 enforce a one-organization database. A stale replica with creation still enabled

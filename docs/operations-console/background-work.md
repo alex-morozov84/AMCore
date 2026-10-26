@@ -302,7 +302,8 @@ authentication. A changed target is refused rather than silently recaptured.
   Ordinary managed work has one lifetime manual grant per incarnation.
   Idempotent handlers own durable business deduplication. Queued email additionally
   requires a supported transient no-effect result, the same immutable request,
-  provider scope and key, a satisfied cooldown and the original provider horizon.
+  provider scope/key and a satisfied cooldown. Conservative welcome recipe2 has
+  no provider retry window. Retained policy1 does not acquire recipe2 retry authority.
   Unknown or accepted delivery is not manually retryable.
 - **Cancel** removes supported unstarted work. It does not interrupt an active
   business effect or promise to undo delivery.
@@ -353,7 +354,9 @@ even after stock job trimming or broker failure. The same job ID can have multip
 incarnations. Broker state and completion counts are explicitly unobserved on
 this source; no queue job can be selected for mutation there. A recorded unknown
 effect has a separate disposition. An active/unrecorded attempt remains protected
-until its immutable horizon is certainly past. Its disposition retains attempt
+until dispatch authority is revoked and its cached local fence expires for recipe2.
+Retained policy1 keeps its original immutable-horizon guard. See
+[queued recovery](../email/queued-safety.md#inspect-a-stopped-welcome). Disposition retains attempt
 markers, certainty, grants, fence and all unresolved/row reservations.
 
 Diagnostics cover a live first512-identity window with pages of1–50, not a complete

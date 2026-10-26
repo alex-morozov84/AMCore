@@ -48,10 +48,11 @@ Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-email` group.
 - If provider-wide: this is outside AMCore's control beyond waiting out the
   provider's incident; confirm no application-side retry storm is making it
   worse in the meantime.
-- If template-specific: fix the template's content/rendering (a malformed
-  address field, a broken merge tag). Re-queue a retained job only after the
-  fix, with the BullMQ API through your controlled operational tooling (the
-  Bull Board is view-only and cannot retry).
+- If template-specific: fix the template for future messages. Retained jobs keep
+  their frozen request; a template edit does not replace it. Use only the registered
+  [managed retry policy](../../email/queued-safety.md#retry-window-and-cooldown),
+  never stock BullMQ requeue. `unknown` or `accepted` certainty forbids retry.
+  A business reissue needs a separate duplicate/loss decision. The queue board is view-only.
 - If bounce-driven: this is expected steady-state noise for the affected
   flow, not an incident — no mitigation needed beyond normal address-hygiene
   practices upstream of AMCore.

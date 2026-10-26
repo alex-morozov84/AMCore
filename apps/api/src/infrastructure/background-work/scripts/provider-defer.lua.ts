@@ -39,11 +39,20 @@ if ARGV[7] ~= '' then
   if values[24] ~= ARGV[7] then return reject('COMMAND_CONFLICT') end
   floor = math.max(floor,now+1000-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs})
 end
-local allowance = ${PROVIDER_WINDOW_CLOCK.maxSchedulingAfterCheckMs + PROVIDER_WINDOW_CLOCK.maxTransportLifetimeMs + PROVIDER_WINDOW_CLOCK.reservedSafetyMarginMs}
-if floor+allowance >= deadline-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs} then
-  return reject('HORIZON_EXPIRED')
+local due
+if ARGV[8] ~= '' then
+  local wait = integer(ARGV[8])
+  if envelope.executionPolicyVersion ~= 2 or not wait or wait < 1 or wait > 86400000 then
+    return reject('CONTENT_UNSUPPORTED')
+  end
+  due = now+wait
+else
+  local allowance = ${PROVIDER_WINDOW_CLOCK.maxSchedulingAfterCheckMs + PROVIDER_WINDOW_CLOCK.maxTransportLifetimeMs + PROVIDER_WINDOW_CLOCK.reservedSafetyMarginMs}
+  if floor+allowance >= deadline-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs} then
+    return reject('HORIZON_EXPIRED')
+  end
+  due = floor+${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs}
 end
-local due = floor+${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs}
 if due <= now then return {'eligible'} end
 if due > 2199023255551 then return reject('CLOCK_UNCERTAIN') end
 if redis.call('TYPE',KEYS[20]).ok ~= 'none' and redis.call('TYPE',KEYS[20]).ok ~= 'set' then
