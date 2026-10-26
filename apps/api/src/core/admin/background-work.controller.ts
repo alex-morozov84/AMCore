@@ -276,12 +276,12 @@ export class BackgroundWorkController {
     summary: 'Record a provider uncertainty disposition independently of ADMIN commands',
     description:
       'Requires fresh personal SUPER_ADMIN authentication, evidence incarnation/revision, reason and bounded references. ' +
-      'Only supported provider-window uncertainty is eligible. Active/unrecorded attempts cannot be acknowledged ' +
-      'until the immutable provider horizon is certainly past under both timestamp uncertainty bounds. No provider, ' +
+      'Only supported external-effect uncertainty is eligible. Active/unrecorded attempts cannot be acknowledged ' +
+      'while dispatch authority remains live. Conservative v2 requires revoked authority; retained v1 uses its original horizon guard. No provider, ' +
       'queue or business mutation. Aggregate certainty, attempt markers, starts, grants, commandFence ' +
       'and protected evidence quotas remain unchanged. Works after broker hash removal; idempotent work returns409.',
   })
-  @ApiParam({ name: 'workId', description: 'Registered provider-window work ID' })
+  @ApiParam({ name: 'workId', description: 'Registered external-effect work ID' })
   @ApiParam({ name: 'jobId', description: 'Bounded job ID, paired with body incarnation' })
   @ApiResponse({
     status: 204,

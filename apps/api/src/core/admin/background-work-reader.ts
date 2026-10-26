@@ -40,6 +40,7 @@ import type {
   WorkDefinition,
   WorkRegistration,
 } from '../../infrastructure/background-work/work-definition.js'
+import { usesProviderEvidence } from '../../infrastructure/background-work/work-definition.js'
 import { currentWorkFailure } from '../../infrastructure/background-work/work-failure.js'
 import type { EmailProvider } from '../../infrastructure/email/email.types.js'
 import { QUEUE_REGISTRY } from '../../infrastructure/queue/constants/queue-inventory.constant.js'
@@ -175,10 +176,9 @@ export class BackgroundWorkReader {
       .parse(binding.project(payload))
     if (Object.keys(projection).length > 8 || Buffer.byteLength(JSON.stringify(projection)) > 2048)
       throw backgroundControlError('CONTENT_UNSUPPORTED')
-    const evidence =
-      binding.replay.kind === 'provider-window'
-        ? this.modules.get(ProviderEvidenceStore, { strict: false })
-        : undefined
+    const evidence = usesProviderEvidence(binding.replay.kind)
+      ? this.modules.get(ProviderEvidenceStore, { strict: false })
+      : undefined
     const provider = evidence
       ? await evidence.observe(definition.id, envelope.incarnation)
       : undefined
@@ -302,7 +302,7 @@ export class BackgroundWorkReader {
 
   /** Independent safety evidence; broker state and attempt completions are deliberately unobserved. */
   private async evidencePage(definition: WorkDefinition, query: WorkListQuery): Promise<WorkPage> {
-    if (!Object.values(definition.jobs).some((job) => job.replay.kind === 'provider-window'))
+    if (!Object.values(definition.jobs).some((job) => usesProviderEvidence(job.replay.kind)))
       throw backgroundControlError('ACTION_UNAVAILABLE')
     const store = this.modules.get(ProviderEvidenceStore, { strict: false })
     return backgroundControlTransaction(this.prisma, async (ctx) => {
@@ -344,7 +344,7 @@ export class BackgroundWorkReader {
             wireVersion: row.wireVersion,
             sampledAt: ctx.now.toISOString(),
             source: 'PG_evidence',
-            replay: 'provider-window',
+            replay: row.recipeVersion === 2 ? 'conservative' : 'provider-window',
             report: row.outcomeRecorded ? 'none' : 'unrecorded',
             certainty: row.certainty,
             attemptsStarted: row.autoStartsUsed + (row.manualGrant === 'spent' ? 1 : 0),

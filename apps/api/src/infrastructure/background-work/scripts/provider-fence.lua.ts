@@ -73,8 +73,8 @@ if now < oldStartedAt or math.abs(now-pgTime) > ${PROVIDER_WINDOW_CLOCK.timestam
 end
 if now+2000 < createdAt or now-createdAt > 2592000000 then return reject('HISTORY_EXPIRED') end
 if expiry <= now then return reject('REQUEST_EXPIRED') end
-if now-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs} < floor then return reject('COOLDOWN') end
-if now+${HORIZON_CHECK_OVERHEAD_MS} >= deadline then return reject('HORIZON_EXPIRED') end
+if envelope.executionPolicyVersion ~= 2 and now-${PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs} < floor then return reject('COOLDOWN') end
+if envelope.executionPolicyVersion ~= 2 and now+${HORIZON_CHECK_OVERHEAD_MS} >= deadline then return reject('HORIZON_EXPIRED') end
 local metadata = cjson.encode({version=1,report='unrecorded',invocationId=ARGV[12],startedAt=now})
 -- Check creation of every borrowed field before HSET; refencing adds no history entry.
 local additions = {'amAutoStartsUsed','amManualGrant','amMode','amIncarnation','amRevision',

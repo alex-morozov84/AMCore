@@ -23,6 +23,10 @@ describe('Protected provider evidence logical representation', () => {
     wireVersion: 2147483647,
     policyVersion: 2147483647,
     revision: 2147483647,
+    recipeVersion: null,
+    cooldownDelayMs: null,
+    cooldownSupported: null,
+    cooldownRevision: 0,
     clockPolicyVersion: 2147483647,
     autoStartsUsed: 10,
     automaticLimit: 10,
@@ -60,6 +64,30 @@ describe('Protected provider evidence logical representation', () => {
         )
       )
     ).toBeGreaterThan(512)
+  })
+
+  it('retains all v2 delay/version fields inside the same compact quota', () => {
+    const v2 = {
+      ...row,
+      policyVersion: 2,
+      recipeVersion: 2,
+      clockPolicyVersion: 1,
+      nominalDeadline: null,
+      floorUpper: 0n,
+      cooldownDelayMs: 86400000,
+      cooldownSupported: false,
+      cooldownRevision: 2147483647,
+    }
+    expect(compactProviderEvidenceBytes(v2)).toBe(501)
+    for (const change of [
+      { cooldownDelayMs: -1 },
+      { cooldownRevision: -1 },
+      { cooldownDelayMs: 86400001 },
+      { nominalDeadline: new Date() },
+    ])
+      expect(() => compactProviderEvidenceBytes({ ...v2, ...change })).toThrow(
+        'CONTENT_UNSUPPORTED'
+      )
   })
 
   it('refuses unsupported content before any compaction rather than silently dropping it', () => {

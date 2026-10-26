@@ -100,6 +100,10 @@ model BackgroundEffectEvidence {
   nominalDeadline    DateTime? @db.Timestamptz(3)
   floorUpper         BigInt    @default(0)
   clockPolicyVersion Int       @default(1)
+  recipeVersion      Int?
+  cooldownDelayMs    Int?
+  cooldownSupported  Boolean?
+  cooldownRevision   Int       @default(0)
   autoStartsUsed     Int       @default(0)
   automaticLimit     Int
   manualGrant        String    @default("none") @db.VarChar(16)
