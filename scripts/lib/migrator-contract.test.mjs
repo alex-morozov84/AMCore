@@ -15,6 +15,9 @@ const paths = [
   'docker/migrator',
 ]
 
+// The migrator pins dotenv exactly, so its lock key follows every dotenv bump.
+const dotenvKey = `dotenv@${JSON.parse(readFileSync(join(root, 'docker/migrator/package.json'), 'utf8')).dependencies.dotenv}`
+
 function fixture(action) {
   const directory = mkdtempSync(join(tmpdir(), 'amcore-migrator-contract-'))
   try {
@@ -76,14 +79,14 @@ for (const [label, change, message] of [
   ],
   [
     'missing integrity',
-    (app) => delete app.packages['dotenv@18.0.8'].resolution.integrity,
+    (app) => delete app.packages[dotenvKey].resolution.integrity,
     /Missing dotenv.*integrity/,
   ],
-  ['missing snapshot', (app) => delete app.snapshots['dotenv@18.0.8'], /Missing migrator snapshot/],
+  ['missing snapshot', (app) => delete app.snapshots[dotenvKey], /Missing migrator snapshot/],
   [
     'transitive compiler',
     (app) => {
-      app.snapshots['dotenv@18.0.8'].dependencies = { '@typescript/native': '7.0.2' }
+      app.snapshots[dotenvKey].dependencies = { '@typescript/native': '7.0.2' }
     },
     /Native compiler/,
   ],
