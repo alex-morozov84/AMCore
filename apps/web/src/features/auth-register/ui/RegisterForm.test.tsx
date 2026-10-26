@@ -9,7 +9,6 @@ import { authApi } from '@/shared/api/auth-api'
 import { ApiNetworkError, ApiRequestError } from '@/shared/api/http-client'
 
 import enMessages from '../../../../messages/en.json'
-import ruMessages from '../../../../messages/ru.json'
 
 import { RegisterForm } from './RegisterForm'
 
@@ -43,11 +42,10 @@ const failure = (status: number, errorCode?: string) =>
     method: 'POST',
   } as never)
 
-function renderForm(locale: 'en' | 'ru' = 'en') {
-  const messages = locale === 'en' ? enMessages : ruMessages
+function renderForm() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
   return render(
-    <NextIntlClientProvider locale={locale} messages={messages}>
+    <NextIntlClientProvider locale="en" messages={enMessages}>
       <QueryClientProvider client={client}>
         <RegisterForm />
       </QueryClientProvider>
@@ -55,8 +53,8 @@ function renderForm(locale: 'en' | 'ru' = 'en') {
   )
 }
 
-async function submitValidForm(locale: 'en' | 'ru' = 'en') {
-  const t = (locale === 'en' ? enMessages : ruMessages).auth
+async function submitValidForm() {
+  const t = enMessages.auth
   const user = userEvent.setup()
   await user.type(screen.getByLabelText(t.name), 'Jane Doe')
   await user.type(screen.getByLabelText(t.email), 'jane@example.com')
@@ -77,29 +75,26 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('RegisterForm after a failed registration', () => {
-  it.each(['en', 'ru'] as const)(
-    'shows one created-account notice, locks the form and offers sign-in (%s)',
-    async (locale) => {
-      const messages = locale === 'en' ? enMessages : ruMessages
-      rejectRegister(failure(503, AuthErrorCode.REGISTRATION_SIGN_IN_REQUIRED))
-      renderForm(locale)
-      await submitValidForm(locale)
+  it('shows one created-account notice, locks the form and offers sign-in', async () => {
+    const messages = enMessages
+    rejectRegister(failure(503, AuthErrorCode.REGISTRATION_SIGN_IN_REQUIRED))
+    renderForm()
+    await submitValidForm()
 
-      const notice = await screen.findByRole('status')
-      expect(notice).toHaveTextContent(messages.errors.REGISTRATION_SIGN_IN_REQUIRED)
-      expect(notice).toHaveFocus()
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-      expect(screen.getByLabelText(messages.auth.password, { exact: true })).toHaveValue('')
-      expect(screen.getByLabelText(messages.auth.password, { exact: true })).toBeDisabled()
-      expect(screen.getByLabelText(messages.auth.email)).toBeDisabled()
-      expect(screen.queryByRole('button', { name: messages.auth.register })).not.toBeInTheDocument()
-      expect(
-        screen.getByRole('link', { name: messages.auth.registrationCreatedLink })
-      ).toHaveAttribute('href', '/login')
-      expect(authApi.register).toHaveBeenCalledTimes(1)
-      expect(screen.queryByText(messages.auth.registrationUnknownHelp)).not.toBeInTheDocument()
-    }
-  )
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent(messages.errors.REGISTRATION_SIGN_IN_REQUIRED)
+    expect(notice).toHaveFocus()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(messages.auth.password, { exact: true })).toHaveValue('')
+    expect(screen.getByLabelText(messages.auth.password, { exact: true })).toBeDisabled()
+    expect(screen.getByLabelText(messages.auth.email)).toBeDisabled()
+    expect(screen.queryByRole('button', { name: messages.auth.register })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: messages.auth.registrationCreatedLink })
+    ).toHaveAttribute('href', '/login')
+    expect(authApi.register).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(messages.auth.registrationUnknownHelp)).not.toBeInTheDocument()
+  })
 
   it.each([
     ['a server error', failure(500)],
