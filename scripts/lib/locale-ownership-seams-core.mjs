@@ -1,6 +1,19 @@
 import { localeSeam } from './locale-ownership-seam.mjs'
 
 export const localeCoreSeams = [
+  ...[
+    ['locale.route-cache-guide', 'AMCORE_LOCALE_ROUTE_CACHE_PATCH'],
+    ['locale-console.route-cache-guide', 'AMCORE_CONSOLE_ROUTE_CACHE_PATCH'],
+  ].map(([id, marker]) =>
+    localeSeam(
+      id,
+      'docs/frontend/next-route-cache-patch.md',
+      { start: `<!-- ${marker}_START -->`, end: `<!-- ${marker}_END -->` },
+      [`${marker}_START`],
+      id,
+      { seamKind: 'owned-block', disposition: 'remove' }
+    )
+  ),
   localeSeam(
     'locale.lint-fixtures',
     'scripts/fixtures/lint/web.json',
@@ -61,18 +74,13 @@ export const localeCoreSeams = [
     ['accepts supported locales and rejects others'],
     'locale.supported-schema-test'
   ),
-  // `ConsoleLocaleSwitcher.tsx` is deleted whole under single-locale mode
-  // (`LOCALE_DELETES`, `locale.navigation-console-switcher` removes its
-  // `ConsoleShell.tsx` usage) - this seam only acknowledges that its
-  // `@/i18n/navigation` import disappears along with the file, the same
-  // `removeImports` mechanism `console.startup-hook` uses in
-  // operations-console-ownership-code-seams.mjs.
+  // The URL-only reexport disappears with the locale feature it imports.
   localeSeam(
     'locale.console-switcher-deleted',
     'apps/web/src/widgets/console-shell/ui/ConsoleLocaleSwitcher.tsx',
-    { identifiers: ['@/i18n/navigation'] },
+    { identifiers: ['@/features/locale-switcher'] },
     ['feature-import'],
     'locale.navigation-console-switcher',
-    { disposition: 'remove', removeImports: ['apps/web/src/i18n/navigation.ts'] }
+    { disposition: 'remove', removeImports: ['apps/web/src/features/locale-switcher/index.ts'] }
   ),
 ]

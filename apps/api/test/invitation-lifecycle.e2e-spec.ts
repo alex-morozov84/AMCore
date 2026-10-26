@@ -37,6 +37,7 @@ import { registerHandoffProofs } from './invitation-lifecycle/handoff'
 import { registerIdentityProofs } from './invitation-lifecycle/identity'
 import { registerIssuanceBudgetProofs } from './invitation-lifecycle/issuance-budget'
 import { registerReceiptProofs } from './invitation-lifecycle/receipts'
+import { registerRegistrationCommitProofs } from './invitation-lifecycle/registration-commit'
 import { registerTransitionsProofs } from './invitation-lifecycle/transitions'
 
 describe('Invitation lifecycle transaction proofs', () => {
@@ -203,6 +204,7 @@ describe('Invitation lifecycle transaction proofs', () => {
   })
   registerFenceProofs(getFixture)
   registerHandoffProofs(getFixture)
+  registerRegistrationCommitProofs(getFixture)
   registerReceiptProofs(getFixture)
   registerTransitionsProofs(getFixture)
   registerForeignKeysProofs(getFixture)

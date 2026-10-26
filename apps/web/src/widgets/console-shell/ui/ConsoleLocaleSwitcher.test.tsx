@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ConsoleLocaleSwitcher } from './ConsoleLocaleSwitcher'
 
+vi.mock('client-only', () => ({}))
+
 const replace = vi.fn()
 
 vi.mock('@/i18n/navigation', () => ({
@@ -21,7 +23,9 @@ vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
 // deliberately not the real catalogues (`messages/en.json`/`ru.json`), which
 // are locale-scaffold-tracked source files this single-locale-agnostic unit
 // test has no reason to depend on.
-const messages = { locale: { label: 'Language', en: 'English', ru: 'Русский' } }
+const messages = {
+  locale: { label: 'Language', changeHint: 'Changes immediately', en: 'English', ru: 'Русский' },
+}
 
 function renderSwitcher() {
   return render(
@@ -49,21 +53,16 @@ describe('ConsoleLocaleSwitcher', () => {
     const user = userEvent.setup()
     renderSwitcher()
 
-    await user.click(screen.getByRole('combobox', { name: 'Language' }))
-    await user.click(await screen.findByRole('option', { name: 'Русский' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'ru')
 
-    expect(replace).toHaveBeenCalledWith(
-      { pathname: '/admin/organizations', query: { page: '2' } },
-      { locale: 'ru' }
-    )
+    expect(replace).toHaveBeenCalledWith('/admin/organizations?page=2', { locale: 'ru' })
   })
 
   it('does nothing when selecting the already-active locale', async () => {
     const user = userEvent.setup()
     renderSwitcher()
 
-    await user.click(screen.getByRole('combobox', { name: 'Language' }))
-    await user.click(await screen.findByRole('option', { name: 'English' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en')
 
     expect(replace).not.toHaveBeenCalled()
   })

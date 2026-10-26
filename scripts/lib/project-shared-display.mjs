@@ -1,4 +1,6 @@
 const summaries = {
+  'locale.route-cache-guide': 'remove multi-locale route-cache checks',
+  'locale-console.route-cache-guide': 'remove locale-specific Console route-cache checks',
   'lint-fixtures-single-locale':
     'lint fixtures: project navigation and sibling examples to single-locale mode',
   'context-locale': 'update i18n_mode/base_locale/supported_locales for single-locale mode',
@@ -50,6 +52,8 @@ const summaries = {
 }
 
 const combined = {
+  'docs/frontend/next-route-cache-patch.md':
+    'retain generic patch maintenance and remove unavailable locale/Console checks',
   'PROJECT_CONTEXT.md': 'update PROJECT_CONTEXT.md fields for the combined dimensions',
   'apps/web/eslint.config.mjs':
     'apps/web/eslint.config.mjs: remove the navigation ban and the Storybook plugin/rules',

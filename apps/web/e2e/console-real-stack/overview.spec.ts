@@ -5,6 +5,7 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
@@ -153,6 +154,10 @@ test('host-mode Overview locale switcher stays on the console host and switches 
     ignoreHTTPSErrors: true,
   })
   const consolePage = await console.newPage()
+  const profileRequests: string[] = []
+  consolePage.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/auth/me') profileRequests.push(request.method())
+  })
   await consolePage.goto('/en/login')
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
@@ -161,12 +166,15 @@ test('host-mode Overview locale switcher stays on the console host and switches 
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
 
-  await consolePage.getByRole('combobox', { name: /language/i }).click()
-  await consolePage.getByRole('option', { name: 'Русский' }).click()
+  await expectNoAxeViolations(consolePage)
+  expect(profileRequests).toEqual([])
+  await consolePage.getByRole('combobox', { name: /language/i }).selectOption('ru')
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/ru/?$')
   )
   await expect(consolePage.getByRole('heading', { name: 'Операционная консоль' })).toBeVisible()
+  await expectNoAxeViolations(consolePage)
+  expect(profileRequests).toEqual([])
 
   await product.close()
   await console.close()

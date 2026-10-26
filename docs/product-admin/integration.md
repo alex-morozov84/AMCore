@@ -53,19 +53,19 @@ export default async function SelectedOrganization({
 }
 ```
 
-The ancestor layout may keep `OrganizationAccessFrame` from the compatibility
+The ancestor layout may keep `OrganizationAccessFrame` from the
 `@/_app/organization-access` entry. It renders AppShell. The ready server mount's
 `index.server` entry has no AppShell dependency, so a downstream can instead wrap
 it with its own server composition and shell. Keep an error boundary that renders
 safe recovery for failed infrastructure reads. The page retains its own admission
 check; a layout alone is insufficient as an authentication gate.
 
-The dashboard layout reads the same `index.config` placement for home and imports
-its Organizations menu from `index.client`. The organization Frame uses the same
-source. A separate composition can pass one shared `placement` object to Frame,
-Mount and NavigationEntry; pass data across the server/client boundary, not href
-functions. Custom placement and compatibility exports remain available. The bundled default
-uses `productAdminPath()` for organizations, home, own keys and login.
+The dashboard layout reuses `OrganizationAccessFrame`, which owns home placement,
+the Organizations menu and client message selection. A separate composition can
+pass one shared `placement` object to Frame, Mount and NavigationEntry; pass data
+across the server/client boundary, not href functions. Content mounts use
+`index.server`; the shell entry does not reexport them. The bundled default uses
+`productAdminPath()` for organizations, home, own keys and login.
 
 The nested members route moves with the selected route. Its thin page renders
 `OrganizationMembersMount` from the same `index.server` entry, after awaiting

@@ -147,6 +147,7 @@ Returned in the response root `errorCode`:
 | Code                            | HTTP | Meaning                                                               |
 | ------------------------------- | ---- | --------------------------------------------------------------------- |
 | `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                    |
+| `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable       |
 | `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                        |
 | `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                        |
 | `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend)                              |

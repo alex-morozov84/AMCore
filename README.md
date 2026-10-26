@@ -232,8 +232,12 @@ signup, Console-disabled installations and recovery after lost responses.
 
 ## Quick Start
 
+Use Node 24 from `.nvmrc`, with the minimum patch version in `package.json`
+(currently 24.15.0). Use the exact pnpm version in `packageManager`
+(currently 12.15.0). Check `node --version` and `pnpm --version` before installation.
+
 ```bash
-# Prerequisites: Node.js 24.15+, pnpm 12.14+, Docker (Compose v2.20.2+)
+# Prerequisites: Node.js 24.15+, pnpm 12.15+, Docker (Compose v2.20.2+)
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
@@ -252,7 +256,7 @@ FRONTEND_URL=http://localhost:3000 WEB_TRUSTED_ORIGINS=http://localhost:3000 doc
 **Option B — run the app on the host** (hot reload):
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 docker compose up -d postgres redis   # or point DATABASE_URL/REDIS_URL at your own
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL development only)
 pnpm dev

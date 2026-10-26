@@ -21,13 +21,14 @@ const actions = authActions('/product-admin/auth')
 /** No profile, organization, or membership fetch is needed to leave a denied page. */
 export function ProductAdminDenied({
   siteOrigin,
+  logoutLabel,
   showOrganizationList = true,
 }: {
   siteOrigin: string
+  logoutLabel: string
   showOrganizationList?: boolean
 }) {
   const t = useTranslations('productAdmin')
-  const auth = useTranslations('auth')
   const locale = coerceSupportedLocale(useLocale())
   const router = useRouteProgressRouter()
   const cache = useQueryClient()
@@ -68,7 +69,7 @@ export function ProductAdminDenied({
           {t(PRODUCT_ADMIN_CONFIG.mode === 'path' ? 'sharedLogout' : 'separateLogout')}
         </p>
         <Button variant="outline" disabled={logout.isPending} onClick={() => logout.mutate()}>
-          {auth('logout')}
+          {logoutLabel}
         </Button>
       </CardContent>
     </Card>

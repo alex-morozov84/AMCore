@@ -1,14 +1,13 @@
 import type { AbstractIntlMessages } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 
-import { ROUTE_SCOPED_NAMESPACES } from './route-scoped-namespaces'
+import { type MessageNamespace, selectMessageNamespaces } from './message-selection'
 
 import 'server-only'
 
-/** The selected locale's messages without route-scoped namespaces, for the root provider. */
-export async function getClientMessages(): Promise<AbstractIntlMessages> {
-  const messages: AbstractIntlMessages = await getMessages()
-  return Object.fromEntries(
-    Object.entries(messages).filter(([namespace]) => !ROUTE_SCOPED_NAMESPACES.includes(namespace))
-  )
+/** A namespace reaches the browser only when its section explicitly selects it. */
+export async function getClientMessages(
+  namespaces: readonly MessageNamespace[]
+): Promise<AbstractIntlMessages> {
+  return selectMessageNamespaces(await getMessages(), namespaces)
 }

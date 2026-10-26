@@ -25,43 +25,44 @@ import type { $ZodRawIssue } from 'zod/v4/core'
  * defeats this map. Verified empirically while building this.
  */
 export function useZodErrorMap() {
-  const t = useTranslations()
+  const t = useTranslations('validation')
+  const errors = useTranslations('errors')
 
   return useCallback(
     (issue: $ZodRawIssue): string => {
       const errorCode = (issue as { params?: { errorCode?: string } }).params?.errorCode
       if (errorCode) {
-        const key = `errors.${errorCode}` as Parameters<typeof t.has>[0]
-        if (t.has(key)) return t(key)
+        const key = errorCode as Parameters<typeof errors.has>[0]
+        if (errors.has(key)) return errors(key)
       }
 
       switch (issue.code) {
         case 'invalid_type':
           // Zod reports a missing field as an `undefined` input rather than a
           // distinct code, so "required" has to be derived here.
-          return issue.input === undefined ? t('validation.required') : t('validation.invalidType')
+          return issue.input === undefined ? t('required') : t('invalidType')
 
         case 'invalid_format':
-          if (issue.format === 'email') return t('validation.email')
-          return t('validation.pattern')
+          if (issue.format === 'email') return t('email')
+          return t('pattern')
 
         case 'too_small':
           return issue.origin === 'string'
-            ? t('validation.tooShort', { min: Number(issue.minimum) })
-            : t('validation.tooSmall', { min: Number(issue.minimum) })
+            ? t('tooShort', { min: Number(issue.minimum) })
+            : t('tooSmall', { min: Number(issue.minimum) })
 
         case 'too_big':
           return issue.origin === 'string'
-            ? t('validation.tooLong', { max: Number(issue.maximum) })
-            : t('validation.tooBig', { max: Number(issue.maximum) })
+            ? t('tooLong', { max: Number(issue.maximum) })
+            : t('tooBig', { max: Number(issue.maximum) })
 
         case 'invalid_value':
-          return t('validation.invalidValue')
+          return t('invalidValue')
 
         default:
-          return t('validation.invalid')
+          return t('invalid')
       }
     },
-    [t]
+    [t, errors]
   )
 }
