@@ -10,6 +10,7 @@ import {
   invitationHandoffProof,
 } from '../../src/core/invitations/invitation-auth-handoff'
 import { InvitationContinuationService } from '../../src/core/invitations/invitation-continuation.service'
+import { invitationClock } from '../../src/core/invitations/invitation-locks'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 const jest = import.meta.jest
 
@@ -84,20 +85,33 @@ export function registerRegistrationCommitProofs(getFixture: () => InvitationPro
     }
   )
 
-  it('RC2 expiry reached while the verification token is issued commits nothing', async () => {
-    const { f, invite, admission, auth } = await admitted()
-    await f.prisma.orgInvite.update({
-      where: { id: invite.id },
-      data: { expiresAt: new Date(Date.now() + 1500) },
-    })
+  it('RC2 expiry reached after token issuance and before the final check commits nothing', async () => {
+    const { f, admission, auth } = await admitted()
+    const continuation = f.context.app.get(InvitationContinuationService)
     const manager = f.context.app.get(TokenManagerService)
-    const original = manager.generateEmailVerificationToken.bind(manager)
+    const lockValid = continuation.lockValid.bind(continuation)
+    const issue = manager.generateEmailVerificationToken.bind(manager)
+    const reached = { admitted: false, issued: false, expired: false }
+    let expiresAt = new Date(0)
+    // The first expiry fence passes against the real database clock; the deadline handed to the
+    // final check is then set 250 ms ahead of that clock, so it does not depend on earlier load.
+    jest.spyOn(continuation, 'lockValid').mockImplementationOnce(async (tx, credential) => {
+      const result = await lockValid(tx, credential)
+      expiresAt = new Date((await invitationClock(tx)).getTime() + 250)
+      reached.admitted = true
+      return { ...result, expiresAt }
+    })
+    // Token issuance runs for real, then waits (inside the same transaction) until the database
+    // clock has passed the deadline. The only operation left is the final expiry check.
     jest
       .spyOn(manager, 'generateEmailVerificationToken')
       .mockImplementationOnce(async (...args) => {
-        // The wait happens inside the transaction, after the first expiry fence and before the last.
-        await new Promise((resolve) => setTimeout(resolve, 1900))
-        return original(...args)
+        const issued = await issue(...args)
+        reached.issued = true
+        const tx = args[2]!
+        while ((await invitationClock(tx)) <= expiresAt) await new Promise((r) => setTimeout(r, 25))
+        reached.expired = true
+        return issued
       })
     const before = await counts(f)
 
@@ -105,6 +119,7 @@ export function registerRegistrationCommitProofs(getFixture: () => InvitationPro
       auth.registerInvited({ password: PASSWORD }, admission.credential, { handoff: proof() })
     ).rejects.toMatchObject({ errorCode: InviteErrorCode.INVITE_INVALID_OR_EXPIRED })
 
+    expect(reached).toEqual({ admitted: true, issued: true, expired: true })
     expect(await counts(f)).toEqual(before)
   })
 

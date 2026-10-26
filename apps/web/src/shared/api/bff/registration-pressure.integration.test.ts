@@ -119,7 +119,9 @@ describe('registration under real Redis memory pressure', () => {
     expect(await vaultKeys()).toEqual(before)
   })
 
-  it('signs the same account in once memory is available again', async () => {
+  // The API is stubbed here: this proves vault publication after memory recovery, not password
+  // sign-in to the existing account (the real sign-in is proved on the stand and in the real stack).
+  it('publishes a session for a new confirmed registration once memory is available again', async () => {
     await fillMemory()
     expect((await register()).status).toBe(503)
     await releaseMemory()
