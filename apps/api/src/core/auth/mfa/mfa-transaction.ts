@@ -15,7 +15,9 @@ export async function lockMfaAccounts(
 }
 
 /** Read after all relevant locks, not before a potentially blocking acquisition. */
-export async function mfaDatabaseClock(tx: Prisma.TransactionClient): Promise<Date> {
+export async function mfaDatabaseClock(
+  tx: Pick<Prisma.TransactionClient, '$queryRaw'>
+): Promise<Date> {
   const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
   if (!clock) throw new Error('MFA transaction clock unavailable')
   return clock.now

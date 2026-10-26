@@ -1,4 +1,5 @@
 // Schemas public API
+export * from './browser-publication'
 export * from './frontend-context'
 export * from './mfa'
 export * from './mfa-browser'
