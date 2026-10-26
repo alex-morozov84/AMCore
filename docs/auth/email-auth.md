@@ -65,11 +65,21 @@ unsupported body `locale` is a `400` validation error.
 1. Email is trimmed and checked for canonical uniqueness — duplicate emails
    across case variants return `EMAIL_ALREADY_EXISTS`
 2. Password is hashed with Argon2id (~100ms intentionally)
-3. A new user is created with `systemRole: USER` and `emailVerified: false`,
-   and the resolved `locale`
-4. A verification email is sent best-effort and never queued (the raw token
-   exists only in the email link)
-5. A session is created, tokens are issued
+3. One database transaction creates the user (`systemRole: USER`,
+   `emailVerified: false`, the resolved `locale`), its first session and its
+   email-verification token. If the transaction fails, its writes roll back. When
+   requests race for one canonical email, one wins and the others get
+   `EMAIL_ALREADY_EXISTS`
+4. After the commit, the welcome email is queued and the verification email is
+   sent directly; see [queued email](../email/delivery.md#queued-email). A failed
+   email never undoes the signup
+5. The access token and the `refresh_token` cookie are returned
+
+The transaction contains no Redis, email or other HTTP call. An error after the
+commit, or a lost response, can hide a committed account: sign in or reset the
+password instead of submitting the registration again. The web application adds
+a session step; see
+[registration results in the web application](../frontend/api-consumption.md#registration-results-in-the-web-application).
 
 **Success response** `201 Created`:
 

@@ -70,6 +70,9 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     mockCtx = createMockContext()
+    // Interactive transactions run their callback against the same mock client (the "tx").
+    mockCtx.prisma.$transaction.mockImplementation(((fn: (tx: unknown) => unknown) =>
+      fn(mockCtx.prisma)) as never)
 
     mockTokenService = {
       generateAccessToken: jest.fn(),
@@ -361,10 +364,108 @@ describe('AuthService', () => {
         await authService.register(registerInput, requestInfo)
 
         expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledTimes(1)
+        // Third argument: the registration transaction client, so the token commits with the user.
         expect(mockTokenManager.generateEmailVerificationToken).toHaveBeenCalledWith(
           mockUser.id,
-          undefined
+          undefined,
+          mockCtx.prisma
         )
+        expect(mockSessionService.createSession).toHaveBeenCalledWith(
+          expect.objectContaining({ userId: mockUser.id }),
+          mockCtx.prisma
+        )
+      })
+
+      describe('commit boundary', () => {
+        const prismaConflict = (target: string, index: string) =>
+          Object.assign(new Error('Unique constraint failed'), {
+            code: 'P2002',
+            meta: {
+              modelName: target,
+              driverAdapterError: { cause: { constraint: { index } } },
+            },
+          })
+
+        it('sends no email when session creation fails inside the transaction', async () => {
+          setupRegisterMocks()
+          mockSessionService.createSession.mockRejectedValue(new Error('session write failed'))
+
+          await expect(authService.register(registerInput, requestInfo)).rejects.toThrow(
+            'session write failed'
+          )
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled()
+          expect(mockEmailService.sendEmailVerificationEmail).not.toHaveBeenCalled()
+        })
+
+        it('sends no email when token issuance fails inside the transaction', async () => {
+          setupRegisterMocks()
+          mockTokenManager.generateEmailVerificationToken.mockRejectedValue(
+            new Error('token write failed')
+          )
+
+          await expect(authService.register(registerInput, requestInfo)).rejects.toThrow(
+            'token write failed'
+          )
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(mockTokenService.generateAccessToken).not.toHaveBeenCalled()
+          expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled()
+          expect(mockEmailService.sendEmailVerificationEmail).not.toHaveBeenCalled()
+        })
+
+        it('fails the transaction when the access token cannot be signed', async () => {
+          setupRegisterMocks()
+          mockTokenService.generateAccessToken.mockImplementation(() => {
+            throw new Error('signing key missing')
+          })
+
+          await expect(authService.register(registerInput, requestInfo)).rejects.toThrow(
+            'signing key missing'
+          )
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(mockEmailService.sendEmailVerificationEmail).not.toHaveBeenCalled()
+        })
+
+        it('fails the transaction when the verification link cannot be built', async () => {
+          setupRegisterMocks()
+          mockEnvService.get.mockImplementation((key: string) => {
+            if (key === 'FRONTEND_URL') throw new Error('FRONTEND_URL is not configured')
+            return key === 'AUTH_PUBLIC_SIGNUP_ENABLED' ? true : 48
+          })
+
+          await expect(authService.register(registerInput, requestInfo)).rejects.toThrow(
+            'FRONTEND_URL is not configured'
+          )
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(mockEmailService.sendWelcomeEmail).not.toHaveBeenCalled()
+        })
+
+        it('maps only a canonical-email unique violation to 409 EMAIL_ALREADY_EXISTS', async () => {
+          setupRegisterMocks()
+          mockCtx.prisma.user.create.mockRejectedValue(
+            prismaConflict('User', 'users_emailCanonical_key')
+          )
+
+          await expect(authService.register(registerInput, requestInfo)).rejects.toMatchObject({
+            status: 409,
+            errorCode: AuthErrorCode.EMAIL_ALREADY_EXISTS,
+          })
+        })
+
+        it('does not relabel another unique violation as an existing email', async () => {
+          setupRegisterMocks()
+          const other = prismaConflict(
+            'EmailVerificationToken',
+            'email_verification_tokens_hash_key'
+          )
+          mockTokenManager.generateEmailVerificationToken.mockRejectedValue(other)
+
+          await expect(authService.register(registerInput, requestInfo)).rejects.toBe(other)
+        })
       })
 
       it('does not call resendVerificationEmail from register()', async () => {

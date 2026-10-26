@@ -48,6 +48,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 
 # Manifests first so the install layer caches across source-only changes.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY patches ./patches
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/shared/package.json ./packages/shared/
@@ -134,6 +135,7 @@ ENV pnpm_config_store_dir=/pnpm/store
 ENV pnpm_config_cache_dir=/pnpm/cache
 ENV pnpm_config_frozen_lockfile=true
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY patches ./patches
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/

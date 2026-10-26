@@ -40,10 +40,16 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
+async function renderRecipient() {
+  const scope = await InvitationRecipientMount({ flowId })
+  expect(scope.props.namespaces).toEqual(['invitationRecipient'])
+  return scope.props.children
+}
+
 describe('actual recipient server reads', () => {
   it('keeps password composition independent of a safely logged provider outage', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })))
-    const page = await InvitationRecipientMount({ flowId })
+    const page = await renderRecipient()
     expect(page.props.children.type).toBe('recipient')
     expect(page.props.children.props.oauthContent.props.children.type).toBe('boundary')
     expect(await RecipientOAuthSection()).toBeNull()
@@ -65,7 +71,7 @@ describe('actual recipient server reads', () => {
   )
   it('renders retry for known primary failure and logs a bounded field set once', async () => {
     f.admission.mockRejectedValue(new ContextRequestError(503, 'SERVICE_UNAVAILABLE'))
-    const page = await InvitationRecipientMount({ flowId })
+    const page = await renderRecipient()
     expect(page.props.children.props.unavailable).toBe(true)
     expect(f.primary).toHaveBeenCalledOnce()
     expect(f.primary).toHaveBeenCalledWith({
@@ -86,7 +92,7 @@ describe('actual recipient server reads', () => {
   )
   it('keeps stale invitation authority ordinary without an availability log', async () => {
     f.admission.mockRejectedValue(new ContextRequestError(409, 'INVITE_FLOW_CHANGED'))
-    const page = await InvitationRecipientMount({ flowId })
+    const page = await renderRecipient()
     expect(page.props.children.props.unavailable).toBeUndefined()
     expect(f.primary).not.toHaveBeenCalled()
   })

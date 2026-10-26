@@ -20,6 +20,9 @@ export enum AuthErrorCode {
   AUTH_HANDOFF_ALREADY_STARTED = 'AUTH_HANDOFF_ALREADY_STARTED',
   AUTH_HANDOFF_CONFIRMED = 'AUTH_HANDOFF_CONFIRMED',
   EMAIL_ALREADY_EXISTS = 'EMAIL_ALREADY_EXISTS',
+  // Emitted by the web BFF only (never by apps/api): registration was confirmed by the API
+  // but the browser session could not be published. The account exists; sign in later.
+  REGISTRATION_SIGN_IN_REQUIRED = 'REGISTRATION_SIGN_IN_REQUIRED',
   PHONE_ALREADY_EXISTS = 'PHONE_ALREADY_EXISTS',
   INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
   MFA_INVALID_PROOF = 'MFA_INVALID_PROOF',

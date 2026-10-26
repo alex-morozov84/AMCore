@@ -52,7 +52,9 @@ beforeEach(() => {
   f.current.mockResolvedValue(undefined)
 })
 async function renderReturn() {
-  const mount = InvitationVerificationMount({ token: 'fixture-owned-token', selectorId })
+  const scope = InvitationVerificationMount({ token: 'fixture-owned-token', selectorId })
+  expect(scope.props.namespaces).toEqual(['invitationRecipient'])
+  const mount = scope.props.children
   expect(mount.props.token).toBe('fixture-owned-token')
   expect(mount.props.successContent.type).toBe('boundary')
   const child = mount.props.successContent.props.children

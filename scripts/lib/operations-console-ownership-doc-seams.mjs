@@ -15,6 +15,16 @@ const section = (start, end) => ({ start, end, retainEnd: true })
 const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
+  entry(
+    'console.route-cache-guide',
+    'docs/frontend/next-route-cache-patch.md',
+    block(
+      '<!-- AMCORE_CONSOLE_ROUTE_CACHE_PATCH_START -->',
+      '<!-- AMCORE_CONSOLE_ROUTE_CACHE_PATCH_END -->'
+    ),
+    ['AMCORE_CONSOLE_ROUTE_CACHE_PATCH_START', 'console-real-stack'],
+    { operationKey: 'locale-console.route-cache-guide' }
+  ),
   // Existing changelog history is retained; only this feature's marked entry is removed.
   ...[
     'ADMIN_CONSOLE_METRICS_URL',

@@ -4,4 +4,5 @@ export { ProductAdminDeniedPage, ProductAdminRecovery } from './server/denied-pa
 export { legacyAdminRedirect } from './server/legacy-redirect'
 export { ProductAdminLinkedPage } from './server/linked-page'
 export { ProductAdminLoginPage } from './server/login-page'
+export { ProductAdminMessages } from './server/message-scope'
 export { ProductAdminHeader, ProductAdminSiteLink } from './ui/header'

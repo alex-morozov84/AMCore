@@ -30,6 +30,8 @@ if (
 }
 
 const nextConfig: NextConfig = {
+  // Next uses this application-only config in dev/build/typegen; full typecheck retains tests.
+  typescript: { tsconfigPath: 'tsconfig.build.json' },
   deploymentId: deploymentVersion,
   // Compiled into both server and client; runtime environment cannot change
   // the identity of an already-built artifact.

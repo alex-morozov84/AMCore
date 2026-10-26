@@ -8,6 +8,7 @@ import {
 
 import { OrganizationMembersClient } from '@/_pages/organization-members'
 import { readOrganizationContext } from '@/entities/organization-context/index.server'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import { SessionNotFoundError } from '@/shared/api/bff/errors'
@@ -66,17 +67,29 @@ export async function OrganizationMembersMount({
     ...(role.success ? { roleId: role.data } : {}),
   }
   return (
-    <OrganizationMembersClient
-      deniedContent={deniedContent}
-      admission={admission}
-      organizationId={id}
-      initialOrganizationName={initialOrganizationName}
-      query={query}
-      backHref={organizationAccessHrefs(placement).contextHref(id)}
-      membersHref={organizationAccessHrefs(placement).membersHref(id)}
-      invitationsHref={organizationAccessHrefs(placement).invitationsHref(id)}
-      rolesHref={organizationAccessHrefs(placement).rolesHref(id)}
-      listHref={organizationAccessHrefs(placement).listHref}
-    />
+    <ClientMessages
+      namespaces={[
+        'organizationMembers',
+        'organizationRoles',
+        'memberAccess',
+        'memberApiKeys',
+        'memberRemoval',
+        'apiKeyPresentation',
+        'organizationNav',
+      ]}
+    >
+      <OrganizationMembersClient
+        deniedContent={deniedContent}
+        admission={admission}
+        organizationId={id}
+        initialOrganizationName={initialOrganizationName}
+        query={query}
+        backHref={organizationAccessHrefs(placement).contextHref(id)}
+        membersHref={organizationAccessHrefs(placement).membersHref(id)}
+        invitationsHref={organizationAccessHrefs(placement).invitationsHref(id)}
+        rolesHref={organizationAccessHrefs(placement).rolesHref(id)}
+        listHref={organizationAccessHrefs(placement).listHref}
+      />
+    </ClientMessages>
   )
 }

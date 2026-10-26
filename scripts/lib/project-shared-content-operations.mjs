@@ -1,3 +1,4 @@
+import { LOCALE_DOC_DEFINITIONS } from './project-locale-doc-content.mjs'
 import { PROJECT_SHARED_CORE_DEFINITIONS } from './project-shared-core-operations.mjs'
 import { LOCALE_DATABASE_DEFAULT_DEFINITIONS } from './project-locale-database-default-operations.mjs'
 import {
@@ -17,6 +18,7 @@ const block = (name) => absent(`markdown:block:${name}`)
 
 const definitions = new Map([
   ...PROJECT_SHARED_CORE_DEFINITIONS,
+  ...LOCALE_DOC_DEFINITIONS,
   ...LOCALE_DATABASE_DEFAULT_DEFINITIONS,
   [
     'readme-storybook',

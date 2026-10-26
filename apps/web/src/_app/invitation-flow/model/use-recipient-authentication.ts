@@ -23,7 +23,12 @@ export function useRecipientAuthentication(
   const [handoff, setHandoff] = useState<string | null>(null)
   const [error, setError] = useState<unknown>()
   const [busy, setBusy] = useState(false)
+  // The API confirmed the account but no session was published. Kept apart from `error`,
+  // which later reads and sign-in attempts replace; it lives above the auth form, so the
+  // notice survives remounts and tab changes (not a full page reload).
+  const [createdFailure, setCreatedFailure] = useState<unknown>()
   const lifecycle = useRef({ active: true, epoch: 0 })
+  const recoverRef = useRef<() => Promise<void>>(async () => undefined)
   const client = useQueryClient()
   useEffect(() => {
     lifecycle.current.active = true
@@ -38,6 +43,7 @@ export function useRecipientAuthentication(
     setPhase('active')
     setHandoff(null)
     setError(undefined)
+    setCreatedFailure(undefined)
     client.setQueryData(userKeys.me(), { user: account })
     lifecycle.current.epoch++
   }
@@ -64,11 +70,20 @@ export function useRecipientAuthentication(
         setPhase('active')
         setHandoff(null)
         setError(undefined)
+        setCreatedFailure(undefined)
         lifecycle.current.epoch++
       },
       async onFailure(failure) {
         setError(failure)
         const code = getErrorCode(failure)
+        if (code === AuthErrorCode.REGISTRATION_SIGN_IN_REQUIRED) {
+          // The account exists but no session was published. Keep the notice, then read the
+          // authoritative context through the existing recovery path; never replay credentials.
+          setCreatedFailure(failure)
+          setError(undefined)
+          await recoverRef.current()
+          return
+        }
         if (
           code !== AuthErrorCode.INVALID_CREDENTIALS &&
           code !== AuthErrorCode.RATE_LIMIT_EXCEEDED
@@ -146,6 +161,7 @@ export function useRecipientAuthentication(
           lifecycle.current.epoch++
           setUser(null)
           setHandoff(null)
+          setCreatedFailure(undefined)
           setPhase(code === 'INVITE_INVALID_OR_EXPIRED' ? 'unusable' : 'retired')
         } else setError(failure)
       }
@@ -153,6 +169,9 @@ export function useRecipientAuthentication(
       if (lifecycle.current.active) setBusy(false)
     }
   }
+  useEffect(() => {
+    recoverRef.current = recover
+  })
   const observePending = useCallback(
     (
       next: InvitationFlowBinding,
@@ -171,6 +190,7 @@ export function useRecipientAuthentication(
     setPhase('retired')
     setUser(null)
     setHandoff(null)
+    setCreatedFailure(undefined)
   }, [])
   return {
     binding,
@@ -178,6 +198,8 @@ export function useRecipientAuthentication(
     phase,
     handoff,
     error,
+    created: createdFailure !== undefined,
+    createdFailure,
     busy,
     adapters,
     recover,
@@ -196,6 +218,7 @@ export function useRecipientAuthentication(
       setPhase('active')
       setHandoff(null)
       setError(undefined)
+      setCreatedFailure(undefined)
       client.setQueryData(userKeys.me(), { user: null })
     },
   }

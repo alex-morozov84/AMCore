@@ -22,8 +22,7 @@ test('a locale switch persists to a fresh session on another device/browser', as
       response.request().method() === 'PATCH' &&
       response.ok()
   )
-  await page.getByRole('combobox', { name: /language/i }).click()
-  await page.getByRole('option', { name: 'Русский' }).click()
+  await page.getByRole('combobox', { name: /language/i }).selectOption('ru')
   await localePersisted
   await expect(page).toHaveURL(/\/ru\/?$/)
 
@@ -38,4 +37,25 @@ test('a locale switch persists to a fresh session on another device/browser', as
   await expect(freshPage).toHaveURL(/\/ru\/?$/)
 
   await freshContext.close()
+})
+
+test('a failed profile save does not block the displayed language change', async ({ page }) => {
+  await registerViaUi(page, uniqueEmail('locale-failed-save'), { name: 'E2E Test' })
+  await expect(page).toHaveURL(/\/en\/?$/)
+  await page.route('**/api/auth/me', async (route) => {
+    if (route.request().method() !== 'PATCH') return route.continue()
+    await route.fulfill({ status: 503, json: { errorCode: 'SERVICE_UNAVAILABLE' } })
+  })
+  const failed = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/auth/me' &&
+      response.request().method() === 'PATCH' &&
+      response.status() === 503
+  )
+  await page.getByRole('combobox', { name: /language/i }).selectOption('ru')
+  await failed
+  await expect(page).toHaveURL(/\/ru\/?$/)
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru')
+  await expect(page.getByRole('combobox')).toHaveValue('ru')
+  await expect(page.getByRole('combobox')).toBeEnabled()
 })
