@@ -75,3 +75,6 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 [Place product administration and isolate host sessions](../product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.
 
 For new server requests, start with the [enforced request boundary](api-consumption.md#server-request-boundary).
+
+Account-security presentation and its dormant BFF boundary are documented in
+[account-security browser preparation](../auth/mfa-browser.md).

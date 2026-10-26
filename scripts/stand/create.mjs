@@ -1,4 +1,5 @@
 import { prepareProductAdminSource, productAdminProfiles } from './product-admin-source.mjs'
+import { prepareAccountMfaPreview } from './account-mfa-source.mjs'
 import { projectChoices } from './project.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { join } from 'node:path'
@@ -129,6 +130,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   }
   // AMCORE_CONSOLE_HOST_SNAPSHOT_END
   await prepareProductAdminSource(m)
+  await prepareAccountMfaPreview(m)
   await save(m)
   return m
 }

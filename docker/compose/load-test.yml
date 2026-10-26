@@ -1,0 +1,54 @@
+# Temporary load-test overlay for a disposable deployment only. Never use it in production.
+# docs/operations/load-testing.md. Add it to COMPOSE_FILE after web.yml and bff-relay.yml
+# for one measurement run, then remove it and run scripts/load-test/remove-check.sh.
+#
+# - Caddy (pinned) also listens on :8443: client certificate from LOAD_TEST_CLIENT_CA_DIR
+#   required, and only the generator at LOAD_TEST_GENERATOR_IP may assert one synthetic
+#   visitor address there (docker/caddy/Caddyfile.load-test).
+# - The Postgres volume of a new project is labelled with LOAD_TEST_RUN_ID; the fixture
+#   loader refuses any database whose volume lacks this run's label.
+# - load-fixture: one-shot fixture loader from the API build stage (dev tools and the
+#   generated Prisma client), built and run only through scripts/load-test/fixture.sh
+services:
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    environment:
+      LOAD_TEST_GENERATOR_IP: ${LOAD_TEST_GENERATOR_IP:?Set LOAD_TEST_GENERATOR_IP to the generator's IPv4 address}
+    ports:
+      - '8443:8443'
+    volumes:
+      - ./docker/caddy/Caddyfile.load-test:/etc/caddy/Caddyfile:ro
+      - ${LOAD_TEST_CLIENT_CA_DIR:?Set LOAD_TEST_CLIENT_CA_DIR to the directory holding the client ca.crt}:/etc/caddy/load-test-ca:ro
+
+  load-fixture:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+      args:
+        BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
+    profiles: ['load-test']
+    working_dir: /app/apps/api
+    command: ['./node_modules/.bin/tsx', './load-test/fixture.ts']
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      LOAD_TEST_RUN_ID: ${LOAD_TEST_RUN_ID:?Set LOAD_TEST_RUN_ID}
+      # Set only by scripts/load-test/fixture.sh after it verified the volume label on the
+      # host; the loader refuses to write when it differs from LOAD_TEST_RUN_ID.
+      LOAD_TEST_OWNERSHIP_CHECKED: ${LOAD_TEST_OWNERSHIP_CHECKED:-}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
+      LOAD_TEST_FIXTURE_PASSWORD_FILE: /run/load-test/fixture-password
+    volumes:
+      # Inside the API workspace, so imports resolve from apps/api/node_modules.
+      - ./scripts/load-test:/app/apps/api/load-test:ro
+      - ${LOAD_TEST_SECRETS_DIR:?Set LOAD_TEST_SECRETS_DIR to the directory holding fixture-password}:/run/load-test:ro
+      - ${POSTGRES_TLS_CA_DIR:?Set POSTGRES_TLS_CA_DIR}:/etc/amcore/db-ca:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+volumes:
+  postgres_data_pg18:
+    labels:
+      org.amcore.load-test: ${LOAD_TEST_RUN_ID:?Set LOAD_TEST_RUN_ID}

@@ -29,7 +29,10 @@ describe('operation inventory against the real plans', () => {
       // Summary ownership includes metrics helpers, its offline fixture and stand seams.
       // Locale verification includes Overview stories, the provider and browser routes.
       // Network exception removal adds one edit, two semantic facts and two claims.
-      { name: 'measured operations', expected: 947, actual: inventory.operations.length },
+      // Account MFA adds four retained page move/rewrite pairs, a switcher removal,
+      // one Console root deletion and one pending-route extraction in applicable recipes.
+      // Providers, manifests and scenario counts remain unchanged.
+      { name: 'measured operations', expected: 967, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -48,17 +51,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1300,
+        expected: 1332,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2143,
+        expected: 2187,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 921,
+        expected: 941,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

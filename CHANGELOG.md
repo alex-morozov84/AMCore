@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Prepared account-security browser screens and dedicated unavailable BFF entries,
+  with local QR rendering, transient secret containment and a managed UI simulation.
+  MFA enrollment, second-factor login and activation remain unavailable.
+
+- Dormant account MFA storage and internal TOTP/backup-code verification primitives,
+  with an incomplete-deployment startup check. Enrollment and second-factor login
+  remain unavailable in this foundation.
+
 <!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_START -->
 
 - Operations Console Overview gathers recorded problems with original observation
@@ -24,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shared recipient limits and recoverable results.
 
 <!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_END -->
+
+- A reproducible load test for a disposable single-host deployment
+  (`scripts/load-test/`, `docker/compose/load-test.yml`): a client-certificate test
+  entry with per-visitor synthetic addresses, guarded fixtures, admission checks, the
+  reference protocol from Capacity with valid/invalid/overload results, and removal
+  checks. See `docs/operations/load-testing.md`.
 
 - CI fails a change that pushes any web page's first-load JavaScript over its
   per-page budget (`pnpm check:route-budgets`, also run in generated scaffold

@@ -1,5 +1,7 @@
 // Schemas public API
 export * from './frontend-context'
+export * from './mfa'
+export * from './mfa-browser'
 
 // Auth schemas
 export {

@@ -1,18 +1,29 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { usePathname } from '@/i18n/navigation'
+import { getConsolePublicPathname } from '@/shared/lib/console-public-href'
 import { cn } from '@/shared/lib/utils'
 import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/shared/ui/sidebar'
 
 import { useConsoleNavItems } from './console-nav-items'
 
+const noSubscription = () => () => {}
+const serverPathname = () => null
+
 export function ConsoleNavigation() {
   const t = useTranslations('console')
   const { setOpenMobile } = useSidebar()
-  const pathname = usePathname()
+  const sourcePathname = usePathname()
+  // Rewritten paths may differ during hydration. Keep SSR and first client markup stable.
+  const pathname = useSyncExternalStore(
+    noSubscription,
+    () => getConsolePublicPathname(sourcePathname),
+    serverPathname
+  )
   const items = useConsoleNavItems()
 
   return (

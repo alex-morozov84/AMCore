@@ -7,7 +7,8 @@ production.
 
 **One server, with approved registry images or building on the host?** Follow
 [Single-host production with Docker Compose](single-host-compose.md) end to end,
-and size the host with [Capacity](capacity.md).
+and size the host with [Capacity](capacity.md). For a bounded measurement on a
+disposable host, use [Load testing](load-testing.md).
 
 The following guides cover deployment contracts and operating concerns:
 

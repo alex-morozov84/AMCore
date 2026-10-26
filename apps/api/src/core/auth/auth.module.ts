@@ -33,6 +33,7 @@ import {
 import { TeamAccessGuard } from './guards/team-access.guard.js'
 import { InvitationHandoffsController } from './invitation-handoffs.controller.js'
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
+import { MfaFoundationModule } from './mfa/mfa-foundation.module.js'
 import { OAuthController } from './oauth/oauth.controller.js'
 import { OAuthService } from './oauth/oauth.service.js'
 import { OAuthAvatarRehostService } from './oauth/oauth-avatar-rehost.service.js'
@@ -52,6 +53,7 @@ import { UserCacheService } from './user-cache.service.js'
 
 @Module({
   imports: [
+    MfaFoundationModule,
     FrontendContextModule,
     AuthMailModule,
     PrismaModule,

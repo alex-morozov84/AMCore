@@ -214,6 +214,13 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 | `STEP_UP_MAX_AGE_SECONDS`         | `600`                | Recent-auth window for step-up-guarded ops                                      |
 | `SUPPORT_EMAIL`                   | `support@amcore.com` | Support/contact address for transactional email                                 |
 
+### Dormant MFA keyring
+
+`MFA_ACTIVE_KEY_ID` and `MFA_ENCRYPTION_KEYS` are optional internal encryption
+inputs. They have no defaults and do not activate MFA. The keyring is a secret
+JSON mapping of IDs to base64-encoded 32-byte keys. See the
+[foundation reference](mfa-foundation.md#encryption-configuration) for its scope.
+
 ### OAuth providers (all optional)
 
 A provider is exposed via `GET /auth/oauth/providers` only if its required env
