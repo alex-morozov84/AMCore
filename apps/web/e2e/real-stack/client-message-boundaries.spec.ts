@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { DEFAULT_LOCALE } from '@amcore/shared'
-import { expect, test } from '@playwright/test'
+import { type APIResponse, expect, test } from '@playwright/test'
 
 import { serializedClientMessages } from '../shared/client-message-payload'
 
@@ -26,13 +26,20 @@ test('sibling navigation sends new section messages without the departed section
     const href = await link.getAttribute('href')
     expect(href).toBeTruthy()
     const path = new URL(href!, page.url()).pathname
-    const incoming = page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === path &&
-        (response.headers()['content-type']?.includes('text/x-component') ?? false)
-    )
+    let capture!: (response: APIResponse) => void
+    const incoming = new Promise<APIResponse>((resolve) => {
+      capture = resolve
+    })
+    const matches = (url: URL) => url.pathname === path
+    await page.route(matches, async (route) => {
+      if (route.request().headers().rsc !== '1') return route.continue()
+      const response = await route.fetch()
+      capture(response)
+      await route.fulfill({ response })
+    })
     await link.click()
     const response = await incoming
+    await page.unroute(matches)
     expect(response.ok()).toBe(true)
     const boundaries = serializedClientMessages((await response.body()).toString('utf8'))
     expect(boundaries.length).toBeGreaterThan(0)
