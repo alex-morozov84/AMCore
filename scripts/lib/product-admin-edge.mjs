@@ -56,6 +56,7 @@ export function renderProductAdminEdge(root) {
     'verify-email',
     'resend-verification',
     'oauth',
+    'mfa',
   ]
   const siteAuthPattern = `^/api/auth/(?:${siteAuth.join('|')})(?:/|$)`
   const publicAssets = [

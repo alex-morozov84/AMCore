@@ -7,6 +7,10 @@ vi.mock('server-only', () => ({}))
 
 describe('effective credential pathname', () => {
   it.each([
+    'auth/mfa',
+    'auth/mfa/enrollment',
+    'auth/mfa/issuance/acknowledge',
+    'auth/%6dfa/verify',
     'auth/login',
     'auth/register',
     'auth/refresh',

@@ -22,6 +22,7 @@ export const LOCALE_DISPLAY_ORDER = [
     `apps/web/src/app/${relative}`,
   ]),
   'apps/web/src/_pages/auth/AuthFrame.tsx',
+  'apps/web/src/_pages/account-security/index.tsx',
   'apps/web/src/features/console-organization-provisioning/ui/organization-provisioning.stories.tsx',
   'apps/web/src/features/console-organization-provisioning/ui/provisioning-management.stories.tsx',
   'apps/web/src/features/console-organization-administration/ui/organization-administration.stories.tsx',

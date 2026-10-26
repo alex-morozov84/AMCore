@@ -7,17 +7,18 @@ their organization role.
 
 ## Contents
 
-| Screen                                | Use it to                                                                                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Overview](overview.md)               | Find recorded problems and open diagnostics; check API/files/resources, open monitoring tools and edit probe interval.                      |
-| [Background work](background-work.md) | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup.                                                  |
-| [Scheduled jobs](scheduled-jobs.md)   | Check that nightly cleanups, the GeoIP update and recovery passes keep running (view-only).                                                 |
-| [Integrations](integrations.md)       | See which outside services are set up and last confirmed, including whether the workers reach Telegram; send a test email to yourself.      |
-| [Queue board](queue-board.md)         | Look at the jobs of the background queues (view-only), opened from Background work.                                                         |
-| [Users](users.md)                     | Find users, inspect sign-in setup and memberships, send recovery/verification mail, investigate security events, manage roles and sessions. |
-| [Organizations](organizations.md)     | Create organizations and invite their first ADMIN; initial setup, inventory and members.                                                    |
-| [API keys](api-keys.md)               | Inspect credential metadata and irreversibly revoke one or selected keys.                                                                   |
-| [Audit](audit.md)                     | Browse recent system events and narrow them by action, identity, or time.                                                                   |
+| Screen                                    | Use it to                                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Overview](overview.md)                   | Find recorded problems and open diagnostics; check API/files/resources, open monitoring tools and edit probe interval.                      |
+| [Background work](background-work.md)     | Diagnose registered work and use policy-eligible pause, resume, retry, cancel and cleanup.                                                  |
+| [Scheduled jobs](scheduled-jobs.md)       | Check that nightly cleanups, the GeoIP update and recovery passes keep running (view-only).                                                 |
+| [Integrations](integrations.md)           | See which outside services are set up and last confirmed, including whether the workers reach Telegram; send a test email to yourself.      |
+| [Queue board](queue-board.md)             | Look at the jobs of the background queues (view-only), opened from Background work.                                                         |
+| [Users](users.md)                         | Find users, inspect sign-in setup and memberships, send recovery/verification mail, investigate security events, manage roles and sessions. |
+| [Organizations](organizations.md)         | Create organizations and invite their first ADMIN; initial setup, inventory and members.                                                    |
+| [API keys](api-keys.md)                   | Inspect credential metadata and irreversibly revoke one or selected keys.                                                                   |
+| [Sign-in protection](account-security.md) | Inspect the dormant account-security screen; MFA setup remains unavailable.                                                                 |
+| [Audit](audit.md)                         | Browse recent system events and narrow them by action, identity, or time.                                                                   |
 
 The Console also has a [configuration and deployment guide](configuration.md)
 for operators who set it up and a [development guide](development.md) for teams

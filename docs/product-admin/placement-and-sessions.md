@@ -22,6 +22,8 @@ With website `https://shop.example.com`, the default Russian addresses are:
 | Own keys         | `/ru/manage/settings/api-keys` | `/ru/settings/api-keys`                      |
 | Sessions         | `/ru/manage/settings/sessions` | `/ru/settings/sessions`                      |
 | OAuth completion | `/ru/manage/auth/callback`     | `/ru/auth/callback`                          |
+| Account security | `/ru/manage/account/security`  | `/ru/account/security`                       |
+| Pending MFA      | `/ru/manage/mfa`               | `/ru/mfa`                                    |
 | Recovery         | `/ru/manage/forgot-password`   | `/ru/forgot-password`                        |
 | Invitation entry | `/ru/manage/invite/accept`     | `/ru/invite/accept`                          |
 

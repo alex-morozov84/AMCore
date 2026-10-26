@@ -25,7 +25,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
   // Provisioning owns two feature roots and a browser-scenario root; Scheduled jobs owns one feature root.
   // Nested files inherit ownership without individual registration.
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 26)
+  assert.equal(operationsConsoleOwnership.facts.roots.length, 27)
   assert.ok(
     operationsConsoleOwnership.facts.roots.some(
       (fact) => fact.path === 'apps/web/src/features/console-discovery'
@@ -36,8 +36,8 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
   const frame = 'apps/web/src/_pages/console/ConsolePageFrame/ConsolePageFrame.tsx'
   const superAdmin = 'apps/web/src/shared/lib/require-super-admin.ts'
   assert.ok(graph.forward.get(frame).some((edge) => edge.target === superAdmin))
-  // Every protected route composes ConsolePageFrame, which live-checks before
-  // mounting chrome. A persisted App Router layout is not a safe sibling-
+  // Protected routes live-check in ConsolePageFrame or the standalone account-security mount
+  // before rendering identity-bearing content. A persisted App Router layout is not a safe sibling-
   // navigation admission point.
   assert.deepEqual(
     graph.reverse
@@ -46,6 +46,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       .sort(),
     [
       frame,
+      'apps/web/src/_app/console-account-security/index.tsx',
       'apps/web/src/_pages/console/ConsolePageFrame/ConsolePageFrame.test.tsx',
       'apps/web/src/shared/lib/require-super-admin.test.ts',
     ].sort()
@@ -67,7 +68,9 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // stand fixture, browser spec and operator guide. Login diagnostics adds three detail UI/test
       // files, a Console API adapter test and the shared host/path browser helper under existing roots.
       // Support mail adds its closed feature root and route/adapter files.
-      expected: 549,
+      // Account security adds a two-file app root, two pages, two BFF route/test files,
+      // one handler and one guide: eight files.
+      expected: 557,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

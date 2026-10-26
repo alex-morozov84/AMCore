@@ -4,6 +4,7 @@ The API contains storage and internal verification primitives for account-owned
 multi-factor authentication (MFA). This foundation does not enable MFA enrollment,
 change login, enforce second-factor admission or expose recovery endpoints.
 The current supported credential contract remains in [Auth contracts](reference.md).
+[Browser preparation](mfa-browser.md) adds a dormant UI without changing this boundary.
 
 ## Deployment boundary
 

@@ -711,3 +711,24 @@ inbound internal claims. It proves wrong-password accounting and aggregate429, t
 removes only its explicitly seeded demo keys. It never uses another stand/ingress.
 The public preview URL remains useful for ordinary login/settings checks; the
 trusted-edge proof runs through the profile's temporary browser proxy.
+
+## Account-security UI preview
+
+Prepare an isolated preview with:
+
+```sh
+pnpm stand preview --id account-security-review --profile account-mfa-ui
+```
+
+Open its printed product URL followed by `/mfa`, with the locale prefix when
+locales are enabled. The demonstration needs no login. Use a made-up password.
+Scan its public test QR with an authenticator app and enter the current code.
+The preview rejects invalid codes. Backup-code examples appear in the demo panel.
+The additional examples show password setup and a separate server-issued ticket.
+
+This profile copies a simulated client adapter only into the owned source
+snapshot. It refuses a normal worktree, mocked stand or E2E-purpose stand.
+It never enables backend MFA, binds a factor or grants account access. Reloading
+resets the UI example. Existing demo accounts and normal login remain separate.
+The managed inspection completes one setup/code-saving journey without tracing
+or capturing secret steps. Do not treat simulation as backend security evidence.

@@ -34,6 +34,11 @@ export const LOCALE_PURE_MOVES = Object.freeze([
 ])
 
 export const LOCALE_REWRITTEN_MOVES = Object.freeze([
+  '(auth)/mfa/page.tsx',
+  '(dashboard)/account/security/page.tsx',
+  '(product-admin)/manage/(auth)/mfa/page.tsx',
+  '(product-admin)/manage/(protected)/account/security/page.tsx',
+
   '(auth)/forgot-password/page.tsx',
   '(auth)/invite/accept/route.ts',
   '(auth)/invite/bootstrap/[pendingId]/route.ts',
