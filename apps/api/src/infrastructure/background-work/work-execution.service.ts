@@ -13,6 +13,7 @@ import { managedJobKey } from './managed-job-key.js'
 import { managedEnvelopeSchema, parseManagedJob } from './managed-job-profile.js'
 import { startIdempotentInvocation } from './scripts/idempotent-start.js'
 import { reportManagedInvocation } from './scripts/invocation-report.js'
+import { usesProviderEvidence } from './work-definition.js'
 import {
   jobVersions,
   type WorkDefinition,
@@ -54,7 +55,7 @@ export class WorkExecutionService {
   discardSecret(definition: WorkDefinition, job: Job): boolean {
     this.readiness.assertReady()
     return (
-      definition.jobs[job.name]?.replay.kind === 'provider-window' &&
+      usesProviderEvidence(definition.jobs[job.name]?.replay.kind) &&
       this.providerWindow?.discardSecret?.(job.data) === true
     )
   }
@@ -71,7 +72,7 @@ export class WorkExecutionService {
     if (!binding) throw new UnrecoverableError('VERSION_UNSUPPORTED')
     if (this.discardSecret(definition, job)) return
     if (
-      binding.replay.kind === 'provider-window' &&
+      usesProviderEvidence(binding.replay.kind) &&
       this.providerWindow?.prepareLegacy &&
       (!job.data || typeof job.data !== 'object' || !('protocolVersion' in job.data))
     )
@@ -104,7 +105,7 @@ export class WorkExecutionService {
       await handler.run(payload, this.context(definition, job, envelope.data.incarnation, uuidv7()))
       return
     }
-    if (binding.replay.kind === 'provider-window') {
+    if (usesProviderEvidence(binding.replay.kind)) {
       if (!this.providerWindow) throw new UnrecoverableError('ACTION_UNAVAILABLE')
       return this.providerWindow.run(definition, queue, job, token, payload, handler)
     }

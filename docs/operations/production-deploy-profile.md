@@ -26,6 +26,10 @@ promotion and rollback; do not assign a new identity at container startup.
 See [open tabs after a deployment](deployment.md#open-tabs-after-a-web-deployment)
 for draft loss, transient Action failures, endpoint freshness and browser limits.
 
+The [registry rollout procedure](deployment.md#production-rollout-via-registry-image-pull-path)
+covers digest checks, first startup, readiness waits and artifact inspection.
+Compose accepts tag references too; the operator must check immutable digests.
+
 ## Who this is for
 
 Two deploy paths are equally first-class in AMCore, and neither is "the

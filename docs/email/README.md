@@ -53,7 +53,7 @@ redact initial query tokens in ingress logs; see
 | Need                                                        | Use                                            |
 | ----------------------------------------------------------- | ---------------------------------------------- |
 | In-app feed, preferences, mandatory channels, retry history | `NotificationsService.notify()` / `notifyTx()` |
-| Non-secret transactional email with async retry             | `EmailService.queue()`                         |
+| Non-secret transactional email with bounded recovery        | `EmailService.queue()`                         |
 | Email with a token URL or other secret payload              | `EmailService.sendNow()`                       |
 | Worker adapter with already-rendered safe content           | `EmailService.send()`                          |
 
@@ -74,7 +74,7 @@ changes. The Console shows only closed codes, never the provider's own error tex
 ## Guides
 
 - [Templates](./templates.md) — add React Email templates, data types, subjects, i18n, and tests.
-- [Delivery](./delivery.md) — choose notification, queued, direct, secret-bearing, or worker delivery.
+- [Delivery](./delivery.md) — choose a delivery path and [verify deployed direct/queued mail](./delivery.md#verify-delivery-on-a-deployed-stack).
 - [Queued safety and recovery](./queued-safety.md) — immutable request, certainty, finite starts, cooldown/horizon, legacy handling and protected evidence.
 - [Security](./security.md) — secret-link invariants, logging rules, and queue boundaries.
 
@@ -84,3 +84,7 @@ changes. The Console shows only closed codes, never the provider's own error tex
 - Auth email flows — [`docs/auth/email-auth.md`](../auth/email-auth.md)
 - Organization invites — [`docs/auth/invites.md`](../auth/invites.md)
 - Email source — [`apps/api/src/infrastructure/email/`](../../apps/api/src/infrastructure/email/)
+
+Welcome unknown results stop automatic recovery, including current Resend429 results.
+See [queued safety](queued-safety.md) and the [offline policy upgrade](queued-upgrade.md).
+Direct-secret and notification delivery retain their separate recovery contracts.

@@ -278,6 +278,7 @@ describe('ResendEmailProvider against the real Resend SDK', () => {
         code: 'RATE_LIMITED',
         retryAfter: { kind: 'absolute', timestamp: Date.parse('2026-10-05T12:02:00.000Z') },
       })
+      expect(calls).toHaveLength(1) // No SDK retry may hide a second submission.
       expect(JSON.stringify(outcome)).not.toContain('SENTINEL')
     }
   )

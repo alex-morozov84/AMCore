@@ -36,7 +36,7 @@ if ats ~= tonumber(ARGV[8]) or atm ~= tonumber(ARGV[9]) or
 if values[4] or values[5] or values[6] or values[15] or values[16] or values[17] or values[18] or
   values[19] or values[20] or values[21] or values[22] or values[23] or values[24] or values[25] or
   values[26] or values[30] or values[31] or values[32] or values[34] then return reject('OUTCOME_UNRECORDED') end
-local unknown = ats ~= 1 or atm ~= 0 or (values[33] and #values[33] > 0)
+local unknown = ARGV[11] == '1' or ats ~= 1 or atm ~= 0 or (values[33] and #values[33] > 0)
 local extra = unknown and 3 or 1
 if redis.call('HLEN',KEYS[1]) + extra > 64 or #ARGV[4] > 32768 or #ARGV[5] > 16384 then
   return reject('CONTENT_UNSUPPORTED') end
@@ -101,7 +101,11 @@ export async function prepareLegacyQueuedEmail(
       .safeParse(options.backoff).success
   )
     throw new UnrecoverableError('CONTENT_UNSUPPORTED')
-  const upgraded = { ...options, backoff: { type: 'exponential', delay: 2000 } }
+  const conservative = binding.replay.kind === 'conservative'
+  const upgraded = {
+    ...options,
+    backoff: { type: 'exponential', delay: conservative ? 1000 : 2000 },
+  }
   const data = JSON.stringify(envelope),
     opts = JSON.stringify(upgraded)
   parseManagedJob(definition, { ...observed.fields, data, opts })
@@ -115,7 +119,7 @@ export async function prepareLegacyQueuedEmail(
     .max(2147483647)
     .parse(observed.fields.atm ?? '0')
   return {
-    unknown: starts !== 1 || made !== 0 || !!observed.fields.failedReason,
+    unknown: conservative || starts !== 1 || made !== 0 || !!observed.fields.failedReason,
     starts,
     queueEpoch: state.snapshot.epoch,
     envelope,
@@ -134,6 +138,7 @@ export async function prepareLegacyQueuedEmail(
       createHash('sha1')
         .update(observed.fields.failedReason ?? '')
         .digest('hex'),
+      conservative ? '1' : '0',
     ],
   }
 }

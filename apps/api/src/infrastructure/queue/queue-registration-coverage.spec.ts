@@ -22,6 +22,7 @@ import ts from 'typescript'
  * ordinary code, not a sandbox. Tests, specs and generated code are not scanned.
  *
  * To add a queue, follow "Adding a queue" in the queue README, not a new allowlist entry.
+ * The offline upgrade CLI may open the already registered EMAIL queue for maintenance.
  */
 const SRC_ROOT = join(__dirname, '..', '..')
 
@@ -29,6 +30,8 @@ const SRC_ROOT = join(__dirname, '..', '..')
 const ALLOWLIST: Record<string, string> = {
   'infrastructure/background-work/compose-background-work.ts':
     'registers enabled WorkDefinitions and projects the queue inventory, the only creation owner',
+  'cli/welcome-upgrade.ts':
+    'offline maintenance client for the registered EMAIL queue; no worker, producer or new queue registration',
 }
 
 interface Finding {

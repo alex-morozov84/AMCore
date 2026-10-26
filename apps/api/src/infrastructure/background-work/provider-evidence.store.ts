@@ -8,6 +8,11 @@ import type { BackgroundEffectEvidence } from '../../generated/prisma/client.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { compactProviderEvidenceBytes } from './compact-provider-evidence.js'
+import {
+  assertConservativeAdmission,
+  conservativeDelay,
+  isConservativeEvidence,
+} from './conservative-evidence.js'
 import { CONTROL_LIMITS } from './control-limits.js'
 import { backgroundControlTransaction, type ControlTransaction } from './control-transaction.js'
 import {
@@ -24,6 +29,7 @@ import {
   PROVIDER_WINDOW_CLOCK,
   type RetryAfterConstraint,
 } from './provider-window-clock.js'
+import { recoverConservativeAttempt } from './recover-conservative-attempt.js'
 import { WorkPolicyError } from './work-policy-error.js'
 
 const identitySchema = z.strictObject({
@@ -46,10 +52,11 @@ const identitySchema = z.strictObject({
   requestDigest: z.string().regex(/^[a-f0-9]{64}$/),
   providerScope: z.string().regex(/^[a-f0-9]{64}$/),
   manualCommandId: z.uuidv7().optional(),
+  cooldownRevision: z.number().int().nonnegative().optional(),
 })
 export type ProviderAdmission = z.infer<typeof identitySchema>
 const controlIdentitySchema = identitySchema
-  .omit({ requestDigest: true, providerScope: true, manualCommandId: true })
+  .omit({ requestDigest: true, providerScope: true, manualCommandId: true, cooldownRevision: true })
   .extend({ evidenceRevision: z.number().int().nonnegative().nullable() })
 export type ProviderControlIdentity = z.infer<typeof controlIdentitySchema>
 export interface ProviderAttempt {
@@ -72,7 +79,7 @@ export interface ProviderOutcome {
 export interface ProviderOutcomeWitness {
   readonly attemptId: string
   readonly incarnation: string
-  readonly kind: 'reported' | 'denied-before-call'
+  readonly kind: 'reported' | 'denied-before-call' | 'accepted-transport'
   readonly brokerRevision?: number
 }
 
@@ -127,6 +134,8 @@ export class ProviderEvidenceStore {
   }
 
   dispositionReason(row: BackgroundEffectEvidence, now: number): WorkReason | undefined {
+    if (isConservativeEvidence(row) && (row.activeAttemptId || !row.outcomeRecorded))
+      return 'OUTCOME_UNRECORDED'
     // An unrecorded attempt may still re-fence. Never invalidate it while a call could start.
     // Once the immutable horizon is certainly past, disposition still retains its marker/uncertainty.
     if (
@@ -200,6 +209,8 @@ export class ProviderEvidenceStore {
         ? 'ACTIVE_JOB'
         : undefined
     if (operation !== 'retry') return undefined
+    if (!isConservativeEvidence(row)) return 'VERSION_UNSUPPORTED'
+    if (row.cooldownSupported === false) return 'CONTENT_UNSUPPORTED'
     if (row.certainty !== 'none') return 'EFFECT_ACCEPTED'
     if (row.manualGrant !== 'none') return 'MANUAL_GRANT_SPENT'
     if (
@@ -211,7 +222,7 @@ export class ProviderEvidenceStore {
         .safeParse(row.safeResult).success
     )
       return 'PERMANENT_FAILURE'
-    if (!row.requestDigest || !row.providerScope || !row.nominalDeadline) return 'REQUEST_EXPIRED'
+    if (!row.requestDigest || !row.providerScope) return 'REQUEST_EXPIRED'
     try {
       this.assertTime(row, now)
     } catch (error) {
@@ -222,6 +233,7 @@ export class ProviderEvidenceStore {
 
   async reserve(input: ProviderAdmission): Promise<ProviderAttempt | { readonly accepted: true }> {
     const request = identitySchema.parse(input)
+    if (request.policyVersion !== 2) throw new WorkPolicyError('VERSION_UNSUPPORTED')
     return backgroundControlTransaction(this.prisma, async (ctx) => {
       const budgets = await lockEvidenceBudgets(ctx, request.workId)
       let row = await this.lock(ctx, request.workId, request.incarnation)
@@ -236,6 +248,7 @@ export class ProviderEvidenceStore {
             jobName: request.jobName,
             wireVersion: request.wireVersion,
             policyVersion: request.policyVersion,
+            recipeVersion: 2,
             automaticLimit: request.automaticLimit,
             requestDigest: request.requestDigest,
             providerScope: request.providerScope,
@@ -253,6 +266,9 @@ export class ProviderEvidenceStore {
         })
       this.assertIdentity(row, request)
       if (row.certainty === 'accepted') return { accepted: true }
+      assertConservativeAdmission(row)
+      if ((request.cooldownRevision ?? 0) !== row.cooldownRevision)
+        throw new WorkPolicyError('STATE_CHANGED')
       if (!row.outcomeRecorded || row.activeAttemptId)
         throw new WorkPolicyError('OUTCOME_UNRECORDED')
       if (
@@ -281,9 +297,7 @@ export class ProviderEvidenceStore {
           unresolvedCount: { increment: 1 },
           safeResult: previous,
           firstDispatchAt,
-          nominalDeadline:
-            row.nominalDeadline ??
-            new Date(firstDispatchAt.getTime() + PROVIDER_WINDOW_CLOCK.providerDedupHorizonMs),
+          nominalDeadline: null,
           ...(mode === 'manual' ? { manualGrant: 'spent' } : { autoStartsUsed: { increment: 1 } }),
           finalizedAt: null,
         },
@@ -335,6 +349,7 @@ export class ProviderEvidenceStore {
           jobName: identity.jobName,
           wireVersion: identity.wireVersion,
           policyVersion: identity.policyVersion,
+          ...(identity.policyVersion === 2 ? { recipeVersion: 2 } : {}),
           automaticLimit: identity.automaticLimit,
           logicalBytes: CONTROL_LIMITS.evidence.rowBytes,
           createdAt: ctx.now,
@@ -428,7 +443,9 @@ export class ProviderEvidenceStore {
       witness.incarnation !== attempt.row.incarnation ||
       (witness.kind === 'denied-before-call'
         ? outcome.certainty !== 'none' || outcome.code !== 'NO_CALL'
-        : !Number.isSafeInteger(witness.brokerRevision) || witness.brokerRevision! < 1)
+        : witness.kind === 'accepted-transport'
+          ? outcome.certainty !== 'accepted' || !isConservativeEvidence(attempt.row)
+          : !Number.isSafeInteger(witness.brokerRevision) || witness.brokerRevision! < 1)
     )
       throw new WorkPolicyError('OUTCOME_UNRECORDED')
     await backgroundControlTransaction(this.prisma, async (ctx) => {
@@ -440,8 +457,38 @@ export class ProviderEvidenceStore {
         typeof row.safeResult === 'object' &&
         !Array.isArray(row.safeResult) &&
         row.safeResult.lastAttemptId === attempt.attemptId
-      )
+      ) {
+        if (
+          isConservativeEvidence(row) &&
+          row.certainty === 'unknown' &&
+          outcome.certainty === 'accepted' &&
+          (witness.kind === 'reported' || witness.kind === 'accepted-transport')
+        ) {
+          if (
+            row.providerScope !== attempt.row.providerScope ||
+            row.requestDigest !== attempt.row.requestDigest ||
+            row.queueEpoch !== attempt.row.queueEpoch
+          )
+            throw new WorkPolicyError('OUTCOME_UNRECORDED')
+          await changeUnresolvedEvidence(ctx, budgets, -1)
+          await ctx.tx.backgroundEffectEvidence.update({
+            where: { workId_incarnation: { workId: row.workId, incarnation: row.incarnation } },
+            data: {
+              revision: { increment: 1 },
+              certainty: 'accepted',
+              unresolvedCount: 0,
+              finalizedAt: ctx.now,
+              safeResult: {
+                code: 'COMPLETED',
+                certainty: 'accepted',
+                lastAttemptId: attempt.attemptId,
+                retryClockSupported: true,
+              },
+            },
+          })
+        }
         return
+      }
       this.assertAttempt(row, attempt)
       const previous = previousSchema.parse(row!.safeResult)
       const unresolved =
@@ -453,9 +500,15 @@ export class ProviderEvidenceStore {
       const certainty =
         outcome.certainty === 'accepted' ? 'accepted' : unresolved > 0 ? 'unknown' : 'none'
       if (unresolved === 0) await changeUnresolvedEvidence(ctx, budgets, -1)
-      const retryClockSupported = outcome.retryAfter?.kind !== 'unsupported'
+      const cooldown = isConservativeEvidence(row!)
+        ? conservativeDelay(
+            row!.autoStartsUsed + (row!.manualGrant === 'spent' ? 1 : 0),
+            outcome.retryAfter
+          )
+        : undefined
+      const retryClockSupported = cooldown?.supported ?? outcome.retryAfter?.kind !== 'unsupported'
       const floor =
-        outcome.retryAfter && outcome.retryAfter.kind !== 'unsupported'
+        !cooldown && outcome.retryAfter && outcome.retryAfter.kind !== 'unsupported'
           ? constrainedRetryFloor(Number(row!.floorUpper), ctx.now.getTime(), outcome.retryAfter)
           : (outcome.floorUpper ?? 0)
       if (!Number.isSafeInteger(floor) || floor < 0) throw new WorkPolicyError('CLOCK_UNCERTAIN')
@@ -468,6 +521,13 @@ export class ProviderEvidenceStore {
           activeAttemptId: null,
           outcomeRecorded: true,
           floorUpper: row!.floorUpper > BigInt(floor) ? row!.floorUpper : BigInt(floor),
+          ...(cooldown
+            ? {
+                cooldownDelayMs: cooldown.delay,
+                cooldownSupported: cooldown.supported,
+                cooldownRevision: { increment: 1 },
+              }
+            : {}),
           ...(row!.manualGrant === 'spent' ? { commandFence: null } : {}),
           safeResult: {
             code: outcome.code,
@@ -479,6 +539,20 @@ export class ProviderEvidenceStore {
         },
       })
       this.assertRowSize(updated)
+    })
+  }
+
+  async recoverStale(
+    workId: string,
+    incarnation: string,
+    revision: number,
+    proof: () => Promise<boolean>
+  ): Promise<void> {
+    await backgroundControlTransaction(this.prisma, async (ctx) => {
+      await lockEvidenceBudgets(ctx, workId)
+      const row = await this.lock(ctx, workId, incarnation)
+      if (!row || row.revision !== revision) throw new WorkPolicyError('STATE_CHANGED')
+      await recoverConservativeAttempt(ctx, row, proof)
     })
   }
 
@@ -548,6 +622,7 @@ export class ProviderEvidenceStore {
   }
 
   private assertIdentity(row: BackgroundEffectEvidence, input: ProviderAdmission): void {
+    if (!isConservativeEvidence(row)) throw new WorkPolicyError('VERSION_UNSUPPORTED')
     if (row.providerScope !== input.providerScope) throw new WorkPolicyError('PROVIDER_CHANGED')
     if (row.requestDigest !== input.requestDigest) throw new WorkPolicyError('REQUEST_EXPIRED')
     if (
@@ -568,8 +643,9 @@ export class ProviderEvidenceStore {
       row.autoStartsUsed > row.automaticLimit ||
       !['none', 'reserved', 'spent'].includes(row.manualGrant) ||
       !['none', 'unknown', 'accepted'].includes(row.certainty) ||
-      !!row.firstDispatchAt !== !!row.nominalDeadline ||
-      (row.firstDispatchAt &&
+      (!isConservativeEvidence(row) && !!row.firstDispatchAt !== !!row.nominalDeadline) ||
+      (!isConservativeEvidence(row) &&
+        row.firstDispatchAt &&
         row.nominalDeadline!.getTime() !==
           row.firstDispatchAt.getTime() + PROVIDER_WINDOW_CLOCK.providerDedupHorizonMs) ||
       (row.certainty === 'accepted' &&
@@ -589,6 +665,11 @@ export class ProviderEvidenceStore {
   }
 
   private assertTime(row: BackgroundEffectEvidence, now: number): void {
+    if (isConservativeEvidence(row)) {
+      if (row.nominalDeadline !== null || row.floorUpper !== 0n)
+        throw new WorkPolicyError('CONTENT_UNSUPPORTED')
+      return
+    }
     if (
       row.nominalDeadline &&
       Math.max(now, Number(row.floorUpper) + PROVIDER_WINDOW_CLOCK.timestampErrorBoundMs) +

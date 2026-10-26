@@ -29,6 +29,11 @@ import {
   type ProviderAttempt,
   ProviderEvidenceStore,
 } from '../src/infrastructure/background-work/provider-evidence.store'
+import {
+  changeUnresolvedEvidence,
+  lockEvidenceBudgets,
+  reserveEvidenceRow,
+} from '../src/infrastructure/background-work/provider-evidence-accounting'
 import { ScheduledJobExecutor } from '../src/infrastructure/schedule/scheduled-job.executor'
 import { PrismaService } from '../src/prisma'
 
@@ -832,7 +837,8 @@ describe('Background-work ADMIN ledger', () => {
       queueEpoch: uuidv7(),
       jobName: 'send-email',
       wireVersion: 1,
-      policyVersion: 1,
+      policyVersion: 2,
+      cooldownRevision: 0,
       automaticLimit,
       requestDigest: 'a'.repeat(64),
       providerScope: 'b'.repeat(64),
@@ -843,6 +849,45 @@ describe('Background-work ADMIN ledger', () => {
     if ('accepted' in reserved) throw new Error('Expected possible-call reservation')
     return reserved
   }
+  async function historicalAttempt(): Promise<ProviderAttempt> {
+    const input = providerInput()
+    // Explicit retained policy1 row, not an executable reservation under the old policy.
+    return transaction(prisma as never, async (ctx) => {
+      const budgets = await lockEvidenceBudgets(ctx, input.workId)
+      await reserveEvidenceRow(ctx, budgets)
+      await changeUnresolvedEvidence(ctx, budgets, 1)
+      const attemptId = uuidv7()
+      const row = await ctx.tx.backgroundEffectEvidence.create({
+        data: {
+          workId: input.workId,
+          jobId: input.jobId,
+          incarnation: input.incarnation,
+          queueEpoch: input.queueEpoch,
+          jobName: input.jobName,
+          wireVersion: 1,
+          policyVersion: 1,
+          recipeVersion: null,
+          clockPolicyVersion: 1,
+          automaticLimit: input.automaticLimit,
+          autoStartsUsed: 1,
+          revision: 1,
+          logicalBytes: 2048,
+          requestDigest: input.requestDigest,
+          providerScope: input.providerScope,
+          firstDispatchAt: ctx.now,
+          nominalDeadline: new Date(ctx.now.getTime() + 86400000),
+          certainty: 'unknown',
+          unresolvedCount: 1,
+          activeAttemptId: attemptId,
+          outcomeRecorded: false,
+          safeResult: { previousCertainty: 'none', previousUnresolved: 0 },
+          createdAt: ctx.now,
+        },
+      })
+      return { row, attemptId, pgTime: ctx.now.getTime(), mode: 'automatic' }
+    })
+  }
+
   function witness(reserved: ProviderAttempt) {
     // This suite proves PG authority; the real broker witness/transport interaction is a separate gate.
     return {
@@ -1037,8 +1082,31 @@ describe('Background-work ADMIN ledger', () => {
     })
   })
 
-  it('permits irreducible unrecorded disposition only beyond the immutable horizon plus both timestamp bounds', async () => {
+  it('keeps active v2 protected regardless of elapsed wall time and stores its recipe identity', async () => {
     const reserved = await attempt(providerInput())
+    expect(reserved.row).toMatchObject({
+      policyVersion: 2,
+      recipeVersion: 2,
+      nominalDeadline: null,
+      cooldownRevision: 0,
+    })
+    for (const now of [Date.now(), Date.now() + 31 * 86400000]) {
+      expect(evidence.dispositionReason(reserved.row, now)).toBe('OUTCOME_UNRECORDED')
+      expect(evidence.controlReason(reserved.row, 'retry', now)).toBe('OUTCOME_UNRECORDED')
+    }
+    expect(await evidence.read(reserved.row.workId, reserved.row.incarnation)).toEqual(reserved.row)
+  })
+
+  it('preserves retained policy1 disposition beyond its original horizon and both timestamp bounds', async () => {
+    const reserved = await historicalAttempt()
+    expect(reserved.row).toMatchObject({
+      policyVersion: 1,
+      recipeVersion: null,
+      clockPolicyVersion: 1,
+      cooldownDelayMs: null,
+      cooldownSupported: null,
+      cooldownRevision: 0,
+    })
     const deadline = reserved.row.nominalDeadline!.getTime()
     for (const delta of [3999, 4000])
       expect(evidence.dispositionReason(reserved.row, deadline + delta)).toBe('OUTCOME_UNRECORDED')
@@ -1213,7 +1281,12 @@ describe('Background-work ADMIN ledger', () => {
 
   it('fences an unstarted provider job until a definitive control refusal, then freezes its first request', async () => {
     const input = providerInput()
-    const { requestDigest: _digest, providerScope: _scope, ...identity } = input
+    const {
+      requestDigest: _digest,
+      providerScope: _scope,
+      cooldownRevision: _cooldownRevision,
+      ...identity
+    } = input
     const commandId = uuidv7()
     const control = await transaction(prisma as never, (ctx) =>
       evidence.reserveControl(ctx, { ...identity, evidenceRevision: null }, 'cancel', commandId)
@@ -1252,12 +1325,18 @@ describe('Background-work ADMIN ledger', () => {
     expect(first.row.firstDispatchAt).not.toBeNull()
   })
 
-  it('consumes a provider manual grant only after its ADMIN receipt commits, retaining immutable clocks and identity', async () => {
+  it('consumes a provider manual grant only after its ADMIN receipt commits, retaining v2 cooldown revision and immutable identity', async () => {
     const input = providerInput()
     const first = await attempt(input)
     await evidence.finalize(first, { certainty: 'none', code: 'RATE_LIMITED' }, witness(first))
     const row = (await evidence.read(input.workId, input.incarnation))!
-    const { requestDigest: _digest, providerScope: _scope, ...identity } = input
+    const retryInput = { ...input, cooldownRevision: row.cooldownRevision }
+    const {
+      requestDigest: _digest,
+      providerScope: _scope,
+      cooldownRevision: _cooldownRevision,
+      ...identity
+    } = input
     const commandId = uuidv7()
     const control = await transaction(prisma as never, (ctx) =>
       evidence.reserveControl(
@@ -1268,6 +1347,9 @@ describe('Background-work ADMIN ledger', () => {
       )
     )
     await expect(evidence.reserve({ ...input, manualCommandId: commandId })).rejects.toThrow(
+      'STATE_CHANGED'
+    )
+    await expect(evidence.reserve({ ...retryInput, manualCommandId: commandId })).rejects.toThrow(
       'COMMAND_CONFLICT'
     )
     const prepared = await admission.admit(
@@ -1300,11 +1382,13 @@ describe('Background-work ADMIN ledger', () => {
         state: 'applied',
       })
     )
-    const manual = await attempt({ ...input, manualCommandId: commandId })
+    const manual = await attempt({ ...retryInput, manualCommandId: commandId })
     expect(manual.mode).toBe('manual')
     expect(manual.row).toMatchObject({
       manualGrant: 'spent',
       autoStartsUsed: 1,
+      recipeVersion: 2,
+      cooldownRevision: row.cooldownRevision,
       requestDigest: input.requestDigest,
       providerScope: input.providerScope,
     })
@@ -1315,7 +1399,7 @@ describe('Background-work ADMIN ledger', () => {
     expect(await evidence.reserve(input)).toEqual({ accepted: true })
   })
 
-  it('never turns older unknown into none after a later verified rate-limit rejection', async () => {
+  it('refuses v2 replay after unknown and does not clear it with a late no-effect result', async () => {
     const input = providerInput()
     const first = await attempt(input)
     await evidence.finalize(
@@ -1323,19 +1407,23 @@ describe('Background-work ADMIN ledger', () => {
       { certainty: 'unknown', code: 'TRANSIENT_FAILURE' },
       witness(first)
     )
-    const second = await attempt(input)
-    await evidence.finalize(second, { certainty: 'none', code: 'RATE_LIMITED' }, witness(second))
+    const before = (await evidence.read(input.workId, input.incarnation))!
+    await expect(
+      evidence.reserve({ ...input, cooldownRevision: before.cooldownRevision })
+    ).rejects.toThrow('EFFECT_UNKNOWN')
+    await evidence.finalize(first, { certainty: 'none', code: 'RATE_LIMITED' }, witness(first))
+    expect(await evidence.read(input.workId, input.incarnation)).toEqual(before)
     expect((await evidence.read(input.workId, input.incarnation))!).toMatchObject({
       certainty: 'unknown',
       unresolvedCount: 1,
-      autoStartsUsed: 2,
+      autoStartsUsed: 1,
     })
     expect(
       (await prisma.backgroundBudget.findUniqueOrThrow({ where: { key: 'global' } })).unresolvedRows
     ).toBe(1)
   })
 
-  it('authoritative same-key/body/scope acceptance clears unresolved quota and suppresses another call', async () => {
+  it('matching late acceptance clears v2 uncertainty once and suppresses another call without resubmission', async () => {
     const input = providerInput()
     const first = await attempt(input)
     await evidence.finalize(
@@ -1343,35 +1431,50 @@ describe('Background-work ADMIN ledger', () => {
       { certainty: 'unknown', code: 'TRANSIENT_FAILURE' },
       witness(first)
     )
-    const second = await attempt(input)
-    await evidence.finalize(second, { certainty: 'accepted', code: 'COMPLETED' }, witness(second))
+    const before = (await evidence.read(input.workId, input.incarnation))!
+    await expect(
+      evidence.reserve({ ...input, cooldownRevision: before.cooldownRevision })
+    ).rejects.toThrow('EFFECT_UNKNOWN')
+    await evidence.finalize(first, { certainty: 'accepted', code: 'COMPLETED' }, witness(first))
+    await evidence.finalize(first, { certainty: 'accepted', code: 'COMPLETED' }, witness(first))
+    expect(await evidence.read(input.workId, input.incarnation)).toMatchObject({
+      certainty: 'accepted',
+      autoStartsUsed: 1,
+      unresolvedCount: 0,
+      firstDispatchAt: first.row.firstDispatchAt,
+      requestDigest: input.requestDigest,
+      providerScope: input.providerScope,
+    })
     expect(await evidence.reserve(input)).toEqual({ accepted: true })
     expect(
       (await prisma.backgroundBudget.findUniqueOrThrow({ where: { key: 'global' } })).unresolvedRows
     ).toBe(0)
   })
 
-  it('refences the same reservation without resetting horizon or spending another start', async () => {
+  it('refences the same v2 reservation without changing identity, cooldown revision or spending another start', async () => {
     const input = providerInput()
     const first = await attempt(input)
     const refreshed = await evidence.refence(first)
     expect(refreshed.attemptId).toBe(first.attemptId)
     expect(refreshed.row.autoStartsUsed).toBe(1)
     expect(refreshed.row.firstDispatchAt).toEqual(first.row.firstDispatchAt)
-    expect(refreshed.row.nominalDeadline).toEqual(first.row.nominalDeadline)
+    expect(refreshed.row.nominalDeadline).toBeNull()
+    expect(refreshed.row.cooldownRevision).toBe(first.row.cooldownRevision)
   })
 
   it('fails closed on frozen body/provider changes and exhausted finite starts', async () => {
     const input = providerInput(1)
     const first = await attempt(input)
     await evidence.finalize(first, { certainty: 'none', code: 'RATE_LIMITED' }, witness(first))
-    await expect(evidence.reserve({ ...input, providerScope: 'c'.repeat(64) })).rejects.toThrow(
-      'PROVIDER_CHANGED'
-    )
-    await expect(evidence.reserve({ ...input, requestDigest: 'c'.repeat(64) })).rejects.toThrow(
-      'REQUEST_EXPIRED'
-    )
-    await expect(evidence.reserve(input)).rejects.toThrow('AUTOMATIC_BUDGET_SPENT')
+    const row = (await evidence.read(input.workId, input.incarnation))!
+    const retryInput = { ...input, cooldownRevision: row.cooldownRevision }
+    await expect(
+      evidence.reserve({ ...retryInput, providerScope: 'c'.repeat(64) })
+    ).rejects.toThrow('PROVIDER_CHANGED')
+    await expect(
+      evidence.reserve({ ...retryInput, requestDigest: 'c'.repeat(64) })
+    ).rejects.toThrow('REQUEST_EXPIRED')
+    await expect(evidence.reserve(retryInput)).rejects.toThrow('AUTOMATIC_BUDGET_SPENT')
     expect((await evidence.read(input.workId, input.incarnation))!.autoStartsUsed).toBe(1)
   })
 })

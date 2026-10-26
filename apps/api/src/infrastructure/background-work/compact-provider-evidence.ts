@@ -37,7 +37,32 @@ const safeResult = z.union([
 export function compactProviderEvidenceBytes(row: BackgroundEffectEvidence): number {
   const result = safeResult.safeParse(row.safeResult)
   if (!result.success) throw new WorkPolicyError('CONTENT_UNSUPPORTED')
-  let bytes = 16 + ('legacyAttemptsStarted' in result.data ? 4 : 0)
+  const conservative = row.recipeVersion === 2 && row.policyVersion === 2
+  if (conservative) {
+    if (
+      row.nominalDeadline !== null ||
+      row.floorUpper !== 0n ||
+      row.clockPolicyVersion !== 1 ||
+      !Number.isInteger(row.cooldownRevision) ||
+      row.cooldownRevision < 0 ||
+      row.cooldownRevision > 2147483647 ||
+      (row.cooldownDelayMs !== null &&
+        (!Number.isInteger(row.cooldownDelayMs) ||
+          row.cooldownDelayMs < 0 ||
+          row.cooldownDelayMs > 86400000)) ||
+      (row.cooldownSupported !== null && typeof row.cooldownSupported !== 'boolean')
+    )
+      throw new WorkPolicyError('CONTENT_UNSUPPORTED')
+  } else if (
+    row.recipeVersion !== null ||
+    row.cooldownDelayMs !== null ||
+    row.cooldownSupported !== null ||
+    row.cooldownRevision !== 0
+  )
+    throw new WorkPolicyError('CONTENT_UNSUPPORTED')
+  // V2 encodes fixed-null legacy deadline/floor and fixed clock version implicitly.
+  // Its recipe/delay/revision and support flag use 13 bytes instead of those 20.
+  let bytes = (conservative ? 9 : 16) + ('legacyAttemptsStarted' in result.data ? 4 : 0)
   // Version, null bitmap, certainty/grant/disposition/code and result variant flags.
   for (const [value, maximum] of [
     [row.workId, 64],

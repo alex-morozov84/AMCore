@@ -1998,6 +1998,7 @@
     "newPassword": "Новый пароль",
     "resetPasswordSubmit": "Сбросить пароль",
     "resettingPassword": "Сброс пароля…",
+    "resetPasswordSuccessTitle": "Пароль изменён",
     "resetPasswordSuccess": "Пароль успешно изменён. Войдите с новым паролем.",
     "requestNewLink": "Запросить новую ссылку",
     "verifyEmailTitle": "Подтверждение email",
