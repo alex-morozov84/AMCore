@@ -1,5 +1,11 @@
 export const LOCALE_ONLY_E2E_PATHS = [
   'apps/web/e2e/mocked/locale-redirect.spec.ts',
+  'apps/web/e2e/mocked/locale-switcher.spec.ts',
+  'apps/web/e2e/real-stack/locale-url.spec.ts',
+  'apps/web/e2e/real-stack/auth-locale-profile.spec.ts',
+  'apps/web/e2e/console-real-stack/locale-profile.spec.ts',
+  'apps/web/e2e/shared/locale-switcher-journey.ts',
+  'apps/web/e2e/shared/url-only-locale-journey.ts',
   'apps/web/e2e/real-stack/locale-persistence.spec.ts',
 ]
 
@@ -55,7 +61,13 @@ export const E2E_ROUTE_DENOMINATOR =
   LOCALE_ONLY_E2E_PATHS.reduce((total, path) => {
     const counts = {
       'apps/web/e2e/mocked/locale-redirect.spec.ts': 4,
-      'apps/web/e2e/real-stack/locale-persistence.spec.ts': 5,
+      'apps/web/e2e/real-stack/locale-persistence.spec.ts': 7,
+      'apps/web/e2e/mocked/locale-switcher.spec.ts': 4,
+      'apps/web/e2e/real-stack/locale-url.spec.ts': 0,
+      'apps/web/e2e/real-stack/auth-locale-profile.spec.ts': 0,
+      'apps/web/e2e/console-real-stack/locale-profile.spec.ts': 0,
+      'apps/web/e2e/shared/locale-switcher-journey.ts': 0,
+      'apps/web/e2e/shared/url-only-locale-journey.ts': 0,
     }
     return total + counts[path]
   }, OAUTH_E2E_ROUTE_SURFACE[1])

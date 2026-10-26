@@ -1,7 +1,7 @@
 import ts from 'typescript'
 
 import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
-import { objectProperty } from './project-locale-ast-helpers.mjs'
+import { objectProperty, testCall } from './project-locale-ast-helpers.mjs'
 import { mockCall } from './project-locale-navigation-test-core.mjs'
 
 function mockObject(model, call, ctx) {
@@ -20,6 +20,10 @@ function addPathnameMock(model, object, ctx) {
 }
 
 export function rewriteBarTest(model, ctx) {
+  model.removeNode(
+    testCall(model, 'finishes a locale-only commit without waiting for the safety timeout', ctx),
+    ctx
+  )
   const locale = mockCall(model, '@/i18n/navigation', ctx)
   model.removeNode(locale.parent, { ...ctx, includeLeadingBlank: true })
   const next = mockObject(model, mockCall(model, 'next/navigation', ctx), ctx)

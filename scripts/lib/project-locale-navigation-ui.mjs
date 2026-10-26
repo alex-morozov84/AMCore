@@ -21,15 +21,8 @@ function rewriteRouter(model, localeImport, ctx) {
 }
 
 function retainedRawKey(rawKey) {
-  return `// Separate from \`lastKeyRef\` for structural symmetry with the multi-locale
-  // version of this file: there, the locale-aware \`usePathname()\` hook is
-  // locale-*stripped* while \`handlePopState\` below only has the locale-
-  // *prefixed* \`window.location.pathname\`, and comparing those two formats
-  // directly caused a real regression (see \`route-progress-bar.test.tsx\`).
-  // Single-locale mode has no \`[locale]\` segment, so \`usePathname()\` here
-  // (\`next/navigation\`'s own) and \`window.location.pathname\` always agree
-  // already -- this ref costs nothing to keep and avoids diverging the two
-  // variants' logic over a distinction that no longer exists.
+  return `// Keep the raw browser URL separate from the locale/path/query completion key.
+  // The single-locale provider supplies a constant locale, preserving the same lifecycle.
   ${rawKey.getText()}`
 }
 
