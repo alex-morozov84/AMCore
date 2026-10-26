@@ -41,24 +41,73 @@ look it up.
 
 ### Which messages reach the browser
 
-The root `NextIntlClientProvider` serializes its messages into the HTML of every
-page. To keep public pages light, `src/i18n/client-messages.ts` gives it the whole
-catalogue except the namespaces listed in `src/i18n/route-scoped-namespaces.ts`.
-Server Components still read every namespace through `getTranslations`.
+Server Components read the complete catalogue through `getTranslations`. The browser
+receives only the namespaces selected by server composition. The locale root selects
+`common`, `errors`, `validation` and `locale`. Shells and sections add their own namespaces.
+Matching top-level catalogue keys automatically define `MessageNamespace` through
+the existing message type augmentation. There is no separate namespace registry or
+denylist to update. A new namespace still needs selection at its section boundary.
 
-- A client component outside a route-scoped subtree can use any other namespace;
-  nothing else is needed.
-- To make a large namespace route-scoped, add it to the list and render a nested
-  `<NextIntlClientProvider messages={await getMessages()}>` in that subtree's
-  layout. Provider props do not merge, so the nested
-  provider passes the complete catalogue itself.
-- A client component that uses a route-scoped namespace outside its subtree shows
-  raw keys. `e2e/mocked/message-payload.spec.ts` checks that login HTML carries no
-  text unique to a route-scoped namespace.
+```text
+Server catalogue -> root core -> section additions -> client context
+```
+
+To add client translations to a new section:
+
+1. Add matching keys to every catalogue.
+2. Wrap the section composition with `ClientMessages` from
+   `@/i18n/client-message-boundary`. Pass a nonempty literal list or local constant tuple.
+   Inline the tuple when local bindings are ambiguous or shadowed.
+3. Select only additions to the parent. A page within an existing section inherits its
+   namespaces; do not select them again. Wrap shared shells, slots and failure branches too.
+4. Verify the rendered section and navigation from another section in both languages.
+   A page boundary does not cover its sibling `loading.tsx` or `error.tsx`.
+
+Find the owning composition under `src/_app/<slice>` and its outer route/layout.
+Search their `ClientMessages` calls to see inherited selections. For example,
+`src/_app/organization-access/ui/frame.tsx` owns the product shell's additions;
+`src/_app/auth/index.tsx` owns ordinary authentication pages.
+
+```tsx
+import type { ReactNode } from 'react'
+import { ClientMessages } from '@/i18n/client-message-boundary'
+
+export function Section({ children }: { children: ReactNode }) {
+  return <ClientMessages namespaces={['auth']}>{children}</ClientMessages>
+}
+```
+
+Use this example only when the parent has not already selected `auth`.
+The private adapter preserves the parent locale and merges disjoint additions.
+Empty, repeated, unknown or parent-overlapping selections fail explicitly. If a known
+namespace was never selected, next-intl reports `MISSING_MESSAGE`; add it at the owning
+section boundary. Do not hide that error by loading the full catalogue.
+
+Runtime catalogue imports belong only in `src/i18n/request.ts`. Production code must
+not access `NextIntlClientProvider`, `IntlProvider` or `useMessages` directly. The paired
+lint policy checks named imports, aliases, reexports and static dynamic imports from
+`next-intl`, `use-intl` and `use-intl/react`. Namespace imports and dynamic loads from
+those entries are rejected outside the private boundary. Test/Storybook fixtures and
+erased type-only imports remain legal. Computed module names and reflected access still
+require review; lint is not a complete module graph analyser.
 
 Never inline user-facing text in a component, including "temporary" strings and
 placeholder copy — an ESLint rule blocks non-ASCII literals, but English
 hardcoded text is just as wrong and only review catches it.
+
+### Language selection
+
+Multi-locale builds use one native select with an accessible name. Selection changes
+language immediately. The control shows the requested language and disables selection
+while navigation is pending. URL-backed state remains in the path, repeated query and
+current fragment. Unsaved local form fields can reset when the locale subtree remounts.
+
+Admitted product pages also save the profile preference on a best-effort basis; a failed
+save does not block navigation. Authentication frames and the Operations Console only
+change the URL and locale cookie. They add no product-profile requests. Existing feature
+reads, such as email-verification status deciding its next page, retain their own contract.
+See the [temporary Next route-cache patch](next-route-cache-patch.md) for the production
+fragment regression and dependency maintenance.
 
 ### Plurals
 

@@ -15,7 +15,11 @@ pnpm --filter api db:generate
 pnpm --filter api build
 ```
 
-The API build runs the required TypeScript 7 source/test check first. Nest then
+The API build runs the required TypeScript 7 application-only `typecheck:build`
+first, using `tsconfig.build.json`. Test helpers and test roots are excluded.
+The separate `pnpm --filter api typecheck` still checks source, tests and Prisma;
+run it before delivery. Exclusion does not prevent runtime imports from reintroducing
+test files. Keep test code outside production imports. Nest then
 runs its retained compiler-API checker and SWC. The identity command runs only
 when those stages succeed. Nest cleans `dist` before emission, so removed modules
 cannot survive a successful rebuild. A failed build is not a deployable artifact;

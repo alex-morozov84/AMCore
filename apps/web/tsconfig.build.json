@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.mts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/test/**",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*-spec.ts",
+    "**/*.testkit.*",
+    "**/*.stories.*",
+    "**/*-test-messages.ts",
+    "**/test-support/**",
+    "**/test-helpers/**"
+  ]
+}

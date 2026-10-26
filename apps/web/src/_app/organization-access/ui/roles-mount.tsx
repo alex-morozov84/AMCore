@@ -1,4 +1,5 @@
 import { OrganizationRolesClient } from '@/_pages/organization-roles'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import { loadManagedOrganization } from '../model/managed-context.server'
@@ -26,19 +27,21 @@ export async function OrganizationRolesMount({
   if (!loaded.ok) return <PrimaryUnavailableFallback reason="upstream" />
   const hrefs = organizationAccessHrefs(placement)
   return (
-    <OrganizationRolesClient
-      deniedContent={deniedContent}
-      admission={loaded.admission}
-      organizationId={id}
-      initialOrganizationName={loaded.organizationName}
-      query={organizationRoleListQuery(await searchParams)}
-      listHref={hrefs.listHref}
-      hrefs={{
-        overview: hrefs.contextHref(id),
-        members: hrefs.membersHref(id),
-        invitations: hrefs.invitationsHref(id),
-        roles: hrefs.rolesHref(id),
-      }}
-    />
+    <ClientMessages namespaces={['organizationRoles', 'organizationNav']}>
+      <OrganizationRolesClient
+        deniedContent={deniedContent}
+        admission={loaded.admission}
+        organizationId={id}
+        initialOrganizationName={loaded.organizationName}
+        query={organizationRoleListQuery(await searchParams)}
+        listHref={hrefs.listHref}
+        hrefs={{
+          overview: hrefs.contextHref(id),
+          members: hrefs.membersHref(id),
+          invitations: hrefs.invitationsHref(id),
+          roles: hrefs.rolesHref(id),
+        }}
+      />
+    </ClientMessages>
   )
 }

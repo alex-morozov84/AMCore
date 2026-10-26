@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation'
-import { NextIntlClientProvider } from 'next-intl'
-import { getMessages } from 'next-intl/server'
 
 import { AccountSecurityPage } from '@/_pages/account-security'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { hasCanonicalConsoleHost } from '@/shared/lib/console-host-guard'
 import { requireSuperAdmin } from '@/shared/lib/require-super-admin'
@@ -18,12 +17,11 @@ export async function ConsoleAccountSecurityMount({ pending = false }: { pending
   if (pending && ADMIN_CONSOLE_CONFIG.mode !== 'host') notFound()
   if (!pending && (await requireSuperAdmin()) === 'unavailable')
     return <PrimaryUnavailableFallback reason="upstream" />
-  const messages = await getMessages()
   return (
-    <AccountSecurityPage standalone>
-      <NextIntlClientProvider messages={messages}>
+    <ClientMessages namespaces={['accountMfa']}>
+      <AccountSecurityPage standalone>
         <ConsoleAccountSecurityClient />
-      </NextIntlClientProvider>
-    </AccountSecurityPage>
+      </AccountSecurityPage>
+    </ClientMessages>
   )
 }

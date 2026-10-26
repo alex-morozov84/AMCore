@@ -28,6 +28,7 @@ FROM base AS build
 ENV pnpm_config_frozen_lockfile=true
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY patches ./patches
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/shared/package.json ./packages/shared/

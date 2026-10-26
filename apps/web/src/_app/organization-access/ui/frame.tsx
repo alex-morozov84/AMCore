@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cookies } from 'next/headers'
 
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { SIDEBAR_COOKIE_NAME } from '@/shared/ui/sidebar-cookie'
 import { AccountMenu } from '@/widgets/account-menu'
 import { AppShell } from '@/widgets/app-shell'
@@ -30,15 +31,27 @@ export async function OrganizationAccessFrame({
 }) {
   const value = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value
   return (
-    <AppShell
-      homeHref={organizationAccessHrefs(placement).homeHref}
-      headerEnd={headerEnd ?? <AccountMenu />}
-      sessionsHref={sessionsHref}
-      sidebarFooter={sidebarFooter}
-      defaultSidebarOpen={value === undefined ? undefined : value === 'true'}
-      navigationAfterDashboard={<OrganizationNavigationEntry placement={placement} />}
+    <ClientMessages
+      namespaces={[
+        'auth',
+        'nav',
+        'sessions',
+        'account',
+        'organizationAccess',
+        'ownApiKeys',
+        'dashboard',
+      ]}
     >
-      {children}
-    </AppShell>
+      <AppShell
+        homeHref={organizationAccessHrefs(placement).homeHref}
+        headerEnd={headerEnd ?? <AccountMenu />}
+        sessionsHref={sessionsHref}
+        sidebarFooter={sidebarFooter}
+        defaultSidebarOpen={value === undefined ? undefined : value === 'true'}
+        navigationAfterDashboard={<OrganizationNavigationEntry placement={placement} />}
+      >
+        {children}
+      </AppShell>
+    </ClientMessages>
   )
 }

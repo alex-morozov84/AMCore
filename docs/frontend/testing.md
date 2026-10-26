@@ -7,6 +7,43 @@ with infra integration called out separately because it has a Docker cost.
 This guide says which layer a new test belongs in and why, not just how to
 run the suite.
 
+## Production typechecking
+
+Next uses `tsconfig.build.json` in development, type generation and production builds.
+Restart a running development server after changing that config selection. Application
+source, declarations, `next.config.ts` and generated route types remain checked.
+Tests, stories, browser fixtures and test configuration are outside the production roots.
+
+From the repository root, build shared prerequisites and regenerate route declarations:
+
+```bash
+pnpm --filter @amcore/shared build
+pnpm --filter web exec next typegen
+pnpm --filter web typecheck
+pnpm --filter web typecheck:build
+```
+
+Type generation loads `next.config.ts` in production mode. Supply the documented project
+configuration first. Use the supported Node/pnpm versions and browser prerequisites from
+[Quick Start](../../README.md#quick-start) and [managed stands](../operations/local-stands.md#prerequisites-and-commands).
+If generated declarations describe removed routes, stop only your development server,
+regenerate current production types, and inspect remaining `.next/dev/types` diagnostics.
+Remove stale generated output only in your own inactive checkout; never delete a live
+server's lock or another task's output. A clean managed stand supplies isolated output.
+
+Run `pnpm --filter web typecheck` for the complete source/test/configuration check.
+`pnpm --filter web typecheck:build` checks the smaller production config independently.
+Both commands remain strict. Excluded files can reenter through imports.
+
+Next additionally filters `.next/dev/types` roots during production typechecking.
+The standalone command retains those roots, and imports can reintroduce them into Next.
+Keep these memberships distinct when diagnosing a development-to-build failure.
+The independent build command stores its incremental state in
+`.amcore/typescript/build.tsbuildinfo`; Next manages its own build cache.
+
+The version-scoped [Next route-cache patch](next-route-cache-patch.md) needs a production
+browser regression. A successful development run cannot prove its cache behavior.
+
 ## The taxonomy
 
 | Layer                 | Tool                                                                     | Boundary it proves                                                                                                                                       | Where                                                                           |
@@ -519,7 +556,8 @@ Do not background a verification command or redirect its output to a file just
 to work around an agent/tool timeout. Those approaches obscure its state, and
 an outer transport timeout can terminate the parent process while the runner's
 cleanup executes. That is **transport interrupted — no verdict**, not a pass or
-failure. Start a fresh observable run instead.
+failure. Confirm that the owning process stopped and managed cleanup finished
+before starting a fresh observable run.
 
 `pnpm test:console-session-e2e` is the reference case: it builds an isolated
 Compose stack, waits for it to become healthy, runs Playwright against the

@@ -6,7 +6,8 @@
     "\\.test\\.ts$",
     "\\.testkit\\.ts$",
     "__tests__",
-    "__mocks__"
+    "__mocks__",
+    "\\.test-support\\.ts$"
   ],
   "jsc": {
     "target": "es2022",

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useLocale } from 'next-intl'
 
 import { usePathname } from '@/i18n/navigation'
 import {
@@ -55,9 +56,10 @@ export function RouteProgressBar({
     controller.getPhase,
     () => 'idle' as const
   )
+  const locale = useLocale()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const lastKeyRef = useRef(toLocationKey(pathname, searchParams.toString()))
+  const lastKeyRef = useRef(JSON.stringify([locale, pathname, searchParams.toString()]))
   // Separate from `lastKeyRef`: `usePathname()` (`@/i18n/navigation`) is
   // locale-*stripped* (`/login`), while `handlePopState` below only has
   // `window.location.pathname`, which is locale-*prefixed* (`/en/login`).
@@ -106,12 +108,12 @@ export function RouteProgressBar({
       window.location.pathname,
       new URLSearchParams(window.location.search).toString()
     )
-    const key = toLocationKey(pathname, searchParams.toString())
+    const key = JSON.stringify([locale, pathname, searchParams.toString()])
     if (key !== lastKeyRef.current) {
       lastKeyRef.current = key
       controller.finish()
     }
-  }, [pathname, searchParams, controller])
+  }, [locale, pathname, searchParams, controller])
 
   if (phase === 'idle' || phase === 'delaying') return null
 

@@ -2,11 +2,10 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
-import { NextIntlClientProvider } from 'next-intl'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { CSPProvider } from '@base-ui/react/csp-provider'
 
-import { getClientMessages } from '@/i18n/client-messages'
+import { RootClientMessages } from '@/i18n/client-message-boundary'
 import { resolveLocaleParam } from '@/i18n/params'
 import { routing } from '@/i18n/routing'
 import { getThemeInitScript } from '@/shared/lib'
@@ -109,9 +108,9 @@ export default async function LocaleLayout({
         <CSPProvider nonce={nonce}>
           {/* Rendered from a Server Component, so locale/formats/timeZone are inherited
               from `i18n/request.ts` — do not pass them by hand. Messages are passed
-              explicitly: route-scoped namespaces stay out of every page's payload
-              (i18n/client-messages.ts). */}
-          <NextIntlClientProvider messages={await getClientMessages()}>
+              explicitly: each section selects only its own namespaces
+              (i18n/client-message-boundary.tsx). */}
+          <RootClientMessages>
             {/* Suspense: RouteProgressBar reads useSearchParams(). See
                 docs/frontend/route-progress.md; disabled entirely (no DOM,
                 listeners, or timers) when ROUTE_PROGRESS_ENABLED is false. */}
@@ -121,7 +120,7 @@ export default async function LocaleLayout({
               </Suspense>
             )}
             <Providers nonce={nonce}>{children}</Providers>
-          </NextIntlClientProvider>
+          </RootClientMessages>
         </CSPProvider>
       </body>
     </html>
