@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('server-only', () => ({}))
+
 vi.mock('next/font/google', () => ({
   IBM_Plex_Sans: () => ({ variable: 'console-heading' }),
   JetBrains_Mono: () => ({ variable: 'console-mono' }),

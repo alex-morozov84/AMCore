@@ -10,6 +10,7 @@ export const SHARED_CONTENT_PATHS = Object.freeze([
     'README.md',
     'docs/README.md',
     'docs/frontend/README.md',
+    'docs/frontend/next-route-cache-patch.md',
     'docs/frontend/architecture-and-conventions.md',
     'docs/operations/local-stands.md',
     'apps/web/messages/en.json',
@@ -37,6 +38,12 @@ function localeFacts(state) {
   if (!state.selected.locale) return []
   const removed = state.locale.base === 'en' ? 'ru' : 'en'
   return [
+    content('locale', 'docs/frontend/next-route-cache-patch.md', 'locale.route-cache-guide'),
+    content(
+      'locale',
+      'docs/frontend/next-route-cache-patch.md',
+      'locale-console.route-cache-guide'
+    ),
     content('locale', 'PROJECT_CONTEXT.md', 'context-locale', { locale: state.locale.base }),
     content('locale', 'apps/web/eslint.config.mjs', 'project-eslint-remove-navigation'),
     content('locale', 'scripts/fixtures/lint/web.json', 'lint-fixtures-single-locale'),

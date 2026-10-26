@@ -365,6 +365,11 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   1. **Never inline user-facing text.** Add the key to `messages/en.json` (the
      source of truth) and to **every** other catalogue. Keys are type-checked;
      a catalogue mismatch fails a test.
+     Select new client namespaces through `ClientMessages` at the owning server
+     composition. Add only namespaces absent from its parent. Raw client providers
+     and `useMessages` belong only in the private boundary. Runtime catalogue imports
+     belong only in `i18n/request.ts`. Paired lint enforces these boundaries.
+     See `docs/frontend/i18n-and-errors.md` for extension steps.
   2. **Use `RouteProgressLink` for internal navigating links and
      `useRouteProgressRouter()` for programmatic navigation.** They wrap the
      locale-aware helpers and keep the top progress bar correct. Import other
@@ -374,7 +379,7 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
      `docs/frontend/route-progress.md`.
   3. **Translate API failures by `errorCode`**, never the backend's `message`
      (English, developer-facing). Use `<ApiErrorAlert>` / `useApiError()`. A new
-     shared error code with no translation fails the build.
+     shared error code with no translation fails the required translation tests.
   4. **Build forms with `useLocalizedForm()`**, never a global Zod locale.
      Any backend link shown to a user (email CTA, notification, OAuth redirect)
      must be built with `localizedFrontendUrl()` from `@amcore/shared`, never

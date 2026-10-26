@@ -4,6 +4,7 @@ import { inviteListQuerySchema, isOrganizationContextId } from '@amcore/shared'
 
 import { OrganizationInvitationsClient } from '@/_pages/organization-invitations'
 import { readOrganizationContext } from '@/entities/organization-context/index.server'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { redirectToLogin } from '@/shared/api/bff/dal'
 import { SessionNotFoundError } from '@/shared/api/bff/errors'
@@ -61,18 +62,20 @@ export async function OrganizationInvitationsMount({
       : { page: 1, search: '', status: 'pending' as const }
   const hrefs = organizationAccessHrefs(placement)
   return (
-    <OrganizationInvitationsClient
-      deniedContent={deniedContent}
-      admission={admission}
-      organizationId={id}
-      initialOrganizationName={initialOrganizationName}
-      query={query}
-      invalidQuery={invalidQuery}
-      listHref={hrefs.listHref}
-      backHref={hrefs.contextHref(id)}
-      membersHref={hrefs.membersHref(id)}
-      invitationsHref={hrefs.invitationsHref(id)}
-      rolesHref={hrefs.rolesHref(id)}
-    />
+    <ClientMessages namespaces={['organizationInvitations', 'organizationNav']}>
+      <OrganizationInvitationsClient
+        deniedContent={deniedContent}
+        admission={admission}
+        organizationId={id}
+        initialOrganizationName={initialOrganizationName}
+        query={query}
+        invalidQuery={invalidQuery}
+        listHref={hrefs.listHref}
+        backHref={hrefs.contextHref(id)}
+        membersHref={hrefs.membersHref(id)}
+        invitationsHref={hrefs.invitationsHref(id)}
+        rolesHref={hrefs.rolesHref(id)}
+      />
+    </ClientMessages>
   )
 }

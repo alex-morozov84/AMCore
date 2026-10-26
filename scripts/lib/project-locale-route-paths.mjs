@@ -75,6 +75,8 @@ export const LOCALE_DELETES = Object.freeze([
   'apps/web/src/i18n/navigation.ts',
   'apps/web/src/i18n/params.ts',
   'apps/web/src/features/locale-switcher',
+  'apps/web/src/shared/ui/locale-selector.tsx',
+  'apps/web/src/shared/ui/locale-selector.stories.tsx',
   // Console-only switcher (widgets/console-shell survives single-locale
   // mode; only this one file inside it needs to go, since it has nothing
   // left to switch between and its navigation call cannot type-check

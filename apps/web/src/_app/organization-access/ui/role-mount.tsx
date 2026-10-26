@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { roleIdSchema } from '@amcore/shared'
 
 import { OrganizationRoleClient } from '@/_pages/organization-role'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import { loadManagedOrganization } from '../model/managed-context.server'
@@ -29,18 +30,20 @@ export async function OrganizationRoleMount({
   if (!loaded.ok) return <PrimaryUnavailableFallback reason="upstream" />
   const hrefs = organizationAccessHrefs(placement)
   return (
-    <OrganizationRoleClient
-      deniedContent={deniedContent}
-      admission={loaded.admission}
-      organizationId={id}
-      roleId={roleId}
-      initialOrganizationName={loaded.organizationName}
-      hrefs={{
-        overview: hrefs.contextHref(id),
-        members: hrefs.membersHref(id),
-        invitations: hrefs.invitationsHref(id),
-        roles: hrefs.rolesHref(id),
-      }}
-    />
+    <ClientMessages namespaces={['organizationRoles', 'organizationNav']}>
+      <OrganizationRoleClient
+        deniedContent={deniedContent}
+        admission={loaded.admission}
+        organizationId={id}
+        roleId={roleId}
+        initialOrganizationName={loaded.organizationName}
+        hrefs={{
+          overview: hrefs.contextHref(id),
+          members: hrefs.membersHref(id),
+          invitations: hrefs.invitationsHref(id),
+          roles: hrefs.rolesHref(id),
+        }}
+      />
+    </ClientMessages>
   )
 }

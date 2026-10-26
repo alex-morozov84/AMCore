@@ -9,7 +9,13 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
-import { inviteRecipient, membershipCount } from './invitation-recipient.helpers'
+import {
+  accountCount,
+  inviteRecipient,
+  membershipCount,
+  refuseInvitationStaging,
+  restoreRedisAccess,
+} from './invitation-recipient.helpers'
 import { resetInvitationRegistrationIpBudget } from './invitation-registration-budget.helpers'
 
 test.beforeEach(() => resetInvitationRegistrationIpBudget())
@@ -144,4 +150,57 @@ for (const locale of SUPPORTED_LOCALES) {
       expect(errors).toEqual([])
     })
   }
+}
+
+for (const locale of SUPPORTED_LOCALES) {
+  test(`recipient ${locale}: account created but session publication refused, notice then explicit sign-in`, async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(180000)
+    const target = activeTarget()
+    const catalogue = JSON.parse(
+      readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
+    )
+    const t = catalogue.invitationRecipient
+    const email = uniqueEmail('invited-publication-refused')
+    const { org, token } = await inviteRecipient(email)
+    await page.goto(
+      localizedFrontendUrl(target.origins.product, locale, `invite/accept?token=${token}`)
+    )
+    await expect(page.getByRole('heading', { name: t.signInTitle })).toBeVisible()
+    await page.getByRole('tab', { name: catalogue.auth.register, exact: true }).click()
+    const registration = page.getByRole('tabpanel', { name: catalogue.auth.register, exact: true })
+    await registration.getByLabel(catalogue.auth.password, { exact: true }).fill(TEST_PASSWORD)
+
+    refuseInvitationStaging()
+    try {
+      await registration.getByRole('button', { name: catalogue.auth.register, exact: true }).click()
+      // The account is committed before the publication refusal; no session may exist yet.
+      await expect.poll(() => accountCount(email)).toBe('1')
+      const notice = page.locator('[data-slot="alert"][role="status"]')
+      await expect(notice).toHaveText(catalogue.errors.REGISTRATION_SIGN_IN_REQUIRED)
+      await expect(notice).toBeFocused()
+      await expect(
+        page.getByRole('tab', { name: catalogue.auth.login, exact: true })
+      ).toHaveAttribute('aria-selected', 'true')
+      await expect(
+        page.getByRole('tab', { name: catalogue.auth.register, exact: true })
+      ).toBeDisabled()
+      expect((await context.cookies()).some((cookie) => cookie.name === 'amcore_session')).toBe(
+        false
+      )
+      expect(membershipCount(email, org.id)).toBe('0')
+      await expectNoAxeViolations(page)
+    } finally {
+      restoreRedisAccess()
+    }
+
+    const login = page.getByRole('tabpanel', { name: catalogue.auth.login, exact: true })
+    await login.getByLabel(catalogue.auth.password, { exact: true }).fill(TEST_PASSWORD)
+    await login.getByRole('button', { name: catalogue.auth.login, exact: true }).click()
+    await expect(page.getByRole('heading', { name: t.verifyTitle })).toBeVisible()
+    expect(accountCount(email)).toBe('1')
+    expect(membershipCount(email, org.id)).toBe('0')
+  })
 }

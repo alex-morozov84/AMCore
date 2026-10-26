@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       schema: registerSchema,
       backendPath: '/auth/register',
       successStatus: 201,
+      registration: true,
     })
   )
 }

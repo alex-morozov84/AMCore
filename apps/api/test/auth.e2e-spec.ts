@@ -10,6 +10,8 @@ import { ServiceUnavailableException } from '../src/common/exceptions'
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
 import { LoginRateLimiterService } from '../src/core/auth/login-rate-limiter.service'
 import { mfaCredential } from '../src/core/auth/mfa/mfa-secrets.js'
+import { SessionService } from '../src/core/auth/session.service'
+import { TokenService } from '../src/core/auth/token.service'
 import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
@@ -328,6 +330,87 @@ describe('Auth (e2e)', () => {
         .post('/auth/register')
         .send({ email: 'badlocale@example.com', password: 'StrongP@ss123', locale: 'de' })
         .expect(400)
+    })
+  })
+
+  describe('POST /auth/register commit boundary', () => {
+    const password = 'StrongP@ss123'
+    const counts = async (emailCanonical: string) => ({
+      users: await prisma.user.count({ where: { emailCanonical } }),
+      sessions: await prisma.session.count(),
+      tokens: await prisma.emailVerificationToken.count(),
+    })
+
+    afterEach(() => jest.restoreAllMocks())
+
+    it('commits the user, one session and one verification token together', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'commit@example.com', password })
+        .expect(201)
+
+      expect(await counts('commit@example.com')).toEqual({ users: 1, sessions: 1, tokens: 1 })
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${response.body.accessToken}`)
+        .expect(200)
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', `refresh_token=${extractRefreshToken(response)}`)
+        .expect(200)
+    })
+
+    it.each([
+      ['session creation', 'sessions'],
+      ['verification token issuance', 'tokens'],
+      ['access token signing', 'signing'],
+    ] as const)('leaves nothing behind when %s fails', async (_label, stage) => {
+      const failure = new Error(`${stage} failed`)
+      if (stage === 'sessions')
+        jest
+          .spyOn(app.get(SessionService), 'createSession')
+          .mockImplementationOnce(() => Promise.reject(failure))
+      else if (stage === 'tokens')
+        jest
+          .spyOn(app.get(TokenManagerService), 'generateEmailVerificationToken')
+          .mockImplementationOnce(() => Promise.reject(failure))
+      else
+        jest.spyOn(app.get(TokenService), 'generateAccessToken').mockImplementationOnce(() => {
+          throw failure
+        })
+      const before = await counts('rollback@example.com')
+
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'rollback@example.com', password })
+        .expect(500)
+
+      expect(await counts('rollback@example.com')).toEqual(before)
+      jest.restoreAllMocks()
+      // The same email is still free: the failed attempt left no partial account behind.
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email: 'rollback@example.com', password })
+        .expect(201)
+    })
+
+    it('creates exactly one account when the same canonical email is submitted concurrently', async () => {
+      const responses = await Promise.all(
+        ['Race@Example.com', 'race@example.com', ' RACE@example.com', 'race@example.com'].map(
+          (email) =>
+            request(app.getHttpServer())
+              .post('/auth/register')
+              .send({ email: email.trim(), password })
+        )
+      )
+
+      const statuses = responses.map((response) => response.status).sort()
+      expect(statuses.filter((status) => status === 201)).toHaveLength(1)
+      for (const response of responses.filter((r) => r.status !== 201)) {
+        expect(response.status).toBe(409)
+        expect(response.body.errorCode).toBe(AuthErrorCode.EMAIL_ALREADY_EXISTS)
+      }
+      expect(await counts('race@example.com')).toEqual({ users: 1, sessions: 1, tokens: 1 })
     })
   })
 

@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { createInvitationOperationId } from '@amcore/shared'
 import { expect } from '@playwright/test'
 
-import { activeTarget, guardedSql } from '../support/managed-target.mjs'
+import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
 import { TEST_PASSWORD, uniqueEmail } from './helpers'
@@ -49,4 +49,38 @@ export function membershipCount(email: string, org: string) {
     `SELECT count(*) FROM core.org_members m JOIN core.users u ON u.id=m."userId" WHERE u."emailCanonical"=:'email' AND m."organizationId"=:'org';`,
     { email, org }
   ).trim()
+}
+
+const STAGED_SESSION_PREFIX = 'web:invitation:staged-session:'
+
+/**
+ * Test-owned fault at the publication boundary: Redis refuses writes to the invitation staging
+ * namespace and nothing else (glob classes allow every key that does not start with the prefix;
+ * reads of the namespace stay allowed). The reservation and the API call succeed, the new session
+ * cannot be staged. Always pair with `restoreRedisAccess` in a `finally`.
+ */
+export function refuseInvitationStaging(): void {
+  const allowed = [...STAGED_SESSION_PREFIX].map(
+    (char, index) => `~${STAGED_SESSION_PREFIX.slice(0, index)}[^${char}]*`
+  )
+  guardedExec(
+    'redis',
+    'redis-cli',
+    'ACL',
+    'SETUSER',
+    'default',
+    'resetkeys',
+    ...allowed,
+    `%R~${STAGED_SESSION_PREFIX}*`
+  )
+}
+
+export function restoreRedisAccess(): void {
+  guardedExec('redis', 'redis-cli', 'ACL', 'SETUSER', 'default', 'resetkeys', '~*')
+}
+
+export function accountCount(email: string): string {
+  return guardedSql(`SELECT count(*) FROM core.users WHERE "emailCanonical"=:'email';`, {
+    email,
+  }).trim()
 }

@@ -19,7 +19,8 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "lint:fix": "node ../../scripts/lint.mjs --scope web --fix && stylelint \"src/**/*.css\" --fix"
+    "lint:fix": "node ../../scripts/lint.mjs --scope web --fix && stylelint \"src/**/*.css\" --fix",
+    "typecheck:build": "tsc --noEmit -p tsconfig.build.json --tsBuildInfoFile .amcore/typescript/build.tsbuildinfo"
   },
   "dependencies": {
     "@amcore/shared": "workspace:^",

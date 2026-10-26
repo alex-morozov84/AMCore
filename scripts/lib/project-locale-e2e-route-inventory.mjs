@@ -86,9 +86,11 @@ export function commentRange(reference) {
 }
 
 export function hasLocaleSwitcherSelection(text) {
-  return (
-    text.includes('name: /language/i') &&
-    (text.includes("selectOption('ru')") ||
-      (text.includes("getByRole('option'") && text.includes("name: 'Русский'")))
+  const control = /name:\s*(?:\/language\/i|['"](?:Language|Язык)['"])/.test(text)
+  const native = /\bselectOption\s*\(/.test(text)
+  const keyboard = /\bpress(?:Sequentially)?\(\s*['"](?:ArrowDown|ArrowUp|Enter|Escape|e)['"]/.test(
+    text
   )
+  const option = text.includes("getByRole('option'") && text.includes("name: 'Русский'")
+  return control && (native || keyboard || option)
 }

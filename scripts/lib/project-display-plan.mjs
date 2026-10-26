@@ -15,6 +15,7 @@ const combinedOrder = [
   'docs/frontend/architecture-and-conventions.md',
   'docs/frontend/brand-theme-and-tokens.md',
   'docs/frontend/testing.md',
+  'docs/frontend/next-route-cache-patch.md',
   'docs/operations/local-stands.md',
   'docs/frontend/README.md',
   'AGENTS.md',
@@ -83,6 +84,7 @@ function insertStorybookProvider(plan, root, storybookSteps) {
 }
 
 function insertConsole(plan, root, singles) {
+  insertProvider(plan, 'console', false, take(singles, 'docs/frontend/next-route-cache-patch.md'))
   const context = singles.get('PROJECT_CONTEXT.md')
   const enabled = context?.semanticFacts[0].params.enabled
   if (enabled) insertProvider(plan, 'console', true, take(singles, 'PROJECT_CONTEXT.md'))

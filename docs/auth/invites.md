@@ -165,7 +165,9 @@ Send `X-Invitation-Continuation` to these endpoints:
 
 Invited registration derives email from current invitation authority. It never
 creates an organization/member or marks email verified. Expiry/reissue before
-its account-creation transaction commits prevents creation. If the account was
+its account-creation transaction commits prevents creation. The user, first
+session, authentication handoff and verification token commit in one transaction;
+the final expiry check runs after all of them. If the account was
 committed but the response was lost, sign in or reset its password; do not replay
 registration blindly. A later reissue can leave an ordinary account without access.
 
@@ -230,6 +232,23 @@ login themselves. Acknowledgment checks the exact current cookie/session and
 attempt; authentication does not accept membership. A lost authentication result
 requires observation/acknowledgment recovery, without automatic credential replay.
 The ready UI synchronizes a known incorrect-password rejection before allowing retry.
+
+If the API confirmed an invited registration but the BFF could not publish the new
+session, `POST register` returns `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`
+and no cookie ([results](../frontend/api-consumption.md#registration-results-in-the-web-application)).
+Do not submit the registration again. The recipient page keeps a notice and reads
+the flow context, which is in exactly one of these states:
+
+- An active flow (current binding) enables invitation sign-in with the chosen
+  password. Membership still needs explicit acceptance.
+- A pending attempt keeps the "Signing in" recovery screen until it settles or its
+  window (about a minute) closes.
+- An expired attempt shows "This invitation session has changed": reopen the original
+  invitation email.
+
+If the context cannot be read, the recovery screen stays with its refresh action.
+
+If Redis refuses the first reservation, the API is not called and nothing is created.
 
 `GET /api/invitation-operations/{operationId}` performs read-only acceptance
 recovery under the current personal session without an active flow. Match the
