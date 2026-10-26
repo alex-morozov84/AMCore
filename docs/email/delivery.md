@@ -203,6 +203,8 @@ Before triggering queued mail, review [uncertainty stops and cooldown](queued-sa
 For an existing policy1 installation, complete the [offline upgrade](queued-upgrade.md) first.
 Arrange authorized worker/notification diagnostics; platform administration
 [requires explicit bootstrap authority](../auth/rbac.md#administering-super_admin).
+If those diagnostics are unavailable, stop verification and contact the authorized
+deployment administrator. Do not infer a missing send or reissue mail to fill the gap.
 Account bootstrap mail also needs the approved budget above.
 
 1. Register a test account in the first supported language. Observe both welcome and verification mail.

@@ -1,15 +1,17 @@
 # Upgrade the welcome-email policy
 
 Use this procedure when upgrading an installation containing policy1 EMAIL work
-to conservative policy2. Fresh installations use2 automatically.
+to conservative policy2. A policy is the versioned rule that permits or refuses
+a job's execution. Fresh installations use2 automatically.
 The command changes only proven untouched jobs. It never sends mail.
 
 ## Prerequisites
 
 Use the approved API image containing `dist/cli/welcome-upgrade.js` and the additive
-migration `20261026000000_conservative_welcome` for recipe/cooldown fields. Retain your complete Compose selection and
+migration `20261026000000_conservative_welcome` for saved retry metadata. Retain your complete Compose selection and
 private environment. Arrange a maintenance window and authorized DB/Redis access.
 This procedure does not authorize a deployment or a business reissue.
+Here, a mutator is any process or administrative action that can change EMAIL work.
 
 1. Stop ingress/account actions, producers, schedulers, control mutators and workers
    that can touch EMAIL. Stop API and worker containers gracefully, allowing60 seconds:

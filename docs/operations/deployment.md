@@ -191,7 +191,10 @@ public `Host` unchanged (the bundled Caddy profile does) and keep the API's `FRO
 Use the same project, environment file and `COMPOSE_FILE` overlays as the running
 installation. Build the new images (or pull approved digests), then run the
 [migrator endpoint preflight](migrator-image.md#endpoint-preflight) against the existing database.
-Stop after any failed command. Apply migrations before recreating application services:
+Stop after any failed command. If this installation contains policy1 EMAIL work,
+follow the [welcome-policy upgrade](../email/queued-upgrade.md) instead of the
+routine sequence below. It keeps old writers stopped through inventory and conversion.
+Otherwise, apply migrations before recreating application services:
 
 ```bash
 git pull
@@ -487,8 +490,9 @@ Complete the [HTTP readiness verification](#web-container-readiness) below.
 
 ### Registry upgrades
 
-With existing healthy infrastructure, set the new digests, preserve all overlays,
-and run the endpoint preflight after pulling:
+Check the [upgrade prerequisites](#upgrades-new-migrations-in-a-release), including
+existing EMAIL work, before using this routine sequence. With healthy infrastructure,
+set the new digests, preserve all overlays and run the endpoint preflight after pulling:
 
 ```bash
 docker compose config --quiet

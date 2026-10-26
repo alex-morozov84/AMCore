@@ -22,7 +22,9 @@ Use [Deployment & migrations](deployment.md) for rollback and other topologies, 
 - SSH limited to your own addresses in the provider firewall. Bots probe public SSH
   continuously; allow key login only.
 - An email provider for production mail; see [Email](../email/README.md).
-- For registry images: the publisher's expected deployment version and three digests.
+- For registry images: the publisher's source repository URL, matching source revision,
+  expected web deployment version and three image digests. Use that repository and
+  revision for `<org>/<repo>` and `<release-tag>` below; a revision may be a commit.
 - Before account actions: approved mail budget, diagnostic authority and the
   [mail prerequisites](../email/delivery.md#verify-delivery-on-a-deployed-stack),
   including tracking, log redaction and queued-mail uncertainty and recovery.

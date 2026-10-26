@@ -295,7 +295,7 @@ recipient substitution, permission repair or grant restoration occurs.
 | Problem                                                       | Recovery                                                                                                                                                   |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Misspelled email                                              | While eligible, deliberately choose the correct recipient; the typo account remains ordinary                                                               |
-| No email                                                      | Check spam, sender/provider configuration and public frontend URL; request a fresh normal link                                                             |
+| No email                                                      | Check spam, sender/provider configuration and public frontend URL; follow [mail recovery rules][mail-recovery] before requesting another link              |
 | Expired/used link                                             | Request a new link; wait for actual verification before granting access                                                                                    |
 | Redis/auth outage                                             | Restore the existing login/recovery prerequisites; do not bypass verification                                                                              |
 | Preparation reply lost                                        | Read installation status first; only an eligible installation permits the same-email repeat                                                                |
@@ -303,6 +303,8 @@ recipient substitution, permission repair or grant restoration occurs.
 | Busy operation                                                | Respect `Retry-After`, then read status; ordinary operators do not stop database writers                                                                   |
 | Selected account deleted before completion                    | While setup is still open and no request has an unknown result, deliberately select another verified user ID and keep the company details for that request |
 | Account, organization or ADMIN grant deleted after completion | Inspect the retained original IDs; exact replay reports changed state and never restores them                                                              |
+
+[mail-recovery]: ../email/delivery.md#verify-delivery-on-a-deployed-stack
 
 The short database lock protects initial check-and-create. It does not permanently
 enforce a one-organization database. A stale replica with creation still enabled
