@@ -142,6 +142,8 @@ export class AuthController {
   @ApiOperation({
     summary:
       'Register under public signup policy; scoped handoff uses the fixed matching invitation email',
+    description:
+      'The user, its first session and its email-verification token are committed in one database transaction: a 2xx means all three exist and a failure leaves none. Emails start after the commit and never undo the signup; the welcome email is queued best-effort without resend, the verification email is sent directly and can be resent. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS. If a 2xx response is lost, sign in or reset the password; do not submit the registration again.',
   })
   @SchemaResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
   async register(

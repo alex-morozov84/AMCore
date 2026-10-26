@@ -95,6 +95,11 @@ keeps server and client rendering consistent. Named formats live in
 2. Throw it from the API with `AppException`.
 3. Add `errors.<CODE>` to **every** catalogue in `apps/web/messages/`.
 
+A code that only the web BFF emits (for example `REGISTRATION_SIGN_IN_REQUIRED`, see
+[registration results](api-consumption.md#registration-results-in-the-web-application))
+lives in the same enum and follows the same steps, except step 2: the BFF builds the
+response instead of the API.
+
 Step 3 is not optional: `src/shared/api/error-messages.test.ts` derives its
 expectations from those enums, so a code without a translation fails the build.
 That guard exists because the original contract rotted exactly this way — the

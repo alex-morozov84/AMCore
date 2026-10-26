@@ -165,7 +165,10 @@ Send `X-Invitation-Continuation` to these endpoints:
 
 Invited registration derives email from current invitation authority. It never
 creates an organization/member or marks email verified. Expiry/reissue before
-its account-creation transaction commits prevents creation. If the account was
+its account-creation transaction commits prevents creation. The user, first
+session, authentication handoff and verification token commit together, and the
+final expiry check runs after all of them, so a link that expires during issuance
+commits nothing. If the account was
 committed but the response was lost, sign in or reset its password; do not replay
 registration blindly. A later reissue can leave an ordinary account without access.
 
@@ -230,6 +233,15 @@ login themselves. Acknowledgment checks the exact current cookie/session and
 attempt; authentication does not accept membership. A lost authentication result
 requires observation/acknowledgment recovery, without automatic credential replay.
 The ready UI synchronizes a known incorrect-password rejection before allowing retry.
+
+If the API confirmed an invited registration but the BFF could not publish the new
+session, `POST register` returns `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`
+and no cookie. The account exists; never submit registration again. The recipient
+page keeps a notice, reads the flow context without replaying credentials and, when
+the binding is current, offers invitation sign-in with the chosen password
+(membership still requires explicit acceptance). A pending, expired or unreadable
+context keeps the existing recovery screen or re-entry guidance. When Redis refuses
+the first reservation instead, the API is never called and nothing is created.
 
 `GET /api/invitation-operations/{operationId}` performs read-only acceptance
 recovery under the current personal session without an active flow. Match the

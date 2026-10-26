@@ -90,6 +90,39 @@ its early-rejection tests, and add a deliberate safe server handler if the
 browser needs the operation. Do not depend on dedicated-route precedence alone
 or add a response scanner that buffers uploads or SSE.
 
+## Registration results in the web application
+
+`POST /api/auth/register` first calls the API, then stores the new session in the
+Redis session vault. Those are two systems, so the browser can see a refusal after
+the account exists. The handler reports only what it can prove:
+
+| What the BFF observed                                                             | Response                                                         | What it proves                                                      |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| API answered exactly `201` with a valid body, and the session was stored          | `201 { user }` and the session cookie                            | The person is signed in                                             |
+| API answered exactly `201` with a valid body, but the session could not be stored | `503` with `errorCode: REGISTRATION_SIGN_IN_REQUIRED`, no cookie | The account exists; sign-in is temporarily unavailable              |
+| API answered `409 EMAIL_ALREADY_EXISTS`                                           | `409` with that code                                             | The email is taken; this does not say who created the account       |
+| No usable answer: network failure, timeout, `5xx`, or `201` with an unusable body | The existing failure response (`503` backend or authentication)  | Unknown: the account may or may not exist. Never say it was created |
+
+`REGISTRATION_SIGN_IN_REQUIRED` is emitted only by the web BFF, never by the API,
+so it is not in the OpenAPI document. A custom registration form must:
+
+1. not repeat the POST after this code (it can only return `409`);
+2. clear the password field, show that the account was created, and link to sign-in;
+3. not write the user into the authenticated cache or navigate as if signed in;
+4. on an unknown result, ask the person to try signing in with the same email and
+   password, without claiming the account exists.
+
+Sign-in can also be unavailable while the vault is full, so the person should try
+again after the service recovers. The same code is returned by
+`POST /api/invitation-flows/{flowId}/register` when the API confirmed the invited
+account but the invitation session could not be published; the recipient page then
+reads the flow context again and offers invitation sign-in
+([invitation recovery](../auth/invites.md#browser-bff-contract)). A browser that
+disconnects before the response cannot be notified: use sign-in or password reset.
+
+See [Redis memory](../operations/capacity.md#redis-memory) for what an operator
+sees, and [registration](../auth/email-auth.md#registration) for the API contract.
+
 ## Invitation adapters
 
 Organization invitation management uses the dedicated personal, session-fenced

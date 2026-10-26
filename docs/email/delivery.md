@@ -27,7 +27,11 @@ Examples:
 
 ## Queued Email
 
-Queued email is only for explicitly queueable, non-secret templates:
+Queued email is only for explicitly queueable, non-secret templates. The registration
+greeting (`welcome`) is queued after the account commits and is best-effort: it is lost
+if the queue refuses the job or the process stops first, a failure never undoes the
+signup, and there is no resend. The verification email is secret-bearing and sent
+directly, so it can be requested again.
 
 ```text
 EmailService.queue()
