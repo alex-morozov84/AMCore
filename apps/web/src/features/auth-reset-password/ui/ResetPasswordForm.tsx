@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import type { AuthActionBase } from '@/shared/api/auth-api'
@@ -32,7 +32,9 @@ interface ResetPasswordFormProps {
    * the page is opened without one — a mistyped/stale link, not a
    * validation failure the form itself can recover from. */
   token?: string
-  onSuccess?: () => void
+  /** Server-rendered headings let the page retain its Server Component boundary. */
+  header?: ReactNode
+  successHeader?: ReactNode
   actionBase?: AuthActionBase
   loginHref?: string
   forgotPasswordHref?: string
@@ -50,7 +52,8 @@ export function ResetPasswordForm({
   actionBase = '/auth',
   loginHref = '/login',
   forgotPasswordHref = '/forgot-password',
-  onSuccess,
+  header,
+  successHeader,
 }: ResetPasswordFormProps) {
   const passwordT = useTranslations('common')
   const t = useTranslations('auth')
@@ -63,8 +66,18 @@ export function ResetPasswordForm({
 
   const { mutate, isPending, error } = useResetPassword(form.setError, actionBase)
 
+  const render = (content: ReactNode) =>
+    header == null ? (
+      content
+    ) : (
+      <div className="space-y-6">
+        {submitted ? successHeader : header}
+        <div className="px-6">{content}</div>
+      </div>
+    )
+
   if (!token) {
-    return (
+    return render(
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">{tErrors('TOKEN_INVALID')}</p>
         <RouteProgressLink href={forgotPasswordHref} className={cn(buttonVariants(), 'w-full')}>
@@ -75,7 +88,7 @@ export function ResetPasswordForm({
   }
 
   if (submitted) {
-    return (
+    return render(
       <div className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{t('resetPasswordSuccess')}</p>
         <RouteProgressLink href={loginHref} className={cn(buttonVariants(), 'w-full')}>
@@ -86,18 +99,10 @@ export function ResetPasswordForm({
   }
 
   const onSubmit = (data: NewPasswordInput) => {
-    mutate(
-      { ...data, token },
-      {
-        onSuccess: () => {
-          setSubmitted(true)
-          onSuccess?.()
-        },
-      }
-    )
+    mutate({ ...data, token }, { onSuccess: () => setSubmitted(true) })
   }
 
-  return (
+  return render(
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
         <ApiErrorAlert error={error} />
