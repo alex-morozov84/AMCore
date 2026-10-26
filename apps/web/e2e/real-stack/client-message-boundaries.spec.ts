@@ -34,7 +34,7 @@ test('sibling navigation sends new section messages without the departed section
     await link.click()
     const response = await incoming
     expect(response.ok()).toBe(true)
-    const boundaries = serializedClientMessages(await response.text())
+    const boundaries = serializedClientMessages((await response.body()).toString('utf8'))
     expect(boundaries.length).toBeGreaterThan(0)
     return Object.assign({}, ...boundaries)
   }
