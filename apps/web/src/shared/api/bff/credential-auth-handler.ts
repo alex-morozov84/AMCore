@@ -34,6 +34,33 @@ export interface CredentialAuthOptions<TInput> {
   registration?: true
 }
 
+/**
+ * Calls the register endpoint and keeps only a confirmed creation. An unconfirmed success
+ * keeps the generic failure (any session cookie is revoked once). `null` means the account
+ * exists but the API set no session cookie, so there is nothing to publish or revoke.
+ */
+async function callRegistration<TInput>(
+  request: Request,
+  options: CredentialAuthOptions<TInput>,
+  body: unknown
+): Promise<UpstreamAuthResult<UserResponse> | null> {
+  const registered = await callUpstreamRegister(options.backendPath, body, request, options.context)
+  if (registered.outcome === 'unknown') {
+    if (registered.refreshToken)
+      await revokeBackendSession(registered.refreshToken, request.headers)
+    throw new Error('Upstream registration did not confirm creation')
+  }
+  if (!registered.refreshToken) {
+    console.error('[bff] registration confirmed without a session cookie')
+    return null
+  }
+  return {
+    user: registered.user,
+    accessToken: registered.accessToken,
+    refreshToken: registered.refreshToken,
+  }
+}
+
 /** Register: the account exists, so report that. Login (and anything else): rethrow as before. */
 function publicationFailure<TInput>(
   request: Request,
@@ -80,39 +107,11 @@ export async function handleCredentialAuth<TInput>(
     })
   }
 
-  let upstream: UpstreamAuthResult<UserResponse>
+  let upstream: UpstreamAuthResult<UserResponse> | null
   try {
-    if (options.registration) {
-      const registered = await callUpstreamRegister(
-        options.backendPath,
-        parsed.data,
-        request,
-        context
-      )
-      if (registered.outcome === 'unknown') {
-        // Not evidence of creation: keep the generic failure, but revoke any session cookie once.
-        if (registered.refreshToken)
-          await revokeBackendSession(registered.refreshToken, request.headers)
-        throw new Error('Upstream registration did not confirm creation')
-      }
-      if (!registered.refreshToken) {
-        // Created, but there is no session this layer could revoke or publish.
-        console.error('[bff] registration confirmed without a session cookie')
-        return registrationSignInRequiredResponse(request)
-      }
-      upstream = {
-        user: registered.user,
-        accessToken: registered.accessToken,
-        refreshToken: registered.refreshToken,
-      }
-    } else {
-      upstream = await callUpstreamAuth<UserResponse>(
-        options.backendPath,
-        parsed.data,
-        request,
-        context
-      )
-    }
+    upstream = options.registration
+      ? await callRegistration(request, options, parsed.data)
+      : await callUpstreamAuth<UserResponse>(options.backendPath, parsed.data, request, context)
   } catch (error) {
     if (error instanceof UpstreamAuthError) {
       return NextResponse.json(error.body as object, { status: error.status })
@@ -124,6 +123,9 @@ export async function handleCredentialAuth<TInput>(
       })
     throw error
   }
+
+  // Created, but there is no session this layer could revoke or publish.
+  if (!upstream) return registrationSignInRequiredResponse(request)
 
   let minted
   try {
