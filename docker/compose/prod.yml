@@ -2,11 +2,10 @@
 # "Production rollout via registry (image-pull path)"). Apply on top of the
 # base file, never in place of it:
 #
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml pull
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml run --rm migrate
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps worker
-#   docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --no-deps api web
-#
+# Use the installation's saved complete COMPOSE_FILE and private environment file.
+# Do not replace them with a shortened -f selection: TLS and routing may be lost.
+# Canonical pull, endpoint preflight and ordered startup/upgrade commands:
+# docs/operations/deployment.md -> "Production rollout via registry (image-pull path)".
 # The worker is recreated first: the queued-job envelope is a strict contract, so a worker
 # must read every job the new API can write (docs/backend/background-work.md).
 #

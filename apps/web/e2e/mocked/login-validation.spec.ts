@@ -2,6 +2,7 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
 import { test } from '../shared/auth-test'
+import { expectNoAxeViolations } from '../shared/axe'
 
 const passwordHints = {
   en: 'Use at least 8 characters, including one uppercase Latin letter (A–Z) and one digit (0–9).',
@@ -127,12 +128,29 @@ test('valid reset submission reaches the BFF and replaces the form on success', 
     return route.fulfill({ status: 204, body: '' })
   })
 
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/en/reset-password?token=${'a'.repeat(64)}`)
+  const oldHeading = await page.getByRole('heading', { level: 1 }).innerText()
+  const oldSubtitle = await page.locator('[data-slot="card-description"]').innerText()
   const input = await expectPasswordHint(page, DEFAULT_LOCALE)
   await input.fill('CorrectPassword1')
   await page.getByRole('button', { name: /reset password/i }).click()
 
   await expect(page.getByText(/your password has been reset/i)).toBeVisible()
   await expect(page.getByText(passwordHints[DEFAULT_LOCALE], { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    /^(Password changed|Пароль изменён)$/
+  )
+  await expect(page.getByRole('heading', { name: oldHeading, exact: true })).toHaveCount(0)
+  await expect(page.getByText(oldSubtitle, { exact: true })).toHaveCount(0)
+  await expect(page.locator('input[type="password"]')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /^(Sign in|Войти)$/ })).toHaveAttribute(
+    'href',
+    /\/login$/
+  )
+  await expectNoAxeViolations(page)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  )
   expect(resetRequestSeen).toBe(true)
 })

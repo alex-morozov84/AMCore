@@ -1998,6 +1998,7 @@
     "newPassword": "New password",
     "resetPasswordSubmit": "Reset password",
     "resettingPassword": "Resetting…",
+    "resetPasswordSuccessTitle": "Password changed",
     "resetPasswordSuccess": "Your password has been reset. Please sign in with your new password.",
     "requestNewLink": "Request a new link",
     "verifyEmailTitle": "Email verification",

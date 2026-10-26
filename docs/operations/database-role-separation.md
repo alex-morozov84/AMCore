@@ -197,6 +197,10 @@ MIGRATION_DATABASE_URL="postgresql://amcore_migrator:<migrator-password>@<host>:
 DATABASE_URL="postgresql://amcore_runtime:<runtime-password>@<host>:5432/amcore?sslmode=require"
 ```
 
+These examples identify the roles; `sslmode=require` alone does not establish
+certificate verification. For the reference production setup, use the distinct
+[application/seed and migration CLI TLS settings](single-host-compose.md#3-complete-env).
+
 Per [Production deploy profile](production-deploy-profile.md)'s secrets
 checklist, the migrator role's URL is a `production` GitHub Environment
 secret only — never `staging`, never a repo secret.

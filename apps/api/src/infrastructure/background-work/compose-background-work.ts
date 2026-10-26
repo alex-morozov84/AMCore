@@ -20,6 +20,7 @@ import { ProviderEvidenceStore } from './provider-evidence.store.js'
 import { MANAGED_PRODUCERS, validateWorkRegistrations, WORK_REGISTRATIONS } from './registration.js'
 import { MANAGED_WORKERS, type ManagedWorkerBinding, WorkCoordinator } from './work-coordinator.js'
 import type { WorkDefinition, WorkRegistration } from './work-definition.js'
+import { usesProviderEvidence } from './work-definition.js'
 import { WorkExecutionService } from './work-execution.service.js'
 import { WorkReadiness } from './work-readiness.js'
 
@@ -85,7 +86,7 @@ async function configure(
     definition.queue ? [definition] : []
   )
   const evidence = queueDefinitions.some((definition) =>
-    Object.values(definition.jobs).some((job) => job.replay.kind === 'provider-window')
+    Object.values(definition.jobs).some((job) => usesProviderEvidence(job.replay.kind))
   )
     ? [ProviderEvidenceStore]
     : []

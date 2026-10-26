@@ -20,9 +20,8 @@ export interface SendEmailParams {
   from?: string
   replyTo?: string
   /**
-   * Idempotency key forwarded to the provider (EQS-03). Set by the email
-   * processor to a value derived from the BullMQ job id so a retry after a
-   * post-accept network blip does not double-send. Ignored by the mock provider.
+   * Optional transport hint, not a universal duplicate-prevention guarantee.
+   * Only an explicitly reviewed adapter/recipe can establish safe replay.
    */
   idempotencyKey?: string
   /**

@@ -814,6 +814,7 @@ describe('OpenAPI success surface (e2e)', () => {
     }
     const job = resolve(response.content?.['application/json']?.schema)
     const properties = job.properties as Record<string, unknown>
+    expect(resolve(properties.replay).enum).toContain('conservative')
     const failure = resolve(properties.failure)
     expect(Object.keys(failure.properties as object).sort()).toEqual(['code', 'nextStep', 'title'])
     expect(failure.required).toEqual(expect.arrayContaining(['code', 'title']))
