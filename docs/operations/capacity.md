@@ -65,9 +65,17 @@ reference run, Redis was filled to its limit on purpose:
   API readiness check reported `503`. No service crashed or restarted.
 - Two welcome emails queued before the limit stayed queued and were sent after
   memory was freed. Everything recovered without restarts.
-- Known limitation: a registration refused with `503` can already have created the
-  account, without its welcome email. A retry then reports that the email is taken.
-  The user can sign in with the password they chose.
+- Registration under this pressure can end in the created-account notice
+  (`REGISTRATION_SIGN_IN_REQUIRED`: the API confirmed the account but the session could not
+  be stored) or in an unavailable or uncertain result (`5xx`, `503`, a lost connection).
+  Known refusals (invalid fields, closed signup, rate limit, email taken) keep their own
+  messages. After the notice or an uncertain result, wait until Redis accepts writes, then
+  sign in with the chosen password or reset it. A failed sign-in does not show that the
+  account is absent, and sign-in also fails while Redis refuses writes; see
+  [registration results](../frontend/api-consumption.md#registration-results-in-the-web-application).
+- The welcome email is queued in Redis and is best-effort: with Redis full the queue refuses it,
+  so it is lost, and it has no resend. The verification email is sent directly and can be
+  requested again; see [queued email](../email/delivery.md#queued-email).
 
 ## Container memory limits
 

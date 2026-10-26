@@ -23,30 +23,31 @@ import type { ValidationError } from '../api/types'
  * schema catches those first; the server path is the backstop.
  */
 export function useFieldErrorTranslator() {
-  const t = useTranslations()
+  const t = useTranslations('validation')
+  const errors = useTranslations('errors')
 
   return useCallback(
     (error: ValidationError): string => {
       if (error.errorCode) {
-        const key = `errors.${error.errorCode}` as Parameters<typeof t.has>[0]
-        if (t.has(key)) return t(key)
+        const key = error.errorCode as Parameters<typeof errors.has>[0]
+        if (errors.has(key)) return errors(key)
       }
 
       switch (error.code) {
         case 'invalid_type':
-          return t('validation.required')
+          return t('required')
         case 'invalid_format':
-          return t('validation.pattern')
+          return t('pattern')
         case 'too_small':
-          return t('validation.invalid')
+          return t('invalid')
         case 'too_big':
-          return t('validation.invalid')
+          return t('invalid')
         case 'invalid_value':
-          return t('validation.invalidValue')
+          return t('invalidValue')
         default:
-          return t('validation.invalid')
+          return t('invalid')
       }
     },
-    [t]
+    [t, errors]
   )
 }

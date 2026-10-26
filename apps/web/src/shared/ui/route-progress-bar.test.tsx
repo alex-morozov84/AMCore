@@ -5,6 +5,9 @@ import { routeProgressController } from '@/shared/lib/route-progress/route-progr
 
 import { RouteProgressBar } from './route-progress-bar'
 
+const locale = vi.hoisted(() => ({ value: 'en' }))
+vi.mock('next-intl', () => ({ useLocale: () => locale.value }))
+
 const pathname = vi.fn(() => '/en')
 vi.mock('@/i18n/navigation', () => ({
   usePathname: () => pathname(),
@@ -29,6 +32,7 @@ function advance(ms: number) {
 }
 
 beforeEach(() => {
+  locale.value = 'en'
   vi.useFakeTimers()
   window.history.pushState({}, '', '/en')
   pathname.mockReturnValue('/en')
@@ -108,6 +112,27 @@ describe('RouteProgressBar', () => {
 
     advance(200)
     expect(phaseNode()).toBeNull()
+  })
+
+  it('finishes a locale-only commit without waiting for the safety timeout', () => {
+    pathname.mockReturnValue('/login')
+    window.history.replaceState({}, '', '/en/login?tag=a&tag=b')
+    searchParams.mockReturnValue(new URLSearchParams('tag=a&tag=b'))
+    const { rerender } = render(<RouteProgressBar />)
+    routeProgressController.start()
+    advance(120)
+    expect(routeProgressController.getPhase()).toBe('visible')
+
+    locale.value = 'ru'
+    window.history.replaceState({}, '', '/ru/login?tag=a&tag=b')
+    rerender(<RouteProgressBar />)
+    expect(routeProgressController.getPhase()).toBe('completing')
+    advance(200)
+    expect(routeProgressController.getPhase()).toBe('idle')
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    advance(120)
+    expect(routeProgressController.getPhase()).toBe('idle')
   })
 
   it('removes its listeners and disposes the controller on unmount', () => {

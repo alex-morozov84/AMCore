@@ -139,7 +139,7 @@ export function RecipientClient({
       <RecipientStatus
         state="authenticating"
         busy={auth.busy}
-        error={auth.error}
+        error={auth.created ? auth.createdFailure : auth.error}
         onRefresh={() => {
           void auth.recover()
         }}
@@ -151,7 +151,7 @@ export function RecipientClient({
       <RecipientStatus
         state="completing_signin"
         busy={auth.busy}
-        error={auth.error}
+        error={auth.created ? auth.createdFailure : auth.error}
         onConfirm={() => {
           void auth.recover()
         }}
@@ -209,6 +209,7 @@ export function RecipientClient({
           email={data.email}
           busy={actionBusy}
           error={actionError ?? auth.error}
+          created={auth.created}
           {...auth.adapters}
           oauth={{
             providers,

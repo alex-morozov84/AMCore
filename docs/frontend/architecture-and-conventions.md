@@ -333,9 +333,8 @@ Locale resolution order: URL prefix → the signed-in user's stored
 `User.locale` (applied at the post-login redirect) → the `NEXT_LOCALE` cookie →
 `Accept-Language` → `DEFAULT_LOCALE`. An explicit URL prefix always wins for
 the request it is on, so following a `/ru/...` link is never overridden
-mid-session. The language switcher (in the shell header) writes both the cookie and — when signed
-in — `PATCH /auth/me`, so the choice follows the user to other devices and to
-their email.
+mid-session. For the language control and separate product/authentication/Console
+preference policies, see [Language selection](./i18n-and-errors.md#language-selection).
 
 Message catalogues live in `apps/web/messages/`. **`en.json` is the source of
 truth**; every other catalogue must have exactly the same keys, which a test
@@ -363,7 +362,7 @@ through one translation path.
 **Adding a backend error code** — add it to the enum in `@amcore/shared`, then
 add a message under `errors.<CODE>` in _every_ catalogue.
 `src/shared/api/error-messages.test.ts` derives its expectations from the shared
-enums, so a code with no translation fails the build rather than silently
+enums, so a code with no translation fails the required tests rather than silently
 degrading to the generic message. It also fails on an orphaned message, which
 catches a typo or a code the backend has since removed.
 
@@ -404,12 +403,13 @@ locale):
 - browser-only APIs;
 - a Zustand store or a TanStack Query hook.
 
-`app/providers.tsx` is the reference client boundary: everything above it
-(`app/layout.tsx`) stays a Server Component (it can `await getLocale()` /
-`getMessages()` directly), and the client-only providers (query client, PWA)
-are isolated below that one boundary rather than marking the whole tree
-client-side. There is no separate client-side auth store — see "State
-model" below.
+`src/app/[locale]/layout.tsx` stays a Server Component. It mounts
+`RootClientMessages` for the client core catalogue. Sections add their explicit
+namespaces through `ClientMessages`; see
+[Browser messages](./i18n-and-errors.md#which-messages-reach-the-browser).
+`src/app/[locale]/providers.tsx` owns client-only providers such as Query and PWA.
+Do not mark the root layout as client code. Server translation reads do not
+require moving the complete catalogue into client props.
 
 ## State model
 
@@ -430,29 +430,16 @@ The optional Console's User Detail page uses this split for its Sessions card
 (`features/console-user-sessions/model/use-user-sessions.ts`); its server-side
 fetches follow ADR-079's primary/secondary graceful-degradation contract.
 
-Don't duplicate server state into a Zustand store "for convenience" — that's
-how the two fall out of sync. If a value needs to survive a page navigation
-and isn't server data, it's a Zustand candidate; if it comes from the API,
-it's a query. `shared/store/stores/ui.ts` used to hold the dashboard
-sidebar's `sidebarOpen`/`toggleSidebar` — removed in Track 9 once shadcn's
-`Sidebar` (`shared/ui/sidebar.tsx`) took over that state through its own
-`SidebarProvider`/`useSidebar()`, so nothing duplicated it. Zustand remains
-the pattern for local client state that genuinely needs to survive a
-navigation; add a store under `shared/store/stores/` the next time one is
-needed, following `ThemeProvider`'s context/provider shape (though that one
-is `useSyncExternalStore`-based, not Zustand, since it syncs an external
-`localStorage`/`matchMedia` source rather than owning in-memory state).
-The `zustand` dependency is **deliberately kept** with no live store: it is
-the documented answer for this row, and a fork adding its first store
-should not have to re-pick a library. Remove it only if that decision is
-revisited.
-The current user used to live in a parallel Zustand
-`useAuthStore`, populated by a mount-time effect — a hand-rolled duplicate of
-what `useCurrentUser()` already did declaratively. Removed once nothing
-else needed the store:
-`useCurrentUser()`/`userKeys.me()` is the one source now, and
-login/register/logout mutate it directly via `queryClient.setQueryData`/
-`queryClient.clear()` rather than an imperative store action.
+Keep server data in its Query cache. Use Zustand only for local client state that
+needs to survive navigation; add such stores under `shared/store/stores/`.
+No Zustand store is currently required. The sidebar owns its state through
+`SidebarProvider`/`useSidebar()` from `shared/ui/sidebar.tsx`.
+Theme uses `useSyncExternalStore` because it synchronizes external
+`localStorage`/`matchMedia` state.
+
+`useCurrentUser()`/`userKeys.me()` is the client source for the current user.
+Login/register/logout update it through `queryClient.setQueryData` or
+`queryClient.clear()`. Do not add a parallel authentication store.
 
 ### Search
 
@@ -515,21 +502,9 @@ issuance still needs deliberate server consumption; see
 Client Components: same-origin relative paths (`fetch('/api' + path)`), no
 manual `Authorization` header, no manual `credentials` option (`fetch`
 already defaults to `credentials: 'same-origin'`). `ApiRequestError`/
-`ApiNetworkError` replace what used to be `AxiosError` detection in
-`shared/api/errors.ts` — same public function signatures
-(`isApiError`/`getValidationErrors`/etc.), so `ApiErrorAlert`/
-`useFormMutation` never needed to change.
-
-**Historical note, resolved:** earlier revisions of this guide flagged
-`shared/api/client.ts` as a known gap — a direct cross-origin axios client
-against `NEXT_PUBLIC_API_URL`, predating ADR-068. It's deleted; `axios` is
-no longer a dependency of `apps/web` at all. A stale `next.config.ts`
-`rewrites()` block that once forwarded `/api/:path*` straight to `apps/api`
-(missing the `/api/v1` prefix Route Handlers add, and silently shadowing
-the `[...path]` catch-all for any path that isn't one of the few static
-routes — Next checks array-form `rewrites()` _before_ dynamic routes) was
-removed in the same slice; confirmed live via a `GET /api/auth/me` that had
-been quietly 404ing through the stale rewrite.
+`ApiNetworkError` identify application and transport failures in
+`shared/api/errors.ts`. Use its public helpers, such as `isApiError` and
+`getValidationErrors`, through `ApiErrorAlert` and `useFormMutation`.
 
 ## The recipe — adding a route
 
@@ -563,7 +538,7 @@ been quietly 404ing through the stale rewrite.
 
 A downstream product forks `apps/web` **in place**: same repository layout,
 same layer contract described in this guide. Branding, theme, and design
-tokens (Track 2) replace assets, copy, and tokens — they do not change this
+tokens replace assets, copy, and tokens — they do not change this
 architectural structure.
 
 ## See also
@@ -581,10 +556,8 @@ architectural structure.
 - [API consumption](./api-consumption.md) — the hooks that consume media,
   notifications, and AI through the BFF Route Handler layer this page
   describes.
-- [Testing](./testing.md) — the frontend test taxonomy; in particular, why
-  `async` Server Components and `requireSession()`-gated pages need the
-  real-stack E2E lane rather than a Vitest unit test (Vitest cannot test
-  `async` Server Components at all — Next's own bundled docs say so).
+- [Testing](./testing.md) — test-layer selection, async Server Component limits,
+  the narrow resolved-output unit-test case and real auth/BFF coverage.
 - [Storybook](./storybook.md) — the component workshop and its own
   accessibility gate, a fifth layer of the testing pyramid above.
 - [Backend architecture & conventions](../backend/architecture-and-conventions.md) —

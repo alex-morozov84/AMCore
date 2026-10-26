@@ -65,6 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Welcome-email delivery stops automatic recovery after uncertain provider results, including current Resend429 responses. Conservative policy2 removes provider-clock qualification and adds an offline upgrade procedure. Direct-secret and notification recovery remain separate.
 
+- Client translation payloads contain explicitly selected root, shell and section
+  namespaces. Production builds check application source and generated route types;
+  separate full typechecks continue to cover tests and authoring configuration.
+
 - Installations use pnpm 12.15, including its registry package-name validation.
   Updated lint parents select Handlebars 4.7.10; email tests use Happy DOM 21
   with CSS and iframe loading disabled by default. API parsing uses the ESM
@@ -125,6 +129,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from application/seed PostgreSQL URLs and preserves the private override during upgrades.
 - Compose forwards database, authentication, media and AI runtime settings from
   the environment to backend roles while retaining their defaults and secret boundaries.
+
+- When Redis cannot store the browser session after the API confirmed a registration, the web
+  application answers `503` with `REGISTRATION_SIGN_IN_REQUIRED` and the page says to sign in
+  later with the same email and password. The API writes the user, first session and
+  verification token in one transaction (ordinary and invited signup); only a canonical-email
+  conflict answers `EMAIL_ALREADY_EXISTS`. Unknown results remain possible (lost responses,
+  errors after the commit). The welcome email stays best-effort without resend. See Capacity,
+  "Redis memory".
+
+- Returning to an initial route with a URL fragment preserves the destination
+  fragment through a temporary exact-version Next.js16.4.2 cache patch.
+  See `docs/frontend/next-route-cache-patch.md` for its scope and removal procedure.
 
 - Password login/step-up preserve aggregate IP failure debt on success and record
   parallel failures atomically. Verified visitor IP selects their budget when

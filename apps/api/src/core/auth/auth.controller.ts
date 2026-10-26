@@ -142,6 +142,8 @@ export class AuthController {
   @ApiOperation({
     summary:
       'Register under public signup policy; scoped handoff uses the fixed matching invitation email',
+    description:
+      'The user, its first session and its email-verification token are created in one database transaction; if it fails, its writes roll back. After the commit the response can still be lost: sign in or reset the password instead of submitting again. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS. The welcome email is queued best-effort without resend; the verification email is sent directly and can be resent.',
   })
   @SchemaResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
   async register(

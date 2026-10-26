@@ -183,3 +183,105 @@ describe('dedicated invited credential commands', () => {
     expect(publishInvitedCredentials).not.toHaveBeenCalled()
   })
 })
+
+describe('invited registration — confirmed creation', () => {
+  const CREATED = 'REGISTRATION_SIGN_IN_REQUIRED'
+  const flowId = (current: ReturnType<typeof fixture>) => current.snapshot.flow.binding.flowId
+  const never = () => new Promise<never>(() => undefined)
+
+  it('reports a created account when publication fails after the API confirmed it', async () => {
+    const current = fixture()
+    prepare(current)
+    vi.mocked(publishInvitedCredentials).mockRejectedValue(new Error('vault unavailable'))
+    const response = await invitationCredentialHandler(
+      current.request('register'),
+      flowId(current),
+      'register',
+      deps
+    )
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(response.headers.get('retry-after')).toBeNull()
+    await expect(response.json()).resolves.toMatchObject({ errorCode: CREATED })
+    expect(recoverFailedInvitationAuth).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps login failures on their existing mapping', async () => {
+    const current = fixture()
+    prepare(current)
+    vi.mocked(publishInvitedCredentials).mockRejectedValue(new Error('vault unavailable'))
+    const response = await invitationCredentialHandler(
+      current.request('login'),
+      flowId(current),
+      'login',
+      deps
+    )
+    expect((await response.json()).errorCode).not.toBe(CREATED)
+  })
+
+  it('does not claim creation when the API gave no confirmed answer', async () => {
+    const current = fixture()
+    prepare(current)
+    vi.mocked(invitationBackend).mockRejectedValue(new InvitationBackendError(503, false))
+    const response = await invitationCredentialHandler(
+      current.request('register'),
+      flowId(current),
+      'register',
+      deps
+    )
+    expect(response.status).toBe(503)
+    expect((await response.json()).errorCode).not.toBe(CREATED)
+    expect(publishInvitedCredentials).not.toHaveBeenCalled()
+  })
+
+  it('classifies an outer abort that wins while publication and cleanup are still pending', async () => {
+    const current = fixture()
+    prepare(current)
+    vi.mocked(publishInvitedCredentials).mockImplementation(never)
+    vi.mocked(recoverFailedInvitationAuth).mockImplementation(never)
+    const controller = new AbortController()
+    const request = new Request(current.request('register'), { signal: controller.signal })
+    const pending = invitationCredentialHandler(request, flowId(current), 'register', deps)
+    await vi.waitFor(() => expect(publishInvitedCredentials).toHaveBeenCalled())
+    controller.abort()
+    const response = await pending
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    await expect(response.json()).resolves.toMatchObject({ errorCode: CREATED })
+  })
+
+  it('does not claim creation when the abort wins before the API evidence', async () => {
+    const current = fixture()
+    prepare(current)
+    vi.mocked(invitationBackend).mockImplementation(never)
+    const controller = new AbortController()
+    const request = new Request(current.request('register'), { signal: controller.signal })
+    const pending = invitationCredentialHandler(request, flowId(current), 'register', deps)
+    await vi.waitFor(() => expect(invitationBackend).toHaveBeenCalled())
+    controller.abort()
+    const response = await pending
+    expect((await response.json()).errorCode).not.toBe(CREATED)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('does not revise an unknown response when the API result arrives late', async () => {
+    const current = fixture()
+    prepare(current)
+    let resolveLate!: (value: Awaited<ReturnType<typeof invitationBackend>>) => void
+    vi.mocked(invitationBackend).mockImplementation(
+      () => new Promise((resolve) => (resolveLate = resolve))
+    )
+    vi.mocked(publishInvitedCredentials).mockImplementation(never)
+    const controller = new AbortController()
+    const request = new Request(current.request('register'), { signal: controller.signal })
+    const pending = invitationCredentialHandler(request, flowId(current), 'register', deps)
+    await vi.waitFor(() => expect(invitationBackend).toHaveBeenCalled())
+    controller.abort()
+    const response = await pending
+    const body = await response.json()
+    resolveLate({ data: { user: current.user, accessToken: '<late>' }, refreshToken: '<late>' })
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(body.errorCode).not.toBe(CREATED)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+})

@@ -70,7 +70,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // Support mail adds its closed feature root and route/adapter files.
       // Account security adds a two-file app root, two pages, two BFF route/test files,
       // one handler and one guide: eight files.
-      expected: 557,
+      expected: 558,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

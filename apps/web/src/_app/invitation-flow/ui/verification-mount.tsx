@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { invitationFlowIdSchema } from '@amcore/shared'
 
+import { ClientMessages } from '@/i18n/client-message-boundary'
 import { invitationContextDeps } from '@/shared/api/bff/invitation-context-deps'
 import { invitationRenderRequest } from '@/shared/api/bff/invitation-render-request'
 import { invitationRequestAuthority } from '@/shared/api/bff/invitation-request-authority'
@@ -77,16 +78,18 @@ export function InvitationVerificationMount({
   admin?: boolean
 }) {
   return (
-    <InvitationVerificationClient
-      token={token}
-      admin={admin}
-      selectorId={selectorId}
-      sessionBinding={null}
-      successContent={
-        <SectionErrorBoundary>
-          <AdmittedVerificationReturn selectorId={selectorId} admin={admin} />
-        </SectionErrorBoundary>
-      }
-    />
+    <ClientMessages namespaces={['invitationRecipient']}>
+      <InvitationVerificationClient
+        token={token}
+        admin={admin}
+        selectorId={selectorId}
+        sessionBinding={null}
+        successContent={
+          <SectionErrorBoundary>
+            <AdmittedVerificationReturn selectorId={selectorId} admin={admin} />
+          </SectionErrorBoundary>
+        }
+      />
+    </ClientMessages>
   )
 }

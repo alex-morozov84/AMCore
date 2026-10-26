@@ -100,12 +100,21 @@ describe('Storybook structural content', () => {
     const target = path.join(root, pathname)
     const original = readFileSync(target, 'utf8')
     const operation = fact(pathname, 'storybook.docs-testing')
-    writeFileSync(target, original.replace("`apps/web`'s test surface (Track 7, **ADR-069**;", ''))
+    writeFileSync(
+      target,
+      original.replace(
+        'Choose the test layer that proves the changed behavior: unit/component,',
+        ''
+      )
+    )
     assert.throws(
       () => materializeProjectContentPath(root, pathname, [operation]),
       /start .* expected 1 found 0; end .* expected 1 found 1/
     )
-    writeFileSync(target, `${original}\n\`apps/web\`'s test surface (Track 7, **ADR-069**;\n`)
+    writeFileSync(
+      target,
+      `${original}\nChoose the test layer that proves the changed behavior: unit/component,\n`
+    )
     assert.throws(
       () => materializeProjectContentPath(root, pathname, [operation]),
       /start .* expected 1 found 2; end .* expected 1 found 1/

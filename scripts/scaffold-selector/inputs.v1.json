@@ -103,6 +103,7 @@
           "docs/frontend/architecture-and-conventions.md",
           "docs/frontend/brand-theme-and-tokens.md",
           "docs/frontend/bundle-budget.md",
+          "docs/frontend/next-route-cache-patch.md",
           "docs/frontend/route-progress.md",
           "docs/frontend/server-rendered-resilience.md",
           "docs/frontend/shared-ui-and-shadcn.md",

@@ -1,3 +1,4 @@
+import { LOCALE_ONLY_E2E_PATHS } from './project-locale-e2e-route-surfaces.mjs'
 import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
 
 const one = (path, extra = {}) => ({ path, kind: 'file', cardinality: 'one', ...extra })
@@ -14,6 +15,7 @@ const sharedModules = [
   'apps/web/messages/en.json',
   'apps/web/messages/ru.json',
   'apps/web/src/i18n/request.ts',
+  'apps/web/src/shared/ui/locale-selector.tsx',
   'apps/web/src/proxy.ts',
   'apps/web/src/i18n/routing.ts',
   'apps/web/src/i18n/navigation.ts',
@@ -60,8 +62,7 @@ const localeOnlyVerification = [
   'apps/web/src/features/console-user-sessions/model/use-user-sessions.locale.test.tsx',
   'apps/web/src/_pages/console/BackgroundWorkPage/QueueCatalogue.locale.test.tsx',
 
-  'apps/web/e2e/mocked/locale-redirect.spec.ts',
-  'apps/web/e2e/real-stack/locale-persistence.spec.ts',
+  ...LOCALE_ONLY_E2E_PATHS,
 ].map((path) => one(path, { disposition: 'delete' }))
 
 const independentConsumers = [
@@ -83,6 +84,7 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one('apps/web/src/shared/ui/locale-selector.stories.tsx', { disposition: 'delete' }),
     one('apps/web/.storybook/preview.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx', {
       disposition: 'rewrite',
@@ -178,4 +180,5 @@ export const localeSurfaceRoots = [
   'apps/web/src',
   'packages/shared/src',
   'PROJECT_CONTEXT.md',
+  'docs/frontend/next-route-cache-patch.md',
 ]

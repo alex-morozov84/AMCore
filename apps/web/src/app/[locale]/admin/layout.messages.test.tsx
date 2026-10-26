@@ -1,20 +1,14 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
-import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
-const catalogue = vi.hoisted(() => ({
-  common: { close: 'Close' },
-  console: { nav: { overview: 'Overview' } },
-}))
 vi.mock('server-only', () => ({}))
 vi.mock('next/font/google', () => ({
   IBM_Plex_Sans: () => ({ variable: 'console-heading' }),
   JetBrains_Mono: () => ({ variable: 'console-mono' }),
 }))
 vi.mock('@/shared/lib/console-host-guard', () => ({ hasCanonicalConsoleHost: async () => true }))
-vi.mock('next-intl/server', () => ({ getMessages: async () => catalogue }))
 
-import { getClientMessages } from '@/i18n/client-messages'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 
 import AdminLayout from './layout'
 
@@ -26,10 +20,11 @@ function findElement(node: ReactNode, type: unknown): ReactElement | undefined {
 }
 
 describe('Console messages', () => {
-  it('stay out of the root provider and reach Console client components', async () => {
-    expect(await getClientMessages()).toEqual({ common: catalogue.common })
-
-    const provider = findElement(await AdminLayout({ children: null }), NextIntlClientProvider)
-    expect((provider?.props as { messages?: unknown }).messages).toBe(catalogue)
+  it('selects Console and its shared session consumers without the full catalogue', async () => {
+    const provider = findElement(await AdminLayout({ children: null }), ClientMessages)
+    expect((provider?.props as { namespaces?: unknown }).namespaces).toEqual([
+      'console',
+      'sessions',
+    ])
   })
 })

@@ -46,16 +46,37 @@ import {
   lockInvitationUser,
 } from '../invitations/invitation-locks.js'
 import { NotificationsService } from '../notifications/notifications.service.js'
+import { isCanonicalEmailConflict } from '../organizations/establishment-error.js'
 
 import { AuthMailLimiter } from './auth-mail-limiter.service.js'
 import { lockAuthMailTokens } from './auth-mail-token-lock.js'
 import { avatarUrlOf } from './avatar-url.js'
 import { EmailIdentityService } from './email-identity.service.js'
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
+import { prepareRegistrationMail, type RegistrationMail } from './registration-mail.js'
 import { SessionService } from './session.service.js'
 import { TokenService } from './token.service.js'
 import { TokenManagerService } from './token-manager.service.js'
 import { UserCacheService } from './user-cache.service.js'
+
+/** Only the canonical-email unique index means "already registered"; other violations stay errors. */
+function rethrowEmailConflict(error: unknown): never {
+  if (isCanonicalEmailConflict(error))
+    throw new AppException(
+      'Email already exists',
+      HttpStatus.CONFLICT,
+      AuthErrorCode.EMAIL_ALREADY_EXISTS
+    )
+  throw error
+}
+
+/** What a registration transaction returns: everything the response and the emails need. */
+interface CommittedRegistration {
+  user: User
+  accessToken: string
+  refreshToken: string
+  mail: RegistrationMail
+}
 
 export interface AuthResult {
   user: UserResponse
@@ -142,35 +163,68 @@ export class AuthService {
     // must never be overridden by the header (MDN Accept-Language guidance).
     const locale = input.locale ?? requestInfo.acceptedLocale
 
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        emailCanonical,
-        passwordHash,
-        name: input.name,
-        ...(locale ? { locale } : {}),
-        lastLoginAt: new Date(),
-      },
-    })
+    // User, session and verification token commit together; if the transaction fails, its writes
+    // roll back. Hashing above and mail below stay outside it; nothing inside waits on Redis, a
+    // provider or another HTTP call.
+    const created = await this.prisma
+      .$transaction(
+        async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              email,
+              emailCanonical,
+              passwordHash,
+              name: input.name,
+              ...(locale ? { locale } : {}),
+              lastLoginAt: new Date(),
+            },
+          })
+          // Create the session first so the access token can carry its id as `sid`
+          // (OB-06b / ADR-037 step-up freshness).
+          const { session, refreshToken } = await this.sessionService.createSession(
+            { userId: user.id, userAgent: requestInfo.userAgent, ipAddress: requestInfo.ipAddress },
+            tx
+          )
+          const verification = await this.tokenManager.generateEmailVerificationToken(
+            user.id,
+            requestInfo.frontend,
+            tx
+          )
+          return this.finishRegistration(
+            user,
+            session.id,
+            refreshToken,
+            verification.token,
+            requestInfo
+          )
+        },
+        { maxWait: 2000, timeout: 4000 }
+      )
+      .catch(rethrowEmailConflict)
+    this.dispatchRegistrationMail(created.user.id, created.mail)
+    return {
+      user: this.mapUserToResponse(created.user),
+      accessToken: created.accessToken,
+      refreshToken: created.refreshToken,
+    }
+  }
 
-    // Create the session first so the access token can carry its id as `sid`
-    // (OB-06b / ADR-037 step-up freshness).
-    const { session, refreshToken } = await this.sessionService.createSession({
-      userId: user.id,
-      userAgent: requestInfo.userAgent,
-      ipAddress: requestInfo.ipAddress,
-    })
-
+  /** Pure CPU/env work done before commit, so a failure here rolls the account back. */
+  private finishRegistration(
+    user: User,
+    sessionId: string,
+    refreshToken: string,
+    verificationToken: string,
+    requestInfo: RequestInfo
+  ): CommittedRegistration {
     const accessToken = this.tokenService.generateAccessToken({
       sub: user.id,
       email: user.email,
       systemRole: user.systemRole,
-      sid: session.id,
+      sid: sessionId,
     })
-
-    await this.sendRegistrationVerification(user, requestInfo.frontend)
-    return { user: this.mapUserToResponse(user), accessToken, refreshToken }
+    const mail = prepareRegistrationMail(this.env, user, verificationToken, requestInfo.frontend)
+    return { user, accessToken, refreshToken, mail }
   }
 
   /** Scoped signup never accepts an editable email or creates organization access. */
@@ -218,74 +272,47 @@ export class AuthService {
             },
             tx
           )
+          // Token issuance sets `lock_timeout` to 1000ms for waits after this point; the
+          // transaction timeout still bounds everything. Keep the expiry check LAST so no
+          // wait added above can move past expiry after the check.
+          const verification = await this.tokenManager.generateEmailVerificationToken(
+            user.id,
+            requestInfo.frontend,
+            tx
+          )
+          const finished = this.finishRegistration(
+            user,
+            session.session.id,
+            session.refreshToken,
+            verification.token,
+            requestInfo
+          )
           if (expiresAt <= (await invitationClock(tx))) throw invalidInvitation()
-          return { user, ...session }
+          return finished
         },
         { maxWait: 2000, timeout: 4000 }
       )
-      .catch((error: unknown) => {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002')
-          throw new AppException('Email already exists', 409, AuthErrorCode.EMAIL_ALREADY_EXISTS)
-        throw error
-      })
-    const accessToken = this.tokenService.generateAccessToken({
-      sub: created.user.id,
-      email: created.user.email,
-      systemRole: created.user.systemRole,
-      sid: created.session.id,
-    })
-    await this.sendRegistrationVerification(created.user, requestInfo.frontend)
+      .catch(rethrowEmailConflict)
+    this.dispatchRegistrationMail(created.user.id, created.mail)
     return {
       user: this.mapUserToResponse(created.user),
-      accessToken,
+      accessToken: created.accessToken,
       refreshToken: created.refreshToken,
     }
   }
 
-  private async sendRegistrationVerification(
-    user: User,
-    frontend?: BrowserFrontendContext
-  ): Promise<void> {
-    // Generate verification token synchronously so the row is committed
-    // before HTTP 201 returns. Calling resendVerificationEmail here would
-    // race with any immediately-following user action that creates a token
-    // (its first step invalidates all existing user tokens), so we build
-    // the URL in-band and only the email *send* stays non-blocking.
-    const { token: verificationToken } = await this.tokenManager.generateEmailVerificationToken(
-      user.id,
-      frontend
-    )
-    const userLocale = coerceSupportedLocale(user.locale)
-    const verificationUrl = localizedFrontendUrl(
-      frontend?.frontend === 'admin'
-        ? resolveFrontendPlacement(this.env).admin
-        : this.env.get('FRONTEND_URL'),
-      userLocale,
-      frontendAuthPath(frontend?.frontend ?? 'site', '/verify-email'),
-      {
-        token: verificationToken,
-      }
-    )
-    const expiresInHours = Number(this.env.get('EMAIL_VERIFICATION_EXPIRY_HOURS'))
-
-    // Queue welcome + verification emails (non-blocking, silent fail)
+  /**
+   * Starts both registration emails after the account has committed. The welcome greeting is
+   * QUEUED (BullMQ/Redis) and best-effort: it is lost if the queue refuses it or the process
+   * stops before queueing, and it has no resend. The verification email is sent directly and
+   * can be resent. A failure here never reverses the signup.
+   */
+  private dispatchRegistrationMail(userId: string, mail: RegistrationMail): void {
     void this.emailService
-      .sendWelcomeEmail(
-        {
-          name: user.name ?? user.email,
-          email: user.email,
-          locale: userLocale,
-        },
-        user.id
-      )
+      .sendWelcomeEmail(mail.welcome, userId)
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send welcome email'))
     void this.emailService
-      .sendEmailVerificationEmail(user.email, {
-        name: user.name ?? user.email,
-        verificationUrl,
-        expiresInHours,
-        locale: userLocale,
-      })
+      .sendEmailVerificationEmail(mail.welcome.email, mail.verification)
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
   }
 

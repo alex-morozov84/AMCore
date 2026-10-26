@@ -92,6 +92,8 @@ export class InvitationPublicController {
   @ApiHeader({ name: 'X-Invitation-Handoff-Key', required: false })
   @ApiOperation({
     summary: 'Create an unverified ordinary account for the fixed invitation email; never join',
+    description:
+      'The user, its first session, the authentication handoff and its email-verification token are created in one transaction; the invitation expiry is checked last. If it fails, its writes roll back. After the commit the response can still be lost: sign in or reset the password instead of submitting again. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS.',
   })
   @SchemaResponse({ type: AuthResponseDto, status: 201 })
   async register(

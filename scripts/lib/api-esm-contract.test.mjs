@@ -14,7 +14,7 @@ test('ESM package uses maintained Nest/SWC and strict native-before-emit sequenc
   assert.equal(api.scripts.dev, 'nest start --watch')
   assert.equal(
     api.scripts.build,
-    'pnpm run typecheck && nest build -p tsconfig.build.json && node scripts/build-identity.mjs'
+    'pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs'
   )
   const cli = json('apps/api/nest-cli.json').compilerOptions
   assert.equal(cli.builder.type, 'swc')

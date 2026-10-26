@@ -109,7 +109,10 @@ Run `pnpm --filter api typecheck` separately. API and shared source checks
 select the pinned TypeScript 7 CLI through `scripts/typecheck-native.mjs`.
 Frontend checks, compiler API tools and shared declaration generation retain
 their supported compiler versions. Bare `tsc` is ambiguous in API/shared; use
-the package commands. API build runs its required native check before Nest/SWC.
+the package commands. API build runs its application-only native `typecheck:build`
+before Nest/SWC. Web production builds use `tsconfig.build.json` for application
+source and generated route types. Full `typecheck` commands still cover tests and
+remain mandatory; build success does not replace them.
 Development diagnostics remain asynchronous. Use explicit `.js` relative imports
 in API runtime modules. See [API build guidance](docs/backend/api-build.md).
 An intentional native compiler patch upgrade must update both native aliases,
@@ -280,12 +283,12 @@ tag. See the internal maintainer checklist in `ai/PROCESS.md` when `ai/` exists.
 ## Troubleshooting
 
 - **`pnpm --filter web build` hangs at "Creating an optimized production build…"** —
-  this is a stuck `next build` process holding `apps/web/.next/lock`, not a dependency
-  problem. Kill the stale process and remove the lock:
-  ```bash
-  rm -f apps/web/.next/lock
-  ```
-  then re-run the build. Don't bisect dependencies for this symptom.
+  a slow build alone does not prove a stale process or lock. Inspect live progress
+  and identify the owning process. Stop only your own build normally. Remove a
+  stale lock only after verifying that its owning process has stopped. Never
+  remove another task's output or an active server's lock. Managed runs use
+  [stand recovery](docs/operations/local-stands.md), not manual lock deletion.
+  See [observable checks](docs/frontend/testing.md#observable-long-running-checks).
 
 ### Backend HTTP changes
 

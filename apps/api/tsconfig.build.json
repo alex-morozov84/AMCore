@@ -7,15 +7,17 @@
     "**/*-spec.ts",
     "**/*.test.ts",
     "**/*.testkit.ts",
-    "**/__tests__/*",
-    "**/__mocks__/*"
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/*.test-support.ts"
   ],
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
     "declaration": false,
     "declarationMap": false,
-    "sourceMap": true
+    "sourceMap": true,
+    "types": ["node"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
