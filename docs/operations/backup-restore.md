@@ -316,10 +316,11 @@ public keys already start `public/`, so public copies can live under
 1. Record the deployment revision and matching images. Prepare known data: a user,
    organization/member, authenticated private file and public avatar. Use the existing
    [private artifact upload/download](../ai/artifacts.md) without creating a run or
-   contacting an AI provider, and [account avatar](../media/README.md#avatar-flow-the-shipped-example) controls. Record selected
-   row facts, file hashes/metadata and DB file references in a protected directory.
+   contacting an AI provider, and [account avatar](../media/README.md#avatar-flow-the-shipped-example) controls.
 2. Close ingress and drain/stop web, API, worker, backup and all custom writers.
-   Verify no writer remains. Keep them stopped through both captures. File objects,
+   Verify no writer remains. Only then record expected rows, file hashes/metadata
+   and DB file references in a protected directory. Keep writers stopped while
+   recording these expectations and capturing both database and files. File objects,
    sidecars and public copies are separate writes; a live tar is not consistent.
 3. Take a one-shot DB dump through the existing restore service with the owner URL:
 
