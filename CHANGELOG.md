@@ -120,6 +120,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restore rehearsal now requires application tables and valid migration history,
+  with optional selected-data assertions. Local-file recovery has a guarded
+  archive helper and coordinated database/files instructions. Recovery startup
+  keeps ordinary workers and public ingress behind validation and key safety.
+- Reference load-test preflight preserves the strict native migration TLS override
+  while retaining PostgreSQL client verification and disposable-target checks.
+
 - Password reset replaces the form heading after success and removes stale input
   instructions in English and Russian.
 

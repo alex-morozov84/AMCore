@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
+import { CA } from '../load-test/database-check.mjs'
 import { checkTarget } from '../load-test/target-check.mjs'
 import { ROOT, stubWorld } from './load-test-stubs.mjs'
 
@@ -13,23 +14,38 @@ const RUN = 'reviewa'
 const PROJECT = `amcore-loadtest-${RUN}`
 const VOLUME = `${PROJECT}_postgres_data_pg18`
 const db = (role, host = 'postgres') =>
-  `postgresql://${role}:x@${host}:5432/amcore?sslmode=verify-full&sslrootcert=/c`
-const config = (o = {}) => ({
-  name: PROJECT,
-  services: {
-    api: { environment: { DATABASE_URL: o.apiUrl ?? db('runtime') } },
-    worker: { environment: { DATABASE_URL: db('runtime') } },
-    migrate: { environment: { DATABASE_URL: db('migrator') } },
-    'load-fixture': { environment: { MIGRATION_DATABASE_URL: o.fixtureUrl ?? db('migrator') } },
-    web: { environment: { API_URL: 'http://api:5002' } },
-    postgres: {
-      volumes: [{ type: 'volume', source: 'postgres_data_pg18', target: '/var/lib/postgresql' }],
+  `postgresql://${role}:x@${host}:5432/amcore?sslmode=verify-full&sslrootcert=${CA}`
+const config = (o = {}) => {
+  const value = {
+    name: PROJECT,
+    services: {
+      api: { environment: { DATABASE_URL: o.apiUrl ?? db('runtime') } },
+      worker: { environment: { DATABASE_URL: db('runtime') } },
+      migrate: {
+        environment: {
+          DATABASE_URL: db('migrator').replace(
+            'sslmode=verify-full&sslrootcert=',
+            'sslmode=require&sslaccept=strict&sslcert='
+          ),
+        },
+      },
+      'load-fixture': { environment: { MIGRATION_DATABASE_URL: o.fixtureUrl ?? db('migrator') } },
+      web: { environment: { API_URL: 'http://api:5002' } },
+      postgres: {
+        volumes: [{ type: 'volume', source: 'postgres_data_pg18', target: '/var/lib/postgresql' }],
+      },
     },
-  },
-  volumes: {
-    postgres_data_pg18: { name: o.volumeName ?? VOLUME, labels: { 'org.amcore.load-test': RUN } },
-  },
-})
+    volumes: {
+      postgres_data_pg18: { name: o.volumeName ?? VOLUME, labels: { 'org.amcore.load-test': RUN } },
+    },
+  }
+  for (const name of ['api', 'worker', 'migrate', 'load-fixture'])
+    value.services[name].volumes = [
+      { type: 'bind', source: '/ca', target: '/etc/amcore/db-ca', read_only: true },
+    ]
+  return value
+}
+
 const NET = `${PROJECT}_default`
 const container = (service, env = [], o = {}) => ({
   Config: {
@@ -62,7 +78,7 @@ test('target check accepts the run project and names every mismatch', () => {
       config({ apiUrl: db('runtime', 'db.example.com') }),
       PROJECT,
       inspect(),
-      /api: DATABASE_URL points at db.example.com/,
+      /api: DATABASE_URL points outside/,
     ],
     [
       'loader without TLS',

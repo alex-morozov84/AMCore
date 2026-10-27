@@ -545,6 +545,7 @@ services:
     image: postgres:18-alpine
     profiles: ['restore-drill']
     entrypoint: ['sh', '/scripts/restore-drill.sh']
+    network_mode: none
     # tmpfs, not a volume: postgres:18-alpine declares /var/lib/postgresql
     # (not the pre-18 /var/lib/postgresql/data) as a VOLUME, so Docker
     # allocates an anonymous volume there for every container regardless of
@@ -558,6 +559,7 @@ services:
       - /var/lib/postgresql
     volumes:
       - ./docker/postgres/restore-drill.sh:/scripts/restore-drill.sh:ro
+      - ./docker/postgres/restore-baseline.sql:/scripts/restore-baseline.sql:ro
       - postgres_backups:/backups:ro
     restart: 'no'
 

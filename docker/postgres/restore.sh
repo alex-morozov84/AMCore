@@ -15,6 +15,7 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
+case "$1" in '' | . | .. | */*) echo 'invalid dump basename' >&2; exit 1 ;; esac
 dump_file="${BACKUP_DIR}/$1"
 if [ ! -f "$dump_file" ]; then
   echo "error: ${dump_file} not found" >&2
@@ -28,5 +29,5 @@ echo "[restore] restoring ${dump_file} into the database at DATABASE_URL"
 # clean replacement). --no-owner: the dump may have been taken under a
 # different role than the target's, so don't try to reassign ownership to
 # roles that might not exist there.
-pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" "$dump_file"
+pg_restore --exit-on-error --clean --if-exists --no-owner --dbname="$DATABASE_URL" "$dump_file"
 echo "[restore] done"

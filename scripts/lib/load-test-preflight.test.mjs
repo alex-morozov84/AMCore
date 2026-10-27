@@ -29,9 +29,10 @@ function checkout({ context = {}, env = {} } = {}) {
       .map(([k, v]) => `- **${k}:** ${v}`)
       .join('\n')
   )
+  if (env.COMPOSE_FILE) env.COMPOSE_FILE += `:${join(d, 'migration-cli.override.yml')}`
   const values = {
     COMPOSE_PROJECT_NAME: 'amcore-loadtest-lt1025a',
-    COMPOSE_FILE: FILES,
+    COMPOSE_FILE: `${FILES}:${join(d, 'migration-cli.override.yml')}`,
     COMPOSE_PROFILES: 'local-infra,edge',
     LOAD_TEST_RUN_ID: 'lt1025a',
     LOAD_TEST_GENERATOR_IP: '203.0.113.7',
@@ -56,11 +57,21 @@ function checkout({ context = {}, env = {} } = {}) {
   )
   chmodSync(join(d, 'bin/docker'), 0o755)
   writeFileSync(join(d, 'docker.log'), '')
+  writeFileSync(join(d, 'migration-cli.override.yml'), 'services: {}')
+  writeFileSync(
+    join(d, 'preflight.sh'),
+    readFileSync(join(ROOT, 'scripts/load-test/preflight.sh'), 'utf8')
+      .replace(
+        '/srv/amcore-secrets/migration-cli.override.yml',
+        join(d, 'migration-cli.override.yml')
+      )
+      .replace('. "$(dirname "$0")/lib.sh"', `. "${join(ROOT, 'scripts/load-test/lib.sh')}"`)
+  )
   return d
 }
 
 function preflight(d, mode = 'plan') {
-  const r = spawnSync('sh', [join(ROOT, 'scripts/load-test/preflight.sh'), mode], {
+  const r = spawnSync('sh', [join(d, 'preflight.sh'), mode], {
     cwd: d,
     encoding: 'utf8',
     env: { ...process.env, PATH: `${join(d, 'bin')}:${process.env.PATH}` },
@@ -217,5 +228,23 @@ test('trust-boundary checker accepts the intended shape and names each violation
     const c = good()
     change(c)
     assert.match(checkLoadTestConfig(c, '203.0.113.7').join('\n'), message, label)
+  }
+})
+
+test('native override must be final and unique; approved overlays keep their order', () => {
+  for (const mutate of [
+    (value, d) => value.replace(`:${join(d, 'migration-cli.override.yml')}`, ''),
+    (value) => value.replace('COMPOSE_FILE=', 'COMPOSE_FILE=docker/compose/load-test.yml:'),
+    (value, d) =>
+      value.replace(
+        join(d, 'migration-cli.override.yml'),
+        `${join(d, 'migration-cli.override.yml')}:docker/compose/supervise.yml`
+      ),
+  ]) {
+    const d = checkout()
+    writeFileSync(join(d, '.env'), mutate(readFileSync(join(d, '.env'), 'utf8'), d))
+    const r = preflight(d)
+    assert.notEqual(r.status, 0)
+    assert.deepEqual(r.calls, [])
   }
 })

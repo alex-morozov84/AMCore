@@ -5,6 +5,7 @@
 // `docker inspect` of the running postgres, api, worker and web. Exit 1 lists violations.
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { databaseProblem } from './database-check.mjs'
 
 const DB_VOLUME = 'postgres_data_pg18'
 const DB_CLIENTS = {
@@ -14,31 +15,26 @@ const DB_CLIENTS = {
   'load-fixture': 'MIGRATION_DATABASE_URL',
 }
 
-function databaseProblem(service, key, value) {
-  if (!value) return `${service}: ${key} is empty`
-  if (!URL.canParse(value)) return `${service}: ${key} is not a URL`
-  const url = new URL(value)
-  if (url.hostname !== 'postgres')
-    return `${service}: ${key} points at ${url.hostname}, not this project's postgres`
-  if (url.searchParams.get('sslmode') !== 'verify-full')
-    return `${service}: ${key} lacks sslmode=verify-full`
-  return undefined
-}
-
 /** @returns {string[]} violations; empty means the target is this run's own project. */
 export function checkTarget(config, project, run, running) {
   const problems = []
   const services = config?.services ?? {}
   if (config?.name !== project)
     problems.push(`effective project is ${config?.name}, expected ${project}`)
+  const referenceValue = services['load-fixture']?.environment?.MIGRATION_DATABASE_URL
+  const reference = URL.canParse(referenceValue) ? new URL(referenceValue) : undefined
   for (const [service, key] of Object.entries(DB_CLIENTS)) {
     if (!services[service])
       problems.push(`service ${service} is not in the effective configuration`)
     else {
-      const problem = databaseProblem(service, key, services[service].environment?.[key])
+      const problem = databaseProblem(service, key, services[service], reference)
       if (problem) problems.push(problem)
     }
   }
+  const caSources = Object.keys(DB_CLIENTS).map(
+    (name) => services[name]?.volumes?.find((m) => m.target === '/etc/amcore/db-ca')?.source
+  )
+  if (new Set(caSources).size !== 1) problems.push('database clients use different CA mounts')
   const apiUrl = services.web?.environment?.API_URL
   if (apiUrl && URL.canParse(apiUrl) && new URL(apiUrl).hostname !== 'api')
     problems.push(`web: API_URL points at ${new URL(apiUrl).hostname}, not this project's api`)

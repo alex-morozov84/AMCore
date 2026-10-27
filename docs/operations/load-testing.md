@@ -30,6 +30,36 @@ you rely on the published numbers for another host class.
 Host commands run in the deployment checkout (`/srv/amcore`), generator commands in the
 generator's checkout. The scripts are in [`scripts/load-test/`](../../scripts/load-test/).
 
+### After a recovery exercise on the same host
+
+Finish and record application recovery before creating load fixtures. The fixture
+loader requires a **new** database; never adopt the restored database or volume.
+Keep its verified off-host recovery set throughout this transition.
+
+1. Record the recovered project's original name, complete Compose selection,
+   protected `.env`/override paths, container/network IDs and existing named volumes.
+   Check DB/file backups and expectations off-host still match their checksums.
+2. Close ingress, drain writers and remove only the recorded maintenance helper.
+   Refuse unknown network attachments. From the original checkout, using its saved
+   `.env`, complete file list/profiles and explicit original project name, run
+   `docker compose --project-name <original-project> down`.
+   Keep the original configuration until postchecks succeed. Do **not** use `-v`,
+   `--rmi`, `--remove-orphans`, prune or forced network disconnections.
+3. Require the original containers/network to be absent. Inspect every recorded
+   named data/backup volume: its identity/labels must remain. Recheck off-host hashes,
+   released ports and stopped task processes. Any failed/unknown check stops here.
+   `stop` alone leaves the subnet reserved; `down` without `-v` preserves named volumes.
+4. Use a separate checkout/configuration for the new load project. Keep recovery
+   settings untouched. Check all remaining Docker subnets and host/VPN routes as in
+   single-host step 3. Reuse the released subnet only if actually free; otherwise stop
+   and deliberately select a free subnet with a matching web address. Keep relay
+   trust values coherent. Every load data volume must have a fresh effective name;
+   no external binding to recovered volumes.
+5. Continue below with preflight and explicit infrastructure startup. Verify the new
+   network's project/subnet, running web address and normal target/fixture admission.
+   Recheck retained recovery volumes/off-host hashes after startup. A failed network
+   creation never permits fixture loading. Final scoped cleanup follows section 7.
+
 ## 1. Create the test certificates
 
 On the generator:
@@ -64,13 +94,22 @@ check (this `COMPOSE_FILE` replaces the one of step 1; no other mail keys are ne
 ```bash
 LOAD_TEST_RUN_ID=lt20261025a        # 4–32 lowercase letters or digits, new per campaign
 COMPOSE_PROJECT_NAME=amcore-loadtest-lt20261025a
-COMPOSE_FILE=docker-compose.yml:docker/compose/supervise.yml:docker/compose/postgres-tls.yml:docker/compose/web.yml:docker/compose/bff-relay.yml:docker/compose/load-test.yml
+COMPOSE_FILE=docker-compose.yml:docker/compose/supervise.yml:docker/compose/postgres-tls.yml:docker/compose/web.yml:docker/compose/bff-relay.yml:docker/compose/load-test.yml:/srv/amcore-secrets/migration-cli.override.yml
 LOAD_TEST_GENERATOR_IP=<generator IPv4 as the host sees it, usually its private address>
 LOAD_TEST_CLIENT_CA_DIR=/srv/amcore-loadtest/ca
 LOAD_TEST_SECRETS_DIR=/srv/amcore-loadtest/secrets
 EMAIL_PROVIDER=mock
 ORG_SELF_SERVICE_CREATION_ENABLED=true
 ```
+
+Keep the [native migration override](single-host-compose.md#native-migration-cli-connection)
+at that final private path. Preflight permits it to change only migrate's
+`DATABASE_URL`: native `sslmode=require&sslaccept=strict&sslcert=...` remains
+separate from API/worker/fixture `verify-full&sslrootcert=...`. Extra overrides or
+other effective changes fail. Database URLs accept only these client-specific TLS
+parameters; query overrides for host, port, credentials or other connection settings
+are refused. Run the exact-endpoint certificate preflight before
+migration; configuration validation alone cannot verify CA/hostname enforcement.
 
 Then:
 
@@ -154,6 +193,12 @@ sh scripts/load-test/protocol.sh campaign    # about 45 minutes
 `~/lt-work/out-smoke`; it is valid only if every action answered as expected. The
 campaign writes to `~/lt-work/out` and first prints the recovery commands (also in
 `out/RECOVERY.txt`). For the next campaign see section 8.
+
+For a short functional-load check, run `prepare` and `smoke` after all admission
+checks. Inspect `out-smoke/report.md`: every action must succeed and the step must
+be valid. The smoke command does not propagate every step failure through its exit
+code. Its 20 seconds at 2 iterations/s prove action coverage, not reference capacity.
+Always remove and verify the test entry through section 7, even if smoke fails.
 
 Protocol (do not change it between compared runs): 60 s warm-up at 5 iterations/s, then 5,
 10, 20, 30 and 40 iterations/s for 120 s each, three repeats, 30 s apart, admin reads at

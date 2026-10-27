@@ -28,13 +28,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Sort by filename, which is safe because backup.sh names dumps
-# amcore-<UTC timestamp>.dump with a sortable ISO-8601-like format — the
-# lexicographically last name is the most recent dump.
-dump_file="$(find "$BACKUP_DIR" -maxdepth 1 -name 'amcore-*.dump' -type f | sort | tail -n 1)"
-if [ -z "$dump_file" ]; then
-  echo "[restore-drill] no amcore-*.dump found in ${BACKUP_DIR} — nothing to rehearse" >&2
-  exit 1
+# Explicit selection never falls back to another archive.
+[ "$#" -le 2 ] || { echo 'usage: restore-drill [dump-basename [assertions.sql]]' >&2; exit 1; }
+if [ "$#" -ge 1 ]; then
+  case "$1" in '' | . | .. | */*) echo 'invalid dump basename' >&2; exit 1 ;; esac
+  dump_file="$BACKUP_DIR/$1"
+else
+  dump_file="$(find "$BACKUP_DIR" -maxdepth 1 -name 'amcore-*.dump' -type f | sort | tail -n 1)"
+fi
+[ -n "$dump_file" ] && [ -f "$dump_file" ] || { echo 'dump not found' >&2; exit 1; }
+baseline=/scripts/restore-baseline.sql
+[ -s "$baseline" ] || { echo 'baseline SQL missing or empty' >&2; exit 1; }
+if [ "$#" -eq 2 ]; then
+  [ -f "$2" ] && [ -s "$2" ] && [ -r "$2" ] || { echo 'assertions SQL missing, empty or unreadable' >&2; exit 1; }
 fi
 echo "[restore-drill] $(date -u -Iseconds) rehearsing restore of ${dump_file}"
 
@@ -68,22 +74,21 @@ echo "[restore-drill] restoring..."
 # here specifically because this drill only proves the dump's *data and
 # schema* restore cleanly, not that the target cluster already has the right
 # roles provisioned (a separate, already-documented setup step).
-if ! gosu postgres pg_restore --no-owner --no-privileges -h "$SOCKET_DIR" -d "$SCRATCH_DB" "$dump_file"; then
+if ! gosu postgres pg_restore --exit-on-error --no-owner --no-privileges -h "$SOCKET_DIR" -d "$SCRATCH_DB" < "$dump_file"; then
   echo "[restore-drill] FAILED: pg_restore reported errors — see output above" >&2
   exit 1
 fi
 
-# Smoke check: the app's schema should have landed. This does not (and
-# cannot, without knowing the current schema) assert row-level data
-# correctness — it proves the dump is a well-formed, restorable Postgres
-# archive that produces a non-empty schema, which is the failure mode
-# GitLab's 2017 incident postmortem names as the one nobody had verified.
-table_count="$(gosu postgres psql -h "$SOCKET_DIR" -d "$SCRATCH_DB" -tAc \
-  "select count(*) from information_schema.tables where table_schema = 'public'")"
-
-if [ "${table_count:-0}" -lt 1 ] 2>/dev/null; then
-  echo "[restore-drill] FAILED: restored database has no public tables (expected the app schema)" >&2
-  exit 1
+# Read-only SQL is trusted operator code, not a hostile-input sandbox.
+verify_sql() {
+  gosu postgres psql -X -v ON_ERROR_STOP=1 -h "$SOCKET_DIR" -d "$SCRATCH_DB" \
+    -c 'BEGIN READ ONLY' -f - -c 'COMMIT' < "$1" >/dev/null
+}
+verify_sql "$baseline"
+echo '[restore-drill] PASSED structural verification (owners/ACLs not checked)'
+if [ "$#" -eq 2 ]; then
+  verify_sql "$2"
+  echo '[restore-drill] PASSED selected-data assertions'
+else
+  echo '[restore-drill] selected-data assertions NOT REQUESTED'
 fi
-
-echo "[restore-drill] $(date -u -Iseconds) PASSED — restored ${dump_file}, ${table_count} public tables present"

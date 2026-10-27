@@ -548,7 +548,7 @@ The restore replaces every object in the dump: rows created after the dump are l
 connects with `MIGRATION_DATABASE_URL` (the owner role) over TLS and reads dumps only
 from the `postgres_backups` volume (`/backups` in the container).
 
-1. List the dumps: `docker compose --profile restore run --rm restore` prints the
+1. List the dumps: `docker compose --profile restore run --rm --no-deps restore` prints the
    available files and exits with an error, which is expected here.
 2. Close the site and stop every writer, so nothing changes from here on:
 
@@ -559,7 +559,7 @@ from the `postgres_backups` volume (`/backups` in the container).
 3. Keep the current state in the same volume, so the restore command can read it back:
 
    ```bash
-   docker compose --profile restore run --rm --entrypoint sh restore \
+   docker compose --profile restore run --rm --no-deps --entrypoint sh restore \
      -c 'pg_dump --dbname="$DATABASE_URL" -Fc -f /backups/before-restore.dump' \
      && echo SAFETY_DUMP_OK
    ```
@@ -570,43 +570,82 @@ from the `postgres_backups` volume (`/backups` in the container).
 4. Restore the chosen dump:
 
    ```bash
-   docker compose --profile restore run --rm restore <dump-filename>
+   docker compose --profile restore run --rm --no-deps restore <dump-filename>
    ```
 
    If it exits with an error, the database can be partly restored. **Do not repeat
    step 3 now**: it would overwrite the safety dump with the partial state. Fix the
    cause and run step 4 again, or go back to the state of step 3 with
-   `docker compose --profile restore run --rm restore before-restore.dump`; then
-   continue with steps 5 and 7 (step 6 is not needed when you went back to the safety
-   dump). If that also fails, keep the site closed and investigate; the safety dump stays
+   `docker compose --profile restore run --rm --no-deps restore before-restore.dump`; then
+   continue with the validation/admission steps below. Reconcile any restored
+   credential and Redis impact even when you returned to the safety dump. If that also fails, keep the site closed and investigate; the safety dump stays
    in the volume.
 
    Dump names carry the time in UTC (`amcore-20261024T030000Z.dump` is 03:00 UTC).
 
-5. Start only the API and the worker. The site stays closed; the API answers only on
-   this host (`127.0.0.1:5002`):
+5. Keep application services stopped. Verify the restored revision's migration
+   names/checksums, selected application rows, file references and
+   [role/grant behavior](backup-restore.md#verify-a-role-separated-restore).
+   Restore local files from the same recovery point before starting writers:
+   [local file recovery](backup-restore.md#local-file-storage).
+   A same-revision restore needs no new migration or seed. If history/artifacts
+   differ, keep maintenance and reconcile compatibility explicitly.
 
-   ```bash
-   docker compose up -d --wait api worker
+6. Decide Redis and outside-effect reconciliation before startup. Retained Redis
+   can contain newer user caches, sessions and jobs; replacing it loses queues,
+   browser session vaults, cache and rate-limit debt. Neither option proves safe
+   replay of email or other provider effects. Do not use `FLUSHALL` as a recovery
+   recipe. Keep production closed until its Redis/queue/credential impact is resolved.
+
+   In a **disposable mock-provider drill only**, you may deliberately replace the
+   proved-owned task Redis volume while all consumers are stopped. Record the loss
+   above and authenticate fresh afterward. This does not invalidate restored DB
+   sessions or prove production Redis recovery. Never delete another deployment's
+   volume or use `down -v` to perform this step.
+
+7. Make restored API keys safe before traffic or ordinary workers resume. A backup
+   can revive keys revoked after it was taken. Follow
+   [API-key restore safety](api-key-lifecycle.md#restore). If API access is necessary,
+   reuse only the isolated API/auth/revocation/completion mechanics in
+   [the maintenance recipe](api-key-lifecycle.md#more-than-1000-keys-or-oversized-metadata):
+   run one matching API with `--no-deps`, `PROCESS_ROLE=web` and verified restricted
+   access. Membership deletion from that offboarding recipe is not part of restore.
+   Keep normal API, worker, web and edge stopped. Login/revocation write data and
+   Redis state; HTTP role also includes producers and storage probes. It is not a
+   read-only process. Do not perform registration/reset or unrelated operator actions.
+   Unknown responses require the recipe's completion barrier, not blind retries.
+   Stop/remove the recorded maintenance API and verify no app connection remains.
+
+8. Start fresh settings readers in explicit order, with no dependency-triggered
+   migration. A lower restored settings revision requires
+   [restarting every API/worker reader](../backend/settings.md#rollout-and-recovery).
+   Check each command succeeds before running the next:
+
+   ```sh
+   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api
    ```
 
-6. Make restored API keys safe before any traffic returns: the dump can contain keys
-   that were revoked after it was taken. Replay those revocations or invalidate the
-   restored keys as [API-key restore safety](api-key-lifecycle.md#restore) describes.
-   This step is required for a dump of this installation too.
+   Verify API readiness, authoritative settings and restored data with restricted
+   local access. Recovered durable work can resume when the worker starts; unresolved
+   provider results must keep this step blocked. A mock-only drill does not prove
+   production delivery safety. Require a 401 response for the old key and verify private/public file access.
 
-7. Open the site:
+9. Start web, verify health, then open the edge last:
 
-   ```bash
-   docker compose up -d --wait
+   ```sh
+   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 web
+   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 caddy
    ```
 
-   Then verify with [step 8](#8-verify) and check the data you restored for.
+   Verify [step 8](#8-verify), fresh sign-in and the data you restored for. Restart
+   `backup` explicitly only after success. Do not use bare `compose up`: dependencies
+   can admit migrate and other writers before recovery checks finish.
 
-A dump from this installation keeps table owners and the runtime role's privileges.
-For a dump from another installation, follow [Backup & restore](backup-restore.md), and
-before restore step 5 re-run the `setup-roles.sql` Step 3 command from
-[setup step 6](#6-migrate-grant-and-seed); running it again is safe.
+A dump from this installation keeps the runtime grants, but verify them rather than
+infer success from table counts. For a different target, provision original roles
+and apply reviewed `setup-roles.sql` Step 3 grants before application admission;
+do not repeat CREATE ROLE over existing roles. Any failure keeps ingress closed.
 
 ## Running the host
 
