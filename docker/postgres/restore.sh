@@ -1,7 +1,9 @@
 #!/bin/sh
 # AMCore — optional bundled restore profile (COMPOSE_PROFILES=...,restore). See
-# docs/operations/backup-restore.md → "Restore". One-shot, invoked explicitly:
-#   docker compose --profile restore run --rm restore <dump-filename>
+# docs/operations/backup-restore.md → "Restore". Prepare the target DB and stop
+# writers first; follow docs/operations/single-host-compose.md →
+# "Restore a database dump". One-shot, invoked explicitly:
+#   docker compose --profile restore run --rm --no-deps restore <dump-filename>
 # Destructive for every object present in the dump (dropped and recreated) —
 # NOT a full database wipe: target objects absent from the dump are untouched.
 set -eu

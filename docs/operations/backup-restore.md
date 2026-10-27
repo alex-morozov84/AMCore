@@ -124,8 +124,14 @@ Restore is a **one-shot**, like the `migrate` service — it never runs on a
 normal `docker compose up`. It requires its own profile _and_ an explicit
 `run`, so it cannot fire by accident:
 
+Before running restore, prepare and verify the target database, stop all writers,
+and follow the full [recovery sequence](single-host-compose.md#restore-a-database-dump).
+Keep writers stopped until that sequence permits startup. Use the same project,
+environment and complete Compose file list throughout; `--no-deps` requires the
+target database to be ready and prevents implicit infrastructure startup.
+
 ```bash
-docker compose --profile restore run --rm restore <dump-filename>
+docker compose --profile restore run --rm --no-deps restore <dump-filename>
 ```
 
 This is destructive by design for every object the dump contains
