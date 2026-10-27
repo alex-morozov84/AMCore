@@ -14,8 +14,8 @@ const translationsSchema = z
   })
   .passthrough()
 const LOCALES = ['en-US', 'en-GB', 'ru-RU'] as const
-const FLOW_ASSET = 'js/async/8.f93064bab2.js'
-const FLOW_SHA256 = '204dea1cda0cb8f792d43cc182b3e68fbe202a1ffbe248837d412688299aee19'
+const FLOW_ASSET = 'js/async/8.0350f20068.js'
+const FLOW_SHA256 = 'dace65826b2eca6ea89eb87419315f5b14e61f9b420ffcc829da71f0df2672cc'
 export const FLOW_CSS = '.jobFlowCard-Y7apDE{display:none!important}'
 export const INFO_ASSET = 'js/async/oa.cadae521aa.js'
 const INFO_SHA256 = '12c98c54fbc4134f4e3515449fe2a0e494ee7a00e8e08a653173adf3b9bac8ba'

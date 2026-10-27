@@ -230,14 +230,14 @@ importers:
         specifier: ^3.1156.0
         version: 3.1156.0
       '@bull-board/api':
-        specifier: ^9.10.4
-        version: 9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+        specifier: ^9.10.5
+        version: 9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
       '@bull-board/fastify':
-        specifier: 9.10.4
-        version: 9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+        specifier: 9.10.5
+        version: 9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
       '@bull-board/nestjs':
-        specifier: ^9.10.4
-        version: 9.10.4(@bull-board/api@9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(@nestjs/bull-shared@12.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0))(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: ^9.10.5
+        version: 9.10.5(@bull-board/api@9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(@nestjs/bull-shared@12.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0))(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@casl/ability':
         specifier: ^7.0.2
         version: 7.0.2
@@ -420,8 +420,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@bull-board/express':
-        specifier: ^9.10.4
-        version: 9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(supports-color@10.2.2)(typescript@5.9.3)
+        specifier: ^9.10.5
+        version: 9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(supports-color@10.2.2)(typescript@5.9.3)
       '@jest/globals':
         specifier: ^30.5.2
         version: 30.5.2(supports-color@10.2.2)
@@ -1279,10 +1279,10 @@ packages:
     resolution: {integrity: sha512-0GEz8qJWokkUVYQYRukmkSHIFNoBH8QTreeHrAFbvz1XFYc3Y+puhMs8PQ5x8GNugiC2l5jvDBXKLbBIByeSBw==}
     hasBin: true
 
-  '@bull-board/api@9.10.4':
-    resolution: {integrity: sha512-DMI4FrNacQRmNsExF4kCXPE01sDiW2o0UgMxRsogFvcLphQIf3TgspiNFURag6CieMneJp2b/ba1TWPJu1Jnpw==}
+  '@bull-board/api@9.10.5':
+    resolution: {integrity: sha512-CMA5WCN5rkpQWG8+IQBFuwf54JVrWE+1mjHEiwyb9+rdHAqXTbZOpjJLZZB0QA+2DGQCK8z0WqqdprCFnhy8aA==}
     peerDependencies:
-      '@bull-board/ui': 9.10.4
+      '@bull-board/ui': 9.10.5
       bull: ^4.16.5
       bullmq: ^5.56.0 || ^6.0.0
     peerDependenciesMeta:
@@ -1291,24 +1291,24 @@ packages:
       bullmq:
         optional: true
 
-  '@bull-board/express@9.10.4':
-    resolution: {integrity: sha512-4vInwCI8x4V/xyxdfw5+vP9HukfYV+s40y/AhvuXyQ/2DJ0DHVDgGj0OuY9PzxTcXgYBQiH9HNYlPYHYpy6+Fg==}
+  '@bull-board/express@9.10.5':
+    resolution: {integrity: sha512-SLaT82KDiEXDHeSfJBsfwN/Q7Zp5fizx7PaaJm//o4rzonlbWielyTRPtzSLsUlX1ZjW5JdQJjAks25uKqZmyw==}
 
-  '@bull-board/fastify@9.10.4':
-    resolution: {integrity: sha512-OYmcgM1GtGV9yo5QSY3E+3ciVaTgNceqChCkkcNMd7lghuQna1uSEKIbMzsAjWwH+PG0520xsFUxNE9LYHGp7g==}
+  '@bull-board/fastify@9.10.5':
+    resolution: {integrity: sha512-STCkO4ELj/bSGUuFQH41Xth0HZGkV2pABx9toeP21O8YXizQPRYhnLIiylxc79WrGFvxaMJ+AzXHcuzINa73NQ==}
 
-  '@bull-board/nestjs@9.10.4':
-    resolution: {integrity: sha512-4ZFe8Cf4KcIBLSnpfaf2lFLpAM40pBCXUWOxeRFpJGHVM44cNVjDQ2acE1n0VfF3jBigEYiI4IJNQeeXT4Oi8A==}
+  '@bull-board/nestjs@9.10.5':
+    resolution: {integrity: sha512-76eWvgqE16kqYXQ/ETbX5rOAzZl2OtmA21fz+nsZuQJIn0dvx396LmLGRhyDG+MkvMRxLAyfqyiUqC6dSVNmTw==}
     peerDependencies:
-      '@bull-board/api': ^9.10.4
+      '@bull-board/api': ^9.10.5
       '@nestjs/bull-shared': ^10.0.0 || ^11.0.0 || ^12.0.0
       '@nestjs/common': ^9.0.0 || ^10.0.0 || ^11.0.0 || ^12.0.0
       '@nestjs/core': ^9.0.0 || ^10.0.0 || ^11.0.0 || ^12.0.0
       reflect-metadata: ^0.1.13 || ^0.2.0
       rxjs: ^7.8.1
 
-  '@bull-board/ui@9.10.4':
-    resolution: {integrity: sha512-eBg7LcIOR1WDZAZBs6l/eclvpnRD0H2PHTLmoMBBTTsbIHh45aCgfKeFMTIbUQ9mmNaHD6rR9vgcylWZ8TFOdg==}
+  '@bull-board/ui@9.10.5':
+    resolution: {integrity: sha512-CW97tdUiD0e7VMvezb0+cjDUdwfBU2Vo1ChLRvqNgn4qoUuqX/q9PnX+y9sF7bkXnc4Kor2u+rj/wRge9pqeVg==}
 
   '@cacheable/memory@2.2.0':
     resolution: {integrity: sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ==}
@@ -10820,9 +10820,9 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@bull-board/api@9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)':
+  '@bull-board/api@9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)':
     dependencies:
-      '@bull-board/ui': 9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/ui': 9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
       redis-info: 3.1.0
       valibot: 1.5.0(typescript@5.9.3)
     optionalDependencies:
@@ -10830,10 +10830,10 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@bull-board/express@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(supports-color@10.2.2)(typescript@5.9.3)':
+  '@bull-board/express@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(supports-color@10.2.2)(typescript@5.9.3)':
     dependencies:
-      '@bull-board/api': 9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
-      '@bull-board/ui': 9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/api': 9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/ui': 9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
       ejs: 6.0.1
       express: 5.3.0(supports-color@10.2.2)
     transitivePeerDependencies:
@@ -10842,10 +10842,10 @@ snapshots:
       - supports-color
       - typescript
 
-  '@bull-board/fastify@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)':
+  '@bull-board/fastify@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)':
     dependencies:
-      '@bull-board/api': 9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
-      '@bull-board/ui': 9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/api': 9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/ui': 9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
       '@fastify/static': 10.1.6
       '@fastify/view': 12.0.1
       ejs: 6.0.1
@@ -10854,18 +10854,18 @@ snapshots:
       - bullmq
       - typescript
 
-  '@bull-board/nestjs@9.10.4(@bull-board/api@9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(@nestjs/bull-shared@12.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0))(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@bull-board/nestjs@9.10.5(@bull-board/api@9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(@nestjs/bull-shared@12.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0))(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@bull-board/api': 9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/api': 9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
       '@nestjs/bull-shared': 12.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@12.2.0)
       '@nestjs/common': 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
       '@nestjs/core': 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
 
-  '@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)':
+  '@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)':
     dependencies:
-      '@bull-board/api': 9.10.4(@bull-board/ui@9.10.4(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
+      '@bull-board/api': 9.10.5(@bull-board/ui@9.10.5(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3))(bullmq@6.4.0(ioredis@6.0.0(supports-color@10.2.2))(pg@8.23.1))(typescript@5.9.3)
     transitivePeerDependencies:
       - bull
       - bullmq
