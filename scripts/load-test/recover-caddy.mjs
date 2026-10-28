@@ -1,5 +1,5 @@
 // Limit recovery to Caddy and already-owned resources; never reconcile database volumes.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 function existing(definitions, inventory, keys, project, kind) {
@@ -60,5 +60,5 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const read = (name) => JSON.parse(readFileSync(`${directory}/${name}.json`, 'utf8'))
   const resources = { volumes: read('volumes'), networks: read('networks') }
   const model = caddyRecoveryModel(read('config'), resources, project)
-  writeFileSync(`${directory}/caddy.json`, JSON.stringify(model), { mode: 0o600 })
+  process.stdout.write(JSON.stringify(model))
 }

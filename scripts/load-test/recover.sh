@@ -31,8 +31,9 @@ networks=$(docker network ls -q --filter "label=com.docker.compose.project=$PROJ
 (umask 077; docker volume inspect $volumes > "$recovery_dir/volumes.json")
 # shellcheck disable=SC2086
 (umask 077; docker network inspect $networks > "$recovery_dir/networks.json")
-docker run --rm -v "$recovery_dir:/d" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" \
-  node /lt/recover-caddy.mjs /d "$PROJECT"
+# Host redirection owns the 0600 result; container UID never owns a host output file.
+(umask 077; docker run --rm -v "$recovery_dir:/d:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" \
+  node /lt/recover-caddy.mjs /d "$PROJECT" > "$recovery_dir/caddy.json")
 if [ "$NEW" != "$FILES" ]; then
   # .env holds secrets: the backup lives outside the checkout (git does not ignore other
   # .env names), and both copies keep its owner and mode (-p, then overwrite in place).

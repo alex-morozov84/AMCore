@@ -1035,18 +1035,64 @@ shorter than the worker needs); in Kubernetes the pod default is
 raise it if you add slow shutdown steps — nothing in the repository can verify a
 live deployment's value.
 
-When stopping the whole Compose stack, stop application clients first. Wait for
-that command to finish and inspect their logs and exit states before stopping
-PostgreSQL and Redis. A single `stop` command with all service names does not
-establish this order. Use the deployment's original project, files and profiles:
+Before stopping the whole stack, suspend deployment automation, scheduled jobs and
+operator commands that can start new database or Redis clients. Keep PostgreSQL
+and Redis running until all clients finish. A single `stop` command with all
+service names does not establish this order. Use the original project, files and
+profiles throughout, including `backup` when enabled.
 
-```bash
-docker compose stop caddy api web worker
-docker compose ps -a caddy api web worker
-docker compose logs --tail=100 api worker
-# Continue only after client shutdown completes without an unexplained crash.
-docker compose stop postgres redis
-```
+1. Stop application clients and inspect their logs and exit states:
+
+   ```bash
+   docker compose stop caddy api web worker
+   docker compose ps -a
+   docker compose logs --tail=100 api worker
+   ```
+
+   Investigate unexplained crashes before continuing. Inventory active one-off
+   containers too, including migration, seed, restore and operator SQL commands.
+   Wait for each operation to finish and inspect its exit state and result. Do not
+   interrupt a migration or restore merely to advance shutdown. If its outcome is
+   uncertain, keep the infrastructure running and resolve that operation first.
+
+2. Stop the optional backup service while PostgreSQL is still available. If a new
+   complete backup is required, first wait for the matching `[backup] completed`
+   log and record its exact `.dump` filename. Then stop the service:
+
+   ```bash
+   docker compose logs --tail=100 backup
+   docker compose stop backup
+   docker compose ps -a backup
+   ```
+
+   Skip these commands if no backup service exists. An idle service is stopped
+   too, so it cannot start another dump. Stopping during `pg_dump` can leave a
+   `.dump.tmp` file; never treat that partial file as a completed backup. Confirm
+   the selected `.dump` has a matching completion log and validate it through the
+   [backup verification procedure](backup-restore.md#restore-drill-rehearsing-a-restore-not-just-taking-one).
+   A successful stop does not certify an archive or imply successful backup work.
+
+3. Verify that no clients remain, including external schedulers, SQL shells,
+   backup tools and Redis consumers. `docker compose ps -a` must show no running
+   project database/Redis client, including one-off containers. On a trusted
+   PostgreSQL administrator connection, the following query must return no rows:
+
+   ```sql
+   SELECT pid, usename, datname, application_name, state
+   FROM pg_stat_activity
+   WHERE backend_type = 'client backend' AND pid <> pg_backend_pid();
+   ```
+
+   Check Redis `CLIENT LIST` through its approved administrator connection; only
+   that inspection connection may remain. Close the inspection connections after
+   checking. If clients remain or reconnect, identify and stop their owners before
+   proceeding. Do not kill unknown sessions to bypass this check.
+
+4. Only after these checks, stop the bundled infrastructure:
+
+   ```bash
+   docker compose stop postgres redis
+   ```
 
 The application owns its PostgreSQL pool error listener through adapter disconnect
 and pool teardown. An idle connection failure logs `prisma.pool_error` with
