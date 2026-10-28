@@ -196,6 +196,15 @@ An API key is bound to one organization at creation. The runtime re-verifies on 
 
 Use one key per (owner, organization) pair. To grant cross-org access, issue multiple keys.
 
+### Failed attempts
+
+The API counts failed key verifications per source address and per key fingerprint. After
+100 failures from one address or 20 for one key within an hour, requests return `429`
+with `RATE_LIMIT_EXCEEDED` until the counters expire. When the counters cannot be
+checked, the API returns `503` with `SERVICE_UNAVAILABLE` and does not verify the key.
+Repeat the request after a short delay. A valid key still works if clearing its own
+counter fails. See [failure counters](concepts.md#api-key-and-invitation-failure-counters).
+
 ---
 
 ## Listing API keys

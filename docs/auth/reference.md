@@ -150,7 +150,8 @@ Returned in the response root `errorCode`:
 | `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable       |
 | `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                        |
 | `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                        |
-| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend)                              |
+| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)  |
+| `SERVICE_UNAVAILABLE`           | 503  | A failure-protection counter could not be checked; repeat later       |
 | `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session                                          |
 | `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                |
 | `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                              |
@@ -244,3 +245,7 @@ Login and password step-up can return429 with Retry-After 900 (pair block) or864
 `SERVICE_UNAVAILABLE`; no new session or step-up token is issued. A dispatched
 counter update may already have executed when its reply is lost. The limiter does
 not replay it. See [brute-force protection](concepts.md#brute-force-protection).
+
+API key authentication and invitation accept return the same `503` before any
+credential or invitation work when their
+[failure counters](concepts.md#api-key-and-invitation-failure-counters) cannot be checked.

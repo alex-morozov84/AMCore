@@ -36,6 +36,26 @@ AMCore is a **modular monolith**. The rules that keep it modular:
 - **Redis is shared infrastructure, not an event bus.** It backs caches, locks, rate
   limits, idempotency, OAuth state, and BullMQ — it is not a mandatory module
   message bus.
+- **Redis access: one purpose-built operation per need; there is no generic cache
+  layer.** The API has no `CacheModule`. Inject `REDIS_CLIENT` and use the command that
+  fits the job: `SET … NX PX` for a claim, a token-checked lock
+  ([`redis-lock.service.ts`](../../apps/api/src/infrastructure/redis/redis-lock.service.ts)),
+  or an `eval` script that receives every key it touches in `KEYS`. A hot-read cache
+  follows [`user-cache.service.ts`](../../apps/api/src/core/auth/user-cache.service.ts).
+  - **Failure counters over an address key and a credential key** use
+    [`AbuseCounterStore`](../../apps/api/src/infrastructure/redis/abuse-counter.store.ts):
+    plain integers under `rate:v2:…`, one atomic script per update that validates both
+    keys before writing, and an error — never zero — for any other value. It needs one
+    Redis server and does not reserve admission.
+  - **A request-path call that must not wait forever** goes through
+    [`BoundedRedis`](../../apps/api/src/infrastructure/redis/bounded-redis.ts). It gives
+    the caller a typed error at a deadline, aborts a command that is still queued and
+    never retries. A command already sent can still run, and a connection that stalls
+    without closing keeps its operations counted (up to a fixed limit) until it errors or
+    closes. It does not bound other users of the shared client. Tests use the
+    `redis-transport-stall` fixture
+    ([`apps/api/test/fixtures`](../../apps/api/test/fixtures/redis-transport-stall.ts))
+    to hold replies from a real server.
 
 `core/` holds domain modules (auth, organizations, api-keys, admin).
 `infrastructure/` holds cross-cutting providers (email, queue, storage, redis,

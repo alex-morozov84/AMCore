@@ -180,6 +180,42 @@ a new session or step-up token. A timeout after sending a Redis command can leav
 its effect unknown. The limiter never retries that command or clears counters to
 hide uncertainty. See the [coordinated upgrade](../operations/deployment.md#password-limiter-upgrade-and-rollback).
 
+### API key and invitation failure counters
+
+API key verification and invitation accept keep two failure counters in Redis: one per
+source address and one per credential fingerprint. The fingerprint is a truncated hash;
+the credential itself is never stored or logged.
+
+| Counter                    | Limit               | Expires                       |
+| -------------------------- | ------------------- | ----------------------------- |
+| Per source address         | 100 failed attempts | 1 hour after the last failure |
+| Per credential fingerprint | 20 failed attempts  | 1 hour after the last failure |
+
+- A request over either limit returns `429` with `RATE_LIMIT_EXCEEDED` and
+  `retryAfterSeconds: 3600`, before any database work.
+- One atomic Redis script updates both counters, so concurrent failures do not lose
+  increments. A valid credential clears only its fingerprint counter and keeps the
+  source-address counter.
+- The limit does not reserve capacity. Requests that passed the check can finish after
+  another request reaches the limit.
+- If a counter cannot be read, the request fails closed: `503` with
+  `SERVICE_UNAVAILABLE`, before any credential or invitation work. It is safe to
+  repeat the request after a short delay.
+- If recording a failed attempt fails, an API key request also returns `503`. An
+  invitation keeps its original error, and that attempt may not be counted. A
+  timeout after the command was sent leaves the effect unknown, and the API never
+  repeats it.
+- A value that is not a canonical integer under a counter key is an error, never
+  zero. The API logs `abuse_counter.check_failed`, `abuse_counter.record_failed` or
+  `abuse_counter.reset_failed` with the case (`not_sent` or `unknown`) and the
+  fingerprint.
+- Counters need one Redis server. The two keys are not guaranteed to share a cluster slot.
+- These Redis calls wait at most a fixed deadline (`BOUNDED_REDIS_DEADLINE_MS`). The
+  deadline limits how long a caller waits. It does not cancel a command that was
+  already sent, and it does not bound other users of the shared Redis client. A
+  connection that stalls without closing keeps its operations counted until it
+  errors or closes, so new requests then fail fast with `503`.
+
 ---
 
 ## What "verified email" means

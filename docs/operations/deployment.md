@@ -1631,8 +1631,8 @@ After trusted SUPER_ADMIN access, migrations and guarded role initialization, us
 
 ## Password limiter upgrade and rollback
 
-This auth change retains existing Redis key names, Keyv JSON envelopes and expiry
-policy. It replaces get/set writers with atomic scripts. Mixed old/new writers are
+This auth change retains existing Redis key names, JSON counter envelopes
+(`{"value":N,"expires":ms}`) and expiry policy. It replaces get/set writers with atomic scripts. Mixed old/new writers are
 unsafe: old success still clears aggregate debt and old failures can lose updates.
 
 For the reference Compose deployment, take the web/API entry routes out of service
