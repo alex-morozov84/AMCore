@@ -124,8 +124,14 @@ Restore is a **one-shot**, like the `migrate` service — it never runs on a
 normal `docker compose up`. It requires its own profile _and_ an explicit
 `run`, so it cannot fire by accident:
 
+Before running restore, prepare and verify the target database, stop all writers,
+and follow the full [recovery sequence](single-host-compose.md#restore-a-database-dump).
+Keep writers stopped until that sequence permits startup. Use the same project,
+environment and complete Compose file list throughout; `--no-deps` requires the
+target database to be ready and prevents implicit infrastructure startup.
+
 ```bash
-docker compose --profile restore run --rm restore <dump-filename>
+docker compose --profile restore run --rm --no-deps restore <dump-filename>
 ```
 
 This is destructive by design for every object the dump contains
@@ -163,43 +169,55 @@ verification:
 docker compose --profile restore-drill run --rm restore-drill
 ```
 
-It mounts the shared backup volume **read-only**, finds the most recent
-`amcore-*.dump`, and restores it into a **throwaway Postgres instance that
-lives only inside that one container's own filesystem** (`initdb`/`pg_ctl`
-against a scratch data directory under `/tmp`), then checks that the
-restored database actually has tables in it — everything is gone whether the
-drill passes or fails. `postgres:18-alpine` declares
-`/var/lib/postgresql` as a Docker volume, which would otherwise leave an
-empty anonymous volume behind on every run regardless of `/tmp` being used
-for the actual scratch data; the compose service overrides that path with a
-`tmpfs` mount instead, so no Docker volume is ever created there — `run
---rm` and `up` are equally clean, verified by volume-count before/after
-both. Unlike `restore` above, this script never reads
-`DATABASE_URL`/`COMPOSE_DATABASE_URL`, has no dependency on the real
-`postgres` service, and cannot write to the backup volume it reads from — it
-is structurally incapable of touching production data or corrupting the
-dumps it's verifying, so it is safe to run against a live production host at
-any time without coordinating a maintenance window for _that_ reason. It is
-**not** free of resource cost, though: it materializes a full copy of your
-database inside the container for the duration of the run, so budget disk
-headroom (roughly your database's size) and expect real CPU/IO load
-proportional to its size — schedule it for a low-traffic window if that
-matters for your host. A non-zero exit code means the drill failed; treat
-that the same as a failed backup, not a formality.
+It mounts backups read-only and restores the selected archive into a temporary
+Postgres instance under `/tmp`, using only a Unix socket with Docker networking disabled. It never reads a live
+database URL. The container's `/var/lib/postgresql` mount is temporary too; the
+drill leaves no database volume. Allow disk/CPU/IO for a full database copy.
 
-This only proves the dump is a well-formed, restorable Postgres archive that
-produces a non-empty schema. Two things it deliberately does **not** check:
-row-level data correctness (it cannot, without knowing your current schema),
-and that restoring ownership/ACLs (`GRANT`/`REVOKE`) against a target
-cluster's roles would succeed — the drill's own scratch cluster has none of
-your database's roles, so it runs `pg_restore --no-owner --no-privileges` to
-skip both rather than fail on every one of them. If you adopt [production DB
-role separation](database-role-separation.md) (a migrator role distinct from
-the app's runtime role), that ownership/ACL restore path is a separate thing
-to verify in its own right; this drill proves the data restores, not that
-your grants would come back with it. It
-closes the exact gap GitLab's incident illustrates (a backup nobody had
-verified could actually restore), not every possible backup failure mode.
+The default structural check requires `core.users`, `core.organizations`,
+`core.org_members` and a completed, well-formed migration history. Empty business
+tables are valid. A ledger-only archive or unresolved migration fails. A fork that
+changes these relations must deliberately replace the read-only mounted
+`/scripts/restore-baseline.sql`; keep the lifecycle script unchanged.
+
+Structural success does not prove row correctness, exact migration compatibility,
+or ownership/ACL restoration. The scratch cluster skips owners and grants because
+it has none of the original roles. Verify the actual target separately below.
+
+For selected-data proof, choose an explicit dump and a protected assertion file:
+
+```sh
+docker compose --profile restore-drill run --rm --no-deps \
+  --volume /absolute/private/expected.sql:/checks.sql:ro \
+  restore-drill <dump-filename> /checks.sql
+```
+
+Capture expectations from the source **before backup, during the same write pause**.
+Keep them off-host beside the dump, source revision and file/archive checksums.
+Assertions derived only from the restored data cannot detect missing source data.
+Use trusted SQL that raises an error on mismatch, for example:
+
+```sql
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM core.users WHERE id = '<expected-user-id>') THEN
+    RAISE EXCEPTION 'Expected user missing';
+  END IF;
+END $$;
+```
+
+Replace the placeholder in the private file with the recorded synthetic/user fact.
+Add expected organization membership, selected field values and exact migration
+names/checksums for your recovery goal. Assert zero explicitly when zero is expected.
+`SELECT false` and a query returning no rows do **not** signal failure.
+The drill runs `psql -X` with `ON_ERROR_STOP` and a read-only transaction. Requested
+missing/empty SQL or missing explicit dump fails; no fallback to another archive.
+SQL and archives are trusted executable inputs, not a hostile-code sandbox.
+Keep them mode 0600 in a private directory; normal verdicts need no user-row output.
+
+Output distinguishes structural success from selected-data assertion success.
+Without assertions, it prints `selected-data assertions NOT REQUESTED`. Neither
+verdict certifies all business data or target permissions. Scheduled backups keep
+their existing format; assertion files are optional, operator-owned evidence.
 
 **Run it on a schedule, not just once.** Like the `backup` service, this
 profile has no built-in wall-clock scheduler — wire it to your host's own
@@ -294,10 +312,122 @@ key; see [API-key restore safety](api-key-lifecycle.md#restore).
 
 ## Local file storage
 
-Postgres backups do not include application files. For STORAGE_DRIVER=local,
-back up the persistent shared storage volume separately: objects/, meta/ and
-public/ must be consistent, using a filesystem snapshot or pausing API/worker
-writes. Store backups outside the VPS and define retention/RPO. Restore them
-with runtime uid/gid 1001 permissions to an isolated deployment, verify private
-and public access, and test persistence across container recreation. Exclude
-objects/.amcore-probes/ and meta/.amcore-probes/ from application backups. See [local production storage](../storage/configuration.md#local-production).
+For `STORAGE_DRIVER=local`, recover the database and shared `local_storage` volume
+from one write pause. The volume contains `objects/`, `meta/` and `public/`;
+public keys already start `public/`, so public copies can live under
+`public/public/`. Preserve that nesting. PostgreSQL dumps do not include these files.
+
+### Capture a recovery set
+
+1. Record the deployment revision and matching images. Prepare known data: a user,
+   organization/member, authenticated private file and public avatar. Use the existing
+   [private artifact upload/download](../ai/artifacts.md) without creating a run or
+   contacting an AI provider, and [account avatar](../media/README.md#avatar-flow-the-shipped-example) controls.
+2. Close ingress and drain/stop web, API, worker, backup and all custom writers.
+   Verify no writer remains. Only then record expected rows, file hashes/metadata
+   and DB file references in a protected directory. Keep writers stopped while
+   recording these expectations and capturing both database and files. File objects,
+   sidecars and public copies are separate writes; a live tar is not consistent.
+3. Take a one-shot DB dump through the existing restore service with the owner URL:
+
+   ```sh
+   docker compose --profile restore run --rm --no-deps --entrypoint sh restore \
+     -c 'set -eu; umask 077; test ! -e /backups/recovery.dump; test ! -e /backups/recovery.dump.tmp; pg_dump --dbname="$DATABASE_URL" -Fc -f /backups/recovery.dump.tmp; mv /backups/recovery.dump.tmp /backups/recovery.dump'
+   ```
+
+   Use a new recovery filename/directory; never overwrite your only good copy.
+   Capture migration names/checksums from the source and compare them after recovery.
+
+4. Resolve the actual `local_storage` mount from the recorded API container with
+   `docker inspect`; confirm its project and volume labels with `docker volume inspect`.
+   Do not guess the project prefix. Create an empty private host backup directory:
+
+   ```sh
+   mkdir -m 700 /absolute/private/recovery-set
+   sh scripts/recovery-files.sh backup <project> <actual-volume> /absolute/private/recovery-set
+   ```
+
+   The helper refuses a missing/foreign volume or running volume consumer before
+   mounting. It supports Compose-owned `local_storage`, regular files/directories
+   and ASCII letters/digits/`_./-` names. Links/devices/hard links and other names
+   are refused. It uses the reference Postgres 18 Alpine tar, excludes only
+   `objects/.amcore-probes/` and `meta/.amcore-probes/`, and refuses existing output.
+
+5. Export the dump from the backup volume into the same private host directory:
+
+   ```sh
+   docker compose --profile restore run --rm --no-deps \
+     --volume /absolute/private/recovery-set:/export \
+     --env EXPORT_UID="$(id -u)" --env EXPORT_GID="$(id -g)" \
+     --entrypoint sh restore -c '
+       set -eu; umask 077
+       test ! -e /export/database.dump
+       cp /backups/recovery.dump /export/database.dump
+       cd /export; sha256sum database.dump > database.dump.sha256
+       chown "$EXPORT_UID:$EXPORT_GID" database.dump database.dump.sha256
+     '
+   ```
+
+   The file helper also gives its archive/checksum to the invoking host user.
+   Keep protected assertions, migration checksums and revision/image identity here.
+   Copy this directory to your prepared private off-host destination over SSH.
+   There, run `sha256sum -c database.dump.sha256 local-files.tar.sha256` before
+   deleting any source data. Restrict access and encrypt off-host copies according
+   to your backup policy. A checksum detects damage; trust the original set.
+
+### Restore while closed
+
+1. Verify the intact off-host set. Select an empty, isolated target with original
+   roles and matching artifacts. Follow the single-host
+   [recovery admission order](single-host-compose.md#restore-a-database-dump).
+   Decide Redis/queue/credential reconciliation before reopening; DB/files alone
+   do not restore queues or prevent replay of outside effects.
+2. Copy the verified set to a private directory on the isolated target. If the
+   selected dump already exists in its backup volume, compare its SHA-256 with
+   the exported `database.dump` and skip import. Otherwise import without overwrite:
+
+   ```sh
+   docker compose --profile restore run --rm --no-deps \
+     --volume /absolute/private/recovery-set:/import:ro --entrypoint sh restore -c '
+       set -eu; umask 077
+       test ! -e /backups/recovery.dump
+       cp /import/database.dump /backups/recovery.dump
+     '
+   docker compose --profile restore run --rm --no-deps restore recovery.dump
+   ```
+
+   Use the target's saved configuration and an explicitly verified database URL.
+   Do not start migrations, seed or application services. Verify selected rows,
+   migration names/checksums and [target role/grant behavior](#verify-a-role-separated-restore).
+
+3. Preserve source data/backups. On a new isolated target, create stopped application
+   containers and their named volumes from the matching prepared images:
+
+   ```sh
+   docker compose create --no-build api worker
+   ```
+
+   This can create stopped dependency containers; it starts no process. Do not run
+   `up` before validation. Inspect the API container's actual storage mount and the
+   volume labels. The destination must be empty. With every consumer stopped, run:
+
+   ```sh
+   sh scripts/recovery-files.sh restore <project> <actual-empty-volume> /absolute/private/recovery-set
+   ```
+
+   The helper verifies the checksum, bounded paths/types and empty target before
+   extraction, then restores uid/gid 1001 access
+   with directories 0750 and files 0640. It never mounts the archive writable.
+   A validation refusal writes nothing. An I/O/extraction failure can leave a partial
+   target: keep writers stopped, discard/recreate **only that owned disposable target**,
+   and retry from the intact off-host set. Never retry over partial files.
+
+4. Compare bytes, metadata, public copies and DB references before starting ordinary
+   writers. After credential reconciliation and ordered startup, verify authenticated
+   private download, unauthorized-private refusal, public avatar and API/worker I/O.
+   Recreate only the application containers and verify persistence again. A failed
+   check keeps ingress closed. A successful storage health probe alone is insufficient.
+
+This procedure demonstrates a coordinated DB/files recovery point. It does not
+implement PITR, S3 recovery, Redis backup, post-backup session revocation or universal
+message replay safety. See [local production storage](../storage/configuration.md#local-production).

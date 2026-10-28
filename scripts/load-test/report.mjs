@@ -29,6 +29,13 @@ const keyValues = (file) =>
         )
     : []
 
+export function compareCommits(host, generator) {
+  const known = (value) =>
+    typeof value === 'string' && /^(?:[a-f\d]{40}|[a-f\d]{64})$/i.test(value) && !/^0+$/.test(value)
+  if (!known(host) || !known(generator)) return 'unknown'
+  return host.toLowerCase() === generator.toLowerCase() ? 'same' : 'different'
+}
+
 export function manifest(dir, mode) {
   const host = {}
   const containers = []
@@ -42,7 +49,8 @@ export function manifest(dir, mode) {
     // The reference protocol ran; whether the host class and data match capacity.md is a
     // comparison the reader makes from the host fields, not something the harness proves.
     referenceProtocol: mode === 'campaign',
-    sameCommit: Boolean(host.commit) && host.commit === generator.commit,
+    commitComparison: compareCommits(host.commit, generator.commit),
+    sameCommit: compareCommits(host.commit, generator.commit) === 'same',
     sameHarness: Boolean(host.harness_sha256) && host.harness_sha256 === generator.harness_sha256,
     host,
     generator,
@@ -100,7 +108,7 @@ export function report(dir, mode) {
       ? '**Smoke run:** not the reference protocol; never compare it with capacity.md.'
       : 'Reference protocol campaign. Compare the host fields below with capacity.md yourself.',
     `Run \`${m.host.run_id ?? 'unknown'}\`, commit \`${m.host.commit ?? 'unknown'}\` (uncommitted changes: ${m.host.dirty ?? 'unknown'}), ${m.host.arch ?? '?'}, ${m.host.cpus ?? '?'} CPUs, ${m.host.mem_total_mib ?? '?'} MiB, swap ${m.host.swap ?? 'unknown'}.`,
-    `Generator: ${m.generator.cpus ?? '?'} CPUs, ${m.generator.mem_total_mib ?? '?'} MiB; same commit as the host: ${m.sameCommit ? 'yes' : 'NO'}; same harness: ${m.sameHarness ? 'yes' : 'NO'}.`,
+    `Generator: ${m.generator.cpus ?? '?'} CPUs, ${m.generator.mem_total_mib ?? '?'} MiB; same commit as the host: ${m.commitComparison === 'unknown' ? 'unknown (not verified)' : m.sameCommit ? 'yes' : 'NO'}; same harness: ${m.sameHarness ? 'yes' : 'NO'}.`,
     '',
     'Rates in iterations/s (one visitor action, about 3 requests). Server p95 from the test-entry access log.',
     '',

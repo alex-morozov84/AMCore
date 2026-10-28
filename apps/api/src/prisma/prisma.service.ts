@@ -10,6 +10,7 @@ import { PrismaClient } from '../generated/prisma/client.js'
 import { MetricsService } from '../infrastructure/observability/index.js'
 
 import { ObservedTransactionRunner } from './observed-transaction.js'
+import { observePoolErrors } from './pool-errors.js'
 
 type SlowQueryEvent = {
   query: string
@@ -98,6 +99,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     })
 
     this.pool = pool
+    observePoolErrors(pool, logger, () => this.tearingDown)
     this.logger.setContext(PrismaService.name)
     // $on must be invoked with `this` bound to the PrismaClient instance — a
     // detached reference (`const f = this.$on; f(...)`) loses binding and Prisma

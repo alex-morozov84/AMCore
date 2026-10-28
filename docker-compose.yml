@@ -19,9 +19,11 @@
 # reverse proxy" → "Optional bundled edge: Caddy".
 #
 # Optional bundled backup/restore (COMPOSE_PROFILES=...,backup for scheduled
-# pg_dump snapshots; `--profile restore run --rm restore <file>` for the
+# pg_dump snapshots; `--profile restore run --rm --no-deps restore <file>` for the
 # one-shot restore). Logical-dump fallback only, NOT point-in-time recovery —
-# see docs/operations/backup-restore.md.
+# Prepare the target DB and stop writers first; follow the full recovery sequence
+# in docs/operations/single-host-compose.md → "Restore a database dump".
+# See docs/operations/backup-restore.md.
 #
 # Optional bundled monitoring (COMPOSE_PROFILES=...,monitoring): a dev-only
 # Prometheus + Grafana + Alertmanager harness that scrapes THIS stack's real
@@ -512,8 +514,9 @@ services:
   # ---------------------------------------------------------------------------
   # Optional bundled restore — one-shot, like `migrate`; never runs on a normal
   # `docker compose up`. Requires its own profile AND an explicit `run` so it
-  # cannot fire by accident:
-  #   docker compose --profile restore run --rm restore <dump-filename>
+  # cannot fire by accident. Prepare the target DB and stop writers first; follow
+  # docs/operations/single-host-compose.md → "Restore a database dump":
+  #   docker compose --profile restore run --rm --no-deps restore <dump-filename>
   # ---------------------------------------------------------------------------
   restore:
     image: postgres:18-alpine
@@ -545,6 +548,7 @@ services:
     image: postgres:18-alpine
     profiles: ['restore-drill']
     entrypoint: ['sh', '/scripts/restore-drill.sh']
+    network_mode: none
     # tmpfs, not a volume: postgres:18-alpine declares /var/lib/postgresql
     # (not the pre-18 /var/lib/postgresql/data) as a VOLUME, so Docker
     # allocates an anonymous volume there for every container regardless of
@@ -558,6 +562,7 @@ services:
       - /var/lib/postgresql
     volumes:
       - ./docker/postgres/restore-drill.sh:/scripts/restore-drill.sh:ro
+      - ./docker/postgres/restore-baseline.sql:/scripts/restore-baseline.sql:ro
       - postgres_backups:/backups:ro
     restart: 'no'
 

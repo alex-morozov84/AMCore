@@ -1,7 +1,9 @@
 #!/bin/sh
 # AMCore — optional bundled restore profile (COMPOSE_PROFILES=...,restore). See
-# docs/operations/backup-restore.md → "Restore". One-shot, invoked explicitly:
-#   docker compose --profile restore run --rm restore <dump-filename>
+# docs/operations/backup-restore.md → "Restore". Prepare the target DB and stop
+# writers first; follow docs/operations/single-host-compose.md →
+# "Restore a database dump". One-shot, invoked explicitly:
+#   docker compose --profile restore run --rm --no-deps restore <dump-filename>
 # Destructive for every object present in the dump (dropped and recreated) —
 # NOT a full database wipe: target objects absent from the dump are untouched.
 set -eu
@@ -15,6 +17,7 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
+case "$1" in '' | . | .. | */*) echo 'invalid dump basename' >&2; exit 1 ;; esac
 dump_file="${BACKUP_DIR}/$1"
 if [ ! -f "$dump_file" ]; then
   echo "error: ${dump_file} not found" >&2
@@ -28,5 +31,5 @@ echo "[restore] restoring ${dump_file} into the database at DATABASE_URL"
 # clean replacement). --no-owner: the dump may have been taken under a
 # different role than the target's, so don't try to reassign ownership to
 # roles that might not exist there.
-pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" "$dump_file"
+pg_restore --exit-on-error --clean --if-exists --no-owner --dbname="$DATABASE_URL" "$dump_file"
 echo "[restore] done"

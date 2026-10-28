@@ -25,12 +25,24 @@ FILES=$(envval COMPOSE_FILE)
 for f in docker-compose.yml docker/compose/postgres-tls.yml docker/compose/web.yml docker/compose/bff-relay.yml docker/compose/load-test.yml; do
   echo ":$FILES:" | grep -q ":$f:" || die "COMPOSE_FILE must include $f"
 done
-for f in $(echo "$FILES" | tr ':' ' '); do
+PRIVATE_OVERRIDE=/srv/amcore-secrets/migration-cli.override.yml
+case "$FILES" in
+  *":$PRIVATE_OVERRIDE") ;;
+  *) die "COMPOSE_FILE must end with $PRIVATE_OVERRIDE" ;;
+esac
+[ -r "$PRIVATE_OVERRIDE" ] || die 'native migration override is unreadable'
+BASE_FILES=${FILES%:"$PRIVATE_OVERRIDE"}
+for f in $(echo "$BASE_FILES" | tr ':' ' '); do
   case "$f" in
     docker-compose.yml | docker/compose/postgres-tls.yml | docker/compose/web.yml | docker/compose/bff-relay.yml | docker/compose/load-test.yml | docker/compose/supervise.yml | docker/compose/prod.yml) ;;
     *) die "COMPOSE_FILE entry $f is not part of the supported load-test topology" ;;
   esac
 done
+TAIL_FILES=docker/compose/postgres-tls.yml:docker/compose/web.yml:docker/compose/bff-relay.yml:docker/compose/load-test.yml
+case "$BASE_FILES" in
+  "docker-compose.yml:$TAIL_FILES" | "docker-compose.yml:docker/compose/supervise.yml:$TAIL_FILES" | "docker-compose.yml:docker/compose/prod.yml:$TAIL_FILES") ;;
+  *) die 'COMPOSE_FILE has unsupported overlay order or duplicates' ;;
+esac
 echo ",$(envval COMPOSE_PROFILES)," | grep -q ',local-infra,' || die "COMPOSE_PROFILES must include local-infra (bundled database owned by this run)"
 
 # Run identity and inputs.
@@ -40,6 +52,16 @@ ipv4 "$GEN" || die "LOAD_TEST_GENERATOR_IP must be one IPv4 address (IPv6 and ra
 [ -s "$CA_DIR/ca.crt" ] || die "LOAD_TEST_CLIENT_CA_DIR must hold ca.crt"
 [ ! -e "$CA_DIR/ca.key" ] || die "keep the client CA private key out of LOAD_TEST_CLIENT_CA_DIR"
 [ -s "$SECRETS/fixture-password" ] || die "LOAD_TEST_SECRETS_DIR must hold fixture-password"
+
+check_override() (
+  private_dir=$(mktemp -d) || exit
+  trap 'rm -rf "$private_dir"' EXIT
+  chmod 700 "$private_dir" || exit
+  lt_compose COMPOSE_FILE="$BASE_FILES" config --format json > "$private_dir/base.json" || exit
+  lt_compose config --format json > "$private_dir/full.json" || exit
+  docker run --rm -v "$private_dir:/d:ro" -v "$LT_DIR:/lt:ro" "$NODE_IMAGE" \
+    node /lt/override-check.mjs /d/base.json /d/full.json
+)
 
 adapted() {
   docker run --rm -e CADDY_DOMAIN="$(envval CADDY_DOMAIN)" -e CADDY_WEB_DOMAIN="$(envval CADDY_WEB_DOMAIN)" \
@@ -54,6 +76,7 @@ check_config() { # check_config <json-file>
 case "$MODE" in
   plan)
     warn_overrides
+    check_override || die "native migration override validation failed"
     lt_compose config --quiet || die "docker compose config failed"
     check_target "$PROJECT" "$RUN"
     TMP=$(mktemp)
@@ -65,6 +88,7 @@ case "$MODE" in
     ;;
   live)
     warn_overrides
+    check_override || die "native migration override validation failed"
     VOLUME="${PROJECT}_postgres_data_pg18"
     LABEL=$(docker volume inspect "$VOLUME" --format '{{index .Labels "org.amcore.load-test"}}' 2> /dev/null) ||
       die "volume $VOLUME not found"

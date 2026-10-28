@@ -647,6 +647,21 @@ jobs:
           AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-operations.json
         run: node scripts/verify-migrator-operations.mjs "$AMCORE_API_MIGRATOR_IMAGE"
 
+      - name: Verify database and local-file archive recovery
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/archive-recovery.json
+        run: |
+          node scripts/verify-recovery.mjs
+          node scripts/verify-load-test-compose.mjs
+
+      - name: Verify load entry recovery and Linux model ownership
+        run: node --test --test-concurrency=1 scripts/load-test/test/recover-ownership.live.mjs scripts/load-test/test/recover.live.mjs
+
+      - name: Verify load migration TLS and restored grants
+        env:
+          AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/recovery-tls.json
+        run: node scripts/verify-recovery-tls.mjs "$AMCORE_API_MIGRATOR_IMAGE"
+
       - name: Verify migration isolation and cleanup failure
         env:
           AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/migrator-network.json
@@ -671,7 +686,7 @@ jobs:
         if: always()
         run: |
           cleanup_status=0
-          for journal in migrator-operations migrator-network migrator-negative migrator-advisory \
+          for journal in migrator-operations archive-recovery recovery-tls migrator-network migrator-negative migrator-advisory \
             migrator-interrupt.json.sigterm migrator-interrupt.json.sigint migrator-interrupt.json.sigkill; do
             case "$journal" in
               *.json.*) path="$RUNNER_TEMP/$journal" ;;

@@ -113,6 +113,18 @@ test('hosted operations and failure controls preserve independent recovery', () 
         assert.ok(cleanup.run.includes(`${journal}.${signal}`))
     } else assert.ok(cleanup.run.includes(journal.replace(/\.json$/, '')))
   }
+  for (const name of [
+    'Verify database and local-file archive recovery',
+    'Verify load migration TLS and restored grants',
+  ]) {
+    const step = steps.find((s) => s.name === name)
+    assert.ok(step)
+    assert.equal(step['continue-on-error'], undefined)
+    const journal = step.env.AMCORE_MIGRATOR_LIFECYCLE_JOURNAL.split('/')
+      .at(-1)
+      .replace(/\.json$/, '')
+    assert.ok(cleanup.run.includes(journal))
+  }
   assert.match(cleanup.run, /\|\| cleanup_status=1/)
   assert.match(cleanup.run, /exit "\$cleanup_status"/)
 })

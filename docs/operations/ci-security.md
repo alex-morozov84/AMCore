@@ -57,7 +57,12 @@ of workflow self-hardening to keep the example forkable.
     The same Docker smoke job declares native migration cancellation, roles/TLS,
     history and recovery checks. Its negative controls test network isolation,
     interrupted verification, independent cleanup and missing lifecycle protections.
-    Cleanup runs independently with `always()` and cannot erase an earlier failure.
+    It also verifies real database/file archive recovery and strict load-test
+    migration TLS configuration with separate recovery journals.
+    Cleanup for these journaled checks runs independently with `always()` and
+    cannot erase an earlier failure. The same job runs blocking Linux tests for
+    Caddy test-entry removal without changing database data and private model-file
+    ownership for a non-root operator.
 - **Test** is the aggregate for unit+real-Redis, capability extension,
   notification/AI extension, focused API fallback and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.
