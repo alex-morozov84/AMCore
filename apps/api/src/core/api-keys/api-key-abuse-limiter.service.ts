@@ -1,13 +1,12 @@
 import { createHash } from 'node:crypto'
 
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'
-import type { Cache } from 'cache-manager'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions/index.js'
+import { AppException, ServiceUnavailableException } from '../../common/exceptions/index.js'
+import { AbuseCounterError, AbuseCounterStore } from '../../infrastructure/redis/index.js'
 
 // Defaults match the LoginRateLimiterService style (hardcoded starter
 // constants; tune by code change, not env). IP and fingerprint counters
@@ -15,7 +14,7 @@ import { AppException } from '../../common/exceptions/index.js'
 // CI runs, key rotation moments) without leaving brute-force much room.
 const IP_MAX = 100
 const FINGERPRINT_MAX = 20
-const COUNTER_TTL_MS = 60 * 60 * 1000 // 1 hour rolling window
+const COUNTER_TTL_MS = 60 * 60 * 1000 // 1 hour of inactivity since the last failure
 
 /**
  * Brute-force protection on API-key verification failures (AK-07).
@@ -23,7 +22,9 @@ const COUNTER_TTL_MS = 60 * 60 * 1000 // 1 hour rolling window
  * Counts failed verifies along two dimensions in Redis: per-IP and
  * per-key-fingerprint. Either counter going over its limit causes the
  * next attempt to return 429 + RATE_LIMIT_EXCEEDED — auth never even
- * touches the DB.
+ * touches the DB. Both counters are updated by one atomic script, so
+ * concurrent failures are not lost; the limit is still not a reservation:
+ * requests that already passed `check` can exceed it by the number in flight.
  *
  * The "fingerprint" is `sha256(shortToken).slice(0, 16)` rather than the
  * raw shortToken. shortToken is technically harmless without longToken
@@ -35,11 +36,16 @@ const COUNTER_TTL_MS = 60 * 60 * 1000 // 1 hour rolling window
  * deliberately leaves the IP counter alone — otherwise an attacker with
  * one valid key could wipe their per-IP failure history by interleaving
  * one success between bad attempts.
+ *
+ * When the counters cannot be read or recorded (Redis down, over its
+ * deadline, or an unexpected value) the methods answer 503 instead of
+ * treating the state as zero. Whether a timed-out record was applied is
+ * unknown; the `abuse_counter.*_failed` warning carries that case.
  */
 @Injectable()
 export class ApiKeyAbuseLimiterService {
   constructor(
-    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly counters: AbuseCounterStore,
     private readonly logger: PinoLogger
   ) {
     this.logger.setContext(ApiKeyAbuseLimiterService.name)
@@ -51,10 +57,11 @@ export class ApiKeyAbuseLimiterService {
 
   /** Throws 429 if either counter is already at or above its limit. */
   async check(ip: string, fingerprint: string): Promise<void> {
-    const ipCount = (await this.cache.get<number>(this.ipKey(ip))) ?? 0
-    const fpCount = (await this.cache.get<number>(this.fingerprintKey(fingerprint))) ?? 0
+    const counts = await this.protect('check', fingerprint, () =>
+      this.counters.read(this.ipKey(ip), this.fingerprintKey(fingerprint))
+    )
 
-    if (ipCount >= IP_MAX || fpCount >= FINGERPRINT_MAX) {
+    if (counts.ip >= IP_MAX || counts.subject >= FINGERPRINT_MAX) {
       throw new AppException(
         'Too many failed API key attempts. Please try again later.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -64,30 +71,53 @@ export class ApiKeyAbuseLimiterService {
     }
   }
 
-  /** Increments both counters; logs WARN with the fingerprint, not the token. */
+  /** Records one failed attempt on both counters; logs WARN with the fingerprint, not the token. */
   async consume(ip: string, fingerprint: string): Promise<void> {
-    const ipCount = ((await this.cache.get<number>(this.ipKey(ip))) ?? 0) + 1
-    await this.cache.set(this.ipKey(ip), ipCount, COUNTER_TTL_MS)
-
-    const fpCount = ((await this.cache.get<number>(this.fingerprintKey(fingerprint))) ?? 0) + 1
-    await this.cache.set(this.fingerprintKey(fingerprint), fpCount, COUNTER_TTL_MS)
+    const counts = await this.protect('record', fingerprint, () =>
+      this.counters.increment(this.ipKey(ip), this.fingerprintKey(fingerprint), COUNTER_TTL_MS)
+    )
 
     this.logger.warn(
-      { ip, keyFingerprint: fingerprint, ipCount, fpCount },
+      { ip, keyFingerprint: fingerprint, ipCount: counts.ip, fpCount: counts.subject },
       'Failed API key verification'
     )
   }
 
   /** Clears the fingerprint counter only — IP counter must not be reset. */
   async reset(fingerprint: string): Promise<void> {
-    await this.cache.del(this.fingerprintKey(fingerprint))
+    await this.protect('reset', fingerprint, () =>
+      this.counters.clear(this.fingerprintKey(fingerprint))
+    )
+  }
+
+  private async protect<T>(
+    step: 'check' | 'record' | 'reset',
+    fingerprint: string,
+    call: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await call()
+    } catch (error) {
+      if (!(error instanceof AbuseCounterError)) throw error
+      this.logger.warn(
+        {
+          event: `abuse_counter.${step}_failed`,
+          keyClass: 'api_key',
+          case: error.outcome,
+          reason: error.kind,
+          keyFingerprint: fingerprint,
+        },
+        'API key abuse counter unavailable'
+      )
+      throw new ServiceUnavailableException('API key protection temporarily unavailable')
+    }
   }
 
   private ipKey(ip: string): string {
-    return `rate:api_key_fail_ip:${ip}`
+    return `rate:v2:api_key_fail_ip:${ip}`
   }
 
   private fingerprintKey(fingerprint: string): string {
-    return `rate:api_key_fail_token:${fingerprint}`
+    return `rate:v2:api_key_fail_token:${fingerprint}`
   }
 }

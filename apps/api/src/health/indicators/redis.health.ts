@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus'
-import type { Cache } from 'cache-manager'
+
+import { BoundedRedis } from '../../infrastructure/redis/index.js'
 
 @Injectable()
 export class RedisHealthIndicator {
   constructor(
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly redis: BoundedRedis,
     private readonly healthIndicatorService: HealthIndicatorService
   ) {}
 
@@ -19,11 +19,15 @@ export class RedisHealthIndicator {
       // Test Redis connectivity by setting and getting a test value. Each probe owns its
       // key: probes overlap across endpoints and across replicas sharing one Redis, and a
       // shared key would let one probe read another's value and report a false mismatch.
+      // One deadline covers both commands: the read is not sent once it has passed.
       const testValue = randomUUID()
       const testKey = `__health_check__:${testValue}`
 
-      await this.cacheManager.set(testKey, testValue, 1000) // 1 second TTL
-      const result = await this.cacheManager.get<string>(testKey)
+      const result = await this.redis.run(async (client, signal) => {
+        await client.set(testKey, testValue, { expiration: { type: 'PX', value: 1000 } })
+        signal.throwIfAborted()
+        return client.get(testKey)
+      })
 
       if (result === testValue) {
         return indicator.up()

@@ -1,5 +1,6 @@
 import type { ExecutionContext } from '@nestjs/common'
 
+import { ServiceUnavailableException } from '../../../common/exceptions'
 import {
   createMockContext,
   type MockContext,
@@ -283,6 +284,37 @@ describe('ApiKeyGuard', () => {
       expect(abuseLimiter.reset).toHaveBeenCalledWith(FINGERPRINT)
       expect(abuseLimiter.reset).toHaveBeenCalledTimes(1)
       expect(abuseLimiter.consume).not.toHaveBeenCalled()
+    })
+
+    it('keeps a verified key when reset() fails (best effort, the limiter logs it)', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
+      mockMembership({ found: true })
+      abuseLimiter.reset.mockRejectedValueOnce(new Error('protection unavailable'))
+
+      const result = await guard.canActivate(createMockExecutionContext(VALID_HEADER, '5.6.7.8'))
+
+      expect(result).toBe(true)
+      expect(abuseLimiter.reset).toHaveBeenCalledWith(FINGERPRINT)
+    })
+
+    it('propagates 503 from check() — fail closed, no DB work happens', async () => {
+      abuseLimiter.check.mockRejectedValueOnce(new ServiceUnavailableException('unavailable'))
+
+      await expect(
+        guard.canActivate(createMockExecutionContext(VALID_HEADER))
+      ).rejects.toBeInstanceOf(ServiceUnavailableException)
+
+      expect(apiKeysService.verifyByShortToken).not.toHaveBeenCalled()
+      expect(mockCtx.prisma.orgMember.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('propagates 503 from consume() when recording a failed verification fails', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(null)
+      abuseLimiter.consume.mockRejectedValueOnce(new ServiceUnavailableException('unavailable'))
+
+      await expect(
+        guard.canActivate(createMockExecutionContext(VALID_HEADER, '5.6.7.8'))
+      ).rejects.toBeInstanceOf(ServiceUnavailableException)
     })
 
     it('propagates 429 from check() — no DB work happens', async () => {

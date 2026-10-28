@@ -77,7 +77,9 @@ export class ApiKeyGuard implements CanActivate {
     // (e.g. a CI run with one bad attempt before fixing the key) doesn't
     // accumulate forever. IP counter intentionally stays — a single valid
     // key must not whitewash unrelated bad attempts from the same source.
-    await this.abuseLimiter.reset(fingerprint)
+    // Best effort: the key is already verified, and a failed cleanup only leaves
+    // fingerprint debt that makes the limit stricter. The limiter logs the failure.
+    await this.abuseLimiter.reset(fingerprint).catch(() => undefined)
 
     const principal: RequestPrincipal = {
       type: 'api_key',
