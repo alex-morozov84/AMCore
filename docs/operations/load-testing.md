@@ -211,10 +211,18 @@ updates (synchronous in-app notification), 60 team-page reads, 60 avatar uploads
 ## 6. Read the result
 
 `~/lt-work/out/report.md` has one row per step; `manifest.json` records commits, image
-digests, sizes, swap and the protocol. The header must say that host and generator ran the
-same commit and the same harness, otherwise the campaign is unusable. Whether the host and
-data match Capacity is your comparison of those fields. The `out` directory holds no key,
-cookie or password.
+digests, sizes, swap and the protocol. A reference campaign requires the same known
+commit and the same harness on both machines. Commit comparison accepts complete
+40- or 64-character hexadecimal object IDs. Missing or invalid IDs produce
+`commitComparison: unknown` and `sameCommit: false`; different known IDs produce
+`different`. Neither result confirms matching revisions.
+
+A matching harness identifies the test scripts, not the application revision. For
+a functional smoke from a source archive, record a separate verified chain of
+archive checksums, deployed files and image IDs. Keep the original report unchanged.
+That chain does not establish a reference-capacity comparison. Whether the host
+and data match Capacity remains your comparison of those fields. The `out`
+directory holds no key, cookie or password.
 
 | Class                 | When                                                                                                                                                              | Use it as                                            |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -239,9 +247,20 @@ On the host, also after any failure or lost generator connection:
 
 ```bash
 sh scripts/load-test/recover.sh        # drops load-test.yml from COMPOSE_FILE, recreates Caddy
-                                       # (the stack keeps running; repeatable)
+                                       # (other services and data volumes stay unchanged; repeatable)
 sh scripts/load-test/remove-check.sh   # only PASS lines, incl. ":8443 refuses connections"
 ```
+
+Recovery uses only the normal Caddy service and its existing volumes and network.
+It checks their exact names and Compose ownership before changing `.env`.
+It does not reconcile database volumes or start dependencies. If an edge resource
+is missing or foreign, recovery stops without changing `.env` or recreating Caddy.
+Do not approve volume recreation or delete data to bypass this refusal. Verify the
+project and repair the missing edge resource before retrying.
+
+An interruption after `.env` changes can leave the old Caddy and test entry running.
+Close 8443 in the firewall while diagnosing the failure. Retry recovery, then run
+`remove-check.sh`; a successful script exit alone does not prove entry removal.
 
 If the generator is reachable, prove it there too, before closing 8443 in the firewall:
 

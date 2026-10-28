@@ -1035,6 +1035,26 @@ shorter than the worker needs); in Kubernetes the pod default is
 raise it if you add slow shutdown steps — nothing in the repository can verify a
 live deployment's value.
 
+When stopping the whole Compose stack, stop application clients first. Wait for
+that command to finish and inspect their logs and exit states before stopping
+PostgreSQL and Redis. A single `stop` command with all service names does not
+establish this order. Use the deployment's original project, files and profiles:
+
+```bash
+docker compose stop caddy api web worker
+docker compose ps -a caddy api web worker
+docker compose logs --tail=100 api worker
+# Continue only after client shutdown completes without an unexplained crash.
+docker compose stop postgres redis
+```
+
+The application owns its PostgreSQL pool error listener through adapter disconnect
+and pool teardown. An idle connection failure logs `prisma.pool_error` with
+`phase` (`runtime` or `shutdown`) and a bounded `sqlState`, without client details.
+The driver discards the failed idle connection. Runtime queries can acquire a new
+connection; query failures still reject. Investigate runtime failures and unexpected
+shutdown errors rather than treating the log as proof of successful shutdown.
+
 What the worker does within that budget:
 
 1. The **notification dispatcher** and the **AI run dispatcher close**: each
