@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Browser login uses current generation checks and atomic invitation publication.
   Activation requires a separately approved compatible fleet and explicit CLI
   transition; the default prepared state refuses operator grants.
+  Protected provider linking revokes previous sessions and requires a new sign-in.
 
 <!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_START -->
 

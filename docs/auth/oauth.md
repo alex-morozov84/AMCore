@@ -1,8 +1,8 @@
 # OAuth — Social Login & Account Linking
 
 OAuth lets users sign in with accounts they already trust — Google, GitHub, Apple, or Telegram — without creating a separate password for ordinary unprotected accounts. Protected
-accounts must also prove their local password and app or backup code. MFA remains
-disabled until the complete deployment contract is ready.
+accounts must also prove their local password and app or backup code. MFA requires the separately approved
+[deployment activation](mfa-deployment.md).
 
 ---
 
@@ -59,7 +59,8 @@ contract until drained. Do not transfer a product cookie/token through a redirec
 Linking authenticates the selected account when the link starts. A protected
 account also needs fresh local password and second-factor proofs. Its one-time
 state retains the original family, security version and browser binding. The
-callback rechecks that authority before and after attachment in one transaction.
+callback rechecks that authority before committing attachment. Successful protected
+linking requires a new sign-in; see [linking consequences](#after-successful-linking).
 Revocation, expiry or a browser change refuses the link; a newer session cannot
 replace the original authority. Telegram is link-only. See [placement and sessions](../product-admin/placement-and-sessions.md)
 for hostname isolation, old links and coordinated deployment.
@@ -313,8 +314,12 @@ curl -X POST https://api.amcore.dev/api/v1/auth/oauth/exchange \
 }
 ```
 
-The refresh token is not rotated by this endpoint. It is only validated to bind
-the ticket to the session created during the OAuth callback.
+The callback cookie binds the one-time identity ticket to this exchange; it does
+not itself grant a session. An ordinary independent API client can receive the
+credential response above. Protected accounts and private browser admission receive
+`202` with a restricted continuation instead. Finish the required local proofs and
+exact publication before using ordinary credentials; see
+[password and publication transport](mfa-foundation.md#password-and-publication-transport).
 
 ---
 
@@ -369,7 +374,22 @@ The flow is identical to regular OAuth login, except:
 
 1. Redis stores `mode: "link"` and the account ID. Protected linking also captures the original session authority with a five-minute deadline.
 2. The callback attaches the provider without creating a session. Protected linking rechecks current authority and local proof freshness under the account lock.
-3. The user is redirected to `/{locale}/settings/linked-accounts?linked=google`
+3. Protected accounts return to the selected frontend's localized `/login?linked=google`.
+   Ordinary accounts retain their linked-accounts destination. See the outcome below.
+
+### After successful linking
+
+For a protected account, provider attachment advances the account security version
+and revokes previous sessions and pending continuations in the same transaction.
+The source session is revoked too. Factor identity, accepted TOTP step and backup
+codes remain unchanged. A failed transaction rolls both attachment and revocation
+back. Replaying a consumed callback does not issue another session or renew proofs.
+
+The callback returns to the selected frontend's login page. Sign in again and
+complete the required local password and app or unused backup-code proof.
+Linking creates no replacement session. An old browser/API session cannot refresh
+or continue a pending action; another session cannot adopt that operation.
+Ordinary unprotected linking keeps its existing session policy.
 
 ### Linking flow
 
@@ -388,7 +408,8 @@ Callback: /api/v1/auth/oauth/github/callback
 Backend:
   - mode == "link" → attach GitHub account to user "cm1abc..."
   - If GitHub account is already linked to a DIFFERENT user → error
-  - Success → redirect to /{locale}/settings/linked-accounts?linked=github
+  - Protected success → revoke old authority → redirect to localized login
+  - Ordinary success → existing linked-accounts destination
 ```
 
 **Errors:**

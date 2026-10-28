@@ -38,6 +38,7 @@ import { registerIdentityProofs } from './invitation-lifecycle/identity'
 import { registerIssuanceBudgetProofs } from './invitation-lifecycle/issuance-budget'
 import { registerReceiptProofs } from './invitation-lifecycle/receipts'
 import { registerRegistrationCommitProofs } from './invitation-lifecycle/registration-commit'
+import { registerSignupLockOrderProofs } from './invitation-lifecycle/signup-lock-order'
 import { registerTransitionsProofs } from './invitation-lifecycle/transitions'
 
 describe('Invitation lifecycle transaction proofs', () => {
@@ -205,6 +206,7 @@ describe('Invitation lifecycle transaction proofs', () => {
   registerFenceProofs(getFixture)
   registerHandoffProofs(getFixture)
   registerRegistrationCommitProofs(getFixture)
+  registerSignupLockOrderProofs(getFixture)
   registerReceiptProofs(getFixture)
   registerTransitionsProofs(getFixture)
   registerForeignKeysProofs(getFixture)

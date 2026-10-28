@@ -32,6 +32,7 @@ import {
 import { avatarUrlOf } from '../avatar-url.js'
 import { EmailIdentityService } from '../email-identity.service.js'
 import { accountRequiresMfa } from '../mfa/mfa-account-policy.js'
+import { advanceAccountSecurity } from '../mfa/mfa-invalidation.js'
 import {
   type StoredInvitationIntent,
   storedInvitationIntentSchema,
@@ -73,6 +74,7 @@ interface IdentityCallbackResult {
 interface LinkCallbackResult {
   mode: 'link'
   user: UserResponse
+  reauthenticationRequired: boolean
 }
 
 type CallbackResult = LoginCallbackResult | IdentityCallbackResult | LinkCallbackResult
@@ -263,7 +265,7 @@ export class OAuthService {
     }
 
     if (stateData.mode === 'link') {
-      const user = await this.attachProviderToUser(
+      const linked = await this.attachProviderToUser(
         stateData.userId!,
         profile,
         providerName,
@@ -272,7 +274,11 @@ export class OAuthService {
           : oauthLinkAuthoritySchema.parse(stateData.linkSource)
       )
       this.logger.info({ userId: stateData.userId, provider: providerName }, 'oauth link')
-      return { mode: 'link', user: this.mapUserToResponse(user) }
+      return {
+        mode: 'link',
+        user: this.mapUserToResponse(linked.user),
+        reauthenticationRequired: linked.reauthenticationRequired,
+      }
     }
 
     if (!profile.email) {
@@ -442,7 +448,7 @@ export class OAuthService {
     profile: OAuthUserProfile,
     providerName: string,
     source?: OAuthLinkAuthority
-  ): Promise<User> {
+  ): Promise<{ user: User; reauthenticationRequired: boolean }> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
     const existing = await this.prisma.oAuthAccount.findUnique({
@@ -456,7 +462,7 @@ export class OAuthService {
       )
     }
 
-    await this.prisma.$transaction(
+    const reauthenticationRequired = await this.prisma.$transaction(
       async (tx) => {
         await authorizeOAuthLink(tx, userId, source)
         await tx.oAuthAccount.create({
@@ -466,14 +472,19 @@ export class OAuthService {
           where: { id: userId },
           data: { ...(profile.phone ? { phone: profile.phone } : {}) },
         })
-        // Reevaluate deadlines/proofs after writes; a failure rolls back the attached provider.
-        await authorizeOAuthLink(tx, userId, source)
+        // Check original authority before invalidating it; both effects commit together.
+        const protectedSource = await authorizeOAuthLink(tx, userId, source)
+        if (protectedSource) await advanceAccountSecurity(tx, userId)
+        return protectedSource !== undefined
       },
       { maxWait: 2000, timeout: 4000 }
     )
 
     await this.userCacheService.invalidateUser(userId)
-    return this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    return {
+      user: await this.prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+      reauthenticationRequired,
+    }
   }
 
   private async findOrCreateUser(

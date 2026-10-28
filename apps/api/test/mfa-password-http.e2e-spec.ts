@@ -864,4 +864,71 @@ describe('Actual password, MFA proof and credential publication HTTP path', () =
       await context.prisma.mfaRecoveryCode.count({ where: { userId: f.id, consumedAt: null } })
     ).toBe(1)
   })
+
+  it('protected OAuth attachment returns to login and old HTTP authority cannot survive', async () => {
+    const f = await enrolled()
+    const started = await login().send({ email, password }).expect(202)
+    const continuation = started.body.continuation
+    await pendingCall(context, 'verify', continuation)
+      .send({
+        purpose: 'login',
+        operationId: randomUUID(),
+        proof: { method: 'recovery_code', code: f.code },
+      })
+      .expect(200)
+    const complete = { purpose: 'login', operationId: randomUUID(), vaultBinding: null }
+    const issued = await pendingCall(context, 'complete', continuation).send(complete).expect(200)
+    await pendingCall(context, 'publication/acknowledge', continuation)
+      .send({
+        ...complete,
+        accessToken: issued.body.accessToken,
+        receipt: issued.body.publication.receipt,
+      })
+      .expect(200)
+    await me(issued.body.accessToken).expect(200)
+    const provider: OAuthProvider = {
+      name: 'google',
+      getAuthorizationURL: async (state) => new URL(`https://provider.example.test?state=${state}`),
+      exchangeCode: async () => ({ accessToken: '<fake-link-http-token>' }),
+      getUserProfile: async () => ({
+        provider: 'google',
+        providerId: 'protected-link-http',
+        email,
+        emailVerified: true,
+        displayName: null,
+        avatarSourceUrl: null,
+      }),
+    }
+    const factory = context.app.get(OAuthProviderFactory) as unknown as {
+      providers: Map<string, OAuthProvider>
+    }
+    factory.providers.set('google', provider)
+    const before = await context.prisma.mfaAccount.findUniqueOrThrow({ where: { userId: f.id } })
+    const count = await context.prisma.session.count()
+    const initiated = await request(context.app.getHttpServer())
+      .get('/auth/oauth/google/link')
+      .auth(issued.body.accessToken, { type: 'bearer' })
+      .expect(302)
+    const state = new URL(initiated.headers.location!).searchParams.get('state')!
+    const nonce = (initiated.headers['set-cookie'] as unknown as string[])
+      .find((value) => value.startsWith('oauth_state='))!
+      .split(';')[0]!
+    const callback = await request(context.app.getHttpServer())
+      .get(`/auth/oauth/google/callback?state=${state}&code=fake-link-code`)
+      .set('Cookie', nonce)
+      .expect(302)
+    expect(new URL(callback.headers.location!).pathname).toMatch(/\/(en|ru)\/login$/)
+    expect(new URL(callback.headers.location!).searchParams.get('linked')).toBe('google')
+    expect(callback.headers['set-cookie']).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^refresh_token=[^;]/)])
+    )
+    expect(await context.prisma.session.count()).toBe(count)
+    expect(
+      await context.prisma.mfaAccount.findUniqueOrThrow({ where: { userId: f.id } })
+    ).toMatchObject({ securityVersion: before.securityVersion + 1 })
+    await me(issued.body.accessToken).expect(409)
+    const again = await login().send({ email, password }).expect(202)
+    expect(again.body.requiredProofs).toContain('second_factor')
+    expect(again.body.accessToken).toBeUndefined()
+  })
 })

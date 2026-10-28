@@ -282,14 +282,14 @@ export class AuthService {
         async (tx) => {
           await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
           if (requestInfo.handoff) await lockInvitationAuthAttempt(tx, requestInfo.handoff)
+          const hint = await invitationCredentialHint(tx, { continuation: credential })
+          assertTokenFrontend(hint.invite, requestInfo.frontend)
+          await lockInvitationSignupEmail(tx, hint.invite.emailCanonical)
           const locked = await lockRegistrationBrowser(
             tx,
             requestInfo.registrationBrowser,
             registrationUserId
           )
-          const hint = await invitationCredentialHint(tx, { continuation: credential })
-          assertTokenFrontend(hint.invite, requestInfo.frontend)
-          await lockInvitationSignupEmail(tx, hint.invite.emailCanonical)
           const { invite, expiresAt } = await this.invitation.lockValid(tx, {
             continuation: credential,
           })

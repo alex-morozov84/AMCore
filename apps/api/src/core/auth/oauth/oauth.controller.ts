@@ -170,6 +170,8 @@ export class OAuthController {
   @ApiServiceUnavailableResponse({ description: 'Authority or one-time state storage unavailable' })
   @ApiOperation({
     summary: 'Start provider linking bound to the current source session; grant no new session',
+    description:
+      'Successful protected linking advances the security version and revokes prior sessions and continuations atomically. The callback redirects to sign-in without issuing replacement credentials.',
   })
   @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
   async link(
@@ -205,7 +207,7 @@ export class OAuthController {
   @ApiOperation({ summary: 'Handle OAuth provider callback (redirect/query providers)' })
   @ApiResponse({
     status: 302,
-    description: 'Redirect to the frontend callback or linked-accounts page',
+    description: 'Redirect to the frontend callback, linked-accounts page or required new sign-in',
   })
   async callbackGet(
     @Param('provider') provider: string,
@@ -233,7 +235,7 @@ export class OAuthController {
   @ApiOperation({ summary: 'Handle OAuth provider form_post callback (Apple)' })
   @ApiResponse({
     status: 302,
-    description: 'Redirect to the frontend callback or linked-accounts page',
+    description: 'Redirect to the frontend callback, linked-accounts page or required new sign-in',
   })
   async callbackPost(
     @Param('provider') provider: string,
@@ -372,9 +374,11 @@ export class OAuthController {
             ? resolveFrontendPlacement(this.env).admin
             : this.env.get('FRONTEND_URL'),
           locale,
-          frontend?.frontend === 'admin'
-            ? frontendAuthPath('admin', '/auth/linked')
-            : 'settings/linked-accounts',
+          result.reauthenticationRequired
+            ? frontendAuthPath(frontend?.frontend ?? 'site', '/login')
+            : frontend?.frontend === 'admin'
+              ? frontendAuthPath('admin', '/auth/linked')
+              : 'settings/linked-accounts',
           {
             linked: provider,
           }

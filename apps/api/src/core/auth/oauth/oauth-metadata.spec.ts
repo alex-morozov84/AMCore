@@ -74,3 +74,46 @@ it.each(['google', 'apple'])(
     )
   }
 )
+
+it.each([true, false])(
+  'link callback requires new sign-in=%s without issuing another identity',
+  async (reauthenticationRequired) => {
+    const issue = jest.fn(),
+      cookie = jest.fn()
+    const controller = new OAuthController(
+      {} as never,
+      {
+        handleCallback: jest.fn().mockResolvedValue({
+          mode: 'link',
+          user: { locale: DEFAULT_LOCALE },
+          reauthenticationRequired,
+        }),
+      } as never,
+      { issue } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {
+        get: (key: string) => (key === 'FRONTEND_URL' ? 'http://web.test' : 'development'),
+      } as never
+    )
+    const res = {
+      cookie,
+      clearCookie: jest.fn(),
+      redirect: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    }
+    await controller.callbackGet(
+      'google',
+      'code',
+      'state',
+      { headers: {}, cookies: { oauth_state: '<fake-nonce>' } } as never,
+      res as never
+    )
+    expect(res.redirect).toHaveBeenCalledWith(
+      `http://web.test${localePathPrefix(DEFAULT_LOCALE)}/${reauthenticationRequired ? 'login' : 'settings/linked-accounts'}?linked=google`
+    )
+    expect(issue).not.toHaveBeenCalled()
+    expect(cookie).not.toHaveBeenCalled()
+  }
+)
