@@ -50,9 +50,12 @@ AMCore is a **modular monolith**. The rules that keep it modular:
   - **A request-path call that must not wait forever** goes through
     [`BoundedRedis`](../../apps/api/src/infrastructure/redis/bounded-redis.ts). It gives
     the caller a typed error at a deadline, aborts a command that is still queued and
-    never retries. A command already sent can still run, and a connection that stalls
-    without closing keeps its operations counted (up to a fixed limit) until it errors or
-    closes. It does not bound other users of the shared client. Tests use the
+    never retries. It reserves a slot before dispatch (a fixed capacity per process) and
+    refuses new calls at once when all slots are held. A slot is released only when the
+    call settles, so a command already sent can still run after its caller gave up, and a
+    connection that stalls without closing holds its slots until replies resume or the
+    connection errors or closes; no finite recovery time is promised. It does not bound
+    other users of the shared client. Tests use the
     `redis-transport-stall` fixture
     ([`apps/api/test/fixtures`](../../apps/api/test/fixtures/redis-transport-stall.ts))
     to hold replies from a real server.

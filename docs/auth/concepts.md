@@ -212,9 +212,15 @@ the credential itself is never stored or logged.
 - Counters need one Redis server. The two keys are not guaranteed to share a cluster slot.
 - These Redis calls wait at most a fixed deadline (`BOUNDED_REDIS_DEADLINE_MS`). The
   deadline limits how long a caller waits. It does not cancel a command that was
-  already sent, and it does not bound other users of the shared Redis client. A
-  connection that stalls without closing keeps its operations counted until it
-  errors or closes, so new requests then fail fast with `503`.
+  already sent, and it does not bound other users of the shared Redis client.
+- Each process holds at most `BOUNDED_REDIS_CAPACITY` unsettled calls of this kind. A
+  call keeps its slot until its reply arrives or the connection errors or closes, even
+  after the caller gave up. When all slots are held, new calls are refused at once
+  (`503`, and nothing was sent). The API sets no finite time for a connection that
+  stalls without closing to recover; it recovers when replies resume or the
+  connection errors or closes.
+- A clear that timed out can still run later and remove fingerprint failures
+  recorded in the meantime. The source-address counter is never cleared by it.
 
 ---
 
