@@ -721,7 +721,9 @@ pnpm stand preview --id account-security-review --profile account-mfa-ui
 ```
 
 Open its printed product URL followed by `/mfa`, with the locale prefix when
-locales are enabled. The demonstration needs no login. Use a made-up password.
+locales are enabled. The demonstration needs no login. Its managed check verifies only the demo USER
+account; it does not attempt password-only operator access. Existing operator
+records stay unchanged when refreshing this preview. Use a made-up password.
 Scan its public test QR with an authenticator app and enter the current code.
 The preview rejects invalid codes. Backup-code examples appear in the demo panel.
 The additional examples show password setup and a separate server-issued ticket.

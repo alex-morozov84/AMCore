@@ -79,7 +79,11 @@ export async function preview(m, profile = 'default') {
       env: cleanEnvironment({ TMPDIR: tmp }),
       args: ['--proxy-bypass-list=<-loopback>'],
     })
-    await fixtureAccounts(m, api, profile)
+    // UI simulation needs only USER; prepared protocol must refuse operator login.
+    await fixtureAccounts(m, api, profile === 'account-mfa-ui' ? 'user' : profile)
+    const accounts = m.accounts.filter(
+      (account) => profile !== 'account-mfa-ui' || account.role === 'USER'
+    )
     // AMCORE_CONSOLE_ESTABLISHMENT_FIXTURE_START
     if (profile === 'organization-establishment') {
       const { executeSetupCommand } = await import('./setup-command.mjs')
@@ -160,7 +164,7 @@ export async function preview(m, profile = 'default') {
         await context.close()
       }
     }
-    for (const account of m.accounts) {
+    for (const account of accounts) {
       const existing = await sql(
         m,
         `SELECT id || ':' || "systemRole" FROM core.users WHERE "emailCanonical" = :'email';`,
@@ -264,7 +268,7 @@ export async function preview(m, profile = 'default') {
     console.log(
       `Stand: ${m.id}\nBranch: ${m.branch}\nSource: ${m.sourceHash}\nURL: ${m.origins.product}${m.localePrefix}`
     )
-    for (const a of m.accounts) console.log(`${a.role}: ${a.email}\nPassword: ${a.password}`)
+    for (const a of accounts) console.log(`${a.role}: ${a.email}\nPassword: ${a.password}`)
     if (
       ['organization-roles', 'product-admin-three-host', 'product-admin-console-path'].includes(
         profile
@@ -282,7 +286,7 @@ export async function preview(m, profile = 'default') {
       )
     let scenario = 'login, inspect current changes'
     // AMCORE_CONSOLE_PREVIEW_SCENARIO_START
-    scenario += ' and Console access'
+    if (profile !== 'account-mfa-ui') scenario += ' and Console access'
     // AMCORE_CONSOLE_PREVIEW_SCENARIO_END
     console.log(`Scenario: ${scenario}. Stop: pnpm stand down --id ${m.id}`)
   } finally {

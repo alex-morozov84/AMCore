@@ -76,7 +76,7 @@ for (const [name, flags] of recipes) {
       assert.match(read('pnpm-lock.yaml'), /otplib@13\.5\.0/)
       assert.match(read('docs/auth/README.md'), /\(mfa-foundation\.md\)/)
       assert.match(read('docs/auth/reference.md'), /MFA_ENCRYPTION_KEYS/)
-      assert.match(read('CHANGELOG.md'), /Dormant account MFA storage/)
+      assert.match(read('CHANGELOG.md'), /Operator MFA with authenticator apps/)
       const single = flags.includes('--mode=single')
       const app = `apps/web/src/app/${single ? '' : '[locale]/'}`
       for (const route of [
