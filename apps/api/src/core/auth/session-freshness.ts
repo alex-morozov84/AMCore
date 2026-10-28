@@ -20,8 +20,8 @@ function stepUpRequired(): AppException {
 
 /**
  * Shared static-route and imperative sensitive-action admission. Protected accounts require the
- * current family plus independently fresh password and second-factor proofs. Ordinary accounts and
- * untouched prepared legacy deployments retain lastAuthAt. Imperative mutations supply their locked
+ * current family plus independently fresh password and second-factor proofs. Ordinary independent legacy accounts
+ * retain lastAuthAt. Protected accounts never use that fallback. Imperative mutations supply their locked
  * transaction for final admission; this helper never acquires locks in a different order.
  */
 export async function assertSessionFresh(

@@ -16,6 +16,7 @@ import {
   teardownE2ETest,
 } from './helpers'
 import { invitationAcceptBody, invitationSeedRole } from './helpers/invitation-contract'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 describe('Audit capture points (e2e)', () => {
   let app: INestApplication
@@ -278,10 +279,10 @@ describe('Audit capture points (e2e)', () => {
       where: { id: auth.userId },
       data: { systemRole: 'SUPER_ADMIN' },
     })
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'superadmin@example.com', password: 'StrongP@ss123' })
-      .expect(200)
+    const login = await loginDomainOperator(context, {
+      email: 'superadmin@example.com',
+      password: 'StrongP@ss123',
+    })
     const stepUp = await request(app.getHttpServer())
       .post('/auth/step-up')
       .set('Authorization', `Bearer ${login.body.accessToken as string}`)

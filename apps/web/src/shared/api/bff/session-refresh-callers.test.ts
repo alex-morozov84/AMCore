@@ -6,8 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { proxyToBackend } from './authenticated-proxy'
 import { getOptionalSessionEntry } from './dal'
-import { fakeVaultEntry } from './dal.test-helpers'
 import { handleGetSessions } from './sessions-handler'
+import { browserTestHeaders, makeBrowserEntry } from './test-fakes'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn() }))
@@ -24,10 +24,20 @@ vi.mock('./session-lock', () => ({ redisVaultLock: {} }))
 vi.mock('./ensure-fresh-session', () => ({
   ensureFreshSession: async (
     _id: string,
-    deps: { upstreamRefresh: (token: string, signal: AbortSignal) => Promise<unknown> }
+    deps: {
+      upstreamRefresh: (
+        token: string,
+        signal: AbortSignal,
+        browser: ReturnType<typeof makeBrowserEntry>['browser']
+      ) => Promise<unknown>
+    }
   ) => {
-    await deps.upstreamRefresh('vault-credential', new AbortController().signal)
-    return fakeVaultEntry()
+    await deps.upstreamRefresh(
+      'vault-credential',
+      new AbortController().signal,
+      makeBrowserEntry().browser
+    )
+    return makeBrowserEntry()
   },
 }))
 
@@ -45,7 +55,7 @@ afterEach(() => {
 it.each(['product DAL', 'authenticated proxy', 'own sessions'])(
   '%s refresh supplies current visitor headers',
   async (caller) => {
-    const source = new Headers({
+    const source = browserTestHeaders({
       host: 'app.example.test',
       'user-agent': caller,
       'x-real-ip': '8.8.8.8',

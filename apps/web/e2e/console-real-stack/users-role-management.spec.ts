@@ -1,3 +1,4 @@
+import { completeMfaSignIn, completeMfaStepUp } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -33,6 +34,7 @@ async function signInToConsole(
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(page, email)
   await expect(page).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
@@ -109,13 +111,14 @@ test('host-mode: demoting with an aged session requires step-up and never expose
   await expect(stepUpDialog).toBeVisible()
   await stepUpDialog.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
+  await completeMfaStepUp(admin.page, adminEmail)
 
   await expect(stepUpDialog).toBeHidden()
   await expect(
     admin.page.getByRole('row').filter({ hasText: targetEmail }).getByText('User', { exact: true })
   ).toBeVisible()
 
-  expect(stepUpBodies).toHaveLength(1)
+  expect(stepUpBodies).toHaveLength(2)
   for (const body of stepUpBodies) {
     expect(body).not.toContain('accessToken')
     expect(body).not.toContain('refreshToken')

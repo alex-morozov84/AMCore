@@ -5,6 +5,7 @@ import { ensureFreshSession } from './ensure-fresh-session'
 import { SessionNotFoundError, SessionVaultUnavailableError } from './errors'
 import { handleGetSessions } from './sessions-handler'
 import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers'
+import { browserTestHeaders } from './test-fakes'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
@@ -12,7 +13,9 @@ vi.mock('./ensure-fresh-session', () => ({ ensureFreshSession: vi.fn() }))
 vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn()) }))
 
 function makeRequest(query = ''): Request {
-  return new Request(`http://next.internal/api/auth/sessions${query}`)
+  return new Request(`http://next.internal/api/auth/sessions${query}`, {
+    headers: browserTestHeaders(),
+  })
 }
 
 beforeEach(() => {

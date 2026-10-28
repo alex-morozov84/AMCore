@@ -23,6 +23,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 describe('runtime settings persistence and admission', () => {
   let c: E2ETestContext
@@ -40,10 +41,10 @@ describe('runtime settings persistence and admission', () => {
       .expect(201)
     userId = registered.body.user.id
     await c.prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const login = await request(c.app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'settings@example.test', password: 'StrongP@ss123' })
-      .expect(200)
+    const login = await loginDomainOperator(c, {
+      email: 'settings@example.test',
+      password: 'StrongP@ss123',
+    })
     token = login.body.accessToken
   }, 120_000)
   afterAll(async () => {
@@ -233,15 +234,18 @@ describe('runtime settings persistence and admission', () => {
       .auth(token, { type: 'bearer' })
       .send({ intervalSeconds: 60, expectedRevision: 0, unexpected: true })
       .expect(400)
-    await c.prisma.session.updateMany({
+    await c.prisma.authSessionFamily.updateMany({
       where: { userId },
-      data: { lastAuthAt: new Date(Date.now() - 3600_000) },
+      data: { primaryAt: new Date(Date.now() - 3600_000), mfaAt: new Date(Date.now() - 3600_000) },
     })
     try {
       await get().expect(200)
       expect((await patch(60, 0).expect(403)).body.errorCode).toBe('STEP_UP_REQUIRED')
     } finally {
-      await c.prisma.session.updateMany({ where: { userId }, data: { lastAuthAt: new Date() } })
+      await c.prisma.authSessionFamily.updateMany({
+        where: { userId },
+        data: { primaryAt: new Date(), mfaAt: new Date() },
+      })
     }
     await c.prisma.user.update({ where: { id: userId }, data: { systemRole: 'USER' } })
     try {

@@ -1,15 +1,18 @@
 // @vitest-environment node
 import { createServer, type Server } from 'node:http'
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { withinContextDeadline } from './context-deadline'
 import { executeContextOperation } from './context-executor'
 import { contextSessionBinding } from './context-session'
-import { FakeVaultStore, makeEntry } from './test-fakes'
+import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes'
 import { SimpleLock } from './test-lock-fakes'
 
+beforeEach(() =>
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-domain-browser-transport-key-at-least-32>')
+)
 vi.mock('server-only', () => ({}))
 afterEach(() => vi.unstubAllEnvs())
 
@@ -37,7 +40,7 @@ describe('context deadline native waiting/cancellation', () => {
     })
     const apiBase = await listen(server)
     vi.stubEnv('API_URL', apiBase)
-    const entry = makeEntry({ userSnapshot: { id: 'actor' } as never })
+    const entry = makeBrowserEntry({ userSnapshot: { id: 'actor' } as never })
     const store = new FakeVaultStore()
     store.seed('owned-session', entry)
     const started = performance.now()
@@ -51,7 +54,7 @@ describe('context deadline native waiting/cancellation', () => {
           },
           {
             expectedSession: contextSessionBinding('owned-session', entry),
-            headers: new Headers(),
+            headers: browserTestHeaders(),
           },
           {
             apiBase,

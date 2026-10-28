@@ -16,6 +16,7 @@ import {
   teardownE2ETest,
 } from './helpers'
 import { holdLoginSnapshot } from './helpers/login-diagnostics-snapshot'
+import { seedDomainOperatorSession } from './operator-auth.fixture.js'
 
 describe('Admin login diagnostics (HTTP and real database)', () => {
   let context: E2ETestContext
@@ -38,10 +39,17 @@ describe('Admin login diagnostics (HTTP and real database)', () => {
       where: { id: actorId },
       data: { systemRole: 'SUPER_ADMIN' },
     })
+    const session = await context.prisma.session.create({
+      data: {
+        userId: actorId,
+        familyId: randomUUID(),
+        refreshToken: randomUUID(),
+        lastAuthAt: new Date(),
+        expiresAt: new Date(Date.now() + 3600000),
+      },
+    })
     token = signAccessToken(context.app, {
-      sub: actorId,
-      email: actor.email,
-      systemRole: 'SUPER_ADMIN',
+      ...(await seedDomainOperatorSession(context, session.id)),
     })
   })
   const http = () => request(context.app.getHttpServer())

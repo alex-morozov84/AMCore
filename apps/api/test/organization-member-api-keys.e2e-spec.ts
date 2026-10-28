@@ -26,6 +26,8 @@ import {
   holdMemberTransaction,
   waitForDbBlock,
 } from './helpers/organization-members-race'
+import { loginDomainOperator } from './operator-auth.fixture.js'
+import { reauthenticateDomainOperator } from './operator-step-up.fixture.js'
 const jest = import.meta.jest
 
 describe('Organization member credential control (real DB)', () => {
@@ -366,7 +368,11 @@ describe('Organization member credential control (real DB)', () => {
       data: { systemRole: SystemRole.SuperAdmin },
     })
     await c.prisma.orgMember.deleteMany({ where: { organizationId: orgId, userId: claims.sub } })
-    const { iat: _, exp: __, ...rest } = claims
+    const admitted = await loginDomainOperator(c, {
+      email: 'keys-admin@example.test',
+      password: 'StrongP@ss123',
+    })
+    const { iat: _, exp: __, ...rest } = c.app.get(JwtService).verify(admitted.body.accessToken)
     const bound = c.app
       .get(JwtService)
       .sign({ ...rest, systemRole: SystemRole.SuperAdmin, organizationId: orgId })
@@ -395,15 +401,14 @@ describe('Organization member credential control (real DB)', () => {
       where: { userId_organizationId: { userId: claims.sub, organizationId: orgId } },
     })
     await c.prisma.memberRole.deleteMany({ where: { memberId: actorMembership.id } })
+    const login = await loginDomainOperator(c, { email: claims.email, password: 'StrongP@ss123' })
     await request(http())
       .get(base())
       .query({ expectedMemberId: memberId })
       .auth(admin, { type: 'bearer' })
-      .expect(403)
-    const login = await request(http())
-      .post('/auth/login')
-      .send({ email: claims.email, password: 'StrongP@ss123' })
-      .expect(200)
+      .expect(409)
+      .expect(({ body }) => expect(body.errorCode).toBe('SESSION_CHANGED'))
+    admin = login.body.accessToken
     const key = await create()
     await request(http())
       .get(base())
@@ -562,10 +567,10 @@ describe('Organization member credential control (real DB)', () => {
           where: { userId_organizationId: { userId: actor, organizationId: orgId } },
         })
         await c.prisma.memberRole.deleteMany({ where: { memberId: membership.id } })
-        const login = await request(http())
-          .post('/auth/login')
-          .send({ email: jwt.verify(admin).email, password: 'StrongP@ss123' })
-          .expect(200)
+        const login = await loginDomainOperator(c, {
+          email: jwt.verify(admin).email,
+          password: 'StrongP@ss123',
+        })
         token = login.body.accessToken
         if (mode === 'bound-super-demoted') {
           const { iat: _, exp: __, ...claims } = jwt.verify(token)
@@ -642,10 +647,8 @@ describe('Organization member credential control (real DB)', () => {
       where: { userId_organizationId: { userId: claims.sub, organizationId: orgId } },
     })
     await c.prisma.memberRole.deleteMany({ where: { memberId: membership.id } })
-    const login = await request(http())
-      .post('/auth/login')
-      .send({ email: claims.email, password: 'StrongP@ss123' })
-      .expect(200)
+    const login = await loginDomainOperator(c, { email: claims.email, password: 'StrongP@ss123' })
+    admin = login.body.accessToken
     const connection = await pool.connect()
     let pending: Promise<request.Response> | undefined
     try {
@@ -919,22 +922,22 @@ describe('Organization member credential control (real DB)', () => {
       }
     }
   )
-  it('recovery platform batch requires step-up and accepts its returned access token', async () => {
+  it('recovery platform batch requires both proofs on its original family', async () => {
     const key = await create()
     const actorId = c.app.get(JwtService).verify(admin).sub
     await c.prisma.user.update({
       where: { id: actorId },
       data: { systemRole: SystemRole.SuperAdmin },
     })
-    const login = await request(http())
-      .post('/auth/login')
-      .send({ email: 'keys-admin@example.test', password: 'StrongP@ss123' })
-      .expect(200)
+    const login = await loginDomainOperator(c, {
+      email: 'keys-admin@example.test',
+      password: 'StrongP@ss123',
+    })
     const token = login.body.accessToken as string
-    const { sid } = c.app.get(JwtService).verify(token)
-    await c.prisma.session.update({
-      where: { id: sid },
-      data: { lastAuthAt: new Date(Date.now() - 86400000) },
+    const { fid } = c.app.get(JwtService).verify(token)
+    await c.prisma.authSessionFamily.update({
+      where: { id: fid },
+      data: { primaryAt: new Date(Date.now() - 86400000), mfaAt: new Date(Date.now() - 86400000) },
     })
     await request(http())
       .post('/admin/api-keys/revoke')
@@ -949,11 +952,13 @@ describe('Organization member credential control (real DB)', () => {
       .post('/auth/step-up')
       .auth(token, { type: 'bearer' })
       .send({ password: 'StrongP@ss123' })
-      .expect(200)
-    expect(typeof stepped.body.accessToken).toBe('string')
+      .expect(202)
+    expect(stepped.body.kind).toBe('proof_required')
+    expect(stepped.body.accessToken).toBeUndefined()
+    await reauthenticateDomainOperator(c, token, 'StrongP@ss123')
     await request(http())
       .post('/admin/api-keys/revoke')
-      .auth(stepped.body.accessToken, { type: 'bearer' })
+      .auth(token, { type: 'bearer' })
       .send({ ids: [key.id] })
       .expect(200)
       .expect((r) => expect(r.body.affectedCount).toBe(1))

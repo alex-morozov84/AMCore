@@ -29,6 +29,7 @@ import {
 import { acceptInvitationForTest, invitationSeedRole } from './helpers/invitation-contract'
 import { keyTestActor } from './helpers/member-key-actor'
 import { holdMemberTransaction, waitForDbBlock } from './helpers/organization-members-race'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 const jest = import.meta.jest
 
 describe('Organization member reads and atomic role set (real DB)', () => {
@@ -566,10 +567,13 @@ describe('Organization member reads and atomic role set (real DB)', () => {
       .auth(token, { type: 'bearer' })
       .set('x-amcore-organization-id', 'other-org')
       .expect(400)
-    const elevated = context.app
-      .get(JwtService)
-      .sign({ sub: userId, email: 'member@example.test', systemRole: 'SUPER_ADMIN' })
     await prisma.user.update({ where: { id: userId }, data: { systemRole: SystemRole.SuperAdmin } })
+    const elevated = (
+      await loginDomainOperator(context, {
+        email: 'member@example.test',
+        password: 'StrongP@ss123',
+      })
+    ).body.accessToken
     await prisma.orgMember.delete({ where: { id: memberId } })
     await request(context.app.getHttpServer())
       .get(path())

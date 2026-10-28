@@ -29,6 +29,7 @@ import {
   signAccessToken,
   teardownE2ETest,
 } from './helpers'
+import { seedDomainOperatorSession } from './operator-auth.fixture.js'
 
 const deferred = () => {
   let resolve!: () => void
@@ -107,7 +108,7 @@ describe('Console support mail: real admission, token/audit commits and receipt 
         },
       })
     ).id
-    actor = { type: 'jwt', sub: operator.id, sid: session.id, systemRole: 'SUPER_ADMIN' }
+    actor = await seedDomainOperatorSession(context, session.id)
     bearer = signAccessToken(app, { ...actor })
   })
 
@@ -187,7 +188,10 @@ describe('Console support mail: real admission, token/audit commits and receipt 
     ])
     expect(results.every((r) => r.evidence !== 'unconfirmed')).toBe(true)
     expect(providerSend).toHaveBeenCalledTimes(1)
-    await prisma.session.update({ where: { id: actor.sid! }, data: { lastAuthAt: new Date(0) } })
+    await prisma.authSessionFamily.update({
+      where: { id: actor.fid! },
+      data: { primaryAt: new Date(0), mfaAt: new Date(0) },
+    })
     expect(await dispatch.run(actor, targetId, prep.attemptId)).toMatchObject({
       outcome: 'simulated',
     })
@@ -199,7 +203,7 @@ describe('Console support mail: real admission, token/audit commits and receipt 
     expect(await prisma.emailVerificationToken.count()).toBe(0)
   })
 
-  it('binds actor, target, recipient, kind and policy and rechecks current role/session', async () => {
+  it('binds actor, target, recipient, kind and policy and rechecks current role/family', async () => {
     const prep = await service.prepare(actor, targetId, 'password_recovery')
     const other = { ...actor, sub: targetId }
     await expect(dispatch.receipt(other, targetId, prep.attemptId)).rejects.toThrow()
@@ -215,9 +219,12 @@ describe('Console support mail: real admission, token/audit commits and receipt 
       where: { id: targetId },
       data: { emailCanonical: 'recipient@e2e.amcore.test' },
     })
-    await prisma.session.update({ where: { id: actor.sid! }, data: { revokedAt: new Date() } })
+    await prisma.authSessionFamily.update({
+      where: { id: actor.fid! },
+      data: { revokedAt: new Date() },
+    })
     await expect(dispatch.run(actor, targetId, prep.attemptId)).rejects.toThrow()
-    await prisma.session.update({ where: { id: actor.sid! }, data: { revokedAt: null } })
+    await prisma.authSessionFamily.update({ where: { id: actor.fid! }, data: { revokedAt: null } })
     await prisma.user.update({ where: { id: actor.sub }, data: { systemRole: 'USER' } })
     await expect(dispatch.run(actor, targetId, prep.attemptId)).rejects.toThrow()
     expect(await prisma.passwordResetToken.count()).toBe(0)
@@ -416,7 +423,10 @@ describe('Console support mail: real admission, token/audit commits and receipt 
       if (change === 'role')
         await prisma.user.update({ where: { id: actor.sub }, data: { systemRole: 'USER' } })
       else
-        await prisma.session.update({ where: { id: actor.sid! }, data: { revokedAt: new Date() } })
+        await prisma.authSessionFamily.update({
+          where: { id: actor.fid! },
+          data: { revokedAt: new Date() },
+        })
       resume.resolve()
       await sending
       expect(providerSend).not.toHaveBeenCalled()

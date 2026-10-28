@@ -3,6 +3,7 @@ import { mockDeep } from 'jest-mock-extended'
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { ORG_DEFAULT_PERMISSIONS } from '../auth/casl/org-role-defaults'
+import { protectedUnitProjection } from '../auth/mfa/mfa-primary-projection.testkit.js'
 import { assertSessionFresh } from '../auth/session-freshness'
 
 import { canonicalAdmin } from './canonical-admin'
@@ -55,12 +56,14 @@ describe('organization establishment safety', () => {
     await expect(canonicalAdmin(tx)).rejects.toMatchObject({ errorCode: 'SYSTEM_NOT_INITIALIZED' })
   })
 
-  it('reads current role and session through the supplied transaction client', async () => {
+  it('reads current role and protected family through the supplied transaction client', async () => {
     const tx = mockDeep<Prisma.TransactionClient>()
     const principal: RequestPrincipal = {
       type: 'jwt',
       sub: 'operator',
       sid: 'session',
+      fid: 'operator-family',
+      securityVersion: 0,
       systemRole: SystemRole.SuperAdmin,
     }
     tx.user.findUnique.mockResolvedValue({
@@ -69,28 +72,18 @@ describe('organization establishment safety', () => {
       mfaAccount: null,
       mfaFactor: null,
     } as never)
-    tx.mfaProtocol.findUnique.mockResolvedValue({ state: 'prepared', version: 1 } as never)
-    tx.session.findUnique.mockResolvedValue({
-      userId: 'operator',
-      revokedAt: null,
-      expiresAt: new Date(Date.now() + 60_000),
-      lastAuthAt: new Date(),
-    } as never)
+    const projection = protectedUnitProjection(principal, new Date())
+    tx.$queryRaw.mockResolvedValue([projection])
     await admitSetupOperator(tx, { principal, freshWindowSeconds: 600 }, true)
     expect(tx.user.findUnique).toHaveBeenCalled()
-    expect(tx.session.findUnique).toHaveBeenCalled()
+    expect(tx.$queryRaw).toHaveBeenCalled()
     tx.user.findUnique.mockResolvedValue({ systemRole: SystemRole.User } as never)
     await expect(
       admitSetupOperator(tx, { principal, freshWindowSeconds: 600 }, true)
     ).rejects.toMatchObject({ errorCode: 'FORBIDDEN' })
-    tx.session.findUnique.mockResolvedValue({
-      userId: 'someone-else',
-      revokedAt: null,
-      expiresAt: new Date(Date.now() + 60_000),
-      lastAuthAt: new Date(),
-    } as never)
+    projection.family!.userId = 'someone-else'
     await expect(assertSessionFresh(tx, 600, principal)).rejects.toMatchObject({
-      errorCode: 'STEP_UP_REQUIRED',
+      errorCode: 'SESSION_CHANGED',
     })
   })
 

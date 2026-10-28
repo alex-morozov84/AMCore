@@ -24,8 +24,8 @@ const config = defineConfig({
   workers: 1,
   use: {
     ...testOptions(),
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: 'off',
+    screenshot: 'off',
     video: 'off',
     serviceWorkers: 'block',
   },

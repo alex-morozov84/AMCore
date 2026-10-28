@@ -159,3 +159,13 @@ test('internal mailbox accepts only fake recipients, consumes once and bounds co
   assert.equal((await send('/consume', { to: message.to })).status, 404)
   await assert.rejects(send('/deliver', { ...message, html: 'x'.repeat(128 * 1024) }))
 })
+
+test('all disposable Docker E2E reporters omit secret-bearing HTML steps', () => {
+  assert.deepEqual(standReporters({ purpose: 'e2e', mocked: false }, '/owned/test'), [
+    ['list', { printSteps: false }],
+  ])
+  assert.deepEqual(
+    standReporters({ purpose: 'e2e', mocked: true }, '/owned/mock').map(([name]) => name),
+    ['list', 'html']
+  )
+})

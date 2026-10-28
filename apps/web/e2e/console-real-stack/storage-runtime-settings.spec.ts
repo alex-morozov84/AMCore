@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { storageSettingJourney } from '../shared/storage-setting-journey'
 import { activeTarget } from '../support/managed-target.mjs'
 
@@ -29,6 +30,7 @@ test('Overview Edit/Cancel/Save and operator reset in HTTPS host topology', asyn
     await operator.getByLabel(/email/i).fill(email)
     await operator.getByLabel(/^password$/i).fill('Test1234Secure')
     await operator.getByRole('button', { name: /sign in/i }).click()
+    await completeMfaSignIn(operator, email)
     await expect(operator).toHaveURL(/\/en\/?$/)
     await storageSettingJourney(operator, '/api/runtime-settings/storage-probe')
   } finally {

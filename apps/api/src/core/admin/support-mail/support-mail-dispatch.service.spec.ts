@@ -9,6 +9,7 @@ import type { PrismaClient, SupportMailAttempt } from '../../../generated/prisma
 import type { EmailService } from '../../../infrastructure/email/email.service'
 import type { AuditLogService } from '../../audit/audit-log.service'
 import type { AuthMailLimiter } from '../../auth/auth-mail-limiter.service'
+import { protectedUnitProjection } from '../../auth/mfa/mfa-primary-projection.testkit.js'
 import type { TokenManagerService } from '../../auth/token-manager.service'
 
 import { type MailUser, policyBinding, recipientBinding } from './support-mail.common'
@@ -28,6 +29,8 @@ describe('Support mail dispatch deadlines and one physical transport', () => {
     type: 'jwt',
     sub: 'operator',
     sid: 'session',
+    fid: 'operator-family',
+    securityVersion: 0,
     systemRole: 'SUPER_ADMIN',
   } as RequestPrincipal
   const user: MailUser = {
@@ -58,20 +61,12 @@ describe('Support mail dispatch deadlines and one physical transport', () => {
     jest.useFakeTimers()
     rows = new Map()
     tx = mockDeep<PrismaClient>()
-    tx.user.findUnique.mockResolvedValue({
-      id: actor.sub,
-      systemRole: actor.systemRole,
-      mfaAccount: null,
-      mfaFactor: null,
-    } as never)
-    tx.mfaProtocol.findUnique.mockResolvedValue({ state: 'prepared', version: 1 } as never)
-    ;(tx.$queryRaw as jest.Mock).mockImplementation(async () => [{ now: new Date() }])
-    tx.session.findUnique.mockResolvedValue({
-      lastAuthAt: new Date(),
-      userId: actor.sub,
-      revokedAt: null,
-      expiresAt: new Date(Date.now() + 3600000),
-    } as never)
+    const proofAt = new Date()
+    ;(tx.$queryRaw as jest.Mock).mockImplementation(async (query: { sql?: string }) =>
+      query.sql?.includes('WITH source')
+        ? [protectedUnitProjection(actor, proofAt)]
+        : [{ now: new Date() }]
+    )
     ;(tx.supportMailAttempt.findUnique as jest.Mock).mockImplementation(async ({ where }) =>
       rows.get(where.id)
     )

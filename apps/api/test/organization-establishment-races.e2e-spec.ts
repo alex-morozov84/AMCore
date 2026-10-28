@@ -2,8 +2,6 @@ import { randomUUID } from 'node:crypto'
 
 import { Client } from 'pg'
 
-import { SystemRole } from '@amcore/shared'
-
 import { OrganizationCreationService } from '../src/core/organizations/organization-creation.service'
 import type { SetupOperator } from '../src/core/organizations/organization-setup-admission'
 import { OrganizationSetupOperations } from '../src/core/organizations/organization-setup-operations'
@@ -24,6 +22,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { seedDomainOperatorSession } from './operator-auth.fixture.js'
 
 describe('Organization establishment serialization (e2e)', () => {
   let context: E2ETestContext
@@ -48,7 +47,7 @@ describe('Organization establishment serialization (e2e)', () => {
       },
     })
     return {
-      principal: { type: 'jwt', sub: user.id, sid: session.id, systemRole: SystemRole.SuperAdmin },
+      principal: await seedDomainOperatorSession(context, session.id),
       freshWindowSeconds: 300,
     }
   }
@@ -250,7 +249,7 @@ describe('Organization establishment serialization (e2e)', () => {
     expect((await setup().bootstrap(intent())).status).toBe('created')
   })
 
-  it('rechecks session revocation after setup lock waits through the transaction client', async () => {
+  it('rechecks family revocation after setup lock waits through the transaction client', async () => {
     const admission = await operator()
     const barrier = setupTableBarrier(context.prisma)
     const pending = new OrganizationSetupOperations(barrier.db, false)
@@ -261,12 +260,12 @@ describe('Organization establishment serialization (e2e)', () => {
       )
     try {
       await barrier.acquired
-      await context.prisma.session.update({
-        where: { id: admission.principal.sid },
+      await context.prisma.authSessionFamily.update({
+        where: { id: admission.principal.fid },
         data: { revokedAt: new Date() },
       })
       barrier.release()
-      expect(await pending).toMatchObject({ error: { errorCode: 'STEP_UP_REQUIRED' } })
+      expect(await pending).toMatchObject({ error: { errorCode: 'SESSION_CHANGED' } })
       expect(await context.prisma.organization.count()).toBe(0)
       expect(await context.prisma.organizationBootstrapResult.count()).toBe(0)
     } finally {

@@ -17,6 +17,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 const jest = import.meta.jest
 
 describe('Role definitions: list, detail, atomic save, confirmed delete (real DB)', () => {
@@ -652,10 +653,10 @@ describe('Role definitions: list, detail, atomic save, confirmed delete (real DB
     const root = await register('root@example.test')
     const rootId = context.app.get(JwtService).verify(root.accessToken).sub
     await prisma.user.update({ where: { id: rootId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const relogin = await http()
-      .post('/auth/login')
-      .send({ email: 'root@example.test', password: 'StrongP@ss123' })
-      .expect(200)
+    const relogin = await loginDomainOperator(context, {
+      email: 'root@example.test',
+      password: 'StrongP@ss123',
+    })
     await get('', relogin.body.accessToken).expect((res) =>
       expect([403, 404]).toContain(res.status)
     )

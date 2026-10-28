@@ -17,6 +17,7 @@ import {
   signAccessToken,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 /**
  * Bull Board access control (EQS-01).
@@ -90,12 +91,14 @@ describe('Bull Board (e2e)', () => {
   })
 
   it('allows a SUPER_ADMIN user', async () => {
-    const { cookie, userId } = await registerUser('superadmin@example.com')
-    // Promote in place: verifyAccess reads systemRole live, so the existing
-    // session cookie now authorizes (no re-login needed).
+    const { cookie: previous, userId } = await registerUser('superadmin@example.com')
     await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-
-    await request(app.getHttpServer()).get(ROUTE).set('Cookie', cookie).expect(200)
+    const admitted = await loginDomainOperator(context, {
+      email: 'superadmin@example.com',
+      password: 'StrongP@ss123',
+    })
+    await request(app.getHttpServer()).get(ROUTE).set('Cookie', previous).expect(409)
+    await request(app.getHttpServer()).get(ROUTE).set('Cookie', refreshCookie(admitted)).expect(200)
   })
 
   it('rejects an API key on the Authorization header', async () => {
@@ -121,10 +124,15 @@ describe('Bull Board (e2e)', () => {
   })
 
   it('allows a SUPER_ADMIN on the UI subroute / data endpoint', async () => {
-    const { cookie, userId } = await registerUser('superadmin@example.com')
+    const { userId } = await registerUser('superadmin@example.com')
     await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-
-    const res = await request(app.getHttpServer()).get(SUBROUTE).set('Cookie', cookie)
+    const admitted = await loginDomainOperator(context, {
+      email: 'superadmin@example.com',
+      password: 'StrongP@ss123',
+    })
+    const res = await request(app.getHttpServer())
+      .get(SUBROUTE)
+      .set('Cookie', refreshCookie(admitted))
     // The route is reachable (not blocked by auth). Bull Board may answer 200.
     expect(res.status).not.toBe(401)
     expect(res.status).not.toBe(403)
@@ -154,6 +162,19 @@ describe('Bull Board (e2e)', () => {
     ): Promise<{ token: string; cookie: string; userId: string }> {
       const { cookie, userId } = await registerUser(email)
       await prisma.user.update({ where: { id: userId }, data: { systemRole: databaseRole } })
+      if (databaseRole === 'SUPER_ADMIN') {
+        const admitted = await loginDomainOperator(context, { email, password: 'StrongP@ss123' })
+        const claims = app.get(JwtService).verify(admitted.body.accessToken)
+        const token = signAccessToken(app, {
+          sub: userId,
+          email,
+          systemRole: claimRole,
+          sid: claims.sid,
+          fid: claims.fid,
+          securityVersion: claims.securityVersion,
+        })
+        return { token, cookie: refreshCookie(admitted), userId }
+      }
       const token = signAccessToken(app, { sub: userId, email, systemRole: claimRole })
       return { token, cookie, userId }
     }

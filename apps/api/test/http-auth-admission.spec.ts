@@ -19,6 +19,7 @@ import { CurrentUser } from '../src/core/auth/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../src/core/auth/guards/jwt-auth.guard'
 import { OriginCheckGuard } from '../src/core/auth/guards/origin-check.guard'
 import { RefreshTokenGuard } from '../src/core/auth/guards/refresh-token.guard'
+import { MfaAuthorityReader } from '../src/core/auth/mfa/mfa-authority-reader.service.js'
 import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import { SessionService } from '../src/core/auth/session.service'
 import { JwtStrategy } from '../src/core/auth/strategies/jwt.strategy'
@@ -47,6 +48,14 @@ class AuthProbeController {
   controllers: [AuthProbeController],
   providers: [
     JwtStrategy,
+    {
+      provide: MfaAuthorityReader,
+      useValue: {
+        readPrimaryProjection: () => {
+          throw new Error('Ordinary Passport probe must not select protected primary authority')
+        },
+      },
+    },
     JwtAuthGuard,
     OriginCheckGuard,
     RefreshTokenGuard,
@@ -75,7 +84,10 @@ for (const [name, makeAdapter] of [
     beforeAll(async () => {
       const adapter = makeAdapter()
       if (adapter instanceof FastifyAdapter) await adapter.getInstance().register(fastifyCookie)
-      app = await NestFactory.create(AuthProbeModule, adapter, { logger: false })
+      app = await NestFactory.create(AuthProbeModule, adapter, {
+        logger: false,
+        abortOnError: false,
+      })
       if (adapter instanceof ExpressAdapter) app.use(cookieParser())
       const logger = {
         setContext: jest.fn(),
@@ -124,7 +136,7 @@ for (const [name, makeAdapter] of [
         .set('Origin', 'https://web.example')
       expect(result.status).toBe(201)
       const hash = app.get(TokenService).hashRefreshToken('probe-refresh')
-      expect(validateRefreshToken).toHaveBeenCalledWith(hash)
+      expect(validateRefreshToken).toHaveBeenCalledWith(hash, null)
       expect(result.body).toEqual({ sub: 'probe', hash })
     })
     it('rejects missing refresh cookie', async () => {

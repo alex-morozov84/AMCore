@@ -2,6 +2,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/shared/api/bff/account-mfa-handler', () => ({
+  handleAccountMfa: vi.fn(async () => Response.json({ kind: 'unavailable' }, { status: 503 })),
+}))
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { GET, POST } from './route'
@@ -12,6 +15,8 @@ beforeEach(() => {
   config.mode = 'host'
   vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
   vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
+  vi.stubEnv('FRONTEND_URL', 'https://shop.example.test')
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-console-route-private-key-at-least-32>')
 })
 afterEach(() => {
   config.mode = original
@@ -29,8 +34,9 @@ it('closes wrong hosts before reading credentials', async () => {
     expect(response.headers.get('set-cookie')).toBeNull()
   }
 })
-it('returns only unavailable on the canonical host and refuses mutation without trusted origin', async () => {
+it('delegates the canonical host and refuses mutation without trusted origin', async () => {
   const read = await GET(request('console.example.test'))
+  expect(read.status).toBe(503)
   expect(await read.json()).toEqual({ kind: 'unavailable' })
   expect(read.headers.get('cache-control')).toBe('private, no-store')
   for (const origin of [undefined, 'https://shop.example.test', 'null'])

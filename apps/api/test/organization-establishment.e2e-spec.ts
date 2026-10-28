@@ -17,6 +17,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 describe('Organization establishment (e2e)', () => {
   let context: E2ETestContext
@@ -308,10 +309,10 @@ describe('Organization establishment (e2e)', () => {
     const path = '/admin/organization-establishment'
     await http().get(`${path}/status`).auth(token, { type: 'bearer' }).expect(403)
     await context.prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const login = await http()
-      .post('/auth/login')
-      .send({ email: 'creator@example.test', password: 'StrongP@ss123' })
-      .expect(200)
+    const login = await loginDomainOperator(context, {
+      email: 'creator@example.test',
+      password: 'StrongP@ss123',
+    })
     token = login.body.accessToken
     await http()
       .get(`${path}/status`)
@@ -343,10 +344,10 @@ describe('Organization establishment (e2e)', () => {
       .expect(409)
     expect(await context.prisma.orgMember.count({ where: { userId } })).toBe(0)
     const principal = context.app.get(JwtService).verify(token)
-    await context.prisma.session.update({
-      where: { id: principal.sid },
+    await context.prisma.authSessionFamily.update({
+      where: { id: principal.fid },
       data: { revokedAt: new Date() },
     })
-    await http().get(`${path}/status`).auth(token, { type: 'bearer' }).expect(401)
+    await http().get(`${path}/status`).auth(token, { type: 'bearer' }).expect(409)
   })
 })

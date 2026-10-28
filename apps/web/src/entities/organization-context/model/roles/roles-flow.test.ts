@@ -9,7 +9,7 @@ import { contextRoute } from '@/shared/api/bff/context-route'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
 import { roleRouteBody, roleRouteInput } from '@/shared/api/bff/role-route'
-import { FakeVaultStore, freshRefresh, makeEntry } from '@/shared/api/bff/test-fakes'
+import { FakeVaultStore, freshRefresh, makeBrowserEntry } from '@/shared/api/bff/test-fakes'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 
 import {
@@ -22,6 +22,9 @@ import { createOrganizationAccessController } from '../access-controller'
 
 import { ROLE_REJECTION_CODES } from './outcomes'
 
+beforeEach(() =>
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-domain-browser-transport-key-at-least-32>')
+)
 vi.mock('server-only', () => ({}))
 vi.mock('@/shared/api/backend-transport', () => ({
   fetchBackendResponse: vi.fn(),
@@ -58,7 +61,9 @@ const dto: SaveRoleDefinition = {
 const originalFetch = globalThis.fetch
 
 function harness(upstream: (url: string, init?: RequestInit) => Response) {
-  const entry = makeEntry({ userSnapshot: { id: 'actor', email: 'a@example.test' } as never })
+  const entry = makeBrowserEntry({
+    userSnapshot: { id: 'actor', email: 'a@example.test' } as never,
+  })
   const store = new FakeVaultStore()
   store.seed('session-x', entry)
   const binding = contextSessionBinding('session-x', entry)
@@ -85,6 +90,7 @@ function harness(upstream: (url: string, init?: RequestInit) => Response) {
       headers: {
         ...(init.headers as Record<string, string>),
         origin: 'http://localhost:3002',
+        cookie: `amcore_browser_context=${'a'.repeat(43)}`,
         host: 'localhost:3002',
       },
     })

@@ -4,6 +4,7 @@ import request from 'supertest'
 import type { PrismaService } from '../src/prisma'
 
 import { type E2ETestContext, seedSystemRoles, setupE2ETest, teardownE2ETest } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 describe('Admin audit browser (e2e)', () => {
   let context: E2ETestContext
@@ -24,10 +25,10 @@ describe('Admin audit browser (e2e)', () => {
       .expect(201)
     operatorId = register.body.user.id as string
     await prisma.user.update({ where: { id: operatorId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'audit-operator@example.com', password: 'StrongP@ss123' })
-      .expect(200)
+    const login = await loginDomainOperator(context, {
+      email: 'audit-operator@example.com',
+      password: 'StrongP@ss123',
+    })
     token = login.body.accessToken as string
   }, 120_000)
 

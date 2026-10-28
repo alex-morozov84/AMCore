@@ -1,3 +1,4 @@
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -42,13 +43,14 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
     ),
     consolePage.getByRole('button', { name: /sign in/i }).click(),
   ])
-  expect(deniedLogin.status()).toBe(403)
+  expect(deniedLogin.status()).toBe(401)
   expect(await console.cookies(`${standTarget.origins.console}`)).not.toContainEqual(
     expect.objectContaining({ name: '__Host-amcore_console_session' })
   )
 
   setSystemRole(email, 'SUPER_ADMIN')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )

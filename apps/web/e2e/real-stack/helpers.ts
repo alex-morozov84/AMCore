@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test'
 
+import { completeMfaSignIn } from '../shared/mfa-login'
+
 /**
  * Real-stack specs register a fresh real account through `apps/api` on
  * every run instead of seeding/cleaning up rows directly — this lane's
@@ -40,11 +42,20 @@ export async function registerViaUi(
   await page.waitForURL(/\/en\/?$/)
 }
 
-export async function loginViaUi(page: Page, email: string): Promise<void> {
+export async function loginViaUi(
+  page: Page,
+  email: string,
+  options: { mfa?: 'complete' | 'manual' } = {}
+): Promise<void> {
   await page.goto('/en/login')
   await page.getByRole('textbox', { name: /email/i }).fill(email)
   await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
+  const response = page.waitForResponse(
+    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: /sign in/i }).click()
+  if ((await response).status() === 202 && options.mfa !== 'manual')
+    await completeMfaSignIn(page, email)
 }
 
 /** Sign out through the product shell's account menu (header), the only logout control there. */

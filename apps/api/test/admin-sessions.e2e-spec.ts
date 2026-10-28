@@ -20,6 +20,8 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
+import { reauthenticateDomainOperator } from './operator-step-up.fixture.js'
 
 describe('Admin sessions (e2e)', () => {
   let app: INestApplication
@@ -58,10 +60,7 @@ describe('Admin sessions (e2e)', () => {
   async function makeSuperAdmin(email: string) {
     const reg = await registerAndGetToken(email)
     await prisma.user.update({ where: { id: reg.userId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200)
+    const login = await loginDomainOperator(context, { email, password: PASSWORD })
     return {
       userId: reg.userId,
       token: login.body.accessToken as string,
@@ -70,9 +69,12 @@ describe('Admin sessions (e2e)', () => {
   }
 
   async function ageSessions(userId: string) {
-    await prisma.session.updateMany({
+    await prisma.authSessionFamily.updateMany({
       where: { userId, revokedAt: null },
-      data: { lastAuthAt: new Date(Date.now() - 60 * 60 * 1000) },
+      data: {
+        primaryAt: new Date(Date.now() - 60 * 60 * 1000),
+        mfaAt: new Date(Date.now() - 60 * 60 * 1000),
+      },
     })
   }
 
@@ -243,7 +245,7 @@ describe('Admin sessions (e2e)', () => {
       const admin = await makeSuperAdmin('revoked-actor@example.com')
       const target = await registerAndGetToken('revoked-actor-target@example.com')
       const session = await prisma.session.findFirstOrThrow({ where: { userId: target.userId } })
-      await prisma.session.updateMany({
+      await prisma.authSessionFamily.updateMany({
         where: { userId: admin.userId },
         data: { revokedAt: new Date() },
       })
@@ -251,8 +253,8 @@ describe('Admin sessions (e2e)', () => {
         const res = await request(app.getHttpServer())
           .delete(`/admin/users/${target.userId}/sessions${path}`)
           .set('Authorization', `Bearer ${admin.token}`)
-          .expect(403)
-        expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+          .expect(409)
+        expect(res.body.errorCode).toBe('SESSION_CHANGED')
       }
       expect(
         (await prisma.session.findUniqueOrThrow({ where: { id: session.id } })).revokedAt
@@ -384,11 +386,7 @@ describe('Admin sessions (e2e)', () => {
         .expect(403)
       expect(stale.body.errorCode).toBe('STEP_UP_REQUIRED')
 
-      await request(app.getHttpServer())
-        .post('/auth/step-up')
-        .set('Authorization', `Bearer ${admin.token}`)
-        .send({ password: PASSWORD })
-        .expect(200)
+      await reauthenticateDomainOperator(context, admin.token, PASSWORD)
 
       await request(app.getHttpServer())
         .delete(`/admin/users/${target.userId}/sessions/${session.familyId}`)

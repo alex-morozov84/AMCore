@@ -27,7 +27,10 @@ export function MfaBackupCodes({
   return (
     <div className="space-y-4">
       <p>{t(setup ? 'codesDescription' : 'newCodesDescription')}</p>
-      <ul className="grid gap-2 rounded-md border bg-muted p-4 font-mono text-sm">
+      <ul
+        aria-label={t('backupCodesTitle')}
+        className="grid gap-2 rounded-md border bg-muted p-4 font-mono text-sm"
+      >
         {codes.map((code) => (
           <li key={code} className="break-all select-text">
             {code}

@@ -10,9 +10,31 @@ import {
 } from '../src/core/organizations/invitation-email.service'
 
 import { cleanDatabase, cleanOrgData, type E2ETestContext } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
-export async function prepareProvisioningFixture(context: E2ETestContext) {
-  const http = () => request(context.app.getHttpServer())
+type ProvisioningInput = {
+  operationId: string
+  name: string
+  slug: string
+  firstAdminEmail: string
+  inviteLocale: typeof DEFAULT_LOCALE
+}
+interface ProvisioningFixture {
+  http: () => ReturnType<typeof request>
+  token: string
+  operatorId: string
+  input: (overrides?: object) => ProvisioningInput
+  create: (body?: ProvisioningInput) => request.Test
+  status: (orgId: string) => request.Test
+  recover: (orgId: string, action: string, body: object) => request.Test
+  mail: Map<string, InvitationMailSnapshot>
+  restore: () => void
+}
+
+export async function prepareProvisioningFixture(
+  context: E2ETestContext
+): Promise<ProvisioningFixture> {
+  const http = (): ReturnType<typeof request> => request(context.app.getHttpServer())
   await cleanOrgData(context.prisma)
   await cleanDatabase(context.prisma, context.cache, context.throttlerStorage)
   const config = context.app.get(ConfigService)
@@ -28,10 +50,10 @@ export async function prepareProvisioningFixture(context: E2ETestContext) {
     where: { id: account.body.user.id },
     data: { systemRole: 'SUPER_ADMIN' },
   })
-  const login = await http()
-    .post('/auth/login')
-    .send({ email: 'operator@e2e.amcore.test', password: 'StrongP@ss123' })
-    .expect(200)
+  const login = await loginDomainOperator(context, {
+    email: 'operator@e2e.amcore.test',
+    password: 'StrongP@ss123',
+  })
   const token: string = login.body.accessToken
   const mail = new Map<string, InvitationMailSnapshot>()
   const spy = import.meta.jest
@@ -39,7 +61,7 @@ export async function prepareProvisioningFixture(context: E2ETestContext) {
     .mockImplementation(async (snapshot) => {
       mail.set(snapshot.email, snapshot)
     })
-  const input = (overrides: object = {}) => ({
+  const input = (overrides: object = {}): ProvisioningInput => ({
     operationId: createInvitationOperationId(),
     name: 'North shop',
     slug: 'north-shop',
@@ -47,11 +69,11 @@ export async function prepareProvisioningFixture(context: E2ETestContext) {
     inviteLocale: DEFAULT_LOCALE,
     ...overrides,
   })
-  const create = (body = input()) =>
+  const create = (body = input()): request.Test =>
     http().post('/admin/organization-provisionings').auth(token, { type: 'bearer' }).send(body)
-  const status = (orgId: string) =>
+  const status = (orgId: string): request.Test =>
     http().get(`/admin/organizations/${orgId}/provisioning`).auth(token, { type: 'bearer' })
-  const recover = (orgId: string, action: string, body: object) =>
+  const recover = (orgId: string, action: string, body: object): request.Test =>
     http()
       .post(`/admin/organizations/${orgId}/provisioning/${action}`)
       .auth(token, { type: 'bearer' })
@@ -65,14 +87,20 @@ export async function prepareProvisioningFixture(context: E2ETestContext) {
     status,
     recover,
     mail,
-    restore: () => spy.mockRestore(),
+    restore: (): void => spy.mockRestore(),
   }
 }
 
 export async function prepareProvisioningRecipient(
   context: E2ETestContext,
   fixture: Awaited<ReturnType<typeof prepareProvisioningFixture>>
-) {
+): Promise<{
+  id: string
+  token: string
+  inspect: () => request.Test
+  accept: () => request.Test
+  inviteId: string
+}> {
   context.app.get(ConfigService).set('AUTH_PUBLIC_SIGNUP_ENABLED', false)
   const issued = fixture.mail.get('admin@e2e.amcore.test')!
   const admitted = await fixture
@@ -89,7 +117,7 @@ export async function prepareProvisioningRecipient(
   const id: string = registered.body.user.id
   const token: string = registered.body.accessToken
   expect(await context.prisma.orgMember.count({ where: { userId: id } })).toBe(0)
-  const inspect = () =>
+  const inspect = (): request.Test =>
     fixture
       .http()
       .post('/auth/invites/inspect')
@@ -98,7 +126,7 @@ export async function prepareProvisioningRecipient(
   expect((await inspect().expect(200)).body.state).toBe('verify_email')
   // Controlled verified fixture. Actual email verification belongs to the separate rendered-mail browser lane.
   await context.prisma.user.update({ where: { id }, data: { emailVerified: true } })
-  const accept = () =>
+  const accept = (): request.Test =>
     fixture
       .http()
       .post('/auth/invites/accept')

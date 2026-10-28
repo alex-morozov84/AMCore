@@ -8,6 +8,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '../../../common/exceptions'
+import type { MfaPrimaryProjection } from '../../auth/mfa/mfa-primary-projection.schema.js'
 
 import { AiConversationAccessAuthorizer } from './ai-conversation-access.authorizer'
 import type { AiConversationControlService } from './ai-conversation-control.service'
@@ -30,20 +31,36 @@ const operatorPrincipal = {
   sub: 'admin-9',
   systemRole: SystemRole.SuperAdmin,
   sid: 'sess-admin',
+  fid: 'operator-family',
+  securityVersion: 0,
 } as RequestPrincipal
 
-/** A fresh (recently re-authenticated) session row for the given user. */
-function freshSession(userId: string): Record<string, unknown> {
+/** Explicit protected family fixture; no password-only privileged admission. */
+function freshFamily(): NonNullable<MfaPrimaryProjection['family']> {
   return {
-    lastAuthAt: new Date(Date.now() - 10_000), // 10s ago, well within the 300s window
+    id: 'operator-family',
+    userId: 'admin-9',
+    securityVersion: 0,
+    expiresAt: new Date(Date.now() + 3600000),
     revokedAt: null,
-    expiresAt: new Date(Date.now() + 3_600_000),
-    userId,
+    publicationState: 'published',
+    primaryMethod: 'password',
+    primaryAt: new Date(Date.now() - 10000),
+    primaryProofId: 'local-password',
+    mfaMethod: 'totp',
+    mfaAt: new Date(Date.now() - 10000),
+    mfaProofId: 'local-factor',
+    factorVersion: 1,
+    browserContextId: null,
+    publicationGeneration: null,
+    browserContext: null,
   }
 }
 
 describe('AiConversationOperatorService', () => {
   let prisma: DeepMockProxy<PrismaService>
+  let family: MfaPrimaryProjection['family']
+  let holderRows: unknown[]
   let control: { takeControl: jest.Mock; releaseControl: jest.Mock }
   let audit: { record: jest.Mock }
   let metrics: { incAiConversationControl: jest.Mock }
@@ -54,6 +71,31 @@ describe('AiConversationOperatorService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
+    family = freshFamily()
+    holderRows = []
+    prisma.$queryRaw.mockImplementation(((query: { sql?: string }) => {
+      if (query.sql?.includes('WITH source'))
+        return Promise.resolve([
+          {
+            now: new Date(),
+            user: {
+              id: 'admin-9',
+              systemRole: SystemRole.SuperAdmin,
+              mfaAccount: {
+                securityVersion: 0,
+                required: true,
+                setupComplete: true,
+                emergencyRequired: false,
+              },
+              mfaFactor: { version: 1 },
+            },
+            family,
+            protocol: { state: 'active', version: 1 },
+            session: null,
+          },
+        ])
+      return Promise.resolve(holderRows)
+    }) as unknown as typeof prisma.$queryRaw)
     ;(prisma.$transaction as unknown as jest.Mock).mockImplementation(
       (cb: (tx: unknown) => unknown) => cb(prisma)
     )
@@ -134,13 +176,11 @@ describe('AiConversationOperatorService', () => {
     })
 
     it('takes over with a fresh session + a reason, passing the TRIMMED reason to the primitive', async () => {
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      family = freshFamily()
 
       await service.takeover(operatorPrincipal, 'conv-1', '  SUP-42  ')
 
-      expect(prisma.session.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'sess-admin' } })
-      )
+      expect(prisma.session.findUnique).not.toHaveBeenCalled()
       expect(control.takeControl).toHaveBeenCalledWith(
         { userId: 'admin-9', isSuperAdmin: true },
         'conv-1',
@@ -149,7 +189,7 @@ describe('AiConversationOperatorService', () => {
     })
 
     it('400s when the cross-user operator omits the reason', async () => {
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      family = freshFamily()
 
       await expect(service.takeover(operatorPrincipal, 'conv-1')).rejects.toThrow(
         BadRequestException
@@ -158,7 +198,7 @@ describe('AiConversationOperatorService', () => {
     })
 
     it('400s for an empty / whitespace-only reason (does not survive as a valid ticket ref)', async () => {
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      family = freshFamily()
 
       await expect(service.takeover(operatorPrincipal, 'conv-1', '   ')).rejects.toThrow(
         BadRequestException
@@ -167,7 +207,7 @@ describe('AiConversationOperatorService', () => {
     })
 
     it('400s for a reason with control characters (audit sanitizer would drop it)', async () => {
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      family = freshFamily()
       const withTab = `SUP${String.fromCharCode(9)}42`
 
       await expect(service.takeover(operatorPrincipal, 'conv-1', withTab)).rejects.toThrow(
@@ -177,12 +217,7 @@ describe('AiConversationOperatorService', () => {
     })
 
     it('403 (step-up) when the operator session is stale — before any control mutation', async () => {
-      prisma.session.findUnique.mockResolvedValue({
-        lastAuthAt: new Date(Date.now() - 10_000_000), // far outside the window
-        revokedAt: null,
-        expiresAt: new Date(Date.now() + 3_600_000),
-        userId: 'admin-9',
-      } as never)
+      family = { ...freshFamily(), primaryAt: new Date(0), mfaAt: new Date(0) }
 
       await expect(service.takeover(operatorPrincipal, 'conv-1', 'SUP-42')).rejects.toMatchObject({
         errorCode: 'STEP_UP_REQUIRED',
@@ -190,10 +225,10 @@ describe('AiConversationOperatorService', () => {
       expect(control.takeControl).not.toHaveBeenCalled()
     })
 
-    it('403 (step-up) when the operator has no session at all', async () => {
-      prisma.session.findUnique.mockResolvedValue(null as never)
+    it('denies changed authority when the operator family is missing', async () => {
+      family = null
       await expect(service.release(operatorPrincipal, 'conv-1', 'SUP-42')).rejects.toMatchObject({
-        errorCode: 'STEP_UP_REQUIRED',
+        errorCode: 'SESSION_CHANGED',
       })
       expect(control.releaseControl).not.toHaveBeenCalled()
     })
@@ -226,7 +261,7 @@ describe('AiConversationOperatorService', () => {
 
     it('cross-user operator read is step-up + reason gated and AUDITED (content-free)', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      family = freshFamily()
       prisma.aiMessage.findMany.mockResolvedValue([msg(0)] as never)
 
       await service.getTranscript(operatorPrincipal, 'conv-1', { limit: 20 }, 'SUP-9')
@@ -247,7 +282,7 @@ describe('AiConversationOperatorService', () => {
 
     it('does not return the transcript when the fail-closed access audit rejects (cross-user)', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
+      family = freshFamily()
       prisma.aiMessage.findMany.mockResolvedValue([msg(0)] as never)
       audit.record.mockRejectedValue(new Error('audit sink down'))
 
@@ -259,13 +294,13 @@ describe('AiConversationOperatorService', () => {
       ).rejects.toThrow('audit sink down')
     })
 
-    it('403 for a cross-user read with a stale session (no transcript served)', async () => {
+    it('serves no transcript when the operator family is missing', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.session.findUnique.mockResolvedValue(null as never)
+      family = null
 
       await expect(
         service.getTranscript(operatorPrincipal, 'conv-1', { limit: 20 }, 'SUP-9')
-      ).rejects.toMatchObject({ errorCode: 'STEP_UP_REQUIRED' })
+      ).rejects.toMatchObject({ errorCode: 'SESSION_CHANGED' })
       expect(prisma.aiMessage.findMany).not.toHaveBeenCalled()
     })
   })
@@ -290,9 +325,9 @@ describe('AiConversationOperatorService', () => {
 
     it('lets the holding owner post a USER-authored ASSISTANT turn + in-tx audit', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.$queryRaw.mockResolvedValue([
+      holderRows = [
         { ownerUserId: 'owner-1', controlledBy: 'HUMAN', humanControlUserId: 'owner-1' },
-      ] as never)
+      ]
 
       await service.postMessage(ownerPrincipal, 'conv-1', { content: input.content })
 
@@ -314,10 +349,10 @@ describe('AiConversationOperatorService', () => {
 
     it('lets the holding operator post an OPERATOR-authored turn', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
-      prisma.$queryRaw.mockResolvedValue([
+      family = freshFamily()
+      holderRows = [
         { ownerUserId: 'owner-1', controlledBy: 'HUMAN', humanControlUserId: 'admin-9' },
-      ] as never)
+      ]
 
       await service.postMessage(operatorPrincipal, 'conv-1', input)
 
@@ -331,9 +366,7 @@ describe('AiConversationOperatorService', () => {
 
     it('409s when the actor does not currently hold control (must take over first)', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.$queryRaw.mockResolvedValue([
-        { ownerUserId: 'owner-1', controlledBy: 'BOT', humanControlUserId: null },
-      ] as never)
+      holderRows = [{ ownerUserId: 'owner-1', controlledBy: 'BOT', humanControlUserId: null }]
 
       await expect(
         service.postMessage(ownerPrincipal, 'conv-1', { content: input.content })
@@ -343,9 +376,9 @@ describe('AiConversationOperatorService', () => {
 
     it('409s when a different human holds control', async () => {
       prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-      prisma.$queryRaw.mockResolvedValue([
+      holderRows = [
         { ownerUserId: 'owner-1', controlledBy: 'HUMAN', humanControlUserId: 'someone-else' },
-      ] as never)
+      ]
 
       await expect(
         service.postMessage(ownerPrincipal, 'conv-1', { content: input.content })

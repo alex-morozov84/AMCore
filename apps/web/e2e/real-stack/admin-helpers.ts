@@ -45,6 +45,10 @@ export function countLiveSessions(email: string): number {
 }
 export function ageSessionLastAuthAt(email: string): void {
   guardedSql(
+    `UPDATE core.auth_session_families SET "primaryAt" = now() - interval '20 minutes', "mfaAt" = now() - interval '20 minutes' WHERE "userId" = (SELECT id FROM core.users WHERE "emailCanonical" = :'email') AND "revokedAt" IS NULL;`,
+    { email }
+  )
+  guardedSql(
     `UPDATE core.sessions SET "lastAuthAt" = now() - interval '20 minutes' WHERE "userId" = (SELECT id FROM core.users WHERE "emailCanonical" = :'email') AND "revokedAt" IS NULL;`,
     { email }
   )

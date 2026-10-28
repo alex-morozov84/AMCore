@@ -10,9 +10,9 @@ import {
   SystemRole,
 } from '@amcore/shared'
 
+import { MfaAuthorityReader } from '../src/core/auth/mfa/mfa-authority-reader.service.js'
 import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
 import { PermissionsCacheService } from '../src/core/auth/permissions-cache.service'
-import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import { OrganizationsService } from '../src/core/organizations/organizations.service'
 import type { PrismaService } from '../src/prisma'
 
@@ -26,6 +26,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 const jest = import.meta.jest
 
@@ -216,10 +217,17 @@ describe('Organizations (e2e)', () => {
         where: { id: actor.sub },
         data: { systemRole: SystemRole.SuperAdmin },
       })
+      const admitted = await loginDomainOperator(context, {
+        email: actor.email,
+        password: 'StrongP@ss123',
+      })
+      const protectedClaims = jwt.verify(admitted.body.accessToken)
       const platform = jwt.sign({
         sub: actor.sub,
         email: actor.email,
-        sid: actor.sid,
+        sid: protectedClaims.sid,
+        fid: protectedClaims.fid,
+        securityVersion: protectedClaims.securityVersion,
         systemRole: SystemRole.SuperAdmin,
       })
       await request(app.getHttpServer())
@@ -230,11 +238,11 @@ describe('Organizations (e2e)', () => {
         .get(`/organizations/${own.body.id}/context`)
         .set('Authorization', `Bearer ${platform}`)
         .expect(200)
-      // Legacy member discovery retains its non-enumerating 404 behavior.
+      // Promotion invalidates the original unprotected token before member discovery.
       await request(app.getHttpServer())
         .get(`/organizations/${foreign.body.id}`)
         .set('Authorization', `Bearer ${actorToken}`)
-        .expect(404)
+        .expect(409)
     })
   })
 
@@ -258,15 +266,22 @@ describe('Organizations (e2e)', () => {
         where: { id: actor.sub },
         data: { systemRole: SystemRole.SuperAdmin },
       })
+      const admitted = await loginDomainOperator(context, {
+        email: actor.email,
+        password: 'StrongP@ss123',
+      })
+      const protectedClaims = jwt.verify(admitted.body.accessToken)
       // Old USER claim cannot elevate merely because primary now says SUPER_ADMIN.
       await request(app.getHttpServer())
         .get('/admin/access')
         .set('Authorization', `Bearer ${actorToken}`)
-        .expect(403)
+        .expect(409)
       const stale = jwt.sign({
         sub: actor.sub,
         email: actor.email,
-        sid: actor.sid,
+        sid: protectedClaims.sid,
+        fid: protectedClaims.fid,
+        securityVersion: protectedClaims.securityVersion,
         systemRole: SystemRole.SuperAdmin,
         organizationId: foreign.body.id,
         aclVersion: 0,
@@ -302,9 +317,9 @@ describe('Organizations (e2e)', () => {
         .set('Authorization', `Bearer ${stale}`)
         .expect(200)
       expect(jwt.verify(derived.body.accessToken).systemRole).toBe(SystemRole.User)
-      const roles = app.get(PrivilegedRoleService)
-      const lookup = roles.getCurrentSystemRole
-      roles.getCurrentSystemRole = async () => {
+      const roles = app.get(MfaAuthorityReader)
+      const lookup = roles.readPrimaryProjection
+      roles.readPrimaryProjection = async () => {
         throw new Error('primary unavailable')
       }
       try {
@@ -317,7 +332,7 @@ describe('Organizations (e2e)', () => {
           await prisma.organization.findUniqueOrThrow({ where: { id: foreign.body.id } })
         ).toEqual(before)
       } finally {
-        roles.getCurrentSystemRole = lookup
+        roles.readPrimaryProjection = lookup
       }
     })
   })

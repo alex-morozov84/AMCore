@@ -1,5 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { completeMfaStepUp } from '../shared/mfa-login'
+
 import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
 
@@ -86,13 +88,14 @@ test('path-mode: demoting with an aged session requires step-up, retries automat
   await expect(stepUpDialog).toBeVisible()
   await stepUpDialog.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
+  await completeMfaStepUp(page, adminEmail)
 
   await expect(stepUpDialog).toBeHidden()
   await expect(
     page.getByRole('row').filter({ hasText: targetEmail }).getByText('User', { exact: true })
   ).toBeVisible()
 
-  expect(stepUpBodies).toHaveLength(1)
+  expect(stepUpBodies).toHaveLength(2)
   for (const body of stepUpBodies) {
     expect(body).not.toContain('accessToken')
     expect(body).not.toContain('refreshToken')

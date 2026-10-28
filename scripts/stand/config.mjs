@@ -1,3 +1,4 @@
+import { mfaE2EEnvironment } from './mfa-e2e.mjs'
 // AMCORE_CONSOLE_SUMMARY_IMPORT_START
 import { consoleSummaryServices } from './console-summary-fixture.mjs'
 // AMCORE_CONSOLE_SUMMARY_IMPORT_END
@@ -45,6 +46,7 @@ export async function configuration(m) {
   const seoIndexing = process.env.AMCORE_STAND_WEB_SEO_INDEXING ?? ''
   const app = {
     NODE_ENV: 'development',
+    ...mfaE2EEnvironment(m),
     API_PORT: '5002',
     DATABASE_URL: db,
     REDIS_URL: 'redis://redis:6379',

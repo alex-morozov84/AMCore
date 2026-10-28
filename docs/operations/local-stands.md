@@ -732,3 +732,27 @@ It never enables backend MFA, binds a factor or grants account access. Reloading
 resets the UI example. Existing demo accounts and normal login remain separate.
 The managed inspection completes one setup/code-saving journey without tracing
 or capturing secret steps. Do not treat simulation as backend security evidence.
+
+### MFA in disposable browser tests
+
+Docker E2E stands receive their own generated MFA encryption key. After the runner
+validates its lease, database marker and owned resources, it seeds protocol version1
+as active in that disposable database. This is test setup, not deployment preflight
+or activation evidence. Preview stands and ordinary Compose deployments do not receive
+this test configuration.
+
+Run the real enrollment, backup sign-in and code-rotation journey with:
+
+```sh
+pnpm stand e2e --lane real-stack -- operator-mfa.spec.ts
+```
+
+This scenario uses the real API, BFF, Redis and browser. It provisions an operator
+only in the owned test database and completes the normal enrollment interface.
+It disables trace, video, screenshots and Playwright's automatic error-context
+DOM snapshot. It also removes matcher-supplied DOM snapshots from test errors,
+while retaining failure messages, stacks and verdicts. Docker E2E uses a step-free
+list reporter because HTML step titles can retain filled factor codes. These rules
+keep factor seeds and backup codes out of failure artifacts.
+The runner removes the disposable stack after the attempt. A failed attempt remains
+failed; test setup does not certify a production deployment.

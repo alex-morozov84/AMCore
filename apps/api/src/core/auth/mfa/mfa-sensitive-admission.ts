@@ -6,7 +6,7 @@ import { requireMfaAdmission } from './mfa-admission-result.js'
 import { type MfaAuthorityDatabase, MfaAuthorityReader } from './mfa-authority-reader.service.js'
 import { principalBrowserBinding } from './mfa-principal-binding.js'
 
-/** Returns false only for ordinary or untouched prepared legacy password freshness. No locks acquired. */
+/** Returns false only for ordinary independent legacy password freshness. No locks acquired. */
 export async function assertMfaSensitiveAdmission(
   db: MfaAuthorityDatabase,
   principal: RequestPrincipal,

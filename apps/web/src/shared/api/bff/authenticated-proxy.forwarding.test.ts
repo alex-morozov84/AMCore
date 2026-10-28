@@ -5,6 +5,7 @@ import { proxyToBackend } from './authenticated-proxy'
 import { makeRequest, mockCookieStore } from './authenticated-proxy.test-helpers'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isTrustedOrigin } from './origin-guard'
+import { makeBrowserEntry } from './test-fakes'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
@@ -16,7 +17,7 @@ describe('proxyToBackend — request/response forwarding once authenticated', ()
   beforeEach(() => {
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
     mockCookieStore('sess-1')
-    vi.mocked(ensureFreshSession).mockResolvedValue({ accessToken: 'at-1' } as never)
+    vi.mocked(ensureFreshSession).mockResolvedValue(makeBrowserEntry())
   })
 
   afterEach(() => {

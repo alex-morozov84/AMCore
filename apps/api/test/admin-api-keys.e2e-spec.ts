@@ -22,6 +22,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 const jestApi = (import.meta as ImportMeta & { jest: typeof jest }).jest
 
@@ -50,10 +51,9 @@ describe('Platform API keys (e2e)', () => {
       .expect(201)
     const id = registered.body.user.id as string
     if (admin) await prisma.user.update({ where: { id }, data: { systemRole: 'SUPER_ADMIN' } })
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200)
+    const login = admin
+      ? await loginDomainOperator(context, { email, password })
+      : await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(200)
     return { id, token: login.body.accessToken as string }
   }
   async function fixture() {
@@ -229,9 +229,9 @@ describe('Platform API keys (e2e)', () => {
     const f = await fixture()
     await get(f.key.key).expect(401)
     await get(f.owner.token).expect(403)
-    await prisma.session.updateMany({
+    await prisma.authSessionFamily.updateMany({
       where: { userId: f.admin.id },
-      data: { lastAuthAt: new Date(Date.now() - 3600000) },
+      data: { primaryAt: new Date(Date.now() - 3600000), mfaAt: new Date(Date.now() - 3600000) },
     })
     await bulk(f.admin.token, [f.key.id]).expect(403)
     await prisma.user.update({ where: { id: f.admin.id }, data: { systemRole: 'USER' } })

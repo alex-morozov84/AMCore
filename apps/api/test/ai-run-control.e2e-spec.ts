@@ -28,6 +28,7 @@ import type { DurableTransactionContext } from '../src/infrastructure/background
 
 import { closeManagedWorker } from './fixtures/background-work/close-managed-worker'
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers'
+import { seedDomainOperatorSession } from './operator-auth.fixture.js'
 
 describe('AI run durable control (real PostgreSQL)', () => {
   let context: E2ETestContext
@@ -253,12 +254,7 @@ describe('AI run durable control (real PostgreSQL)', () => {
     })
     const gate = await context.prisma.aiRunControl.findUniqueOrThrow({ where: { id: 1 } })
     const receipt = await commands.executeDurable(
-      {
-        type: 'jwt',
-        sub: user.id,
-        sid: session.id,
-        systemRole: SystemRole.SuperAdmin,
-      },
+      await seedDomainOperatorSession(context, session.id),
       {
         contractVersion: 1,
         commandId: uuidv7(),
@@ -378,12 +374,7 @@ describe('AI run durable control (real PostgreSQL)', () => {
     })
     const source = await context.prisma.aiRun.findUniqueOrThrow({ where: { id: run.id } })
     const receipt = await commands.executeDurable(
-      {
-        type: 'jwt',
-        sub: user.id,
-        sid: session.id,
-        systemRole: SystemRole.SuperAdmin,
-      },
+      await seedDomainOperatorSession(context, session.id),
       {
         contractVersion: 1,
         commandId: uuidv7(),

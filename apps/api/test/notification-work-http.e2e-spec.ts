@@ -17,6 +17,7 @@ import {
   waitForDatabaseTime,
 } from './fixtures/notification-work/barriers'
 import { signAccessToken } from './helpers'
+import { seedDomainOperatorSession } from './operator-auth.fixture.js'
 import {
   createTgUser,
   issueTokenRow,
@@ -58,7 +59,9 @@ describe('Notification adapter through the common HTTP authority', () => {
         expiresAt: new Date(Date.now() + 60000),
       },
     })
-    token = signAccessToken(tg.app, { sub: user, sid: session.id, systemRole: 'SUPER_ADMIN' })
+    token = signAccessToken(tg.app, {
+      ...(await seedDomainOperatorSession(tg.context, session.id)),
+    })
     await tg.prisma.telegramConnection.create({
       data: { userId: user, chatId: '111', telegramUserId: '111' },
     })

@@ -7,6 +7,7 @@ import {
   backgroundWorkRetryAfterJourney,
 } from '../shared/background-work-intercepted-journeys'
 import { backgroundWorkJourney, queueBoardJourney } from '../shared/background-work-journey'
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
@@ -35,6 +36,7 @@ async function operator(
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/^password$/i).fill('Test1234Secure')
   await page.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(page, email)
   await expect(page).toHaveURL(/\/en\/?$/)
   return { page, close: () => Promise.all([product.close(), consoleContext.close()]) }
 }

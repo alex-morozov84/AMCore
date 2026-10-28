@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 
 import type { BrowserAudience } from '@amcore/shared'
 
@@ -57,7 +57,7 @@ export async function writeFamily(
     })
   const family = await tx.authSessionFamily.create({
     data: {
-      id: randomUUID(),
+      id: randomBytes(16).toString('hex'),
       userId: user.id,
       securityVersion: plan.securityVersion,
       primaryMethod: plan.primaryMethod,

@@ -30,8 +30,8 @@ export default defineConfig({
   workers: 1,
   use: {
     ...testOptions(),
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: 'off',
+    screenshot: 'off',
     serviceWorkers: 'block',
   },
   projects: [

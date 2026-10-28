@@ -50,3 +50,23 @@ export const freshRefresh = (): ReturnType<UpstreamRefreshFn> =>
     accessTokenExpiresAt: Date.now() + 60_000,
     refreshToken: 'rt-2',
   })
+
+/** Explicit published browser fixture; makeEntry still permits unbound negative cases. */
+export function makeBrowserEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
+  return makeEntry({
+    audience: 'product',
+    browser: {
+      contextId: 'context-x',
+      generation: 1,
+      familyId: 'family-x',
+      securityVersion: 0,
+      audience: 'product',
+    },
+    ...overrides,
+  })
+}
+export function browserTestHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init)
+  headers.set('cookie', `amcore_browser_context=${'a'.repeat(43)}`)
+  return headers
+}

@@ -152,7 +152,7 @@ export class PasswordStepUpService {
         targetId: family?.id ?? source.principal.sid,
         metadata: family
           ? { operationId: eventId, method: 'password' }
-          : { sessionId: source.principal.sid },
+          : { pinoEvent: 'auth.step_up.succeeded', sessionId: source.principal.sid },
       },
       { tx }
     )
@@ -174,7 +174,7 @@ export class PasswordStepUpService {
       actorId: source.principal.sub,
       targetType: AuditTargetType.SESSION,
       targetId: source.principal.sid ?? null,
-      metadata: { reason },
+      metadata: { pinoEvent: 'auth.step_up.failed', reason },
     })
   }
 }
