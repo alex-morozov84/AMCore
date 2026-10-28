@@ -161,7 +161,7 @@ export function MfaFlow({
                 action:
                   view.purpose === 'rotate_codes'
                     ? 'rotate_codes'
-                    : view.purpose === 'initial_setup' || view.purpose === 'replace_factor'
+                    : view.purpose === 'replace_factor'
                       ? 'start_enrollment'
                       : view.purpose === 'reauthenticate'
                         ? 'complete_confirmation'

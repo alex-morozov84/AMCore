@@ -72,7 +72,7 @@ function readRenderContext(req: Request): BoardRequestLocals['boardContext'] | n
  * - Machine credentials are rejected outright: the board is a user UI, not a machine API. An
  *   `Authorization` header carrying an API key (`amcore_` prefix) or any `x-api-key` header → 401.
  * - Bearer (the Console BFF): a live SUPER_ADMIN access token (`BullBoardBearerAuthService`) — 401
- *   invalid/expired/unknown user, 403 not SUPER_ADMIN (claim or current role), 503 could not verify.
+ *   invalid/expired/unknown user, 403 not SUPER_ADMIN, 409 changed session, 503 could not verify.
  *   The optional render context header is honoured only here, and an invalid one is a 400.
  * - Cookie: a session of a SUPER_ADMIN user (`BullBoardAuthService`), no render context.
  *
@@ -86,7 +86,7 @@ export function createBullBoardAuthMiddleware(
   bearerAuth: Pick<BullBoardBearerAuthService, 'verify'>,
   events: BoardEventSink = NOOP_BOARD_EVENTS
 ): RequestHandler {
-  const deny = (res: Response, status: 400 | 401 | 403 | 503, reason: DenialReason): void => {
+  const deny = (res: Response, status: 400 | 401 | 403 | 409 | 503, reason: DenialReason): void => {
     events({ event: 'bull_board.access_denied', reason })
     res.statusCode = status
     res.end()
@@ -99,13 +99,14 @@ export function createBullBoardAuthMiddleware(
       return
     }
     bearerAuth
-      .verify(token)
+      .verify(token, req)
       .then((access) => {
         if (access.kind !== 'authorized') {
           const outcome = {
             unauthenticated: [401, 'unauthenticated'],
             forbidden: [403, 'forbidden'],
             unavailable: [503, 'unavailable'],
+            session_changed: [409, 'session_changed'],
           } as const
           const [status, reason] = outcome[access.kind]
           deny(res, status, reason)
@@ -152,17 +153,21 @@ export function createBullBoardAuthMiddleware(
     }
 
     cookieAuth
-      .verifyAccess(refreshToken)
+      .verifyAccess(refreshToken, req)
       .then((access) => {
         if (access === 'authorized') {
           ;(res.locals as BoardRequestLocals).boardCredential = 'cookie'
           next()
         } else if (access === 'forbidden') {
           deny(res, 403, 'forbidden')
+        } else if (access === 'session_changed') {
+          deny(res, 409, 'session_changed')
+        } else if (access === 'unavailable') {
+          deny(res, 503, 'unavailable')
         } else {
           deny(res, 401, 'unauthenticated')
         }
       })
-      .catch(() => deny(res, 401, 'unavailable'))
+      .catch(() => deny(res, 503, 'unavailable'))
   }
 }

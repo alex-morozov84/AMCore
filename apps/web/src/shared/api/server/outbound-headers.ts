@@ -26,5 +26,7 @@ export async function buildOutboundHeaders(
     'X-Correlation-Id': correlationId,
   })
   if (authResult.header) outbound.set('Authorization', authResult.header)
+  for (const [name, value] of Object.entries(authResult.browserHeaders ?? {}))
+    outbound.set(name, value)
   return { headers: outbound, source: inbound }
 }

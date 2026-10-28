@@ -3,12 +3,15 @@ import {
   invitationFlowExpectedSchema,
   invitationFlowIdSchema,
   invitationHandoffConfirmedSchema,
+  publicationAcknowledgedSchema,
 } from '@amcore/shared'
 
+import { postBrowserAuth } from './browser-auth-upstream'
 import { readContextJson } from './context-body-budget'
 import { withinContextDeadline } from './context-deadline'
 import { ContextRequestError } from './context-errors'
 import type { ContextExecutorDeps } from './context-executor'
+import { contextSessionBinding } from './context-session'
 import { confirmInvitationAuth } from './invitation-auth-transition'
 import { expectedInvitationFlow, invitationFlowChanged } from './invitation-flow-authority'
 import { withInvitationOwnerLease } from './invitation-owner-lease'
@@ -60,20 +63,45 @@ export function invitationAckHandler(
               throw invitationFlowChanged()
             signal.throwIfAborted()
             // Do not refresh a pending SID. The API verifies the issued JWT's exact SID/actor and deadline.
-            await invitationBackend(
-              `/auth/invites/auth-handoffs/${id}/confirm`,
-              invitationHandoffConfirmedSchema,
-              {
-                context: deps.webContext,
-                source: request.headers,
-                signal,
-                method: 'POST',
-                expectedStatus: 200,
-                accessToken: snapshot.session.entry.accessToken,
-                handoff: { attemptId: id, cleanupKey: handoff.cleanupKey },
-              }
-            )
-            signal.throwIfAborted()
+            if (handoff.publication) {
+              const metadata = handoff.publication
+              if (!deps.webContext || !metadata.browser) throw invitationFlowChanged()
+              const confirmed = await postBrowserAuth(
+                request,
+                deps.webContext,
+                { id: metadata.flowBinding, browser: metadata.browser },
+                '/auth/browser-publications/invitation-confirm',
+                {
+                  purpose: metadata.purpose,
+                  operationId: metadata.operationId,
+                  vaultBinding: metadata.vaultBinding,
+                  accessToken: snapshot.session.entry.accessToken,
+                  receipt: metadata.receipt,
+                  handoff: { attemptId: id, cleanupKey: handoff.cleanupKey },
+                },
+                metadata.continuation
+              )
+              if (
+                confirmed.status !== 200 ||
+                !publicationAcknowledgedSchema.safeParse(confirmed.body).success
+              )
+                throw new ContextRequestError(503, 'SERVICE_UNAVAILABLE')
+            } else {
+              await invitationBackend(
+                `/auth/invites/auth-handoffs/${id}/confirm`,
+                invitationHandoffConfirmedSchema,
+                {
+                  context: deps.webContext,
+                  source: request.headers,
+                  signal,
+                  method: 'POST',
+                  expectedStatus: 200,
+                  accessToken: snapshot.session.entry.accessToken,
+                  handoff: { attemptId: id, cleanupKey: handoff.cleanupKey },
+                }
+              )
+              signal.throwIfAborted()
+            }
             const latest = await invitationOwnerStore.get(
               snapshot.ownerHash,
               snapshot.owner.origin,
@@ -100,7 +128,13 @@ export function invitationAckHandler(
             signal.throwIfAborted()
             return invitationFlowAuthResponseSchema.parse({
               binding: expected.binding,
-              data: { user: snapshot.session.entry.userSnapshot },
+              data: {
+                user: snapshot.session.entry.userSnapshot,
+                contextSession: contextSessionBinding(
+                  snapshot.session.sessionId,
+                  snapshot.session.entry
+                ),
+              },
               handoff: { attemptId: id },
             })
           },

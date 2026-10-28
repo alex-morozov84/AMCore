@@ -17,6 +17,7 @@ export function invitationNamespace(kind: string, context?: ProductWebContext): 
 }
 
 export function invitationSurfaceData(context?: ProductWebContext) {
+  if (context?.audience === 'console') throw invitationFlowChanged()
   return context?.frontend === 'admin'
     ? {
         frontend: 'admin' as const,

@@ -1,4 +1,4 @@
-vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => boundHeaders()) }))
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -7,7 +7,7 @@ import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { probeConsoleAccess } from './access-probe'
-import { getConsoleAccessToken } from './session'
+import { getConsoleSessionEntry } from './session'
 
 // `./access-probe` imports `./access-token`, which also exports
 // `getConsoleAwareUser` (unused here) backed by `dal.ts` - mocked wholesale
@@ -23,13 +23,27 @@ vi.mock('./session', () => ({
 }))
 
 const mockedAccessToken = vi.mocked(getOptionalSessionEntry)
-const mockedConsoleAccessToken = vi.mocked(getConsoleAccessToken)
+const mockedConsoleAccessToken = vi.mocked(getConsoleSessionEntry)
+function boundHeaders() {
+  return new Headers({
+    cookie: `amcore_browser_context=${'a'.repeat(43)}; __Host-amcore_console_context=${'b'.repeat(43)}`,
+  })
+}
+function boundEntry(accessToken: string) {
+  const audience = mutableConfig.mode === 'host' ? 'console' : 'product'
+  return {
+    accessToken,
+    audience,
+    browser: { audience, contextId: 'ctx', generation: 1, familyId: 'family', securityVersion: 0 },
+  } as never
+}
 const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 describe('probeConsoleAccess', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
     mutableConfig.mode = 'path'
   })
 
@@ -47,7 +61,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('forwards only the no-content success status', async () => {
-    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
+    mockedAccessToken.mockResolvedValue(boundEntry('access-token'))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
 
     const status = await probeConsoleAccess()
@@ -56,7 +70,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it.each([401, 403])('forwards expected policy denial %i without a body', async (status) => {
-    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
+    mockedAccessToken.mockResolvedValue(boundEntry('access-token'))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })))
 
     const result = await probeConsoleAccess()
@@ -65,7 +79,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('fails closed when the policy probe is unavailable', async () => {
-    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
+    mockedAccessToken.mockResolvedValue(boundEntry('access-token'))
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('unreachable')))
 
     const status = await probeConsoleAccess()
@@ -74,7 +88,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('does not disclose an unexpected upstream response', async () => {
-    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
+    mockedAccessToken.mockResolvedValue(boundEntry('access-token'))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('unexpected', { status: 500 })))
 
     const status = await probeConsoleAccess()
@@ -90,7 +104,7 @@ describe('probeConsoleAccess', () => {
 
   it('uses only the console-held bearer in host mode', async () => {
     mutableConfig.mode = 'host'
-    mockedConsoleAccessToken.mockResolvedValue('console-token')
+    mockedConsoleAccessToken.mockResolvedValue(boundEntry('console-token'))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
 
     await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'admitted' })
@@ -106,7 +120,7 @@ describe('probeConsoleAccess', () => {
   })
 
   it('preserves only an explicit upstream 503 as unavailable', async () => {
-    mockedAccessToken.mockResolvedValue({ accessToken: 'access-token' } as never)
+    mockedAccessToken.mockResolvedValue(boundEntry('access-token'))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })))
 
     await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'upstream-unavailable' })

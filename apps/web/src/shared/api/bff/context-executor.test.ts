@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { fetchBackendResponse } from '@/shared/api/backend-transport'
@@ -15,8 +15,23 @@ vi.mock('@/shared/api/backend-transport', () => ({
   getBackendBaseUrl: () => 'http://api.test',
 }))
 
+beforeEach(() => vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8)))
+afterEach(() => vi.unstubAllEnvs())
+function boundHeaders(init?: HeadersInit) {
+  const result = new Headers(init)
+  result.set('cookie', `amcore_browser_context=${'a'.repeat(43)}`)
+  return result
+}
 function fixture(stale = false) {
   const entry = makeEntry({
+    audience: 'product',
+    browser: {
+      contextId: 'context-x',
+      generation: 1,
+      familyId: 'family-x',
+      securityVersion: 0,
+      audience: 'product',
+    },
     userSnapshot: { id: 'actor-x', email: 'x@example.test' } as never,
     ...(stale && { accessTokenExpiresAt: Date.now() - 1000 }),
   })
@@ -25,6 +40,7 @@ function fixture(stale = false) {
   const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: vi.fn().mockResolvedValue('session-x'),
     apiBase: 'http://api.test',
@@ -55,7 +71,7 @@ describe('typed context executor', () => {
     ).byteLength
     const bounded = { ...operation, responseBytes: apiBytes, envelopeBytes: 262144 }
     deps.fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json(data)))
-    const input = { expectedSession: expected, headers: new Headers() }
+    const input = { expectedSession: expected, headers: boundHeaders() }
     expect((await executeContextOperation(bounded, input, deps)).data).toEqual(data)
     await expect(
       executeContextOperation({ ...bounded, envelopeBytes: envelopeBytes - 1 }, input, deps)
@@ -82,7 +98,7 @@ describe('typed context executor', () => {
       },
       {
         expectedSession: expected,
-        headers: new Headers({ 'x-invitation-operation-id': 'browser-unvalidated-id' }),
+        headers: boundHeaders({ 'x-invitation-operation-id': 'browser-unvalidated-id' }),
       },
       deps
     )
@@ -106,17 +122,17 @@ describe('typed context executor', () => {
     expect(
       await executeContextOperation(
         revoke,
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
     ).toEqual({ binding: expected, data: { status: 'revoked' } })
     deps.fetch = vi.fn().mockResolvedValue(Response.json({ status: 'revoked' }, { status: 200 }))
     await expect(
-      executeContextOperation(revoke, { expectedSession: expected, headers: new Headers() }, deps)
+      executeContextOperation(revoke, { expectedSession: expected, headers: boundHeaders() }, deps)
     ).rejects.toMatchObject({ status: 502, errorCode: 'INVALID_UPSTREAM_RESPONSE' })
     deps.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204, body: new ReadableStream() })
     await expect(
-      executeContextOperation(revoke, { expectedSession: expected, headers: new Headers() }, deps)
+      executeContextOperation(revoke, { expectedSession: expected, headers: boundHeaders() }, deps)
     ).rejects.toMatchObject({ status: 502 })
   })
 
@@ -131,7 +147,7 @@ describe('typed context executor', () => {
       await expect(
         executeContextOperation(
           operation,
-          { expectedSession: expected, headers: new Headers() },
+          { expectedSession: expected, headers: boundHeaders() },
           deps
         )
       ).rejects.toMatchObject({ status: 409 })
@@ -152,7 +168,7 @@ describe('typed context executor', () => {
     const controller = new AbortController()
     const pending = executeContextOperation(
       operation,
-      { expectedSession: expected, headers: new Headers(), signal: controller.signal },
+      { expectedSession: expected, headers: boundHeaders(), signal: controller.signal },
       deps
     )
     await vi.waitFor(() => expect(deps.upstreamRefresh).toHaveBeenCalledTimes(1))
@@ -170,7 +186,7 @@ describe('typed context executor', () => {
       operation,
       {
         expectedSession: expected,
-        headers: new Headers({
+        headers: boundHeaders({
           'x-amcore-organization-id': 'org-b',
           'x-amcore-context-session': 'browser',
           authorization: 'Bearer browser',
@@ -200,7 +216,7 @@ describe('typed context executor', () => {
     await expect(
       executeContextOperation(
         operation,
-        { expectedSession: undefined, headers: new Headers() },
+        { expectedSession: undefined, headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({ status: 400 })
@@ -210,7 +226,7 @@ describe('typed context executor', () => {
     await expect(
       executeContextOperation(
         operation,
-        { expectedSession: '0'.repeat(64), headers: new Headers() },
+        { expectedSession: '0'.repeat(64), headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({ status: 409 })
@@ -222,7 +238,7 @@ describe('typed context executor', () => {
     const { deps, expected } = fixture(true)
     await executeContextOperation(
       operation,
-      { expectedSession: expected, headers: new Headers() },
+      { expectedSession: expected, headers: boundHeaders() },
       deps
     )
     expect(deps.upstreamRefresh).toHaveBeenCalledTimes(1)
@@ -237,7 +253,7 @@ describe('typed context executor', () => {
     await expect(
       executeContextOperation(
         { ...operation, organizationId: '../foreign' },
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({ status: 400 })
@@ -258,7 +274,7 @@ describe('typed context executor', () => {
     const controller = new AbortController()
     const pending = executeContextOperation(
       operation,
-      { expectedSession: expected, headers: new Headers(), signal: controller.signal },
+      { expectedSession: expected, headers: boundHeaders(), signal: controller.signal },
       deps
     )
     await vi.waitFor(() => expect(deps.store.get).toHaveBeenCalled())
@@ -281,7 +297,7 @@ describe('typed context executor', () => {
       await expect(
         executeContextOperation(
           { ...operation, successStatus: 200 },
-          { expectedSession: expected, headers: new Headers() },
+          { expectedSession: expected, headers: boundHeaders() },
           deps
         )
       ).rejects.toMatchObject({ status: 502, errorCode: 'INVALID_UPSTREAM_RESPONSE' })
@@ -297,7 +313,7 @@ describe('typed context executor', () => {
         .mockResolvedValue(Response.json({ name: 'x'.repeat(bytes - Buffer.byteLength(empty)) }))
       const pending = executeContextOperation(
         { ...operation, responseBytes: 1048576 },
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
       if (bytes === 1048576) {
@@ -320,7 +336,7 @@ describe('typed context executor', () => {
     await expect(
       executeContextOperation(
         operation,
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({
@@ -339,7 +355,7 @@ describe('typed context executor', () => {
           ...operation,
           path: operation.path.split('?')[0] + '?' + new URLSearchParams({ search }),
         },
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
       const sent = new URL(String(vi.mocked(deps.fetch!).mock.calls[0]![0]))
@@ -360,7 +376,7 @@ describe('typed context executor', () => {
     await expect(
       executeContextOperation(
         { ...operation, path },
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({ status: 400 })
@@ -394,7 +410,7 @@ describe('closed administrator conflict projection', () => {
     await expect(
       executeContextOperation(
         { ...operation, errorDetails: { code: 'ADMIN_INVITATION_ALREADY_PENDING', schema } },
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({
@@ -404,7 +420,7 @@ describe('closed administrator conflict projection', () => {
     await expect(
       executeContextOperation(
         operation,
-        { expectedSession: expected, headers: new Headers() },
+        { expectedSession: expected, headers: boundHeaders() },
         deps
       )
     ).rejects.toMatchObject({ status: 409, details: undefined })
@@ -424,7 +440,7 @@ it('allows a member-key acknowledgment after the generic five-second deadline', 
     )
     const pending = executeContextOperation(
       { ...operation, timeoutMs: 15000 },
-      { expectedSession: expected, headers: new Headers() },
+      { expectedSession: expected, headers: boundHeaders() },
       deps
     )
     await vi.advanceTimersByTimeAsync(6500)

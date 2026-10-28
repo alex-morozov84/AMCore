@@ -19,6 +19,7 @@ vi.mock('./session-vault-store', () => ({ redisVaultStore: { delete: vi.fn() } }
 
 describe('handleLogout — CSRF gating and no-session case', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
     vi.mocked(redisVaultStore.delete).mockResolvedValue(undefined)
   })
@@ -37,7 +38,7 @@ describe('handleLogout — CSRF gating and no-session case', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
-    const response = await handleLogout(makeRequest())
+    const response = await handleLogout(makeRequest(null))
 
     expect(response.status).toBe(200)
     expect(response.cookies.get('amcore_session')?.value).toBe('')

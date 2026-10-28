@@ -1,5 +1,7 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import type { BrowserAudience } from '@amcore/shared'
 
+import { createBrowserBindingVerifier } from './browser-binding.server'
 import { SESSION_COOKIE_NAME } from './session-cookie'
 import type { VaultEntry, VaultStore } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
@@ -21,13 +23,15 @@ export interface CurrentVaultSession {
  */
 export async function getCurrentVaultSession(
   store: VaultStore = redisVaultStore,
-  cookieName: string = SESSION_COOKIE_NAME
+  cookieName: string = SESSION_COOKIE_NAME,
+  audience: BrowserAudience = 'product'
 ): Promise<CurrentVaultSession | null> {
   const sessionId = (await cookies()).get(cookieName)?.value
   if (!sessionId) return null
 
   const entry = await store.get(sessionId)
   if (!entry) return null
+  await createBrowserBindingVerifier(await headers(), audience)(entry)
 
   return { sessionId, entry }
 }

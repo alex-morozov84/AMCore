@@ -1,5 +1,9 @@
+import type { BrowserAudience } from '@amcore/shared'
+
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
+import { browserSessionHeaders } from './browser-binding.server'
+import { ContextRequestError } from './context-errors'
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import type { UpstreamRefreshFn } from './session-vault.types'
@@ -27,16 +31,22 @@ const REFRESH_COOKIE_NAME = 'refresh_token'
  */
 export function createUpstreamRefresh(
   source: Headers,
-  context?: ProductWebContext
+  context?: ProductWebContext,
+  audience: BrowserAudience = context?.audience ?? 'product'
 ): UpstreamRefreshFn {
   const originalSource = new Headers(source)
   const metadata = { ...sessionMetadataHeaders(originalSource), ...context?.apiHeaders }
-  return async (refreshToken, signal) => {
+  return async (refreshToken, signal, browser) => {
+    const bindingHeaders = browserSessionHeaders(originalSource, audience, { browser, audience })
     let response: Response
     try {
       response = await fetchBackendResponse(`${API_URL}/api/v1/auth/refresh`, originalSource, {
         method: 'POST',
-        headers: { ...metadata, Cookie: `${REFRESH_COOKIE_NAME}=${refreshToken}` },
+        headers: {
+          ...metadata,
+          ...bindingHeaders,
+          Cookie: `${REFRESH_COOKIE_NAME}=${refreshToken}`,
+        },
         signal,
       })
     } catch (cause) {
@@ -46,6 +56,11 @@ export function createUpstreamRefresh(
     }
 
     if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null)
+      const errorCode =
+        body && typeof body === 'object' && 'errorCode' in body ? body.errorCode : null
+      if (errorCode === 'AUTH_CONTEXT_CHANGED' || errorCode === 'SESSION_CHANGED')
+        throw new ContextRequestError(401, 'AUTH_CONTEXT_CHANGED')
       const code = response.status === 401 ? 'invalid' : 'network'
       throw Object.assign(new Error(`Upstream refresh failed with status ${response.status}`), {
         code,

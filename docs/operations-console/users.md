@@ -136,11 +136,18 @@ controls if needed. Mail results do not establish session revocation. See the
 3. Confirm the change. If asked, enter **your own password** to verify this
    sensitive action. The original change resumes after verification.
 
-A successful change revokes the target user's server-side sessions. Their
-existing short-lived access token can remain valid until it expires, but they
+A successful change commits the role, security version and server-side session
+revocation together. Audit failure prevents the change. Physical cleanup may
+leave revoked rows; it cannot restore their authority or delete a new sign-in.
+An ordinary independent client's short-lived access token can remain valid until
+it expires, but they
 must sign in again to obtain a new session and role claim. A promotion does not
 give an old token immediate admin access. The Console cannot change your own
 role or remove the last `SUPER_ADMIN`.
+
+Internal MFA-protected credentials also require the current security version.
+They do not receive the ordinary token exception. MFA activation remains behind
+the [dormant deployment boundary](../auth/mfa-foundation.md).
 
 If the password is wrong, your account has no password, or the request fails,
 the role change does not complete. The Console shows an error and leaves the

@@ -57,6 +57,20 @@ describe('SystemRolesGuard', () => {
     )
   })
 
+  it('never treats key owner role as a platform grant, even with stale privileged admission fields', async () => {
+    const original = evidence(SystemRole.SuperAdmin, SystemRole.SuperAdmin)
+    const key: PrivilegedAdmission = {
+      ...original,
+      authenticated: { ...original.authenticated, type: 'api_key' },
+      principal: { ...original.principal, type: 'api_key' },
+    }
+    getAllAndOverride.mockReturnValue([SystemRole.SuperAdmin])
+    await expect(guard.canActivate(context(key))).rejects.toThrow(ForbiddenException)
+    key.principal.systemRole = SystemRole.User
+    getAllAndOverride.mockReturnValue([SystemRole.User])
+    await expect(guard.canActivate(context(key))).resolves.toBe(true)
+  })
+
   it('projected USER after demotion is not an original USER claim', async () => {
     getAllAndOverride.mockReturnValue([SystemRole.User])
     await expect(

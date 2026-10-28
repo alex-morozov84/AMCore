@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
-import { AuthErrorCode, stepUpSchema } from '@amcore/shared'
+import { AuthErrorCode, mfaStepUpCommandSchema, stepUpSchema } from '@amcore/shared'
 
 import { apiErrorResponse, zodValidationErrors } from '@/shared/api/bff/api-error-response'
+import { authFailureResponse } from '@/shared/api/bff/auth-failure-response'
+import { readContextJson } from '@/shared/api/bff/context-body-budget'
+import { ContextRequestError } from '@/shared/api/bff/context-errors'
+import {
+  completeSourceReauthentication,
+  startSourceReauthentication,
+} from '@/shared/api/bff/mfa-source-operation'
 import { forwardRequestHeaders } from '@/shared/api/bff/proxy-headers'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
@@ -20,21 +27,19 @@ function originRejected(request: Request): Response {
   })
 }
 
-/**
- * Console step-up (ADR-037 fresh-auth). Deliberately does not stream the
- * upstream response back verbatim the way an ordinary mutation proxy would:
- * `POST /auth/step-up`'s success body contains a real `{ accessToken }`.
- * This handler reads that body server-side, discards it entirely (the
- * operator's existing session remains valid for the immediate retry —
- * freshness is server-side, not carried by the token), and always responds
- * without a body on success. Error bodies (400/401/403/429) carry no
- * credential and are relayed as-is.
- */
+/** Completed proofs return 204 without credentials; missing MFA returns a safe source-bound continuation. */
 export async function handleConsoleStepUp(request: Request): Promise<Response> {
   if (!isConsoleRequestOriginTrusted(request)) return originRejected(request)
 
-  const parsed = stepUpSchema.safeParse(await request.json().catch(() => null))
-  if (!parsed.success) {
+  if (
+    new URL(request.url).search ||
+    !/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')
+  )
+    return apiErrorResponse(request, { statusCode: 400, message: 'Invalid step-up command' })
+  const body = await readContextJson(request.body, 2048).catch(() => null)
+  const proof = mfaStepUpCommandSchema.safeParse(body)
+  const parsed = stepUpSchema.safeParse(body)
+  if (!parsed.success && !proof.success) {
     return apiErrorResponse(request, {
       statusCode: 400,
       message: 'Validation failed',
@@ -45,6 +50,18 @@ export async function handleConsoleStepUp(request: Request): Promise<Response> {
   const resolved = await resolveConsoleAccessToken(request)
   if ('failure' in resolved) return resolved.failure
 
+  if (proof.success) {
+    try {
+      const result = await completeSourceReauthentication(request, resolved, proof.data)
+      return result
+        ? NextResponse.json(result, { status: 202 })
+        : new Response(null, { status: 204 })
+    } catch (error) {
+      return sourceFailure(request, error)
+    }
+  }
+  if (!parsed.success) throw new Error('Validated step-up command required')
+
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetchBackendResponse(
@@ -52,7 +69,7 @@ export async function handleConsoleStepUp(request: Request): Promise<Response> {
       request.headers,
       {
         method: 'POST',
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
         body: JSON.stringify(parsed.data),
       }
     )
@@ -71,7 +88,38 @@ export async function handleConsoleStepUp(request: Request): Promise<Response> {
     )
   }
 
-  // Discard the token-bearing success body — never forwarded to the browser.
-  await upstreamResponse.json().catch(() => null)
+  // A missing factor is not completed authentication and must never trigger the mutation retry.
+  const result: unknown = await readContextJson(upstreamResponse.body, 16384).catch(() => null)
+  if (
+    upstreamResponse.status === 202 &&
+    result &&
+    typeof result === 'object' &&
+    'kind' in result &&
+    result.kind === 'proof_required'
+  ) {
+    try {
+      return NextResponse.json(await startSourceReauthentication(request, resolved), {
+        status: 202,
+      })
+    } catch (error) {
+      return sourceFailure(request, error)
+    }
+  }
+  if (
+    upstreamResponse.status !== 200 ||
+    !result ||
+    typeof result !== 'object' ||
+    !('accessToken' in result) ||
+    typeof result.accessToken !== 'string' ||
+    !result.accessToken
+  )
+    return apiErrorResponse(request, { statusCode: 503, message: 'Invalid step-up outcome' })
   return new Response(null, { status: 204 })
+}
+
+function sourceFailure(request: Request, error: unknown): Response {
+  const response = authFailureResponse(request, error)
+  if (error instanceof ContextRequestError && error.retryAfterSeconds)
+    response.headers.set('retry-after', String(error.retryAfterSeconds))
+  return response
 }

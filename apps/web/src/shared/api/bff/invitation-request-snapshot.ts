@@ -19,6 +19,7 @@ export async function invitationIncomingSession(
   if (!/^[A-Za-z0-9_-]{43}$/.test(sessionId)) throw invitationFlowChanged()
   const entry: VaultEntry | null = await deps.store.get(sessionId)
   if (!entry) throw invitationFlowChanged()
+  await deps.verifyBinding(entry)
   const bindingVersion = deps.webContext?.frontend === 'admin' ? (2 as const) : (1 as const)
   return {
     sessionId,

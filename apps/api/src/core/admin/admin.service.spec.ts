@@ -14,6 +14,7 @@ import type { PrismaService } from '../../prisma'
 import type { AuditLogService } from '../audit'
 
 import { AdminService } from './admin.service'
+import type { AdminCommandAdmission } from './admin-command-admission'
 
 import type { Organization, User } from '@/generated/prisma/client'
 import type { PrismaClient } from '@/generated/prisma/client'
@@ -102,7 +103,8 @@ describe('AdminService', () => {
       cleanupService as unknown as CleanupService,
       auditLog as unknown as AuditLogService,
       logger,
-      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never
+      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never,
+      { assert: jest.fn().mockResolvedValue(undefined) } as unknown as AdminCommandAdmission
     )
     // Delegate $transaction callbacks to the same prisma mock so test
     // mocks set on the outer prisma instance (findUnique, count,
@@ -111,6 +113,8 @@ describe('AdminService', () => {
       async (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma)
     )
     prisma.$executeRaw.mockResolvedValue(0 as never)
+    prisma.$queryRaw.mockResolvedValue([{ now: new Date() }])
+    prisma.mfaAccount.upsert.mockResolvedValue({ securityVersion: 1 } as never)
     // OB-06a: updateUserSystemRole revokes the target's sessions on any
     // role change; default the post-commit deleteMany so role-change tests
     // that don't assert on it still resolve cleanly.
@@ -436,8 +440,8 @@ describe('AdminService', () => {
 
     /**
      * OB-06a / ADR-037 (amendment 2026-05-30): a committed system-role change
-     * revokes the target's sessions on ANY `before !== after` change
-     * (demotion + promotion), best-effort, post-commit. No-op does not revoke.
+     * revokes the target's authority in the role transaction on any change.
+     * Post-commit deletion cleans up only revoked rows. No-op does not revoke.
      */
     describe('OB-06a session revocation', () => {
       it('revokes target sessions after a promotion (any before !== after)', async () => {
@@ -449,7 +453,9 @@ describe('AdminService', () => {
 
         await service.updateUserSystemRole('user-1', SystemRole.SuperAdmin, actor)
 
-        expect(prisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
+        expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+          where: { userId: 'user-1', revokedAt: { not: null } },
+        })
         expect(logger.info).toHaveBeenCalledWith(
           {
             event: 'auth.admin.sessions_revoked',
@@ -471,7 +477,9 @@ describe('AdminService', () => {
 
         await service.updateUserSystemRole('sa-target', SystemRole.User, actor)
 
-        expect(prisma.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'sa-target' } })
+        expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+          where: { userId: 'sa-target', revokedAt: { not: null } },
+        })
       })
 
       it('does not revoke on a no-op (before === after)', async () => {
@@ -483,7 +491,7 @@ describe('AdminService', () => {
         expect(prisma.session.deleteMany).not.toHaveBeenCalled()
       })
 
-      it('swallows a revocation failure: role change still succeeds, warn emitted', async () => {
+      it('keeps committed revocation when physical cleanup fails: role change succeeds, warn emitted', async () => {
         const target: User = { ...mockUser, id: 'user-1', systemRole: 'USER' }
         const updated: User = { ...target, systemRole: 'SUPER_ADMIN' }
         prisma.user.findUnique.mockResolvedValue(target)

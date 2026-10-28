@@ -5,6 +5,8 @@ import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { apiErrorResponse } from './api-error-response'
 import { authFailureResponse } from './auth-failure-response'
+import { browserSessionHeaders, createBrowserBindingVerifier } from './browser-binding.server'
+import { CONTEXT_SESSION_HEADER, contextSessionBinding } from './context-session'
 import { isControlPlaneRoute, isCredentialRoute } from './credential-route'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isClosedOrganizationFamily } from './organization-family'
@@ -68,14 +70,19 @@ export async function proxyToBackend(
   }
 
   let accessToken: string
+  let bindingHeaders: Record<string, string>
+  let contextBinding: string
   try {
     const session = await ensureFreshSession(sessionId, {
       store: context?.store ?? redisVaultStore,
       expectedAudience: context?.audience,
       lock: context?.lock ?? redisVaultLock,
       upstreamRefresh: createUpstreamRefresh(request.headers, context),
+      verifyBinding: createBrowserBindingVerifier(request.headers, context?.audience ?? 'product'),
     })
     accessToken = session.accessToken
+    contextBinding = contextSessionBinding(sessionId, session)
+    bindingHeaders = browserSessionHeaders(request.headers, context?.audience ?? 'product', session)
   } catch (error) {
     return authFailureResponse(request, error)
   }
@@ -83,12 +90,14 @@ export async function proxyToBackend(
   const hasBody = !SAFE_METHODS.has(request.method) && request.body !== null
 
   let upstreamResponse: Response
+  const outgoingHeaders = context
+    ? frontendApiHeaders(context, forwardRequestHeaders(request.headers, accessToken))
+    : forwardRequestHeaders(request.headers, accessToken)
+  for (const [name, value] of Object.entries(bindingHeaders)) outgoingHeaders.set(name, value)
   try {
     upstreamResponse = await fetchBackendResponse(upstreamUrl.toString(), request.headers, {
       method: request.method,
-      headers: context
-        ? frontendApiHeaders(context, forwardRequestHeaders(request.headers, accessToken))
-        : forwardRequestHeaders(request.headers, accessToken),
+      headers: outgoingHeaders,
       body: hasBody ? request.body : undefined,
       // Required by Node's fetch (undici) whenever `body` is a stream.
       ...(hasBody ? { duplex: 'half' } : {}),
@@ -100,9 +109,11 @@ export async function proxyToBackend(
     })
   }
 
+  const responseHeaders = forwardResponseHeaders(upstreamResponse.headers)
+  responseHeaders.set(CONTEXT_SESSION_HEADER, contextBinding)
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
-    headers: forwardResponseHeaders(upstreamResponse.headers),
+    headers: responseHeaders,
   })
 }
 

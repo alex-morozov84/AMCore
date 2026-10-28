@@ -42,6 +42,7 @@ function setup(response: () => Response) {
   const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: vi.fn().mockResolvedValue('session-a'),
     apiBase: 'http://api.test',

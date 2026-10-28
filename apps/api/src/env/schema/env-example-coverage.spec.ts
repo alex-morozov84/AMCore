@@ -87,6 +87,7 @@ const COMPOSE_ONLY_ALLOW = new Set([
   'NEXT_DEPLOYMENT_ID',
   // Compose build args for the image build stage only (api/worker/seed/web Dockerfiles).
   'BUILD_NODE_OPTIONS',
+  'BUILD_SOURCE_COMMIT',
   // Production single-host overlays: docker/compose/bff-relay.yml (fixed subnet and web
   // address) and docker/compose/postgres-tls.yml (certificate directories).
   'COMPOSE_NETWORK_SUBNET',

@@ -42,6 +42,7 @@ export async function captureContextSession(
   if (!sessionId) throw new SessionNotFoundError('missing')
   const entry = await deps.store.get(sessionId)
   if (!entry) throw new SessionNotFoundError('missing')
+  await deps.verifyBinding(entry)
   const binding = contextSessionBinding(sessionId, entry)
   if (!bootstrap && expected !== binding)
     throw new ContextRequestError(409, 'CONTEXT_SESSION_CHANGED')

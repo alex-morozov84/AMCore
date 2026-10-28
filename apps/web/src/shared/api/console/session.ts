@@ -4,6 +4,7 @@ import { cache } from 'react'
 import { cookies, headers } from 'next/headers'
 import type { UserResponse } from '@amcore/shared'
 
+import { createBrowserBindingVerifier } from '@/shared/api/bff/browser-binding.server'
 import { ensureFreshSession } from '@/shared/api/bff/ensure-fresh-session'
 import type { VaultEntry } from '@/shared/api/bff/session-vault.types'
 import { createUpstreamRefresh } from '@/shared/api/bff/upstream-refresh'
@@ -51,12 +52,14 @@ export async function mintConsoleSession({
 export const getConsoleSessionEntry = cache(async (): Promise<ConsoleVaultEntry | null> => {
   const sessionId = (await cookies()).get(CONSOLE_SESSION_COOKIE_NAME)?.value
   if (!sessionId) return null
+  const source = await headers()
 
   const entry = await ensureFreshSession(sessionId, {
     expectedAudience: 'console',
     store: redisConsoleVaultStore,
     lock: redisConsoleVaultLock,
-    upstreamRefresh: createUpstreamRefresh(await headers()),
+    upstreamRefresh: createUpstreamRefresh(source, undefined, 'console'),
+    verifyBinding: createBrowserBindingVerifier(source, 'console'),
   })
   return isConsoleVaultEntry(entry) ? entry : null
 })
@@ -73,5 +76,6 @@ export async function getCurrentConsoleSession(): Promise<{
   if (!sessionId) return null
 
   const entry = await redisConsoleVaultStore.get(sessionId)
+  if (entry) await createBrowserBindingVerifier(await headers(), 'console')(entry)
   return entry && isConsoleVaultEntry(entry) ? { sessionId, entry } : null
 }

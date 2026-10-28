@@ -1,18 +1,19 @@
 import { generateSecret, generateURI, verify } from 'otplib'
 
+export function totpUri(account: string, secret: string): string {
+  return generateURI({
+    issuer: 'AMCore',
+    label: account,
+    secret,
+    algorithm: 'sha1',
+    digits: 6,
+    period: 30,
+  })
+}
+
 export function createTotpSecret(account: string): { secret: string; otpauthUri: string } {
   const secret = generateSecret({ length: 20 })
-  return {
-    secret,
-    otpauthUri: generateURI({
-      issuer: 'AMCore',
-      label: account,
-      secret,
-      algorithm: 'sha1',
-      digits: 6,
-      period: 30,
-    }),
-  }
+  return { secret, otpauthUri: totpUri(account, secret) }
 }
 
 /** Caller must persist timeStep in the SAME locked transaction as the effect. */

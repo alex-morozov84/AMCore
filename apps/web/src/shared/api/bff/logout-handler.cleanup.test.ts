@@ -13,13 +13,28 @@ vi.mock('./current-session', () => ({ getCurrentVaultSession: vi.fn() }))
 vi.mock('./session-vault-store', () => ({ redisVaultStore: { delete: vi.fn() } }))
 
 describe('handleLogout — backend/vault cleanup and partial-failure handling', () => {
+  it('refuses an old page intent against a newly selected cookie without clearing or revoking the new session', async () => {
+    const current = fakeSession('b'.repeat(43))
+    vi.mocked(getCurrentVaultSession).mockResolvedValue(current)
+    const send = vi.fn()
+    vi.stubGlobal('fetch', send)
+    const response = await handleLogout(makeRequest(current, 'f'.repeat(64)))
+    expect(response.status).toBe(401)
+    expect((await response.json()).errorCode).toBe('AUTH_CONTEXT_CHANGED')
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(send).not.toHaveBeenCalled()
+    expect(redisVaultStore.delete).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-logout-browser-key-at-least-32>')
     vi.mocked(isTrustedOrigin).mockReturnValue(true)
     vi.mocked(redisVaultStore.delete).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('calls backend logout with the raw refresh token as a Cookie header, deletes the vault entry, clears the cookie', async () => {
@@ -34,18 +49,18 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:5002/api/v1/auth/logout')
     expect(new Headers(init.headers).get('cookie')).toBe('refresh_token=rt-1')
-    expect(redisVaultStore.delete).toHaveBeenCalledWith('sess-1')
+    expect(redisVaultStore.delete).toHaveBeenCalledWith('s'.repeat(43))
   })
 
-  it('still clears the cookie and returns 200 when the backend logout call fails', async () => {
+  it('returns unconfirmed 503 without clearing or deleting the selected vault when backend logout fails', async () => {
     vi.mocked(getCurrentVaultSession).mockResolvedValue(fakeSession())
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
 
     const response = await handleLogout(makeRequest())
 
-    expect(response.status).toBe(200)
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
-    expect(redisVaultStore.delete).toHaveBeenCalledWith('sess-1')
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(redisVaultStore.delete).not.toHaveBeenCalled()
   })
 
   it('still clears the cookie and returns 200 when the vault delete fails', async () => {
@@ -59,7 +74,7 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     expect(response.cookies.get('amcore_session')?.value).toBe('')
   })
 
-  it('still clears the cookie and returns 200 when reading the current session itself throws (Redis down)', async () => {
+  it('returns 503 without cookie clearing when the current vault cannot be read', async () => {
     vi.mocked(getCurrentVaultSession).mockRejectedValue(new Error('ECONNREFUSED'))
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -67,24 +82,23 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
 
     const response = await handleLogout(makeRequest())
 
-    expect(response.status).toBe(200)
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
     expect(redisVaultStore.delete).not.toHaveBeenCalled()
-    expect(errorSpy).toHaveBeenCalled()
     errorSpy.mockRestore()
   })
 
-  it('logs a non-2xx backend logout response instead of silently ignoring it', async () => {
+  it('returns 503 for a failed primary logout without claiming success', async () => {
     vi.mocked(getCurrentVaultSession).mockResolvedValue(fakeSession())
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('boom', { status: 500 })))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const response = await handleLogout(makeRequest())
 
-    expect(response.status).toBe(200)
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('500'))
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(redisVaultStore.delete).not.toHaveBeenCalled()
     errorSpy.mockRestore()
   })
 })

@@ -38,6 +38,7 @@ test(
       const initial = hash()
       for (const file of [
         'scripts/typecheck-native.mjs',
+        'scripts/write-mfa-artifact.mjs',
         'packages/typescript-config/nestjs.json',
         'apps/api/.swcrc',
         'apps/api/src/cli/storage-check.ts',

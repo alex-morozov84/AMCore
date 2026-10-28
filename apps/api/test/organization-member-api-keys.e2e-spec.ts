@@ -385,7 +385,7 @@ describe('Organization member credential control (real DB)', () => {
       .auth(bound, { type: 'bearer' })
       .expect(204)
   })
-  it('live SUPER_ADMIN with membership uses synthetic trust without an org role', async () => {
+  it('a human operator keeps synthetic trust while their key needs explicit organization grants', async () => {
     const claims = c.app.get(JwtService).verify(admin)
     await c.prisma.user.update({
       where: { id: claims.sub },
@@ -434,6 +434,11 @@ describe('Organization member credential control (real DB)', () => {
     await request(http())
       .delete(`/organizations/${orgId}/members/${userId}`)
       .auth(operatorKey.key, { type: 'bearer' })
+      .expect(403)
+    expect(await c.prisma.orgMember.findUnique({ where: { id: memberId } })).not.toBeNull()
+    await request(http())
+      .delete(`/organizations/${orgId}/members/${userId}`)
+      .auth(login.body.accessToken, { type: 'bearer' })
       .expect(204)
   })
   it.each([

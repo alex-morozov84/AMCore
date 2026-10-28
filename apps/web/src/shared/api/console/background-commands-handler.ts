@@ -130,7 +130,7 @@ async function forward(request: Request, path: string, body?: string): Promise<R
       {
         method: body === undefined ? 'GET' : 'POST',
         cache: 'no-store',
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
         ...(body === undefined ? {} : { body }),
       }

@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
 import type { Request } from 'express'
 
-import type { RequestPrincipal } from '@amcore/shared'
+import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { PrismaService } from '../../../prisma/index.js'
 import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service.js'
@@ -86,14 +86,14 @@ export class ApiKeyGuard implements CanActivate {
     const principal: RequestPrincipal = {
       type: 'api_key',
       sub: apiKey.userId,
-      systemRole: apiKey.user.systemRole,
+      systemRole: SystemRole.User,
       organizationId: apiKey.organizationId,
       aclVersion: membership.organization.aclVersion,
       scopes: apiKey.scopes,
     }
 
     request.user = principal
-    registerApiKeyAdmission(request, apiKey.id, principal)
+    registerApiKeyAdmission(request, apiKey.id, principal, apiKey.user.systemRole)
 
     void this.apiKeysService.touchLastUsed(apiKey.id)
 

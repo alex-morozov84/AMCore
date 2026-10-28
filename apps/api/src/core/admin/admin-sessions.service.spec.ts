@@ -9,12 +9,14 @@ import type { GeoIpService } from '../../infrastructure/geoip/geoip.service'
 import type { PrismaService } from '../../prisma'
 import type { AuditLogService } from '../audit'
 
+import type { AdminCommandAdmission } from './admin-command-admission'
 import { AdminSessionsService } from './admin-sessions.service'
 
 import type { PrismaClient, Session } from '@/generated/prisma/client'
 
 describe('AdminSessionsService', () => {
   let service: AdminSessionsService
+  let commandAdmission: { assert: jest.Mock }
   let prisma: DeepMockProxy<PrismaClient>
   let geoIp: jest.Mocked<Pick<GeoIpService, 'resolve'>>
   let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
@@ -49,11 +51,13 @@ describe('AdminSessionsService', () => {
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
 
+    commandAdmission = { assert: jest.fn().mockResolvedValue(undefined) }
     service = new AdminSessionsService(
       prisma as unknown as PrismaService,
       geoIp as unknown as GeoIpService,
       auditLog as unknown as AuditLogService,
-      logger
+      logger,
+      commandAdmission as unknown as AdminCommandAdmission
     )
 
     // Delegate $transaction callbacks to the same prisma mock, as the
@@ -140,7 +144,7 @@ describe('AdminSessionsService', () => {
 
       const result = await service.revokeOne(targetUserId, activeSession.familyId, actor)
 
-      expect(prisma.$executeRaw).toHaveBeenCalled()
+      expect(commandAdmission.assert).toHaveBeenCalledWith(prisma, actor, [targetUserId])
       expect(prisma.session.updateMany).toHaveBeenCalledWith({
         where: {
           userId: targetUserId,
@@ -190,7 +194,7 @@ describe('AdminSessionsService', () => {
 
       const result = await service.revokeAll(targetUserId, actor)
 
-      expect(prisma.$executeRaw).toHaveBeenCalled()
+      expect(commandAdmission.assert).toHaveBeenCalledWith(prisma, actor, [targetUserId])
       expect(prisma.session.updateMany).toHaveBeenCalledWith({
         where: {
           userId: targetUserId,

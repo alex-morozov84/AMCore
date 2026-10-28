@@ -1,60 +1,28 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 
-import type { BrowserRevision } from '@amcore/shared'
+import { jest } from '@jest/globals'
 
-import { browserRequestBinding } from '../src/core/auth/mfa/browser-binding.js'
-import {
-  bootstrapBrowserContext,
-  matchesBrowserRevision,
-  readBrowserContext,
-} from '../src/core/auth/mfa/browser-context.repository.js'
-import {
-  lockBrowserLogin,
-  reserveBrowserLogin,
-} from '../src/core/auth/mfa/browser-login-reservation.js'
+import { BrowserPublicationService } from '../src/core/auth/mfa/browser-publication.service.js'
+import type { MfaSourceLimiterService } from '../src/core/auth/mfa/mfa-source-limiter.service.js'
 import { mfaDatabaseClock } from '../src/core/auth/mfa/mfa-transaction.js'
+import { hashRefreshToken } from '../src/core/auth/utils/refresh-token-hash.js'
+import type { PrismaService } from '../src/prisma/index.js'
 
-import { authorityReader, createAuthorityAccount } from './mfa-authority.fixture.js'
+import { createAuthorityAccount } from './mfa-authority.fixture.js'
 import { MfaProofFixture } from './mfa-proof.fixture.js'
 
-type BoundFixture = Awaited<ReturnType<typeof createAuthorityAccount>> & {
-  binding: string
-  expected: BrowserRevision
-}
-
-async function boundFixture(fixture: MfaProofFixture): Promise<BoundFixture> {
-  const db = fixture.clients[0]!
-  const f = await createAuthorityAccount(fixture)
-  const bootstrap = await bootstrapBrowserContext(db, 'product')
-  await db.authSessionFamily.update({
-    where: { id: f.family.id },
-    data: { browserContextId: bootstrap.view.contextId, publicationGeneration: 1 },
-  })
-  await db.browserAuthContext.update({
-    where: { id: bootstrap.view.contextId },
-    data: {
-      state: 'published',
-      generation: 1,
-      currentFamilyId: f.family.id,
-      expiresAt: f.family.expiresAt,
-    },
-  })
-  return {
-    ...f,
-    requestBinding: browserRequestBinding(bootstrap.binding, 'product', {
-      contextId: bootstrap.view.contextId,
-      generation: 1,
-    })!,
-    binding: bootstrap.binding,
-    expected: { contextId: bootstrap.view.contextId, generation: 1 },
-  }
-}
-
-describe('Browser generation reservation on primary PostgreSQL', () => {
+describe('Account-neutral browser bootstrap and read-only exact-vault proof on PostgreSQL', () => {
   const fixture = new MfaProofFixture()
+  const consume = jest.fn<() => Promise<void>>()
+  const service = (): BrowserPublicationService =>
+    new BrowserPublicationService(
+      fixture.clients[0]! as unknown as PrismaService,
+      { consume } as unknown as MfaSourceLimiterService
+    )
   beforeAll(() => fixture.start(), 120000)
   afterAll(() => fixture.close(), 60000)
   beforeEach(async () => {
+    consume.mockReset().mockResolvedValue(undefined)
     const db = fixture.clients[0]!
     await db.user.deleteMany()
     await db.browserAuthContext.deleteMany()
@@ -65,103 +33,172 @@ describe('Browser generation reservation on primary PostgreSQL', () => {
     })
   })
 
-  it('uses a fresh binding per bootstrap, stores only its hash and refuses wrong audience/expiry', async () => {
+  async function prepared(protectedAccount = true) {
     const db = fixture.clients[0]!
-    const first = await bootstrapBrowserContext(db, 'product')
-    const second = await bootstrapBrowserContext(db, 'product')
-    expect(first.binding === second.binding).toBe(false)
-    const row = await readBrowserContext(db, first.binding, 'product')
-    expect(row?.bindingHash === first.binding).toBe(false)
-    expect(row?.id).toBe(first.view.contextId)
-    expect(await readBrowserContext(db, first.binding, 'console')).toBeNull()
-    expect(await readBrowserContext(db, 'malformed', 'product')).toBeNull()
-    const now = await mfaDatabaseClock(db)
-    expect(matchesBrowserRevision(row, first.view, now)).toBe(true)
-    expect(matchesBrowserRevision(row && { ...row, expiresAt: now }, first.view, now)).toBe(false)
+    const f = await createAuthorityAccount(fixture, protectedAccount)
+    const raw = randomBytes(32).toString('hex')
+    await db.session.update({
+      where: { id: f.session.id },
+      data: { refreshToken: hashRefreshToken(raw) },
+    })
+    return { ...f, input: { refreshToken: raw, familyId: f.family.id, securityVersion: 3 } }
+  }
+
+  it('creates distinct neutral anchors and never re-emits a previously issued binding', async () => {
+    const s = service()
+    const first = await s.bootstrap('product', undefined, 'source')
+    if (first.kind !== 'created') throw new Error('Expected new anchor')
+    expect(Object.keys(first).sort()).toEqual(['binding', 'kind', 'view'])
+    await expect(s.bootstrap('product', first.binding, 'source')).resolves.toEqual({
+      kind: 'existing',
+      view: first.view,
+    })
+    await expect(s.status('product', first.binding)).resolves.toEqual(first.view)
+    expect(consume).toHaveBeenCalledTimes(1)
+    const retry = await s.bootstrap('product', undefined, 'source')
+    if (retry.kind !== 'created') throw new Error('Expected distinct retry')
+    expect(retry.binding === first.binding).toBe(false)
+    expect(retry.view.contextId === first.view.contextId).toBe(false)
+    expect(await fixture.clients[0]!.session.count()).toBe(0)
+    expect(await fixture.clients[0]!.user.count()).toBe(0)
   })
 
-  it('retires the old browser family but preserves an independently issued family', async () => {
+  it('returns only primary tuple metadata without token rotation, proof renewal or session writes', async () => {
     const db = fixture.clients[0]!
-    const f = await boundFixture(fixture)
-    const reader = authorityReader(fixture.clients[1]!)
-    const independent = await db.authSessionFamily.create({
-      data: {
-        ...f.family,
-        id: randomUUID(),
-        primaryProofId: randomUUID(),
-        mfaProofId: randomUUID(),
-        browserContextId: null,
-        publicationGeneration: null,
-      },
+    const f = await prepared()
+    const session = await db.session.findUniqueOrThrow({ where: { id: f.session.id } })
+    const context = await db.browserAuthContext.findUniqueOrThrow({
+      where: { id: f.requestBinding.contextId },
     })
-    const other = await db.user.create({
-      data: { email: 'other@example.test', emailCanonical: 'other@example.test' },
+    await expect(service().probe(f.input, f.requestBinding)).resolves.toEqual({
+      status: 'current',
+      userId: f.user.id,
+      familyId: f.family.id,
+      securityVersion: 3,
+      contextId: context.id,
+      generation: 1,
+      audience: 'product',
     })
-    expect((await reader.read(f.claims, f.requestBinding)).kind).toBe('admitted')
-    await db.$transaction(
-      async (tx) => {
-        const locked = await lockBrowserLogin(tx, f.binding, 'product', f.expected, other.id)
-        if (!locked) throw new Error('fixture could not lock expected browser')
-        const now = await mfaDatabaseClock(tx)
-        const reserved = await reserveBrowserLogin(
-          tx,
-          locked,
-          f.expected,
-          randomUUID(),
-          new Date(now.getTime() + 300_000)
-        )
-        expect(reserved?.generation).toBe(2)
-      },
-      { maxWait: 2000, timeout: 4000 }
+    expect(await db.session.findUniqueOrThrow({ where: { id: session.id } })).toEqual(session)
+    expect(await db.authSessionFamily.findUniqueOrThrow({ where: { id: f.family.id } })).toEqual(
+      f.family
     )
-    expect(await reader.read(f.claims, f.requestBinding)).toEqual({
-      kind: 'denied',
-      reason: 'browser_context_changed',
-    })
-    expect(
-      await reader.read({ ...f.claims, fid: independent.id, browserBound: undefined })
-    ).toEqual({ kind: 'admitted', operator: true })
-    expect(await db.session.findUnique({ where: { id: f.session.id } })).toMatchObject({
-      revokedAt: expect.any(Date),
-      revocationReason: 'browser-superseded',
-    })
-    const stale = await db.$transaction((tx) =>
-      lockBrowserLogin(tx, f.binding, 'product', f.expected, other.id)
+    expect(await db.browserAuthContext.findUniqueOrThrow({ where: { id: context.id } })).toEqual(
+      context
     )
-    expect(stale).toBeNull()
+    expect(consume).not.toHaveBeenCalled()
+  })
+
+  it('uses a retained rotated row only for identity, and refuses other revoked refresh credentials', async () => {
+    const db = fixture.clients[0]!
+    const f = await prepared()
+    await db.session.update({
+      where: { id: f.session.id },
+      data: { revokedAt: new Date(), revocationReason: 'rotated' },
+    })
+    await expect(service().probe(f.input, f.requestBinding)).resolves.toMatchObject({
+      status: 'current',
+    })
+    await db.session.update({
+      where: { id: f.session.id },
+      data: { revocationReason: 'user-revoked' },
+    })
+    await expect(service().probe(f.input, f.requestBinding)).rejects.toMatchObject({
+      status: 401,
+      errorCode: 'AUTH_CONTEXT_CHANGED',
+    })
     expect(
-      (await db.browserAuthContext.findUnique({ where: { id: f.expected.contextId } }))?.generation
-    ).toBe(2)
-    expect(
-      (await db.authSessionFamily.findUnique({ where: { id: independent.id } }))?.revokedAt
+      (await db.authSessionFamily.findUniqueOrThrow({ where: { id: f.family.id } })).revokedAt
     ).toBeNull()
   })
 
-  it('rolls reservation and old-family revocation back with the enclosing auth operation', async () => {
-    const db = fixture.clients[0]!
-    const f = await boundFixture(fixture)
-    await expect(
-      db.$transaction(async (tx) => {
-        const locked = await lockBrowserLogin(tx, f.binding, 'product', f.expected, f.user.id)
-        if (!locked) throw new Error('fixture could not lock expected browser')
-        const now = await mfaDatabaseClock(tx)
-        await reserveBrowserLogin(
-          tx,
-          locked,
-          f.expected,
-          randomUUID(),
-          new Date(now.getTime() + 300_000)
-        )
-        throw new Error('new auth operation failed')
+  it('refuses absent/mismatched capability, tuple, epoch or audience instead of selecting current account', async () => {
+    const f = await prepared()
+    const s = service()
+    for (const binding of [
+      null,
+      { ...f.requestBinding, bindingHash: '0'.repeat(64) },
+      { ...f.requestBinding, generation: 2 },
+      { ...f.requestBinding, audience: 'console' as const },
+    ])
+      await expect(s.probe(f.input, binding)).rejects.toMatchObject({
+        status: 401,
+        errorCode: 'AUTH_CONTEXT_CHANGED',
       })
-    ).rejects.toThrow('new auth operation failed')
-    expect(await authorityReader(fixture.clients[1]!).read(f.claims, f.requestBinding)).toEqual({
-      kind: 'admitted',
-      operator: true,
+    for (const patch of [{ familyId: 'another-family' }, { securityVersion: 4 }])
+      await expect(s.probe({ ...f.input, ...patch }, f.requestBinding)).rejects.toMatchObject({
+        status: 401,
+        errorCode: 'AUTH_CONTEXT_CHANGED',
+      })
+  })
+
+  it.each([
+    'pending',
+    'revoked',
+    'account_version',
+    'generation',
+    'expired_refresh',
+    'missing_family',
+  ])('refuses current primary state %s', async (state) => {
+    const db = fixture.clients[0]!
+    const f = await prepared()
+    if (state === 'missing_family')
+      await db.authSessionFamily.delete({ where: { id: f.family.id } })
+    if (state === 'pending')
+      await db.authSessionFamily.update({
+        where: { id: f.family.id },
+        data: { publicationState: 'pending' },
+      })
+    if (state === 'revoked')
+      await db.authSessionFamily.update({
+        where: { id: f.family.id },
+        data: { revokedAt: new Date() },
+      })
+    if (state === 'account_version')
+      await db.mfaAccount.update({ where: { userId: f.user.id }, data: { securityVersion: 4 } })
+    if (state === 'generation')
+      await db.browserAuthContext.update({
+        where: { id: f.requestBinding.contextId },
+        data: { generation: 2 },
+      })
+    if (state === 'expired_refresh')
+      await db.session.update({
+        where: { id: f.session.id },
+        data: { expiresAt: new Date((await mfaDatabaseClock(db)).getTime() - 1) },
+      })
+    await expect(service().probe(f.input, f.requestBinding)).rejects.toMatchObject({
+      status: 401,
+      errorCode: 'AUTH_CONTEXT_CHANGED',
     })
-    expect(
-      (await db.browserAuthContext.findUnique({ where: { id: f.expected.contextId } }))?.generation
-    ).toBe(1)
-    expect((await db.session.findUnique({ where: { id: f.session.id } }))?.revokedAt).toBeNull()
+  })
+
+  it('keeps ordinary prepared browser admission, but never grants an enrolled operator through prepared mode', async () => {
+    const db = fixture.clients[0]!
+    const ordinary = await prepared(false)
+    await db.mfaProtocol.update({ where: { id: 'platform' }, data: { state: 'prepared' } })
+    await expect(service().probe(ordinary.input, ordinary.requestBinding)).resolves.toMatchObject({
+      status: 'current',
+      userId: ordinary.user.id,
+    })
+    await db.user.deleteMany()
+    const operator = await prepared()
+    await expect(service().probe(operator.input, operator.requestBinding)).rejects.toMatchObject({
+      status: 503,
+    })
+  })
+
+  it('expires neutral status on read and creates only a distinct anchor on explicit bootstrap', async () => {
+    const db = fixture.clients[0]!
+    const first = await service().bootstrap('product', undefined, 'source')
+    if (first.kind !== 'created') throw new Error('Expected bootstrap')
+    await db.browserAuthContext.update({
+      where: { id: first.view.contextId },
+      data: { expiresAt: new Date((await mfaDatabaseClock(db)).getTime() - 1) },
+    })
+    await expect(service().status('product', first.binding)).rejects.toMatchObject({
+      errorCode: 'AUTH_CONTEXT_CHANGED',
+    })
+    const next = await service().bootstrap('product', first.binding, 'source')
+    expect(next.kind === 'created' && next.binding !== first.binding).toBe(true)
   })
 })

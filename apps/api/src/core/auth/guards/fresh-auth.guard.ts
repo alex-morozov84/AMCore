@@ -23,15 +23,14 @@ export const REQUIRE_FRESH_AUTH_KEY = 'requireFreshAuth'
  *
  * Method-level guard attached only via `@RequireFreshAuth`. It runs AFTER the
  * global `AuthenticationGuard` (Nest order: global → controller → method), so
- * `request.user` (with `sid`) is already populated. It loads the session by
- * `sid` and requires it to have been (re)authenticated within the window.
+ * `request.user` (with `sid`) is already populated. Protected accounts require
+ * their current family's independently fresh password and second-factor proofs.
  *
  * Fail-closed everywhere with `403 STEP_UP_REQUIRED` — missing `sid` (legacy
- * token), missing/revoked/expired session, owner mismatch, NULL `lastAuthAt`
- * (pre-migration row), or stale `lastAuthAt`. 403 (not 401) so a generic client
- * 401→refresh handler can't loop; the client branches on the errorCode to call
- * `POST /auth/step-up`. The session read happens ONLY on annotated routes, so
- * the `sid` claim adds no cost to ordinary authenticated traffic.
+ * token), missing/revoked/expired session or stale proofs. Changed family/browser
+ * authority returns terminal409. Ordinary accounts retain password lastAuthAt;
+ * protected step-up returns the missing proof types and never becomes complete
+ * from a password-only timestamp update. Unannotated routes do not read freshness.
  */
 @Injectable()
 export class FreshAuthGuard implements CanActivate {

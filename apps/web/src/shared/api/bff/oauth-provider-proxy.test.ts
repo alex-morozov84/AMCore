@@ -1,9 +1,22 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { NextResponse } from 'next/server'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { proxyOAuthAuthorize, proxyOAuthCallback } from './oauth-provider-proxy'
+import { type ProductWebContext } from './product-web-context.server'
 
 vi.mock('server-only', () => ({}))
+vi.mock('./browser-bootstrap-handler', () => ({
+  prepareBrowserAuthAttempt: vi.fn(async () => {
+    const response = NextResponse.json({
+      attemptId: '01900000-0000-7000-8000-000000000000',
+      browser: { contextId: 'ctx', generation: 0 },
+    })
+    response.cookies.set('amcore_browser_context', 'a'.repeat(43))
+    return response
+  }),
+}))
+vi.mock('./invitation-auth-lifecycle', () => ({ cancelInvitedOAuthForOrdinaryStart: vi.fn() }))
 vi.mock('./dal', () => ({ getOptionalSessionEntry: vi.fn() }))
 
 function fakeUpstream(init: {
@@ -24,7 +37,10 @@ function fakeUpstream(init: {
   } as unknown as Response
 }
 
+const context = { frontend: 'site', audience: 'product', apiHeaders: {} } as ProductWebContext
+beforeEach(() => vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8)))
 afterEach(() => {
+  vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
 
@@ -41,7 +57,7 @@ describe('proxyOAuthAuthorize', () => {
     const request = new Request('http://next.internal/api/auth/oauth/google', {
       headers: { 'accept-language': 'ru' },
     })
-    const response = await proxyOAuthAuthorize(request, 'google')
+    const response = await proxyOAuthAuthorize(request, 'google', context)
 
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
     expect(url.toString()).toBe('http://localhost:5002/api/v1/auth/oauth/google')
@@ -52,8 +68,11 @@ describe('proxyOAuthAuthorize', () => {
     expect(response.headers.get('location')).toBe(
       'https://accounts.google.com/o/oauth2/v2/auth?client_id=x'
     )
-    expect(response.headers.get('set-cookie')).toBe(
+    expect(response.headers.getSetCookie()).toContain(
       'oauth_state=nonce-1; Path=/; HttpOnly; SameSite=Lax'
+    )
+    expect(response.headers.getSetCookie()).toEqual(
+      expect.arrayContaining([expect.stringContaining('amcore_browser_context=')])
     )
   })
 
@@ -63,7 +82,8 @@ describe('proxyOAuthAuthorize', () => {
 
     await proxyOAuthAuthorize(
       new Request('http://next.internal/api/auth/oauth/google?foo=bar'),
-      'google'
+      'google',
+      context
     )
 
     const [url] = fetchMock.mock.calls[0] as [URL]
@@ -136,7 +156,8 @@ describe('proxyOAuthCallback', () => {
 
     const response = await proxyOAuthCallback(
       new Request('http://next.internal/api/auth/oauth/google/callback', { method: 'POST' }),
-      'google'
+      'google',
+      context
     )
 
     expect(response.status).toBe(405)

@@ -9,6 +9,8 @@ import type {
 } from '@amcore/shared'
 
 import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
+import type { StoredInvitationIntent } from '../mfa/mfa-invitation-intent.js'
+import type { OAuthIdentitySnapshot } from '../mfa/mfa-login-start.service.js'
 
 const TICKET_TTL_MS = 60 * 1000
 
@@ -18,10 +20,14 @@ export interface OAuthLoginTicketClaims {
   callbackUri?: string
   returnTo?: ProductAdminReturn
   invitation?: InvitationOAuthCorrelation
+  invitationIntent?: StoredInvitationIntent
   userId: string
   email: string
   systemRole: SystemRole
   sessionId: string
+  browserAttemptId?: string
+  identity?: OAuthIdentitySnapshot
+  exchangeBindingHash?: string
 }
 
 @Injectable()

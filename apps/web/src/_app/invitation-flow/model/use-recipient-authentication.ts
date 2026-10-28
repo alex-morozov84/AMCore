@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AuthErrorCode, type InvitationFlowBinding, type UserResponse } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  frontendAuthPath,
+  type InvitationFlowBinding,
+  type UserResponse,
+} from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { invitationFlowClient } from '@/entities/invitation-flow'
 import { userKeys } from '@/entities/user'
 import { ClientErrorCode, ClientStateError } from '@/shared/api/error-codes'
 import { getErrorCode } from '@/shared/api/errors'
+import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 import { createInvitationCredentialAdapters } from './credential-adapters'
 
@@ -15,8 +21,10 @@ const changed = () => new ClientStateError(ClientErrorCode.AUTH_CONTINUATION_CHA
 /** Application auth/cache wiring; credentials and headless presentation remain separate boundaries. */
 export function useRecipientAuthentication(
   initial: InvitationFlowBinding,
-  initialUser: UserResponse | null
+  initialUser: UserResponse | null,
+  actionBase: '/auth' | '/product-admin/auth' = '/auth'
 ) {
+  const router = useRouteProgressRouter()
   const [binding, setBinding] = useState(initial)
   const [user, setUser] = useState(initialUser)
   const [phase, setPhase] = useState<Phase>('active')
@@ -37,20 +45,32 @@ export function useRecipientAuthentication(
       lifecycle.current.epoch++
     }
   }, [])
-  const confirmed = (next: InvitationFlowBinding, account: UserResponse) => {
+  const confirmed = (
+    next: InvitationFlowBinding,
+    account: UserResponse,
+    contextSession?: string
+  ) => {
     setBinding(next)
     setUser(account)
     setPhase('active')
     setHandoff(null)
     setError(undefined)
     setCreatedFailure(undefined)
-    client.setQueryData(userKeys.me(), { user: account })
+    client.setQueryData(userKeys.me(), {
+      user: account,
+      ...(contextSession ? { contextSession } : {}),
+    })
+    if (!contextSession) void client.invalidateQueries({ queryKey: userKeys.me() })
     lifecycle.current.epoch++
   }
   const adapters = useMemo(() => {
     let captured: number | undefined
     return createInvitationCredentialAdapters({
       binding,
+      onMfaRequired: (flowBinding) =>
+        router.replace(
+          `${frontendAuthPath(actionBase === '/auth' ? 'site' : 'admin', '/mfa')}?flow=${encodeURIComponent(flowBinding)}`
+        ),
       isCurrent: () =>
         lifecycle.current.active &&
         (captured === undefined || lifecycle.current.epoch === captured),
@@ -110,7 +130,7 @@ export function useRecipientAuthentication(
         }
       },
     })
-  }, [binding])
+  }, [binding, actionBase, router])
   async function recover() {
     if (busy || !lifecycle.current.active) return
     const captured = lifecycle.current.epoch
@@ -137,7 +157,7 @@ export function useRecipientAuthentication(
         return
       }
       if ('user' in response.data) {
-        confirmed(response.binding, response.data.user)
+        confirmed(response.binding, response.data.user, response.data.contextSession)
         return
       }
       if (response.binding.sessionBinding === null) {
@@ -210,6 +230,7 @@ export function useRecipientAuthentication(
     updateUser(account: UserResponse) {
       setUser(account)
       client.setQueryData(userKeys.me(), { user: account })
+      void client.invalidateQueries({ queryKey: userKeys.me() })
     },
     signedOut(next: InvitationFlowBinding) {
       lifecycle.current.epoch++

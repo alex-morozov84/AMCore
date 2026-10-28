@@ -44,7 +44,7 @@ async function revoke(request: Request, id?: string) {
       {
         method: id !== undefined ? 'DELETE' : 'POST',
         cache: 'no-store',
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
         ...(id === undefined ? { body: JSON.stringify(parsed.data) } : {}),
       }
     )

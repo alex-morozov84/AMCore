@@ -18,9 +18,15 @@ export function ConsoleAccountSecurityClient() {
   const [controller] = useState(
     () =>
       new AccountMfaController({
-        inspect: (operationId) =>
+        inspect: (operationId, flowBinding) =>
           apiClient.get<MfaBrowserView>(
-            `${apiBase}${operationId ? `?operationId=${encodeURIComponent(operationId)}` : ''}`
+            `${apiBase}${operationId ? `?operationId=${encodeURIComponent(operationId)}` : ''}`,
+            {
+              headers: {
+                'x-amcore-mfa-flow':
+                  flowBinding ?? new URLSearchParams(window.location.search).get('flow') ?? '',
+              },
+            }
           ),
         command: (command) => apiClient.post<MfaBrowserResult>(apiBase, command),
       })
@@ -39,7 +45,21 @@ export function ConsoleAccountSecurityClient() {
       onExit={async () => {
         try {
           const host = ADMIN_CONSOLE_CONFIG.mode === 'host'
-          await apiClient.post(host ? getConsolePublicApiPath('/auth/logout') : '/auth/logout')
+          const flowBinding = controller.getFlowBinding()
+          if (flowBinding)
+            await apiClient.post(apiBase, {
+              action: 'cancel',
+              operationId: crypto.randomUUID(),
+              flowBinding,
+            })
+          else
+            await apiClient.post(
+              host ? getConsolePublicApiPath('/auth/logout') : '/auth/logout',
+              undefined,
+              {
+                headers: { 'x-amcore-context-session': controller.getSessionIntent() ?? '' },
+              }
+            )
           router.replace('/login')
         } finally {
           queryClient.clear()

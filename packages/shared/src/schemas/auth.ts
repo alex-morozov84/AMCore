@@ -248,6 +248,18 @@ export const refreshResponseSchema = z.object({
 
 export type RefreshResponse = z.infer<typeof refreshResponseSchema>
 
+/** Password verification can leave a second proof pending; this response contains no credentials. */
+export const stepUpPendingSchema = z.strictObject({
+  kind: z.literal('proof_required'),
+  requiredProofs: z
+    .array(z.enum(['password', 'second_factor']))
+    .min(1)
+    .max(2)
+    .refine((proofs) => new Set(proofs).size === proofs.length),
+})
+export const stepUpResponseSchema = z.union([refreshResponseSchema.strict(), stepUpPendingSchema])
+export type StepUpResponse = z.infer<typeof stepUpResponseSchema>
+
 /** OAuth login ticket exchange response */
 export const oauthExchangeResponseSchema = z.strictObject({
   returnTo: productAdminReturnSchema.optional(),

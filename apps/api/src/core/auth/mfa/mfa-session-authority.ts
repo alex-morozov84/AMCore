@@ -37,7 +37,7 @@ export interface BrowserPublicationAuthority {
 }
 
 export type SessionAdmission =
-  | { kind: 'admitted'; operator: boolean }
+  | { kind: 'admitted'; operator: boolean; requiredProofs?: Array<'password' | 'second_factor'> }
   | {
       kind: 'denied'
       reason:

@@ -53,6 +53,8 @@
     "TOKEN_INVALID": "This link is invalid or has expired.",
     "RATE_LIMIT_EXCEEDED": "Too many attempts. Please wait a moment and try again.",
     "AUTH_ORIGIN_REJECTED": "This request came from an unrecognized origin.",
+    "SESSION_CHANGED": "Your session changed. Sign in again.",
+    "AUTH_CONTEXT_CHANGED": "Your sign-in session changed. Sign in again.",
     "SESSION_NOT_FOUND": "That session no longer exists.",
     "CONTEXT_SESSION_CHANGED": "Your session changed. Reload the page to continue.",
     "UNAUTHORIZED": "Please sign in to continue.",
@@ -351,6 +353,17 @@
         "api_key_created": "API key created",
         "api_key_revoked": "API key revoked",
         "auth_step_up_failed": "Fresh authentication failed",
+        "auth_mfa_backup_codes_replaced": "New MFA backup codes generated",
+        "auth_mfa_backup_codes_saved": "MFA backup codes saved",
+        "auth_mfa_setup_completed": "MFA setup completed",
+        "auth_mfa_factor_enrolled": "MFA app connected",
+        "auth_mfa_factor_replaced": "MFA app replaced",
+        "auth_mfa_protocol_activated": "MFA deployment activated",
+        "auth_mfa_offline_recovery_started": "Offline MFA recovery started",
+        "auth_mfa_recovery_ticket_redeemed": "Recovery enrollment ticket used",
+        "auth_mfa_proof_verified": "Sign-in factor verified",
+        "auth_mfa_verification_failed": "MFA verification failed",
+        "auth_mfa_backup_code_used": "MFA backup code used",
         "auth_step_up_succeeded": "Fresh authentication succeeded",
         "org_invite_accepted": "Organization invitation accepted",
         "org_invite_created": "Organization invitation created",
@@ -1473,6 +1486,10 @@
         "details": "Details:"
       },
       "jobs": {
+        "mfa-retention": {
+          "name": "MFA cleanup",
+          "purpose": "Removes expired MFA drafts and retained session records in bounded batches."
+        },
         "cleanup": {
           "name": "Cleanup of expired records",
           "purpose": "Deletes expired sessions, tokens, API keys and invitations."

@@ -58,6 +58,7 @@ describe('context deadline native waiting/cancellation', () => {
             readSessionId: async () => 'owned-session',
             store,
             lock: new SimpleLock(),
+            verifyBinding: async () => undefined,
             upstreamRefresh: vi.fn(),
           }
         )

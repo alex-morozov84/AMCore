@@ -11,22 +11,22 @@ All paths below are relative to `/api/v1`. Organizations, members, roles and
 invites declare an organization-context boundary. Each handler declares its own
 personal, discovery, exchange or organization policy.
 
-| Operation                                                                                | Context and credentials                                                                               |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `POST /organizations`                                                                    | Personal, bearer-only; creates ADMIN membership                                                       |
-| `GET /organizations/creation-policy`, `GET /organizations/creation-results/:operationId` | Personal bearer; independent deployment policy and original-actor result recovery                     |
-| `GET /organizations`                                                                     | Actor-owned discovery, bearer-only                                                                    |
-| `GET /organizations/:id`                                                                 | Existing membership discovery; accepted keys remain bound and scope-limited                           |
-| `GET /organizations/:id/context`                                                         | Selected organization, bearer-only; current membership required even for SUPER_ADMIN                  |
-| `GET /organizations/:orgId/capabilities`                                                 | Selected organization, bearer-only; full TeamAccess; implemented authoring metadata only              |
-| `POST /organizations/:orgId/roles/:roleId/permissions/presets`                           | Selected organization, bearer-only; full TeamAccess and custom role                                   |
-| `GET /organizations/:orgId/members`, `GET /organizations/:orgId/members/:userId/roles`   | Selected organization, bearer-only; current membership and full TeamAccess, including for SUPER_ADMIN |
-| `PATCH /organizations/:orgId/members/:userId/roles`                                      | Same admission; atomic complete-set replacement with membership identity and ACL revision checks      |
-| `PATCH /organizations/:id`, `DELETE /organizations/:id`                                  | Selected organization; existing credential/field/TeamAccess requirements retained                     |
-| Legacy per-role/member-removal and role handlers                                         | Path-selected organization; existing per-handler credential allowlist retained                        |
-| `GET/POST /organizations/:orgId/invites`, reissue/revoke and own operation receipts      | Personal bearer; actual membership and full TeamAccess; no platform bypass or API-key admission       |
-| `POST /auth/invites/accept`                                                              | Personal, bearer-only                                                                                 |
-| `POST /organizations/:id/switch`                                                         | Existing bearer-only exchange; membership-checked A→B and parent-bounded expiry retained              |
+| Operation                                                                                | Context and credentials                                                                                                                 |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /organizations`                                                                    | Personal, bearer-only; creates ADMIN membership                                                                                         |
+| `GET /organizations/creation-policy`, `GET /organizations/creation-results/:operationId` | Personal bearer; independent deployment policy and original-actor result recovery                                                       |
+| `GET /organizations`                                                                     | Actor-owned discovery, bearer-only                                                                                                      |
+| `GET /organizations/:id`                                                                 | Existing membership discovery; accepted keys remain bound and scope-limited                                                             |
+| `GET /organizations/:id/context`                                                         | Selected organization, bearer-only; current membership required even for SUPER_ADMIN                                                    |
+| `GET /organizations/:orgId/capabilities`                                                 | Selected organization, bearer-only; full TeamAccess; implemented authoring metadata only                                                |
+| `POST /organizations/:orgId/roles/:roleId/permissions/presets`                           | Selected organization, bearer-only; full TeamAccess and custom role                                                                     |
+| `GET /organizations/:orgId/members`, `GET /organizations/:orgId/members/:userId/roles`   | Selected organization, bearer-only; current membership and full TeamAccess, including for SUPER_ADMIN                                   |
+| `PATCH /organizations/:orgId/members/:userId/roles`                                      | Same admission; atomic complete-set replacement with membership identity and ACL revision checks                                        |
+| `PATCH /organizations/:id`, `DELETE /organizations/:id`                                  | Selected organization; existing credential/field/TeamAccess requirements retained                                                       |
+| Legacy per-role/member-removal and role handlers                                         | Path-selected organization; existing per-handler credential allowlist retained                                                          |
+| `GET/POST /organizations/:orgId/invites`, reissue/revoke and own operation receipts      | Personal bearer; actual membership and full TeamAccess; no platform bypass or API-key admission                                         |
+| `POST /auth/invites/accept`                                                              | Personal, bearer-only                                                                                                                   |
+| `POST /organizations/:id/switch`                                                         | Existing bearer-only exchange; membership-checked A→B, exact family/security version/browser binding and parent-bounded expiry retained |
 
 `GET /organizations/:id/context` returns the safe organization summary,
 `canManageTeamAccess`, finite `actorAffordances` and actual-organization

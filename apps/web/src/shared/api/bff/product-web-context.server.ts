@@ -1,4 +1,5 @@
 import {
+  type BrowserAudience,
   type FrontendDestination,
   PRODUCT_ADMIN_CONFIG,
   productAdminPath,
@@ -71,7 +72,15 @@ export function resolveProductWebContext(source: Headers, routeKind: ProductRout
   })
 }
 
-export type ProductWebContext = ReturnType<typeof resolveProductWebContext>
+export type ProductWebContext = Omit<
+  ReturnType<typeof resolveProductWebContext>,
+  'audience' | 'apiHeaders' | 'cookieName' | 'namespace'
+> & {
+  cookieName: string
+  namespace: string
+  audience: BrowserAudience
+  apiHeaders: Readonly<Record<string, string>>
+}
 
 export function isProductMutationTrusted(request: Request, context: ProductWebContext): boolean {
   const rawOrigin = request.headers.get('origin')

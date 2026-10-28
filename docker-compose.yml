@@ -292,6 +292,7 @@ services:
       dockerfile: apps/api/Dockerfile
       args:
         BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
+        BUILD_SOURCE_COMMIT: ${BUILD_SOURCE_COMMIT:-}
     profiles: ['seed']
     command: ['node', 'dist/cli/system-seed.js', '--url-from-env', 'MIGRATION_DATABASE_URL']
     environment:
@@ -311,6 +312,7 @@ services:
       args:
         # Build stage only (never the runtime image). See docs/operations/capacity.md.
         BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
+        BUILD_SOURCE_COMMIT: ${BUILD_SOURCE_COMMIT:-}
     ports:
       # Loopback-only by default (ADR-072): reachable as localhost:5002 on
       # THIS host for local dev/curl, but not from other hosts or the
@@ -357,6 +359,7 @@ services:
       dockerfile: apps/api/Dockerfile
       args:
         BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
+        BUILD_SOURCE_COMMIT: ${BUILD_SOURCE_COMMIT:-}
     # See the note on `api`: the worker's notification dispatcher closes (no new claims or sends),
     # waits up to ~15 s for in-flight deliveries to record their result, then the database is
     # torn down. The default 10 s kill timer would cut that short.
@@ -386,6 +389,7 @@ services:
       args:
         NEXT_DEPLOYMENT_ID: ${NEXT_DEPLOYMENT_ID:-}
         BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:-}
+        BUILD_SOURCE_COMMIT: ${BUILD_SOURCE_COMMIT:-}
     ports:
       - '${WEB_PUBLISH_HOST:-127.0.0.1}:3000:3000'
     environment:

@@ -2,6 +2,8 @@ import { SystemRole } from '@amcore/shared'
 
 import { UnauthorizedException } from '../../../common/exceptions'
 import type { EnvService } from '../../../env/env.service'
+import { beginJwtPrimaryAdmission } from '../mfa/jwt-primary-admission.js'
+import type { MfaAuthorityReader } from '../mfa/mfa-authority-reader.service.js'
 import type { PrivilegedRoleService } from '../privileged-role.service'
 import type { UserCacheService } from '../user-cache.service'
 
@@ -9,10 +11,12 @@ import { JwtStrategy } from './jwt.strategy'
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy
+  let readPrimaryProjection: jest.Mock
   let getUser: jest.Mock
   let getCurrentSystemRole: jest.Mock
 
   beforeEach(() => {
+    readPrimaryProjection = jest.fn()
     getUser = jest.fn()
     getCurrentSystemRole = jest.fn().mockResolvedValue(SystemRole.SuperAdmin)
     const env = {
@@ -21,7 +25,8 @@ describe('JwtStrategy', () => {
     strategy = new JwtStrategy(
       env,
       { getUser } as unknown as UserCacheService,
-      { getCurrentSystemRole } as unknown as PrivilegedRoleService
+      { getCurrentSystemRole } as unknown as PrivilegedRoleService,
+      { readPrimaryProjection } as unknown as MfaAuthorityReader
     )
   })
 
@@ -36,6 +41,21 @@ describe('JwtStrategy', () => {
     })
 
     expect(principal).toMatchObject({ type: 'jwt', sub: 'user-1', sid: 'session-1' })
+    expect(getUser).not.toHaveBeenCalled()
+    expect(getCurrentSystemRole).toHaveBeenCalledWith('user-1')
+  })
+
+  it('retains family and browser claims and reads existence from primary even for a USER claim', async () => {
+    getCurrentSystemRole.mockResolvedValue(SystemRole.User)
+    const principal = await strategy.validate({
+      sub: 'user-1',
+      email: 'a@example.com',
+      systemRole: SystemRole.User,
+      fid: 'family',
+      securityVersion: 4,
+      browserBound: true,
+    })
+    expect(principal).toMatchObject({ fid: 'family', securityVersion: 4, browserBound: true })
     expect(getUser).not.toHaveBeenCalled()
     expect(getCurrentSystemRole).toHaveBeenCalledWith('user-1')
   })
@@ -105,5 +125,29 @@ describe('JwtStrategy', () => {
     expect((await strategy.validate(signed)).systemRole).toBe(SystemRole.SuperAdmin)
     // The separate primary admission intersects this original claim before a privileged grant.
     expect(getUser).not.toHaveBeenCalled()
+  })
+  it('consolidates existence only for a marked request, still rejecting deletion before credential selection', async () => {
+    const request = { headers: { 'x-skip-existence': 'true' } }
+    const claims = { sub: 'gone', email: 'gone@example.test', systemRole: SystemRole.SuperAdmin }
+    getCurrentSystemRole.mockResolvedValue(null)
+    await expect(strategy.validate(request, claims)).rejects.toBeInstanceOf(UnauthorizedException)
+    getCurrentSystemRole.mockClear()
+    readPrimaryProjection.mockResolvedValueOnce({ user: { id: 'gone' } })
+    const release = beginJwtPrimaryAdmission(request)
+    try {
+      expect(await strategy.validate(request, claims)).toMatchObject({ sub: 'gone' })
+    } finally {
+      release()
+    }
+    expect(getCurrentSystemRole).not.toHaveBeenCalled()
+    expect(readPrimaryProjection).toHaveBeenCalledTimes(1)
+    await expect(strategy.validate(request, claims)).rejects.toBeInstanceOf(UnauthorizedException)
+    const finish = beginJwtPrimaryAdmission(request)
+    readPrimaryProjection.mockResolvedValueOnce(null)
+    try {
+      await expect(strategy.validate(request, claims)).rejects.toBeInstanceOf(UnauthorizedException)
+    } finally {
+      finish()
+    }
   })
 })

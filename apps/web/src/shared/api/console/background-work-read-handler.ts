@@ -58,7 +58,7 @@ async function read(request: Request, path: string): Promise<Response> {
       {
         method: 'GET',
         cache: 'no-store',
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(20_000)]),
       }
     )

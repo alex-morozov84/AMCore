@@ -2,8 +2,14 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@/i18n/client-message-boundary', () => ({
+  ClientMessages: ({ children }: { children: unknown }) => children,
+}))
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
-vi.mock('@/shared/api/console/access-token', () => ({ getConsoleAwareUser: vi.fn() }))
+vi.mock('@/shared/api/console/access-token', () => ({
+  getConsoleAwareUser: vi.fn(),
+  getConsoleLogoutIntent: vi.fn().mockResolvedValue('a'.repeat(64)),
+}))
 vi.mock('@/shared/lib/require-super-admin', () => ({ requireSuperAdmin: vi.fn() }))
 vi.mock('@/shared/ui/primary-unavailable-fallback', () => ({
   PrimaryUnavailableFallback: () => <div>Unavailable</div>,
@@ -48,6 +54,7 @@ describe('ConsolePageFrame', () => {
       fallback: <div>Loading</div>,
     })
 
-    expect(frame.props.defaultSidebarOpen).toBe(false)
+    expect(frame.props.namespaces).toEqual(['accountMfa'])
+    expect(frame.props.children.props.defaultSidebarOpen).toBe(false)
   })
 })

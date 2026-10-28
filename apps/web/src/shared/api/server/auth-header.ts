@@ -1,6 +1,7 @@
+import { ContextRequestError } from '../bff/context-errors'
 import { SessionLockTimeoutError, SessionVaultUnavailableError } from '../bff/errors'
 
-import { getBackendAccessToken } from './access-token'
+import { getBackendSessionCredential } from './access-token'
 import { BackendAuthRequiredError } from './errors'
 
 import 'server-only'
@@ -19,7 +20,8 @@ import 'server-only'
  */
 export type BackendAuthMode = 'none' | 'optional' | 'required'
 
-export type AuthHeaderResult = { header?: string } | { unavailable: true }
+export type AuthHeaderResult =
+  { header?: string; browserHeaders?: Record<string, string> } | { unavailable: true }
 
 /**
  * A pluggable token source for a caller with its own, isolated session
@@ -28,9 +30,12 @@ export type AuthHeaderResult = { header?: string } | { unavailable: true }
  * Defaults to `getBackendAccessToken` (the product session) below —
  * every existing call site is unaffected.
  */
-export type TokenResolver = () => Promise<string | null>
+export type TokenResolver = () => Promise<
+  string | { accessToken: string; browserHeaders: Record<string, string> } | null
+>
 
 function isAuthInfrastructureFailure(error: unknown): boolean {
+  if (error instanceof ContextRequestError && error.status >= 500) return true
   if (error instanceof SessionVaultUnavailableError || error instanceof SessionLockTimeoutError) {
     return true
   }
@@ -41,18 +46,21 @@ function isAuthInfrastructureFailure(error: unknown): boolean {
 
 export async function resolveAuthHeader(
   mode: BackendAuthMode,
-  tokenResolver: TokenResolver = getBackendAccessToken
+  tokenResolver: TokenResolver = getBackendSessionCredential
 ): Promise<AuthHeaderResult> {
   if (mode === 'none') return {}
 
-  let token: string | null
+  let token: Awaited<ReturnType<TokenResolver>>
   try {
     token = await tokenResolver()
   } catch (error) {
     if (!isAuthInfrastructureFailure(error)) throw error
     return { unavailable: true }
   }
-  if (token) return { header: `Bearer ${token}` }
+  if (token)
+    return typeof token === 'string'
+      ? { header: `Bearer ${token}` }
+      : { header: `Bearer ${token.accessToken}`, browserHeaders: token.browserHeaders }
   if (mode === 'required') throw new BackendAuthRequiredError()
   return {}
 }

@@ -14,15 +14,17 @@ guide covers the model and the invariants OpenAPI does not express.
 ## The two layers
 
 Every request is evaluated against two independent layers. **Both must pass**,
-with an internal `SUPER_ADMIN` owner grant. API-key scopes still narrow that grant;
-organization management still requires matching organization context.
+with an internal `SUPER_ADMIN` owner grant for admitted human JWT sessions.
+API keys always have effective system role `USER` and use explicit organization
+grants intersected with key scopes. Organization management requires matching
+organization context.
 
 ```
 Request
   │
   ▼
 Layer 1 — System role      USER        → normal access, continue to layer 2
-                           SUPER_ADMIN → synthesized owner grant, then credential scopes
+                           SUPER_ADMIN → human JWT owner grant; API keys remain USER
   │
   ▼
 Layer 2 — Org permissions  org membership + roles + permissions, evaluated by CASL
@@ -77,10 +79,14 @@ lookup failures fail closed; infrastructure errors remain observable.
   routes and AI platform bypasses, without relying on cache invalidation/session cleanup.
 - **Promotion cannot elevate an old USER claim.** Obtain a new credential through
   the normal authenticated issuance flow.
-- Administrative system-role changes still revoke the affected user's sessions;
-  [session revocation](./sessions.md) and live-role admission are separate protections.
-- API-key authentication already reads the owner's current role from primary;
-  admission reuses it, retaining live membership and scope intersection.
+- Administrative system-role changes commit the target role, account security
+  version, existing family/session revocation and audit in one transaction.
+  A no-op does not advance the version. Physical cleanup follows the commit and
+  cannot delete a new sign-in. [Session revocation](./sessions.md) and live-role
+  admission remain separate protections.
+- API-key authentication reads the owner's current role only for private audit
+  evidence. The effective role remains `USER`; live organization membership,
+  explicit grants and key scopes determine its permissions.
 
 This mirrors the org-permission freshness contract below.
 
@@ -251,7 +257,7 @@ Permission {
 - **action** — `manage` is the wildcard for all four concrete actions.
 - **subject** — the resource type. `all` is the wildcard for every subject;
   positive `all` grants are rejected for stored org policies. Wildcard DENYs remain
-  supported; the factory alone synthesizes a positive `manage:all` for SUPER_ADMIN.
+  supported; the factory alone synthesizes a positive `manage:all` for admitted human SUPER_ADMIN JWTs.
 
 `action` and `subject` are **closed enums** (`Action` and `Subject` in
 `packages/shared/src/enums/permissions.ts`). `assignPermissionSchema` validates

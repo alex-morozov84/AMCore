@@ -67,7 +67,7 @@ function setCachedAvatarUrl(
   avatarUrl: string | null
 ): void {
   queryClient.setQueryData<{ user: UserResponse | null }>(userKeys.me(), (old) =>
-    old?.user ? { user: { ...old.user, avatarUrl } } : old
+    old?.user ? { ...old, user: { ...old.user, avatarUrl } } : old
   )
 }
 

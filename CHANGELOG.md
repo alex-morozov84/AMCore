@@ -9,13 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Prepared account-security browser screens and dedicated unavailable BFF entries,
-  with local QR rendering, transient secret containment and a managed UI simulation.
-  MFA enrollment, second-factor login and activation remain unavailable.
-
-- Dormant account MFA storage and internal TOTP/backup-code verification primitives,
-  with an incomplete-deployment startup check. Enrollment and second-factor login
-  remain unavailable in this foundation.
+- Operator MFA with authenticator apps, one-use backup login, saved-code setup,
+  source-bound code regeneration/app replacement and deployment-owner recovery.
+  Browser login uses current generation checks and atomic invitation publication.
+  Activation requires a separately approved compatible fleet and explicit CLI
+  transition; the default prepared state refuses operator grants.
 
 <!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_START -->
 
@@ -78,6 +76,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without limit. Consumers that already set a timeout keep it.
   Commands already sent, `MULTI` batches and total request time are not covered by that limit.
   See `docs/backend/architecture-and-conventions.md`.
+
+- System-role changes commit account security-version advancement and existing
+  session revocation with the role and audit. Later cleanup preserves new sign-ins.
+
+- Own-session revocation closes the selected refresh family. Revoking other
+  sessions preserves the current family and rejects a changed keep-token before
+  mutation. MFA family/browser checks enforce current source authority.
+
+- API keys always use effective system role USER, including keys owned by platform
+  operators. Their permissions come from current organization grants intersected
+  with scopes; the owner's SUPER_ADMIN role grants no platform or team bypass.
 
 - Welcome-email delivery stops automatic recovery after uncertain provider results, including current Resend429 responses. Conservative policy2 removes provider-clock qualification and adds an offline upgrade procedure. Direct-secret and notification recovery remain separate.
 

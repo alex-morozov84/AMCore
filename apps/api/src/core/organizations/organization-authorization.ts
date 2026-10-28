@@ -32,7 +32,7 @@ export async function lockOrganization(
   await tx.$queryRaw`SELECT id FROM core.organizations WHERE id = ${id} FOR UPDATE`
   const org = await tx.organization.findUnique({ where: { id } })
   if (!org) throw new NotFoundException('Organization', id)
-  if (principal.systemRole !== SystemRole.SuperAdmin) {
+  if (principal.type !== 'jwt' || principal.systemRole !== SystemRole.SuperAdmin) {
     const member = await tx.orgMember.findUnique({
       where: { userId_organizationId: { userId: principal.sub, organizationId: id } },
       select: { id: true },

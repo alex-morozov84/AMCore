@@ -27,6 +27,7 @@ import { ConsoleTimeZoneSwitcher } from './ConsoleTimeZoneSwitcher'
 import { ConsoleUserBadge } from './ConsoleUserBadge'
 
 interface ConsoleShellProps {
+  logoutIntent?: string
   children: ReactNode
   /** Server-resolved (`getConsoleAwareUser`) - chrome only, never an auth decision. */
   user: UserResponse | null
@@ -34,7 +35,12 @@ interface ConsoleShellProps {
   defaultSidebarOpen?: boolean
 }
 
-export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShellProps) {
+export function ConsoleShell({
+  children,
+  defaultSidebarOpen,
+  user,
+  logoutIntent,
+}: ConsoleShellProps) {
   const t = useTranslations('console')
 
   return (
@@ -82,7 +88,9 @@ export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShel
               <ConsoleTimeZoneSwitcher />
               <ConsoleLocaleSwitcher />
               <ConsoleUserBadge user={user} />
-              {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
+              {ADMIN_CONSOLE_CONFIG.mode === 'host' && (
+                <ConsoleLogoutButton contextSession={logoutIntent} />
+              )}
             </div>
           </header>
           <div className="w-full p-4 sm:p-6">{children}</div>

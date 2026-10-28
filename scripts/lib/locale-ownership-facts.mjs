@@ -84,6 +84,8 @@ export const localeOwnershipFacts = {
   sharedModuleTests: linkedTests,
   topology,
   verification: [
+    one('apps/web/src/shared/ui/console-step-up-dialog.stories.tsx', { disposition: 'rewrite' }),
+    one('apps/web/e2e/mocked/account-mfa-setup.spec.ts', { disposition: 'rewrite' }),
     one('apps/web/src/shared/ui/locale-selector.stories.tsx', { disposition: 'delete' }),
     one('apps/web/.storybook/preview.tsx', { disposition: 'rewrite' }),
     one('apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx', {

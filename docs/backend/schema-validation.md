@@ -67,6 +67,23 @@ output. If the handler already applies a transform, declare a separate schema
 for that result to avoid applying the transform twice. `[ThingDto]` declares an
 array of that DTO. A root array schema keeps its whole-array constraints.
 
+Use `SchemaResponses` when a route has several JSON outcomes. Declare a separate
+DTO and HTTP status for each outcome:
+
+```ts
+@SchemaResponses(
+  { type: ReadyDto, status: 200 },
+  { type: PendingDto, status: 202 },
+)
+```
+
+The handler returns the DTO union. The first status is the default; a passthrough
+response selects another status explicitly. After the handler completes, the
+interceptor validates the body against that status's schema. A body valid only for
+another status, or an undeclared status, fails safely. A pending response cannot
+serialize credentials through the completed response's schema. Swagger documents
+each status with its own DTO rather than a shared ambiguous union.
+
 The interceptor passes through responses without a schema. Keep download,
 `StreamableFile`, SSE, manual responses and 204 handlers outside JSON validation
 unless they already declare a corresponding response contract.

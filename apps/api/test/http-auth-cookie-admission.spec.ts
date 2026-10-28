@@ -26,9 +26,17 @@ const auth = new AuthController(
   {} as never,
   {} as never,
   { hashRefreshToken: () => 'fixture-hash' } as never,
-  env
+  env,
+  {
+    begin: async () => ({
+      kind: 'complete',
+      refreshToken: 'fixture-refresh',
+      body: { user: {}, accessToken: 'fixture-access' },
+    }),
+  } as never
 )
 const oauth = new OAuthController(
+  {} as never,
   {
     getAuthorizationURL: async () => ({
       url: 'https://provider.example.test/authorize',

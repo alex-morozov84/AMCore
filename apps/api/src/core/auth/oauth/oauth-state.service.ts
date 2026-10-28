@@ -8,10 +8,14 @@ import type {
 } from '@amcore/shared'
 
 import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
+import type { StoredInvitationIntent } from '../mfa/mfa-invitation-intent.js'
+
+import type { OAuthLinkAuthority } from './oauth-link-authority.js'
 
 const STATE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 export interface OAuthInvitationState {
+  intent?: StoredInvitationIntent
   correlation: Omit<InvitationOAuthCorrelation, 'backendSessionId'>
   cleanupKeyHash: string
   expiresAt: string
@@ -21,11 +25,13 @@ export interface OAuthStateData {
   placementFingerprint?: string
   callbackUri?: string
   returnTo?: ProductAdminReturn
+  browserAttemptId?: string
   pkceMethod?: 'S256'
   invitation?: OAuthInvitationState
   provider: string
   codeVerifier: string
   mode: 'login' | 'link'
+  linkSource?: OAuthLinkAuthority
   userId?: string
   /**
    * Locale negotiated from `Accept-Language` when the login flow started (D2).

@@ -29,6 +29,36 @@ function held<T>() {
 }
 
 describe('account MFA secret and command containment', () => {
+  it('retains the original flow intent across concealment and sends it with later status/commands', async () => {
+    const flowBinding = crypto.randomUUID()
+    const view = { ...flow, flowBinding }
+    const inspect = vi.fn(async () => view)
+    const command = vi.fn(async () => ({ view }))
+    const controller = new AccountMfaController({ inspect, command })
+    await controller.inspect()
+    controller.conceal()
+    await controller.inspect()
+    expect(inspect).toHaveBeenLastCalledWith(undefined, flowBinding)
+    await controller.command({ action: 'start_enrollment' })
+    expect(command).toHaveBeenCalledWith(expect.objectContaining({ flowBinding }))
+  })
+  it('refuses another flow after a pending cookie switch without displaying its identity', async () => {
+    const first = { ...flow, flowBinding: crypto.randomUUID() }
+    const inspect = vi
+      .fn()
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce({
+        ...first,
+        flowBinding: crypto.randomUUID(),
+        accountLabel: 'Other account',
+      })
+    const controller = new AccountMfaController({ inspect, command: async () => enrollment })
+    await controller.inspect()
+    controller.conceal()
+    await controller.inspect()
+    expect(controller.getSnapshot()).toEqual({ phase: 'changed' })
+    expect(controller.getSecrets()).toEqual({})
+  })
   it('discards a late secret response after the view was concealed', async () => {
     const response = held<MfaBrowserResult>()
     const controller = new AccountMfaController({

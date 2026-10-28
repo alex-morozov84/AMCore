@@ -4,7 +4,9 @@ import { Reflector } from '@nestjs/core'
 import { AuthType, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import type { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
+import type { BrowserSessionContextService } from '../../frontend-context/browser-session-context.service'
 import type { AbilityFactory } from '../casl/ability.factory'
+import type { MfaJwtAdmissionService } from '../mfa/mfa-jwt-admission.service.js'
 import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
 import { PrivilegedAdmissionService } from '../privileged-admission.service'
 import type { PrivilegedRoleService } from '../privileged-role.service'
@@ -78,7 +80,9 @@ it('normalizes privilege before ability and every downstream guard, outside auth
     new PrivilegedAdmissionService(roles as unknown as PrivilegedRoleService),
     {
       resolve: async (_context: unknown, admission: unknown) => ({ admission }),
-    } as unknown as OrganizationContextResolver
+    } as unknown as OrganizationContextResolver,
+    { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
+    { verify: () => undefined } as unknown as BrowserSessionContextService
   )
   await guard.canActivate(ctx)
   expect(order).toEqual(['auth', 'primary', 'ability', 'policy', 'team'])

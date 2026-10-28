@@ -25,6 +25,11 @@ when those stages succeed. Nest cleans `dist` before emission, so removed module
 cannot survive a successful rebuild. A failed build is not a deployable artifact;
 never launch a remaining directory after an unsuccessful build.
 
+After emission, the build writes the nonsecret MFA compatibility artifact. Set
+`BUILD_SOURCE_COMMIT` to the reviewed commit for deployment images. Unpinned
+local artifacts contain a null commit and cannot pass MFA deployment preflight.
+Turborepo hashes this build-only input and the artifact writer.
+
 The workspace `pnpm build` orders shared before its consumers through Turborepo.
 Direct package commands require the shared build above. The E2E preparation
 receipt covers Prisma generation and shared outputs; it does not prove API

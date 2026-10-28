@@ -3,14 +3,19 @@ import { JwtService } from '@nestjs/jwt'
 
 import { type JwtPayload, type RequestPrincipal, SystemRole } from '@amcore/shared'
 
-import { UnauthorizedException } from '../../../common/exceptions/index.js'
+import { AppException, UnauthorizedException } from '../../../common/exceptions/index.js'
+import { MfaAuthorityReader } from '../../../core/auth/mfa/mfa-authority-reader.service.js'
 import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service.js'
+import { BrowserSessionContextService } from '../../../core/frontend-context/browser-session-context.service.js'
+
+import { type BoardAuthRequest, boardBrowserBinding } from './bull-board-auth-context.js'
 
 export type BullBoardBearerAccess =
   | { readonly kind: 'authorized'; readonly userId: string }
   | { readonly kind: 'unauthenticated' }
   | { readonly kind: 'forbidden' }
   | { readonly kind: 'unavailable' }
+  | { readonly kind: 'session_changed' }
 
 /**
  * Admission of the Console BFF's request to the board: a live SUPER_ADMIN access token.
@@ -21,19 +26,21 @@ export type BullBoardBearerAccess =
  * because the database now says so, and a demoted admin is refused on the next request. It runs on
  * every request (page, asset, data), without a cache. Like the cookie path it must not import
  * `AuthModule` (`QueueModule → AuthModule → EmailModule → QueueModule` would close a cycle); it needs
- * only the JWT verifier and the two privileged-role providers, which depend on Prisma alone.
+ * the JWT verifier, primary family/role readers and private browser normalization.
  *
- * Outcomes are four on purpose: an infrastructure failure is `unavailable` (503), never a 401/403,
+ * Changed family/browser authority is terminal409. An infrastructure failure is503, never401/403,
  * so the Console can tell "could not verify" from "not allowed".
  */
 @Injectable()
 export class BullBoardBearerAuthService {
   constructor(
     private readonly jwt: JwtService,
-    private readonly admission: PrivilegedAdmissionService
+    private readonly admission: PrivilegedAdmissionService,
+    private readonly authority: MfaAuthorityReader,
+    private readonly contexts: BrowserSessionContextService
   ) {}
 
-  async verify(accessToken: string): Promise<BullBoardBearerAccess> {
+  async verify(accessToken: string, request?: BoardAuthRequest): Promise<BullBoardBearerAccess> {
     let payload: JwtPayload
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(accessToken, { algorithms: ['HS256'] })
@@ -55,16 +62,27 @@ export class BullBoardBearerAuthService {
       aclVersion: payload.aclVersion,
       sid: payload.sid,
       exp: payload.exp,
+      ...(payload.fid !== undefined && { fid: payload.fid }),
+      ...(payload.securityVersion !== undefined && { securityVersion: payload.securityVersion }),
+      ...(payload.browserBound !== undefined && { browserBound: payload.browserBound }),
     }
     try {
+      const binding = boardBrowserBinding(this.contexts, request)
       const { principal: effective } = await this.admission.resolve(principal, [
         SystemRole.SuperAdmin,
       ])
       // `resolve` demotes a stale claim to USER instead of throwing: the result must be checked.
-      return effective.systemRole === SystemRole.SuperAdmin
-        ? { kind: 'authorized', userId: payload.sub }
-        : { kind: 'forbidden' }
+      if (effective.systemRole !== SystemRole.SuperAdmin) return { kind: 'forbidden' }
+      const result = await this.authority.readForRuntime(payload, binding)
+      if (result.kind === 'denied')
+        return {
+          kind: result.reason === 'enforcement_unavailable' ? 'unavailable' : 'session_changed',
+        }
+      return result.operator ? { kind: 'authorized', userId: payload.sub } : { kind: 'forbidden' }
     } catch (error) {
+      if (error instanceof AppException && error.errorCode === 'SESSION_CHANGED')
+        return { kind: 'session_changed' }
+      if (error instanceof AppException && error.getStatus() === 403) return { kind: 'forbidden' }
       return error instanceof UnauthorizedException
         ? { kind: 'unauthenticated' }
         : { kind: 'unavailable' }

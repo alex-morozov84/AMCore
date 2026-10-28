@@ -83,7 +83,7 @@ export async function handleConsoleIntegrations(
       method: mutation ? 'POST' : 'GET',
       body: upstream.body,
       cache: 'no-store',
-      headers: forwardRequestHeaders(request.headers, resolved.token),
+      headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
       signal: AbortSignal.any([
         request.signal,
         AbortSignal.timeout(target.kind === 'probe' ? PROBE_TIMEOUT_MS : READ_TIMEOUT_MS),

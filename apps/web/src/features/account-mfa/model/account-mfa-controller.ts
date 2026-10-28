@@ -11,7 +11,7 @@ import { getErrorCode, getErrorStatus, getRetryAfterMs } from '@/shared/api/erro
 import { ApiRequestError } from '@/shared/api/http-client'
 
 export interface AccountMfaAdapter {
-  inspect(operationId?: string): Promise<MfaBrowserView>
+  inspect(operationId?: string, flowBinding?: string): Promise<MfaBrowserView>
   command(input: MfaBrowserCommand): Promise<MfaBrowserResult>
 }
 export interface AccountMfaSnapshot {
@@ -27,10 +27,14 @@ export class AccountMfaController {
   private state: AccountMfaSnapshot = { phase: 'loading' }
   private secrets: Secrets = {}
   private generation = 0
+  private flowBinding?: string
+  private sessionIntent?: string
   private listeners = new Set<() => void>()
   constructor(private readonly adapter: AccountMfaAdapter) {}
   getSnapshot = () => this.state
   getSecrets = () => this.secrets
+  getFlowBinding = () => this.flowBinding
+  getSessionIntent = () => this.sessionIntent
   subscribe = (listener: () => void) => {
     this.listeners.add(listener)
     return () => {
@@ -52,27 +56,45 @@ export class AccountMfaController {
     this.secrets = {}
     this.update({ phase: 'loading', operationId })
     try {
-      const view = mfaBrowserViewSchema.parse(await this.adapter.inspect(operationId))
-      if (generation === this.generation) this.update({ phase: 'ready', view })
+      const view = mfaBrowserViewSchema.parse(
+        await (this.flowBinding
+          ? this.adapter.inspect(operationId, this.flowBinding)
+          : this.adapter.inspect(operationId))
+      )
+      if (generation === this.generation) {
+        this.retainFlowBinding(view)
+        this.update({ phase: 'ready', view })
+      }
     } catch (error) {
       if (generation === this.generation) this.fail(error, false)
     }
   }
-  async command(input: Omit<MfaBrowserCommand, 'operationId'>) {
+  async command(input: Omit<MfaBrowserCommand, 'operationId' | 'flowBinding'>) {
     if (this.state.phase !== 'ready') return
     const generation = ++this.generation
     const operationId = crypto.randomUUID()
     this.update({ ...this.state, phase: 'submitting', operationId, error: undefined })
     try {
       const result = mfaBrowserResultSchema.parse(
-        await this.adapter.command({ ...input, operationId })
+        await this.adapter.command({
+          ...input,
+          operationId,
+          ...(this.flowBinding ? { flowBinding: this.flowBinding } : {}),
+        })
       )
       if (generation !== this.generation) return
+      this.retainFlowBinding(result.view)
       this.secrets = { enrollment: result.enrollment, backupCodes: result.backupCodes }
       this.update({ phase: 'ready', view: result.view })
     } catch (error) {
       if (generation === this.generation) this.fail(error, true)
     }
+  }
+  private retainFlowBinding(view: MfaBrowserView) {
+    if (view.kind === 'settings') this.sessionIntent = view.contextSession
+    const binding = 'flowBinding' in view ? view.flowBinding : undefined
+    if (this.flowBinding && this.flowBinding !== binding) throw new ApiRequestError(401, undefined)
+    if (binding) this.flowBinding = binding
   }
   private fail(error: unknown, mutation: boolean) {
     const status = getErrorStatus(error)

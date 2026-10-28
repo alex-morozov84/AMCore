@@ -101,6 +101,7 @@ model User {
   // Relations
   mfaAccount              MfaAccount?
   mfaFactor               MfaFactor?
+  mfaRecoveryTicket       MfaRecoveryTicket?
   mfaRecoveryCodes        MfaRecoveryCode[]
   authFamilies            AuthSessionFamily[]
   mfaFlows                MfaFlow[]

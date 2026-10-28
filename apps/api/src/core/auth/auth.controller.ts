@@ -20,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-fastify'
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiConsumes,
   ApiCookieAuth,
   ApiHeader,
@@ -35,21 +36,24 @@ import type { Request, Response } from 'express'
 import type { FastifyReply } from 'fastify'
 
 import {
-  type AuthResponse,
   AuthType,
   type AvatarResponse,
   coerceSupportedLocale,
   type MessageResponse,
   PAGINATION,
+  type PasswordLoginPending,
+  type PasswordLoginResponse,
   type ProfileResponse,
   type RefreshResponse,
   type RequestPrincipal,
   type SessionsListResponse,
+  type StepUpResponse,
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
-import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
+import { ApiProtectionUnavailable, AppException } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
+import { SchemaResponses } from '../../common/schemas/schema-responses.js'
 import {
   resolveSessionIpAddress,
   resolveVerifiedVisitorIp,
@@ -58,6 +62,7 @@ import { EnvService } from '../../env/env.service.js'
 import type { User } from '../../generated/prisma/client.js'
 import { AVATAR_VALIDATION, FileValidationPipe } from '../../infrastructure/storage/index.js'
 import { RATE_LIMIT_POLICIES, RateLimit } from '../../infrastructure/throttling/index.js'
+import { browserSessionContext } from '../frontend-context/browser-session-context.service.js'
 import { ApiFrontendContext } from '../frontend-context/frontend-context.openapi.js'
 import { browserFrontendContext } from '../frontend-context/frontend-context.service.js'
 import { invitationHandoffProof } from '../invitations/invitation-auth-handoff.js'
@@ -67,11 +72,12 @@ import { AvatarService, type AvatarUploadFile } from './avatar.service.js'
 import { Auth } from './decorators/auth.decorator.js'
 import { CurrentUser } from './decorators/current-user.decorator.js'
 import {
-  AuthResponseDto,
   AvatarResponseDto,
   ForgotPasswordDto,
   LoginDto,
   MessageResponseDto,
+  PasswordLoginPendingDto,
+  PasswordLoginResponseDto,
   ProfileResponseDto,
   RefreshResponseDto,
   RegisterDto,
@@ -79,12 +85,16 @@ import {
   ResetPasswordDto,
   SignupPolicyResponseDto,
   StepUpDto,
+  StepUpPendingDto,
   UpdateProfileDto,
   VerifyEmailDto,
 } from './dto/index.js'
 import { SessionsListResponseDto } from './dto/sessions-list-response.dto.js'
 import { OriginCheckGuard, RefreshTokenGuard } from './guards/index.js'
 import { negotiateLocale } from './locale-negotiation.js'
+import { ApiRegistrationPublication } from './mfa/mfa-registration.openapi.js'
+import { registrationBrowserIntent } from './mfa/mfa-registration-publication.js'
+import { PasswordLoginService } from './password-login.service.js'
 import { SessionService } from './session.service.js'
 import { TokenService } from './token.service.js'
 
@@ -105,7 +115,8 @@ export class AuthController {
     private readonly avatarService: AvatarService,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
-    private readonly env: EnvService
+    private readonly env: EnvService,
+    private readonly passwordLogin: PasswordLoginService
   ) {}
 
   private cookieOptions(res: Response | FastifyReply): {
@@ -136,6 +147,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @ApiRegistrationPublication()
   @Auth(AuthType.None)
   @ApiHeader({ name: 'X-Invitation-Auth-Attempt-Id', required: false })
   @ApiHeader({ name: 'X-Invitation-Handoff-Key', required: false })
@@ -146,13 +158,18 @@ export class AuthController {
     description:
       'The user, its first session and its email-verification token are created in one database transaction; if it fails, its writes roll back. After the commit the response can still be lost: sign in or reset the password instead of submitting again. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS. The welcome email is queued best-effort without resend; the verification email is sent directly and can be resent.',
   })
-  @SchemaResponse({ type: AuthResponseDto, status: 201, description: 'User registered' })
+  @SchemaResponse({
+    type: PasswordLoginResponseDto,
+    status: 201,
+    description: 'User registered; browser credentials await exact publication',
+  })
   async register(
     @Body({ schema: RegisterDto.schema }) dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
-  ): Promise<AuthResponse> {
+  ): Promise<PasswordLoginResponse> {
     const result = await this.authService.register(dto, {
+      registrationBrowser: registrationBrowserIntent(req),
       frontend: browserFrontendContext(req),
       userAgent: req.headers['user-agent'],
       ipAddress: resolveSessionIpAddress(req, this.env),
@@ -172,6 +189,7 @@ export class AuthController {
     return {
       user: result.user,
       accessToken: result.accessToken,
+      ...(result.publication ? { publication: result.publication } : {}),
     }
   }
 
@@ -187,7 +205,18 @@ export class AuthController {
   @ApiOperation({
     summary: 'Login user; optional scoped invitation handoff requires explicit confirmation',
   })
-  @SchemaResponse({ type: AuthResponseDto, status: 200, description: 'Login successful' })
+  @SchemaResponses(
+    {
+      type: PasswordLoginResponseDto,
+      status: 200,
+      description: 'Credentials issued; browser publication must still settle before use',
+    },
+    {
+      type: PasswordLoginPendingDto,
+      status: 202,
+      description: 'Restricted MFA continuation; no access or refresh credential',
+    }
+  )
   @ApiTooManyRequestsResponse({
     description: 'Password attempt limit reached; Retry-After is 900 or 86400 seconds',
   })
@@ -199,28 +228,42 @@ export class AuthController {
     @Body({ schema: LoginDto.schema }) dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
-  ): Promise<AuthResponse> {
-    const result = await this.authService.login(dto, {
+  ): Promise<PasswordLoginResponse | PasswordLoginPending> {
+    const handoff = invitationHandoffProof(
+      req.headers['x-invitation-auth-attempt-id'],
+      req.headers['x-invitation-handoff-key']
+    )
+    const invitationCredential = req.headers['x-invitation-continuation']
+    if (handoff ? typeof invitationCredential !== 'string' : invitationCredential !== undefined)
+      throw new AppException('Invalid invitation login scope', 401, 'AUTH_HANDOFF_INVALID')
+    const browser = browserSessionContext(req)
+    if (browser && !browser.binding)
+      throw new AppException(
+        'Browser bootstrap required before sign-in',
+        401,
+        'AUTH_CONTEXT_CHANGED'
+      )
+    const result = await this.passwordLogin.begin(dto, {
+      ...(handoff && typeof invitationCredential === 'string'
+        ? {
+            invited: {
+              handoff,
+              credential: invitationCredential,
+              frontend: browserFrontendContext(req),
+            },
+          }
+        : {}),
       userAgent: req.headers['user-agent'],
-      ipAddress:
-        resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
-      sessionIpAddress: resolveSessionIpAddress(req, this.env),
-      handoff: invitationHandoffProof(
-        req.headers['x-invitation-auth-attempt-id'],
-        req.headers['x-invitation-handoff-key']
-      ),
-      invitationCredential:
-        typeof req.headers['x-invitation-continuation'] === 'string'
-          ? req.headers['x-invitation-continuation']
-          : undefined,
+      source: resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
+      ipAddress: resolveSessionIpAddress(req, this.env),
+      frame: browser ? { kind: 'browser', binding: browser.binding! } : { kind: 'direct' },
     })
-
-    res.cookie('refresh_token', result.refreshToken, this.cookieOptions(res))
-
-    return {
-      user: result.user,
-      accessToken: result.accessToken,
+    if (result.kind === 'pending') {
+      res.status(202)
+      return result.body
     }
+    res.cookie('refresh_token', result.refreshToken, this.cookieOptions(res))
+    return result.body
   }
 
   @Post('logout')
@@ -230,10 +273,22 @@ export class AuthController {
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Logout user' })
   @ApiNoContentResponse({ description: 'Logged out' })
+  @ApiConflictResponse({
+    description:
+      'SESSION_CHANGED: browser generation or selected family changed; no fallback logout',
+  })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     const refreshToken = req.cookies?.refresh_token
-
-    if (refreshToken) {
+    const transport = browserSessionContext(req)
+    const browser = transport?.binding
+    if (transport && !browser)
+      throw new AppException('Browser context required', 401, 'AUTH_CONTEXT_CHANGED')
+    if (browser) {
+      await this.sessionService.logoutBrowser(
+        browser,
+        refreshToken ? this.tokenService.hashRefreshToken(refreshToken) : undefined
+      )
+    } else if (refreshToken) {
       const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
       await this.authService.logout(hashedToken)
     }
@@ -247,6 +302,9 @@ export class AuthController {
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Refresh access token' })
   @SchemaResponse({ type: RefreshResponseDto, status: 200, description: 'Access token refreshed' })
+  @ApiConflictResponse({
+    description: 'SESSION_CHANGED: current family, account version or browser binding changed',
+  })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
@@ -257,22 +315,22 @@ export class AuthController {
     }
 
     // Rotate refresh token; the new session id becomes the access token `sid`.
-    const { refreshToken: newRefreshToken, sessionId } =
-      await this.sessionService.rotateRefreshToken(refreshTokenHash, {
+    const {
+      refreshToken: newRefreshToken,
+      accessClaims,
+      accessToken: issuedAccessToken,
+    } = await this.sessionService.rotateRefreshToken(
+      refreshTokenHash,
+      {
         userId: user.id,
         userAgent: req.headers['user-agent'],
         ipAddress: resolveSessionIpAddress(req, this.env),
-      })
+      },
+      browserSessionContext(req)?.binding ?? null
+    )
 
-    // Generate new access token with current system role (org context not preserved — use /switch).
-    // `sid` points at the rotated session, which carried `lastAuthAt` forward
-    // (refresh preserves step-up freshness but never renews it — OB-06b).
-    const accessToken = this.tokenService.generateAccessToken({
-      sub: user.id,
-      email: user.email,
-      systemRole: user.systemRole,
-      sid: sessionId,
-    })
+    // Issuance uses the current owner/family read under the rotation locks, never the earlier guard snapshot.
+    const accessToken = issuedAccessToken ?? this.tokenService.generateAccessToken(accessClaims)
 
     res.cookie('refresh_token', newRefreshToken, this.cookieOptions(res))
 
@@ -373,7 +431,21 @@ export class AuthController {
   @Auth(AuthType.Bearer)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Re-verify password to refresh step-up freshness' })
-  @SchemaResponse({ type: RefreshResponseDto, status: 200, description: 'Step-up token issued' })
+  @SchemaResponses(
+    {
+      type: RefreshResponseDto,
+      status: 200,
+      description: 'Same-family step-up token issued; all required proofs are fresh',
+    },
+    {
+      type: StepUpPendingDto,
+      status: 202,
+      description: 'Password verified; listed proofs are still required. No credentials issued',
+    }
+  )
+  @ApiConflictResponse({
+    description: 'SESSION_CHANGED: original family, account version or browser binding changed',
+  })
   @ApiTooManyRequestsResponse({
     description: 'Password attempt limit reached; Retry-After is 900 or 86400 seconds',
   })
@@ -384,13 +456,16 @@ export class AuthController {
   async stepUp(
     @CurrentUser() principal: RequestPrincipal,
     @Body({ schema: StepUpDto.schema }) dto: StepUpDto,
-    @Req() req: Request
-  ): Promise<RefreshResponse> {
-    return this.authService.stepUp(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<StepUpResponse> {
+    const result = await this.authService.stepUp(
       principal,
       dto.password,
       resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? ''
     )
+    if ('kind' in result) res.status(HttpStatus.ACCEPTED)
+    return result
   }
 
   // Session-management routes are bearer-only — API keys must not be able to
@@ -462,6 +537,10 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke all sessions except current' })
   @ApiNoContentResponse({ description: 'Other sessions revoked' })
+  @ApiConflictResponse({
+    description:
+      'SESSION_CHANGED: the retained refresh family is no longer current or belongs to another user',
+  })
   async revokeOtherSessions(
     @CurrentUser('sub') userId: string,
     @Req() req: Request
@@ -471,7 +550,11 @@ export class AuthController {
     if (!refreshToken) return
 
     const currentHash = this.tokenService.hashRefreshToken(refreshToken)
-    await this.sessionService.deleteOtherSessions(userId, currentHash)
+    await this.sessionService.deleteOtherSessions(
+      userId,
+      currentHash,
+      browserSessionContext(req)?.binding ?? null
+    )
   }
 
   @Post('forgot-password')

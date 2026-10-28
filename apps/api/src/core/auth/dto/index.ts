@@ -8,12 +8,15 @@ import {
   oauthExchangeRequestSchema,
   oauthExchangeResponseSchema,
   oauthProvidersResponseSchema,
+  passwordLoginPendingSchema,
+  passwordLoginResponseSchema,
   profileResponseSchema,
   refreshResponseSchema,
   registerSchema,
   resendVerificationSchema,
   resetPasswordSchema,
   signupPolicyResponseSchema,
+  stepUpPendingSchema,
   stepUpSchema,
   updateProfileSchema,
   verifyEmailSchema,
@@ -37,7 +40,10 @@ export class StepUpDto extends createSchemaDto(stepUpSchema) {}
 // `@SchemaResponse` to keep run-time serialization, the TS return type, and the
 // OpenAPI schema in sync.
 export class AuthResponseDto extends createSchemaDto(authResponseSchema) {}
+export class PasswordLoginResponseDto extends createSchemaDto(passwordLoginResponseSchema) {}
+export class PasswordLoginPendingDto extends createSchemaDto(passwordLoginPendingSchema) {}
 export class RefreshResponseDto extends createSchemaDto(refreshResponseSchema) {}
+export class StepUpPendingDto extends createSchemaDto(stepUpPendingSchema) {}
 export class ProfileResponseDto extends createSchemaDto(profileResponseSchema) {}
 export class AvatarResponseDto extends createSchemaDto(avatarResponseSchema) {}
 export class MessageResponseDto extends createSchemaDto(messageResponseSchema) {}

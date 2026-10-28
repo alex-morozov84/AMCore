@@ -20,7 +20,11 @@ export function dropLocalePushOption(model, ctx) {
   )
   const push = findUniqueNode(
     model,
-    (node) => ts.isCallExpression(node) && node.expression.getText() === 'router.push',
+    (node) =>
+      ts.isCallExpression(node) &&
+      node.expression.getText() === 'router.push' &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      node.arguments[0].text === '/',
     { ...ctx, describe: 'ordinary authentication locale navigation' },
     callback
   )
@@ -135,7 +139,10 @@ export function dropAdminLoginLocale(model, ctx) {
   const fn = uniqueFunction(model, 'ProductAdminLoginForm', ctx)
   const replace = findUniqueNode(
     model,
-    (node) => ts.isCallExpression(node) && node.expression.getText() === 'router.replace',
+    (node) =>
+      ts.isCallExpression(node) &&
+      node.expression.getText() === 'router.replace' &&
+      node.arguments[0]?.getText() === 'destination',
     ctx,
     fn
   )

@@ -47,6 +47,13 @@ describe('AiConversationAccessAuthorizer', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
+    prisma.user.findUnique.mockResolvedValue({
+      id: operatorPrincipal.sub,
+      systemRole: SystemRole.SuperAdmin,
+      mfaAccount: null,
+      mfaFactor: null,
+    } as never)
+    prisma.mfaProtocol.findUnique.mockResolvedValue({ state: 'prepared', version: 1 } as never)
     const env = { get: jest.fn(() => STEP_UP_WINDOW) } as unknown as EnvService
     authorizer = new AiConversationAccessAuthorizer(prisma, env)
   })
@@ -63,6 +70,14 @@ describe('AiConversationAccessAuthorizer', () => {
     await expect(authorizer.authorize(ownerPrincipal, 'conv-1', undefined)).rejects.toThrow(
       NotFoundException
     )
+  })
+
+  it('does not grant cross-user support access to an API key carrying a legacy operator role', async () => {
+    prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'someone-else' } as never)
+    await expect(
+      authorizer.authorize({ ...operatorPrincipal, type: 'api_key' }, 'conv-1', 'TICKET-1')
+    ).rejects.toThrow(NotFoundException)
+    expect(prisma.session.findUnique).not.toHaveBeenCalled()
   })
 
   it('authorizes the owner with no step-up and no reason (isCrossUser=false)', async () => {

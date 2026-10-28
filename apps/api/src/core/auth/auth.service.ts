@@ -6,9 +6,10 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type {
   InvitedRegisterInput,
-  LoginInput,
+  LoginPublication,
   RegisterInput,
   RequestPrincipal,
+  StepUpResponse,
   SupportedLocale,
   UpdateProfileInput,
   UserResponse,
@@ -23,11 +24,10 @@ import {
 
 import { AppException } from '../../common/exceptions/index.js'
 import { EnvService } from '../../env/env.service.js'
-import { AuditActorType, AuditTargetType, type User } from '../../generated/prisma/client.js'
+import type { User } from '../../generated/prisma/client.js'
 import { EmailService } from '../../infrastructure/email/index.js'
 import { StorageService } from '../../infrastructure/storage/index.js'
 import { PrismaService } from '../../prisma/index.js'
-import { AuditLogService } from '../audit/index.js'
 import {
   type BrowserFrontendContext,
   resolveFrontendPlacement,
@@ -43,7 +43,6 @@ import {
   invalidInvitation,
   invitationClock,
   lockInvitationSignupEmail,
-  lockInvitationUser,
 } from '../invitations/invitation-locks.js'
 import { NotificationsService } from '../notifications/notifications.service.js'
 import { isCanonicalEmailConflict } from '../organizations/establishment-error.js'
@@ -54,7 +53,14 @@ import { avatarUrlOf } from './avatar-url.js'
 import { EmailIdentityService } from './email-identity.service.js'
 import { LoginRateLimiterService } from './login-rate-limiter.service.js'
 import { advanceAccountSecurity } from './mfa/mfa-invalidation.js'
+import { captureInvitationLogin } from './mfa/mfa-invitation-intent.js'
+import {
+  lockRegistrationBrowser,
+  type RegistrationBrowserIntent,
+  writeRegistrationPublication,
+} from './mfa/mfa-registration-publication.js'
 import { lockMfaAccounts } from './mfa/mfa-transaction.js'
+import { PasswordStepUpService } from './password-step-up.service.js'
 import { prepareRegistrationMail, type RegistrationMail } from './registration-mail.js'
 import { SessionService } from './session.service.js'
 import { TokenService } from './token.service.js'
@@ -78,15 +84,18 @@ interface CommittedRegistration {
   accessToken: string
   refreshToken: string
   mail: RegistrationMail
+  publication?: LoginPublication
 }
 
 export interface AuthResult {
+  publication?: LoginPublication
   user: UserResponse
   accessToken: string
   refreshToken: string
 }
 
 export interface RequestInfo {
+  registrationBrowser?: RegistrationBrowserIntent
   frontend?: BrowserFrontendContext
   handoff?: InvitationHandoffProof
   invitationCredential?: string
@@ -98,10 +107,6 @@ export interface RequestInfo {
    * fallback when the body carries no explicit `locale`.
    */
   acceptedLocale?: SupportedLocale
-}
-
-interface LoginRequestInfo extends RequestInfo {
-  sessionIpAddress: string | undefined
 }
 
 @Injectable()
@@ -116,12 +121,12 @@ export class AuthService {
     private readonly userCacheService: UserCacheService,
     private readonly env: EnvService,
     private readonly emailIdentity: EmailIdentityService,
-    private readonly auditLog: AuditLogService,
     private readonly loginRateLimiter: LoginRateLimiterService,
     private readonly notifications: NotificationsService,
     private readonly logger: PinoLogger,
     private readonly invitation: InvitationContinuationService,
-    private readonly storage: StorageService
+    private readonly storage: StorageService,
+    private readonly passwordStepUp: PasswordStepUpService
   ) {
     this.logger.setContext(AuthService.name)
   }
@@ -165,28 +170,51 @@ export class AuthService {
     // must never be overridden by the header (MDN Accept-Language guidance).
     const locale = input.locale ?? requestInfo.acceptedLocale
 
+    const registrationUserId = randomUUID()
     // User, session and verification token commit together; if the transaction fails, its writes
     // roll back. Hashing above and mail below stay outside it; nothing inside waits on Redis, a
     // provider or another HTTP call.
     const created = await this.prisma
       .$transaction(
         async (tx) => {
+          const locked = await lockRegistrationBrowser(
+            tx,
+            requestInfo.registrationBrowser,
+            registrationUserId
+          )
           const user = await tx.user.create({
             data: {
+              ...(requestInfo.registrationBrowser ? { id: registrationUserId } : {}),
               email,
               emailCanonical,
               passwordHash,
               name: input.name,
               ...(locale ? { locale } : {}),
-              lastLoginAt: new Date(),
+              lastLoginAt: requestInfo.registrationBrowser ? null : new Date(),
             },
           })
           // Create the session first so the access token can carry its id as `sid`
           // (OB-06b / ADR-037 step-up freshness).
-          const { session, refreshToken } = await this.sessionService.createSession(
-            { userId: user.id, userAgent: requestInfo.userAgent, ipAddress: requestInfo.ipAddress },
-            tx
-          )
+          const coordinated =
+            locked && requestInfo.registrationBrowser
+              ? await writeRegistrationPublication(tx, this.tokenService, {
+                  user,
+                  locked,
+                  intent: requestInfo.registrationBrowser,
+                  userAgent: requestInfo.userAgent,
+                  ipAddress: requestInfo.ipAddress,
+                })
+              : undefined
+          const legacy = coordinated
+            ? undefined
+            : await this.sessionService.createSession(
+                {
+                  userId: user.id,
+                  userAgent: requestInfo.userAgent,
+                  ipAddress: requestInfo.ipAddress,
+                },
+                tx
+              )
           const verification = await this.tokenManager.generateEmailVerificationToken(
             user.id,
             requestInfo.frontend,
@@ -194,10 +222,11 @@ export class AuthService {
           )
           return this.finishRegistration(
             user,
-            session.id,
-            refreshToken,
+            coordinated ? coordinated.sessionId : legacy!.session.id,
+            coordinated?.refreshToken ?? legacy!.refreshToken,
             verification.token,
-            requestInfo
+            requestInfo,
+            coordinated
           )
         },
         { maxWait: 2000, timeout: 4000 }
@@ -208,6 +237,7 @@ export class AuthService {
       user: this.mapUserToResponse(created.user),
       accessToken: created.accessToken,
       refreshToken: created.refreshToken,
+      ...(created.publication ? { publication: created.publication } : {}),
     }
   }
 
@@ -217,16 +247,25 @@ export class AuthService {
     sessionId: string,
     refreshToken: string,
     verificationToken: string,
-    requestInfo: RequestInfo
+    requestInfo: RequestInfo,
+    coordinated?: { accessToken: string; publication: LoginPublication }
   ): CommittedRegistration {
-    const accessToken = this.tokenService.generateAccessToken({
-      sub: user.id,
-      email: user.email,
-      systemRole: user.systemRole,
-      sid: sessionId,
-    })
+    const accessToken =
+      coordinated?.accessToken ??
+      this.tokenService.generateAccessToken({
+        sub: user.id,
+        email: user.email,
+        systemRole: user.systemRole,
+        sid: sessionId,
+      })
     const mail = prepareRegistrationMail(this.env, user, verificationToken, requestInfo.frontend)
-    return { user, accessToken, refreshToken, mail }
+    return {
+      user,
+      accessToken,
+      refreshToken,
+      mail,
+      ...(coordinated ? { publication: coordinated.publication } : {}),
+    }
   }
 
   /** Scoped signup never accepts an editable email or creates organization access. */
@@ -237,11 +276,17 @@ export class AuthService {
   ): Promise<AuthResult> {
     // Password work stays outside the bounded, generation-checked transaction.
     const passwordHash = await argon2.hash(input.password)
+    const registrationUserId = randomUUID()
     const created = await this.prisma
       .$transaction(
         async (tx) => {
           await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
           if (requestInfo.handoff) await lockInvitationAuthAttempt(tx, requestInfo.handoff)
+          const locked = await lockRegistrationBrowser(
+            tx,
+            requestInfo.registrationBrowser,
+            registrationUserId
+          )
           const hint = await invitationCredentialHint(tx, { continuation: credential })
           assertTokenFrontend(hint.invite, requestInfo.frontend)
           await lockInvitationSignupEmail(tx, hint.invite.emailCanonical)
@@ -257,23 +302,46 @@ export class AuthService {
           const locale = input.locale ?? requestInfo.acceptedLocale
           const user = await tx.user.create({
             data: {
+              ...(requestInfo.registrationBrowser ? { id: registrationUserId } : {}),
               email: invite.email,
               emailCanonical: invite.emailCanonical,
               passwordHash,
               name: input.name,
               ...(locale ? { locale } : {}),
-              lastLoginAt: new Date(),
+              lastLoginAt: requestInfo.registrationBrowser ? null : new Date(),
             },
           })
-          const session = await this.sessionService.createSession(
-            {
-              userId: user.id,
-              userAgent: requestInfo.userAgent,
-              ipAddress: requestInfo.ipAddress,
-              handoff: requestInfo.handoff,
-            },
-            tx
-          )
+          if (locked && !requestInfo.handoff) throw invalidInvitation()
+          const intent =
+            locked && requestInfo.handoff
+              ? await captureInvitationLogin(
+                  tx,
+                  { credential, handoff: requestInfo.handoff, frontend: requestInfo.frontend },
+                  user.emailCanonical
+                )
+              : undefined
+          const coordinated =
+            locked && requestInfo.registrationBrowser
+              ? await writeRegistrationPublication(tx, this.tokenService, {
+                  user,
+                  locked,
+                  intent: requestInfo.registrationBrowser,
+                  invitation: intent,
+                  userAgent: requestInfo.userAgent,
+                  ipAddress: requestInfo.ipAddress,
+                })
+              : undefined
+          const session = coordinated
+            ? undefined
+            : await this.sessionService.createSession(
+                {
+                  userId: user.id,
+                  userAgent: requestInfo.userAgent,
+                  ipAddress: requestInfo.ipAddress,
+                  handoff: requestInfo.handoff,
+                },
+                tx
+              )
           // Token issuance sets `lock_timeout` to 1000ms for waits after this point; the
           // transaction timeout still bounds everything. Keep the expiry check LAST so no
           // wait added above can move past expiry after the check.
@@ -284,10 +352,11 @@ export class AuthService {
           )
           const finished = this.finishRegistration(
             user,
-            session.session.id,
-            session.refreshToken,
+            coordinated ? coordinated.sessionId : session!.session.id,
+            coordinated?.refreshToken ?? session!.refreshToken,
             verification.token,
-            requestInfo
+            requestInfo,
+            coordinated
           )
           if (expiresAt <= (await invitationClock(tx))) throw invalidInvitation()
           return finished
@@ -300,6 +369,7 @@ export class AuthService {
       user: this.mapUserToResponse(created.user),
       accessToken: created.accessToken,
       refreshToken: created.refreshToken,
+      ...(created.publication ? { publication: created.publication } : {}),
     }
   }
 
@@ -318,229 +388,15 @@ export class AuthService {
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to send verification email'))
   }
 
-  /** Login user */
-  async login(input: LoginInput, requestInfo: LoginRequestInfo): Promise<AuthResult> {
-    const ip = requestInfo.ipAddress ?? ''
-    const emailCanonical = this.emailIdentity.canonicalize(input.email)
-
-    // Check brute-force limits before hitting DB
-    await this.loginRateLimiter.check(emailCanonical, ip)
-
-    // Find user
-    const user = await this.prisma.user.findUnique({
-      where: { emailCanonical },
-    })
-
-    if (!user || !user.passwordHash) {
-      await this.loginRateLimiter.consume(emailCanonical, ip)
-      throw new AppException(
-        'Invalid email or password',
-        HttpStatus.UNAUTHORIZED,
-        AuthErrorCode.INVALID_CREDENTIALS
-      )
-    }
-
-    // Verify password
-    const valid = await argon2.verify(user.passwordHash, input.password)
-    if (!valid) {
-      await this.loginRateLimiter.consume(emailCanonical, ip)
-      throw new AppException(
-        'Invalid email or password',
-        HttpStatus.UNAUTHORIZED,
-        AuthErrorCode.INVALID_CREDENTIALS
-      )
-    }
-
-    // Reset rate limit counters on successful login
-    await this.loginRateLimiter.reset(emailCanonical, ip)
-
-    // Update last login
-    if (!requestInfo.handoff)
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() },
-      })
-
-    // Create the session first so the access token can carry its id as `sid`
-    // (OB-06b / ADR-037 step-up freshness).
-    const params = {
-      userId: user.id,
-      userAgent: requestInfo.userAgent,
-      ipAddress: requestInfo.sessionIpAddress,
-      handoff: requestInfo.handoff,
-    }
-    const { session, refreshToken } = requestInfo.handoff
-      ? await this.prisma.$transaction(
-          async (tx) => {
-            await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
-            await lockInvitationAuthAttempt(tx, requestInfo.handoff!)
-            await lockInvitationUser(tx, user.id, true)
-            const { invite } = await this.invitation.lockValid(tx, {
-              continuation: requestInfo.invitationCredential ?? '',
-            })
-            if (invite.emailCanonical !== user.emailCanonical)
-              throw new AppException('Invitation account mismatch', 400, 'INVITE_ACCOUNT_MISMATCH')
-            const result = await this.sessionService.createSession(params, tx)
-            await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
-            return result
-          },
-          { maxWait: 2000, timeout: 4000 }
-        )
-      : await this.sessionService.createSession(params)
-
-    const accessToken = this.tokenService.generateAccessToken({
-      sub: user.id,
-      email: user.email,
-      systemRole: user.systemRole,
-      sid: session.id,
-    })
-
-    this.logger.info({ userId: user.id }, 'User logged in successfully')
-
-    return {
-      user: this.mapUserToResponse(user),
-      accessToken,
-      refreshToken,
-    }
-  }
-
   /** Logout (invalidate refresh token) */
   async logout(refreshTokenHash: string): Promise<void> {
     await this.sessionService.deleteByRefreshToken(refreshTokenHash)
     this.logger.info('User logged out successfully')
   }
 
-  /**
-   * Step-up re-authentication (OB-06b / ADR-037).
-   *
-   * Verifies the caller's password and refreshes ONLY the current session's
-   * recent-auth window (`Session.lastAuthAt`). It never creates a session or
-   * rotates the refresh token. Returns a fresh access token carrying the same
-   * `sid`. All "must re-login" outcomes use `403 STEP_UP_REQUIRED`; a wrong
-   * password is `401 INVALID_CREDENTIALS`; a password-less (OAuth-only) account
-   * is `403 STEP_UP_METHOD_UNAVAILABLE`. Shares the login brute-force limiter
-   * (per canonical email + IP), so the controller threads `req.ip`.
-   */
-  async stepUp(
-    principal: RequestPrincipal,
-    password: string,
-    ip: string
-  ): Promise<{ accessToken: string }> {
-    const sid = principal.sid
-    if (!sid) {
-      await this.recordStepUp(principal.sub, sid, 'auth.step_up_failed', 'no_session')
-      // Legacy token without a session id — cannot identify the session to bump.
-      throw this.stepUpRequired()
-    }
-
-    // Prove the session is live BEFORE any password work, so a stolen but
-    // already-revoked/expired access token cannot be used as a password oracle.
-    // This precedes the password-less check too: a no-session OAuth-only token
-    // gets STEP_UP_REQUIRED, not STEP_UP_METHOD_UNAVAILABLE.
-    const live = await this.sessionService.hasLiveSession(sid, principal.sub)
-    if (!live) {
-      await this.recordStepUp(principal.sub, sid, 'auth.step_up_failed', 'no_session')
-      this.logger.warn(
-        { event: 'auth.step_up.failed', userId: principal.sub, reason: 'no_session' },
-        'Step-up failed: current session not live'
-      )
-      throw this.stepUpRequired()
-    }
-
-    const user = await this.prisma.user.findUnique({ where: { id: principal.sub } })
-    if (!user) {
-      await this.recordStepUp(principal.sub, sid, 'auth.step_up_failed', 'no_session')
-      throw this.stepUpRequired()
-    }
-
-    // OAuth-only accounts have no password; factor-based step-up is future MFA.
-    if (!user.passwordHash) {
-      await this.recordStepUp(user.id, sid, 'auth.step_up_failed', 'method_unavailable')
-      this.logger.warn(
-        { event: 'auth.step_up.failed', userId: user.id, reason: 'method_unavailable' },
-        'Step-up unavailable: account has no password'
-      )
-      throw new AppException(
-        'Password step-up is not available for this account',
-        HttpStatus.FORBIDDEN,
-        AuthErrorCode.STEP_UP_METHOD_UNAVAILABLE
-      )
-    }
-
-    // Reuse the login brute-force limiter so step-up is not a password oracle.
-    await this.loginRateLimiter.check(user.emailCanonical, ip)
-
-    const valid = await argon2.verify(user.passwordHash, password)
-    if (!valid) {
-      await this.loginRateLimiter.consume(user.emailCanonical, ip)
-      await this.recordStepUp(user.id, sid, 'auth.step_up_failed', 'invalid_password')
-      this.logger.warn(
-        { event: 'auth.step_up.failed', userId: user.id, reason: 'invalid_password' },
-        'Step-up failed: invalid password'
-      )
-      throw new AppException(
-        'Invalid password',
-        HttpStatus.UNAUTHORIZED,
-        AuthErrorCode.INVALID_CREDENTIALS
-      )
-    }
-
-    await this.loginRateLimiter.reset(user.emailCanonical, ip)
-
-    // Bump only the current live session. count 0 → session gone (revoked by a
-    // Stage 1 role change, logged out, expired) → must re-login.
-    const touched = await this.sessionService.touchLastAuth(sid, user.id)
-    if (touched === 0) {
-      await this.recordStepUp(user.id, sid, 'auth.step_up_failed', 'no_session')
-      this.logger.warn(
-        { event: 'auth.step_up.failed', userId: user.id, reason: 'no_session' },
-        'Step-up failed: current session not found'
-      )
-      throw this.stepUpRequired()
-    }
-
-    const accessToken = this.tokenService.generateAccessToken({
-      sub: user.id,
-      email: user.email,
-      systemRole: user.systemRole,
-      sid,
-    })
-
-    await this.recordStepUp(user.id, sid, 'auth.step_up_succeeded')
-
-    this.logger.info(
-      { event: 'auth.step_up.succeeded', userId: user.id, sessionId: sid },
-      'Step-up succeeded'
-    )
-
-    return { accessToken }
-  }
-
-  private stepUpRequired(): AppException {
-    return new AppException(
-      'Step-up authentication required',
-      HttpStatus.FORBIDDEN,
-      AuthErrorCode.STEP_UP_REQUIRED
-    )
-  }
-
-  private async recordStepUp(
-    actorId: string,
-    sessionId: string | undefined,
-    action: 'auth.step_up_failed' | 'auth.step_up_succeeded',
-    reason?: string
-  ): Promise<void> {
-    await this.auditLog.record({
-      action,
-      actorId,
-      actorType: AuditActorType.USER,
-      metadata:
-        action === 'auth.step_up_failed'
-          ? { pinoEvent: 'auth.step_up.failed', reason }
-          : { pinoEvent: 'auth.step_up.succeeded', sessionId },
-      targetId: sessionId ?? null,
-      targetType: AuditTargetType.SESSION,
-    })
+  /** Password entry can refresh only primary evidence of the same admitted session family. */
+  async stepUp(principal: RequestPrincipal, password: string, ip: string): Promise<StepUpResponse> {
+    return this.passwordStepUp.verify(principal, password, ip)
   }
 
   /** Get user by ID */
@@ -677,7 +533,7 @@ export class AuthService {
       { maxWait: 2000, timeout: 4000 }
     )
 
-    await this.sessionService.deleteAllByUserId(userId)
+    await this.sessionService.deleteRevokedByUserId(userId)
     await this.userCacheService.invalidateUser(userId)
 
     // Security alert via the durable notifications subsystem (ADR-052): in-app + email,

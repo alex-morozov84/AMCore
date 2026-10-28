@@ -16,7 +16,7 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
     store.seed('s1', makeEntry({ accessTokenExpiresAt: Date.now() - 1000 }))
     const lock = new QueuedFakeLock()
     const upstreamRefresh = vi.fn(freshRefresh)
-    const deps = { store, lock, upstreamRefresh }
+    const deps = { store, lock, verifyBinding: async () => undefined, upstreamRefresh }
 
     const [first, second] = await Promise.all([
       ensureFreshSession('s1', deps),
@@ -52,6 +52,7 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
     const result = await ensureFreshSession('s1', {
       store,
       lock: new SimpleLock(),
+      verifyBinding: async () => undefined,
       upstreamRefresh,
     })
 
@@ -73,7 +74,12 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
           )
       )
 
-      const firstPending = ensureFreshSession('s1', { store, lock, upstreamRefresh })
+      const firstPending = ensureFreshSession('s1', {
+        store,
+        lock,
+        verifyBinding: async () => undefined,
+        upstreamRefresh,
+      })
 
       // Past the original 10s lock TTL — only still blocked if renewal
       // (every 4s) actually extended the lease.
@@ -82,6 +88,7 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
       const secondAttempt = ensureFreshSession('s1', {
         store,
         lock,
+        verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(freshRefresh),
       })
       await expect(secondAttempt).rejects.toBeInstanceOf(SessionLockTimeoutError)

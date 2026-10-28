@@ -91,7 +91,8 @@ export class OwnKeyOrganizationsService {
         ])
         return (
           Boolean(member.memberId) &&
-          ((actor.systemRole === SystemRole.SuperAdmin &&
+          ((actor.type === 'jwt' &&
+            actor.systemRole === SystemRole.SuperAdmin &&
             user.systemRole === SystemRole.SuperAdmin) ||
             hasFullTeamAccess(
               normalizeOwnerPermissions(member.permissions, {

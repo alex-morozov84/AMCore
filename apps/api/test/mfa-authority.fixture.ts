@@ -30,8 +30,9 @@ export function authorityReader(db: PrismaClient): MfaAuthorityReader {
 
 /** Isolated Testcontainers state only; no deployment activation command is invoked. */
 export async function createAuthorityAccount(
-  fixture: MfaProofFixture,
-  protectedAccount = true
+  fixture: Pick<MfaProofFixture, 'clients' | 'codec'>,
+  protectedAccount = true,
+  email = 'authority.fixture@example.test'
 ): Promise<{
   user: User
   family: AuthSessionFamily
@@ -45,8 +46,8 @@ export async function createAuthorityAccount(
   const expiresAt = new Date(now.getTime() + 3_600_000)
   const user = await db.user.create({
     data: {
-      email: 'authority.fixture@example.test',
-      emailCanonical: 'authority.fixture@example.test',
+      email,
+      emailCanonical: email,
       passwordHash: 'original-fixture-hash',
       systemRole: protectedAccount ? SystemRole.SuperAdmin : SystemRole.User,
     },

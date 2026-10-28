@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { productAdminReturnPath } from '@amcore/shared'
@@ -7,13 +9,17 @@ import {
   localizedFrontendUrl,
   type OAuthExchangeResponse,
 } from '@amcore/shared'
+import { frontendAuthPath, parseProductAdminReturn } from '@amcore/shared'
 
 import { revokeBackendSession } from './backend-session-revocation'
+import { readBrowserAuthAttempt } from './browser-auth-attempt'
+import { handleBrowserOAuth } from './browser-login-handler'
 import { assertOrdinaryOAuthAllowed, retireFlowsForOrdinaryAuth } from './invitation-auth-lifecycle'
 import { publishInvitedOAuth } from './invitation-oauth-exchange'
 import { recoverPublishedInvitedOAuth } from './invitation-oauth-recovery'
 import { invitationCanonicalOrigin } from './invitation-render-request'
 import { invitationPagePath } from './invitation-surface'
+import { inspectPendingMfa } from './mfa-pending-handler'
 import { mintSession } from './mint-session'
 import type { OAuthCompletionInput } from './oauth-completion-input'
 import type { ProductWebContext } from './product-web-context.server'
@@ -57,8 +63,83 @@ export async function handleOAuthExchange(
   }
   const refreshToken = (await cookies()).get(refreshCookie)?.value
 
-  if (!ticket || !refreshToken) {
+  if (!ticket) {
     return failureRedirect(request, locale, undefined, context)
+  }
+
+  const pending = await readBrowserAuthAttempt(request.headers, context)
+  if (pending && 'oauthTicketHash' in pending.record) {
+    if (pending.record.oauthTicketHash !== createHash('sha256').update(ticket).digest('hex'))
+      return failureRedirect(request, locale, undefined, context)
+    if (pending.record.state === 'published' || pending.record.state === 'staged') {
+      try {
+        const probe = new URL(request.url)
+        probe.search = new URLSearchParams({ operationId: pending.record.completionId }).toString()
+        const source = new Headers(request.headers)
+        source.set('x-amcore-mfa-flow', pending.record.id)
+        const recovered = await inspectPendingMfa(new Request(probe, { headers: source }), context)
+        if (!recovered.cookies.get(context.cookieName))
+          return failureRedirect(request, locale, undefined, context)
+        const target = pending.record.flow.returnTo
+        const response = NextResponse.redirect(
+          localizedFrontendUrl(
+            context.origin,
+            target?.locale ?? coerceSupportedLocale(locale),
+            pending.record.invitation
+              ? invitationPagePath(`invite/flow/${pending.record.invitation.flowId}`, context)
+              : target
+                ? productAdminReturnPath(target)
+                : context.entryPath
+          ),
+          303
+        )
+        for (const cookie of recovered.cookies.getAll()) response.cookies.set(cookie)
+        clearTransientCookie(response, context)
+        response.headers.set('cache-control', 'private, no-store')
+        response.headers.set('referrer-policy', 'no-referrer')
+        response.headers.set('x-robots-tag', 'noindex, nofollow')
+        return response
+      } catch (error) {
+        return failureRedirect(request, locale, error, context)
+      }
+    }
+    return failureRedirect(request, locale, undefined, context)
+  }
+  if (!refreshToken) return failureRedirect(request, locale, undefined, context)
+  if (pending?.record.state === 'ready') {
+    try {
+      const completed = await handleBrowserOAuth(request, context, ticket, refreshToken)
+      const result = (await completed.json()) as { kind?: string; flowBinding?: string }
+      const returnTo = parseProductAdminReturn(
+        completed.headers.get('x-amcore-oauth-return') ?? undefined
+      )
+      const target =
+        completed.status === 202
+          ? localizedFrontendUrl(
+              context.origin,
+              coerceSupportedLocale(locale),
+              frontendAuthPath(context.frontend, '/mfa'),
+              { flow: result.flowBinding! }
+            )
+          : localizedFrontendUrl(
+              context.origin,
+              returnTo?.locale ?? coerceSupportedLocale(locale),
+              pending.record.invitation
+                ? invitationPagePath(`invite/flow/${pending.record.invitation.flowId}`, context)
+                : returnTo
+                  ? productAdminReturnPath(returnTo)
+                  : context.entryPath
+            )
+      const response = NextResponse.redirect(target, 303)
+      for (const cookie of completed.cookies.getAll()) response.cookies.set(cookie)
+      clearTransientCookie(response, context)
+      response.headers.set('cache-control', 'private, no-store')
+      response.headers.set('referrer-policy', 'no-referrer')
+      response.headers.set('x-robots-tag', 'noindex, nofollow')
+      return response
+    } catch (error) {
+      return failureRedirect(request, locale, error, context)
+    }
   }
 
   let exchange: OAuthExchangeResponse

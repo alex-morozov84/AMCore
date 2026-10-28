@@ -5,7 +5,11 @@ import { AuthErrorCode, type RequestPrincipal } from '@amcore/shared'
 import { AppException } from '../../common/exceptions/domain/app.exception.js'
 import type { Prisma } from '../../generated/prisma/client.js'
 
-/** The 403 STEP_UP_REQUIRED an unfresh privileged action raises (client → `POST /auth/step-up`). */
+import type { MfaAuthorityDatabase } from './mfa/mfa-authority-reader.service.js'
+import { refreshSessionChanged } from './mfa/mfa-refresh-authority.js'
+import { assertMfaSensitiveAdmission } from './mfa/mfa-sensitive-admission.js'
+
+/** A stale proof requests step-up; changed family/browser authority terminates the action instead. */
 function stepUpRequired(): AppException {
   return new AppException(
     'Step-up authentication required',
@@ -15,26 +19,33 @@ function stepUpRequired(): AppException {
 }
 
 /**
- * Assert the caller's session was (re)authenticated within `windowSec` (ADR-037 step-up). This is the
- * **single source** of the freshness rule, shared by `FreshAuthGuard` (static `@RequireFreshAuth`
- * routes) and the imperative **cross-user** checks (Arc F operator actions, where step-up is required
- * only when a SUPER_ADMIN acts on a conversation they do not own). Fail-closed everywhere with 403
- * `STEP_UP_REQUIRED`: missing sid/principal (legacy token), missing/revoked/expired session, owner
- * mismatch, or NULL/stale `lastAuthAt`. The session is read ONLY when invoked, so ordinary traffic
- * pays nothing; 403 (not 401) so a generic 401→refresh client can't loop — it branches on the code.
+ * Shared static-route and imperative sensitive-action admission. Protected accounts require the
+ * current family plus independently fresh password and second-factor proofs. Ordinary accounts and
+ * untouched prepared legacy deployments retain lastAuthAt. Imperative mutations supply their locked
+ * transaction for final admission; this helper never acquires locks in a different order.
  */
 export async function assertSessionFresh(
-  prisma: Pick<Prisma.TransactionClient, 'session'>,
+  prisma: Pick<Prisma.TransactionClient, 'session'> & MfaAuthorityDatabase,
   windowSec: number,
   principal: RequestPrincipal | undefined,
   clock?: Date
 ): Promise<void> {
-  const sid = principal?.sid
-  if (!sid || !principal) throw stepUpRequired()
+  if (!principal || principal.type !== 'jwt' || !Number.isFinite(windowSec) || windowSec <= 0)
+    throw stepUpRequired()
+  const sid = principal.sid
+  const bound = principal.fid !== undefined || principal.browserBound !== undefined
+  if (!sid) throw bound ? refreshSessionChanged() : stepUpRequired()
+
+  // Signed fid selects stable authority. Rotated/deleted historical token rows do not select it.
+  if (bound) {
+    if (!(await assertMfaSensitiveAdmission(prisma, principal, windowSec)))
+      throw refreshSessionChanged()
+    return
+  }
 
   const session = await prisma.session.findUnique({
     where: { id: sid },
-    select: { lastAuthAt: true, revokedAt: true, expiresAt: true, userId: true },
+    select: { lastAuthAt: true, revokedAt: true, expiresAt: true, userId: true, familyId: true },
   })
 
   const now = clock?.getTime() ?? Date.now()
@@ -42,10 +53,15 @@ export async function assertSessionFresh(
     !session ||
     session.revokedAt !== null ||
     session.expiresAt.getTime() <= now ||
-    session.userId !== principal.sub ||
-    session.lastAuthAt === null ||
-    now - session.lastAuthAt.getTime() > windowSec * 1000
+    session.userId !== principal.sub
   ) {
-    throw stepUpRequired()
+    throw bound ? refreshSessionChanged() : stepUpRequired()
   }
+  if (await assertMfaSensitiveAdmission(prisma, principal, windowSec)) return
+  if (
+    session.lastAuthAt === null ||
+    session.lastAuthAt.getTime() > now ||
+    now - session.lastAuthAt.getTime() > windowSec * 1000
+  )
+    throw stepUpRequired()
 }

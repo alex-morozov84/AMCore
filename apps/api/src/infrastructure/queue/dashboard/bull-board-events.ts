@@ -11,7 +11,12 @@ export type BoardEvent =
   | {
       readonly event: 'bull_board.access_denied'
       readonly reason:
-        'unauthenticated' | 'forbidden' | 'api_key' | 'invalid_context' | 'unavailable'
+        | 'unauthenticated'
+        | 'forbidden'
+        | 'api_key'
+        | 'session_changed'
+        | 'invalid_context'
+        | 'unavailable'
     }
   | { readonly event: 'bull_board.entry_render_failed' }
 

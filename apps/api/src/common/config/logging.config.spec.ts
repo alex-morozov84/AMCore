@@ -106,6 +106,8 @@ describe('createLoggingConfig', () => {
           headers: {
             'x-invitation-continuation': 'fake-scope-secret',
             'x-invitation-handoff-key': 'fake-cleanup-secret',
+            'x-amcore-browser-context-key': 'fake-browser-key-secret',
+            'x-amcore-browser-binding': 'fake-browser-binding-secret',
           },
         },
         res: {
@@ -124,9 +126,36 @@ describe('createLoggingConfig', () => {
       'fake-ticket-secret',
       'fake-exchange-secret',
       'fake-body-secret',
+      'fake-browser-key-secret',
+      'fake-browser-binding-secret',
     ])
       expect(output).not.toContain(value)
     expect(output).toContain('[REDACTED]')
+  })
+
+  it('redacts entire MFA/publication bodies before validation, including unexpected secrets', () => {
+    const config = createLoggingConfig(clsServiceMock, 4096)
+    const { serializers } = config.pinoHttp as {
+      serializers: { req: (value: unknown) => { body: unknown; query: unknown; url: string } }
+    }
+    for (const url of [
+      '/auth/mfa/verify?unexpected=fake-query-secret',
+      '/auth/browser-publications/invitations/attempt/confirm?binding=fake-query-secret',
+    ]) {
+      const serialized = serializers.req({
+        id: 'mfa-request',
+        method: 'POST',
+        url,
+        query: { unexpected: 'fake-query-secret' },
+        params: {},
+        headers: {},
+        socket: {},
+        body: { extra: { seed: 'fake-private-seed' } },
+      })
+      expect(serialized.body).toBe('[REDACTED]')
+      expect(serialized.query).toBe('[REDACTED]')
+      expect(serialized.url).not.toContain('fake-query-secret')
+    }
   })
 
   it('redacts token-bearing action URLs in actual log output (EQS-02)', () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import type { UseFormSetError } from 'react-hook-form'
-import type { LoginInput } from '@amcore/shared'
+import type { LoginInput, MfaBrowserSignInPending } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
@@ -12,7 +12,7 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
 
 export function useLogin(
   setError?: UseFormSetError<LoginInput>,
-  adapter?: CredentialFormAdapter<LoginInput>
+  adapter?: CredentialFormAdapter<LoginInput, MfaBrowserSignInPending>
 ) {
   const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
@@ -28,6 +28,12 @@ export function useLogin(
     setError: guardedSetError,
     onSuccess: (response) => {
       if (adapter && !adapter.isCurrent()) return
+      if ('kind' in response) {
+        queryClient.clear()
+        if (adapter?.onMfaRequired) return adapter.onMfaRequired(response.flowBinding)
+        router.push(`/mfa?flow=${encodeURIComponent(response.flowBinding)}`)
+        return
+      }
       // Publish confirmed authentication into the server-state cache.
       queryClient.setQueryData(userKeys.me(), response)
       if (adapter) return adapter.onSuccess(response)

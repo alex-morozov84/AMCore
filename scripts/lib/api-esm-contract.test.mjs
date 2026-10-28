@@ -14,7 +14,7 @@ test('ESM package uses maintained Nest/SWC and strict native-before-emit sequenc
   assert.equal(api.scripts.dev, 'nest start --watch')
   assert.equal(
     api.scripts.build,
-    'pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs'
+    'pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs && node ../../scripts/write-mfa-artifact.mjs api-worker'
   )
   const cli = json('apps/api/nest-cli.json').compilerOptions
   assert.equal(cli.builder.type, 'swc')
@@ -30,9 +30,14 @@ test('ESM package uses maintained Nest/SWC and strict native-before-emit sequenc
 test('build cache and Docker include the native check while preserving test inputs', () => {
   const tasks = json('turbo.json').tasks
   assert.ok(tasks.build.inputs.includes('$TURBO_DEFAULT$'))
-  for (const file of ['scripts/typecheck-native.mjs', 'packages/typescript-config/**']) {
+  for (const file of [
+    'scripts/typecheck-native.mjs',
+    'scripts/write-mfa-artifact.mjs',
+    'packages/typescript-config/**',
+  ]) {
     assert.ok(tasks.build.inputs.includes('$TURBO_ROOT$/' + file))
   }
+  assert.ok(tasks.build.env.includes('BUILD_SOURCE_COMMIT'))
   assert.ok(tasks.test.inputs.includes('$TURBO_ROOT$/scripts/typecheck-native.mjs'))
   assert.match(
     read('apps/api/Dockerfile'),

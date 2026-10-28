@@ -28,6 +28,11 @@ export class MfaProofFixture {
   readonly first = new MfaProofRepository(this.codec)
   readonly second = new MfaProofRepository(this.codec)
 
+  get connectionUri(): string {
+    if (!this.container) throw new Error('Owned MFA fixture has not started')
+    return this.container.getConnectionUri()
+  }
+
   async start(): Promise<void> {
     this.container = await new PostgreSqlContainer('postgres:18-alpine')
       .withLabels(e2eContainerLabels())

@@ -56,6 +56,7 @@ const sharedModules = [
     'console-step-up-mutation.test.tsx',
   ]),
   module('apps/web/src/shared/ui/console-step-up-dialog.tsx'),
+  module('apps/web/src/shared/ui/console-step-up-proof.tsx'),
   module('apps/web/src/shared/lib/format-console-date-time.ts'),
   module('apps/web/src/shared/lib/require-super-admin.ts', ['require-super-admin.test.ts']),
 ]
@@ -153,6 +154,9 @@ export const operationsConsoleFacts = {
   sharedModuleTests: [
     ...sharedModuleTests,
     ...sharedApiModuleTests,
+    one('apps/web/src/shared/ui/console-step-up-dialog.stories.tsx', {
+      module: 'apps/web/src/shared/ui/console-step-up-dialog.tsx',
+    }),
     one('apps/web/src/shared/ui/console-step-up-dialog.test.tsx', {
       module: 'apps/web/src/shared/ui/console-step-up-dialog.tsx',
     }),

@@ -296,6 +296,8 @@ describe('OAuth (e2e)', () => {
         .set('Cookie', OAUTH_STATE_COOKIE)
         .expect(302)
 
+      expect(await prisma.session.count()).toBe(0)
+      expect(await prisma.authSessionFamily.count()).toBe(0)
       const ticket = extractTicket(callbackRes.headers.location)
       const refreshCookie = extractRefreshCookie(callbackRes.headers['set-cookie'])
 
@@ -307,6 +309,11 @@ describe('OAuth (e2e)', () => {
 
       expect(exchangeRes.body.accessToken).toEqual(expect.any(String))
       expect(exchangeRes.body.accessToken.split('.')).toHaveLength(3)
+      expect(await prisma.authSessionFamily.count()).toBe(1)
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${exchangeRes.body.accessToken}`)
+        .expect(200)
     })
 
     it('should reject replay of the same ticket', async () => {

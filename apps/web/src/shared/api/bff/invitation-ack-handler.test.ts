@@ -154,7 +154,10 @@ describe('explicit invited sign-in acknowledgment', () => {
     const body = await response.json()
     expect(body).toEqual({
       binding: current.snapshot.flow.binding,
-      data: { user: current.snapshot.session.entry.userSnapshot },
+      data: {
+        user: current.snapshot.session.entry.userSnapshot,
+        contextSession: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
       handoff: { attemptId: current.attemptId },
     })
     expect(JSON.stringify(body)).not.toContain(current.snapshot.flow.handoff!.cleanupKey)

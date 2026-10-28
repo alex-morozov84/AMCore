@@ -21,11 +21,18 @@ const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
 function request(method = 'PATCH'): Request {
   const host = mutableConfig.mode === 'host' ? 'console.example.test' : 'app.example.test'
-  return new Request(`https://${host}/api/console/users/u1/role`, { method, headers: { host } })
+  return new Request(`https://${host}/api/console/users/u1/role`, {
+    method,
+    headers: {
+      host,
+      cookie: `amcore_browser_context=${'a'.repeat(43)}; __Host-amcore_console_context=${'b'.repeat(43)}`,
+    },
+  })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
   vi.stubEnv('FRONTEND_URL', 'https://app.example.test')
   vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
   vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
@@ -57,21 +64,47 @@ describe('isConsoleRequestOriginTrusted', () => {
 describe('resolveConsoleAccessToken', () => {
   it('host mode: returns the token from the isolated console vault', async () => {
     mutableConfig.mode = 'host'
-    vi.mocked(getConsoleSessionEntry).mockResolvedValue({ accessToken: 'tok-1' } as never)
+    vi.mocked(getConsoleSessionEntry).mockResolvedValue({
+      accessToken: 'tok-1',
+      audience: 'console',
+      browser: {
+        audience: 'console',
+        contextId: 'ctx',
+        generation: 1,
+        familyId: 'family',
+        securityVersion: 0,
+      },
+    } as never)
 
     const result = await resolveConsoleAccessToken(request())
 
-    expect(result).toEqual({ token: 'tok-1' })
+    expect(result).toMatchObject({
+      token: 'tok-1',
+      bindingHeaders: { 'x-amcore-browser-audience': 'console' },
+    })
     expect(getOptionalSessionEntry).not.toHaveBeenCalled()
   })
 
   it('path mode: returns the token from the product session', async () => {
     mutableConfig.mode = 'path'
-    vi.mocked(getOptionalSessionEntry).mockResolvedValue({ accessToken: 'tok-2' } as never)
+    vi.mocked(getOptionalSessionEntry).mockResolvedValue({
+      accessToken: 'tok-2',
+      audience: 'product',
+      browser: {
+        audience: 'product',
+        contextId: 'ctx',
+        generation: 1,
+        familyId: 'family',
+        securityVersion: 0,
+      },
+    } as never)
 
     const result = await resolveConsoleAccessToken(request())
 
-    expect(result).toEqual({ token: 'tok-2' })
+    expect(result).toMatchObject({
+      token: 'tok-2',
+      bindingHeaders: { 'x-amcore-browser-audience': 'product' },
+    })
     expect(getConsoleSessionEntry).not.toHaveBeenCalled()
   })
 

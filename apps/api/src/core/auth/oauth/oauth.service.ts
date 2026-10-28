@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
-import { randomBytes, timingSafeEqual } from 'crypto'
+import { randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { ProductAdminReturn } from '@amcore/shared'
@@ -23,19 +23,30 @@ import {
   lockInvitationAuthAttempt,
 } from '../../invitations/invitation-auth-handoff.js'
 import { InvitationContinuationService } from '../../invitations/invitation-continuation.service.js'
+import { invitationSecretHash } from '../../invitations/invitation-credential.js'
 import {
   invalidInvitation,
-  invitationClock,
   lockInvitationSignupEmail,
   lockInvitationUser,
 } from '../../invitations/invitation-locks.js'
 import { avatarUrlOf } from '../avatar-url.js'
 import { EmailIdentityService } from '../email-identity.service.js'
+import { accountRequiresMfa } from '../mfa/mfa-account-policy.js'
+import {
+  type StoredInvitationIntent,
+  storedInvitationIntentSchema,
+  validateInvitationIntent,
+} from '../mfa/mfa-invitation-intent.js'
+import { type OAuthIdentitySnapshot } from '../mfa/mfa-login-start.service.js'
+import { lockMfaAccounts, mfaDatabaseClock } from '../mfa/mfa-transaction.js'
+import type { PasswordStepUpSource } from '../password-step-up-authority.js'
 import { SessionService } from '../session.service.js'
 import type { AccessTokenPayload } from '../token.service.js'
 import { UserCacheService } from '../user-cache.service.js'
 
 import { OAuthAvatarRehostService } from './oauth-avatar-rehost.service.js'
+import type { OAuthLinkAuthority } from './oauth-link-authority.js'
+import { authorizeOAuthLink, oauthLinkAuthoritySchema } from './oauth-link-authority.js'
 import { generateOAuthStateNonce, hashOAuthStateNonce } from './oauth-nonce.js'
 import { type OAuthInvitationState, OAuthStateService } from './oauth-state.service.js'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
@@ -50,12 +61,21 @@ interface LoginCallbackResult {
   accessClaims: AccessTokenPayload
 }
 
+interface IdentityCallbackResult {
+  mode: 'login_identity'
+  browserAttemptId?: string
+  user: UserResponse
+  identity: OAuthIdentitySnapshot
+  invitationIntent?: StoredInvitationIntent
+  returnTo?: ProductAdminReturn
+}
+
 interface LinkCallbackResult {
   mode: 'link'
   user: UserResponse
 }
 
-type CallbackResult = LoginCallbackResult | LinkCallbackResult
+type CallbackResult = LoginCallbackResult | IdentityCallbackResult | LinkCallbackResult
 
 interface RequestInfo {
   userAgent?: string
@@ -66,7 +86,7 @@ interface RequestInfo {
 export class OAuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly sessionService: SessionService,
+    _sessionService: SessionService,
     private readonly userCacheService: UserCacheService,
     private readonly providerFactory: OAuthProviderFactory,
     private readonly stateService: OAuthStateService,
@@ -85,7 +105,8 @@ export class OAuthService {
     locale?: SupportedLocale,
     invited?: { credential: string; attemptId: string; handoff: InvitationHandoffProof },
     frontend?: BrowserFrontendContext,
-    returnTo?: ProductAdminReturn
+    returnTo?: ProductAdminReturn,
+    browserAttemptId?: string
   ): Promise<{ url: string; browserNonce: string }> {
     const provider = this.providerFactory.get(providerName, frontend?.frontend ?? 'site')
     const state = randomBytes(32).toString('base64url')
@@ -106,6 +127,18 @@ export class OAuthService {
           })
           assertTokenFrontend(invite, frontend)
           return {
+            intent: {
+              attemptId: invited.attemptId,
+              cleanupKeyHash: invited.handoff.cleanupKeyHash,
+              credentialHash: invitationSecretHash(invited.credential),
+              inviteId: invite.id,
+              organizationId: invite.organizationId,
+              generation: invite.generation,
+              recipient: invite.emailCanonical,
+              expiresAt: new Date(
+                Math.min(expiresAt.getTime(), invite.expiresAt.getTime())
+              ).toISOString(),
+            },
             correlation: {
               attemptId: invited.attemptId,
               provider: providerName as 'google' | 'github' | 'apple',
@@ -123,6 +156,7 @@ export class OAuthService {
       provider: providerName,
       codeVerifier,
       mode: 'login',
+      ...(browserAttemptId ? { browserAttemptId } : {}),
       pkceMethod: 'S256',
       ...(frontend
         ? {
@@ -143,7 +177,8 @@ export class OAuthService {
   async getLinkAuthorizationURL(
     providerName: string,
     userId: string,
-    frontend?: BrowserFrontendContext
+    frontend?: BrowserFrontendContext,
+    source?: PasswordStepUpSource
   ): Promise<{ url: string; browserNonce: string }> {
     const provider = this.providerFactory.get(providerName, frontend?.frontend ?? 'site')
     const state = randomBytes(32).toString('base64url')
@@ -154,6 +189,13 @@ export class OAuthService {
       provider: providerName,
       codeVerifier,
       mode: 'link',
+      ...(await this.prisma.$transaction(
+        async (tx) => {
+          const linkSource = await authorizeOAuthLink(tx, userId, source)
+          return linkSource ? { linkSource } : {}
+        },
+        { maxWait: 2000, timeout: 4000 }
+      )),
       pkceMethod: 'S256',
       ...(frontend
         ? {
@@ -221,7 +263,14 @@ export class OAuthService {
     }
 
     if (stateData.mode === 'link') {
-      const user = await this.attachProviderToUser(stateData.userId!, profile, providerName)
+      const user = await this.attachProviderToUser(
+        stateData.userId!,
+        profile,
+        providerName,
+        stateData.linkSource === undefined
+          ? undefined
+          : oauthLinkAuthoritySchema.parse(stateData.linkSource)
+      )
       this.logger.info({ userId: stateData.userId, provider: providerName }, 'oauth link')
       return { mode: 'link', user: this.mapUserToResponse(user) }
     }
@@ -236,7 +285,7 @@ export class OAuthService {
 
     if (stateData.invitation && !profile.emailVerified) throw invalidInvitation()
 
-    const { user, accountCreated, session, refreshToken } = await this.prisma.$transaction(
+    const login = await this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
         const emailCanonical = this.emailIdentity.canonicalize(profile.email!)
@@ -257,7 +306,10 @@ export class OAuthService {
         const existingUser = account
           ? { id: account.userId }
           : await tx.user.findUnique({ where: { emailCanonical }, select: { id: true } })
-        if (existingUser) await lockInvitationUser(tx, existingUser.id, true)
+        if (existingUser) {
+          await lockMfaAccounts(tx, [existingUser.id])
+          await lockInvitationUser(tx, existingUser.id, true)
+        }
         if (stateData.invitation) {
           const invite = await this.invitationAuthority.lockOAuthIntent(
             tx,
@@ -265,6 +317,29 @@ export class OAuthService {
             stateData.invitation.expiresAt
           )
           if (invite.emailCanonical !== emailCanonical) throw invalidInvitation()
+        }
+        if (existingUser && !account) {
+          const current = await tx.user.findUniqueOrThrow({
+            where: { id: existingUser.id },
+            select: {
+              systemRole: true,
+              mfaAccount: true,
+              mfaFactor: { select: { version: true } },
+            },
+          })
+          if (
+            accountRequiresMfa({
+              systemRole: current.systemRole,
+              required: current.mfaAccount?.required ?? false,
+              emergencyRequired: current.mfaAccount?.emergencyRequired ?? false,
+              factorVersion: current.mfaFactor?.version ?? null,
+            })
+          )
+            throw new AppException(
+              'Link this provider from the authenticated security settings',
+              403,
+              AuthErrorCode.STEP_UP_REQUIRED
+            )
         }
         const { user, accountCreated } = await this.findOrCreateUser(
           tx,
@@ -277,37 +352,52 @@ export class OAuthService {
         )
         if (stateData.invitation && user.emailCanonical !== emailCanonical)
           throw invalidInvitation()
-        const issuance = await this.sessionService.createSession(
-          {
-            userId: user.id,
-            userAgent: requestInfo.userAgent,
-            ipAddress: requestInfo.ipAddress,
-            ...(stateData.invitation
-              ? {
-                  handoff: {
-                    attemptId: stateData.invitation.correlation.attemptId,
-                    cleanupKeyHash: stateData.invitation.cleanupKeyHash,
-                  },
-                }
-              : {}),
-          },
-          tx
-        )
-        if (
-          stateData.invitation &&
-          new Date(stateData.invitation.expiresAt) <= (await invitationClock(tx))
-        )
-          throw invalidInvitation()
-        return { user, accountCreated, ...issuance }
+        let invitationIntent: StoredInvitationIntent | undefined
+        if (stateData.invitation) {
+          const intent = storedInvitationIntentSchema.safeParse(stateData.invitation.intent)
+          if (
+            !intent.success ||
+            intent.data.attemptId !== stateData.invitation.correlation.attemptId ||
+            intent.data.inviteId !== stateData.invitation.correlation.expectedInviteId ||
+            intent.data.generation !== stateData.invitation.correlation.expectedGeneration ||
+            intent.data.cleanupKeyHash !== stateData.invitation.cleanupKeyHash ||
+            Date.parse(intent.data.expiresAt) > Date.parse(stateData.invitation.expiresAt)
+          )
+            throw invalidInvitation()
+          await validateInvitationIntent(tx, intent.data, user.emailCanonical)
+          invitationIntent = intent.data
+        }
+        {
+          const assurance = await tx.mfaAccount.findUnique({ where: { userId: user.id } })
+          const factor = await tx.mfaFactor.findUnique({
+            where: { userId: user.id },
+            select: { version: true },
+          })
+          return {
+            user,
+            accountCreated,
+            invitationIntent,
+            identity: {
+              userId: user.id,
+              emailCanonical: user.emailCanonical,
+              systemRole: user.systemRole,
+              securityVersion: assurance?.securityVersion ?? 0,
+              protectedAccount: accountRequiresMfa({
+                systemRole: user.systemRole,
+                required: assurance?.required ?? false,
+                emergencyRequired: assurance?.emergencyRequired ?? false,
+                factorVersion: factor?.version ?? null,
+              }),
+              verifiedAt: (await mfaDatabaseClock(tx)).toISOString(),
+              eventId: randomUUID(),
+            } satisfies OAuthIdentitySnapshot,
+          }
+        }
       },
       { maxWait: 2000, timeout: 4000 }
     )
+    const { user, accountCreated } = login
     await this.userCacheService.invalidateUser(user.id)
-    const accessClaims: AccessTokenPayload = {
-      sub: user.id,
-      email: user.email,
-      systemRole: user.systemRole,
-    }
 
     this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
     // Copied once, when this sign-in created the account or linked this provider for the first time.
@@ -315,17 +405,16 @@ export class OAuthService {
     if (accountCreated && !user.avatarKey && profile.avatarSourceUrl)
       this.avatarRehost.schedule(user.id, profile.avatarSourceUrl)
 
-    return {
-      mode: 'login',
-      ...(stateData.returnTo ? { returnTo: stateData.returnTo } : {}),
-      user: this.mapUserToResponse(user),
-      refreshToken,
-      sessionId: session.id,
-      accessClaims,
-      ...(stateData.invitation
-        ? { invitation: { ...stateData.invitation.correlation, backendSessionId: session.id } }
-        : {}),
-    }
+    if ('identity' in login && login.identity)
+      return {
+        mode: 'login_identity',
+        ...(stateData.browserAttemptId ? { browserAttemptId: stateData.browserAttemptId } : {}),
+        user: this.mapUserToResponse(user),
+        identity: login.identity,
+        ...(login.invitationIntent ? { invitationIntent: login.invitationIntent } : {}),
+        ...(stateData.returnTo ? { returnTo: stateData.returnTo } : {}),
+      }
+    throw invalidInvitation()
   }
 
   /**
@@ -351,7 +440,8 @@ export class OAuthService {
   private async attachProviderToUser(
     userId: string,
     profile: OAuthUserProfile,
-    providerName: string
+    providerName: string,
+    source?: OAuthLinkAuthority
   ): Promise<User> {
     const provider = providerName.toUpperCase() as OAuthProvider
 
@@ -366,15 +456,21 @@ export class OAuthService {
       )
     }
 
-    await this.prisma.$transaction([
-      this.prisma.oAuthAccount.create({
-        data: { userId, provider, providerAccountId: profile.providerId },
-      }),
-      this.prisma.user.update({
-        where: { id: userId },
-        data: { ...(profile.phone ? { phone: profile.phone } : {}) },
-      }),
-    ])
+    await this.prisma.$transaction(
+      async (tx) => {
+        await authorizeOAuthLink(tx, userId, source)
+        await tx.oAuthAccount.create({
+          data: { userId, provider, providerAccountId: profile.providerId },
+        })
+        await tx.user.update({
+          where: { id: userId },
+          data: { ...(profile.phone ? { phone: profile.phone } : {}) },
+        })
+        // Reevaluate deadlines/proofs after writes; a failure rolls back the attached provider.
+        await authorizeOAuthLink(tx, userId, source)
+      },
+      { maxWait: 2000, timeout: 4000 }
+    )
 
     await this.userCacheService.invalidateUser(userId)
     return this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
@@ -402,10 +498,6 @@ export class OAuthService {
           409,
           AuthErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED
         )
-      await tx.user.update({
-        where: { id: existing.userId },
-        data: { lastLoginAt: new Date() },
-      })
       return { user: existing.user, accountCreated: false }
     }
 
@@ -425,6 +517,24 @@ export class OAuthService {
           'Identity changed during sign-in',
           409,
           AuthErrorCode.EMAIL_ALREADY_EXISTS
+        )
+      const account = await tx.mfaAccount.findUnique({ where: { userId: userByEmail.id } })
+      const factor = await tx.mfaFactor.findUnique({
+        where: { userId: userByEmail.id },
+        select: { version: true },
+      })
+      if (
+        accountRequiresMfa({
+          systemRole: userByEmail.systemRole,
+          required: account?.required ?? false,
+          emergencyRequired: account?.emergencyRequired ?? false,
+          factorVersion: factor?.version ?? null,
+        })
+      )
+        throw new AppException(
+          'Protected accounts must link providers from a locally confirmed session',
+          403,
+          AuthErrorCode.STEP_UP_REQUIRED
         )
       // Existing account linked by email — keep its stored locale (D2: never
       // overwrite an established preference with a browser hint).
@@ -453,7 +563,7 @@ export class OAuthService {
       }),
       tx.user.update({
         where: { id: existingUser.id },
-        data: { lastLoginAt: new Date(), ...(shouldVerifyEmail && { emailVerified: true }) },
+        data: { ...(shouldVerifyEmail && { emailVerified: true }) },
       }),
     ])
 
@@ -477,7 +587,6 @@ export class OAuthService {
         name: profile.displayName,
         // Seed from the negotiated locale (D2); omit to take the DB default.
         ...(locale ? { locale } : {}),
-        lastLoginAt: new Date(),
         accounts: { create: { provider, providerAccountId: profile.providerId } },
       },
     })

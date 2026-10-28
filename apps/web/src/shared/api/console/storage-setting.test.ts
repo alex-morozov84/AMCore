@@ -20,7 +20,10 @@ const request = (body: unknown = { intervalSeconds: 60, expectedRevision: 0 }) =
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'access-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'access-token',
+    bindingHeaders: {},
+  })
   fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
 })
 describe('fixed storage setting proxy', () => {

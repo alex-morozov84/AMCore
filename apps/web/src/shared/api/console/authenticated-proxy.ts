@@ -1,5 +1,11 @@
+import { createHash } from 'node:crypto'
+
 import { apiErrorResponse } from '@/shared/api/bff/api-error-response'
 import { authFailureResponse } from '@/shared/api/bff/auth-failure-response'
+import {
+  browserSessionHeaders,
+  readBrowserCapability,
+} from '@/shared/api/bff/browser-binding.server'
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { isTrustedOrigin } from '@/shared/api/bff/origin-guard'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
@@ -7,10 +13,13 @@ import { isConsoleHost } from '@/shared/lib/console-host-guard'
 
 import { isTrustedConsoleOrigin } from './origin-guard'
 import { getConsoleSessionEntry } from './session'
+import { CONSOLE_SESSION_COOKIE_NAME } from './session-cookie'
 
 import 'server-only'
 
-export type ConsoleTokenResolution = { token: string } | { failure: Response }
+export type ConsoleTokenResolution =
+  | { token: string; bindingHeaders: Record<string, string>; sourceFingerprint?: string }
+  | { failure: Response }
 
 /**
  * Resolves the operator's current access token the same way every console
@@ -40,7 +49,27 @@ export async function resolveConsoleAccessToken(request: Request): Promise<Conso
         failure: apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' }),
       }
     }
-    return { token: entry.accessToken }
+    return {
+      token: entry.accessToken,
+      sourceFingerprint: createHash('sha256')
+        .update(
+          JSON.stringify([
+            'mfa-source-family-v1',
+            entry.audience,
+            entry.browser,
+            readBrowserCapability(
+              request.headers,
+              ADMIN_CONSOLE_CONFIG.mode === 'host' ? CONSOLE_SESSION_COOKIE_NAME : 'amcore_session'
+            ),
+          ])
+        )
+        .digest('hex'),
+      bindingHeaders: browserSessionHeaders(
+        request.headers,
+        ADMIN_CONSOLE_CONFIG.mode === 'host' ? 'console' : 'product',
+        entry
+      ),
+    }
   } catch (error) {
     return { failure: authFailureResponse(request, error) }
   }

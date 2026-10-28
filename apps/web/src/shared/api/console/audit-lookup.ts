@@ -62,7 +62,7 @@ export async function handleConsoleAuditLookup(request: Request): Promise<Respon
     upstream = await fetchBackendResponse(`${API_URL}${path}?${query}`, request.headers, {
       method: 'GET',
       cache: 'no-store',
-      headers: forwardRequestHeaders(request.headers, resolved.token),
+      headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
     })
   } catch {
     return privateResponse(

@@ -76,8 +76,8 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
 
     it('admits an authorized SUPER_ADMIN cookie and marks the credential', async () => {
       verifyAccess.mockResolvedValue('authorized')
-      await run({ cookie: 'refresh_token=abc123; theme=dark' })
-      expect(verifyAccess).toHaveBeenCalledWith('abc123')
+      const req = await run({ cookie: 'refresh_token=abc123; theme=dark' })
+      expect(verifyAccess).toHaveBeenCalledWith('abc123', req)
       expect(next).toHaveBeenCalledTimes(1)
       expect(res.statusCode).toBe(200)
       expect(end).not.toHaveBeenCalled()
@@ -99,6 +99,8 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
     it.each([
       ['forbidden', 403],
       ['unauthenticated', 401],
+      ['session_changed', 409],
+      ['unavailable', 503],
     ] as const)('returns %s as %i', async (access, code) => {
       verifyAccess.mockResolvedValue(access)
       await run({ cookie: 'refresh_token=abc123' })
@@ -106,10 +108,10 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
       expect(next).not.toHaveBeenCalled()
     })
 
-    it('fails closed (401) if the verifier throws', async () => {
+    it('reports unavailable (503) if the verifier throws', async () => {
       verifyAccess.mockRejectedValue(new Error('redis down'))
       await run({ cookie: 'refresh_token=abc123' })
-      expect(res.statusCode).toBe(401)
+      expect(res.statusCode).toBe(503)
       expect(next).not.toHaveBeenCalled()
       expect(events).toEqual([{ event: 'bull_board.access_denied', reason: 'unavailable' }])
     })
@@ -118,8 +120,11 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
   describe('bearer (Console BFF)', () => {
     it('admits a live SUPER_ADMIN token, records the actor and parses the render context', async () => {
       verify.mockResolvedValue({ kind: 'authorized', userId: 'admin-1' })
-      await run({ authorization: 'Bearer token-1', [BULL_BOARD_CONTEXT_HEADER]: encode(CONTEXT) })
-      expect(verify).toHaveBeenCalledWith('token-1')
+      const req = await run({
+        authorization: 'Bearer token-1',
+        [BULL_BOARD_CONTEXT_HEADER]: encode(CONTEXT),
+      })
+      expect(verify).toHaveBeenCalledWith('token-1', req)
       expect(next).toHaveBeenCalledTimes(1)
       expect(res.locals).toMatchObject({
         boardCredential: 'bearer',
@@ -140,6 +145,7 @@ describe('createBullBoardAuthMiddleware (Bull Board admission — EQS-01)', () =
       [{ kind: 'unauthenticated' }, 401, 'unauthenticated'],
       [{ kind: 'forbidden' }, 403, 'forbidden'],
       [{ kind: 'unavailable' }, 503, 'unavailable'],
+      [{ kind: 'session_changed' }, 409, 'session_changed'],
     ] as const)('maps %j to %i', async (access, code, reason) => {
       verify.mockResolvedValue(access)
       await run({ authorization: 'Bearer token-1' })

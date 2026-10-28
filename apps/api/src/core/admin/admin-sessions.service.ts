@@ -13,10 +13,10 @@ import {
 import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions/index.js'
 import { AuditActorType, AuditTargetType } from '../../generated/prisma/client.js'
 import { GeoIpService } from '../../infrastructure/geoip/geoip.service.js'
-import { acquireXactLock, PrismaService } from '../../prisma/index.js'
+import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
-import { sessionCoordinationLockKey } from '../auth/session-lock-key.js'
 
+import { AdminCommandAdmission } from './admin-command-admission.js'
 import { querySessionPage, type SessionListRow } from './admin-session-query.js'
 
 /**
@@ -37,7 +37,8 @@ export class AdminSessionsService {
     private readonly prisma: PrismaService,
     private readonly geoIp: GeoIpService,
     private readonly auditLog: AuditLogService,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly commandAdmission: AdminCommandAdmission
   ) {
     this.logger.setContext(AdminSessionsService.name)
   }
@@ -87,34 +88,47 @@ export class AdminSessionsService {
   ): Promise<AdminSessionsRevokeResult> {
     this.rejectSelfTarget(targetUserId, actor)
 
-    return this.prisma.$transaction(async (tx) => {
-      await acquireXactLock(tx, sessionCoordinationLockKey(targetUserId))
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.commandAdmission.assert(tx, actor, [targetUserId])
 
-      const existing = await tx.session.findFirst({
-        where: { userId: targetUserId, familyId },
-        select: { id: true },
-      })
-      if (!existing) throw new NotFoundException('Session', familyId)
+        const existing = await tx.session.findFirst({
+          where: { userId: targetUserId, familyId },
+          select: { id: true },
+        })
+        if (!existing) {
+          const family = await tx.authSessionFamily.findUnique({ where: { id: familyId } })
+          if (!family || family.userId !== targetUserId)
+            throw new NotFoundException('Session', familyId)
+        }
 
-      const result = await tx.session.updateMany({
-        where: { userId: targetUserId, familyId, revokedAt: null, expiresAt: { gt: new Date() } },
-        data: { revokedAt: new Date(), revocationReason: 'admin_revoked' },
-      })
+        await tx.authSessionFamily.updateMany({
+          where: { id: familyId, userId: targetUserId, revokedAt: null },
+          data: { revokedAt: new Date(), publicationState: 'retired' },
+        })
 
-      await this.auditLog.record(
-        {
-          action: 'admin.user.session_revoked',
-          actorId: actor.sub,
-          actorType: AuditActorType.USER,
-          metadata: { sessionId: familyId, count: result.count > 0 ? 1 : 0 },
-          targetId: targetUserId,
-          targetType: AuditTargetType.USER,
-        },
-        { tx }
-      )
+        const result = await tx.session.updateMany({
+          where: { userId: targetUserId, familyId, revokedAt: null, expiresAt: { gt: new Date() } },
+          data: { revokedAt: new Date(), revocationReason: 'admin_revoked' },
+        })
 
-      return { affected: result.count > 0 ? 1 : 0 }
-    })
+        await this.auditLog.record(
+          {
+            action: 'admin.user.session_revoked',
+            actorId: actor.sub,
+            actorType: AuditActorType.USER,
+            metadata: { sessionId: familyId, count: result.count > 0 ? 1 : 0 },
+            targetId: targetUserId,
+            targetType: AuditTargetType.USER,
+          },
+          { tx }
+        )
+        await this.commandAdmission.assert(tx, actor, [targetUserId])
+
+        return { affected: result.count > 0 ? 1 : 0 }
+      },
+      { maxWait: 2000, timeout: 4000 }
+    )
   }
 
   /**
@@ -128,50 +142,60 @@ export class AdminSessionsService {
   ): Promise<AdminSessionsRevokeResult> {
     this.rejectSelfTarget(targetUserId, actor)
 
-    return this.prisma.$transaction(async (tx) => {
-      await acquireXactLock(tx, sessionCoordinationLockKey(targetUserId))
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.commandAdmission.assert(tx, actor, [targetUserId])
 
-      const now = new Date()
-      const families = await tx.session.findMany({
-        where: { userId: targetUserId, revokedAt: null, expiresAt: { gt: now } },
-        select: { familyId: true },
-        distinct: ['familyId'],
-      })
-      await tx.session.updateMany({
-        where: {
-          userId: targetUserId,
-          familyId: { in: families.map((row) => row.familyId) },
-          revokedAt: null,
-          expiresAt: { gt: now },
-        },
-        data: { revokedAt: now, revocationReason: 'admin_revoked' },
-      })
-      const count = families.length
+        const now = new Date()
+        // Include issued/pending families even when their original SID has already been cleaned up.
+        // Independent pre-login capabilities are not account-lockout or epoch changes.
+        await tx.authSessionFamily.updateMany({
+          where: { userId: targetUserId, revokedAt: null },
+          data: { revokedAt: now, publicationState: 'retired' },
+        })
+        const families = await tx.session.findMany({
+          where: { userId: targetUserId, revokedAt: null, expiresAt: { gt: now } },
+          select: { familyId: true },
+          distinct: ['familyId'],
+        })
+        await tx.session.updateMany({
+          where: {
+            userId: targetUserId,
+            familyId: { in: families.map((row) => row.familyId) },
+            revokedAt: null,
+            expiresAt: { gt: now },
+          },
+          data: { revokedAt: now, revocationReason: 'admin_revoked' },
+        })
+        const count = families.length
 
-      await this.auditLog.record(
-        {
-          action: 'admin.user.sessions_revoked',
-          actorId: actor.sub,
-          actorType: AuditActorType.USER,
-          metadata: { count: count, reason: 'admin_bulk_revoke' },
-          targetId: targetUserId,
-          targetType: AuditTargetType.USER,
-        },
-        { tx }
-      )
+        await this.auditLog.record(
+          {
+            action: 'admin.user.sessions_revoked',
+            actorId: actor.sub,
+            actorType: AuditActorType.USER,
+            metadata: { count: count, reason: 'admin_bulk_revoke' },
+            targetId: targetUserId,
+            targetType: AuditTargetType.USER,
+          },
+          { tx }
+        )
+        await this.commandAdmission.assert(tx, actor, [targetUserId])
 
-      this.logger.info(
-        {
-          event: 'auth.admin.sessions_revoked',
-          actorUserId: actor.sub,
-          targetUserId,
-          count: count,
-        },
-        'Admin revoked all sessions for target user'
-      )
+        this.logger.info(
+          {
+            event: 'auth.admin.sessions_revoked',
+            actorUserId: actor.sub,
+            targetUserId,
+            count: count,
+          },
+          'Admin revoked all sessions for target user'
+        )
 
-      return { affected: count }
-    })
+        return { affected: count }
+      },
+      { maxWait: 2000, timeout: 4000 }
+    )
   }
 
   private rejectSelfTarget(targetUserId: string, actor: RequestPrincipal): void {

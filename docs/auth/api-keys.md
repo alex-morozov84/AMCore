@@ -22,13 +22,15 @@ Both auth methods use the same `Authorization: Bearer` header — the server tel
 ---
 
 API-key verification reads the owner's system role directly from primary on each
-request. Common privilege admission reuses that result; it does not perform a
-second privileged-role read. Live organization membership and scope intersection
-remain required even for a SUPER_ADMIN owner. Keys cannot use `/switch` or enter
-bearer-only Console/FreshAuth routes. Invitation operations are bearer-only,
-including creation, reissue, revocation and acceptance. A current organization
-membership and full team authority are required for management; see
-[organization invitations](invites.md).
+request and retains it only as request-local audit evidence. Every API key has
+effective system role `USER`, including a key owned by a `SUPER_ADMIN`.
+Keys receive no synthetic platform permission or platform membership bypass.
+Live organization membership, explicit organization permissions and scope
+intersection remain required. Promoting an owner does not enlarge their keys.
+Keys cannot use `/switch` or enter bearer-only Console/FreshAuth routes.
+Invitation operations are bearer-only, including creation, reissue, revocation
+and acceptance. A current organization membership and full team authority are
+required for management; see [organization invitations](invites.md).
 
 ## Scopes
 

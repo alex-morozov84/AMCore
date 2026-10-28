@@ -1,4 +1,4 @@
-import { AMCORE_CLIENT_IP_HEADER, WEB_FRONTEND_HEADERS } from '@amcore/shared'
+import { AMCORE_CLIENT_IP_HEADER, BROWSER_AUTH_HEADERS, WEB_FRONTEND_HEADERS } from '@amcore/shared'
 
 // Re-exported so existing local imports (`./proxy-headers`) keep working;
 // `apps/api`'s throttler guard imports the same shared constant directly
@@ -14,6 +14,10 @@ export { AMCORE_CLIENT_IP_HEADER }
 // web origin (round 2 finding).
 const STRIP_REQUEST_HEADERS = new Set([
   ...Object.values(WEB_FRONTEND_HEADERS),
+  ...Object.values(BROWSER_AUTH_HEADERS),
+  'x-amcore-oauth-attempt',
+  'x-amcore-login-attempt',
+  'x-amcore-mfa-flow',
   'host',
   'connection',
   'cookie',
@@ -77,14 +81,24 @@ const STRIP_RESPONSE_HEADERS = new Set([
 ])
 
 /** Selective proxy headers. The backend transport sets the visitor claim at send time. */
-export function forwardRequestHeaders(source: Headers, accessToken: string): Headers {
+export function forwardRequestHeaders(
+  source: Headers,
+  accessToken: string,
+  bindingHeaders?: Record<string, string>
+): Headers {
   const headers = new Headers()
   for (const [name, value] of source.entries()) {
     const lower = name.toLowerCase()
-    if (STRIP_REQUEST_HEADERS.has(lower) || isSpoofableForwardingHeader(lower)) continue
+    if (
+      STRIP_REQUEST_HEADERS.has(lower) ||
+      lower.startsWith('x-mfa-') ||
+      isSpoofableForwardingHeader(lower)
+    )
+      continue
     headers.set(name, value)
   }
   headers.set('Authorization', `Bearer ${accessToken}`)
+  for (const [name, value] of Object.entries(bindingHeaders ?? {})) headers.set(name, value)
   return headers
 }
 

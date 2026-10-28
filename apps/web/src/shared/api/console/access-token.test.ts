@@ -1,3 +1,4 @@
+vi.mock('next/headers', () => ({ headers: vi.fn(async () => boundHeaders()) }))
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -9,7 +10,7 @@ import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { getConsoleAwareAccessToken, getConsoleAwareUser } from './access-token'
-import { getConsoleAccessToken, getConsoleSessionEntry } from './session'
+import { getConsoleSessionEntry } from './session'
 
 // Mocked wholesale (not just `@/i18n/navigation`) so this test never pulls in
 // `dal.ts`'s own transitive next-intl navigation import - unrelated to what
@@ -24,9 +25,22 @@ vi.mock('./session', () => ({
 }))
 
 const mockedAccessToken = vi.mocked(getOptionalSessionEntry)
-const mockedConsoleAccessToken = vi.mocked(getConsoleAccessToken)
+const mockedConsoleAccessToken = vi.mocked(getConsoleSessionEntry)
 const mockedOptionalSession = vi.mocked(getOptionalSession)
 const mockedConsoleSessionEntry = vi.mocked(getConsoleSessionEntry)
+function boundHeaders() {
+  return new Headers({
+    cookie: `amcore_browser_context=${'a'.repeat(43)}; __Host-amcore_console_context=${'b'.repeat(43)}`,
+  })
+}
+function boundEntry(accessToken: string) {
+  const audience = mutableConfig.mode === 'host' ? 'console' : 'product'
+  return {
+    accessToken,
+    audience,
+    browser: { audience, contextId: 'ctx', generation: 1, familyId: 'family', securityVersion: 0 },
+  } as never
+}
 const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
 
@@ -35,6 +49,7 @@ const fakeUser = { id: 'u1', email: 'u1@example.com' } as unknown as UserRespons
 describe('getConsoleAwareAccessToken', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
   })
 
   afterEach(() => {
@@ -43,17 +58,23 @@ describe('getConsoleAwareAccessToken', () => {
 
   it('uses the product session in path mode', async () => {
     mutableConfig.mode = 'path'
-    mockedAccessToken.mockResolvedValue({ accessToken: 'product-token' } as never)
+    mockedAccessToken.mockResolvedValue(boundEntry('product-token'))
 
-    await expect(getConsoleAwareAccessToken()).resolves.toBe('product-token')
+    await expect(getConsoleAwareAccessToken()).resolves.toMatchObject({
+      accessToken: 'product-token',
+      browserHeaders: { 'x-amcore-browser-audience': 'product' },
+    })
     expect(mockedConsoleAccessToken).not.toHaveBeenCalled()
   })
 
   it('uses the isolated console session in host mode, never the product session', async () => {
     mutableConfig.mode = 'host'
-    mockedConsoleAccessToken.mockResolvedValue('console-token')
+    mockedConsoleAccessToken.mockResolvedValue(boundEntry('console-token'))
 
-    await expect(getConsoleAwareAccessToken()).resolves.toBe('console-token')
+    await expect(getConsoleAwareAccessToken()).resolves.toMatchObject({
+      accessToken: 'console-token',
+      browserHeaders: { 'x-amcore-browser-audience': 'console' },
+    })
     expect(mockedAccessToken).not.toHaveBeenCalled()
   })
 })
@@ -61,6 +82,7 @@ describe('getConsoleAwareAccessToken', () => {
 describe('getConsoleAwareUser', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
   })
 
   afterEach(() => {

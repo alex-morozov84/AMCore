@@ -5,6 +5,7 @@ import type { Request, Response } from 'express'
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import {
   AuthErrorCode,
+  BROWSER_AUTH_HEADERS,
   type RequestPrincipal,
   type SessionsListResponse,
   SystemRole,
@@ -21,6 +22,7 @@ jest.mock('../../infrastructure/email', () => ({
 }))
 
 import { EnvService } from '../../env/env.service'
+import { BrowserSessionContextService } from '../frontend-context/browser-session-context.service'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
@@ -34,12 +36,14 @@ import type {
   VerifyEmailDto,
 } from './dto'
 import { JwtAuthGuard, RefreshTokenGuard } from './guards'
+import { PasswordLoginService } from './password-login.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
 describe('AuthController', () => {
   let controller: AuthController
   let authService: jest.Mocked<AuthService>
+  let passwordLogin: jest.Mocked<PasswordLoginService>
   let avatarService: jest.Mocked<AvatarService>
   let sessionService: jest.Mocked<SessionService>
   let tokenService: jest.Mocked<TokenService>
@@ -94,6 +98,7 @@ describe('AuthController', () => {
   } as unknown as Request
 
   const mockResponse = {
+    status: jest.fn().mockReturnThis(),
     cookie: jest.fn(),
     clearCookie: jest.fn(),
   } as unknown as Response
@@ -102,12 +107,14 @@ describe('AuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        { provide: PasswordLoginService, useValue: { begin: jest.fn() } },
         {
           provide: AuthService,
           useValue: {
             register: jest.fn(),
             login: jest.fn(),
             logout: jest.fn(),
+            stepUp: jest.fn(),
             getUserById: jest.fn(),
             updateProfile: jest.fn(),
             forgotPassword: jest.fn(),
@@ -123,6 +130,7 @@ describe('AuthController', () => {
             getUserSessions: jest.fn(),
             deleteSession: jest.fn(),
             deleteOtherSessions: jest.fn(),
+            logoutBrowser: jest.fn(),
           },
         },
         {
@@ -173,6 +181,7 @@ describe('AuthController', () => {
 
     controller = module.get<AuthController>(AuthController)
     authService = module.get(AuthService)
+    passwordLogin = module.get(PasswordLoginService)
     avatarService = module.get(AvatarService)
     sessionService = module.get(SessionService)
     tokenService = module.get(TokenService)
@@ -292,18 +301,19 @@ describe('AuthController', () => {
     }
 
     it('should login user and set refresh token cookie', async () => {
-      authService.login.mockResolvedValue({
-        user: mockUserResponse,
-        accessToken: mockAccessToken,
+      passwordLogin.begin.mockResolvedValue({
+        kind: 'complete',
+        body: { user: mockUserResponse, accessToken: mockAccessToken },
         refreshToken: mockRefreshToken,
       })
 
       const result = await controller.login(loginDto, mockRequest, mockResponse)
 
-      expect(authService.login).toHaveBeenCalledWith(loginDto, {
+      expect(passwordLogin.begin).toHaveBeenCalledWith(loginDto, {
         userAgent: 'test-agent',
+        source: '127.0.0.1',
         ipAddress: '127.0.0.1',
-        sessionIpAddress: '127.0.0.1',
+        frame: { kind: 'direct' },
       })
       expect(mockResponse.cookie).toHaveBeenCalledWith('refresh_token', mockRefreshToken, {
         httpOnly: true,
@@ -319,7 +329,7 @@ describe('AuthController', () => {
     })
 
     it('should throw UnauthorizedException for invalid credentials', async () => {
-      authService.login.mockRejectedValue(new UnauthorizedException('Invalid email or password'))
+      passwordLogin.begin.mockRejectedValue(new UnauthorizedException('Invalid email or password'))
 
       await expect(controller.login(loginDto, mockRequest, mockResponse)).rejects.toThrow(
         UnauthorizedException
@@ -328,6 +338,39 @@ describe('AuthController', () => {
   })
 
   describe('logout', () => {
+    it.each([false, true])(
+      'uses verified browser logout without legacy fallback; failure=%s',
+      async (fails) => {
+        const req = { ...mockRequest, cookies: {} } as Request
+        const key = '<fake-browser-controller-key-at-least-32>'
+        const transport = new BrowserSessionContextService({
+          get: () => key,
+        } as unknown as EnvService)
+        transport.verify(req, {
+          [BROWSER_AUTH_HEADERS.key]: key,
+          [BROWSER_AUTH_HEADERS.audience]: 'product',
+          [BROWSER_AUTH_HEADERS.binding]: 'A'.repeat(43),
+          [BROWSER_AUTH_HEADERS.contextId]: '11111111-1111-4111-8111-111111111111',
+          [BROWSER_AUTH_HEADERS.generation]: '1',
+        })
+        if (fails) sessionService.logoutBrowser.mockRejectedValue(new Error('changed'))
+        await expect(
+          controller.logout(req, mockResponse).then(
+            () => 'completed',
+            (error: Error) => error.message
+          )
+        ).resolves.toBe(fails ? 'changed' : 'completed')
+        expect(mockResponse.clearCookie).toHaveBeenCalledTimes(fails ? 0 : 1)
+        expect(sessionService.logoutBrowser).toHaveBeenCalledWith(
+          expect.objectContaining({
+            contextId: '11111111-1111-4111-8111-111111111111',
+            generation: 1,
+          }),
+          undefined
+        )
+        expect(authService.logout).not.toHaveBeenCalled()
+      }
+    )
     it('should logout user and clear refresh token cookie', async () => {
       const requestWithCookie = {
         ...mockRequest,
@@ -370,6 +413,29 @@ describe('AuthController', () => {
     })
   })
 
+  describe('step-up HTTP outcome', () => {
+    it.each([false, true])(
+      'returns a credential-free202 only while proof is pending=%s',
+      async (pending) => {
+        const result = pending
+          ? { kind: 'proof_required' as const, requiredProofs: ['second_factor' as const] }
+          : { accessToken: 'fake-same-family-access-token' }
+        authService.stepUp.mockResolvedValue(result)
+        const principal: RequestPrincipal = {
+          type: 'jwt',
+          sub: mockUser.id,
+          systemRole: SystemRole.User,
+          sid: 'same-session',
+        }
+        await expect(
+          controller.stepUp(principal, { password: '<fake-password>' }, mockRequest, mockResponse)
+        ).resolves.toEqual(result)
+        expect(jest.mocked(mockResponse.status).mock.calls).toEqual(pending ? [[202]] : [])
+        expect(authService.stepUp).toHaveBeenCalledWith(principal, '<fake-password>', '127.0.0.1')
+      }
+    )
+  })
+
   describe('refresh', () => {
     const requestWithUser = {
       ...mockRequest,
@@ -386,16 +452,26 @@ describe('AuthController', () => {
       sessionService.rotateRefreshToken.mockResolvedValue({
         refreshToken: newRefreshToken,
         sessionId: 'session-123',
+        accessClaims: {
+          sub: mockUser.id,
+          email: mockUser.email,
+          systemRole: mockUser.systemRole,
+          sid: 'session-123',
+        },
       })
       tokenService.generateAccessToken.mockReturnValue(newAccessToken)
 
       const result = await controller.refresh(requestWithUser, mockResponse)
 
-      expect(sessionService.rotateRefreshToken).toHaveBeenCalledWith('old-hashed-token', {
-        userId: mockUser.id,
-        userAgent: 'test-agent',
-        ipAddress: '127.0.0.1',
-      })
+      expect(sessionService.rotateRefreshToken).toHaveBeenCalledWith(
+        'old-hashed-token',
+        {
+          userId: mockUser.id,
+          userAgent: 'test-agent',
+          ipAddress: '127.0.0.1',
+        },
+        null
+      )
       expect(tokenService.generateAccessToken).toHaveBeenCalledWith({
         sub: mockUser.id,
         email: mockUser.email,
@@ -621,7 +697,8 @@ describe('AuthController', () => {
       expect(tokenService.hashRefreshToken).toHaveBeenCalledWith(mockRefreshToken)
       expect(sessionService.deleteOtherSessions).toHaveBeenCalledWith(
         mockUser.id,
-        'current-hashed-token'
+        'current-hashed-token',
+        null
       )
     })
 
@@ -763,14 +840,14 @@ describe('AuthController', () => {
         email: 'flow@example.com',
         password: 'FlowP@ss123',
       }
-      authService.login.mockResolvedValue({
-        user: mockUserResponse,
-        accessToken: mockAccessToken,
+      passwordLogin.begin.mockResolvedValue({
+        kind: 'complete',
+        body: { user: mockUserResponse, accessToken: mockAccessToken },
         refreshToken: 'new-refresh-token',
       })
 
       const loginResult = await controller.login(loginDto, mockRequest, mockResponse)
-      expect(loginResult.accessToken).toBeDefined()
+      expect('accessToken' in loginResult && loginResult.accessToken).toBeDefined()
 
       // Refresh
       const refreshRequest = {
@@ -784,6 +861,12 @@ describe('AuthController', () => {
       sessionService.rotateRefreshToken.mockResolvedValue({
         refreshToken: 'rotated-refresh-token',
         sessionId: 'session-123',
+        accessClaims: {
+          sub: mockUser.id,
+          email: mockUser.email,
+          systemRole: mockUser.systemRole,
+          sid: 'session-123',
+        },
       })
       tokenService.generateAccessToken.mockReturnValue('new-access-token')
 

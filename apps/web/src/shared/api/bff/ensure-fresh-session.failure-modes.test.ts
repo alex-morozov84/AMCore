@@ -22,7 +22,12 @@ describe('ensureFreshSession — failure classification', () => {
     })
 
     await expect(
-      ensureFreshSession('s1', { store, lock: new SimpleLock(), upstreamRefresh })
+      ensureFreshSession('s1', {
+        store,
+        lock: new SimpleLock(),
+        verifyBinding: async () => undefined,
+        upstreamRefresh,
+      })
     ).rejects.toBe(upstreamError)
     await expect(store.get('s1')).resolves.toBeNull()
   })
@@ -36,7 +41,12 @@ describe('ensureFreshSession — failure classification', () => {
     })
 
     await expect(
-      ensureFreshSession('s1', { store, lock: new SimpleLock(), upstreamRefresh })
+      ensureFreshSession('s1', {
+        store,
+        lock: new SimpleLock(),
+        verifyBinding: async () => undefined,
+        upstreamRefresh,
+      })
     ).rejects.toBe(networkError)
     await expect(store.get('s1')).resolves.not.toBeNull()
   })
@@ -50,6 +60,7 @@ describe('ensureFreshSession — failure classification', () => {
       const pending = ensureFreshSession('s1', {
         store,
         lock: new FailingRenewalLock(),
+        verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(neverSettles),
       }).catch((e: unknown) => e)
 
@@ -73,6 +84,7 @@ describe('ensureFreshSession — failure classification', () => {
       const pending = ensureFreshSession('s1', {
         store,
         lock: new RejectingRenewalLock(),
+        verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(neverSettles),
       }).catch((e: unknown) => e)
 
@@ -95,6 +107,7 @@ describe('ensureFreshSession — failure classification', () => {
       const pending = ensureFreshSession('s1', {
         store,
         lock: new SimpleLock(), // renew() always succeeds
+        verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(neverSettles),
       }).catch((e: unknown) => e)
 

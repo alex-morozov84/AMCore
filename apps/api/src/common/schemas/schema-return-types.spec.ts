@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import ts from 'typescript'
 
 describe('SchemaResponse return-type enforcement', () => {
-  function diagnostics(returnType: string, result: string) {
+  function diagnostics(returnType: string, result: string, multiple = false) {
     const directory = mkdtempSync(join(tmpdir(), 'amcore-schema-types-'))
     const file = join(directory, 'fixture.ts')
     const dtoPath = resolve(__dirname, 'schema-dto').replaceAll('\\', '/')
@@ -21,10 +21,11 @@ describe('SchemaResponse return-type enforcement', () => {
       import type { z } from ${JSON.stringify(zodPath)}
       import { createSchemaDto } from ${JSON.stringify(dtoPath)}
       import { SchemaResponse } from ${JSON.stringify(responsePath)}
+      import { SchemaResponses } from ${JSON.stringify(resolve(__dirname, 'schema-responses').replaceAll('\\', '/'))}
       declare const schema: z.ZodObject<{ id: z.ZodString }>
       class Dto extends createSchemaDto(schema) {}
       class Controller {
-        @SchemaResponse({ type: Dto })
+        @${multiple ? 'SchemaResponses({ type: Dto, status: 200 }, { type: Dto, status: 202 })' : 'SchemaResponse({ type: Dto })'}
         handler(): ${returnType} { return ${result} }
       }
     `
@@ -59,6 +60,13 @@ describe('SchemaResponse return-type enforcement', () => {
     expect(errors.map((error) => error.code)).toEqual([1241])
     expect(ts.flattenDiagnosticMessageText(errors[0]!.messageText, '\n')).toContain('id')
   })
+
+  it('keeps return typing when several HTTP outcomes are declared', () => {
+    expect(diagnostics('{ id: string }', '{ id: "valid" }', true)).toEqual([])
+    expect(
+      diagnostics('{ secret: string }', '{ secret: "invalid" }', true).map((error) => error.code)
+    ).toEqual([1241])
+  })
 })
 
 describe.each(['native', 'legacy'] as const)('%s response compiler contract', (compiler) => {
@@ -67,10 +75,12 @@ describe.each(['native', 'legacy'] as const)('%s response compiler contract', (c
     ['async', 'Promise<{ id: string }>', 'Promise.resolve({ id: "valid" })', false],
     ['array', 'Array<{ id: string }>', '[{ id: "valid" }]', false],
     ['union', '{ id: string } | { count: number }', '{ count: 1 }', false],
+    ['multi', '{ id: string }', '{ id: "valid" }', false],
     ['invalid-sync', '{ id: number }', '{ id: 1 }', true],
     ['invalid-async', 'Promise<{ id: number }>', 'Promise.resolve({ id: 1 })', true],
     ['invalid-array', 'Array<{ id: number }>', '[{ id: 1 }]', true],
     ['invalid-union', '{ other: boolean }', '{ other: true }', true],
+    ['invalid-multi', '{ other: boolean }', '{ other: true }', true],
   ] as const
   it.each(cases)('%s retains route return typing', (name, returnType, result, invalid) => {
     const directory = mkdtempSync(join(tmpdir(), 'native-schema-types-'))
@@ -86,8 +96,9 @@ describe.each(['native', 'legacy'] as const)('%s response compiler contract', (c
       `import type {z} from ${JSON.stringify(zod)};
       import {createSchemaDto} from ${JSON.stringify(resolve(__dirname, 'schema-dto'))};
       import {SchemaResponse} from ${JSON.stringify(resolve(__dirname, 'schema-response'))};
+      import {SchemaResponses} from ${JSON.stringify(resolve(__dirname, 'schema-responses'))};
       declare const schema: ${schemaType}; const Dto = createSchemaDto(schema);
-      class Controller { @SchemaResponse({type:${name.includes('array') ? '[Dto]' : 'Dto'}})
+      class Controller { @${name.includes('multi') ? 'SchemaResponses({type:Dto,status:200},{type:Dto,status:202})' : `SchemaResponse({type:${name.includes('array') ? '[Dto]' : 'Dto'}})`}
       handler(): ${returnType} {return ${result}} }`
     )
     const config = join(directory, 'tsconfig.json')

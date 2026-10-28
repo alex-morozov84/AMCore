@@ -50,6 +50,16 @@ export const test = proxyTest.extend<{
       if (oauthProvidersDefault) providers([])
       if (!baseURL) throw new Error('Managed auth tests require baseURL')
       const productOrigin = new URL(baseURL).origin
+      // This lane proves client states only; the real-stack lane owns browser authority/cookies.
+      await page.route('**/api/auth/browser-context', (route) => {
+        expect(route.request().method()).toBe('POST')
+        expect(route.request().postDataJSON()).toEqual({})
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ attemptId: '01900000-0000-7000-8000-000000000000' }),
+        })
+      })
       await page.route('**/*', async (route) => {
         if (new URL(route.request().url()).origin !== productOrigin) {
           unexpected.push(`browser ${route.request().url()}`)

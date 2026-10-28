@@ -159,6 +159,7 @@ describe('Session metadata transport boundary', () => {
     const winner = ensureFreshSession('shared', {
       store,
       lock,
+      verifyBinding: async () => undefined,
       upstreamRefresh: createUpstreamRefresh(browserHeaders()),
     })
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
@@ -167,6 +168,7 @@ describe('Session metadata transport boundary', () => {
     const waiter = ensureFreshSession('shared', {
       store,
       lock,
+      verifyBinding: async () => undefined,
       upstreamRefresh: createUpstreamRefresh(waitingHeaders),
     })
     finish(

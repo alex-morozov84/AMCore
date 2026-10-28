@@ -2,6 +2,9 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
 import { SystemRole } from '@amcore/shared'
 
+import type { MfaAuthorityReader } from '../../../core/auth/mfa/mfa-authority-reader.service'
+import type { BrowserSessionContextService } from '../../../core/frontend-context/browser-session-context.service'
+
 import { BullBoardAuthService } from './bull-board-auth.service'
 
 import type { PrismaClient } from '@/generated/prisma/client'
@@ -11,16 +14,28 @@ describe('BullBoardAuthService (read-only Bull Board verifier — EQS-01)', () =
   let service: BullBoardAuthService
   let prisma: DeepMockProxy<PrismaClient>
 
+  const readForRuntime = jest.fn()
+  const verify = jest.fn()
+
   const future = new Date(Date.now() + 60_000)
   const past = new Date(Date.now() - 60_000)
 
   beforeEach(() => {
     prisma = mockDeep<PrismaClient>()
-    service = new BullBoardAuthService(prisma as unknown as PrismaService)
+    readForRuntime.mockReset().mockResolvedValue({ kind: 'admitted', operator: true })
+    verify.mockReset()
+    service = new BullBoardAuthService(
+      prisma as unknown as PrismaService,
+      { readForRuntime } as unknown as MfaAuthorityReader,
+      { verify } as unknown as BrowserSessionContextService
+    )
   })
 
   it('authorizes a live SUPER_ADMIN session', async () => {
     prisma.session.findUnique.mockResolvedValue({
+      id: 'sid-1',
+      userId: 'user-1',
+      familyId: 'family-1',
       expiresAt: future,
       revokedAt: null,
       user: { systemRole: SystemRole.SuperAdmin },
@@ -29,8 +44,27 @@ describe('BullBoardAuthService (read-only Bull Board verifier — EQS-01)', () =
     await expect(service.verifyAccess('raw-token')).resolves.toBe('authorized')
   })
 
+  it.each([
+    ['session_changed', 'session_changed'],
+    ['enforcement_unavailable', 'unavailable'],
+  ])('preserves terminal authority denial %s', async (reason, expected) => {
+    prisma.session.findUnique.mockResolvedValue({
+      id: 'sid-1',
+      userId: 'user-1',
+      familyId: 'family-1',
+      expiresAt: future,
+      revokedAt: null,
+      user: { systemRole: SystemRole.SuperAdmin },
+    } as never)
+    readForRuntime.mockResolvedValue({ kind: 'denied', reason })
+    await expect(service.verifyAccess('raw-token')).resolves.toBe(expected)
+  })
+
   it('forbids a live session whose user is not SUPER_ADMIN', async () => {
     prisma.session.findUnique.mockResolvedValue({
+      id: 'sid-1',
+      userId: 'user-1',
+      familyId: 'family-1',
       expiresAt: future,
       revokedAt: null,
       user: { systemRole: SystemRole.User },
@@ -57,6 +91,9 @@ describe('BullBoardAuthService (read-only Bull Board verifier — EQS-01)', () =
 
   it('treats a revoked session as unauthenticated', async () => {
     prisma.session.findUnique.mockResolvedValue({
+      id: 'sid-1',
+      userId: 'user-1',
+      familyId: 'family-1',
       expiresAt: future,
       revokedAt: past,
       user: { systemRole: SystemRole.SuperAdmin },

@@ -97,6 +97,13 @@ stores the session in the Redis vault and retires earlier invitation flows. The 
 commit and the publication are separate, so publication can fail after the account
 exists.
 
+The browser first completes `/api/auth/browser-context` and echoes its nonsecret
+attempt identifier. The BFF retains its private proposal before creating the
+account. The API commits the account, pending family/session and email token in
+one transaction. The BFF prepares Redis state and confirms the exact publication
+before setting a session cookie. Invitation registration confirms its handoff in
+that same publication transaction; it never accepts membership.
+
 | What the BFF observed                                                                                                                                                                | Response                                                         | Meaning                                                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | The API answered exactly `201` with a valid body and the session was published                                                                                                       | `201 { user }` and the session cookie                            | The person is signed in                                                                                                          |

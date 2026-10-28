@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto'
+
 import {
   Body,
   Controller,
@@ -11,14 +13,19 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import {
+  ApiBearerAuth,
+  ApiConflictResponse,
   ApiCookieAuth,
+  ApiForbiddenResponse,
   ApiHeader,
   ApiOperation,
   ApiQuery,
   ApiResponse,
+  ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger'
 import type { Request, Response } from 'express'
+import { z } from 'zod'
 
 import { frontendAuthPath, parseProductAdminReturn } from '@amcore/shared'
 import {
@@ -28,13 +35,24 @@ import {
   invitationOAuthCorrelationSchema,
   localizedFrontendUrl,
   type OAuthExchangeResponse,
+  oauthExchangeResponseSchema,
   type OAuthProvidersResponse,
+  type PasswordLoginPending,
+  type PasswordLoginResponse,
+  passwordLoginResponseSchema,
+  type RequestPrincipal,
 } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../../common/exceptions/index.js'
+import { createSchemaDto } from '../../../common/schemas/schema-dto.js'
 import { SchemaResponse } from '../../../common/schemas/schema-response.js'
-import { resolveSessionIpAddress } from '../../../common/utils/verified-visitor-ip.js'
+import { SchemaResponses } from '../../../common/schemas/schema-responses.js'
+import {
+  resolveSessionIpAddress,
+  resolveVerifiedVisitorIp,
+} from '../../../common/utils/verified-visitor-ip.js'
 import { EnvService } from '../../../env/env.service.js'
+import { browserSessionContext } from '../../frontend-context/browser-session-context.service.js'
 import { ApiFrontendContext } from '../../frontend-context/frontend-context.openapi.js'
 import { browserFrontendContext } from '../../frontend-context/frontend-context.service.js'
 import { resolveFrontendPlacement } from '../../frontend-context/frontend-placement.js'
@@ -42,13 +60,14 @@ import { invitationHandoffProof } from '../../invitations/invitation-auth-handof
 import { invalidInvitation } from '../../invitations/invitation-locks.js'
 import { Auth } from '../decorators/auth.decorator.js'
 import { CurrentUser } from '../decorators/current-user.decorator.js'
-import {
-  OAuthExchangeDto,
-  OAuthExchangeResponseDto,
-  OAuthProvidersResponseDto,
-} from '../dto/index.js'
+import { PasswordLoginPendingDto } from '../dto/index.js'
+import { OAuthExchangeDto, OAuthProvidersResponseDto } from '../dto/index.js'
 import { OriginCheckGuard } from '../guards/index.js'
 import { negotiateLocale } from '../locale-negotiation.js'
+import { storedInvitationIntentSchema } from '../mfa/mfa-invitation-intent.js'
+import { oauthIdentitySnapshotSchema } from '../mfa/mfa-login-start.service.js'
+import { PasswordLoginService } from '../password-login.service.js'
+import { capturePasswordStepUp } from '../password-step-up-authority.js'
 import { SessionService } from '../session.service.js'
 import { TokenService } from '../token.service.js'
 
@@ -63,11 +82,17 @@ import {
 import { OAuthLoginTicketService } from './oauth-login-ticket.service.js'
 import { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
+const OAuthCompleteResult = createSchemaDto(
+  z.union([passwordLoginResponseSchema, oauthExchangeResponseSchema]),
+  'OAuthCompleteResult'
+)
+
 @ApiFrontendContext()
 @ApiTags('oauth')
 @Controller('auth/oauth')
 export class OAuthController {
   constructor(
+    private readonly login: PasswordLoginService,
     private readonly oauthService: OAuthService,
     private readonly ticketService: OAuthLoginTicketService,
     private readonly providerFactory: OAuthProviderFactory,
@@ -119,7 +144,8 @@ export class OAuthController {
       negotiateLocale(req),
       this.invitedStart(req),
       browserFrontendContext(req),
-      parseProductAdminReturn(req.query.returnTo)
+      parseProductAdminReturn(req.query.returnTo),
+      this.browserAttempt(req)
     )
     setOAuthBindingCookie(
       res,
@@ -134,18 +160,29 @@ export class OAuthController {
 
   @Get(':provider/link')
   @Auth(AuthType.Bearer)
-  @ApiOperation({ summary: 'Redirect to OAuth provider to link account' })
+  @ApiBearerAuth()
+  @ApiForbiddenResponse({
+    description: 'Protected linking requires fresh local password and second-factor proofs',
+  })
+  @ApiConflictResponse({
+    description: 'Original family, security version or browser binding changed',
+  })
+  @ApiServiceUnavailableResponse({ description: 'Authority or one-time state storage unavailable' })
+  @ApiOperation({
+    summary: 'Start provider linking bound to the current source session; grant no new session',
+  })
   @ApiResponse({ status: 302, description: 'Redirect to the provider authorization URL' })
   async link(
     @Param('provider') provider: string,
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() principal: RequestPrincipal,
     @Res() res: Response,
     @Req() req?: Request
   ): Promise<void> {
     const { url, browserNonce } = await this.oauthService.getLinkAuthorizationURL(
       provider,
-      userId,
-      browserFrontendContext(req)
+      principal.sub,
+      browserFrontendContext(req),
+      capturePasswordStepUp(principal)
     )
     setOAuthBindingCookie(
       res,
@@ -250,6 +287,48 @@ export class OAuthController {
     // account's stored preference.
     const locale = coerceSupportedLocale(result.user.locale)
 
+    if (result.mode === 'login_identity') {
+      // This cookie proves the callback browser only. It is not stored as a Session or refresh credential.
+      const binding = randomBytes(32).toString('hex')
+      const ticket = await this.ticketService.issue({
+        userId: result.identity.userId,
+        email: result.user.email,
+        systemRole: result.identity.systemRole,
+        sessionId: '',
+        ...(result.browserAttemptId ? { browserAttemptId: result.browserAttemptId } : {}),
+        identity: result.identity,
+        ...(result.invitationIntent ? { invitationIntent: result.invitationIntent } : {}),
+        exchangeBindingHash: this.tokenService.hashRefreshToken(binding),
+        ...(frontend
+          ? {
+              ...frontend,
+              callbackUri: this.providerFactory.callbackUri(provider, frontend.frontend),
+            }
+          : {}),
+        ...(result.returnTo ? { returnTo: result.returnTo } : {}),
+      })
+      res.cookie('refresh_token', binding, {
+        httpOnly: true,
+        secure: this.isProduction,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 60000 * ('raw' in res ? 1 : 1000),
+      })
+      res
+        .status(HttpStatus.FOUND)
+        .redirect(
+          localizedFrontendUrl(
+            frontend?.frontend === 'admin'
+              ? resolveFrontendPlacement(this.env).admin
+              : this.env.get('FRONTEND_URL'),
+            locale,
+            frontendAuthPath(frontend?.frontend ?? 'site', '/auth/callback'),
+            { ticket }
+          )
+        )
+      return
+    }
+
     if (result.mode === 'login') {
       res.cookie('refresh_token', result.refreshToken, {
         httpOnly: true,
@@ -309,25 +388,26 @@ export class OAuthController {
   @UseGuards(OriginCheckGuard)
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Exchange OAuth login ticket for access token' })
-  @SchemaResponse({
-    type: OAuthExchangeResponseDto,
-    status: 200,
-    description: 'Access token issued',
-  })
+  @SchemaResponses(
+    {
+      type: OAuthCompleteResult,
+      status: 200,
+      description: 'Legacy invitation exchange pending combined publication integration',
+    },
+    {
+      type: PasswordLoginPendingDto,
+      status: 202,
+      description:
+        'Restricted OAuth identity continuation; protected accounts require local password and factor',
+    }
+  )
   async exchange(
     @Body({ schema: OAuthExchangeDto.schema }) dto: OAuthExchangeDto,
-    @Req() req: Request
-  ): Promise<OAuthExchangeResponse> {
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<OAuthExchangeResponse | PasswordLoginResponse | PasswordLoginPending> {
     const refreshToken = req.cookies?.refresh_token
     if (!refreshToken) {
-      throw this.invalidExchange()
-    }
-
-    let session: Awaited<ReturnType<SessionService['validateRefreshToken']>>
-    try {
-      const refreshTokenHash = this.tokenService.hashRefreshToken(refreshToken)
-      session = await this.sessionService.validateRefreshToken(refreshTokenHash)
-    } catch {
       throw this.invalidExchange()
     }
 
@@ -343,6 +423,61 @@ export class OAuthController {
         (!frontend || claims.placementFingerprint !== frontend.placementFingerprint))
     )
       throw this.invalidExchange()
+
+    if (claims.identity) {
+      if (
+        claims.invitation ||
+        claims.sessionId ||
+        claims.userId !== claims.identity.userId ||
+        !claims.exchangeBindingHash ||
+        this.tokenService.hashRefreshToken(refreshToken) !== claims.exchangeBindingHash
+      )
+        throw this.invalidExchange()
+      const identity = oauthIdentitySnapshotSchema.safeParse(claims.identity)
+      if (!identity.success) throw this.invalidExchange()
+      const transport = browserSessionContext(req)
+      if (claims.browserAttemptId !== this.browserAttempt(req)) throw this.invalidExchange()
+      if (transport && !transport.binding) throw this.invalidExchange()
+      const invitation = claims.invitationIntent
+        ? storedInvitationIntentSchema.safeParse(claims.invitationIntent)
+        : undefined
+      if (invitation && (!invitation.success || !transport?.binding)) throw this.invalidExchange()
+      const result = await this.login.beginOAuth(
+        identity.data,
+        {
+          source:
+            resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
+          frame: transport?.binding
+            ? { kind: 'browser', binding: transport.binding }
+            : { kind: 'direct' },
+          userAgent: req.headers['user-agent'],
+          ipAddress: resolveSessionIpAddress(req, this.env),
+        },
+        invitation?.success ? invitation.data : undefined
+      )
+      if (result.kind === 'pending') {
+        res.status(202)
+        return { ...result.body, ...(claims.returnTo ? { returnTo: claims.returnTo } : {}) }
+      }
+      res.status(200)
+      res.cookie('refresh_token', result.refreshToken, {
+        httpOnly: true,
+        secure: this.isProduction,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * ('raw' in res ? 1 : 1000),
+      })
+      return result.body
+    }
+    // Remaining legacy form is invitation-only, never an ordinary OAuth bypass.
+    if (!claims.invitation) throw this.invalidExchange()
+    let session: Awaited<ReturnType<SessionService['validateRefreshToken']>>
+    try {
+      const refreshTokenHash = this.tokenService.hashRefreshToken(refreshToken)
+      session = await this.sessionService.validateRefreshToken(refreshTokenHash)
+    } catch {
+      throw this.invalidExchange()
+    }
 
     if (session.id !== claims.sessionId || session.userId !== claims.userId) {
       throw this.invalidExchange()
@@ -396,6 +531,18 @@ export class OAuthController {
     )
       throw invalidInvitation()
     return { handoff, credential, attemptId }
+  }
+
+  private browserAttempt(req: Request): string | undefined {
+    const transport = browserSessionContext(req)
+    const attempt = req.headers['x-amcore-oauth-attempt']
+    if (!transport) {
+      if (attempt !== undefined) throw this.invalidExchange()
+      return undefined
+    }
+    if (typeof attempt !== 'string' || !z.string().uuid().safeParse(attempt).success)
+      throw this.invalidExchange()
+    return attempt
   }
 
   private invalidExchange(): AppException {

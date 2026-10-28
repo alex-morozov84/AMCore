@@ -87,6 +87,15 @@ export const NOTIFICATION_RECOVERY_JOB = frequent('notification-recovery', EVERY
 export const AI_RUN_RECOVERY_JOB = frequent('ai-run-recovery', EVERY_30S, 30_000)
 export const AI_APPROVAL_EXPIRY_JOB = frequent('ai-approval-expiry', EVERY_MIN, MINUTE)
 export const INVITATION_HANDOFF_JOB = frequent('invitation-handoff-sweep', EVERY_MIN, MINUTE)
+export const MFA_RETENTION_JOB = frequent(
+  'mfa-retention',
+  {
+    kind: 'cron',
+    expression: CronExpression.EVERY_5_MINUTES,
+    timeZone: null,
+  },
+  5 * MINUTE
+)
 /** Removing the Telegram channel removes this entry together with its job source. */
 export const TELEGRAM_REACHABILITY_JOB = frequent('telegram-reachability', EVERY_MIN, MINUTE, {
   disabledReason: (env) => (env.get('TELEGRAM_BOT_TOKEN') ? null : 'telegram_not_configured'),
@@ -107,6 +116,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJobDefinition[] = Object.freeze([
   AI_RUN_RECOVERY_JOB,
   AI_APPROVAL_EXPIRY_JOB,
   INVITATION_HANDOFF_JOB,
+  MFA_RETENTION_JOB,
   TELEGRAM_REACHABILITY_JOB,
   BACKGROUND_CONTROL_JOB,
 ])

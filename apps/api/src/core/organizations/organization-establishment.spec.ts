@@ -63,7 +63,13 @@ describe('organization establishment safety', () => {
       sid: 'session',
       systemRole: SystemRole.SuperAdmin,
     }
-    tx.user.findUnique.mockResolvedValue({ systemRole: SystemRole.SuperAdmin } as never)
+    tx.user.findUnique.mockResolvedValue({
+      id: principal.sub,
+      systemRole: SystemRole.SuperAdmin,
+      mfaAccount: null,
+      mfaFactor: null,
+    } as never)
+    tx.mfaProtocol.findUnique.mockResolvedValue({ state: 'prepared', version: 1 } as never)
     tx.session.findUnique.mockResolvedValue({
       userId: 'operator',
       revokedAt: null,

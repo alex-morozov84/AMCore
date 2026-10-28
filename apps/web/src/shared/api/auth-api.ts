@@ -2,6 +2,7 @@ import type {
   AvatarResponse,
   ForgotPasswordInput,
   LoginInput,
+  MfaBrowserSignInPending,
   RegisterInput,
   ResendVerificationInput,
   ResetPasswordInput,
@@ -16,11 +17,13 @@ import { apiClient } from './http-client'
 
 interface UserEnvelope {
   user: UserResponse
+  contextSession?: string
 }
 
 interface MeResponse {
   /** `null` when the access token is valid but its user no longer exists. */
   user: UserResponse | null
+  contextSession?: string
 }
 
 interface MessageResponse {
@@ -29,11 +32,25 @@ interface MessageResponse {
 
 /** The application composition selects a literal endpoint family, never user input. */
 export type AuthActionBase = '/auth' | '/product-admin/auth'
+export type BrowserLoginResponse = UserEnvelope | MfaBrowserSignInPending
+
+async function passwordSignIn(
+  base: AuthActionBase,
+  data: LoginInput
+): Promise<BrowserLoginResponse> {
+  const bootstrap = await apiClient.post<{ attemptId: string }>(`${base}/browser-context`, {})
+  return apiClient.post<BrowserLoginResponse>(`${base}/login`, data, {
+    headers: { 'x-amcore-login-attempt': bootstrap.attemptId },
+  })
+}
 
 export function authActions(base: AuthActionBase) {
   return {
-    login: (data: LoginInput) => apiClient.post<UserEnvelope>(`${base}/login`, data),
-    logout: () => apiClient.post<MessageResponse>(`${base}/logout`),
+    login: (data: LoginInput) => passwordSignIn(base, data),
+    logout: (contextSession?: string) =>
+      apiClient.post<MessageResponse>(`${base}/logout`, undefined, {
+        headers: contextSession ? { 'x-amcore-context-session': contextSession } : {},
+      }),
     forgotPassword: (data: ForgotPasswordInput) =>
       apiClient.post<MessageResponse>(`${base}/forgot-password`, data),
     resetPassword: (data: ResetPasswordInput) =>
@@ -51,13 +68,19 @@ export function authActions(base: AuthActionBase) {
  * mints the session server-side and sets `amcore_session` itself.
  */
 export const authApi = {
-  register: (data: RegisterInput): Promise<UserEnvelope> =>
-    apiClient.post<UserEnvelope>('/auth/register', data),
+  register: async (data: RegisterInput): Promise<UserEnvelope> => {
+    const bootstrap = await apiClient.post<{ attemptId: string }>('/auth/browser-context', {})
+    return apiClient.post<UserEnvelope>('/auth/register', data, {
+      headers: { 'x-amcore-login-attempt': bootstrap.attemptId },
+    })
+  },
 
-  login: (data: LoginInput): Promise<UserEnvelope> =>
-    apiClient.post<UserEnvelope>('/auth/login', data),
+  login: (data: LoginInput): Promise<BrowserLoginResponse> => passwordSignIn('/auth', data),
 
-  logout: (): Promise<MessageResponse> => apiClient.post<MessageResponse>('/auth/logout'),
+  logout: (contextSession?: string): Promise<MessageResponse> =>
+    apiClient.post<MessageResponse>('/auth/logout', undefined, {
+      headers: contextSession ? { 'x-amcore-context-session': contextSession } : {},
+    }),
 
   // Always the same enumeration-safe message regardless of whether the
   // account exists — never rendered as-is (it's backend English prose);
@@ -74,7 +97,15 @@ export const authApi = {
   resendVerification: (data: ResendVerificationInput): Promise<MessageResponse> =>
     apiClient.post<MessageResponse>('/auth/resend-verification', data),
 
-  getMe: (): Promise<MeResponse> => apiClient.get<MeResponse>('/auth/me'),
+  getMe: async (): Promise<MeResponse> => {
+    let contextSession: string | undefined
+    const result = await apiClient.get<MeResponse>('/auth/me', {
+      onResponseHeaders: (headers) => {
+        contextSession = headers.get('x-amcore-context-session') ?? undefined
+      },
+    })
+    return { ...result, ...(contextSession ? { contextSession } : {}) }
+  },
 
   updateMe: (data: UpdateProfileInput): Promise<UserEnvelope> =>
     apiClient.patch<UserEnvelope>('/auth/me', data),

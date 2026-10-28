@@ -23,7 +23,10 @@ function request(body: unknown): Request {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'vault-only-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'vault-only-token',
+    bindingHeaders: {},
+  })
 })
 
 describe('Audit name lookup boundary', () => {

@@ -38,6 +38,8 @@ test('disabled projection applies once and passes the residual scan', () =>
       'apps/web/e2e/organization-setup/console-organization-setup.spec.ts',
       'apps/web/src/shared/lib/console-step-up-mutation.ts',
       'apps/web/src/shared/ui/console-step-up-dialog.tsx',
+      'apps/web/src/shared/ui/console-step-up-proof.tsx',
+      'apps/web/src/shared/ui/console-step-up-dialog.stories.tsx',
       'apps/web/src/shared/ui/console-step-up-dialog.test.tsx',
       'apps/web/src/shared/api/console/session-metadata.test.ts',
       'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',

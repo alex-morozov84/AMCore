@@ -3,6 +3,8 @@ import type { ClsService } from 'nestjs-cls'
 import type { Params } from 'nestjs-pino'
 import { hostname } from 'os'
 
+import { mfaCredentialPath } from '../utils/mfa-credential-path.js'
+
 export type TruncatedBody = {
   _truncated: true
   _originalBytes: number
@@ -56,6 +58,9 @@ export function sanitizeRequestUrl(url: unknown): string {
   if (typeof url !== 'string' || url.length === 0) return '[REDACTED]'
   try {
     const parsed = new URL(url, 'http://sanitize.invalid')
+    if (mfaCredentialPath(url)) {
+      return `${parsed.pathname}${parsed.search ? '?[REDACTED]' : ''}`
+    }
     for (const key of SENSITIVE_QUERY_PARAMS) {
       if (parsed.searchParams.has(key)) parsed.searchParams.set(key, '[REDACTED]')
     }
@@ -98,6 +103,7 @@ function serializeRequestBody(
   if (url?.includes('/webhooks/')) return '[REDACTED]'
   // Validation may reject arbitrary extra fields; they must not reach logs first.
   if (url && /\/ai\/approvals(?:\/|\?|$)/.test(url)) return '[REDACTED]'
+  if (url && mfaCredentialPath(url)) return '[REDACTED]'
   return truncateBody(body, maxBodyBytes)
 }
 
@@ -240,6 +246,14 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
           // Headers
           'req.headers.authorization',
           'req.headers["x-amcore-web-context-key"]',
+          'req.headers["x-amcore-browser-context-key"]',
+          'req.headers["x-amcore-browser-binding"]',
+          'req.headers["x-mfa-continuation"]',
+          'req.headers["x-mfa-vault-binding"]',
+          'headers["x-amcore-browser-context-key"]',
+          'headers["x-amcore-browser-binding"]',
+          'headers["x-mfa-continuation"]',
+          'headers["x-mfa-vault-binding"]',
           'headers["x-amcore-web-context-key"]',
           'WEB_FRONTEND_CONTEXT_KEY',
           'req.headers.cookie',
@@ -280,7 +294,8 @@ export function createLoggingConfig(cls: ClsService, maxBodyBytes: number): Para
             id: req.id,
             method: req.method,
             url: sanitizeRequestUrl(req.url),
-            query: req.query,
+            query:
+              typeof req.url === 'string' && mfaCredentialPath(req.url) ? '[REDACTED]' : req.query,
             params: req.params,
             headers: {
               host: req.headers.host,

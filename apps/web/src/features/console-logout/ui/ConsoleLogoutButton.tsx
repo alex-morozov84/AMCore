@@ -9,11 +9,14 @@ import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 import { Button } from '@/shared/ui/button'
 
-export function ConsoleLogoutButton() {
+export function ConsoleLogoutButton({ contextSession }: { contextSession?: string }) {
   const router = useRouteProgressRouter()
   const t = useTranslations('console')
   const { mutate, isPending } = useMutation({
-    mutationFn: () => apiClient.post<void>(getConsolePublicApiPath('/auth/logout')),
+    mutationFn: () =>
+      apiClient.post<void>(getConsolePublicApiPath('/auth/logout'), undefined, {
+        headers: { 'x-amcore-context-session': contextSession ?? '' },
+      }),
     onSettled: () => router.replace('/login'),
   })
 

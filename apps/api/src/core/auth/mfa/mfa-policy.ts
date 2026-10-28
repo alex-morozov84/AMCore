@@ -15,27 +15,39 @@ export function acceptedMfaMethod(method: string | null): method is MfaMethod {
 }
 
 /** Inclusive boundary, matching existing recent-auth semantics; future proof is invalid. */
-function fresh(at: Date | null, now: Date): boolean {
+function fresh(at: Date | null, now: Date, windowSec: number): boolean {
   if (!at) return false
   const age = now.getTime() - at.getTime()
-  return age >= 0 && age <= 600_000
+  return age >= 0 && age <= Math.min(600, windowSec) * 1000
 }
 
 export function requiredMfaProofs(
   evidence: MfaEvidence,
   factorVersion: number,
-  now: Date
+  now: Date,
+  windowSec = 600
 ): Array<'password' | 'second_factor'> {
   const required: Array<'password' | 'second_factor'> = []
-  if (!evidence.primaryProofId || !fresh(evidence.primaryAt, now)) required.push('password')
+  if (!evidence.primaryProofId || !fresh(evidence.primaryAt, now, windowSec))
+    required.push('password')
   if (
     !evidence.mfaProofId ||
     !acceptedMfaMethod(evidence.mfaMethod) ||
     evidence.factorVersion !== factorVersion ||
-    !fresh(evidence.mfaAt, now)
+    !fresh(evidence.mfaAt, now, windowSec)
   )
     required.push('second_factor')
   return required
+}
+
+/** Ordinary families retain the configurable primary-authentication window without requiring MFA. */
+export function requiredPrimaryProofs(
+  evidence: Pick<MfaEvidence, 'primaryAt' | 'primaryProofId'>,
+  now: Date,
+  windowSec: number
+): Array<'password'> {
+  const age = evidence.primaryAt ? now.getTime() - evidence.primaryAt.getTime() : -1
+  return evidence.primaryProofId && age >= 0 && age <= windowSec * 1000 ? [] : ['password']
 }
 
 export interface FamilyAuthority {

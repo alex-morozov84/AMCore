@@ -46,7 +46,7 @@ export async function handleConsoleUserSessionsList(request: Request, userId: st
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
-      headers: forwardRequestHeaders(request.headers, resolved.token),
+      headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
     })
   } catch {
     return apiErrorResponse(request, {
@@ -75,7 +75,7 @@ export async function handleConsoleUserSessionRevoke(
   try {
     upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
       method: 'DELETE',
-      headers: forwardRequestHeaders(request.headers, resolved.token),
+      headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
     })
   } catch {
     return apiErrorResponse(request, {
@@ -98,7 +98,7 @@ export async function handleConsoleUserSessionsRevokeAll(request: Request, userI
   try {
     upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
       method: 'DELETE',
-      headers: forwardRequestHeaders(request.headers, resolved.token),
+      headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
     })
   } catch {
     return apiErrorResponse(request, {

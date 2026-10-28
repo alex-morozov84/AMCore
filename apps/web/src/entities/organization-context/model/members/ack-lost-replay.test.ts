@@ -35,6 +35,7 @@ it('replays actual committed safe503 through BFF/headless: unknown, fresh V+1, n
   const deps = {
     store,
     lock: new SimpleLock(),
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: async () => 'session-x',
     apiBase: 'http://api.test',

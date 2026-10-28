@@ -48,12 +48,13 @@ COPY docker/nginx/product-admin*.conf ./docker/nginx/
 RUN pnpm --filter @amcore/shared build
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG BUILD_SOURCE_COMMIT
 ARG NEXT_DEPLOYMENT_ID
 ENV NEXT_DEPLOYMENT_ID=${NEXT_DEPLOYMENT_ID}
 # Optional build-only Node options, e.g. --max-old-space-size=3072 on a small host with
 # swap: V8 sizes its default heap from physical RAM. Scoped to this RUN, never the runner.
 ARG BUILD_NODE_OPTIONS=""
-RUN NODE_OPTIONS="$BUILD_NODE_OPTIONS" pnpm --filter web build
+RUN BUILD_SOURCE_COMMIT="$BUILD_SOURCE_COMMIT" NODE_OPTIONS="$BUILD_NODE_OPTIONS" pnpm --filter web build
 
 # ===========================================
 # Runner — minimal, self-contained, non-root

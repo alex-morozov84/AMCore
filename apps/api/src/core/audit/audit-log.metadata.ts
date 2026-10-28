@@ -291,6 +291,46 @@ const specs: Record<AuditAction, MetadataSpec> = {
   'api_key.created': { expiresAt: true, name: true, scopes: 'string[]' },
   'api_key.revoked': { reason: true },
   'auth.step_up_failed': { reason: true },
+  'auth.mfa_backup_codes_replaced': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    generation: true,
+  },
+  'auth.mfa_backup_codes_saved': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    generation: true,
+  },
+  'auth.mfa_setup_completed': { operationId: boundedString(36, /^[a-f0-9-]+$/), generation: true },
+  'auth.mfa_factor_enrolled': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    factorVersion: true,
+  },
+  'auth.mfa_factor_replaced': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    factorVersion: true,
+  },
+  'auth.mfa_protocol_activated': {
+    actorDatabaseRole: boundedString(63, /^[\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}]+$/u),
+    evidenceHash: boundedString(64, /^[a-f0-9]{64}$/),
+    sourceCommit: boundedString(64, /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
+  },
+  'auth.mfa_offline_recovery_started': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    actorDatabaseRole: boundedString(63, /^[\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}]+$/u),
+    reason: boundedString(256, /^[\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}]+$/u),
+  },
+  'auth.mfa_recovery_ticket_redeemed': { operationId: boundedString(36, /^[a-f0-9-]+$/) },
+  'auth.mfa_proof_verified': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    method: boundedString(13, /^(password|totp|recovery_code)$/),
+  },
+  'auth.mfa_verification_failed': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    reason: boundedString(20, /^invalid_code$/),
+  },
+  'auth.mfa_backup_code_used': {
+    operationId: boundedString(36, /^[a-f0-9-]+$/),
+    method: boundedString(13, /^recovery_code$/),
+  },
   'auth.step_up_succeeded': { sessionId: true },
   'org.created': {
     source: boundedString(17, /^(self-service|bootstrap-cli|bootstrap-console)$/),

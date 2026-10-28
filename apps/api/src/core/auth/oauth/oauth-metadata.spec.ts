@@ -30,6 +30,7 @@ it.each(['google', 'apple'])(
             : 'development',
     } as unknown as EnvService
     const controller = new OAuthController(
+      {} as never,
       { handleCallback } as never,
       { issue } as never,
       {} as never,

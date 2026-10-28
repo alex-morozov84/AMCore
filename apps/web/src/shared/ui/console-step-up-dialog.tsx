@@ -1,12 +1,13 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { type StepUpInput, stepUpSchema } from '@amcore/shared'
+import { type MfaProof, type StepUpInput, stepUpSchema } from '@amcore/shared'
 
 import { useLocalizedForm } from '@/shared/hooks'
 import type { StepUpPhase } from '@/shared/lib/console-step-up-mutation'
 
 import { Button } from './button'
+import { ConsoleStepUpProof } from './console-step-up-proof'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import { PasswordInput } from './password-input'
 interface ConsoleStepUpDialogProps {
   phase: StepUpPhase
   isSubmitting: boolean
-  onSubmit: (password: string) => void
+  onSubmit: (input: string | MfaProof | null) => void
   onClose: () => void
 }
 
@@ -43,6 +44,7 @@ export function ConsoleStepUpDialog({
 }: ConsoleStepUpDialogProps) {
   const t = useTranslations('console')
   const tCommon = useTranslations('common')
+  const tMfa = useTranslations('accountMfa')
   const form = useLocalizedForm<StepUpInput>(stepUpSchema, { defaultValues: { password: '' } })
   const open = phase.kind !== 'closed'
   const terminal = phase.kind === 'error' && phase.terminal
@@ -60,14 +62,23 @@ export function ConsoleStepUpDialog({
       <DialogContent closeLabel={tCommon('close')}>
         <DialogHeader>
           <DialogTitle>{t('stepUpTitle')}</DialogTitle>
-          <DialogDescription>{t('stepUpDescription')}</DialogDescription>
+          <DialogDescription>
+            {phase.kind === 'proof' ? tMfa('verifyDescription') : t('stepUpDescription')}
+          </DialogDescription>
         </DialogHeader>
-        {phase.kind === 'error' && (
+        {(phase.kind === 'error' || (phase.kind === 'proof' && phase.message)) && (
           <p role="alert" className="text-sm text-destructive">
             {phase.message}
           </p>
         )}
-        {terminal ? (
+        {phase.kind === 'proof' ? (
+          <ConsoleStepUpProof
+            pending={isSubmitting}
+            unknown={phase.unknown}
+            onSubmit={onSubmit}
+            onClose={onClose}
+          />
+        ) : terminal ? (
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               {tCommon('cancel')}

@@ -46,14 +46,34 @@ interface Expected {
 const EXPECTED: Record<string, Expected> = {
   // auth
   'post /auth/register': { status: '201', kind: 'json' },
-  'post /auth/login': { status: '200', kind: 'json' },
+  'post /auth/login': { status: ['200', '202'], kind: 'json' },
+  'post /auth/mfa/password': { status: '200', kind: 'json' },
+  'post /auth/mfa/verify': { status: '200', kind: 'json' },
+  'post /auth/mfa/status': { status: '200', kind: 'json' },
+  'post /auth/mfa/enrollment': { status: '200', kind: 'json' },
+  'post /auth/mfa/bind-factor': { status: '200', kind: 'json' },
+  'post /auth/mfa/acknowledge-codes': { status: '200', kind: 'json' },
+  'post /auth/mfa/session-flow': { status: '200', kind: 'json' },
+  'post /auth/mfa/reauthenticate': { status: '200', kind: 'json' },
+  'get /auth/mfa/settings': { status: '200', kind: 'json' },
+  'post /auth/mfa/rotate-codes': { status: '200', kind: 'json' },
+  'post /auth/mfa/recover-setup-codes': { status: '200', kind: 'json' },
+  'post /auth/mfa/redeem-recovery-ticket': { status: '200', kind: 'json' },
+  'post /auth/mfa/complete': { status: ['200', '202'], kind: 'json' },
+  'post /auth/browser-publications/invitation-confirm': { status: '200', kind: 'json' },
+  'post /auth/mfa/publication/acknowledge': { status: '200', kind: 'json' },
+  'post /auth/mfa/publication/status': { status: '200', kind: 'json' },
+  'post /auth/mfa/publication/retire': { status: '200', kind: 'json' },
   'post /auth/logout': { status: '204', kind: 'none' },
   'post /auth/refresh': { status: '200', kind: 'json' },
   'get /auth/me': { status: '200', kind: 'json' },
   'patch /auth/me': { status: '200', kind: 'json' },
   'post /auth/me/avatar': { status: '201', kind: 'json' },
   'delete /auth/me/avatar': { status: '204', kind: 'none' },
-  'post /auth/step-up': { status: '200', kind: 'json' },
+  'post /auth/step-up': { status: ['200', '202'], kind: 'json' },
+  'post /auth/browser-publications/bootstrap': { status: '200', kind: 'json' },
+  'post /auth/browser-publications/status': { status: '200', kind: 'json' },
+  'post /auth/browser-publications/probe': { status: '200', kind: 'json' },
   'get /auth/sessions': { status: '200', kind: 'json' },
   'delete /auth/sessions/{sessionId}': { status: '204', kind: 'none' },
   'delete /auth/sessions': { status: '204', kind: 'none' },
@@ -67,7 +87,7 @@ const EXPECTED: Record<string, Expected> = {
   'get /auth/oauth/{provider}/link': { status: '302', kind: 'redirect' },
   'get /auth/oauth/{provider}/callback': { status: '302', kind: 'redirect' },
   'post /auth/oauth/{provider}/callback': { status: '302', kind: 'redirect' },
-  'post /auth/oauth/exchange': { status: '200', kind: 'json' },
+  'post /auth/oauth/exchange': { status: ['200', '202'], kind: 'json' },
   'get /auth/signup-policy': { status: '200', kind: 'json' },
   'post /auth/invites/continuations': { status: '201', kind: 'json' },
   'post /auth/invites/continuations/context': { status: '200', kind: 'json' },
@@ -298,6 +318,28 @@ describe('OpenAPI success surface (e2e)', () => {
       expect(responses['429']).toBeDefined()
       expect(responses['503']).toBeDefined()
     }
+  })
+
+  it('documents credential-free partial step-up separately from a complete token response', () => {
+    const responses = document.paths['/auth/step-up']!.post!.responses
+    expect(responses['200']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/RefreshResponseDto_Output' },
+        },
+      },
+    })
+    expect(responses['202']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/StepUpPendingDto_Output' },
+        },
+      },
+    })
+    expect(document.components!.schemas!.StepUpPendingDto_Output).toMatchObject({
+      additionalProperties: false,
+      required: expect.arrayContaining(['kind', 'requiredProofs']),
+    })
   })
 
   it('documents the finite OAuth return destination under its public query name', () => {

@@ -4,6 +4,7 @@ import { type RequestPrincipal, type SystemRole as Role, SystemRole } from '@amc
 
 import { UnauthorizedException } from '../../common/exceptions/index.js'
 
+import type { MfaAdmissionEvidence } from './mfa/mfa-admission-evidence.js'
 import { PrivilegedRoleService } from './privileged-role.service.js'
 
 /** Request-local evidence; original credential facts never become effective grants. */
@@ -19,7 +20,8 @@ export class PrivilegedAdmissionService {
 
   async resolve(
     principal: RequestPrincipal,
-    requiredRoles: Role[] = []
+    requiredRoles: Role[] = [],
+    evidence?: MfaAdmissionEvidence
   ): Promise<PrivilegedAdmission> {
     const authenticated = Object.freeze({
       ...principal,
@@ -27,20 +29,24 @@ export class PrivilegedAdmissionService {
         scopes: Object.freeze([...principal.scopes]) as unknown as string[],
       }),
     })
-    // ApiKeyGuard obtained this owner role directly from primary during authentication.
+    // API keys always operate as USER; primary owner-role evidence cannot become a platform grant.
     const needsCurrentRole =
       principal.systemRole === SystemRole.SuperAdmin || requiredRoles.includes(principal.systemRole)
     const currentRole =
       principal.type === 'api_key'
-        ? principal.systemRole
+        ? SystemRole.User
         : needsCurrentRole
-          ? await this.roles.getCurrentSystemRole(principal.sub)
+          ? evidence?.principal === principal
+            ? evidence.currentRole
+            : await this.roles.getCurrentSystemRole(principal.sub)
           : undefined
     if (currentRole === null) throw new UnauthorizedException('User not found')
     const systemRole =
-      principal.systemRole === SystemRole.SuperAdmin && currentRole !== SystemRole.SuperAdmin
+      principal.type === 'api_key'
         ? SystemRole.User
-        : principal.systemRole
+        : principal.systemRole === SystemRole.SuperAdmin && currentRole !== SystemRole.SuperAdmin
+          ? SystemRole.User
+          : principal.systemRole
     return Object.freeze({ authenticated, principal: { ...principal, systemRole }, currentRole })
   }
 }

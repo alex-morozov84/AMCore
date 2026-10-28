@@ -1,18 +1,34 @@
-# Account-security preparation
+# Sign-in protection
 
-**Sign-in protection** opens the account-security screen. It is unavailable in
-this deployment: MFA enrollment and second-factor sign-in are not enabled.
-The page cannot change the operator's protection or create recovery credentials.
-Normal Console authentication remains unchanged.
+After the deployment owner activates MFA, operators sign in with a local password
+and an authenticator code or unused backup code. Before activation, the prepared
+protocol refuses operator access. See [activation](../auth/mfa-deployment.md).
 
-The protected page uses logical `/account/security` under the Console's selected
-public base. In host mode, `/mfa` is a separate pending-authentication page that
-does not depend on admitted Console navigation. Path mode uses the website's
-pending-authentication journey. A pending page never grants Console access.
+On first setup, scan the QR code with Google Authenticator, Microsoft Authenticator
+or another compatible app. Enter its six-digit code. Save the ten backup codes
+somewhere available without that phone, then confirm that you saved them.
+Each backup code works once. The application cannot show the set again.
 
-The dedicated Console MFA BFF follows the canonical host and mutation-origin
-checks. It returns only unavailable status or a refusal, with private no-store
-responses. It never returns a credential or publishes a session cookie.
-The Console entry disappears when the optional Console is removed. The
-[retained account-security UI](../auth/mfa-browser.md) remains in the website and
-product administration. Its prepared recovery states are not operational APIs.
+**Sign-in protection** opens your settings. It shows the remaining backup-code
+count. **Create new codes** replaces the old set after fresh password and second-factor
+confirmation. It keeps your current session and other valid devices signed in.
+A lost response does not make a consumed code unused or restore an old set.
+
+**Replace authenticator app** is separate. Confirm the existing protection, connect the new app,
+and verify its code. This change signs out other sessions and replaces old codes.
+Save the new backup set before completing the new sign-in. An error after binding
+does not restore the old app. Sign in again if the setup response was lost.
+
+If you have no phone, choose a backup code during sign-in. That grants normal
+access after the password. It does not force you to replace the app. If no codes
+remain, use the app or ask the deployment owner for
+[offline recovery](../auth/mfa-foundation.md#internal-offline-recovery-boundary).
+
+Path-mode Console uses the website's selected session. A separate-host Console
+has its own secure cookie and session. Pending setup uses the minimal `/mfa`
+page and does not require the admitted Console shell. The backend still verifies
+the current account/family/browser on every protected request.
+
+Removing the optional Console removes only its entry. The
+[retained account-security journey](../auth/mfa-browser.md) remains available on
+the website and product administration for eligible or already protected accounts.

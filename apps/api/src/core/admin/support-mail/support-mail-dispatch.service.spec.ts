@@ -58,6 +58,13 @@ describe('Support mail dispatch deadlines and one physical transport', () => {
     jest.useFakeTimers()
     rows = new Map()
     tx = mockDeep<PrismaClient>()
+    tx.user.findUnique.mockResolvedValue({
+      id: actor.sub,
+      systemRole: actor.systemRole,
+      mfaAccount: null,
+      mfaFactor: null,
+    } as never)
+    tx.mfaProtocol.findUnique.mockResolvedValue({ state: 'prepared', version: 1 } as never)
     ;(tx.$queryRaw as jest.Mock).mockImplementation(async () => [{ now: new Date() }])
     tx.session.findUnique.mockResolvedValue({
       lastAuthAt: new Date(),

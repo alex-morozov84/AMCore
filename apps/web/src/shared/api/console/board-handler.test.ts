@@ -75,7 +75,10 @@ function boardResponse(init: ResponseInit & { csp?: string | null } = {}): Respo
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'access-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'access-token',
+    bindingHeaders: {},
+  })
   fetchMock.mockResolvedValue(boardResponse())
 })
 

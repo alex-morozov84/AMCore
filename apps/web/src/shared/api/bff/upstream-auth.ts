@@ -1,7 +1,13 @@
-import { authResponseSchema, type UserResponse } from '@amcore/shared'
+import {
+  type LoginPublication,
+  passwordLoginResponseSchema,
+  type UserResponse,
+} from '@amcore/shared'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
+import { postBrowserAuth } from './browser-auth-upstream'
+import type { prepareBrowserRegistration } from './browser-registration'
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import { extractCookieValue } from './set-cookie'
@@ -26,6 +32,7 @@ export interface UpstreamAuthResult<TUser> {
   user: TUser
   accessToken: string
   refreshToken: string
+  publication?: LoginPublication
 }
 
 /**
@@ -70,7 +77,13 @@ export async function callUpstreamAuth<TUser>(
  * in an error or a log.
  */
 export type UpstreamRegisterResult =
-  | { outcome: 'created'; user: UserResponse; accessToken: string; refreshToken: string | null }
+  | {
+      outcome: 'created'
+      user: UserResponse
+      accessToken: string
+      refreshToken: string | null
+      publication?: LoginPublication
+    }
   | { outcome: 'unknown'; refreshToken: string | null }
 
 /** Same transport and failures as `callUpstreamAuth`, but classifies creation evidence. */
@@ -78,20 +91,39 @@ export async function callUpstreamRegister(
   path: string,
   body: unknown,
   originalRequest: Request,
-  context?: ProductWebContext
+  context?: ProductWebContext,
+  prepared?: Awaited<ReturnType<typeof prepareBrowserRegistration>>
 ): Promise<UpstreamRegisterResult> {
+  if (prepared && context) {
+    const response = await postBrowserAuth(
+      originalRequest,
+      context,
+      prepared.previous,
+      '/auth/register',
+      body,
+      prepared.intent.continuation,
+      undefined,
+      undefined,
+      prepared.intent
+    )
+    if (response.status !== 201) return { outcome: 'unknown', refreshToken: response.refreshToken }
+    const parsed = passwordLoginResponseSchema.safeParse(response.body)
+    if (!parsed.success) return { outcome: 'unknown', refreshToken: response.refreshToken }
+    return { outcome: 'created', ...parsed.data, refreshToken: response.refreshToken }
+  }
   const response = await postUpstream(path, body, originalRequest, context)
   if (!response.ok) throw new UpstreamAuthError(response.status, await safeJson(response))
 
   const refreshToken = extractCookieValue(response, REFRESH_COOKIE_NAME)
   if (response.status !== 201) return { outcome: 'unknown', refreshToken }
-  const parsed = authResponseSchema.safeParse(await safeJson(response))
+  const parsed = passwordLoginResponseSchema.safeParse(await safeJson(response))
   if (!parsed.success) return { outcome: 'unknown', refreshToken }
   return {
     outcome: 'created',
     user: parsed.data.user,
     accessToken: parsed.data.accessToken,
     refreshToken,
+    ...(parsed.data.publication ? { publication: parsed.data.publication } : {}),
   }
 }
 
