@@ -20,8 +20,8 @@ The following guides cover deployment contracts and operating concerns:
    the migration contract.
 3. [Database role separation](database-role-separation.md) — a migrator role
    distinct from the app's runtime role.
-4. [Backup & restore](backup-restore.md) — a strategy, plus the `restore-drill`
-   that proves it actually restores.
+4. [Backup & restore](backup-restore.md) — backup strategy, coordinated database/local-file
+   recovery and `restore-drill` checks for the selected database archive.
 5. [Secret rotation](secret-rotation.md) — before you need it, not during.
 6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
    VPS.
@@ -53,8 +53,9 @@ Already running? Reach for whichever concern below applies.
 - **[Backup & restore](backup-restore.md)** — which backup strategy fits your
   deployment (managed-provider PITR, self-hosted WAL archiving, or the
   logical-dump fallback), the optional compose `backup`/`restore` profiles
-  this repo ships, and the `restore-drill` profile that rehearses an actual
-  restore on a schedule instead of only taking backups.
+  this repo ships, the `restore-drill` profile that rehearses an actual database
+  restore on a schedule instead of only taking backups, and coordinated
+  backup/restore of locally stored files.
 - **[Database role separation](database-role-separation.md)** — a
   migrator/owner role for `prisma migrate deploy` versus a DML-only runtime
   role for the running app, the setup script, and adopting it on an existing
