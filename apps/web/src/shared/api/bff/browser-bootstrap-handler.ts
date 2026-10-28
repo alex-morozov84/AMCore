@@ -3,6 +3,7 @@ import { browserBootstrapResultSchema } from '@amcore/shared'
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+import { parseRetryAfterSeconds } from '../retry-after'
 
 import { apiErrorResponse } from './api-error-response'
 import {
@@ -97,6 +98,12 @@ export async function prepareBrowserAuthAttempt(
       body: JSON.stringify(anchor ? { binding: anchor } : {}),
     }
   )
+  if (upstream.status === 429)
+    throw new ContextRequestError(
+      429,
+      'RATE_LIMIT_EXCEEDED',
+      parseRetryAfterSeconds(upstream.headers)
+    )
   if (!upstream.ok) throw unavailableBrowserContext()
   const parsed = browserBootstrapResultSchema.safeParse(await readContextJson(upstream.body, 2048))
   if (!parsed.success) throw unavailableBrowserContext()

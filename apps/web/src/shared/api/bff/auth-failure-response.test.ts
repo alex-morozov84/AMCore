@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { authFailureResponse } from './auth-failure-response'
+import { ContextRequestError } from './context-errors'
 import { SessionLockTimeoutError, SessionNotFoundError, SessionRefreshUnsafeError } from './errors'
 
 vi.mock('server-only', () => ({}))
@@ -35,4 +36,14 @@ describe('authFailureResponse', () => {
     const response = authFailureResponse(makeRequest(), error)
     expect(response.status).toBe(503)
   })
+})
+
+it('preserves a bounded source Retry-After for the Console error adapter', async () => {
+  const response = authFailureResponse(
+    makeRequest(),
+    new ContextRequestError(429, 'RATE_LIMIT_EXCEEDED', 75)
+  )
+  expect(response.status).toBe(429)
+  expect(response.headers.get('retry-after')).toBe('75')
+  expect(await response.json()).toMatchObject({ errorCode: 'RATE_LIMIT_EXCEEDED' })
 })

@@ -1,6 +1,7 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 import { completeMfaSignIn } from '../shared/mfa-login'
+import { resetMfaDomainSourceBudgets } from '../support/mfa-domain-fixture.mjs'
 
 /**
  * Real-stack specs register a fresh real account through `apps/api` on
@@ -31,13 +32,25 @@ export async function registerViaUi(
   email: string,
   options: { name?: string } = {}
 ): Promise<void> {
+  resetMfaDomainSourceBudgets()
   await page.goto('/en/register')
   if (options.name) {
     await page.getByLabel(/name/i).fill(options.name)
   }
   await page.getByRole('textbox', { name: /email/i }).fill(email)
   await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
+  const registration = page.waitForResponse(
+    (r) => new URL(r.url()).pathname.endsWith('/auth/register') && r.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: /sign up/i }).click()
+  const response = await registration
+  if (response.status() !== 201) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(
+      `Registration fixture rejected: status=${response.status()}, code=${body.errorCode ?? 'none'}, reference=${body.correlationId ?? 'none'}`
+    )
+  }
+  expect(response.status()).toBe(201)
   // Callers may immediately close this context or assign a role to the new account.
   await page.waitForURL(/\/en\/?$/)
 }

@@ -68,6 +68,8 @@ const sharedModules = [
 const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts'])]
 
 const verification = [
+  // This story exercises only the optional Console journey, even though its UI module is shared.
+  'apps/web/src/shared/ui/console-step-up-dialog.stories.tsx',
   'apps/web/e2e/real-stack/product-admin-oauth-path.spec.ts',
   'apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts',
   'apps/web/e2e/product-admin-real-stack/product-admin-host.spec.ts',
@@ -154,9 +156,6 @@ export const operationsConsoleFacts = {
   sharedModuleTests: [
     ...sharedModuleTests,
     ...sharedApiModuleTests,
-    one('apps/web/src/shared/ui/console-step-up-dialog.stories.tsx', {
-      module: 'apps/web/src/shared/ui/console-step-up-dialog.tsx',
-    }),
     one('apps/web/src/shared/ui/console-step-up-dialog.test.tsx', {
       module: 'apps/web/src/shared/ui/console-step-up-dialog.tsx',
     }),

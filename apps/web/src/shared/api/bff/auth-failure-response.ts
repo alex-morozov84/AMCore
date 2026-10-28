@@ -20,12 +20,16 @@ import 'server-only'
  * logging the user out or crashing into an unhandled 500.
  */
 export function authFailureResponse(request: Request, error: unknown): NextResponse {
-  if (error instanceof ContextRequestError)
-    return apiErrorResponse(request, {
+  if (error instanceof ContextRequestError) {
+    const response = apiErrorResponse(request, {
       statusCode: error.status,
       message: 'Session verification failed',
       errorCode: error.errorCode,
     })
+    if ((error.status === 429 || error.status === 503) && error.retryAfterSeconds !== undefined)
+      response.headers.set('retry-after', String(error.retryAfterSeconds))
+    return response
+  }
   if (error instanceof SessionNotFoundError || error instanceof SessionRefreshUnsafeError) {
     return apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' })
   }

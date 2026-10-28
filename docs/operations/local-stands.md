@@ -754,5 +754,9 @@ DOM snapshot. It also removes matcher-supplied DOM snapshots from test errors,
 while retaining failure messages, stacks and verdicts. Docker E2E uses a step-free
 list reporter because HTML step titles can retain filled factor codes. These rules
 keep factor seeds and backup codes out of failure artifacts.
+Domain success fixtures reset only their disposable MFA source-budget keys before
+creating a fresh test account. The guarded executor validates the live invocation
+and Redis resource first. Limiter tests use their own setup and retain real budgets;
+this reset changes no production limits, factors, sessions or browser authority.
 The runner removes the disposable stack after the attempt. A failed attempt remains
 failed; test setup does not certify a production deployment.

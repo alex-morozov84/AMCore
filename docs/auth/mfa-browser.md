@@ -33,6 +33,9 @@ anchor and a separate pending attempt. Product administration uses its own BFF
 entry and selected audience. The anchor is an HttpOnly session cookie. Browser
 JSON receives only a nonsecret attempt identifier. A protected account receives
 no ordinary session until its required proofs and publication complete.
+A source-budget refusal returns `429 RATE_LIMIT_EXCEEDED` with a valid
+`Retry-After` delay when supplied. Bootstrap issues no attempt or credentials
+on refusal; wait before starting another sign-in or registration.
 
 The BFF retains the continuation before requesting credentials. One Redis update
 stores the pending vault and its operation journal. The API then confirms the
