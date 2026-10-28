@@ -5,8 +5,8 @@ export {
   type AbuseCounts,
 } from './abuse-counter.store.js'
 export {
+  BOUNDED_REDIS_CAPACITY,
   BOUNDED_REDIS_DEADLINE_MS,
-  BOUNDED_REDIS_STALLED_CAPACITY,
   BoundedRedis,
   type BoundedRedisClient,
   BoundedRedisError,
