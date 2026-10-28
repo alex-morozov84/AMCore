@@ -241,10 +241,10 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 1. Resolve the token and hash the new password outside the transaction.
 2. Lock the user's mail-token operations and recheck the token, frontend binding
    and expiry against the current database clock after lock waits.
-3. Conditionally consume the unused, unexpired token and update the password
-   and `emailVerified` together in one transaction.
-4. Delete the user's server-side sessions and invalidate their cached profile
-   after the password transaction commits.
+3. Consume the unused, unexpired token, update the password and `emailVerified`,
+   advance the account security version and revoke existing families/sessions
+   together in one transaction.
+4. Delete revoked session rows and invalidate the cached profile after commit.
 5. Emit the password-changed notification best-effort.
 
 **Success response:** `204 No Content`
@@ -257,16 +257,20 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 
 ### Completion and session failures
 
-Session deletion and cache invalidation occur after the password/token commit.
+Physical session cleanup and cache invalidation follow the security transaction.
 If either fails, the endpoint can return an error although the password changed
-and the link was consumed. Existing session rows can remain when deletion fails;
-a cache failure can leave stale profile data. Notification failure alone does not
+and the link was consumed. Revoked session rows can remain when cleanup fails;
+a cache failure can leave stale profile data. Neither restores revoked authority.
+Notification failure alone does not
 reject the committed reset. There is no automatic replay of these follow-ups.
 
 Try normal sign-in with the chosen password. Do not repeatedly reuse the consumed
 link. Inspect and revoke sessions through Settings or an authorized administrator
-when needed. Successful deletion prevents future refresh; already issued access
-JWTs retain their ordinary lifetime. A mail-send result proves none of these
+when needed. Browser and protected-account credentials fail their next authority
+check, even
+if physical cleanup fails. Only never-protected independent API clients retain
+the residual lifetime of already issued access JWTs. Future refresh is refused.
+A mail-send result proves none of these
 recipient completion effects.
 
 ---

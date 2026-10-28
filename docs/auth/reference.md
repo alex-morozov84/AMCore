@@ -81,11 +81,11 @@ alone:
   Independent ordinary API clients retain the 200 credential response.
   Protected accounts receive 503 in prepared deployments. See
   [password and publication transport](mfa-foundation.md#password-and-publication-transport)
-  for the incomplete-deployment boundary and acknowledgement requirements.
-- **`POST /auth/logout` returns `204` without a legacy cookie.** Internal
-  browser-bound credentials additionally require their actual private browser
+  for publication acknowledgement and deployment requirements.
+- **`POST /auth/logout` returns `204` without a legacy cookie.**
+  Browser-bound credentials additionally require their actual private browser
   generation. Changed authority returns terminal `409 SESSION_CHANGED`, without
-  falling back to legacy logout. See the [dormant boundary](mfa-foundation.md).
+  falling back to legacy logout. See the [session authority](mfa-foundation.md#session-admission).
 - **`POST /auth/reset-password` side effects:** the token is consumed atomically
   with the password update (single-use under concurrency), account security-version
   change and existing family/session revocation. Physical session cleanup and
@@ -98,7 +98,7 @@ alone:
   refreshes the existing session server-side — it does **not** create a session
   or rotate the refresh token, and a silent `POST /auth/refresh` does **not**
   refresh the window.
-  Internal protected state can return `202` with
+  Protected accounts can return `202` with
   `{ "kind": "proof_required", "requiredProofs": ["second_factor"] }` instead
   of a token. This verifies only the password; do not retry the sensitive action
   as though MFA were complete. Activation requires the separate [deployment procedure](mfa-deployment.md).
@@ -178,7 +178,7 @@ Returned in the response root `errorCode`:
 | `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: provider env vars missing                                                                                                        |
 | `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user                                                                                          |
 | `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed                                                                                                     |
-| `STEP_UP_REQUIRED`              | 403  | Sensitive action needs recent proof; legacy password step-up remains, while internal protected admission names `details.requiredProofs` |
+| `STEP_UP_REQUIRED`              | 403  | Sensitive action needs recent proof; legacy password step-up remains, while protected-account admission names `details.requiredProofs` |
 | `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: OAuth-only account, no password                                                                                     |
 
 ### Invitation and signup errors

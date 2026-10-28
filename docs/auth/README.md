@@ -16,8 +16,9 @@ revocation, member removal and bounded operator recovery.
 ## What's included
 
 [Account MFA architecture](mfa-foundation.md) describes storage, current session
-authority, one-time proofs and recovery. [Browser journeys](mfa-browser.md) cover
-setup and self-service. [Deployment](mfa-deployment.md) requires separate owner
+authority, one-time proofs and [extension to other users](mfa-foundation.md#extend-mfa-to-other-users). [Browser journeys](mfa-browser.md) cover
+setup, self-service and safe recovery. [Deployment and maintenance](mfa-deployment.md)
+cover activation, offline reset and key rotation. Activation requires separate owner
 approval; the default prepared protocol does not enable MFA or operator grants.
 
 | Topic                                                 | What it covers                                                                     |

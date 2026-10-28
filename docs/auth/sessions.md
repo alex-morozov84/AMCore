@@ -206,7 +206,7 @@ curl -X DELETE https://api.amcore.dev/api/v1/auth/sessions/sess_def456 \
 You can only revoke your own sessions. Attempting to delete someone else's session returns `404`.
 Revocation closes the selected row's complete refresh family, including rotated
 token rows. Stored family authority remains retired, so deleting rows cannot
-restore internal protected access or its session-derived continuations.
+restore protected access or its session-derived continuations.
 
 **Success response:** `204 No Content`
 
@@ -325,7 +325,7 @@ the reset survives that cleanup.
 Try ordinary sign-in with the chosen password, then inspect/revoke sessions if
 needed. Do not replay the consumed link. See [completion failures](email-auth.md#completion-and-session-failures).
 Already issued JWTs for never-protected independent clients retain their ordinary
-expiry. Internal protected credentials also require the current account version.
+expiry. Browser and protected credentials also require the current account version.
 
 Sessions don't just expire — they can be invalidated by specific events:
 
@@ -376,15 +376,15 @@ historical token row. Refresh can rotate or remove that old row without losing
 the family's proof. A signed family ID never selects another family's proof;
 revocation, expiry, version and browser checks still apply.
 
-Internal protected-account admission uses the exact current family's password
+Protected-account admission uses the exact current family's password
 and second-factor proof times instead. Each must satisfy the route window, capped
 at ten minutes. A fresh committed backup-code proof can satisfy the second factor
 without consuming another code. Missing proof types appear in
 `details.requiredProofs`; a fresh legacy password timestamp cannot replace them.
-These contracts remain behind the [dormant deployment boundary](mfa-foundation.md).
+Activation follows the [deployment procedure](mfa-deployment.md).
 
 Password-only step-up updates only primary evidence. When MFA remains stale,
-the internal protected path returns `202` with `kind: "proof_required"` and
+the protected path returns `202` with `kind: "proof_required"` and
 `requiredProofs`, without an access token. It does not complete the protected
 action. A `200` token retains the original family, security version, browser
 binding marker and organization scope. No new session or refresh token is created.

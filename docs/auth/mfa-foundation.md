@@ -31,17 +31,17 @@ it; the operator owns the image allowlist and closed-ingress upgrade boundary.
 | `MfaFactor`                | Encrypted TOTP seed and globally accepted time step                        |
 | `MfaRecoveryTicket`        | Hashed, single-use deployment recovery authority bound to account/version  |
 | `MfaRecoveryCode`          | Owner/generation-bound hash and atomic consumption timestamp               |
-| `AuthSessionFamily`        | Reserved storage for durable authentication authority                      |
-| `BrowserAuthContext`       | Reserved storage for browser publication generations                       |
+| `AuthSessionFamily`        | Durable family authority, proof identities and revocation                  |
+| `BrowserAuthContext`       | Browser publication generation and exact vault binding                     |
 | `MfaFlow` / `MfaOperation` | Purpose-bound continuation and nonsecret operation state                   |
-| `MfaAttemptBudget`         | Reserved account attempt-history storage                                   |
+| `MfaAttemptBudget`         | Account attempt history and bounded verification admission                 |
 | `MfaProtocol`              | Durable deployment compatibility marker                                    |
 
 These records live in the core schema. They remain independent of the optional
 Console frontend. Adding a record does not publish a session or grant a role.
 Existing sessions receive no positive assurance from the migration.
 
-## Internal verification
+## Factor verification
 
 The TOTP adapter uses a 20-byte random seed, SHA1, six digits and 30-second steps.
 It accepts the current step and one adjacent step in either direction.
@@ -57,10 +57,9 @@ A code is unavailable until setup acknowledgement. The last code remains valid.
 exact continuation, source family, browser binding, account version and current
 proof requirements before consumption. It must enforce account/source/flow
 limits and commit the security effect, audit and notification intent together.
-Internal coordinators apply these checks to password proofs, factor binding,
-code regeneration and pending family publication. Password HTTP admission uses
-these coordinators. OAuth/invitation integration and the complete deployment
-protocol remain unfinished; these helpers do not enable MFA.
+The password, OAuth, invitation and account-security adapters use these
+coordinators for proof consumption, factor binding, code regeneration and family
+publication. None can bypass the deployment activation boundary.
 Rolling back the transaction also rolls back consumption. After a committed
 transaction, a lost response never makes the code unused again.
 
@@ -131,9 +130,9 @@ It preserves already committed family proofs, unrelated sessions and the account
 completed setup. Its save acknowledgement belongs only to that flow.
 
 Restricted initial-enrollment and signed-in source-family handlers expose these
-contracts. The deployment boundary above still applies.
+contracts. The deployment activation boundary still applies.
 
-## Internal session admission
+## Session admission
 
 A parameterized primary SQL projection reads account, family, browser context and
 current database time together. The JWT strategy can retain that projection only
@@ -188,13 +187,11 @@ their issuance deadlines and references. Read-time expiry applies before cleanup
 Scheduled evidence reports removed/examined counts, remaining backlog and failures;
 a truncated or partly failed pass reports a partial result.
 
-These internal checks do not complete the public login, BFF or deployment protocol.
-
 ## Encryption configuration
 
 `MFA_ACTIVE_KEY_ID` selects the write key from `MFA_ENCRYPTION_KEYS`, a secret JSON
 mapping of key IDs to canonical base64-encoded 32-byte keys. Both variables may
-be absent in the dormant deployment. Setting them does not activate MFA.
+be absent while the protocol is prepared. Setting them does not activate MFA.
 Missing or invalid keys make cryptographic operations unavailable.
 
 The codec uses AES256GCM with a fresh 96-bit nonce, 128-bit tag and associated
@@ -202,64 +199,8 @@ data containing the format version, account ID and factor ID. Stored factors
 retain their key ID so the codec can read a retained key after write-key rotation.
 The keyring is separate from JWT secrets. Never log or put it in source control.
 
-### Bounded key maintenance command
-
-`pnpm --filter api auth:mfa -- rotate-key` re-encrypts at most100 existing factors
-with the configured active key. It reads `DATABASE_URL`, `MFA_ACTIVE_KEY_ID` and
-`MFA_ENCRYPTION_KEYS`; it does not initialize HTTP, JWT or Redis services.
-`--after-user-id <account-id>` continues after a returned `nextUserId`.
-Each account commits separately. The command changes neither factor identity nor
-replay counters, account security version, backup codes or session proofs.
-
-Output contains counts, a cursor and whether old references remain. `complete`
-means no old factor references were observed; `more` needs another batch. `partial`
-returns exit3 and retains failed factors. An unavailable database or uncertain
-result returns `unconfirmed`, exit4; earlier account transactions may have committed.
-Inspect references and repeat safely. Missing input/key configuration returns exit2.
-The command never prints plaintext seeds, keys or connection strings.
-
-This command does not activate MFA or implement total-loss recovery. Old keys must
-remain available to replicas and matching database backups that still need them.
-A successful batch alone does not prove fleet migration or backup restoration.
-Unbound drafts can still reference the old key until their bounded expiry and
-cleanup. Deployment preflight checks factor and draft references. Retain old keys
-until those records disappear and retain matching keys with older backups.
-
-### Internal offline recovery boundary
-
-`pnpm --filter api auth:mfa -- recover --user-id <account-id>` requires a private
-POSIX terminal and an actual core-schema owner, owner-role member or superuser.
-Runtime table DML and the application SUPER_ADMIN role are insufficient.
-The target must already be MFA-protected and have a local password. Complete
-normal verified password recovery before issuing a ticket if that password is absent.
-The command requires the active supported protocol. The recipient finishes
-recovery through the restricted browser/API setup journey. Recovery is not activation.
-
-The terminal asks for a reason and exact target confirmation. The reset transaction
-revokes sessions and continuations, advances the account security version, removes
-the old factor/codes and preserves required MFA with emergency enrollment pending.
-It records strict audit and notification intent together. A missing old encryption
-key does not prevent targeted reset; enrollment still needs a healthy active key.
-
-The command displays one15-minute enrollment ticket only on the verified private
-terminal. JSON outcomes, logs, audit and notifications never contain that ticket.
-The database stores only its domain-separated hash. Password reset or another
-offline reset invalidates earlier tickets. A lost ticket needs another confirmed reset.
-The terminal check verifies device identity, OS owner and read permissions; the
-operator must also keep the terminal private and unrecorded.
-
-Password plus ticket grants only a new setup continuation. It creates no ordinary
-session. Ticket consumption is single-use and rotates the continuation; a lost
-winning response cannot recover its secret through the old parent. The user must
-then connect a new app, verify its TOTP and acknowledge the new backup codes.
-The emergency flag clears only at binding; completed setup remains pending until
-code saving. These internal flows do not complete the HTTP/BFF deployment protocol.
-
-A refused prerequisite changes nothing. A failed strict transaction rolls back its
-security changes and intent. `unconfirmed` never promises rollback after an uncertain
-commit. If the ticket cannot be displayed after commit, a new confirmed reset is
-required. There is no support UI, HTTP reset endpoint, master code or global MFA-off
-operation for this recovery path.
+For administrative recovery and key rotation, use the
+[deployment procedures](mfa-deployment.md#recover-an-account-without-its-app-or-codes).
 
 ### Source-session continuation
 
@@ -288,3 +229,111 @@ replacement result can retain the restricted setup successor after revoking the
 source family. The user must save its codes before the new session is published.
 Losing that binding response before successor retention requires a new sign-in;
 it cannot restore the retired source session.
+
+## Browser adapter contract
+
+Dedicated BFF entries are `/api/auth/mfa` and `/api/product-admin/auth/mfa`.
+They select the canonical frontend context before any work. Pending GET reads the
+selected continuation's nonsecret status. POST confirms a local password, verifies
+an app or backup code,
+completes password login, or cancels that exact browser attempt. An untrusted
+mutation returns 403; the wrong frontend host returns 404. Initial setup uses restricted enrollment handlers. Signed-in settings capture
+the exact current family before rotation or replacement. Emergency recovery
+accepts only a previously issued server-administrator ticket with the local password.
+Responses use `Cache-Control: private, no-store`. The generic authenticated proxy
+denies all `/auth/mfa` upstream paths.
+
+Before password submission, `/api/auth/browser-context` creates a neutral browser
+anchor and a separate pending attempt. Product administration uses its own BFF
+entry and selected audience. The anchor is an HttpOnly session cookie. Browser
+JSON receives only a nonsecret attempt identifier. A protected account receives
+no ordinary session until its required proofs and publication complete.
+A source-budget refusal returns `429 RATE_LIMIT_EXCEEDED` with a valid
+`Retry-After` delay when supplied. Bootstrap issues no attempt or credentials
+on refusal; wait before starting another sign-in or registration.
+
+The BFF retains the continuation before requesting credentials. One Redis update
+stores the pending vault and its operation journal. The API then confirms the
+exact publication. Readers verify the selected family, account security version,
+browser generation and audience against the API before returning identity or
+credentials. They repeat verification across token refresh. A changed context
+fails with `AUTH_CONTEXT_CHANGED`; it never triggers automatic refresh.
+
+Logout requires the session identifier captured by the displayed screen. The
+API retires that exact browser generation before the BFF clears its local cookie.
+An older screen cannot log out a newer winning session. An unavailable API leaves
+the outcome unconfirmed; the BFF does not report successful logout or clear the
+stable browser anchor.
+
+Password and OAuth invitations use the restricted combined confirmation. It validates
+the exact pending attempt before one database transaction confirms the handoff and
+publishes its family. Membership still requires separate acceptance. The BFF also
+checks the actual invitation owner before recovering a lost confirmation response.
+Ordinary and invitation-bound browser registration retain a private publication
+proposal before account creation. Account, pending family/session and email token
+commit together. The BFF confirms publication before setting its session cookie.
+Independent clients retain separate API sessions. Protected provider linking
+captures its original family and local proof freshness through the callback.
+A provider identity cannot bypass required local proofs or publish a browser session.
+
+## Component and adapter boundaries
+
+`features/account-mfa` exports a headless controller and the reusable journey.
+The app layer chooses the frontend adapter and destinations. Shared strict Zod
+schemas define browser states and commands. Raw backend continuation, JWT,
+refresh-token and publication-receipt fields are excluded from browser results.
+Unknown fields are rejected, rather than silently copied into client state.
+
+The controller keeps a setup key and a newly issued backup set outside its
+serializable snapshot and the Query cache. Concealment invalidates in-flight
+responses. Page exit, unmount and a safe status read erase displayed secrets.
+A restored page reads nonsecret status; it cannot redisplay an issued set.
+A changed-session response removes the previous identity and secrets.
+Backend services separately enforce family and publication authority.
+
+An uncertain mutation result offers a status-only read with the operation ID.
+It does not automatically repeat the password, code or mutation. An ordinary
+refusal keeps the form available. The server must still own proof freshness,
+one-time consumption, rate limits, family binding and transaction outcomes.
+
+## Extend MFA to other users
+
+The mechanism belongs to the account, not to Console or an organization role.
+The current shipped policy requires MFA for `SUPER_ADMIN` and preserves protection
+for accounts with `required`, `emergencyRequired` or a bound factor. It does not
+offer initial enrollment to never-protected ordinary users. There is no supported
+configuration flag or public administrative endpoint for widening that rollout.
+
+A downstream extension requires reviewed code changes and its own rollout approval:
+
+1. Define who may enroll and who must use MFA. Change `enrollmentEligible` and
+   `accountRequiresMfa` in `apps/api/src/core/auth/mfa/mfa-account-policy.ts`
+   separately. Enrollment eligibility alone must not require MFA before binding.
+   Keep bound factors and emergency-required accounts protected after role changes.
+2. Reuse account-owned factors, recovery codes, continuations and session families.
+   Do not create role-specific factor tables or another password-only login route.
+   Reuse the existing website/product-administration account-security adapters and
+   `features/account-mfa` journey. Derive eligibility from the server settings response.
+3. Define policy transitions for existing sessions and incomplete enrollment.
+   Use the existing ordered account locks and transactional security-version/family
+   invalidation when a transition must retire authority. A profile flag or client
+   setting alone cannot change server admission. Organization membership and roles
+   remain separate authorization decisions; MFA grants neither.
+4. Extend `mfa-account-policy.spec.ts` and the affected HTTP/BFF/browser tests.
+   Cover newly eligible users, required users, unaffected ordinary users, role
+   removal, existing sessions, OAuth, invitations, last-code login and recovery.
+   Preserve fresh proof requirements for sensitive actions and original-family
+   revocation for every continuation.
+
+```text
+Enrollment policy -> existing setup journey -> account-owned factor
+Login policy -> password + required proof -> exact session publication
+Role/organization policy -> independent authorization
+```
+
+Keep the browser anchor, publication generation and all reader/refresh checks.
+A late cookie must never restore old identity. Invitation confirmation must still
+validate the exact attempt and commit handoff with publication atomically.
+Do not admit protected accounts in `prepared` state or weaken fleet/key checks.
+Measure ordinary request cost and route JavaScript when expanding shared paths;
+keep MFA client code scoped to its owning interactive journeys.

@@ -77,5 +77,5 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 For new server requests, start with the [enforced request boundary](api-consumption.md#server-request-boundary).
 
-Account-security presentation and its dormant BFF boundary are documented in
-[account-security browser preparation](../auth/mfa-browser.md).
+For account-security UI, use the [user journey](../auth/mfa-browser.md).
+Developers can reuse the [browser adapter contract](../auth/mfa-foundation.md#browser-adapter-contract).

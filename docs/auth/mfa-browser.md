@@ -1,146 +1,121 @@
-# Account-security browser journey
+# Use sign-in protection
 
-The account-security UI supports app setup, code verification, backup-code saving
-and app replacement. Activation requires the separately approved
-[deployment procedure](mfa-deployment.md). Before activation, protected operator
-access is unavailable. Password/OAuth login, invitations and browser publication
-share server-owned continuations. A pending continuation grants no ordinary access.
+After the deployment owner [activates MFA](mfa-deployment.md), operators use a local
+password plus an authenticator code or an unused backup code. Initial enrollment
+is unavailable to never-protected ordinary users. Already protected accounts stay
+protected after a role change. Prepared deployments refuse operator access.
 
-## Routes and availability
+## Open the journey
 
-The website has `/mfa` for pending authentication and `/account/security` for
-signed-in self-service. Product administration retains the same logical suffixes.
-Use its [placement helpers](../product-admin/placement-and-sessions.md), not a
-hardcoded administration prefix. Multi-locale builds prefix pages with the locale.
-The standalone language switcher changes only the browser URL/cookie. It never
-reads or updates a product profile during pending authentication.
-Signed-in settings require the selected frontend session. Pending pages do not
-grant a session or access to protected pages.
-
-Dedicated BFF entries are `/api/auth/mfa` and `/api/product-admin/auth/mfa`.
-They select the canonical frontend context before any work. Pending GET reads the
-selected continuation's nonsecret status. POST confirms a local password, verifies
-an app or backup code,
-completes password login, or cancels that exact browser attempt. An untrusted
-mutation returns 403; the wrong frontend host returns 404. Initial setup uses restricted enrollment handlers. Signed-in settings capture
-the exact current family before rotation or replacement. Emergency recovery
-accepts only a previously issued server-administrator ticket with the local password.
-Responses use `Cache-Control: private, no-store`. The generic authenticated proxy
-denies all `/auth/mfa` upstream paths.
-
-Before password submission, `/api/auth/browser-context` creates a neutral browser
-anchor and a separate pending attempt. Product administration uses its own BFF
-entry and selected audience. The anchor is an HttpOnly session cookie. Browser
-JSON receives only a nonsecret attempt identifier. A protected account receives
-no ordinary session until its required proofs and publication complete.
-A source-budget refusal returns `429 RATE_LIMIT_EXCEEDED` with a valid
-`Retry-After` delay when supplied. Bootstrap issues no attempt or credentials
-on refusal; wait before starting another sign-in or registration.
-
-The BFF retains the continuation before requesting credentials. One Redis update
-stores the pending vault and its operation journal. The API then confirms the
-exact publication. Readers verify the selected family, account security version,
-browser generation and audience against the API before returning identity or
-credentials. They repeat verification across token refresh. A changed context
-fails with `AUTH_CONTEXT_CHANGED`; it never triggers automatic refresh.
-
-Logout requires the session identifier captured by the displayed screen. The
-API retires that exact browser generation before the BFF clears its local cookie.
-An older screen cannot log out a newer winning session. An unavailable API leaves
-the outcome unconfirmed; the BFF does not report successful logout or clear the
-stable browser anchor.
-
-Password and OAuth invitations use the restricted combined confirmation. It validates
-the exact pending attempt before one database transaction confirms the handoff and
-publishes its family. Membership still requires separate acceptance. The BFF also
-checks the actual invitation owner before recovering a lost confirmation response.
-Ordinary and invitation-bound browser registration retain a private publication
-proposal before account creation. Account, pending family/session and email token
-commit together. The BFF confirms publication before setting its session cookie.
-Independent clients retain separate API sessions. Protected provider linking
-captures its original family and local proof freshness through the callback.
-A provider identity cannot bypass required local proofs or publish a browser session.
+Sign-in opens `/mfa` when further proof or setup is required. Signed-in users open
+**Sign-in protection** at `/account/security`. Multi-locale builds add the locale
+prefix. Product administration uses its configured placement with these suffixes;
+see [placement and sessions](../product-admin/placement-and-sessions.md).
+Pending pages grant no ordinary session. If the account has no local password,
+complete the offered password-recovery path first. An OAuth provider cannot
+replace the protected account's local password or second factor.
 
 ## Initial setup and lost responses
 
-A current password confirmation opens the unbound app draft. The new app's unused
-TOTP binds the factor and creates a restricted setup successor. The BFF retains
-that successor before returning the one-time backup set. It keeps the same public
-flow identifier, while replacing the private continuation and browser generation.
-Saving the exact code generation precedes session issuance and publication. The
-save command and publication have distinct operation IDs; the journal binds them
-for a status-only recovery of the same completed session.
+1. Confirm your local password when requested.
+2. Open Google Authenticator, Microsoft Authenticator or another compatible app.
+   Add an account and scan the QR code. Manual entry is available if scanning fails.
+3. Enter the six-digit **Code from your app** and continue.
+4. Copy or download the ten backup codes. Store them somewhere accessible without
+   your phone. Select **I have saved my backup codes**, then **Finish setup**.
 
-A status read never returns a seed or backup set. If the browser lost the backup
-response after the BFF retained its successor, use the connected app's next unused
-code to create a new set. If the API binding response was lost before the BFF could
-retain the successor, sign in again with the password. The app stays bound. The
-new setup flow requires that app's next unused code to generate replacement backup
-codes. An old set cannot be acknowledged after its generation changes.
+```text
+Password -> connect app -> verify app code -> save backup codes -> session
+```
 
-Emergency recovery consumes its ticket once and replaces the pending continuation
-with restricted new-app enrollment. It returns no session, refresh credential or
-backup set. Connect and verify the new app, then save its new backup codes before
-publication. If the only redemption response is lost before its successor is
-retained, request another ticket from the server administrator. The old ticket
-cannot reconstruct its successor. This does not change normal backup-code login.
+Each backup code works once. The application cannot display the issued set again.
+Copying or downloading does not confirm saving. The application cannot erase your
+clipboard, downloads or screenshots. QR generation and code downloads are local.
+
+If a response is lost, select **Check result** before submitting anything again.
+This reads status; it does not repeat the code or mutation. A status read cannot
+show a seed or backup set. If setup needs replacement codes, use the connected
+app's next unused code. If the browser could not retain the setup continuation,
+sign in again. The app stays bound; the new flow requires its next unused code.
+An old code set cannot be confirmed after a newer set replaces it.
+
+## Sign in without your phone
+
+Enter your password, then select **No access to your app? Use a backup code**.
+Enter one unused **Backup code**. This grants ordinary access without replacing
+or disconnecting your app. The last code is valid too.
+
+After entry, **Create new codes** can use the still-fresh password and backup-code
+confirmation from that session. If either confirmation expires, confirm again.
+If you have no unused codes, use the app or the administrator recovery below.
+
+A lost response can consume the last code without delivering a usable session.
+Select **Check result** first. If the browser can recover the exact completed
+result, continue. Otherwise sign in with another unused code or the app. If
+neither is available, request administrator recovery. Do not reuse the consumed
+code or assume that the browser can always recover a session.
+
+## Maintain your protection
+
+**Sign-in protection** shows the number of unused backup codes.
+
+- **Create new codes** requires fresh password and second-factor confirmation.
+  It invalidates unused old codes. It keeps the current session and other valid
+  sessions signed in. Save and acknowledge the new set.
+- **Replace authenticator app** requires confirmation of the existing protection.
+  Connect and verify the new app. This retires old sessions and replaces old codes.
+  Save its new codes before completing the successor session. A failure after
+  binding does not restore the old app. Sign in again if the setup result is lost.
+
+For either action, check an uncertain result before retrying. A status response
+never redisplays the new codes. A revoked original session or changed browser
+context requires a new sign-in; another login cannot adopt its pending operation.
 
 ## Confirm a sensitive action
 
-After the password, a protected account may still need an app or unused backup
-code. The caller keeps the original action pending. It retries that action once
-only after the server commits all fresh proofs to the original session family.
-The continuation is bound to the selected vault, browser context and generation;
-a newer login cannot adopt it. Closing the dialog prevents a late response from
-retrying the action.
+Enter the requested password and app or unused backup code. Password confirmation
+alone does not complete MFA. The interface retries the original action only after
+all required confirmations succeed. Canceling the dialog prevents a late response
+from retrying it. If a response is lost, select **Check result** first.
 
-If the code response is lost, check the result before entering another code.
-This check completes from already committed proofs and never resends the code.
-An expired password confirmation returns to password entry. A revoked source
-session or changed browser context requires a new sign-in. No continuation
-response contains an ordinary access or refresh token.
+## Recover without your app or backup codes
 
-## Component and adapter boundaries
+Contact your deployment administrator through your organization's approved private
+channel. Support contact alone does not authorize a reset. The administrator must
+follow [offline recovery](mfa-deployment.md#recover-an-account-without-its-app-or-codes).
+This reset signs out existing sessions and invalidates old app codes, backup codes
+and pending continuations. It cannot restore the old app afterward.
 
-`features/account-mfa` exports a headless controller and the reusable journey.
-The app layer chooses the frontend adapter and destinations. Shared strict Zod
-schemas define browser states and commands. Raw backend continuation, JWT,
-refresh-token and publication-receipt fields are excluded from browser results.
-Unknown fields are rejected, rather than silently copied into client state.
+The administrator supplies a single-use ticket that expires after 15 minutes.
+Sign in with your password. On the code screen, select **Code from the server
+administrator**. Enter your local password and the ticket in that recovery form. This ticket is not a backup code. Connect a new app, verify its
+code and save the new backup set. Ticket redemption alone gives no ordinary access.
 
-The controller keeps a setup key and a newly issued backup set outside its
-serializable snapshot and the Query cache. Concealment invalidates in-flight
-responses. Page exit, unmount and a safe status read erase displayed secrets.
-A restored page reads nonsecret status; it cannot redisplay an issued set.
-A changed-session response removes the previous identity and secrets.
-Backend services separately enforce family and publication authority.
+If the administrator loses the ticket or cannot confirm its delivery, ask for
+another confirmed reset. If your redemption response is lost, check the result.
+If the browser did not retain its successor, ask for another ticket. Each new
+reset invalidates prior tickets and revokes sessions again. The consumed ticket
+cannot reconstruct its successor. If your password is unavailable, complete the
+normal password-recovery path before the administrator issues a ticket.
 
-An uncertain mutation result offers a status-only read with the operation ID.
-It does not automatically repeat the password, code or mutation. An ordinary
-refusal keeps the form available. The server must still own proof freshness,
-one-time consumption, rate limits, family binding and transaction outcomes.
+## Ask for help safely
 
-## Prepared states
+Use the organization's published support contact. AMCore does not provide a
+support reset screen or a universal support address. Describe the approximate
+time, page, action, displayed error code or reference, and which response was lost.
+State whether you still have the phone or unused codes; do not send their values.
+Provide only the account identification required by that approved private channel.
 
-The flow includes local QR/manual entry, app and backup-code forms, one-time
-code saving with an explicit acknowledgement, replacement confirmation, expiry,
-changed-session refusal and uncertain-result recovery. A password-setup state
-uses the existing password-recovery route. An emergency-recovery state has its
-own password and deployment-ticket fields; it never treats that ticket as a
-backup code. Initial setup and emergency-ticket redemption use connected restricted browser APIs.
-Signed-in rotation keeps the current family; app replacement switches to the
-restricted successor after retiring old authority.
+Never send passwords, app codes, QR codes, setup keys, backup codes, recovery
+tickets, encryption keys, tokens or cookies. Do not attach unsanitized screenshots,
+logs or database copies. This guide does not authorize sharing fleet artifacts,
+audit records or other users' details. Support cannot bypass the administrator's
+recovery permissions.
 
-QR generation is local. Clipboard failure keeps manual selection available.
-The download is a local text file. Copying or downloading does not check the
-saved-codes acknowledgement. Users must store codes somewhere available without
-their phone. The UI cannot erase clipboard contents, downloads or screenshots.
+## Integration and safe UI inspection
 
-## Inspect the UI safely
-
-Use an owned managed preview with `--profile account-mfa-ui`; see
-[local stands](../operations/local-stands.md#account-security-ui-preview).
-That profile replaces only the client adapter in its isolated source snapshot.
-It labels the journey as simulation and uses public test data. It does not write
-MFA factors or change account protection. It cannot prove real enrollment,
-server recovery, session publication or enforcement.
+Developers: use the [browser adapter contract](mfa-foundation.md#browser-adapter-contract)
+and [extension instructions](mfa-foundation.md#extend-mfa-to-other-users).
+For a simulated UI preview, use an owned managed stand with
+`--profile account-mfa-ui`; see [local stands](../operations/local-stands.md#account-security-ui-preview).
+Simulation does not prove enrollment, recovery, publication or enforcement.
