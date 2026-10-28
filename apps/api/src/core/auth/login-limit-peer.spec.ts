@@ -52,6 +52,18 @@ async function peer(reply: (command: string[], socket: Socket) => void) {
 const run = (url: string) =>
   LoginLimitConnection.acquire().run(() => url, 'return {1,0}', ['a', 'b', 'c'], 'check')
 
+async function withinWatchdog<T>(operation: () => Promise<T>): Promise<T> {
+  let timer!: ReturnType<typeof setTimeout>
+  const watchdog = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Redis peer wave did not settle')), 750)
+  })
+  try {
+    return await Promise.race([operation(), watchdog])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 describe('actual ioredis bounded lifecycle against controlled RESP peer', () => {
   it('does not poll INFO while loading and does not resend EVAL', async () => {
     const p = await peer((args, socket) =>
@@ -123,12 +135,14 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
     })
     try {
       for (let wave = 0; wave < 2; wave++) {
-        const start = performance.now()
-        const batch = Array.from({ length: 32 }, () => run(p.url))
-        expect(() => LoginLimitConnection.acquire()).toThrow('capacity')
-        const settled = await Promise.allSettled(batch)
+        // Race scheduled timers rather than counting CI event-loop starvation as client work.
+        // Exact 450/500 ms deadlines are covered by the controlled-clock lifecycle tests.
+        const settled = await withinWatchdog(() => {
+          const batch = Array.from({ length: 32 }, () => run(p.url))
+          expect(() => LoginLimitConnection.acquire()).toThrow('capacity')
+          return Promise.allSettled(batch)
+        })
         expect(settled.every((r) => r.status === 'rejected')).toBe(true)
-        expect(performance.now() - start).toBeLessThanOrEqual(750)
       }
       healthy = true
       await expect(run(p.url)).resolves.toEqual([1, 0])
