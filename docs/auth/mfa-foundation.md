@@ -304,7 +304,16 @@ for accounts with `required`, `emergencyRequired` or a bound factor. It does not
 offer initial enrollment to never-protected ordinary users. There is no supported
 configuration flag or public administrative endpoint for widening that rollout.
 
-A downstream extension requires reviewed code changes and its own rollout approval:
+A downstream extension requires reviewed code changes and its own rollout approval.
+First establish the current deployment state. In `prepared`, first activation
+requires the existing closed-ingress [activation procedure](mfa-deployment.md).
+In compatible `active` state, widening policy does not activate the protocol again.
+Deploy the reviewed policy change using the normal approved deployment procedure;
+verify new and unaffected users before exposing the changed admission policy.
+Owner approval of this policy rollout is separate from the original activation.
+Neither case permits a protocol downgrade or a password-only protected fallback.
+
+Complete these steps before enabling the wider policy:
 
 1. Define who may enroll and who must use MFA. Change `enrollmentEligible` and
    `accountRequiresMfa` in `apps/api/src/core/auth/mfa/mfa-account-policy.ts`
@@ -336,4 +345,7 @@ A late cookie must never restore old identity. Invitation confirmation must stil
 validate the exact attempt and commit handoff with publication atomically.
 Do not admit protected accounts in `prepared` state or weaken fleet/key checks.
 Measure ordinary request cost and route JavaScript when expanding shared paths;
-keep MFA client code scoped to its owning interactive journeys.
+keep MFA client code scoped to its owning interactive journeys. Use the existing
+[route bundle budgets](../frontend/bundle-budget.md) and the affected
+[frontend verification lanes](../frontend/testing.md); do not raise limits to hide
+a regression. Agree any new request-cost acceptance criterion with the owner.
