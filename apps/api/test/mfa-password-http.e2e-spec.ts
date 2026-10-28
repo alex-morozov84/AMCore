@@ -4,7 +4,7 @@ import { jest } from '@jest/globals'
 import { generate } from 'otplib'
 import request from 'supertest'
 
-import { BROWSER_AUTH_HEADERS } from '@amcore/shared'
+import { BROWSER_AUTH_HEADERS, DEFAULT_LOCALE, localePathPrefix } from '@amcore/shared'
 
 import { MfaAuthorityReader } from '../src/core/auth/mfa/mfa-authority-reader.service.js'
 import { MfaEncryptionService } from '../src/core/auth/mfa/mfa-encryption.service.js'
@@ -917,7 +917,9 @@ describe('Actual password, MFA proof and credential publication HTTP path', () =
       .get(`/auth/oauth/google/callback?state=${state}&code=fake-link-code`)
       .set('Cookie', nonce)
       .expect(302)
-    expect(new URL(callback.headers.location!).pathname).toMatch(/\/(en|ru)\/login$/)
+    expect(new URL(callback.headers.location!).pathname).toBe(
+      `${localePathPrefix(DEFAULT_LOCALE)}/login`
+    )
     expect(new URL(callback.headers.location!).searchParams.get('linked')).toBe('google')
     expect(callback.headers['set-cookie']).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/^refresh_token=[^;]/)])
