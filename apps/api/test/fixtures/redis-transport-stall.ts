@@ -10,6 +10,8 @@ export async function redisTransportStall(
   holdReplies: () => void
   holdCommands: () => void
   release: () => void
+  /** Destroys every open connection but keeps listening, so clients can reconnect. */
+  dropConnections: () => void
   close: () => Promise<void>
 }> {
   const sockets = new Set<Socket>()
@@ -72,6 +74,11 @@ export async function redisTransportStall(
       holdCommands = false
       for (const pending of [...commands.splice(0), ...replies.splice(0)])
         pending.socket.write(pending.chunk)
+    },
+    dropConnections: () => {
+      replies.splice(0)
+      commands.splice(0)
+      for (const socket of sockets) socket.destroy()
     },
     close: async () => {
       for (const socket of sockets) socket.destroy()

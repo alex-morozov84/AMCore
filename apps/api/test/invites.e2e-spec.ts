@@ -7,7 +7,9 @@ import request from 'supertest'
 import { createInvitationOperationId } from '@amcore/shared'
 
 import { InviteService } from '../src/core/organizations/invite.service'
+import { InviteAcceptLimiterService } from '../src/core/organizations/invite-accept-limiter.service'
 import { EmailService } from '../src/infrastructure/email'
+import { AbuseCounterError, AbuseCounterStore } from '../src/infrastructure/redis'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -377,6 +379,97 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
         .set('X-Invitation-Operation-Id', createInvitationOperationId())
         .send({ token: randomBytes(32).toString('base64url') })
         .expect(401)
+    })
+
+    describe('failure counters (OB-02)', () => {
+      afterEach(() => {
+        jest.restoreAllMocks()
+      })
+
+      async function inviteeWithInvite(): Promise<{ inviteeToken: string; rawToken: string }> {
+        const { orgId, adminUserId } = await setupAdminOrg()
+        const memberRoleRow = await prisma.role.findFirstOrThrow({
+          where: { name: 'MEMBER', isSystem: true, organizationId: null },
+        })
+        const inviteeToken = await registerAndLogin('invitee@example.com')
+        await verifyEmail('invitee@example.com')
+        const { rawToken } = await inviteFor(
+          orgId,
+          adminUserId,
+          memberRoleRow.id,
+          'invitee@example.com'
+        )
+        return { inviteeToken, rawToken }
+      }
+
+      const accept = async (inviteeToken: string, token: string): Promise<request.Response> =>
+        request(app.getHttpServer())
+          .post('/auth/invites/accept')
+          .set('X-Invitation-Operation-Id', createInvitationOperationId())
+          .set('Authorization', `Bearer ${inviteeToken}`)
+          .send(await invitationAcceptBody(prisma, token))
+
+      it('answers 503 SERVICE_UNAVAILABLE before any invitation work when the counters cannot be read', async () => {
+        const { inviteeToken, rawToken } = await inviteeWithInvite()
+        jest
+          .spyOn(app.get(AbuseCounterStore), 'read')
+          .mockRejectedValueOnce(new AbuseCounterError('unavailable', 'not_sent'))
+
+        const res = await accept(inviteeToken, rawToken)
+
+        expect(res.status).toBe(503)
+        expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        const invite = await prisma.orgInvite.findFirstOrThrow({
+          where: { tokenHash: hashToken(rawToken) },
+        })
+        expect(invite.acceptedAt).toBeNull()
+        expect(
+          await prisma.orgMember.count({
+            where: { user: { emailCanonical: 'invitee@example.com' } },
+          })
+        ).toBe(0)
+      })
+
+      it.each(['not_sent', 'unknown'] as const)(
+        'keeps the original 400 INVITE_INVALID_OR_EXPIRED when recording the failure is %s',
+        async (outcome) => {
+          const { inviteeToken } = await inviteeWithInvite()
+          jest
+            .spyOn(app.get(AbuseCounterStore), 'increment')
+            .mockRejectedValueOnce(new AbuseCounterError('unavailable', outcome))
+
+          const res = await accept(inviteeToken, randomBytes(32).toString('base64url'))
+
+          expect(res.status).toBe(400)
+          expect(res.body.errorCode).toBe('INVITE_INVALID_OR_EXPIRED')
+        }
+      )
+
+      it('counts failures in v2 integer keys; a successful accept clears only its own fingerprint', async () => {
+        const { inviteeToken, rawToken } = await inviteeWithInvite()
+        const wrong = randomBytes(32).toString('base64url')
+        await accept(inviteeToken, wrong).then((res) => expect(res.status).toBe(400))
+        await accept(inviteeToken, wrong).then((res) => expect(res.status).toBe(400))
+
+        const redis = context.cache.connection
+        const [ipKey] = await redis.keys('rate:v2:invite_accept_fail_ip:*')
+        expect(await redis.get(ipKey!)).toBe('2')
+        const wrongKey = `rate:v2:invite_accept_fail_token:${InviteAcceptLimiterService.fingerprint(wrong)}`
+        expect(await redis.get(wrongKey)).toBe('2')
+        expect(await redis.keys('rate:invite_accept_fail_*')).toEqual([])
+
+        await accept(inviteeToken, rawToken).then((res) => expect(res.status).toBe(200))
+
+        // Success removes only the accepted token's counter: the IP debt and the other
+        // fingerprint are untouched.
+        expect(await redis.get(ipKey!)).toBe('2')
+        expect(await redis.get(wrongKey)).toBe('2')
+        expect(
+          await redis.exists(
+            `rate:v2:invite_accept_fail_token:${InviteAcceptLimiterService.fingerprint(rawToken)}`
+          )
+        ).toBe(0)
+      })
     })
   })
 

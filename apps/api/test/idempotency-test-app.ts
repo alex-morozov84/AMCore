@@ -1,7 +1,5 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import type { Provider, Type } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
-import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
 import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
@@ -16,6 +14,7 @@ import {
   noopPinoLogger,
   setupE2ETestInfrastructure,
 } from './helpers'
+import { TestRedis } from './test-redis'
 
 export async function setupIdempotencyTestApp(
   controller: Type<unknown>,
@@ -48,7 +47,7 @@ export async function setupIdempotencyTestApp(
   await app.getHttpAdapter().getInstance().ready()
 
   const prisma = app.get(PrismaService)
-  const cache = app.get<Cache>(CACHE_MANAGER)
+  const cache = await TestRedis.connect(redisContainer)
   const throttlerStorage = app.get(GcraRedisLimiter)
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }

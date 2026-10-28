@@ -1,5 +1,4 @@
 import type { WorkerHost } from '@nestjs/bullmq'
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { type INestApplication, Module } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -7,7 +6,6 @@ import type { TestingModule, TestingModuleBuilder } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
-import type { Cache } from 'cache-manager'
 import { execSync } from 'child_process'
 import { PinoLogger } from 'nestjs-pino'
 import { Client } from 'pg'
@@ -27,6 +25,7 @@ import { boundedPhase, cleanupE2E } from './e2e-cleanup'
 import { e2eContainerLabels } from './e2e-owned-containers'
 import { cleanupFailedE2ESetup, prepareE2EAuthEnvironment } from './e2e-setup'
 import { closeE2EWorkers } from './e2e-workers'
+import { TestRedis } from './test-redis'
 
 /**
  * Suite-local PinoLogger stub for E2E. The original Jest ESM harness stalled
@@ -51,7 +50,13 @@ export const noopPinoLogger = {
 export interface E2ETestContext {
   app: INestApplication
   prisma: PrismaService
-  cache: Cache
+  /**
+   * The context's own connection to its isolated Redis container, used for per-test
+   * cleanup and for seeding or inspecting keys. The name is historical (the application
+   * no longer has a cache layer); it is kept so the many suites that pass
+   * `context.cache` to `cleanDatabase` do not change.
+   */
+  cache: TestRedis
   throttlerStorage: GcraRedisLimiter
   postgresContainer: StartedPostgreSqlContainer
   redisContainer: StartedRedisContainer
@@ -146,6 +151,7 @@ export async function setupE2ETest(
 
   let app: NestFastifyApplication | undefined
   let moduleFixture: TestingModule | undefined
+  let testRedis: TestRedis | undefined
   try {
     // Set environment variables
     const databaseUrl = postgresContainer.getConnectionUri()
@@ -218,9 +224,9 @@ export async function setupE2ETest(
     await migrateTestDatabase(databaseUrl)
     await app.init()
 
-    // Get Prisma service and cache
+    // Get Prisma service and the context's own connection to its isolated Redis
     const prisma = app.get(PrismaService)
-    const cache = app.get<Cache>(CACHE_MANAGER)
+    const cache = (testRedis = await TestRedis.connect(redisContainer))
     // GcraRedisLimiter is a plain injectable (no custom-token indirection like
     // the old @nestjs/throttler storage needed) — the guard resolves the exact
     // same instance via its own constructor injection.
@@ -240,6 +246,9 @@ export async function setupE2ETest(
         async () => {
           if (app) await app.close()
           else await moduleFixture?.close()
+        },
+        async () => {
+          await testRedis?.quit()
         },
         () => redisContainer.stop({ timeout: 10_000 }),
         () => postgresContainer.stop({ timeout: 10_000 }),
@@ -261,6 +270,7 @@ export async function teardownE2ETest(context: E2ETestContext): Promise<void> {
   await cleanupE2E([
     { name: 'workers', run: () => closeBullWorkers(context.app), milliseconds: 10_000 },
     { name: 'app', run: () => context.app.close(), milliseconds: 10_000 },
+    { name: 'test-redis', run: () => context.cache.quit(), milliseconds: 5_000 },
     {
       name: 'redis',
       run: () => context.redisContainer.stop({ timeout: 10_000 }),
@@ -295,7 +305,7 @@ async function closeBullWorkers(app: INestApplication): Promise<void> {
  */
 export async function cleanDatabase(
   prisma: PrismaService,
-  cache: Cache,
+  cache: TestRedis,
   throttlerStorage?: GcraRedisLimiter
 ): Promise<void> {
   // Delete in correct order (respecting foreign keys)
@@ -329,18 +339,10 @@ export async function cleanDatabase(
   await prisma.aiProvider.deleteMany()
   await prisma.user.deleteMany()
 
-  // Flush Redis directly — cache.clear() with @keyv/redis filters keys by '::' and
-  // misses rate limiter keys like `rate:login_ip:...` that lack a namespace separator.
-  type KeyvStore = { _store?: KeyvAdapter; opts?: { store?: KeyvAdapter } }
-  type KeyvAdapter = { getClient?: () => Promise<{ flushDb: () => Promise<void> }> }
-  const stores = (cache as unknown as { stores: KeyvStore[] }).stores
-  for (const keyv of stores) {
-    const adapter = keyv._store ?? keyv.opts?.store
-    if (adapter && typeof adapter.getClient === 'function') {
-      const client = await adapter.getClient()
-      await client.flushDb()
-    }
-  }
+  // Empty the context's own isolated Testcontainers Redis. This is test setup only: it
+  // goes through the connection built from that container, never through the
+  // application's Redis provider, so it cannot reach application or other suites' Redis.
+  await cache.flush()
 
   // Scoped rate-limiter cleanup: delete only `ratelimit:v1:*` keys (never FLUSHDB).
   if (throttlerStorage) {
