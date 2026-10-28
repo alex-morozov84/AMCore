@@ -9,7 +9,12 @@ import { createInvitationOperationId } from '@amcore/shared'
 import { InviteService } from '../src/core/organizations/invite.service'
 import { InviteAcceptLimiterService } from '../src/core/organizations/invite-accept-limiter.service'
 import { EmailService } from '../src/infrastructure/email'
-import { AbuseCounterError, AbuseCounterStore } from '../src/infrastructure/redis'
+import {
+  AbuseCounterError,
+  AbuseCounterStore,
+  BOUNDED_REDIS_CAPACITY,
+  BoundedRedis,
+} from '../src/infrastructure/redis'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -444,6 +449,93 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
           expect(res.body.errorCode).toBe('INVITE_INVALID_OR_EXPIRED')
         }
       )
+
+      // Whatever an accepted attempt would change: the invitation, memberships, sessions.
+      const effects = async (rawToken: string): Promise<unknown> => ({
+        invite: (
+          await prisma.orgInvite.findFirstOrThrow({ where: { tokenHash: hashToken(rawToken) } })
+        ).acceptedAt,
+        invites: await prisma.orgInvite.count(),
+        members: await prisma.orgMember.count({
+          where: { user: { emailCanonical: 'invitee@example.com' } },
+        }),
+        sessions: await prisma.session.count(),
+      })
+      const limiterLogger = (): { warn: (...args: unknown[]) => void } =>
+        (app.get(InviteAcceptLimiterService) as unknown as { logger: { warn: () => void } }).logger
+      const recordFailures = (warn: { mock: { calls: unknown[][] } }): unknown[] =>
+        warn.mock.calls
+          .map(([payload]) => payload as { event?: string })
+          .filter((payload) => payload.event === 'abuse_counter.record_failed')
+
+      it('refuses the record at capacity after a successful check: original 400, not_sent, no effects', async () => {
+        const { inviteeToken, rawToken } = await inviteeWithInvite()
+        const store = app.get(AbuseCounterStore)
+        const bounded = app.get(BoundedRedis)
+        const warn = jest.spyOn(limiterLogger(), 'warn')
+        const held: Array<() => void> = []
+        const read = store.read.bind(store)
+        // The check really succeeds; only then is every helper slot taken, so the record
+        // that follows is refused by the real helper. No timing between requests is used.
+        jest.spyOn(store, 'read').mockImplementationOnce(async (ipKey, subjectKey) => {
+          const counts = await read(ipKey, subjectKey)
+          for (let i = 0; i < BOUNDED_REDIS_CAPACITY; i++)
+            void bounded
+              .run(() => new Promise<void>((resolve) => held.push(resolve)), 60_000)
+              .catch(() => undefined)
+          return counts
+        })
+        const before = await effects(rawToken)
+
+        try {
+          const res = await accept(inviteeToken, randomBytes(32).toString('base64url'))
+
+          expect(res.status).toBe(400)
+          expect(res.body.errorCode).toBe('INVITE_INVALID_OR_EXPIRED')
+          expect(recordFailures(warn)).toEqual([
+            expect.objectContaining({ case: 'not_sent', keyClass: 'invite_accept' }),
+          ])
+          expect(await effects(rawToken)).toEqual(before)
+        } finally {
+          for (const release of held) release()
+          await new Promise((resolve) => setImmediate(resolve))
+        }
+      })
+
+      it('keeps the original 400 for several already-admitted failures; each record is unknown; no effects', async () => {
+        const { inviteeToken, rawToken } = await inviteeWithInvite()
+        const store = app.get(AbuseCounterStore)
+        const warn = jest.spyOn(limiterLogger(), 'warn')
+        const admitted = 6
+        let arrived = 0
+        let open!: () => void
+        const gate = new Promise<void>((resolve) => (open = resolve))
+        // Every request must reach the record step, having passed its check, before any
+        // record outcome exists. That is the "already admitted" condition, by construction.
+        jest.spyOn(store, 'increment').mockImplementation(async () => {
+          if (++arrived === admitted) open()
+          await gate
+          throw new AbuseCounterError('unavailable', 'unknown')
+        })
+        const before = await effects(rawToken)
+
+        const responses = await Promise.all(
+          Array.from({ length: admitted }, () =>
+            accept(inviteeToken, randomBytes(32).toString('base64url'))
+          )
+        )
+
+        expect(arrived).toBe(admitted)
+        for (const res of responses) {
+          expect(res.status).toBe(400)
+          expect(res.body.errorCode).toBe('INVITE_INVALID_OR_EXPIRED')
+        }
+        const failures = recordFailures(warn)
+        expect(failures).toHaveLength(admitted)
+        for (const failure of failures)
+          expect(failure).toMatchObject({ case: 'unknown', keyClass: 'invite_accept' })
+        expect(await effects(rawToken)).toEqual(before)
+      })
 
       it('counts failures in v2 integer keys; a successful accept clears only its own fingerprint', async () => {
         const { inviteeToken, rawToken } = await inviteeWithInvite()

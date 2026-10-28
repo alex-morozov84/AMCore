@@ -4,7 +4,12 @@ import request from 'supertest'
 
 import { ApiKeysService } from '../src/core/api-keys/api-keys.service'
 import type { Prisma } from '../src/generated/prisma/client'
-import { AbuseCounterError, AbuseCounterStore } from '../src/infrastructure/redis'
+import {
+  AbuseCounterError,
+  AbuseCounterStore,
+  BOUNDED_REDIS_CAPACITY,
+  BoundedRedis,
+} from '../src/infrastructure/redis'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -497,17 +502,44 @@ describe('API Keys (e2e)', () => {
       expect(res.status).toBe(200)
     })
 
-    it('answers 503 when a failed verification cannot be recorded', async () => {
-      jest
-        .spyOn(app.get(AbuseCounterStore), 'increment')
-        .mockRejectedValueOnce(new AbuseCounterError('unavailable', 'unknown'))
+    it.each(['not_sent', 'unknown'] as const)(
+      'answers 503 when a failed verification cannot be recorded (%s), without authenticating',
+      async (outcome) => {
+        jest
+          .spyOn(app.get(AbuseCounterStore), 'increment')
+          .mockRejectedValueOnce(new AbuseCounterError('unavailable', outcome))
 
-      const res = await request(app.getHttpServer())
-        .get('/auth/me')
-        .set('Authorization', `Bearer amcore_live_${'a'.repeat(11)}_${'b'.repeat(32)}`)
+        const res = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer amcore_live_${'a'.repeat(11)}_${'b'.repeat(32)}`)
 
-      expect(res.status).toBe(503)
-      expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(res.status).toBe(503)
+        expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(res.body.user).toBeUndefined()
+      }
+    )
+
+    it('answers 503 when the counters are unreadable because the helper is at capacity', async () => {
+      const bounded = app.get(BoundedRedis)
+      const held: Array<() => void> = []
+      for (let i = 0; i < BOUNDED_REDIS_CAPACITY; i++)
+        void bounded
+          .run(() => new Promise<void>((resolve) => held.push(resolve)), 60_000)
+          .catch(() => undefined)
+      const verify = jest.spyOn(app.get(ApiKeysService), 'verifyByShortToken')
+
+      try {
+        const res = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer amcore_live_${'e'.repeat(11)}_${'f'.repeat(32)}`)
+
+        expect(res.status).toBe(503)
+        expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(verify).not.toHaveBeenCalled()
+      } finally {
+        for (const release of held) release()
+        await new Promise((resolve) => setImmediate(resolve))
+      }
     })
 
     it('counts bad keys atomically in v2 integer keys and clears only the fingerprint on success', async () => {

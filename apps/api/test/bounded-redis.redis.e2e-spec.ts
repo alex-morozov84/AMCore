@@ -1,12 +1,16 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 
+import { jest } from '@jest/globals'
 import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
 
+import { ServiceUnavailableException } from '../src/common/exceptions'
+import { ApiKeyAbuseLimiterService } from '../src/core/api-keys/api-key-abuse-limiter.service'
+import { InviteAcceptLimiterService } from '../src/core/organizations/invite-accept-limiter.service'
 import { AbuseCounterStore } from '../src/infrastructure/redis/abuse-counter.store'
 import {
+  BOUNDED_REDIS_CAPACITY,
   BOUNDED_REDIS_DEADLINE_MS,
-  BOUNDED_REDIS_STALLED_CAPACITY,
   BoundedRedis,
 } from '../src/infrastructure/redis/bounded-redis'
 import type { AppRedisClient } from '../src/infrastructure/redis/redis-connection.service'
@@ -98,7 +102,7 @@ describe('BoundedRedis against a real server with a stalled transport', () => {
 
   it('b1: at capacity new calls fail immediately as not_sent, and slots free when replies resume', async () => {
     proxy.holdReplies()
-    const stalled = Array.from({ length: BOUNDED_REDIS_STALLED_CAPACITY }, (_, i) =>
+    const stalled = Array.from({ length: BOUNDED_REDIS_CAPACITY }, (_, i) =>
       store.read(`rate:v2:cap:${i}:a`, `rate:v2:cap:${i}:b`).catch((e: unknown) => e)
     )
     for (const error of await Promise.all(stalled))
@@ -115,7 +119,7 @@ describe('BoundedRedis against a real server with a stalled transport', () => {
 
   it('b2: closing the connection with work pending frees the slots and a fresh call works after reconnect', async () => {
     proxy.holdReplies()
-    const stalled = Array.from({ length: BOUNDED_REDIS_STALLED_CAPACITY }, (_, i) =>
+    const stalled = Array.from({ length: BOUNDED_REDIS_CAPACITY }, (_, i) =>
       store.increment(`rate:v2:close:${i}:a`, `rate:v2:close:${i}:b`, TTL).catch((e: unknown) => e)
     )
     for (const error of await Promise.all(stalled))
@@ -135,7 +139,7 @@ describe('BoundedRedis against a real server with a stalled transport', () => {
     )
 
     // Every stalled increment ran exactly once on the server, none was replayed.
-    for (let i = 0; i < BOUNDED_REDIS_STALLED_CAPACITY; i++)
+    for (let i = 0; i < BOUNDED_REDIS_CAPACITY; i++)
       expect(await raw.get(`rate:v2:close:${i}:a`)).toBe('1')
   })
 
@@ -149,5 +153,105 @@ describe('BoundedRedis against a real server with a stalled transport', () => {
     await client.connect()
     await expect(store.read(IP, SUBJECT)).resolves.toEqual({ ip: 0, subject: 0 })
     expect(await raw.get(IP)).toBeNull()
+  })
+
+  it('aborts a command still waiting in the client queue; no late mutation after reconnect', async () => {
+    // A slow reconnect keeps the command in node-redis's offline queue. Readiness is forced
+    // to true so the helper dispatches into that queue: the one path where a command is
+    // accepted before the connection can write it.
+    const slow = createClient({
+      url: `redis://127.0.0.1:${proxy.port}`,
+      socket: { reconnectStrategy: (retries) => (retries === 0 ? 1500 : 250) },
+    })
+    slow.on('error', () => undefined)
+    await slow.connect()
+    try {
+      const helper = new BoundedRedis(slow as unknown as AppRedisClient)
+      // Reconnect attempts fail while the proxy refuses connections, so the client waits its
+      // strategy delay (the first attempt after a drop is always immediate).
+      proxy.refuseConnections(true)
+      proxy.dropConnections()
+      for (const started = performance.now(); slow.isReady;) {
+        if (performance.now() - started > 3000) throw new Error('client never lost readiness')
+        await sleep(10)
+      }
+      Object.defineProperty(slow, 'isReady', { get: () => true, configurable: true })
+
+      const aborted = helper
+        .run((client) => client.set('rate:v2:queued:aborted', '1'), BOUNDED_REDIS_DEADLINE_MS)
+        .catch((e: unknown) => e)
+      const control = helper.run((client) => client.set('rate:v2:queued:control', '1'), 10000)
+
+      // The deadline aborts the queued command; its outcome is still reported as unknown.
+      expect(await aborted).toMatchObject({ reason: 'deadline', outcome: 'unknown' })
+      proxy.refuseConnections(false)
+      delete (slow as unknown as { isReady?: boolean }).isReady
+      await expect(control).resolves.toBe('OK')
+
+      // Positive control: a queued command that was not aborted does run after reconnect.
+      expect(await raw.get('rate:v2:queued:control')).toBe('1')
+      expect(await raw.get('rate:v2:queued:aborted')).toBeNull()
+    } finally {
+      delete (slow as unknown as { isReady?: boolean }).isReady
+      if (slow.isOpen) slow.destroy()
+    }
+  })
+
+  describe('caller mapping with an executed command whose reply is held', () => {
+    let logger: { setContext: jest.Mock; warn: jest.Mock }
+    let apiKey: ApiKeyAbuseLimiterService
+    let invite: InviteAcceptLimiterService
+    const ip = '203.0.113.7'
+
+    beforeEach(() => {
+      logger = { setContext: jest.fn(), warn: jest.fn() }
+      apiKey = new ApiKeyAbuseLimiterService(store, logger as never)
+      invite = new InviteAcceptLimiterService(store, logger as never)
+    })
+
+    const events = (): unknown[] =>
+      logger.warn.mock.calls
+        .map(([payload]) => payload as { event?: string; case?: string; keyClass?: string })
+        .filter((payload) => payload.event)
+
+    it('answers 503 and classifies the record as unknown while the server applied it once', async () => {
+      proxy.holdReplies()
+
+      const first = await apiKey.consume(ip, 'fpa').catch((e: unknown) => e)
+      const second = await invite.consume(ip, 'fpb').catch((e: unknown) => e)
+
+      expect(first).toBeInstanceOf(ServiceUnavailableException)
+      expect(second).toBeInstanceOf(ServiceUnavailableException)
+      expect(events()).toEqual([
+        expect.objectContaining({
+          event: 'abuse_counter.record_failed',
+          case: 'unknown',
+          keyClass: 'api_key',
+        }),
+        expect.objectContaining({
+          event: 'abuse_counter.record_failed',
+          case: 'unknown',
+          keyClass: 'invite_accept',
+        }),
+      ])
+      await proxy.held
+      // Both commands reached the server and ran exactly once although both callers failed.
+      expect(await raw.get(`rate:v2:api_key_fail_ip:${ip}`)).toBe('1')
+      expect(await raw.get(`rate:v2:invite_accept_fail_ip:${ip}`)).toBe('1')
+    })
+
+    it('fails the check closed with 503 and an unknown case when its read reply is held', async () => {
+      proxy.holdReplies()
+
+      const first = await apiKey.check(ip, 'fpa').catch((e: unknown) => e)
+      const second = await invite.check(ip, 'fpb').catch((e: unknown) => e)
+
+      expect(first).toBeInstanceOf(ServiceUnavailableException)
+      expect(second).toBeInstanceOf(ServiceUnavailableException)
+      expect(events().map((e) => (e as { event: string }).event)).toEqual([
+        'abuse_counter.check_failed',
+        'abuse_counter.check_failed',
+      ])
+    })
   })
 })
