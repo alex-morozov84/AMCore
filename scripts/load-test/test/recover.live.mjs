@@ -20,7 +20,11 @@ test(
     const dir = mkdtempSync(join(tmpdir(), 't080-recover-'))
     const run = `c1${Date.now()}`
     const project = `amcore-loadtest-${run}`
-    const env = { ...process.env, HOME: join(dir, 'home') }
+    // CI has its own smoke project; only this fixture's .env may select resources.
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !/^(COMPOSE_|LOAD_TEST_)/.test(key))
+    )
+    env.HOME = join(dir, 'home')
     mkdirSync(env.HOME)
     symlinkSync(join(process.env.HOME, '.docker'), join(env.HOME, '.docker'))
     mkdirSync(join(dir, 'docker/compose'), { recursive: true })

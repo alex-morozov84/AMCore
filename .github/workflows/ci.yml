@@ -654,6 +654,9 @@ jobs:
           node scripts/verify-recovery.mjs
           node scripts/verify-load-test-compose.mjs
 
+      - name: Verify load entry recovery and Linux model ownership
+        run: node --test --test-concurrency=1 scripts/load-test/test/recover-ownership.live.mjs scripts/load-test/test/recover.live.mjs
+
       - name: Verify load migration TLS and restored grants
         env:
           AMCORE_MIGRATOR_LIFECYCLE_JOURNAL: ${{ runner.temp }}/recovery-tls.json
