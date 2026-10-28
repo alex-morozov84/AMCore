@@ -33,6 +33,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
+import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -87,6 +88,7 @@ export class RolesController {
   @Get()
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'List all roles in the organization — requires full TeamAccess' })
   @ApiQuery({
     name: 'page',
@@ -120,6 +122,7 @@ export class RolesController {
   @Post()
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Create a custom role — requires full TeamAccess' })
   @SchemaResponse({ type: OrgRoleResponseDto, status: 201, description: 'Role created' })
   @RequestContextPolicy({
@@ -138,6 +141,7 @@ export class RolesController {
   @Patch(':roleId')
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Update a custom role — requires full TeamAccess' })
   @SchemaResponse({ type: OrgRoleResponseDto, status: 200, description: 'Updated role' })
   @RequestContextPolicy({
@@ -158,6 +162,7 @@ export class RolesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({
     summary: 'Delete a custom role — requires full TeamAccess (system roles cannot be deleted)',
   })
@@ -178,6 +183,7 @@ export class RolesController {
   @Post(':roleId/permissions')
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Assign a CASL permission to a custom role — requires full TeamAccess' })
   @SchemaResponse({ type: PermissionResponseDto, status: 201, description: 'Permission assigned' })
   @ApiBadRequestResponse({
@@ -202,6 +208,7 @@ export class RolesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Remove a permission from a custom role — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Permission removed' })
   @RequestContextPolicy({

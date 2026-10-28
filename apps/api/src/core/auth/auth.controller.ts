@@ -48,6 +48,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
+import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import {
   resolveSessionIpAddress,
@@ -293,6 +294,7 @@ export class AuthController {
   @Auth(AuthType.Bearer, AuthType.ApiKey)
   @ApiBearerAuth()
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Get current user profile' })
   @SchemaResponse({ type: ProfileResponseDto, status: 200, description: 'Current user profile' })
   async me(@CurrentUser() user: RequestPrincipal): Promise<ProfileResponse> {
