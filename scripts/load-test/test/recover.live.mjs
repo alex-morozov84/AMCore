@@ -88,13 +88,28 @@ test(
       assert.equal(volume.Labels['amcore.load-test.run'], run)
       const deadline = Date.now() + 30000
       while (
-        spawnSync(docker, ['exec', pg, 'pg_isready', '-U', 'postgres'], { stdio: 'ignore' })
-          .status !== 0
+        // The initdb server accepts sockets before restarting into the final TCP server.
+        spawnSync(docker, ['exec', pg, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'], {
+          stdio: 'ignore',
+        }).status !== 0
       ) {
         assert.ok(Date.now() < deadline, 'Postgres readiness deadline')
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
-      const sql = (query) => call(['exec', pg, 'psql', '-U', 'postgres', '-Atc', query])
+      const sql = (query) =>
+        call([
+          'exec',
+          '-e',
+          'PGPASSWORD=fixture-only',
+          pg,
+          'psql',
+          '-h',
+          '127.0.0.1',
+          '-U',
+          'postgres',
+          '-Atc',
+          query,
+        ])
       sql("CREATE TABLE proof (value text); INSERT INTO proof VALUES ('preserved-c1')")
       const preserved = () => {
         assert.equal(compose('ps', '-q', 'postgres'), pg)

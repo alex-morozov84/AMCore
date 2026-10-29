@@ -4,6 +4,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -21,6 +22,26 @@ export function copyShared(directory) {
   manifest.packageManager = JSON.parse(readFileSync(join(root, 'package.json'))).packageManager
   writeFileSync(manifestPath, JSON.stringify(manifest))
   linkDependencies(source, directory)
+}
+
+// Observe completed format builds without changing the package's build behavior.
+export function observeSharedBuilds(directory) {
+  renameSync(join(directory, 'tsdown.config.ts'), join(directory, 'tsdown.base.config.ts'))
+  writeFileSync(
+    join(directory, 'tsdown.config.ts'),
+    `import config from './tsdown.base.config.ts'
+export default {
+  ...config,
+  hooks: {
+    ...config.hooks,
+    'build:done': async (context) => {
+      await config.hooks['build:done'](context)
+      console.log('SHARED_BUILD_DONE:' + context.options.format)
+    },
+  },
+}
+`
+  )
 }
 
 // pnpm shell launchers contain relative paths that break through a directory symlink.

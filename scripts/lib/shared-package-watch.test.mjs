@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { copyShared } from './shared-package-fixture.mjs'
+import { copyShared, observeSharedBuilds } from './shared-package-fixture.mjs'
 
 async function waitFor(predicate, detail) {
   const deadline = Date.now() + 20_000
@@ -45,8 +45,19 @@ test(
     let child
     let output = ''
     let stopped = false
+    let buildStart = 0
+    const completed = () => {
+      const recent = output.slice(buildStart)
+      return ['es', 'cjs'].every((format) => recent.includes(`SHARED_BUILD_DONE:${format}`))
+    }
+    const waitForBuild = (marker, expected) =>
+      waitFor(
+        () => completed() && hasMarker(directory, marker, expected),
+        () => output
+      )
     try {
       copyShared(directory)
+      observeSharedBuilds(directory)
       child = spawn('pnpm', ['run', 'dev'], {
         cwd: directory,
         detached: true,
@@ -63,33 +74,29 @@ test(
       child.stderr.on('data', (data) => {
         output += data
       })
-      await waitFor(
-        () => output.includes('Rebuilt') && hasMarker(directory, 'registerSchema', true),
-        () => output
-      )
+      await waitForBuild('registerSchema', true)
       const index = join(directory, 'src/index.ts')
       const original = readFileSync(index)
       const module = join(directory, 'src/watch-module.ts')
+      buildStart = output.length
       writeFileSync(module, 'export const watchModule = "watch-module-sentinel"\n')
       writeFileSync(
         index,
         Buffer.concat([original, Buffer.from('\nexport * from "./watch-module"\n')])
       )
-      await waitFor(
-        () => hasMarker(directory, 'watchModule', true),
-        () => output
-      )
+      await waitForBuild('watchModule', true)
+      buildStart = output.length
       writeFileSync(module, 'export const watchModuleUpdated = "updated"\n')
-      await waitFor(
-        () => hasMarker(directory, 'watchModuleUpdated', true),
-        () => output
-      )
+      await waitForBuild('watchModuleUpdated', true)
+      buildStart = output.length
       writeFileSync(index, original)
+      // Remove the import first; deleting a still-watched dependency can queue another build.
+      await waitForBuild('watchModule', false)
+      buildStart = output.length
       rmSync(module)
-      await waitFor(
-        () => hasMarker(directory, 'watchModule', false),
-        () => output
-      )
+      // Force a final rebuild even when the watcher has already dropped the removed file.
+      writeFileSync(index, Buffer.concat([original, Buffer.from('\n')]))
+      await waitForBuild('watchModule', false)
       process.kill(-child.pid, 'SIGTERM')
       await exited
       await waitFor(
