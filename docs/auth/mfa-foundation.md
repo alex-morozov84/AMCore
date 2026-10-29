@@ -256,8 +256,8 @@ A known expired anchor keeps its existing binding. Under the context and sorted
 account locks, bootstrap retires the expired generation and its authority, advances
 the generation and renews only neutral state for 15 minutes. It issues no session
 or credentials and restores no old MFA, invitation or return proof. Fresh credentials
-and publication remain separate. Unknown bindings and replacement anchors with
-visible capabilities remain refused; a missing record is not proof of ownership.
+and publication remain separate. The BFF still refuses replacement anchors while
+session or pending capabilities remain visible. A missing record is not proof of ownership.
 
 The BFF retains the continuation before requesting credentials. One Redis update
 stores the pending vault and its operation journal. The API then confirms the

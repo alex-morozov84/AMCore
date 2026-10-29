@@ -1,6 +1,8 @@
 # Sign-in protection in Console
 
-Open **Sign-in protection** for your account. Follow the retained
+Open your profile menu in the Console header, then **Profile settings**.
+The protection card stays inside the Console; its actions open a dialog over the page.
+The same menu contains **Sign out**. Follow the retained
 [setup, backup-code and recovery instructions](../auth/mfa-browser.md).
 The deployment owner must approve and complete [activation](../auth/mfa-deployment.md)
 before operators can enter the final MFA-capable deployment.
