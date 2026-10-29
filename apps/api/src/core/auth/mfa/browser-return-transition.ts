@@ -56,7 +56,11 @@ export async function linkReturnReservation(
     where: { operationId: record.operationId },
     data: { reservedFlowId: flowId, reservedGeneration: after.generation },
   })
-  return linkSchema.parse(proof)
+  return linkSchema.parse({
+    operationId: proof.operationId,
+    returnEntryId: proof.returnEntryId,
+    neutralAttemptId: proof.neutralAttemptId,
+  })
 }
 
 /** This optional write shares the exact session publication transaction. */
