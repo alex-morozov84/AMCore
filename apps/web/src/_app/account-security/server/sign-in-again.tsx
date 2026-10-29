@@ -5,6 +5,7 @@ import type { SupportedLocale } from '@amcore/shared'
 import { z } from 'zod'
 
 import { LoginPage } from '@/_pages/auth'
+import { ClientMessages } from '@/i18n/client-message-boundary'
 
 import { SignInAgainClient, type SignInAgainPlacement } from '../ui/sign-in-again-client'
 
@@ -42,7 +43,9 @@ export async function SignInAgainMount({
     />
   )
   return standalone ? (
-    <main className="flex min-h-screen items-center justify-center p-4">{content}</main>
+    <ClientMessages namespaces={['auth']}>
+      <main className="flex min-h-screen items-center justify-center p-4">{content}</main>
+    </ClientMessages>
   ) : (
     content
   )
