@@ -66,8 +66,9 @@ AMCore is a **modular monolith**. The rules that keep it modular:
     each build their `@redis/client` 6 client from one options function. RESP 2 is explicit,
     so the client never sends `HELLO` or enables maintenance notifications. An ordinary
     command waits at most 5000 ms to be written; this covers reconnect backoff and write
-    backpressure, and a per-call limit is shorter and wins. The first keepalive probe goes
-    out after 5000 ms of idle. There is deliberately no `socketTimeout`, because it would
+    backpressure. A local limit on a call overrides it and may be shorter or longer;
+    existing bounded consumers keep their own shorter limits. The first keepalive probe
+    goes out after 5000 ms of idle; this is not a failure-detection guarantee. There is deliberately no `socketTimeout`, because it would
     disconnect idle subscriber connections. Do not create a client with bare `createClient`
     for code that production injects; tests use `appClientOptions()` (a convention, not a lint rule).
   - **What the 5000 ms limit does not bound:** connecting, a command already written (its

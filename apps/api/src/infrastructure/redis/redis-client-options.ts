@@ -3,8 +3,8 @@ import { createClient, type RedisClientType } from '@redis/client'
 /**
  * Longest an ordinary command may wait in the client's queue before it is written. It covers
  * reconnect backoff and write backpressure. It never bounds connecting, a command that is already
- * written, MULTI/pipeline batches or the whole HTTP request; callers keep their own shorter limits,
- * because a local option overrides this base value.
+ * written, MULTI/pipeline batches or the whole HTTP request. A local option overrides this base
+ * value and may be shorter or longer; existing bounded consumers keep their own shorter limits.
  */
 export const REDIS_QUEUE_TIMEOUT_MS = 5000
 

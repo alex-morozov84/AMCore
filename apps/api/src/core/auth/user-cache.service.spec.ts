@@ -320,7 +320,8 @@ describe('UserCacheService', () => {
   })
 
   describe('Redis failure', () => {
-    // A command that waited out the client queue timeout rejects with TimeoutError. The cache has
+    // Mocked rejections prove how the service maps a failure; they are not an outage test. A
+    // command that waited out the client queue timeout rejects with TimeoutError. The cache has
     // no Redis-outage fallback: only lock contention falls back to the database.
     it('propagates a rejected read and does not query the database', async () => {
       const failure = new TimeoutError()
@@ -340,8 +341,9 @@ describe('UserCacheService', () => {
       expect(prisma.user.findUnique).not.toHaveBeenCalled()
     })
 
+    // A MULTI has no queue timeout, so this is a connection failure, not a TimeoutError.
     it('propagates a rejected invalidation transaction', async () => {
-      const failure = new TimeoutError()
+      const failure = new Error('Socket closed unexpectedly')
       redis.sMembers.mockResolvedValueOnce([userKey])
       multi.exec.mockRejectedValueOnce(failure)
 

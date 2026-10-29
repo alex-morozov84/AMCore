@@ -2,6 +2,8 @@ import { connect, createServer, type Socket } from 'node:net'
 
 import { createClient, type RedisClientType } from '@redis/client'
 
+import { appClientOptions } from './test-redis'
+
 interface ProvisioningRedisTransport {
   client: RedisClientType<{}, {}, {}, 2>
   reply: Promise<void>
@@ -52,11 +54,11 @@ export async function provisioningRedisTransport(
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Test proxy did not bind')
-  const client = createClient({
-    url: `redis://127.0.0.1:${address.port}`,
-    RESP: 2,
-    socket: { reconnectStrategy: false },
-  })
+  // The provisioning limiter receives this client, so it has the production options; only the
+  // reconnect strategy is replaced, to fail fast when the fixture drops the connection.
+  const client = createClient(
+    appClientOptions(`redis://127.0.0.1:${address.port}`, { reconnectStrategy: false })
+  )
   client.on('error', () => undefined)
   try {
     await client.connect()

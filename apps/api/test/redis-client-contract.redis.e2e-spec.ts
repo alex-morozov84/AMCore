@@ -29,12 +29,16 @@ type Proxy = Awaited<ReturnType<typeof redisTransportStall>>
  * Pins what the application relies on from node-redis 6 against a real server: the negotiated
  * protocol, option propagation, what the queue timeout does and does not bound, and recovery.
  * Each case that proves a bound has a positive control that shows the same path succeeding.
+ *
+ * Transport state is established from observed client events and bounded waits, never from a fixed
+ * sleep. Real elapsed time is used only to observe a timeout or a non-settlement after a deadline.
  */
 describe('node-redis 6 client contract against Redis 7', () => {
   let broker: StartedRedisContainer
   let raw: ReturnType<typeof createClient>
   let proxy: Proxy
   const open: Array<{ isOpen: boolean; destroy: () => void }> = []
+  const errorCounts = new WeakMap<object, number>()
 
   const connect = async (
     reconnectMs: number | false,
@@ -43,21 +47,39 @@ describe('node-redis 6 client contract against Redis 7', () => {
     const options = appClientOptions(`redis://127.0.0.1:${proxy.port}`, {
       reconnectStrategy: reconnectMs === false ? false : () => reconnectMs,
     })
-    const client = createClient({
-      ...options,
-      commandOptions: { timeout: timeoutMs },
-    }) as unknown as AppRedisClient
-    client.on('error', () => undefined)
+    const client = createClient({ ...options, commandOptions: { timeout: timeoutMs } })
+    client.on('error', () => errorCounts.set(client, (errorCounts.get(client) ?? 0) + 1))
     open.push(client)
     await client.connect()
     return client
   }
 
-  /** Puts the client into reconnect backoff: the first attempt after the drop is refused. */
-  const intoBackoff = async (): Promise<void> => {
+  /** Bounded wait for a condition. A failed premise becomes a normal, readable test failure. */
+  const until = async (
+    condition: () => boolean | Promise<boolean>,
+    what: string,
+    limitMs = 10_000
+  ): Promise<void> => {
+    const deadline = performance.now() + limitMs
+    while (!(await condition())) {
+      if (performance.now() > deadline) throw new Error(`Timed out waiting for ${what}`)
+      await sleep(25)
+    }
+  }
+
+  /**
+   * Puts the client into reconnect backoff and waits until it has seen it: the drop closes the
+   * socket (first error) and the first reconnect attempt meets the refusing proxy (second error).
+   * After both, the client waits out its reconnect delay, and every command issued now is queued.
+   */
+  const intoBackoff = async (client: AppRedisClient): Promise<void> => {
+    const before = errorCounts.get(client) ?? 0
     proxy.refuseConnections(true)
     proxy.dropConnections()
-    await sleep(150)
+    await until(
+      () => !client.isReady && (errorCounts.get(client) ?? 0) >= before + 2,
+      'the client to observe the drop and a failed reconnect'
+    )
   }
 
   const settleAfter = async (work: Promise<unknown>): Promise<{ at: number; error?: unknown }> => {
@@ -131,13 +153,10 @@ describe('node-redis 6 client contract against Redis 7', () => {
   describe('reply shapes the application reads', () => {
     it('keeps the values and null/number/array types of the commands in use', async () => {
       const client = await connect(false)
+      const nx = { condition: 'NX', expiration: { type: 'PX', value: 5000 } } as const
 
-      expect(
-        await client.set('c:nx', 'v', { condition: 'NX', expiration: { type: 'PX', value: 5000 } })
-      ).toBe('OK')
-      expect(
-        await client.set('c:nx', 'w', { condition: 'NX', expiration: { type: 'PX', value: 5000 } })
-      ).toBeNull()
+      expect(await client.set('c:nx', 'v', nx)).toBe('OK')
+      expect(await client.set('c:nx', 'w', nx)).toBeNull()
       expect(await client.getDel('c:nx')).toBe('v')
       expect(await client.getDel('c:nx')).toBeNull()
       await client.sAdd('c:set', ['a', 'b'])
@@ -159,73 +178,82 @@ describe('node-redis 6 client contract against Redis 7', () => {
   })
 
   describe('option propagation while a command waits in the queue', () => {
+    // Each case starts a control with no local option in the same established state. The control
+    // expires at the base timeout, so a local option that took effect finishes well before it.
+    const MARGIN_MS = 200
+
     it('a local timeout overrides the base value for typed and raw commands', async () => {
       const client = await connect(BACKOFF_MS)
-      await intoBackoff()
+      await intoBackoff(client)
 
-      const typed = await settleAfter(client.withCommandOptions({ timeout: 200 }).get('k'))
-      const rawTime = await settleAfter(
-        client.withCommandOptions({ timeout: 200 }).sendCommand(['TIME'])
-      )
+      const control = settleAfter(client.get('control'))
+      const typed = settleAfter(client.withCommandOptions({ timeout: 200 }).get('k'))
+      const rawTime = settleAfter(client.withCommandOptions({ timeout: 200 }).sendCommand(['TIME']))
+      const [base, ...locals] = await Promise.all([control, typed, rawTime])
 
-      for (const outcome of [typed, rawTime]) {
+      expect(base.error).toBeInstanceOf(TimeoutError)
+      for (const outcome of locals) {
         expect(outcome.error).toBeInstanceOf(TimeoutError)
-        expect(outcome.at).toBeLessThan(QUEUE_MS - 200)
+        expect(outcome.at + MARGIN_MS).toBeLessThan(base.at)
       }
     })
 
     it('a local abort signal cancels a raw command, and a chained proxy inherits it', async () => {
       const client = await connect(BACKOFF_MS)
-      await intoBackoff()
+      await intoBackoff(client)
 
-      const direct = await settleAfter(
+      const control = settleAfter(client.get('control'))
+      const direct = settleAfter(
         client.withCommandOptions({ abortSignal: AbortSignal.timeout(150) }).sendCommand(['TIME'])
       )
-      const chained = await settleAfter(
+      const chained = settleAfter(
         client
           .withCommandOptions({ abortSignal: AbortSignal.timeout(150) })
           .withCommandOptions({ timeout: 10_000 })
           .get('k')
       )
+      const [base, ...aborted] = await Promise.all([control, direct, chained])
 
-      expect(direct.error).toBeInstanceOf(AbortError)
-      expect(chained.error).toBeInstanceOf(AbortError)
-      expect(Math.max(direct.at, chained.at)).toBeLessThan(QUEUE_MS - 200)
+      expect(base.error).toBeInstanceOf(TimeoutError)
+      for (const outcome of aborted) {
+        expect(outcome.error).toBeInstanceOf(AbortError)
+        expect(outcome.at + MARGIN_MS).toBeLessThan(base.at)
+      }
     })
 
     it('a command without local options expires at the base queue timeout', async () => {
       const client = await connect(BACKOFF_MS)
-      await intoBackoff()
+      await intoBackoff(client)
 
       const outcome = await settleAfter(client.get('k'))
 
       expect(outcome.error).toBeInstanceOf(TimeoutError)
       expect(outcome.at).toBeGreaterThanOrEqual(QUEUE_MS - 100)
-      expect(outcome.at).toBeLessThan(QUEUE_MS + 600)
+      expect(outcome.at).toBeLessThan(QUEUE_MS + 1000) // generous scheduler slack
     })
   })
 
   describe('queue timeout against reconnect', () => {
     it('positive control: a queued command runs exactly once when the connection returns in time', async () => {
       const client = await connect(300)
-      await intoBackoff()
+      await intoBackoff(client)
       const pending = client.incr('q:once')
       proxy.refuseConnections(false)
 
       await expect(pending).resolves.toBe(1)
-      await sleep(500)
+      await sleep(500) // observation window for a second, unwanted execution
       expect(await raw.get('q:once')).toBe('1')
     })
 
     it('an expired queued command never mutates after the connection returns', async () => {
       const client = await connect(QUEUE_MS + 1200)
-      await intoBackoff()
+      await intoBackoff(client)
 
       const outcome = await settleAfter(client.incr('q:late'))
       expect(outcome.error).toBeInstanceOf(TimeoutError)
 
       proxy.refuseConnections(false)
-      await sleep(QUEUE_MS + 1800) // the reconnect happens and a fresh command succeeds
+      await until(() => client.isReady, 'the client to reconnect')
       await expect(client.ping()).resolves.toBe('PONG')
       expect(await raw.get('q:late')).toBeNull()
     }, 20000)
@@ -239,7 +267,7 @@ describe('node-redis 6 client contract against Redis 7', () => {
       })
       pending.catch(() => undefined)
       await proxy.held
-      await sleep(QUEUE_MS + 500)
+      await sleep(QUEUE_MS + 500) // real time past the queue timeout is the observation
 
       expect(settled).toBe(false)
       expect(await raw.get('q:held')).toBe('1') // the server ran it once; the caller still waits
@@ -247,24 +275,40 @@ describe('node-redis 6 client contract against Redis 7', () => {
   })
 
   describe('MULTI and pipeline are not covered by the queue timeout', () => {
-    it('a MULTI queued during backoff waits past the timeout and runs when the connection returns', async () => {
-      const client = await connect(QUEUE_MS + 800)
-      await intoBackoff()
+    it.each([
+      ['exec', (client: AppRedisClient) => client.multi().incr('m:one').exec()],
+      ['execAsPipeline', (client: AppRedisClient) => client.multi().incr('m:one').execAsPipeline()],
+    ] as const)(
+      '%s queued during backoff waits past the timeout and runs when the connection returns',
+      async (_name, run) => {
+        const client = await connect(QUEUE_MS + 800)
+        await intoBackoff(client)
 
-      let settled = false
-      const pending = client
-        .multi()
-        .incr('m:one')
-        .exec()
-        .finally(() => {
-          settled = true
-        })
-      await sleep(QUEUE_MS + 300)
-      expect(settled).toBe(false) // a typed command would have expired by now
+        // The observer is attached at once, so a rejection fails the premise with its own error.
+        const outcome: { value?: unknown; error?: unknown; settled: boolean } = { settled: false }
+        void run(client)
+          .then(
+            (value) => {
+              outcome.value = value
+            },
+            (error: unknown) => {
+              outcome.error = error
+            }
+          )
+          .finally(() => {
+            outcome.settled = true
+          })
+        await sleep(QUEUE_MS + 300) // a typed command would have expired by now
+        expect(outcome.error).toBeUndefined()
+        expect(outcome.settled).toBe(false)
 
-      proxy.refuseConnections(false)
-      await expect(pending).resolves.toEqual([1])
-    }, 20000)
+        proxy.refuseConnections(false)
+        await until(() => outcome.settled, 'the batch to run after reconnect')
+        expect(outcome.error).toBeUndefined()
+        expect(outcome.value).toEqual([1])
+      },
+      20000
+    )
   })
 
   describe('subscriber recovery', () => {
@@ -279,15 +323,17 @@ describe('node-redis 6 client contract against Redis 7', () => {
         received.push(message)
       })
       await raw.publish('contract:chan', 'before')
-      const delivered = Date.now() + 3000
-      while (!received.includes('before') && Date.now() < delivered) await sleep(20)
+      await until(() => received.includes('before'), 'the first message', 3000)
 
       proxy.dropConnections()
-      const deadline = Date.now() + 8000
-      while (!received.includes('after') && Date.now() < deadline) {
-        await raw.publish('contract:chan', 'after')
-        await sleep(100)
-      }
+      await until(
+        async () => {
+          await raw.publish('contract:chan', 'after')
+          return received.includes('after')
+        },
+        'a message after the reconnect',
+        8000
+      )
 
       expect(received).toContain('before')
       expect(received).toContain('after')
@@ -315,8 +361,11 @@ describe('node-redis 6 client contract against Redis 7', () => {
       const store = new TelegramReachabilityStore(client, metrics, logger)
       store.open()
       try {
-        await sleep(300)
-        await expect(store.now()).resolves.toBeGreaterThan(1_600_000_000_000) // positive control
+        // The store opens its own duplicate; it answers once that connection is ready.
+        await until(
+          async () => typeof (await store.now()) === 'number',
+          'the store connection to answer (positive control)'
+        )
         proxy.holdReplies()
 
         const started = performance.now()

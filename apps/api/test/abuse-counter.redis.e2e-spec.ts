@@ -14,7 +14,7 @@ import { BoundedRedis } from '../src/infrastructure/redis/bounded-redis'
 import type { AppRedisClient } from '../src/infrastructure/redis/redis-connection.service'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
-import type { RedisConnection } from './test-redis'
+import { appClientOptions, type RedisConnection } from './test-redis'
 
 const IP = 'rate:v2:test_ip:203.0.113.1'
 const SUBJECT = 'rate:v2:test_subject:fp'
@@ -23,7 +23,9 @@ const TTL = 3_600_000
 const CEILING = 1_000_000_000_000_000
 
 type Client = RedisConnection
-const open = (url: string): Client => createClient({ url, RESP: 2 })
+// `raw` only inspects; the clients that back a store use the production options.
+const open = (url: string, production: boolean): Client =>
+  createClient(production ? appClientOptions(url) : { url, RESP: 2 })
 
 describe('AbuseCounterStore against Redis 7', () => {
   let broker: StartedRedisContainer
@@ -32,8 +34,8 @@ describe('AbuseCounterStore against Redis 7', () => {
   let first: AbuseCounterStore
   let second: AbuseCounterStore
 
-  const connect = async (): Promise<Client> => {
-    const client = open(broker.getConnectionUrl())
+  const connect = async (production = true): Promise<Client> => {
+    const client = open(broker.getConnectionUrl(), production)
     client.on('error', () => undefined)
     await client.connect()
     clients.push(client)
@@ -50,7 +52,7 @@ describe('AbuseCounterStore against Redis 7', () => {
   beforeAll(async () => {
     broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
     clients = []
-    raw = await connect()
+    raw = await connect(false)
     first = storeOn(await connect())
     second = storeOn(await connect())
   }, 120000)

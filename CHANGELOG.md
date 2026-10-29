@@ -73,8 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the API. See `docs/auth/concepts.md#api-key-and-invitation-failure-counters`.
 
 - The Redis client is updated to `@redis/client` 6.3.0 in the API and the web server (Node 20
-  or later). Both keep RESP 2 and a 5 s first keepalive probe. An ordinary command now fails
-  after waiting 5 s to be written during a reconnect; before, it waited without limit.
+  or later). Both keep RESP 2 and a 5 s first keepalive probe. A command without its own
+  timeout now fails after waiting 5 s to be written during a reconnect; before, it waited
+  without limit. Consumers that already set a timeout keep it.
   Commands already sent, `MULTI` batches and total request time are not covered by that limit.
   See `docs/backend/architecture-and-conventions.md`.
 
