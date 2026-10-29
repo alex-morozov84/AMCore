@@ -35,6 +35,8 @@
       "locale.navigation-call",
       "locale.navigation-console-switcher",
       "locale.navigation-dal",
+      "locale.navigation-mfa",
+      "locale.navigation-mfa-redirect",
       "locale.navigation-oauth",
       "locale.navigation-plain-pathname",
       "locale.navigation-selected-redirect",
