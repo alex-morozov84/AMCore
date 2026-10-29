@@ -536,9 +536,11 @@ Database failures propagate through the existing exception filter (`503` for
 recognized availability errors, `500` for unexpected failures). No cached
 version or JWT version is used on failure. A permission Redis read, lock or
 publication error also fails authorization; a completed database load alone is
-not an availability fallback. Existing shared Redis reconnect/queue behavior is
-unchanged, so this does not promise a bounded
-response time during every outage. No new authorization retry is introduced.
+not an availability fallback. The shared Redis client fails a command that waits
+more than 5 s to be written during a reconnect. It does not bound a command that
+is already sent or the whole request, so this does not promise a bounded
+response time during every outage. No new authorization retry is introduced. See
+[the Redis client contract](../backend/architecture-and-conventions.md).
 
 When adding an ACL mutation, call `bumpAclVersionTx(orgId, tx)` inside the same
 transaction as the write. A standalone bump is insufficient for an ACL write.
