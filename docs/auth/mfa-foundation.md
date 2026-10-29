@@ -252,6 +252,13 @@ A source-budget refusal returns `429 RATE_LIMIT_EXCEEDED` with a valid
 `Retry-After` delay when supplied. Bootstrap issues no attempt or credentials
 on refusal; wait before starting another sign-in or registration.
 
+A known expired anchor keeps its existing binding. Under the context and sorted
+account locks, bootstrap retires the expired generation and its authority, advances
+the generation and renews only neutral state for 15 minutes. It issues no session
+or credentials and restores no old MFA, invitation or return proof. Fresh credentials
+and publication remain separate. Unknown bindings and replacement anchors with
+visible capabilities remain refused; a missing record is not proof of ownership.
+
 The BFF retains the continuation before requesting credentials. One Redis update
 stores the pending vault and its operation journal. The API then confirms the
 exact publication. Readers verify the selected family, account security version,
@@ -260,7 +267,9 @@ credentials. They repeat verification across token refresh. A changed context
 fails with `AUTH_CONTEXT_CHANGED`; it never triggers automatic refresh.
 
 Logout requires the session identifier captured by the displayed screen. The
-API retires that exact browser generation before the BFF clears its local cookie.
+API retires that exact browser generation before the BFF removes its selected vault record.
+Responses do not clear fixed-name browser cookies: a delayed response must not
+erase a newer login. Retired pointers confer no authority.
 An older screen cannot log out a newer winning session. An unavailable API leaves
 the outcome unconfirmed; the BFF does not report successful logout or clear the
 stable browser anchor.

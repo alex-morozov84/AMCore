@@ -92,7 +92,7 @@ export class BrowserPublicationsController {
   @ApiOperation({
     summary: 'Create or read an account-neutral browser anchor, separately from sign-in',
     description:
-      'Only a newly created anchor returns its binding. Existing status never re-emits an old capability or issues credentials.',
+      'Only a newly created anchor returns its binding. A known expired binding renews the same context atomically after retiring its old generation. Existing status never re-emits an old capability or issues credentials.',
   })
   @SchemaResponse({ type: BootstrapResult, status: 200 })
   bootstrap(

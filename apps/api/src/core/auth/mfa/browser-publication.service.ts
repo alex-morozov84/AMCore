@@ -19,6 +19,7 @@ import { hashRefreshToken } from '../utils/refresh-token-hash.js'
 
 import type { BrowserRequestBinding } from './browser-binding.js'
 import { bootstrapBrowserContext, readBrowserContext } from './browser-context.repository.js'
+import { renewExpiredBrowserContext } from './browser-context-renewal.js'
 import { MfaAuthorityReader } from './mfa-authority-reader.service.js'
 import { readMfaPrimaryProjection } from './mfa-primary-projection.js'
 import { MfaSourceLimiterService } from './mfa-source-limiter.service.js'
@@ -49,6 +50,11 @@ export class BrowserPublicationService {
       const current = await readBrowserContext(this.db, existingBinding, audience)
       if (current && current.expiresAt > (await mfaDatabaseClock(this.db)))
         return { kind: 'existing', view: this.view(current) }
+      if (current) {
+        await this.sourceLimiter.consume('start', source)
+        const renewed = await renewExpiredBrowserContext(this.db, existingBinding, audience)
+        return { kind: 'existing', view: this.view(renewed) }
+      }
     }
     await this.sourceLimiter.consume('start', source)
     return { kind: 'created', ...(await bootstrapBrowserContext(this.db, audience)) }
