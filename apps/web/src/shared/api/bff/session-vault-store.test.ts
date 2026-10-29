@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type { UserResponse } from '@amcore/shared'
+import { TimeoutError } from '@redis/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SessionVaultUnavailableError } from './errors'
@@ -88,6 +89,21 @@ describe('redisVaultStore', () => {
 
     await expect(redisVaultStore.setIfVersionMatches('s1', 2, entry)).resolves.toBe(false)
   })
+
+  // A command that waited out the client's queue timeout rejects with TimeoutError: every vault
+  // operation must fail closed with the same error the callers already map to "cannot authenticate".
+  it.each([
+    ['create', () => redisVaultStore.create('s1', entry), 'set'],
+    ['setIfVersionMatches', () => redisVaultStore.setIfVersionMatches('s1', 2, entry), 'eval'],
+    ['delete', () => redisVaultStore.delete('s1'), 'del'],
+  ] as const)(
+    '%s() maps a queue timeout to SessionVaultUnavailableError',
+    async (_name, run, command) => {
+      fakeRedis[command].mockRejectedValue(new TimeoutError())
+
+      await expect(run()).rejects.toBeInstanceOf(SessionVaultUnavailableError)
+    }
+  )
 
   it('delete() removes the key', async () => {
     fakeRedis.del.mockResolvedValue(1)

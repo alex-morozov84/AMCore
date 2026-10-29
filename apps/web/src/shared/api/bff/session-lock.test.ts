@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { TimeoutError } from '@redis/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getWebRedisClient } from './redis-client'
@@ -52,6 +53,18 @@ describe('redisVaultLock', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // A queue timeout is a rejection, never a silent "lock not held": acquire must not report a
+  // token it does not own, and the refresh protocol must see the failure.
+  it.each([
+    ['acquire', () => redisVaultLock.acquire('s1', 5000), 'set'],
+    ['renew', () => redisVaultLock.renew('s1', 'my-token', 5000), 'eval'],
+    ['release', () => redisVaultLock.release('s1', 'my-token'), 'eval'],
+  ] as const)('%s() propagates a queue timeout', async (_name, run, command) => {
+    fakeRedis[command].mockRejectedValue(new TimeoutError())
+
+    await expect(run()).rejects.toBeInstanceOf(TimeoutError)
   })
 
   it('release() runs the token-checked DEL script', async () => {
