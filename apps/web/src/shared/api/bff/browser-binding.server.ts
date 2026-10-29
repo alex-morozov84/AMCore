@@ -8,6 +8,7 @@ import {
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+import { parseRetryAfterSeconds } from '../retry-after'
 
 import { ContextRequestError } from './context-errors'
 import { sessionCookieOptions } from './session-cookie'
@@ -109,6 +110,12 @@ export function createBrowserBindingVerifier(source: Headers, expected: BrowserA
     } catch {
       throw unavailableBrowserContext()
     }
+    if (response.status === 429)
+      throw new ContextRequestError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        parseRetryAfterSeconds(response.headers)
+      )
     if ([401, 403, 409].includes(response.status)) throw changedBrowserContext()
     if (!response.ok) throw unavailableBrowserContext()
     const checked = browserBindingProbeResultSchema.safeParse(

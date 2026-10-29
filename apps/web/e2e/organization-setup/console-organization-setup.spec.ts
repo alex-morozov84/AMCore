@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
+import { probeRefusalEvidence } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
 import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
@@ -86,7 +87,9 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   try {
     await expect(repeat).toBeVisible()
   } catch {
-    throw new Error(`Setup recovery unavailable: ${JSON.stringify(responses)}`)
+    throw new Error(
+      `Setup recovery unavailable: ${JSON.stringify({ responses, primary: await probeRefusalEvidence() })}`
+    )
   }
   await repeat.click()
   await expect(setup.getByText(en.unverified, { exact: true })).toBeVisible()

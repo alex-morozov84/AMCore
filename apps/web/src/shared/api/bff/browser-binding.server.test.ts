@@ -99,6 +99,25 @@ describe('Primary browser-vault binding verification', () => {
     }
   )
 
+  it('preserves a known rate refusal and Retry-After without accepting or refreshing authority', async () => {
+    const send = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 429,
+        headers: { 'retry-after': '3' },
+      })
+    )
+    vi.stubGlobal('fetch', send)
+    const vault = entry()
+    await expect(createBrowserBindingVerifier(source(), 'product')(vault)).rejects.toMatchObject({
+      status: 429,
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfterSeconds: 3,
+    })
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(String(send.mock.calls[0]![0])).toContain('/browser-publications/probe')
+    expect(vault.browser).toEqual(entry().browser)
+  })
+
   it('fails closed on unavailable or malformed primary verification', async () => {
     const send = vi
       .fn()

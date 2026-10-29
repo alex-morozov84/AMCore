@@ -1,6 +1,7 @@
 import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
 import { expect, type Locator, type Page } from '@playwright/test'
 
+import { probeRefusalEvidence } from '../real-stack/helpers'
 import {
   addDefaultQueueJob,
   addFailedDefaultQueueJob,
@@ -364,6 +365,9 @@ export async function queueBoardJourney(
     )
     expect(responses.filter((response) => GOOGLE_FONTS.test(response.url))).toEqual([])
     await board.close()
+  } catch (error) {
+    console.error('Queue board primary-status evidence', await probeRefusalEvidence())
+    throw error
   } finally {
     clearDefaultQueue()
   }

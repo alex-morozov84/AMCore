@@ -1,6 +1,7 @@
 import { type APIRequestContext, expect, type Page } from '@playwright/test'
 
 import { completeMfaSignIn } from '../shared/mfa-login'
+import { activeTarget } from '../support/managed-target.mjs'
 import { resetMfaDomainSourceBudgets } from '../support/mfa-domain-fixture.mjs'
 
 /**
@@ -84,12 +85,20 @@ export async function logoutViaApi(
   path = '/api/auth/logout'
 ) {
   const current = await request.get(new URL('/api/auth/me', origin).href)
-  expect(current.status()).toBe(200)
+  if (current.status() !== 200)
+    throw new Error(
+      `Current profile refused (${current.status()}): ${JSON.stringify(await probeRefusalEvidence())}`
+    )
   const contextSession = current.headers()['x-amcore-context-session']
   expect(contextSession).toBeTruthy()
-  return request.post(new URL(path, origin).href, {
+  const result = await request.post(new URL(path, origin).href, {
     headers: { Origin: origin, 'x-amcore-context-session': contextSession! },
   })
+  if (result.status() !== 200)
+    throw new Error(
+      `Logout refused (${result.status()}): ${JSON.stringify(await probeRefusalEvidence())}`
+    )
+  return result
 }
 
 /** Establish the exact browser attempt before testing a credential endpoint directly. */
@@ -124,4 +133,30 @@ export async function browserCredentialRequest(
     ...options,
     headers: { ...options.headers, 'x-amcore-login-attempt': attemptId },
   })
+}
+
+/** Read-only diagnostics: report only status counts, never metric labels, identities or credentials. */
+export async function probeRefusalEvidence() {
+  try {
+    const target = activeTarget()
+    const response = await fetch(`http://127.0.0.1:${target.ports.api}/api/v1/metrics`, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!response.ok) return { metricsStatus: response.status }
+    const counts: Record<string, number> = {}
+    for (const line of (await response.text()).split('\n')) {
+      if (
+        !line.startsWith('amcore_http_requests_total{') ||
+        !line.includes('/auth/browser-publications/probe')
+      )
+        continue
+      const status = /status_code="(\d{3})"/.exec(line)?.[1]
+      const value = Number(line.slice(line.lastIndexOf(' ') + 1))
+      if (status && Number.isFinite(value)) counts[status] = (counts[status] ?? 0) + value
+    }
+    return { probeStatusCounts: counts }
+  } catch {
+    return { metricsUnavailable: true }
+  }
 }
