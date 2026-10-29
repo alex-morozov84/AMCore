@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   frontendAuthPath,
   type MfaBrowserResult,
@@ -22,19 +23,35 @@ export interface AccountSecurityPlacement {
 }
 
 export function AccountSecurityClient({ placement }: { placement: AccountSecurityPlacement }) {
+  const requestedFlow = useSearchParams().get('flow') ?? ''
+  return (
+    <AccountSecurityInstance
+      key={`${placement.apiBase}:${requestedFlow}`}
+      placement={placement}
+      requestedFlow={requestedFlow}
+    />
+  )
+}
+
+function AccountSecurityInstance({
+  placement,
+  requestedFlow,
+}: {
+  placement: AccountSecurityPlacement
+  requestedFlow: string
+}) {
   const router = useRouteProgressRouter()
   const queryClient = useQueryClient()
   const [controller] = useState(
     () =>
       new AccountMfaController({
-        recoveryScope: `${placement.apiBase}:flow:${typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('flow') ?? '')}`,
+        recoveryScope: `${placement.apiBase}:flow:${requestedFlow}`,
         inspect: (operationId, flowBinding) =>
           apiClient.get<MfaBrowserView>(
             `${placement.apiBase}${operationId ? `?operationId=${encodeURIComponent(operationId)}` : ''}`,
             {
               headers: {
-                'x-amcore-mfa-flow':
-                  flowBinding ?? new URLSearchParams(window.location.search).get('flow') ?? '',
+                'x-amcore-mfa-flow': flowBinding ?? requestedFlow,
               },
             }
           ),
