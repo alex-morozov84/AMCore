@@ -37,7 +37,7 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     vi.unstubAllEnvs()
   })
 
-  it('calls backend logout with the raw refresh token as a Cookie header, deletes the vault entry, clears the cookie', async () => {
+  it('calls backend logout with the raw refresh token as a Cookie header, deletes the exact vault entry without rewriting cookies', async () => {
     vi.mocked(getCurrentVaultSession).mockResolvedValue(fakeSession())
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -45,7 +45,7 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     const response = await handleLogout(makeRequest())
 
     expect(response.status).toBe(200)
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
+    expect(response.headers.get('set-cookie')).toBeNull()
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:5002/api/v1/auth/logout')
     expect(new Headers(init.headers).get('cookie')).toBe('refresh_token=rt-1')
@@ -63,7 +63,7 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     expect(redisVaultStore.delete).not.toHaveBeenCalled()
   })
 
-  it('still clears the cookie and returns 200 when the vault delete fails', async () => {
+  it('returns 200 after confirmed server retirement without rewriting cookies when vault cleanup fails', async () => {
     vi.mocked(getCurrentVaultSession).mockResolvedValue(fakeSession())
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
     vi.mocked(redisVaultStore.delete).mockRejectedValue(new Error('redis down'))
@@ -71,7 +71,7 @@ describe('handleLogout — backend/vault cleanup and partial-failure handling', 
     const response = await handleLogout(makeRequest())
 
     expect(response.status).toBe(200)
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
+    expect(response.headers.get('set-cookie')).toBeNull()
   })
 
   it('returns 503 without cookie clearing when the current vault cannot be read', async () => {

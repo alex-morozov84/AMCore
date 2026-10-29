@@ -33,7 +33,7 @@ describe('handleLogout — CSRF gating and no-session case', () => {
     expect(getCurrentVaultSession).not.toHaveBeenCalled()
   })
 
-  it('clears the cookie and returns 200 even with no current session (already logged out)', async () => {
+  it('returns 200 without rewriting cookies when already logged out', async () => {
     vi.mocked(getCurrentVaultSession).mockResolvedValue(null)
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -41,7 +41,7 @@ describe('handleLogout — CSRF gating and no-session case', () => {
     const response = await handleLogout(makeRequest(null))
 
     expect(response.status).toBe(200)
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
+    expect(response.headers.get('set-cookie')).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
     expect(redisVaultStore.delete).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
