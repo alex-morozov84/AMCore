@@ -23,6 +23,7 @@ import {
 import { claimConsoleReturn } from './console-return-claim'
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
+import { currentFlowView } from './mfa-flow-view'
 import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 
@@ -98,9 +99,23 @@ export async function prepareBrowserAuthAttempt(
       !['published', 'cleanup_needed'].includes(pending.record.state) &&
       !['completed', 'cancelled', 'restart_required', 'expired'].includes(pending.record.flow.state)
     ) {
-      if (entry?.entryId && !invitation)
-        return NextResponse.json({ kind: 'resume_required', flowBinding: pending.record.id })
-      throw changedBrowserContext()
+      let live = true
+      try {
+        const status = await currentFlowView(request, context, pending.record)
+        live =
+          status.kind !== 'flow' ||
+          !['completed', 'cancelled', 'restart_required', 'expired'].includes(status.state)
+      } catch (error) {
+        // Only an authoritative refusal makes this exact old continuation inert.
+        if (!(error instanceof ContextRequestError) || error.errorCode !== 'AUTH_CONTEXT_CHANGED')
+          throw error
+        live = false
+      }
+      if (live) {
+        if (entry?.entryId && !invitation)
+          return NextResponse.json({ kind: 'resume_required', flowBinding: pending.record.id })
+        throw changedBrowserContext()
+      }
     }
   }
   const upstream = await fetchBackendResponse(
