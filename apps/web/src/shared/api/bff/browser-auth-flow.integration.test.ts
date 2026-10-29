@@ -669,7 +669,7 @@ describe('Browser password/MFA publication with actual Redis', () => {
       expect(JSON.stringify(body)).not.toContain('continuation')
     }
   )
-  it('confirms primary browser logout before deleting only its own vault and clearing its cookie', async () => {
+  it('confirms primary browser logout and deletes only its own vault without clearing a newer cookie', async () => {
     const backend = upstream()
     const completed = await signIn()
     const result = (await completed.json()) as { contextSession: string }
@@ -681,7 +681,7 @@ describe('Browser password/MFA publication with actual Redis', () => {
     expect(response.status).toBe(200)
     expect(backend.logoutCalls()).toBe(1)
     expect(await context().store.get(oldId)).toBeNull()
-    expect(response.cookies.get('amcore_session')?.value).toBe('')
+    expect(response.cookies.get('amcore_session')).toBeUndefined()
     expect(response.cookies.get('amcore_browser_context')).toBeUndefined()
   })
   it('cannot use an old page logout intent to revoke a later winning cookie', async () => {
@@ -877,7 +877,7 @@ describe('Browser password/MFA publication with actual Redis', () => {
         productContextDeps(ackInput.headers)
       )
       expect(ack.status).toBe(200)
-      expect(backend.counts().acknowledgements).toBe(lostAck && protectedAccount ? 3 : 2)
+      expect(backend.counts().acknowledgements).toBe(2)
       expect(
         backend.send.mock.calls.some(
           ([url]) =>
@@ -1034,12 +1034,20 @@ describe('Browser password/MFA publication with actual Redis', () => {
       view: { state: 'cancelled', flowBinding: pending.flowBinding },
     })
     expect(backend.logoutCalls()).toBe(1)
-    expect(response.cookies.get('amcore_auth_pending')?.value).toBe('')
+    expect(response.cookies.get('amcore_auth_pending')).toBeUndefined()
     expect(response.cookies.get('amcore_browser_context')).toBeUndefined()
   })
   it('refuses a stale MFA page intent after a newer pending cookie wins, before any proof/status call', async () => {
     const backend = upstream(true)
     const first = (await (await signIn()).json()) as { flowBinding: string }
+    await commandPendingMfa(
+      request('/api/auth/mfa', {
+        action: 'cancel',
+        flowBinding: first.flowBinding,
+        operationId: randomUUID(),
+      }),
+      context()
+    )
     const second = (await (await signIn()).json()) as { flowBinding: string }
     expect(second.flowBinding).not.toBe(first.flowBinding)
     const calls = backend.send.mock.calls.length
@@ -1301,7 +1309,7 @@ describe('Signed-in settings keep the original published family', () => {
           eligible: true,
           remainingCodes: 10,
         })
-      if (path.endsWith('/mfa/session-flow')) {
+      if (path.endsWith('/mfa/settings-start')) {
         expect(new Headers(init?.headers).get('authorization')).toBeTruthy()
         return Response.json({
           ...status(),

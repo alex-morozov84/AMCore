@@ -10,6 +10,7 @@ import { postBrowserAuth } from './browser-auth-upstream'
 import { changedBrowserContext, createBrowserBindingVerifier } from './browser-binding.server'
 import { completeBrowserLogin, publishBrowserLogin } from './browser-login-handler'
 import { confirmedConsoleReturn } from './console-return-destination'
+import { resumeInvitedBrowserPublication } from './invited-browser-login'
 import { currentFlowView, flowView, stagedEntry } from './mfa-flow-view'
 import type { ProductWebContext } from './product-web-context.server'
 
@@ -79,6 +80,8 @@ export async function reconcileBrowserLogin(
     return NextResponse.json({ view: flowView(record, 'restart_required') })
   }
   if (status.familyId && status.familyId !== record.familyId) throw changedBrowserContext()
+  if (status.state === 'published' && record.invitation)
+    settlement = await resumeInvitedBrowserPublication(request, context, handle, record, true)
   const entry = await stagedEntry(context, record)
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
   const consoleReturn = await confirmedConsoleReturn(request, context, record, entry)

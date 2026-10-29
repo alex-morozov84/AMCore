@@ -151,7 +151,7 @@ describe('Bounded expired MFA retention preserves factors, journals and session 
       outcome: 'partial',
       code: 'batch_limit',
       summary: {
-        counts: { flows: 200, examined: 200, removed: 200, batches: 10, truncated: 1 },
+        counts: { flows: 200, examined: 200, removed: 200, batches: 14, truncated: 1 },
         codes: [],
       },
     })
@@ -197,8 +197,8 @@ describe('Bounded expired MFA retention preserves factors, journals and session 
       outcome: 'partial',
       code: 'retention_incomplete',
       summary: {
-        counts: { drafts: 2, removed: 2, examined: 10, batches: 10 },
-        codes: ['receipts', 'flows', 'families', 'contexts'],
+        counts: { drafts: 2, removed: 2, examined: 14, batches: 14 },
+        codes: ['receipts', 'settingsStarts', 'logoutReceipts', 'flows', 'families', 'contexts'],
       },
     })
     expect(JSON.stringify(result)).not.toContain('private failure')

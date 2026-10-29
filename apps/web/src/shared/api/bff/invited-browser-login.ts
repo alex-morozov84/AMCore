@@ -324,7 +324,8 @@ async function settleRetainedInvitation(
     !(await invitationOwnerStore.compareAndSet(invitation.ownerHash, owner.version, next, context))
   )
     throw invitationFlowChanged()
-  await updateBrowserAuthAttempt(handle, staged, { ...staged, state: 'published' }, context)
+  if (staged.state === 'staged')
+    await updateBrowserAuthAttempt(handle, staged, { ...staged, state: 'published' }, context)
   const response = NextResponse.json(
     invitationFlowAuthResponseSchema.parse({
       binding: flow.binding,

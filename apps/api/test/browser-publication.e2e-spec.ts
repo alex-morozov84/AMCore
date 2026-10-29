@@ -187,7 +187,7 @@ describe('Account-neutral browser bootstrap and read-only exact-vault proof on P
     })
   })
 
-  it('expires neutral status on read and creates only a distinct anchor on explicit bootstrap', async () => {
+  it('refuses expired status and renews only neutral state at the same known binding on bootstrap', async () => {
     const db = fixture.clients[0]!
     const first = await service().bootstrap('product', undefined, 'source')
     if (first.kind !== 'created') throw new Error('Expected bootstrap')
@@ -199,6 +199,15 @@ describe('Account-neutral browser bootstrap and read-only exact-vault proof on P
       errorCode: 'AUTH_CONTEXT_CHANGED',
     })
     const next = await service().bootstrap('product', first.binding, 'source')
-    expect(next.kind === 'created' && next.binding !== first.binding).toBe(true)
+    expect(next).toMatchObject({
+      kind: 'existing',
+      view: {
+        contextId: first.view.contextId,
+        generation: first.view.generation + 1,
+        state: 'logged_out',
+      },
+    })
+    expect('binding' in next).toBe(false)
+    expect(await db.session.count()).toBe(0)
   })
 })
