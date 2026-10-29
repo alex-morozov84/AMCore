@@ -1520,10 +1520,12 @@ off` on the stream location (and never gzip a `text/event-stream`).
   (`amcore` BullMQ prefix, `ratelimit:v1:*` (ADR-073), `auth:*`, `rate:*`).
 - Managed Redis: use `rediss://` (TLS) with ACL user/password in `REDIS_URL` /
   `COMPOSE_REDIS_URL`.
-- **During a Redis restart or failover**, the API and web server reconnect on their own
-  (retry delay grows to 2 s). A command that waits to be written fails after 5 s; a command
-  already sent has an unknown result. Requests that need Redis can answer errors in the
-  meantime. BullMQ connections have their own policy. Details and limits:
+- **During a Redis restart or failover**, the API and web server reconnect automatically,
+  with retry delays up to 2 s. An ordinary command without a local timeout fails after
+  waiting 5 s to be written. This limit does not cover `MULTI` or pipeline batches, commands
+  already sent, or the whole request. If the reply to a sent command is lost, its effect can
+  be unknown. Requests that need Redis can answer errors in the meantime. BullMQ uses its
+  own connection policy. Details and limits:
   [the Redis client contract](../backend/architecture-and-conventions.md).
 
 ## Database pool sizing

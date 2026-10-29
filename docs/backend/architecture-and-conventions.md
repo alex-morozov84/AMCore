@@ -71,8 +71,8 @@ AMCore is a **modular monolith**. The rules that keep it modular:
     goes out after 5000 ms of idle; this is not a failure-detection guarantee. There is deliberately no `socketTimeout`, because it would
     disconnect idle subscriber connections. Do not create a client with bare `createClient`
     for code that production injects; tests use `appClientOptions()` (a convention, not a lint rule).
-  - **What the 5000 ms limit does not bound:** connecting, a command already written (its
-    outcome stays unknown), a `MULTI` or pipeline batch (the user cache uses `MULTI` for
+  - **What the 5000 ms limit does not bound:** connecting, a command already written (if
+    its reply is lost, its effect can be unknown), a `MULTI` or pipeline batch (the user cache uses `MULTI` for
     tags and invalidation, and it waits in a reconnect backoff without a limit), the whole
     HTTP request, or the total number of queued commands. A Redis error in the user or
     permissions cache is not caught: it reaches the caller and the global filter answers
