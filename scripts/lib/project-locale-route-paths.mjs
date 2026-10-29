@@ -15,6 +15,7 @@ export const LOCALE_PURE_MOVES = Object.freeze([
   '(product-admin)/manage/(auth)/invite/flow/[flowId]/loading.tsx',
   '(product-admin)/manage/(auth)/layout.tsx',
   '(product-admin)/manage/(auth)/login/page.tsx',
+  '(product-admin)/manage/(auth)/sign-in-again/page.tsx',
   '(product-admin)/manage/(auth)/resend-verification/page.tsx',
   '(product-admin)/manage/(auth)/reset-password/page.tsx',
   '(product-admin)/manage/(auth)/verify-email/page.tsx',
@@ -35,6 +36,7 @@ export const LOCALE_PURE_MOVES = Object.freeze([
 
 export const LOCALE_REWRITTEN_MOVES = Object.freeze([
   '(auth)/mfa/page.tsx',
+  '(auth)/sign-in-again/page.tsx',
   '(dashboard)/account/security/page.tsx',
   '(product-admin)/manage/(auth)/mfa/page.tsx',
   '(product-admin)/manage/(protected)/account/security/page.tsx',

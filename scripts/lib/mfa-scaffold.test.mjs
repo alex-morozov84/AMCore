@@ -67,7 +67,14 @@ for (const [name, flags] of recipes) {
       const before = new Map(retained.map((file) => [file, read(file)]))
       const result = runInitProject(root, [...flags, '--yes'])
       assert.equal(result.status, 0, result.stderr || result.stdout)
-      for (const file of retained) assert.equal(read(file), before.get(file), file)
+      for (const file of retained) {
+        if (
+          flags.includes('--admin-console=disabled') &&
+          ['docs/auth/mfa-browser.md', 'docs/auth/mfa-foundation.md'].includes(file)
+        )
+          continue
+        assert.equal(read(file), before.get(file), file)
+      }
       assert.match(read('apps/api/prisma/user.prisma'), /mfaAccount\s+MfaAccount\?/)
       assert.match(read('packages/shared/src/schemas/index.ts'), /export \* from '\.\/mfa'/)
       assert.match(read('.env.example'), /MFA_ACTIVE_KEY_ID=current/)
@@ -81,6 +88,7 @@ for (const [name, flags] of recipes) {
       const app = `apps/web/src/app/${single ? '' : '[locale]/'}`
       for (const route of [
         '(auth)/mfa/page.tsx',
+        '(auth)/sign-in-again/page.tsx',
         '(dashboard)/account/security/page.tsx',
         '(product-admin)/manage/(auth)/mfa/page.tsx',
         '(product-admin)/manage/(protected)/account/security/page.tsx',
@@ -88,6 +96,15 @@ for (const [name, flags] of recipes) {
         const source = read(`${app}${route}`)
         if (single) assert.doesNotMatch(source, /resolveLocaleParam|setRequestLocale/)
         else assert.match(source, /resolveLocaleParam/)
+      }
+      assert.match(
+        read(`${app}(product-admin)/manage/(auth)/sign-in-again/page.tsx`),
+        /SignInAgainMount/
+      )
+      if (single) {
+        const entry = read('apps/web/src/_app/account-security/ui/sign-in-again-client.tsx')
+        assert.doesNotMatch(entry, /router\.replace\(placement\.destination, \{ locale \}\)/)
+        assert.match(entry, /returnEntryId/)
       }
       const frame = read('apps/web/src/_pages/account-security/index.tsx')
       if (single) assert.doesNotMatch(frame, /LocaleSwitcher/)
@@ -101,10 +118,28 @@ for (const [name, flags] of recipes) {
         )
       } else {
         const slug = flags.some((flag) => flag.includes('slug=control')) ? 'control' : 'admin'
+        assert.match(read(`${app}${slug}/(auth)/sign-in-again/page.tsx`), /SignInAgainMount/)
+        assert.match(read(`${app}${slug}/(protected)/profile/page.tsx`), /ConsoleProfileMount/)
         for (const route of ['(auth)/mfa/page.tsx', '(protected)/account/security/page.tsx'])
           assert.match(read(`${app}${slug}/${route}`), /ConsoleAccountSecurityMount/)
       }
       if (flags.includes('--admin-console=disabled')) {
+        assert.equal(existsSync(path.join(root, 'apps/web/src/_app/console-profile')), false)
+        for (const name of ['entry', 'claim', 'destination', 'recovery.integration.test'])
+          assert.equal(
+            existsSync(path.join(root, `apps/web/src/shared/api/bff/console-return-${name}.ts`)),
+            false
+          )
+        assert.doesNotMatch(
+          read('apps/web/src/shared/api/bff/browser-bootstrap-handler.ts'),
+          /console-return-claim/
+        )
+        assert.match(read('docs/auth/mfa-browser.md'), /Sign in without your phone/)
+        assert.doesNotMatch(
+          read('docs/auth/mfa-browser.md'),
+          /In the Operations Console|Console sign-out/
+        )
+        assert.match(read('docs/auth/mfa-foundation.md'), /Extend MFA to other users/)
         assert.equal(existsSync(path.join(root, 'docs/operations-console')), false)
       }
     } finally {

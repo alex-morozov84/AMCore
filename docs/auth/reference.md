@@ -161,25 +161,25 @@ A raw API consumer (a script, an integration, a log pipeline) may of course read
 
 Returned in the response root `errorCode`:
 
-| Code                            | HTTP | Meaning                                                                                                                                 |
-| ------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                                                                                      |
-| `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable                                                                         |
-| `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                                                                                          |
-| `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                                                                                          |
-| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)                                                                                                |
-| `SERVICE_UNAVAILABLE`           | 503  | A failure-protection counter could not be checked; repeat later       |
-| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session                                                                                                            |
-| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                                                                                  |
-| `SESSION_CHANGED`               | 409  | Family, account version or actual browser authority changed; stop the operation without refresh fallback                                |
-| `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                                                                                                |
-| `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                                                                                       |
-| `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email                                                                                                           |
-| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: provider env vars missing                                                                                                        |
-| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user                                                                                          |
-| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed                                                                                                     |
+| Code                            | HTTP | Meaning                                                                                                                                |
+| ------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                                                                                     |
+| `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable                                                                        |
+| `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                                                                                         |
+| `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                                                                                         |
+| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)                                                                   |
+| `SERVICE_UNAVAILABLE`           | 503  | A failure-protection counter could not be checked; repeat later                                                                        |
+| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session                                                                                                           |
+| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                                                                                 |
+| `SESSION_CHANGED`               | 409  | Family, account version or actual browser authority changed; stop the operation without refresh fallback                               |
+| `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                                                                                               |
+| `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                                                                                      |
+| `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email                                                                                                          |
+| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: provider env vars missing                                                                                                       |
+| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user                                                                                         |
+| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed                                                                                                    |
 | `STEP_UP_REQUIRED`              | 403  | Sensitive action needs recent proof; legacy password step-up remains, while protected-account admission names `details.requiredProofs` |
-| `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: OAuth-only account, no password                                                                                     |
+| `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: OAuth-only account, no password                                                                                    |
 
 ### Invitation and signup errors
 

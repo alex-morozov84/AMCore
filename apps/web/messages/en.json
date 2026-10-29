@@ -1984,7 +1984,9 @@
       "fileIntegrationResult": "Integrations: {result}"
     },
     "accountSecurity": "Sign-in protection",
-    "profileSettings": "Profile settings"
+    "profileSettings": "Profile settings",
+    "logoutReturnUnknown": "We could not confirm the sign-out result. You can start a new sign-in without returning to the previous page. After signing in, the Console overview opens.",
+    "freshSignIn": "Start a new sign-in"
   },
   "auth": {
     "login": "Sign in",
@@ -2040,9 +2042,7 @@
     },
     "signInAgainTitle": "Sign in again",
     "existingSignInHelp": "A sign-in is already in progress. Open it to finish or cancel it before starting another sign-in.",
-    "existingSignInAction": "Open existing sign-in",
-    "logoutReturnUnknown": "We could not confirm the sign-out result. You can start a new sign-in without returning to the previous page. After signing in, the Console overview opens.",
-    "freshConsoleSignIn": "Start a new sign-in"
+    "existingSignInAction": "Open existing sign-in"
   },
   "nav": {
     "dashboard": "Dashboard",

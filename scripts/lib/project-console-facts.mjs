@@ -56,6 +56,7 @@ function routeMoves(slug) {
     ...plain.map((relative) => move(`${source}/${relative}`, `${target}/${relative}`)),
     move(`${source}/(auth)/login/page.tsx`, `${target}/(auth)/login/page.tsx`),
     move(`${source}/(auth)/mfa`, `${target}/(auth)/mfa`),
+    move(`${source}/(auth)/sign-in-again`, `${target}/(auth)/sign-in-again`),
     content(`${source}/(auth)/login/page.tsx`, 'console.login-single-locale'),
   ]
 }

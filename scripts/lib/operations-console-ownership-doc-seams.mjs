@@ -1,3 +1,5 @@
+import { operationsConsoleMfaDocSeams } from './operations-console-auth-seams.mjs'
+
 const entry = (id, path, selector, detectors = [id], extra = {}) => ({
   id,
   path,
@@ -15,6 +17,7 @@ const section = (start, end) => ({ start, end, retainEnd: true })
 const block = (start, end) => ({ start, end, consumeBlankLine: true })
 
 export const operationsConsoleDocSeams = [
+  ...operationsConsoleMfaDocSeams,
   entry(
     'console.route-cache-guide',
     'docs/frontend/next-route-cache-patch.md',

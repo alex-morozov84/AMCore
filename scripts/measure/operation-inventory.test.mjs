@@ -35,8 +35,11 @@ describe('operation inventory against the real plans', () => {
       // Enforcement adds: five Console proof-story edits/deletions, three MFA
       // setup fixture edits, three RU notification-definition edits and one
       // disabled-Console proof-module deletion (+12 final operations).
-      // Composed shared/Console inventories retain distinct semantic facts/claims.
-      { name: 'measured operations', expected: 1007, actual: inventory.operations.length },
+      // Post-preview profile/return ownership, re-entry route moves and strict MFA locale
+      // navigation add 30 operations, 38 facts, 61 claims and 28 final operations.
+      // Grouped code/doc seams are shared/Console semantic facts on the same final edit.
+      // Providers/manifests/scenarios remain unchanged. Raw inventory is independently inspected.
+      { name: 'measured operations', expected: 1037, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -55,17 +58,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1382,
+        expected: 1420,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2246,
+        expected: 2307,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 980,
+        expected: 1008,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

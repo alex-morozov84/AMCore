@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server'
+
 import { SignInAgainMount } from '@/_app/account-security'
 import { getConsoleOverviewHref, getConsoleSignInAgainHref } from '@/shared/lib/console-public-href'
 
@@ -6,6 +8,7 @@ export default async function SignInAgain({
 }: {
   searchParams: Promise<{ entryId?: string | string[]; returnEntryId?: string | string[] }>
 }) {
+  const t = await getTranslations('console')
   return (
     <SignInAgainMount
       query={await searchParams}
@@ -15,7 +18,11 @@ export default async function SignInAgain({
         mfaHref: '/mfa',
         destination: getConsoleOverviewHref(),
         entryKind: 'console',
-        freshEntryHref: getConsoleSignInAgainHref(),
+        recovery: {
+          href: getConsoleSignInAgainHref(),
+          description: t('logoutReturnUnknown'),
+          label: t('freshSignIn'),
+        },
       }}
     />
   )

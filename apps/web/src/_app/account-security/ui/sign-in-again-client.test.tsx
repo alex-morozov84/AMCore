@@ -46,8 +46,8 @@ it('offers an explicit fresh Console entry after an unknown logout without repla
       locale="en"
       messages={{
         auth: {
-          logoutReturnUnknown: 'Sign-out result is unknown',
-          freshConsoleSignIn: 'Start a new sign-in',
+          existingSignInHelp: 'Existing sign-in',
+          existingSignInAction: 'Continue',
         },
       }}
     >
@@ -57,7 +57,11 @@ it('offers an explicit fresh Console entry after an unknown logout without repla
           mfaHref: '/mfa',
           destination: '/admin',
           entryKind: 'console',
-          freshEntryHref: '/admin/sign-in-again',
+          recovery: {
+            href: '/admin/sign-in-again',
+            description: 'Sign-out result is unknown',
+            label: 'Start a new sign-in',
+          },
         }}
         entryId={crypto.randomUUID()}
         returnEntryId={crypto.randomUUID()}

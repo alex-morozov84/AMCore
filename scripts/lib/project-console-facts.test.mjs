@@ -40,30 +40,31 @@ test('reports every stale Console exact count together', () => {
   // Integrations add a feature root, a stand fixture and an e2e spec: three more deletes.
   // Login diagnostics adds the two stand fixture files; its UI/browser helper use existing roots.
   // Support mail adds one closed root, verification removals and mixed script/doc operations.
-  // Account MFA adds one closed-root deletion and one pending-route extraction.
+  // Account MFA includes profile ownership, exact-return modules, grouped code/doc removal
+  // and a separate sign-in-again move. Core account MFA remains without Console.
   // The exact network-exception seam adds one content fact/removal step, with no new root/delete.
   assert.equal(
     factFor(disabled.consoleFacts, 'console.network-exceptions')?.path,
     'apps/web/network-policy.mjs'
   )
   assertExactScaffoldCounts([
-    { name: 'console roots', expected: 27, actual: operationsConsoleOwnership.facts.roots.length },
+    { name: 'console roots', expected: 28, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 112,
+      expected: 117,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
       name: 'console disabled content',
-      expected: 72,
+      expected: 77,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 165, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 175, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
       name: 'console single-locale moves',
-      expected: 4,
+      expected: 5,
       actual: count(singleHost.consoleFacts, 'move'),
     },
     {
@@ -75,12 +76,12 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 112,
+      expected: 117,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {
       name: 'console single-locale content',
-      expected: 71,
+      expected: 76,
       actual: count(singleDisabled.consoleFacts, 'content'),
     },
   ])

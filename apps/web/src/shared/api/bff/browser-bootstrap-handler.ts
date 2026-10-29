@@ -7,6 +7,7 @@ import { parseRetryAfterSeconds } from '../retry-after'
 
 import { apiErrorResponse } from './api-error-response'
 import {
+  type BrowserAuthAttempt,
   createBrowserAuthAttempt,
   type InvitedBrowserAttempt,
   pendingAuthCookie,
@@ -20,7 +21,9 @@ import {
   readBrowserCapability,
   unavailableBrowserContext,
 } from './browser-binding.server'
+// AMCORE_CONSOLE_RETURN_IMPORT_START
 import { claimConsoleReturn } from './console-return-claim'
+// AMCORE_CONSOLE_RETURN_IMPORT_END
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { currentFlowView } from './mfa-flow-view'
@@ -60,14 +63,19 @@ async function bootstrap(request: Request, context: ProductWebContext): Promise<
   const input = z
     .object({
       entryId: z.string().uuid().optional(),
+      // AMCORE_CONSOLE_RETURN_INPUT_START
       returnEntryId: z.string().uuid().optional(),
       entryKind: z.literal('console').optional(),
+      // AMCORE_CONSOLE_RETURN_INPUT_END
       locale: z.enum(SUPPORTED_LOCALES).optional(),
     })
     .strict()
     .safeParse(await readContextJson(request.body, 2048))
-  if (!input.success || (input.data.returnEntryId && !input.data.entryKind))
+  if (!input.success) throw new ContextRequestError(400, 'BAD_REQUEST')
+  // AMCORE_CONSOLE_RETURN_VALIDATION_START
+  if (input.data.returnEntryId && !input.data.entryKind)
     throw new ContextRequestError(400, 'BAD_REQUEST')
+  // AMCORE_CONSOLE_RETURN_VALIDATION_END
   return prepareBrowserAuthAttempt(request, context, undefined, input.data)
 }
 
@@ -78,8 +86,10 @@ export async function prepareBrowserAuthAttempt(
   invitation?: InvitedBrowserAttempt,
   entry?: {
     entryId?: string
+    // AMCORE_CONSOLE_RETURN_TYPE_START
     returnEntryId?: string
     entryKind?: 'console'
+    // AMCORE_CONSOLE_RETURN_TYPE_END
     locale?: (typeof SUPPORTED_LOCALES)[number]
   }
 ): Promise<NextResponse> {
@@ -154,22 +164,29 @@ export async function prepareBrowserAuthAttempt(
     throw changedBrowserContext()
   const actual = result.kind === 'created' ? result.binding : anchor
   if (!actual) throw changedBrowserContext()
-  const returned =
-    entry?.entryKind === 'console' && entry.returnEntryId && !invitation
-      ? await claimConsoleReturn(request, context, entry.returnEntryId, result.view)
-      : undefined
+  let returnIdentity: { id: string; handle: string } | undefined
+  let navigation: BrowserAuthAttempt['consoleEntry']
+  // AMCORE_CONSOLE_RETURN_BINDING_START
+  if (entry?.entryKind === 'console') {
+    const returned =
+      entry.returnEntryId && !invitation
+        ? await claimConsoleReturn(request, context, entry.returnEntryId, result.view)
+        : undefined
+    if (returned)
+      returnIdentity = { id: returned.record.attemptId, handle: returned.record.pendingHandle }
+    navigation = {
+      locale: returned?.record.locale ?? entry.locale ?? 'en',
+      ...(returned ? { proof: returned.proof } : {}),
+    }
+  }
+  // AMCORE_CONSOLE_RETURN_BINDING_END
   const attempt = await createBrowserAuthAttempt(
     context,
     actual,
     result.view,
     invitation,
-    returned ? { id: returned.record.attemptId, handle: returned.record.pendingHandle } : undefined,
-    entry?.entryKind === 'console'
-      ? {
-          locale: returned?.record.locale ?? entry.locale ?? 'en',
-          ...(returned ? { proof: returned.proof } : {}),
-        }
-      : undefined
+    returnIdentity,
+    navigation
   )
   const response = NextResponse.json({ attemptId: attempt.record.id, browser: result.view })
   response.headers.set('cache-control', 'private, no-store')

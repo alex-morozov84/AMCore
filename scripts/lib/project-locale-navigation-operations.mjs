@@ -1,3 +1,4 @@
+import { dropMfaLocaleNavigation, rewriteMfaRedirect } from './project-locale-mfa-navigation.mjs'
 import { absent, claim, localeParams } from './project-locale-ast-helpers.mjs'
 import {
   dropLocalePushOption,
@@ -14,6 +15,22 @@ import {
 } from './project-locale-navigation-ui.mjs'
 
 const definitions = [
+  [
+    'locale.navigation-mfa',
+    {
+      paramsSchema: localeParams,
+      deriveSemanticWrites: () => [absent('ts:mfa:route-locale-option')],
+      adapter: dropMfaLocaleNavigation,
+    },
+  ],
+  [
+    'locale.navigation-mfa-redirect',
+    {
+      paramsSchema: localeParams,
+      deriveSemanticWrites: () => [claim('ts:mfa:redirect-source', 'next/navigation')],
+      adapter: rewriteMfaRedirect,
+    },
+  ],
   [
     'locale.navigation-admin-login',
     {

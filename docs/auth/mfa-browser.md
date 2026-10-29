@@ -11,9 +11,13 @@ Sign-in opens `/mfa` when further proof or setup is required. Signed-in users op
 **Sign-in protection** at `/account/security`. Multi-locale builds add the locale
 prefix. Product administration uses its configured placement with these suffixes;
 see [placement and sessions](../product-admin/placement-and-sessions.md).
+<!-- AMCORE_CONSOLE_MFA_PROFILE_START -->
+
 In the Operations Console, open your profile menu in the header and select
 **Profile settings**. The profile page stays inside the Console. Protection actions
 open a dialog over that page. The same profile menu contains **Sign out**.
+<!-- AMCORE_CONSOLE_MFA_PROFILE_END -->
+
 Pending pages grant no ordinary session. If the account has no local password,
 complete the offered password-recovery path first. An OAuth provider cannot
 replace the protected account's local password or second factor.
@@ -83,11 +87,16 @@ After the final login proof, the browser completes sign-in automatically. If the
 result stays unknown, use **Check result** or **Sign in again**. The deliberate
 `/sign-in-again` route works even when an older session remains. It never signs
 out on a page read. A live unfinished login must be opened and completed or
-canceled before another attempt. Console sign-out records its return destination;
+canceled before another attempt.
+
+<!-- AMCORE_CONSOLE_MFA_RETURN_START -->
+
+Console sign-out records its return destination;
 only the matching next login can use it. An expired or competing return falls
 back to the Console overview. If the sign-out result cannot be confirmed, select
 **Start a new sign-in**. This drops the previous return destination and asks you
 to sign in again. It does not claim that the earlier sign-out succeeded.
+<!-- AMCORE_CONSOLE_MFA_RETURN_END -->
 
 ## Confirm a sensitive action
 

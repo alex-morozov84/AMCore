@@ -11,7 +11,8 @@ export default async function SignInAgain({
   params: Promise<{ locale: string }>
   searchParams: Promise<{ entryId?: string | string[]; returnEntryId?: string | string[] }>
 }) {
-  setRequestLocale(await resolveLocaleParam(params))
+  const locale = await resolveLocaleParam(params)
+  setRequestLocale(locale)
   return (
     <SignInAgainMount
       query={await searchParams}

@@ -16,7 +16,7 @@ export interface SignInAgainPlacement {
   mfaHref: string
   destination: string
   entryKind?: 'console'
-  freshEntryHref?: string
+  recovery?: { href: string; description: string; label: string }
 }
 export function SignInAgainClient({
   placement,
@@ -31,6 +31,7 @@ export function SignInAgainClient({
 }) {
   const router = useRouteProgressRouter()
   const t = useTranslations('auth')
+  const recovery = placement.recovery
   const [pendingFlow, setPendingFlow] = useState<string>()
   const [returnFailed, setReturnFailed] = useState(false)
   const active = useRef(true)
@@ -80,18 +81,16 @@ export function SignInAgainClient({
           onSuccess: () => router.replace(placement.destination, { locale }),
         }}
       />
-      {returnFailed && placement.freshEntryHref && (
+      {returnFailed && recovery && (
         <div className="space-y-3">
           <p role="status" className="text-sm text-muted-foreground">
-            {t('logoutReturnUnknown')}
+            {recovery.description}
           </p>
           <Button
             variant="outline"
-            onClick={() =>
-              router.replace(`${placement.freshEntryHref}?entryId=${crypto.randomUUID()}`)
-            }
+            onClick={() => router.replace(`${recovery.href}?entryId=${crypto.randomUUID()}`)}
           >
-            {t('freshConsoleSignIn')}
+            {recovery.label}
           </Button>
         </div>
       )}

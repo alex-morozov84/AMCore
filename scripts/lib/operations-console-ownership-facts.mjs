@@ -66,7 +66,14 @@ const sharedModules = [
 // server-only and holds real credentials) live beside the product's own
 // `authApi` in `shared/api/`, not under `shared/lib/` like the modules
 // above — so their test path is derived separately below.
-const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts'])]
+const sharedApiModules = [
+  module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts']),
+  module('apps/web/src/shared/api/bff/console-return-entry.ts', [
+    'bff/console-return-recovery.integration.test.ts',
+  ]),
+  module('apps/web/src/shared/api/bff/console-return-claim.ts'),
+  module('apps/web/src/shared/api/bff/console-return-destination.ts'),
+]
 
 const verification = [
   // This story exercises only the optional Console journey, even though its UI module is shared.
