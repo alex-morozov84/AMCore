@@ -1,17 +1,34 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('./browser-context', () => ({ consoleBrowserContext: vi.fn() }))
 vi.mock('@/shared/api/bff/logout-handler', () => ({ handleLogout: vi.fn() }))
+vi.mock('@/shared/api/bff/console-return-entry', () => ({ logoutConsoleReturnEntry: vi.fn() }))
+vi.mock('./personal-mutation-route', () => ({ consolePersonalMutation: vi.fn() }))
 
+import { logoutConsoleReturnEntry } from '@/shared/api/bff/console-return-entry'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { handleLogout } from '@/shared/api/bff/logout-handler'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { consoleBrowserContext } from './browser-context'
 import { handleConsoleLogout } from './logout-handler'
+import { consolePersonalMutation } from './personal-mutation-route'
 
-beforeEach(() => vi.clearAllMocks())
+const config = ADMIN_CONSOLE_CONFIG as unknown as { mode: 'path' | 'host' }
+const originalMode = config.mode
+const pathContext = { audience: 'product', cookieName: 'amcore_session' } as never
+beforeEach(() => {
+  vi.clearAllMocks()
+  config.mode = 'host'
+  vi.mocked(consolePersonalMutation).mockImplementation(async (_request, action) =>
+    action(pathContext)
+  )
+})
+afterEach(() => {
+  config.mode = originalMode
+})
 describe('Console logout uses the common original-page intent and primary fence', () => {
   it('forwards the original request and exact Console context without alternative revocation', async () => {
     const context = { audience: 'console', cookieName: '__Host-amcore_console_session' } as never
@@ -38,3 +55,34 @@ describe('Console logout uses the common original-page intent and primary fence'
     expect(handleLogout).not.toHaveBeenCalled()
   })
 })
+
+it('routes path-mode logout through personal mutation admission with the original request', async () => {
+  config.mode = 'path'
+  const response = Response.json({ message: 'Logged out' })
+  vi.mocked(handleLogout).mockResolvedValue(response as never)
+  const request = new Request('https://shop.example.test/api/console/auth/logout', {
+    method: 'POST',
+  })
+  expect(await handleConsoleLogout(request)).toBe(response)
+  expect(consolePersonalMutation).toHaveBeenCalledWith(request, expect.any(Function))
+  expect(handleLogout).toHaveBeenCalledWith(request, pathContext)
+  expect(consoleBrowserContext).not.toHaveBeenCalled()
+})
+
+it.each(['path', 'host'] as const)(
+  'keeps exact receipt logout separate from legacy logout in %s mode',
+  async (mode) => {
+    config.mode = mode
+    const response = Response.json({ state: 'logged_out' })
+    vi.mocked(logoutConsoleReturnEntry).mockResolvedValue(response as never)
+    const request = new Request('https://console.example.test/api/console/auth/logout', {
+      method: 'POST',
+      headers: { 'x-amcore-return-entry': 'present' },
+    })
+    expect(await handleConsoleLogout(request)).toBe(response)
+    expect(consolePersonalMutation).toHaveBeenCalledWith(request, expect.any(Function))
+    expect(logoutConsoleReturnEntry).toHaveBeenCalledWith(request, pathContext)
+    expect(handleLogout).not.toHaveBeenCalled()
+    expect(consoleBrowserContext).not.toHaveBeenCalled()
+  }
+)

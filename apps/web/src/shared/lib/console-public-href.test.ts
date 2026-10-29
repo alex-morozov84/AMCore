@@ -219,9 +219,9 @@ describe('recorded security views', () => {
 it('keeps account security inside the selected Console topology', () => {
   mutableConfig.mode = 'path'
   mutableConfig.slug = 'operations'
-  expect(getConsoleAccountSecurityHref()).toBe('/operations/account/security')
+  expect(getConsoleAccountSecurityHref()).toBe('/operations/profile')
   mutableConfig.mode = 'host'
-  expect(getConsoleAccountSecurityHref()).toBe('/account/security')
+  expect(getConsoleAccountSecurityHref()).toBe('/profile')
 })
 
 it('normalizes only the selected physical host prefix for display', () => {
