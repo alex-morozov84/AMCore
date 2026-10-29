@@ -1,31 +1,31 @@
 import { HttpStatus } from '@nestjs/common'
-import type { Cache } from 'cache-manager'
 
 import { AuthErrorCode } from '@amcore/shared'
 
-import { AppException } from '../../common/exceptions'
+import { AppException, ServiceUnavailableException } from '../../common/exceptions'
+import { AbuseCounterError, type AbuseCounterStore } from '../../infrastructure/redis'
 
 import { ApiKeyAbuseLimiterService } from './api-key-abuse-limiter.service'
 
 // AK-07: brute-force protection on api-key verifications.
 //
-// Tests exercise the public service contract — Redis is mocked via
-// cache-manager. The fingerprint helper is a static so it's tested
+// Tests exercise the public service contract with a mocked counter store; the store's
+// Lua, atomicity and refusal cases are proven against a real Redis in
+// abuse-counter.redis.e2e-spec.ts. The fingerprint helper is a static so it's tested
 // without instantiation.
 
 describe('ApiKeyAbuseLimiterService (AK-07)', () => {
   let service: ApiKeyAbuseLimiterService
-  let cache: jest.Mocked<Cache>
+  let counters: { read: jest.Mock; increment: jest.Mock; clear: jest.Mock }
   let logger: { setContext: jest.Mock; warn: jest.Mock }
 
   beforeEach(() => {
-    cache = {
-      get: jest.fn(),
-      set: jest.fn(),
-      del: jest.fn(),
-    } as unknown as jest.Mocked<Cache>
+    counters = { read: jest.fn(), increment: jest.fn(), clear: jest.fn() }
     logger = { setContext: jest.fn(), warn: jest.fn() }
-    service = new ApiKeyAbuseLimiterService(cache, logger as never)
+    service = new ApiKeyAbuseLimiterService(
+      counters as unknown as AbuseCounterStore,
+      logger as never
+    )
   })
 
   describe('fingerprint()', () => {
@@ -43,18 +43,24 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
   })
 
   describe('check()', () => {
-    it('does not throw when both counters are under the limits', async () => {
-      cache.get.mockResolvedValueOnce(10).mockResolvedValueOnce(5)
+    it('reads both v2 keys and does not throw under the limits', async () => {
+      counters.read.mockResolvedValue({ ip: 10, subject: 5 })
+
       await expect(service.check('1.2.3.4', 'fp123')).resolves.toBeUndefined()
+
+      expect(counters.read).toHaveBeenCalledWith(
+        'rate:v2:api_key_fail_ip:1.2.3.4',
+        'rate:v2:api_key_fail_token:fp123'
+      )
     })
 
-    it('does not throw when counters are missing (fresh keys)', async () => {
-      cache.get.mockResolvedValue(undefined)
+    it('does not throw for fresh keys', async () => {
+      counters.read.mockResolvedValue({ ip: 0, subject: 0 })
       await expect(service.check('1.2.3.4', 'fp123')).resolves.toBeUndefined()
     })
 
     it('throws 429 + RATE_LIMIT_EXCEEDED when IP counter is at the limit', async () => {
-      cache.get.mockResolvedValueOnce(100).mockResolvedValueOnce(0)
+      counters.read.mockResolvedValue({ ip: 100, subject: 0 })
 
       const err = await service.check('1.2.3.4', 'fp123').catch((e: unknown) => e)
 
@@ -63,43 +69,70 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
       expect((err as AppException).errorCode).toBe(AuthErrorCode.RATE_LIMIT_EXCEEDED)
     })
 
-    it('throws 429 + RATE_LIMIT_EXCEEDED when fingerprint counter is at the limit', async () => {
-      cache.get.mockResolvedValueOnce(0).mockResolvedValueOnce(20)
-
-      await expect(service.check('1.2.3.4', 'fp123')).rejects.toBeInstanceOf(AppException)
-    })
-
-    it('includes retryAfterSeconds in the exception details', async () => {
-      cache.get.mockResolvedValueOnce(100).mockResolvedValueOnce(0)
+    it('throws 429 when the fingerprint counter is at the limit', async () => {
+      counters.read.mockResolvedValue({ ip: 0, subject: 20 })
 
       const err = await service.check('1.2.3.4', 'fp123').catch((e: unknown) => e)
 
-      expect(err).toBeInstanceOf(AppException)
+      expect((err as AppException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
+    })
+
+    it('includes retryAfterSeconds in the exception details', async () => {
+      counters.read.mockResolvedValue({ ip: 100, subject: 0 })
+
+      const err = await service.check('1.2.3.4', 'fp123').catch((e: unknown) => e)
+
       expect((err as AppException).details).toEqual({ retryAfterSeconds: 3600 })
+    })
+
+    it.each([
+      ['unavailable', 'unknown'],
+      ['unavailable', 'not_sent'],
+      ['invalid_state', 'not_sent'],
+    ] as const)(
+      'fails closed with 503 on %s/%s, never reading the state as zero',
+      async (kind, outcome) => {
+        counters.read.mockRejectedValue(new AbuseCounterError(kind, outcome))
+
+        const err = await service.check('1.2.3.4', 'fp123').catch((e: unknown) => e)
+
+        expect(err).toBeInstanceOf(ServiceUnavailableException)
+        expect((err as AppException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE)
+        expect((err as AppException).errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'abuse_counter.check_failed',
+            keyClass: 'api_key',
+            case: outcome,
+            reason: kind,
+            keyFingerprint: 'fp123',
+          }),
+          expect.any(String)
+        )
+      }
+    )
+
+    it('rethrows errors that are not counter failures', async () => {
+      counters.read.mockRejectedValue(new TypeError('bug'))
+      await expect(service.check('1.2.3.4', 'fp123')).rejects.toBeInstanceOf(TypeError)
     })
   })
 
-  describe('consume()', () => {
-    it('increments both counters with the rolling TTL', async () => {
-      cache.get.mockResolvedValueOnce(5).mockResolvedValueOnce(3)
+  describe('consume() — records one failed attempt', () => {
+    it('increments both v2 counters with the one-hour inactivity expiry', async () => {
+      counters.increment.mockResolvedValue({ ip: 6, subject: 4 })
 
       await service.consume('1.2.3.4', 'fp123')
 
-      expect(cache.set).toHaveBeenCalledWith('rate:api_key_fail_ip:1.2.3.4', 6, 60 * 60 * 1000)
-      expect(cache.set).toHaveBeenCalledWith('rate:api_key_fail_token:fp123', 4, 60 * 60 * 1000)
-    })
-
-    it('initializes counters from 0 when missing', async () => {
-      cache.get.mockResolvedValue(undefined)
-
-      await service.consume('1.2.3.4', 'fp123')
-
-      expect(cache.set).toHaveBeenCalledWith('rate:api_key_fail_ip:1.2.3.4', 1, expect.any(Number))
-      expect(cache.set).toHaveBeenCalledWith('rate:api_key_fail_token:fp123', 1, expect.any(Number))
+      expect(counters.increment).toHaveBeenCalledWith(
+        'rate:v2:api_key_fail_ip:1.2.3.4',
+        'rate:v2:api_key_fail_token:fp123',
+        60 * 60 * 1000
+      )
     })
 
     it('logs WARN with keyFingerprint and counts; raw shortToken never appears', async () => {
-      cache.get.mockResolvedValueOnce(5).mockResolvedValueOnce(3)
+      counters.increment.mockResolvedValue({ ip: 6, subject: 4 })
 
       await service.consume('1.2.3.4', 'fp123')
 
@@ -115,23 +148,64 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
       expect(payload).not.toHaveProperty('longToken')
       expect(message).toBe('Failed API key verification')
     })
+
+    it.each(['not_sent', 'unknown'] as const)(
+      'answers 503 and logs the %s case when recording fails',
+      async (outcome) => {
+        counters.increment.mockRejectedValue(new AbuseCounterError('unavailable', outcome))
+
+        await expect(service.consume('1.2.3.4', 'fp123')).rejects.toBeInstanceOf(
+          ServiceUnavailableException
+        )
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'abuse_counter.record_failed',
+            case: outcome,
+            keyFingerprint: 'fp123',
+          }),
+          expect.any(String)
+        )
+      }
+    )
+
+    it('never puts the IP address or a token in the failure event', async () => {
+      counters.increment.mockRejectedValue(new AbuseCounterError('unavailable', 'unknown'))
+
+      await service.consume('203.0.113.9', 'fp123').catch(() => undefined)
+
+      expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('203.0.113.9')
+    })
   })
 
   describe('reset()', () => {
-    it('clears the fingerprint counter', async () => {
+    it('clears only the fingerprint counter', async () => {
+      counters.clear.mockResolvedValue(undefined)
+
       await service.reset('fp123')
-      expect(cache.del).toHaveBeenCalledWith('rate:api_key_fail_token:fp123')
+
+      expect(counters.clear).toHaveBeenCalledTimes(1)
+      expect(counters.clear).toHaveBeenCalledWith('rate:v2:api_key_fail_token:fp123')
     })
 
     // Critical: a valid attacker key must not wipe the per-IP failure
     // history of the surrounding bad attempts.
-    it('does NOT clear the IP counter', async () => {
+    it('does NOT touch the IP counter', async () => {
       await service.reset('fp123')
 
-      const ipKeyCalls = cache.del.mock.calls.filter(([key]) =>
-        String(key).startsWith('rate:api_key_fail_ip:')
+      const touched = counters.clear.mock.calls.map(([key]) => String(key))
+      expect(touched.some((key) => key.startsWith('rate:v2:api_key_fail_ip:'))).toBe(false)
+    })
+
+    it('answers 503 and logs when the clear fails', async () => {
+      counters.clear.mockRejectedValue(new AbuseCounterError('unavailable', 'unknown'))
+
+      await expect(service.reset('fp123')).rejects.toBeInstanceOf(ServiceUnavailableException)
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'abuse_counter.reset_failed' }),
+        expect.any(String)
       )
-      expect(ipKeyCalls).toHaveLength(0)
     })
   })
 })

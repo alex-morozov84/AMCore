@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { TimeoutError } from '@redis/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
@@ -315,6 +316,38 @@ describe('UserCacheService', () => {
       expect(metrics.dbQueries).toBe(1)
       expect(metrics.total).toBe(2)
       expect(metrics.hitRate).toBe('50.00%')
+    })
+  })
+
+  describe('Redis failure', () => {
+    // Mocked rejections prove how the service maps a failure; they are not an outage test. A
+    // command that waited out the client queue timeout rejects with TimeoutError. The cache has
+    // no Redis-outage fallback: only lock contention falls back to the database.
+    it('propagates a rejected read and does not query the database', async () => {
+      const failure = new TimeoutError()
+      redis.get.mockRejectedValueOnce(failure)
+
+      await expect(service.getUser(mockUser.id)).rejects.toBe(failure)
+      expect(prisma.user.findUnique).not.toHaveBeenCalled()
+      expect(lock.acquire).not.toHaveBeenCalled()
+    })
+
+    it('propagates a rejected lock acquisition', async () => {
+      const failure = new TimeoutError()
+      redis.get.mockResolvedValueOnce(null)
+      lock.acquire.mockRejectedValueOnce(failure)
+
+      await expect(service.getUser(mockUser.id)).rejects.toBe(failure)
+      expect(prisma.user.findUnique).not.toHaveBeenCalled()
+    })
+
+    // A MULTI has no queue timeout, so this is a connection failure, not a TimeoutError.
+    it('propagates a rejected invalidation transaction', async () => {
+      const failure = new Error('Socket closed unexpectedly')
+      redis.sMembers.mockResolvedValueOnce([userKey])
+      multi.exec.mockRejectedValueOnce(failure)
+
+      await expect(service.invalidateUser(mockUser.id)).rejects.toBe(failure)
     })
   })
 

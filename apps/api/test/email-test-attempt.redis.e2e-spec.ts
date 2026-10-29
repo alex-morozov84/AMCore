@@ -9,6 +9,7 @@ import { EmailTestStore } from '../src/core/admin/integrations/email-test/email-
 import type { AppRedisClient } from '../src/infrastructure/redis/index.js'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { appClientOptions } from './test-redis'
 
 /** The Lua lifecycle of the operator email test against a real Redis 7. */
 const policy = {
@@ -26,7 +27,7 @@ describe('email test attempt lifecycle (real Redis)', () => {
 
   beforeAll(async () => {
     container = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
-    client = createClient({ url: container.getConnectionUrl() })
+    client = createClient(appClientOptions(container.getConnectionUrl()))
     await client.connect()
     store = new EmailTestStore(client)
   }, 120_000)

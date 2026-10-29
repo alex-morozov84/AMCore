@@ -1,11 +1,12 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import { createClient } from '@redis/client'
 import { PinoLogger } from 'nestjs-pino'
 
 import { EnvService } from '../../env/env.service.js'
 import { MetricsService } from '../observability/index.js'
 
-export type AppRedisClient = ReturnType<typeof createClient>
+import { type AppRedisClient, createAppRedisClient } from './redis-client-options.js'
+
+export type { AppRedisClient }
 
 @Injectable()
 export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
@@ -17,12 +18,7 @@ export class RedisConnectionService implements OnModuleInit, OnModuleDestroy {
     private readonly metrics: MetricsService
   ) {
     this.logger.setContext(RedisConnectionService.name)
-    this.redisClient = createClient({
-      url: this.env.get('REDIS_URL'),
-      socket: {
-        reconnectStrategy: (retries) => Math.min(retries * 50, 2000),
-      },
-    })
+    this.redisClient = createAppRedisClient(this.env.get('REDIS_URL'))
 
     this.redisClient.on('error', (error) => {
       this.metrics.incRedisClientEvent('shared', 'error')

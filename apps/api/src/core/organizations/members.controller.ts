@@ -37,6 +37,7 @@ import {
   type RequestPrincipal,
 } from '@amcore/shared'
 
+import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js'
@@ -211,6 +212,7 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({
     summary: 'Remove a member and permanently revoke their organization API keys',
     description:
@@ -257,6 +259,7 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Assign a role to a member — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Role assigned' })
   @RequestContextPolicy({
@@ -277,6 +280,7 @@ export class MembersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('orgId')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({ summary: 'Remove a role from a member — requires full TeamAccess' })
   @ApiNoContentResponse({ description: 'Role removed' })
   @RequestContextPolicy({

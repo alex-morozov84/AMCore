@@ -99,7 +99,10 @@ export class InviteAcceptService {
         error instanceof AppException &&
         Object.values(InviteErrorCode).includes(error.errorCode as InviteErrorCode)
       )
-        await this.limiter.consume(ip, fingerprint)
+        // The request is already rejected: keep the original decision error even when
+        // recording the attempt fails. The limiter logs whether the record was never
+        // sent or has an unknown outcome; there is no retry or reservation.
+        await this.limiter.consume(ip, fingerprint).catch(() => undefined)
       throw error
     })
     const reason = await invitationPostCommit(() =>

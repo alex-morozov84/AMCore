@@ -37,6 +37,7 @@ import {
 } from '@amcore/shared'
 
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
+import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import type { AppAbility } from '../auth/casl/ability.factory.js'
 import type { TeamAccessDecision } from '../auth/casl/ability.factory.js'
@@ -194,6 +195,7 @@ export class OrganizationsController {
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
   @ApiNotFoundResponse({ description: 'Organization missing or caller is not a member' })
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({
     summary: 'Get organization details (must be a member)',
     description:
@@ -236,6 +238,7 @@ export class OrganizationsController {
   @ApiForbiddenResponse({ description: 'FORBIDDEN: organization access denied' })
   @ApiNotFoundResponse({ description: 'Organization missing' })
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({
     summary:
       'Update selected organization fields — current authority and full response read required',
@@ -261,6 +264,7 @@ export class OrganizationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequireTeamAccess('id')
   @ApiSecurity('apiKeyBearer')
+  @ApiProtectionUnavailable('API key')
   @ApiOperation({
     summary:
       'Delete organization — full TeamAccess and delete on every organization field required',

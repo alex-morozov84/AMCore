@@ -1,5 +1,3 @@
-import KeyvRedis from '@keyv/redis'
-import { CacheModule } from '@nestjs/cache-manager'
 import type { ModuleMetadata, Provider } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core'
@@ -44,7 +42,7 @@ import { IdempotencyModule } from './infrastructure/idempotency/index.js'
 import { ObservabilityModule } from './infrastructure/observability/index.js'
 import { BullBoardHttpModule } from './infrastructure/queue/dashboard/bull-board-http.module.js'
 import { QueueModule } from './infrastructure/queue/index.js'
-import { type AppRedisClient, REDIS_CLIENT, RedisModule } from './infrastructure/redis/index.js'
+import { RedisModule } from './infrastructure/redis/index.js'
 import { ScheduleModule } from './infrastructure/schedule/schedule.module.js'
 import { SettingsModule } from './infrastructure/settings/settings.module.js'
 import { StorageModule, StoragePublicModule } from './infrastructure/storage/index.js'
@@ -128,20 +126,9 @@ export function coreImports(
     // metrics service for bounded, low-cardinality instrumentation.
     ObservabilityModule,
 
+    // Shared Redis client plus the abuse-counter store and bounded-call helper.
+    // There is no general cache layer: each consumer uses the Redis commands it needs.
     RedisModule,
-
-    // Cache (Redis)
-    CacheModule.registerAsync({
-      isGlobal: true,
-      imports: [RedisModule],
-      inject: [REDIS_CLIENT],
-      useFactory: (redisClient: AppRedisClient) => ({
-        // RedisConnectionService opens the shared client during Nest init; KeyvRedis defers
-        // commands until first cache operation, after providers have initialized.
-        stores: [new KeyvRedis(redisClient)],
-        ttl: 60 * 1000, // 60 seconds default
-      }),
-    }),
 
     // Rate limiting (GCRA, Option O — ADR-039/ADR-073). Registration, the
     // Redis-backed limiter, the global guard, and the @RateLimit/

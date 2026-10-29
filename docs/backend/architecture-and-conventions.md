@@ -36,6 +36,47 @@ AMCore is a **modular monolith**. The rules that keep it modular:
 - **Redis is shared infrastructure, not an event bus.** It backs caches, locks, rate
   limits, idempotency, OAuth state, and BullMQ — it is not a mandatory module
   message bus.
+- **Redis access: one purpose-built operation per need; there is no generic cache
+  layer.** The API has no `CacheModule`. Inject `REDIS_CLIENT` and use the command that
+  fits the job: `SET … NX PX` for a claim, a token-checked lock
+  ([`redis-lock.service.ts`](../../apps/api/src/infrastructure/redis/redis-lock.service.ts)),
+  or an `eval` script that receives every key it touches in `KEYS`. A hot-read cache
+  follows [`user-cache.service.ts`](../../apps/api/src/core/auth/user-cache.service.ts).
+  - **Failure counters over an address key and a credential key** use
+    [`AbuseCounterStore`](../../apps/api/src/infrastructure/redis/abuse-counter.store.ts):
+    plain integers under `rate:v2:…`, one atomic script per update that validates both
+    keys before writing, and an error — never zero — for any other value. It needs one
+    Redis server and does not reserve admission.
+  - **A request-path call that must not wait forever** goes through
+    [`BoundedRedis`](../../apps/api/src/infrastructure/redis/bounded-redis.ts). It gives
+    the caller a typed error at a deadline, aborts a command that is still queued and
+    never retries. It reserves a slot before dispatch (a fixed capacity per process) and
+    refuses new calls at once when all slots are held. A slot is released only when the
+    call settles, so a command already sent can still run after its caller gave up, and a
+    connection that stalls without closing holds its slots until replies resume or the
+    connection errors or closes; no finite recovery time is promised. It does not bound
+    other users of the shared client. Tests use the
+    `redis-transport-stall` fixture
+    ([`apps/api/test/fixtures`](../../apps/api/test/fixtures/redis-transport-stall.ts))
+    to hold replies from a real server.
+  - **The shared client has one fixed contract.** The API
+    ([`redis-client-options.ts`](../../apps/api/src/infrastructure/redis/redis-client-options.ts))
+    and the web BFF
+    ([`redis-client-options.ts`](../../apps/web/src/shared/api/bff/redis-client-options.ts))
+    each build their `@redis/client` 6 client from one options function. RESP 2 is explicit,
+    so the client never sends `HELLO` or enables maintenance notifications. An ordinary
+    command waits at most 5000 ms to be written; this covers reconnect backoff and write
+    backpressure. A local limit on a call overrides it and may be shorter or longer;
+    existing bounded consumers keep their own shorter limits. The first keepalive probe
+    goes out after 5000 ms of idle; this is not a failure-detection guarantee. There is deliberately no `socketTimeout`, because it would
+    disconnect idle subscriber connections. Do not create a client with bare `createClient`
+    for code that production injects; tests use `appClientOptions()` (a convention, not a lint rule).
+  - **What the 5000 ms limit does not bound:** connecting, a command already written (if
+    its reply is lost, its effect can be unknown), a `MULTI` or pipeline batch (the user cache uses `MULTI` for
+    tags and invalidation, and it waits in a reconnect backoff without a limit), the whole
+    HTTP request, or the total number of queued commands. A Redis error in the user or
+    permissions cache is not caught: it reaches the caller and the global filter answers
+    `500`. Only lock contention falls back to the database.
 
 `core/` holds domain modules (auth, organizations, api-keys, admin).
 `infrastructure/` holds cross-cutting providers (email, queue, storage, redis,

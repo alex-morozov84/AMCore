@@ -4,6 +4,12 @@ import request from 'supertest'
 
 import { ApiKeysService } from '../src/core/api-keys/api-keys.service'
 import type { Prisma } from '../src/generated/prisma/client'
+import {
+  AbuseCounterError,
+  AbuseCounterStore,
+  BOUNDED_REDIS_CAPACITY,
+  BoundedRedis,
+} from '../src/infrastructure/redis'
 import type { PrismaService } from '../src/prisma'
 
 import {
@@ -457,6 +463,105 @@ describe('API Keys (e2e)', () => {
         .get('/auth/me')
         .set('Authorization', `Bearer ${key}`)
         .expect(401)
+    })
+  })
+
+  describe('AK-07: failure counters', () => {
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    it('answers 503 SERVICE_UNAVAILABLE and does no verification work when the counters cannot be read', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'CI Key', ['read:User'])
+      jest
+        .spyOn(app.get(AbuseCounterStore), 'read')
+        .mockRejectedValueOnce(new AbuseCounterError('unavailable', 'unknown'))
+      const verify = jest.spyOn(app.get(ApiKeysService), 'verifyByShortToken')
+
+      const res = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${key}`)
+
+      expect(res.status).toBe(503)
+      expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+      expect(verify).not.toHaveBeenCalled()
+    })
+
+    it('keeps a verified key working when clearing its fingerprint counter fails', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'CI Key', ['read:User'])
+      jest
+        .spyOn(app.get(AbuseCounterStore), 'clear')
+        .mockRejectedValueOnce(new AbuseCounterError('unavailable', 'unknown'))
+
+      const res = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${key}`)
+
+      expect(res.status).toBe(200)
+    })
+
+    it.each(['not_sent', 'unknown'] as const)(
+      'answers 503 when a failed verification cannot be recorded (%s), without authenticating',
+      async (outcome) => {
+        jest
+          .spyOn(app.get(AbuseCounterStore), 'increment')
+          .mockRejectedValueOnce(new AbuseCounterError('unavailable', outcome))
+
+        const res = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer amcore_live_${'a'.repeat(11)}_${'b'.repeat(32)}`)
+
+        expect(res.status).toBe(503)
+        expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(res.body.user).toBeUndefined()
+      }
+    )
+
+    it('answers 503 when the counters are unreadable because the helper is at capacity', async () => {
+      const bounded = app.get(BoundedRedis)
+      const held: Array<() => void> = []
+      for (let i = 0; i < BOUNDED_REDIS_CAPACITY; i++)
+        void bounded
+          .run(() => new Promise<void>((resolve) => held.push(resolve)), 60_000)
+          .catch(() => undefined)
+      const verify = jest.spyOn(app.get(ApiKeysService), 'verifyByShortToken')
+
+      try {
+        const res = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer amcore_live_${'e'.repeat(11)}_${'f'.repeat(32)}`)
+
+        expect(res.status).toBe(503)
+        expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
+        expect(verify).not.toHaveBeenCalled()
+      } finally {
+        for (const release of held) release()
+        await new Promise((resolve) => setImmediate(resolve))
+      }
+    })
+
+    it('counts bad keys atomically in v2 integer keys and clears only the fingerprint on success', async () => {
+      const { token, organizationId } = await registerWithOrg('user@example.com')
+      const { key } = await createApiKey(token, organizationId, 'CI Key', ['read:User'])
+      const bad = `amcore_live_${'c'.repeat(11)}_${'d'.repeat(32)}`
+
+      await Promise.all(
+        Array.from({ length: 5 }, () =>
+          request(app.getHttpServer()).get('/auth/me').set('Authorization', `Bearer ${bad}`)
+        )
+      ).then((all) => all.forEach((res) => expect(res.status).toBe(401)))
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${key}`)
+        .expect(200)
+
+      const redis = context.cache.connection
+      const [ipKey] = await redis.keys('rate:v2:api_key_fail_ip:*')
+      expect(await redis.get(ipKey!)).toBe('5')
+      expect((await redis.keys('rate:v2:api_key_fail_token:*')).length).toBe(1)
+      expect(await redis.keys('rate:api_key_fail_*')).toEqual([])
     })
   })
 

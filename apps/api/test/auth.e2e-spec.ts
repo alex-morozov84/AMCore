@@ -16,6 +16,7 @@ import { TokenManagerService } from '../src/core/auth/token-manager.service'
 import { EnvService } from '../src/env/env.service'
 import type { PrismaService } from '../src/prisma'
 
+import { readEnvelope, seedEnvelope } from './fixtures/counter-envelope'
 import {
   cleanDatabase,
   cleanOrgData,
@@ -109,19 +110,19 @@ describe('Auth (e2e)', () => {
         .expect(201)
       const visitor = '203.0.113.75'
       const key = `rate:login_ip:${visitor}`
-      await context.cache.set(key, 99, 100000)
+      await seedEnvelope(context.cache.connection, key, 99, 100000)
       await request(app.getHttpServer())
         .post('/auth/login')
         .set('x-amcore-client-ip', visitor)
         .send({ email: 'relay@e2e.amcore.test', password: 'StrongP@ss123' })
         .expect(200)
-      expect(await context.cache.get(key)).toBe(99)
+      expect(await readEnvelope(context.cache.connection, key)).toBe(99)
       await request(app.getHttpServer())
         .post('/auth/login')
         .set('x-amcore-client-ip', visitor)
         .send({ email: 'relay@e2e.amcore.test', password: 'WrongP@ss123' })
         .expect(401)
-      expect(await context.cache.get(key)).toBe(100)
+      expect(await readEnvelope(context.cache.connection, key)).toBe(100)
       await request(app.getHttpServer())
         .post('/auth/login')
         .set('x-amcore-client-ip', visitor)

@@ -1,9 +1,7 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Module, type Type } from '@nestjs/common'
 import { MODULE_METADATA } from '@nestjs/common/constants'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import type { Cache } from 'cache-manager'
 import { PinoLogger } from 'nestjs-pino'
 
 import { createSchemaValidationPipe } from '../src/common/schemas/schema-validation'
@@ -12,6 +10,7 @@ import { PrismaService } from '../src/prisma'
 
 import { createHttpTestApp } from './create-http-test-app'
 import { type E2ETestContext, migrateTestDatabase, noopPinoLogger } from './helpers'
+import { TestRedis } from './test-redis'
 
 export async function setupWebhookTestApp(
   controllers: Type<unknown> | Type<unknown>[],
@@ -63,7 +62,7 @@ export async function setupWebhookTestApp(
   await app.getHttpAdapter().getInstance().ready()
 
   const prisma = app.get(PrismaService)
-  const cache = app.get<Cache>(CACHE_MANAGER)
+  const cache = await TestRedis.connect(redisContainer)
   const throttlerStorage = app.get(GcraRedisLimiter)
   return { app, prisma, cache, throttlerStorage, postgresContainer, redisContainer }
 }

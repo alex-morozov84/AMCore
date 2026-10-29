@@ -676,6 +676,46 @@ describe('OpenAPI success surface (e2e)', () => {
     }
   })
 
+  it('documents the fail-closed protection 503 on every ADR-034 operation and on invite accept, and nowhere else', () => {
+    // An abuse counter that cannot be checked answers 503 SERVICE_UNAVAILABLE. The response
+    // is documented exactly where the counter runs: operations that accept an API key
+    // (the allowlist) and the invitation accept route. Unrelated routes must not claim it.
+    const apiKeyMarker = 'API key failure counters could not be checked'
+    const inviteMarker = 'invitation failure counters could not be checked'
+    const expected = new Map<string, string>(
+      ADR_034_APIKEY_ALLOWLIST.map((entry) => [
+        toOpenApiPathKey(entry.method, entry.classPath, entry.handlerPath),
+        apiKeyMarker,
+      ])
+    )
+    expected.set('post /auth/invites/accept', inviteMarker)
+    const violations: string[] = []
+
+    for (const [path, item] of Object.entries(document.paths)) {
+      if (isExcluded(path)) continue
+      for (const method of HTTP_METHODS) {
+        const op = (item as Record<string, { responses?: Record<string, unknown> } | undefined>)[
+          method
+        ]
+        if (!op) continue
+        const key = `${method} ${path}`
+        const described = JSON.stringify(op.responses?.['503'] ?? '')
+        const marker = expected.get(key)
+        if (marker && !described.includes(marker))
+          violations.push(`${key}: missing the protection 503 (${marker})`)
+        if (!marker && (described.includes(apiKeyMarker) || described.includes(inviteMarker)))
+          violations.push(`${key}: documents a protection 503 but runs no abuse counter`)
+      }
+    }
+    for (const key of expected.keys()) {
+      const [method, ...parts] = key.split(' ')
+      if (!(document.paths[parts.join(' ')] as Record<string, unknown> | undefined)?.[method!])
+        violations.push(`${key}: expected operation is missing from the document`)
+    }
+
+    expect(violations).toEqual([])
+  })
+
   it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {
     // Guards against a dangling security reference: every @ApiSecurity('apiKeyBearer')
     // reference below is meaningless if the scheme itself isn't registered in

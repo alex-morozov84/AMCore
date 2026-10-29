@@ -2,19 +2,16 @@ import { once } from 'node:events'
 import { connect, createServer, type Socket } from 'node:net'
 
 import { jest } from '@jest/globals'
-import KeyvRedis from '@keyv/redis'
-import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager'
 import { ConfigService } from '@nestjs/config'
-import { Test } from '@nestjs/testing'
 import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
-import type { Cache } from 'cache-manager'
 
 import { LoginRateLimiterService } from '../src/core/auth/login-rate-limiter.service'
 import { LOGIN_LIMIT_SCRIPT, LOGIN_LIMIT_VALIDATION } from '../src/core/auth/login-rate-limits.lua'
 import { EnvService } from '../src/env/env.service'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { readEnvelope, seedEnvelope } from './fixtures/counter-envelope'
 
 const ip = '203.0.113.1'
 const email = 'login@e2e.amcore.test'
@@ -26,21 +23,20 @@ const keys = (who = email, address = ip): [string, string, string] => [
 const payload = (value: number, expires = Date.now() + 100000): string =>
   JSON.stringify({ value, expires })
 
-describe('Login atomic accounting with installed CacheModule and Redis7', () => {
+describe('Login atomic accounting with envelope counters and Redis7', () => {
   let broker: StartedRedisContainer
   let client: ReturnType<typeof createClient>
-  let module: Awaited<ReturnType<ReturnType<typeof Test.createTestingModule>['compile']>>
-  let cache: Cache
+  // Counters are seeded and read as the envelope the login script accepts (see the fixture).
+  const cache = {
+    set: (key: string, value: number, ttl: number) => seedEnvelope(client, key, value, ttl),
+    get: (key: string) => readEnvelope(client, key),
+  }
   let first: LoginRateLimiterService
   let second: LoginRateLimiterService
   beforeAll(async () => {
     broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
-    client = createClient({ url: broker.getConnectionUrl() })
+    client = createClient({ url: broker.getConnectionUrl(), RESP: 2 })
     await client.connect()
-    module = await Test.createTestingModule({
-      imports: [CacheModule.register({ stores: [new KeyvRedis(client)], ttl: 60000 })],
-    }).compile()
-    cache = module.get<Cache>(CACHE_MANAGER)
     const env = new EnvService(new ConfigService({ REDIS_URL: broker.getConnectionUrl() }))
     first = new LoginRateLimiterService(env)
     second = new LoginRateLimiterService(env)
@@ -56,7 +52,6 @@ describe('Login atomic accounting with installed CacheModule and Redis7', () => 
   afterAll(async () => {
     await first?.onModuleDestroy()
     await second?.onModuleDestroy()
-    await module?.close()
     if (client?.isOpen) await client.quit()
     await broker?.stop()
   }, 60000)

@@ -1,4 +1,4 @@
-import { createClient } from '@redis/client'
+import { createBffRedisClient } from './redis-client-options'
 
 import 'server-only'
 
@@ -10,12 +10,7 @@ function createWebRedisClient() {
     )
   }
 
-  const client = createClient({
-    url,
-    socket: {
-      reconnectStrategy: (retries) => Math.min(retries * 50, 2000),
-    },
-  })
+  const client = createBffRedisClient(url)
 
   client.on('error', (error) => {
     console.error('[bff] Redis client error', error)
@@ -24,10 +19,8 @@ function createWebRedisClient() {
   return client
 }
 
-// No explicit return-type annotation on the factory above: `createClient`'s
-// generic defaults don't structurally match a separately-computed
-// `ReturnType<typeof createClient>` alias (a `@redis/client` inference
-// quirk), so `WebRedisClient` is derived from the factory itself instead.
+// Derived from the factory, not from a separate `ReturnType<typeof createClient>`: the factory
+// pins RESP 2, and the library's generic default (RESP 3) would not match it.
 export type WebRedisClient = ReturnType<typeof createWebRedisClient>
 
 // Standalone Next.js server (ADR-038-style packaging) is a long-lived

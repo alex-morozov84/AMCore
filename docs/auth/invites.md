@@ -300,6 +300,13 @@ limits still apply to replay. `429` carries `Retry-After` (3600 seconds for an
 exhausted hourly allowance); wait before making a fresh request.
 Existing login/verification/reset/OAuth and global rate limits remain active.
 
+Accept also counts failed attempts per source address and per token fingerprint. Over
+the limit it returns `429`. When those counters cannot be checked, it returns `503` with
+`SERVICE_UNAVAILABLE` before the invitation is looked up, so nothing changed and the
+same operation ID can be repeated after a short delay. A failed accept keeps its own
+error even when recording the attempt fails. See
+[failure counters](concepts.md#api-key-and-invitation-failure-counters).
+
 Secret-bearing invitation endpoints return `no-store`, `no-referrer` and
 `noindex,nofollow`. Generic browser BFF proxying closes the entire invitation
 family, including encoded aliases, and strips browser-supplied invitation secret

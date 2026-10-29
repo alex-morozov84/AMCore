@@ -10,6 +10,10 @@ export async function redisTransportStall(
   holdReplies: () => void
   holdCommands: () => void
   release: () => void
+  /** Destroys every open connection but keeps listening, so clients can reconnect. */
+  dropConnections: () => void
+  /** While true, new connections are closed at once, so a client's reconnect attempts fail. */
+  refuseConnections: (refuse: boolean) => void
   close: () => Promise<void>
 }> {
   const sockets = new Set<Socket>()
@@ -17,11 +21,16 @@ export async function redisTransportStall(
   const commands: Array<{ socket: Socket; chunk: Buffer }> = []
   let holdReplies = false
   let holdCommands = false
+  let refusing = false
   let notifyHeld!: () => void
   const held = new Promise<void>((resolve) => {
     notifyHeld = resolve
   })
   const server = createServer((downstream) => {
+    if (refusing) {
+      downstream.destroy()
+      return
+    }
     const upstream = createConnection({ host, port })
     sockets.add(downstream)
     sockets.add(upstream)
@@ -72,6 +81,14 @@ export async function redisTransportStall(
       holdCommands = false
       for (const pending of [...commands.splice(0), ...replies.splice(0)])
         pending.socket.write(pending.chunk)
+    },
+    refuseConnections: (refuse) => {
+      refusing = refuse
+    },
+    dropConnections: () => {
+      replies.splice(0)
+      commands.splice(0)
+      for (const socket of sockets) socket.destroy()
     },
     close: async () => {
       for (const socket of sockets) socket.destroy()

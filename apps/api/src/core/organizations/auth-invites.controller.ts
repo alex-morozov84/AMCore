@@ -27,6 +27,7 @@ import type { Request } from 'express'
 
 import { type AcceptInviteInput, AuthType, type RequestPrincipal } from '@amcore/shared'
 
+import { ApiProtectionUnavailable } from '../../common/exceptions/index.js'
 import { SchemaResponse } from '../../common/schemas/schema-response.js'
 import { getClientIp } from '../../common/utils/anonymize-ip.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
@@ -122,6 +123,7 @@ export class AuthInvitesController {
       'Explicitly accept the inspected intent; same operation replays without granting twice',
   })
   @SchemaResponse({ type: AcceptInviteResponseDto, status: 200 })
+  @ApiProtectionUnavailable('invitation')
   accept(
     @Body({ schema: AcceptInviteDto.schema }) dto: AcceptInviteInput,
     @CurrentUser() principal: RequestPrincipal,

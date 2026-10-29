@@ -1,7 +1,7 @@
-import type { Cache } from 'cache-manager'
 import type { PinoLogger } from 'nestjs-pino'
 
 import { ForbiddenException, NotFoundException } from '../../common/exceptions'
+import type { BoundedRedis } from '../../infrastructure/redis'
 import type { AuditLogService } from '../audit'
 import {
   createMockContext,
@@ -17,7 +17,8 @@ import { SystemRole } from '@/generated/prisma/client'
 describe('ApiKeysService', () => {
   let service: ApiKeysService
   let mockCtx: MockContext
-  let mockCache: jest.Mocked<Pick<Cache, 'get' | 'set' | 'del'>>
+  let redisSet: jest.Mock
+  let mockRedis: { run: jest.Mock }
   let mockAuditLog: jest.Mocked<Pick<AuditLogService, 'record'>>
   const mockRevocation = { revoke: jest.fn() }
   let mockLogger: jest.Mocked<PinoLogger>
@@ -48,11 +49,12 @@ describe('ApiKeysService', () => {
   beforeEach(() => {
     mockCtx = createMockContext()
 
-    mockCache = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      del: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<Pick<Cache, 'get' | 'set' | 'del'>>
+    redisSet = jest.fn().mockResolvedValue('OK')
+    mockRedis = {
+      run: jest.fn((operation: (client: { set: jest.Mock }) => Promise<unknown>) =>
+        operation({ set: redisSet })
+      ),
+    }
 
     mockLogger = {
       setContext: jest.fn(),
@@ -66,7 +68,7 @@ describe('ApiKeysService', () => {
     const prisma = mockContextToPrisma(mockCtx)
     service = new ApiKeysService(
       prisma,
-      mockCache as unknown as Cache,
+      mockRedis as unknown as BoundedRedis,
       mockAuditLog as unknown as AuditLogService,
       mockLogger,
       mockRevocation as unknown as ApiKeyRevocationService
@@ -302,16 +304,16 @@ describe('ApiKeysService', () => {
   })
 
   describe('touchLastUsed', () => {
-    it('should skip db update if Redis gate is already set', async () => {
-      mockCache.get.mockResolvedValue('1')
+    it('should skip db update if another caller already holds the Redis claim', async () => {
+      redisSet.mockResolvedValue(null)
 
       await service.touchLastUsed('key-1')
 
       expect(mockCtx.prisma.apiKey.updateMany).not.toHaveBeenCalled()
     })
 
-    it('should update db and set Redis gate on cache miss', async () => {
-      mockCache.get.mockResolvedValue(null)
+    it('should claim the hourly gate atomically and update db when the claim succeeds', async () => {
+      redisSet.mockResolvedValue('OK')
       mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
       await service.touchLastUsed('key-1')
@@ -326,16 +328,33 @@ describe('ApiKeysService', () => {
         },
         data: { lastUsedAt: expect.any(Date) },
       })
-      expect(mockCache.set).toHaveBeenCalledWith('api_key:last_used:key-1', '1', 3600 * 1000)
+      expect(redisSet).toHaveBeenCalledTimes(1)
+      expect(redisSet).toHaveBeenCalledWith('api_key:last_used:key-1', '1', {
+        expiration: { type: 'PX', value: 3600 * 1000 },
+        condition: 'NX',
+      })
     })
 
-    // AK-12: cache I/O must not propagate. The caller does `void
+    it('does not delete the claim when the db update fails (metadata stays stale up to an hour)', async () => {
+      mockCtx.prisma.apiKey.updateMany.mockRejectedValue(new Error('db down'))
+
+      await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
+      await new Promise((resolve) => setImmediate(resolve))
+
+      expect(redisSet).toHaveBeenCalledTimes(1)
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error) }),
+        'Failed to update lastUsedAt'
+      )
+    })
+
+    // AK-12: Redis I/O must not propagate. The caller does `void
     // touchLastUsed(...)` — any uncaught error becomes an unhandled
-    // rejection. Each cache op is wrapped; a flaky Redis only ever
+    // rejection. The claim is wrapped; a flaky Redis only ever
     // produces a warn log, never breaks an authenticated request.
-    describe('AK-12: best-effort cache I/O', () => {
-      it('cache.get rejection → no throw, warn logged, db update still fires', async () => {
-        mockCache.get.mockRejectedValueOnce(new Error('Redis ECONNRESET'))
+    describe('AK-12: best-effort Redis I/O', () => {
+      it('claim rejection → no throw, warn logged, db update still fires', async () => {
+        mockRedis.run.mockRejectedValueOnce(new Error('Redis ECONNRESET'))
         mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
 
         await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
@@ -343,50 +362,18 @@ describe('ApiKeysService', () => {
 
         expect(mockLogger.warn).toHaveBeenCalledWith(
           expect.objectContaining({ apiKeyId: 'key-1' }),
-          expect.stringContaining('Failed to read api_key last_used cache gate')
+          expect.stringContaining('Failed to claim api_key last_used gate')
         )
         // Falls through to the DB update — we don't know if it was a
         // recent touch, so we do the extra write rather than skip silently.
         expect(mockCtx.prisma.apiKey.updateMany).toHaveBeenCalled()
       })
 
-      it('cache.set rejection → no throw, warn logged', async () => {
-        mockCache.get.mockResolvedValue(null)
-        mockCache.set.mockRejectedValueOnce(new Error('Redis OOM'))
-        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
-
-        await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
-        await new Promise((resolve) => setImmediate(resolve))
-
-        expect(mockLogger.warn).toHaveBeenCalledWith(
-          expect.objectContaining({ apiKeyId: 'key-1' }),
-          expect.stringContaining('Failed to set api_key last_used cache gate')
-        )
-      })
-
-      it('both cache ops reject → method completes, two warns', async () => {
-        mockCache.get.mockRejectedValueOnce(new Error('get failed'))
-        mockCache.set.mockRejectedValueOnce(new Error('set failed'))
-        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
-
-        await expect(service.touchLastUsed('key-1')).resolves.toBeUndefined()
-        await new Promise((resolve) => setImmediate(resolve))
-
-        const warnMessages = mockLogger.warn.mock.calls.map(([, msg]) => msg)
-        expect(warnMessages).toEqual(
-          expect.arrayContaining([
-            expect.stringContaining('Failed to read api_key last_used cache gate'),
-            expect.stringContaining('Failed to set api_key last_used cache gate'),
-          ])
-        )
-      })
-
       // Raw key material (shortToken / longToken / hash / salt) must never
       // appear in any log emitted by this method.
       it('warn payloads never contain raw key material', async () => {
-        mockCache.get.mockRejectedValueOnce(new Error('boom'))
-        mockCache.set.mockRejectedValueOnce(new Error('boom'))
-        mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
+        mockRedis.run.mockRejectedValueOnce(new Error('boom'))
+        mockCtx.prisma.apiKey.updateMany.mockRejectedValue(new Error('boom'))
 
         await service.touchLastUsed('key-1')
         await new Promise((resolve) => setImmediate(resolve))

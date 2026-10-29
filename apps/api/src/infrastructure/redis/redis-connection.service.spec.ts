@@ -32,6 +32,13 @@ describe('RedisConnectionService metrics', () => {
     } as unknown as MetricsService
 
     new RedisConnectionService(env, logger, metrics)
+    expect(createClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'redis://localhost:6379',
+        RESP: 2,
+        commandOptions: { timeout: 5000 },
+      })
+    )
     listeners.get('error')?.(new Error('redis down'))
     listeners.get('reconnecting')?.()
 

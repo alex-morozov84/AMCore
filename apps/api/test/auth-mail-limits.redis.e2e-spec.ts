@@ -1,13 +1,9 @@
 import { createHash } from 'node:crypto'
 
 import { jest } from '@jest/globals'
-import KeyvRedis from '@keyv/redis'
-import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager'
 import { ConfigService } from '@nestjs/config'
-import { Test } from '@nestjs/testing'
 import { createClient } from '@redis/client'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
-import type { Cache } from 'cache-manager'
 import { Redis } from 'ioredis'
 
 import { AuthErrorCode, SupportMailErrorCode } from '@amcore/shared'
@@ -16,6 +12,7 @@ import { AuthMailLimiter } from '../src/core/auth/auth-mail-limiter.service'
 import { EnvService } from '../src/env/env.service'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { seedEnvelope } from './fixtures/counter-envelope'
 
 const hash = (s: string): string => createHash('sha256').update(s).digest('hex')
 const prefix = 'amcore:auth-mail:v1:'
@@ -24,27 +21,19 @@ const recipient = (email: string, kind = 'password_recovery'): string =>
 const actor = (id: string): string => `${prefix}actor:${hash(id)}`
 const cooldown = (email: string): string => `${prefix}cooldown:password_recovery:${hash(email)}`
 
-describe('Shared auth mail limits and installed CacheModule legacy migration', () => {
+describe('Shared auth mail limits and legacy envelope counter import', () => {
   let broker: StartedRedisContainer
   let client: ReturnType<typeof createClient>
-  let module: Awaited<ReturnType<ReturnType<typeof Test.createTestingModule>['compile']>>
-  let cache: Cache
+  // The legacy counter is seeded as the envelope the auth-mail script imports (see the fixture).
+  const cache = {
+    set: (key: string, value: number, ttl: number) => seedEnvelope(client, key, value, ttl),
+  }
   let limiter: AuthMailLimiter
 
   beforeAll(async () => {
     broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
-    client = createClient({ url: broker.getConnectionUrl() })
+    client = createClient({ url: broker.getConnectionUrl(), RESP: 2 })
     await client.connect()
-    // This is the production CacheModule recipe, with the same installed Keyv adapter.
-    module = await Test.createTestingModule({
-      imports: [
-        CacheModule.register({
-          stores: [new KeyvRedis(client)],
-          ttl: 60000,
-        }),
-      ],
-    }).compile()
-    cache = module.get<Cache>(CACHE_MANAGER)
     limiter = new AuthMailLimiter(
       new EnvService(new ConfigService({ REDIS_URL: broker.getConnectionUrl() }))
     )
@@ -54,7 +43,6 @@ describe('Shared auth mail limits and installed CacheModule legacy migration', (
     await client.flushDb()
   })
   afterAll(async () => {
-    await module?.close()
     if (client?.isOpen) await client.quit()
     await broker?.stop()
   }, 60000)

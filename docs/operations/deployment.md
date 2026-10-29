@@ -1520,6 +1520,13 @@ off` on the stream location (and never gzip a `text/event-stream`).
   (`amcore` BullMQ prefix, `ratelimit:v1:*` (ADR-073), `auth:*`, `rate:*`).
 - Managed Redis: use `rediss://` (TLS) with ACL user/password in `REDIS_URL` /
   `COMPOSE_REDIS_URL`.
+- **During a Redis restart or failover**, the API and web server reconnect automatically,
+  with retry delays up to 2 s. An ordinary command without a local timeout fails after
+  waiting 5 s to be written. This limit does not cover `MULTI` or pipeline batches, commands
+  already sent, or the whole request. If the reply to a sent command is lost, its effect can
+  be unknown. Requests that need Redis can answer errors in the meantime. BullMQ uses its
+  own connection policy. Details and limits:
+  [the Redis client contract](../backend/architecture-and-conventions.md).
 
 ## Database pool sizing
 
@@ -1631,8 +1638,8 @@ After trusted SUPER_ADMIN access, migrations and guarded role initialization, us
 
 ## Password limiter upgrade and rollback
 
-This auth change retains existing Redis key names, Keyv JSON envelopes and expiry
-policy. It replaces get/set writers with atomic scripts. Mixed old/new writers are
+This auth change retains existing Redis key names, JSON counter envelopes
+(`{"value":N,"expires":ms}`) and expiry policy. It replaces get/set writers with atomic scripts. Mixed old/new writers are
 unsafe: old success still clears aggregate debt and old failures can lose updates.
 
 For the reference Compose deployment, take the web/API entry routes out of service

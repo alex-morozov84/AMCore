@@ -428,9 +428,9 @@ recovery still lets the mailbox owner establish a password.
 Before upgrading existing installations, stop and drain every old API writer
 that can request auth email. Apply the migration, then start the new version.
 Do not run old and new writers together: old cache counters cannot participate
-in the new atomic budget. The new limiter imports the installed CacheModule/Keyv
-legacy counter and its remaining Redis TTL on first reservation without granting
-a second budget. Unknown or malformed live data refuses safely. Admitted requests
+in the new atomic budget. The new limiter imports the legacy counter (a
+`{"value":N,"expires":ms}` envelope under the old key) and its remaining Redis TTL
+on first reservation without granting a second budget. Unknown or malformed live data refuses safely. Admitted requests
 renew the new recipient counter for one hour; denied requests retain its expiry.
 
 For rollback, stop/drain new writers first. Retain the database migration and

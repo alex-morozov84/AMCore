@@ -1,8 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
-import { CACHE_MANAGER } from '@nestjs/cache-manager'
-import { Inject, Injectable } from '@nestjs/common'
-import type { Cache } from 'cache-manager'
+import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { ApiKeyListResponse, ApiKeyQuery } from '@amcore/shared'
@@ -10,6 +8,7 @@ import type { CreateApiKeyInput } from '@amcore/shared'
 
 import { ForbiddenException } from '../../common/exceptions/index.js'
 import { AuditActorType, AuditTargetType, Prisma } from '../../generated/prisma/client.js'
+import { BoundedRedis } from '../../infrastructure/redis/index.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
 
@@ -49,7 +48,7 @@ export interface ApiKeyListItem {
 export class ApiKeysService {
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    private readonly redis: BoundedRedis,
     private readonly auditLog: AuditLogService,
     private readonly logger: PinoLogger,
     private readonly revocation: ApiKeyRevocationService
@@ -238,19 +237,25 @@ export class ApiKeysService {
   async touchLastUsed(id: string): Promise<void> {
     const cacheKey = `api_key:last_used:${id}`
 
-    let alreadyUpdated: unknown = false
+    // One atomic claim per key per hour: the first caller gets `OK` and writes.
+    // A stale claim after a failed DB write only leaves lastUsedAt old for up to
+    // an hour; the claim is deliberately not deleted on failure.
+    let claimed = true
     try {
-      alreadyUpdated = await this.cache.get(cacheKey)
+      claimed =
+        (await this.redis.run((client) =>
+          client.set(cacheKey, '1', {
+            expiration: { type: 'PX', value: 3600 * 1000 },
+            condition: 'NX',
+          })
+        )) === 'OK'
     } catch (err) {
-      this.logger.warn(
-        { err, apiKeyId: id },
-        'Failed to read api_key last_used cache gate (continuing)'
-      )
-      // Fall through: without the cache gate we'll do one extra DB
+      this.logger.warn({ err, apiKeyId: id }, 'Failed to claim api_key last_used gate (continuing)')
+      // Fall through: without the gate we'll do one extra DB
       // write per request, but the request itself succeeds.
     }
 
-    if (alreadyUpdated) return
+    if (!claimed) return
 
     // Conditional metadata update cannot modify a terminal credential or resurrect a row.
     const now = new Date()
@@ -260,15 +265,6 @@ export class ApiKeysService {
         data: { lastUsedAt: now },
       })
       .catch((err: unknown) => this.logger.warn({ err }, 'Failed to update lastUsedAt'))
-
-    try {
-      await this.cache.set(cacheKey, '1', 3600 * 1000)
-    } catch (err) {
-      this.logger.warn(
-        { err, apiKeyId: id },
-        'Failed to set api_key last_used cache gate (continuing)'
-      )
-    }
   }
 
   // AK-08: only `live` is supported. A real test/sandbox mode would need
