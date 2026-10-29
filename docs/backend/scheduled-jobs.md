@@ -193,6 +193,9 @@ with the catalogue, so a catalogue entry without its job fails there; the source
 - Table limits: at most 64 jobs in the catalogue and 2560 run rows in total. Rows of ids
   that are no longer in the catalogue are removed when a worker starts.
 
+The config version is a SHA-256 fingerprint of public job identity, family,
+schedule and freshness thresholds. It contains no password, secret or environment value.
+
 Changing a job's schedule, grace or stale threshold changes its config version.
 For a daily job, the success recorded under the old schedule stays visible but no
 longer sets the due time, which restarts from the new version. A frequent job has no

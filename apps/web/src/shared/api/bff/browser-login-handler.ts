@@ -106,6 +106,7 @@ export async function handleBrowserOAuth(
     undefined,
     callbackBinding
   )
+  // The ticket has 256 random bits; this digest correlates one exchange, not a password.
   const response = await retainBrowserLogin(
     request,
     context,

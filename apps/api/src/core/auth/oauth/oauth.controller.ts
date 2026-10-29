@@ -464,6 +464,7 @@ export class OAuthController {
         return { ...result.body, ...(claims.returnTo ? { returnTo: claims.returnTo } : {}) }
       }
       res.status(200)
+      // Random 256-bit session handle, not a password; only its digest is stored server-side.
       res.cookie('refresh_token', result.refreshToken, {
         httpOnly: true,
         secure: this.isProduction,

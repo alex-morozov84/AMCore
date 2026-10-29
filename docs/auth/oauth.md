@@ -153,6 +153,11 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 with a short-lived browser binding cookie, so the callback is tied both to the
 server-side flow state and to the browser that started the login/link flow.
 
+Exchange tickets contain 256 random bits. SHA-256 fingerprints correlate one-use tickets
+with their retained browser attempt; they do not store or verify human passwords.
+For direct API sessions, the HttpOnly/Strict refresh cookie carries a random 256-bit
+session handle. The server stores its digest, not a password in that cookie.
+
 **How `apps/web` adapts this (ADR-068).** The diagram above describes the
 direct/native API transport. The reference web frontend uses its own
 origin for browser requests and calls the API server-side. Provider authorization,

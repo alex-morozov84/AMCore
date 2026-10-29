@@ -69,6 +69,7 @@ export async function handleOAuthExchange(
 
   const pending = await readBrowserAuthAttempt(request.headers, context)
   if (pending && 'oauthTicketHash' in pending.record) {
+    // Match the random one-use ticket, never a human password or reusable login proof.
     if (pending.record.oauthTicketHash !== createHash('sha256').update(ticket).digest('hex'))
       return failureRedirect(request, locale, undefined, context)
     if (pending.record.state === 'published' || pending.record.state === 'staged') {

@@ -9,6 +9,10 @@ import { http, HttpResponse } from 'msw'
  * instead of an unhandled-request warning.
  */
 export const handlers = [
+  // Credential forms first prepare a neutral browser attempt; it grants no session.
+  http.post('/api/auth/browser-context', () =>
+    HttpResponse.json({ attemptId: crypto.randomUUID() })
+  ),
   http.get('/api/auth/sessions', () => {
     const body: SessionsListResponse = { data: [], total: 0, page: 1, limit: 20 }
     return HttpResponse.json(body)
