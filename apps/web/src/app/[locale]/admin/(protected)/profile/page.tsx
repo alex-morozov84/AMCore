@@ -1,4 +1,4 @@
-import { ConsoleProfileMount } from '@/_app/console-account-security'
+import { ConsoleProfileMount } from '@/_app/console-profile'
 
 export default function ProfilePage() {
   return <ConsoleProfileMount />

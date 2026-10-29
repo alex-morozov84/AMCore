@@ -11,7 +11,9 @@
     "admin-console:/mfa": 1044788,
     "admin-console:/organizations": 1304831,
     "admin-console:/organizations/[id]": 1312400,
+    "admin-console:/profile": 1428639,
     "admin-console:/scheduled-jobs": 1342814,
+    "admin-console:/sign-in-again": 1064187,
     "admin-console:/users": 1304831,
     "admin-console:/users/[id]": 1368741
   }

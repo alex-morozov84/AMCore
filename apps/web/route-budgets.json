@@ -14,6 +14,7 @@
     "app:/resend-verification": 933872,
     "app:/reset-password": 933872,
     "app:/settings/sessions": 1212706,
+    "app:/sign-in-again": 1064187,
     "app:/verify-email": 1013492,
     "product-admin:/": 1161531,
     "product-admin:/account/security": 1233375,
@@ -34,6 +35,7 @@
     "product-admin:/reset-password": 1152490,
     "product-admin:/settings/api-keys": 1570652,
     "product-admin:/settings/sessions": 1251705,
+    "product-admin:/sign-in-again": 1224333,
     "product-admin:/verify-email": 1221290
   }
 }

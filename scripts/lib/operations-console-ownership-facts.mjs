@@ -5,6 +5,7 @@ const module = (path, tests = []) => one(path, { tests })
 
 const roots = [
   'apps/web/src/_app/console-account-security',
+  'apps/web/src/_app/console-profile',
   'apps/web/src/app/[locale]/admin',
   'apps/web/src/app/api/console',
   'apps/web/src/_pages/console',
