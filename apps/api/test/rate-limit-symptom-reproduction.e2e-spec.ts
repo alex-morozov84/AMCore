@@ -19,6 +19,7 @@ import {
 import { createHttpTestApp } from './create-http-test-app'
 import { cleanupE2E } from './e2e-cleanup'
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { appClientOptions } from './test-redis'
 
 const noopLogger = {
   setContext: () => undefined,
@@ -71,7 +72,7 @@ describe('Originally-reported-symptom reproduction (e2e, real Redis)', () => {
         Wait.forAll([Wait.forLogMessage('Ready to accept connections'), Wait.forListeningPorts()])
       )
       .start()
-    client = createClient({ url: container.getConnectionUrl() })
+    client = createClient(appClientOptions(container.getConnectionUrl()))
     await client.connect()
 
     const moduleRef = await Test.createTestingModule({

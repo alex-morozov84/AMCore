@@ -73,7 +73,7 @@
     "@prisma/client": "7.10.1",
     "@prometheus-io/client": "0.16.1",
     "@react-email/render": "^2.1.1",
-    "@redis/client": "^5.12.1",
+    "@redis/client": "^6.3.0",
     "accepts": "2.0.0",
     "ai": "7.0.150",
     "argon2": "^0.45.1",

@@ -10,6 +10,7 @@ import type { RateLimitPolicy } from '../src/infrastructure/throttling/rate-limi
 
 import { cleanupE2E } from './e2e-cleanup'
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { appClientOptions } from './test-redis'
 
 type RedisClient = ReturnType<typeof createClient>
 
@@ -43,7 +44,7 @@ describe('GcraRedisLimiter (e2e, real Redis)', () => {
         Wait.forAll([Wait.forLogMessage('Ready to accept connections'), Wait.forListeningPorts()])
       )
       .start()
-    client = createClient({ url: container.getConnectionUrl() })
+    client = createClient(appClientOptions(container.getConnectionUrl()))
     await client.connect()
     limiter = new GcraRedisLimiter(client as never, noopLogger, noopMetrics)
   }, 120000)

@@ -4,6 +4,7 @@ import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redi
 import { AiCatalogCache } from '../../src/infrastructure/ai/registry/ai-catalog-cache'
 import type { AppRedisClient } from '../../src/infrastructure/redis'
 import { e2eContainerLabels } from '../e2e-owned-containers'
+import { appClientOptions } from '../test-redis'
 
 import { redisTransportStall } from './redis-transport-stall'
 
@@ -32,10 +33,9 @@ export function catalogueRedisPhysicalProof(): void {
     }> {
       const stall = await redisTransportStall(container.getHost(), container.getPort())
       cleanups.push(() => stall.close())
-      const client = createClient({
-        url: `redis://127.0.0.1:${stall.port}`,
-        socket: { reconnectStrategy: false },
-      })
+      const client = createClient(
+        appClientOptions(`redis://127.0.0.1:${stall.port}`, { reconnectStrategy: false })
+      )
       client.on('error', () => undefined)
       await client.connect()
       cleanups.push(async () => {
@@ -84,10 +84,9 @@ export function catalogueRedisPhysicalProof(): void {
       const f = await fixture()
       const probe = await f.cache.probe()
       expect(probe?.token).toBeDefined()
-      const remote = createClient({
-        url: container.getConnectionUrl(),
-        socket: { reconnectStrategy: false },
-      })
+      const remote = createClient(
+        appClientOptions(container.getConnectionUrl(), { reconnectStrategy: false })
+      )
       remote.on('error', () => undefined)
       await remote.connect()
       cleanups.push(async () => {

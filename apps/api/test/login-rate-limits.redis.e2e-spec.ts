@@ -35,7 +35,7 @@ describe('Login atomic accounting with envelope counters and Redis7', () => {
   let second: LoginRateLimiterService
   beforeAll(async () => {
     broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
-    client = createClient({ url: broker.getConnectionUrl() })
+    client = createClient({ url: broker.getConnectionUrl(), RESP: 2 })
     await client.connect()
     const env = new EnvService(new ConfigService({ REDIS_URL: broker.getConnectionUrl() }))
     first = new LoginRateLimiterService(env)

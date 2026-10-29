@@ -17,6 +17,7 @@ import type { MetricsService } from '../src/infrastructure/observability/index.j
 import type { AppRedisClient } from '../src/infrastructure/redis/index.js'
 
 import { e2eContainerLabels } from './e2e-owned-containers'
+import { appClientOptions } from './test-redis'
 
 /** The stored shape of the Telegram reachability check against a real Redis 7. */
 const BINDING = 'c'.repeat(64)
@@ -30,7 +31,7 @@ describe('Telegram reachability store (real Redis)', () => {
 
   beforeAll(async () => {
     container = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
-    client = createClient({ url: container.getConnectionUrl() })
+    client = createClient(appClientOptions(container.getConnectionUrl()))
     await client.connect()
     store = new TelegramReachabilityStore(client, metrics, logger)
     store.open()
@@ -166,10 +167,9 @@ describe('Telegram reachability store (real Redis)', () => {
 
   it('with Redis away a write fails at once instead of waiting in an offline queue', async () => {
     // Socket options change the inferred client type; the store only needs the app client shape.
-    const away = createClient({
-      url: 'redis://127.0.0.1:1',
-      socket: { reconnectStrategy: false },
-    }) as unknown as AppRedisClient
+    const away = createClient(
+      appClientOptions('redis://127.0.0.1:1', { reconnectStrategy: false })
+    ) as unknown as AppRedisClient
     away.on('error', () => undefined)
     const offline = new TelegramReachabilityStore(away, metrics, logger)
     offline.open()

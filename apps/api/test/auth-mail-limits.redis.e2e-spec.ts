@@ -32,7 +32,7 @@ describe('Shared auth mail limits and legacy envelope counter import', () => {
 
   beforeAll(async () => {
     broker = await new RedisContainer('redis:7-alpine').withLabels(e2eContainerLabels()).start()
-    client = createClient({ url: broker.getConnectionUrl() })
+    client = createClient({ url: broker.getConnectionUrl(), RESP: 2 })
     await client.connect()
     limiter = new AuthMailLimiter(
       new EnvService(new ConfigService({ REDIS_URL: broker.getConnectionUrl() }))

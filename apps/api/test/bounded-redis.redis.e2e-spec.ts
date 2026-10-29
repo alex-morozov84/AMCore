@@ -17,7 +17,7 @@ import type { AppRedisClient } from '../src/infrastructure/redis/redis-connectio
 
 import { e2eContainerLabels } from './e2e-owned-containers'
 import { redisTransportStall } from './fixtures/redis-transport-stall'
-import type { RedisConnection } from './test-redis'
+import { appClientOptions, type RedisConnection } from './test-redis'
 
 const IP = 'rate:v2:stall_ip:203.0.113.2'
 const SUBJECT = 'rate:v2:stall_subject:fp'
@@ -26,10 +26,9 @@ const SLACK_MS = 750
 
 type Client = RedisConnection
 const open = (url: string): Client =>
-  createClient({
-    url,
-    socket: { reconnectStrategy: (retries) => Math.min(retries * 50, 250) },
-  })
+  createClient(
+    appClientOptions(url, { reconnectStrategy: (retries) => Math.min(retries * 50, 250) })
+  )
 
 // The suite-owned TCP fixture sits between the client and a real Redis. With replies held,
 // the server executes each command exactly once but the client never sees the answer: the
@@ -159,10 +158,13 @@ describe('BoundedRedis against a real server with a stalled transport', () => {
     // A slow reconnect keeps the command in node-redis's offline queue. Readiness is forced
     // to true so the helper dispatches into that queue: the one path where a command is
     // accepted before the connection can write it.
-    const slow = createClient({
-      url: `redis://127.0.0.1:${proxy.port}`,
-      socket: { reconnectStrategy: (retries) => (retries === 0 ? 1500 : 250) },
-    })
+    const slow = createClient(
+      appClientOptions(`redis://127.0.0.1:${proxy.port}`, {
+        // Constant: version 6 keeps retrying on this schedule. A shorter later delay would let an
+        // attempt connect to the refusing proxy and write the command before it is reset.
+        reconnectStrategy: () => 1500,
+      })
+    )
     slow.on('error', () => undefined)
     await slow.connect()
     try {

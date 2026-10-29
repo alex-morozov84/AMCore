@@ -54,6 +54,7 @@ export async function provisioningRedisTransport(
   if (!address || typeof address === 'string') throw new Error('Test proxy did not bind')
   const client = createClient({
     url: `redis://127.0.0.1:${address.port}`,
+    RESP: 2,
     socket: { reconnectStrategy: false },
   })
   client.on('error', () => undefined)

@@ -23,7 +23,7 @@ const TTL = 3_600_000
 const CEILING = 1_000_000_000_000_000
 
 type Client = RedisConnection
-const open = (url: string): Client => createClient({ url })
+const open = (url: string): Client => createClient({ url, RESP: 2 })
 
 describe('AbuseCounterStore against Redis 7', () => {
   let broker: StartedRedisContainer

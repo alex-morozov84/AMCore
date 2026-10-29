@@ -61,7 +61,11 @@ export async function proveOwnedRefresh(
     throw new Error('Not a test-created session')
   }
   const url = `redis://127.0.0.1:${activeTarget().ports.redis}/0`
-  const client = createClient({ url, socket: { reconnectStrategy: false, connectTimeout: 5000 } })
+  const client = createClient({
+    url,
+    RESP: 2,
+    socket: { reconnectStrategy: false, connectTimeout: 5000 },
+  })
   client.on('error', () => {}) // No credentials or raw records in runner diagnostics.
   try {
     await client.connect()

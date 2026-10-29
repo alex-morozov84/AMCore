@@ -1,14 +1,19 @@
 import { createClient, type RedisClientType } from '@redis/client'
 import type { StartedRedisContainer } from '@testcontainers/redis'
 
-/** The client type `createClient` infers when no modules or RESP version are configured. */
+import {
+  type AppRedisClientOptions,
+  redisClientOptions,
+} from '../src/infrastructure/redis/redis-client-options'
+
+/** An explicit RESP 2 client without modules: the protocol production pins. */
 export type RedisConnection = RedisClientType<
   Record<never, never>,
   Record<never, never>,
   Record<never, never>,
   2
 >
-const open = (url: string): RedisConnection => createClient({ url })
+const open = (url: string): RedisConnection => createClient({ url, RESP: 2 })
 
 /**
  * Connection owned by one E2E context and built from that context's own Testcontainers
@@ -38,4 +43,17 @@ export class TestRedis {
   async quit(): Promise<void> {
     if (this.client.isOpen) await this.client.quit()
   }
+}
+
+/**
+ * Options of a test client that production code receives. They are the production options
+ * (RESP 2, explicit queue timeout, keepalive) with only the socket fields a case needs replaced,
+ * so a case never exercises a different protocol or timeout than the application does.
+ */
+export function appClientOptions(
+  url: string,
+  socket: Partial<AppRedisClientOptions['socket']> = {}
+): AppRedisClientOptions {
+  const base = redisClientOptions(url)
+  return { ...base, socket: { ...base.socket, ...socket } }
 }
