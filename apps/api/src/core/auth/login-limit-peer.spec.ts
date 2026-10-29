@@ -57,9 +57,9 @@ const realTimeout = setTimeout
 const realClearTimeout = clearTimeout
 const wallNow = performance.now.bind(performance)
 
-async function waitForCommands(commands: string[][], count: number): Promise<void> {
+async function waitForPeer(predicate: () => boolean): Promise<void> {
   const deadline = wallNow() + 3000
-  while (commands.filter((command) => command[0]?.toLowerCase() === 'eval').length < count) {
+  while (!predicate()) {
     if (wallNow() >= deadline) throw new Error('Redis peer did not receive the wave')
     await nextTurn()
   }
@@ -78,14 +78,31 @@ async function withinWatchdog<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 describe('actual ioredis bounded lifecycle against controlled RESP peer', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({
+      doNotFake: [
+        'nextTick',
+        'setImmediate',
+        'clearImmediate',
+        'queueMicrotask',
+        'performance',
+        'hrtime',
+      ],
+    })
+    jest.spyOn(performance, 'now').mockImplementation(() => jest.now())
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.useRealTimers()
+  })
   it('does not poll INFO while loading and does not resend EVAL', async () => {
     const p = await peer((args, socket) =>
       socket.write(args[0]?.toLowerCase() === 'eval' ? '-LOADING loading\r\n' : '+OK\r\n')
     )
     try {
       const start = performance.now()
-      await expect(run(p.url)).rejects.toThrow()
-      expect(performance.now() - start).toBeLessThanOrEqual(750)
+      await expect(withinWatchdog(() => run(p.url))).rejects.toThrow('LOADING')
+      expect(performance.now() - start).toBeLessThanOrEqual(500)
       expect(p.commands.filter((c) => c[0]?.toLowerCase() === 'info')).toHaveLength(0)
       expect(p.commands.filter((c) => c[0]?.toLowerCase() === 'eval')).toHaveLength(1)
     } finally {
@@ -96,8 +113,18 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
     const p = await peer(() => undefined)
     try {
       const start = performance.now()
-      await expect(run(p.url.replace('redis://', 'redis://:fake@'))).rejects.toThrow()
-      expect(performance.now() - start).toBeLessThanOrEqual(750)
+      let settled = false
+      const pending = run(p.url.replace('redis://', 'redis://:fake@'))
+        .catch((error) => error)
+        .finally(() => {
+          settled = true
+        })
+      await waitForPeer(() => p.commands.some((c) => c[0]?.toLowerCase() === 'auth'))
+      await jest.advanceTimersByTimeAsync(249)
+      expect(settled).toBe(false)
+      await jest.advanceTimersByTimeAsync(1)
+      expect(await withinWatchdog(() => pending)).toBeInstanceOf(Error)
+      expect(performance.now() - start).toBeLessThanOrEqual(500)
       expect(p.commands.some((c) => c[0]?.toLowerCase() === 'auth')).toBe(true)
       expect(p.commands.some((c) => c[0]?.toLowerCase() === 'eval')).toBe(false)
     } finally {
@@ -106,10 +133,13 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
   })
   it('bounds a withheld TLS handshake without EVAL submission', async () => {
     const sockets = new Set<Socket>()
+    let handshakeReceived = false
     const server = createServer((socket) => {
       sockets.add(socket)
       socket.on('close', () => sockets.delete(socket))
-      socket.on('data', () => undefined)
+      socket.on('data', () => {
+        handshakeReceived = true
+      })
     })
     server.listen(0, '127.0.0.1')
     await once(server, 'listening')
@@ -117,8 +147,18 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
     if (!address || typeof address === 'string') throw new Error('No TLS peer')
     try {
       const start = performance.now()
-      await expect(run(`rediss://127.0.0.1:${address.port}`)).rejects.toThrow()
-      expect(performance.now() - start).toBeLessThanOrEqual(750)
+      let settled = false
+      const pending = run(`rediss://127.0.0.1:${address.port}`)
+        .catch((error) => error)
+        .finally(() => {
+          settled = true
+        })
+      await waitForPeer(() => handshakeReceived)
+      await jest.advanceTimersByTimeAsync(249)
+      expect(settled).toBe(false)
+      await jest.advanceTimersByTimeAsync(1)
+      expect(await withinWatchdog(() => pending)).toBeInstanceOf(Error)
+      expect(performance.now() - start).toBeLessThanOrEqual(500)
     } finally {
       for (const socket of sockets) socket.destroy()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -141,17 +181,6 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
     }
   })
   it('bounds timeout waves and recovers without a closing-client tail', async () => {
-    jest.useFakeTimers({
-      doNotFake: [
-        'nextTick',
-        'setImmediate',
-        'clearImmediate',
-        'queueMicrotask',
-        'performance',
-        'hrtime',
-      ],
-    })
-    jest.spyOn(performance, 'now').mockImplementation(() => jest.now())
     let healthy = false
     const p = await peer((args, socket) => {
       if (args[0]?.toLowerCase() !== 'eval') socket.write('+OK\r\n')
@@ -164,7 +193,9 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
           const batch = Array.from({ length: 32 }, () => run(p.url))
           const results = Promise.allSettled(batch)
           expect(() => LoginLimitConnection.acquire()).toThrow('capacity')
-          await waitForCommands(p.commands, (wave + 1) * 32)
+          await waitForPeer(
+            () => p.commands.filter((c) => c[0]?.toLowerCase() === 'eval').length >= (wave + 1) * 32
+          )
           await jest.advanceTimersByTimeAsync(250)
           return results
         })
@@ -175,8 +206,6 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
       expect(p.commands.filter((c) => c[0]?.toLowerCase() === 'eval')).toHaveLength(65)
     } finally {
       await p.close()
-      jest.restoreAllMocks()
-      jest.useRealTimers()
     }
   })
 })
