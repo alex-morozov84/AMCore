@@ -180,7 +180,7 @@ Browser logout additionally advances the exact browser generation and retires it
 pending flows. A stale generation or mismatched old refresh cookie cannot log out
 a later account. An independent API family's logout does not change browser state.
 A worker-only `mfa-retention` job runs every five minutes. Each pass attempts at
-most ten batches of100 rows. It scrubs expired flow data, retains nonsecret receipts
+most fourteen batches of100 rows across its seven cleanup buckets. It scrubs expired flow data, retains nonsecret receipts
 for at least24 hours and deletes a flow only after its receipts are gone. It never
 deletes a bound factor or resets replay state. Family and browser records retain
 their issuance deadlines and references. Read-time expiry applies before cleanup.
