@@ -61,7 +61,7 @@ export function ConsoleStepUpDialog({
     >
       <DialogContent closeLabel={tCommon('close')}>
         <DialogHeader>
-          <DialogTitle>{t('stepUpTitle')}</DialogTitle>
+          <DialogTitle>{phase.kind === 'proof' ? tMfa('title') : t('stepUpTitle')}</DialogTitle>
           <DialogDescription>
             {phase.kind === 'proof' ? tMfa('verifyDescription') : t('stepUpDescription')}
           </DialogDescription>

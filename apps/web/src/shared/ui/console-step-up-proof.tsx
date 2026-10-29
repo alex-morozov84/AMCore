@@ -9,7 +9,7 @@ import { useLocalizedForm } from '@/shared/hooks'
 import { Button } from './button'
 import { DialogFooter } from './dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './form'
-import { Input } from './input'
+import { MfaCodeInput } from './mfa-code-input'
 
 /** Reuses the accepted app/backup proof choices inside the existing sensitive-action dialog. */
 export function ConsoleStepUpProof({
@@ -44,7 +44,7 @@ export function ConsoleStepUpProof({
   return (
     <Form {...form}>
       <form
-        className="space-y-4"
+        className="min-w-0 space-y-4"
         noValidate
         onSubmit={form.handleSubmit((proof) => {
           form.reset({ method, code: '' })
@@ -58,12 +58,13 @@ export function ConsoleStepUpProof({
             <FormItem>
               <FormLabel>{t(method === 'totp' ? 'appCode' : 'backupCode')}</FormLabel>
               <FormControl>
-                <Input
-                  {...field}
-                  inputMode={method === 'totp' ? 'numeric' : 'text'}
-                  autoComplete={method === 'totp' ? 'one-time-code' : 'off'}
-                  spellCheck={false}
-                  autoCapitalize="off"
+                <MfaCodeInput
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  method={method}
+                  onValueChange={field.onChange}
                   disabled={pending}
                 />
               </FormControl>
@@ -73,7 +74,8 @@ export function ConsoleStepUpProof({
         />
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
+          className="h-auto min-h-9 max-w-full whitespace-normal text-left"
           disabled={pending}
           onClick={() => {
             const next = method === 'totp' ? 'recovery_code' : 'totp'
