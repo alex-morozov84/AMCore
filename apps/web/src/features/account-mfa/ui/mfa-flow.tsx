@@ -119,24 +119,6 @@ export function MfaFlow({
           )}
         </p>
         {lost && <p>{t('rotateWarning')}</p>}
-        {!setupOnly && (
-          <Button
-            variant="link"
-            disabled={pending}
-            onClick={() => setMethod(selected === 'totp' ? 'recovery_code' : 'totp')}
-          >
-            {t(selected === 'totp' ? 'noApp' : 'backToApp')}
-          </Button>
-        )}
-        {view.purpose === 'login' && !lost && (
-          <Button
-            variant="link"
-            disabled={pending}
-            onClick={() => void command({ action: 'start_recovery' })}
-          >
-            {t('emergencyEntry')}
-          </Button>
-        )}
         <MfaProofForm
           key={selected}
           method={selected}
@@ -145,6 +127,26 @@ export function MfaFlow({
           submitLabel={t(lost ? 'newCodes' : view.purpose === 'login' ? 'signIn' : 'continue')}
           onSubmit={(proof) => void command({ action: lost ? 'recover_codes' : 'verify', proof })}
         />
+        <div className="flex flex-wrap gap-2">
+          {!setupOnly && (
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => setMethod(selected === 'totp' ? 'recovery_code' : 'totp')}
+            >
+              {t(selected === 'totp' ? 'noApp' : 'backToApp')}
+            </Button>
+          )}
+          {view.purpose === 'login' && !lost && (
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => void command({ action: 'start_recovery' })}
+            >
+              {t('emergencyEntry')}
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
