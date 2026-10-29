@@ -3,6 +3,8 @@ import { Prisma } from '../../../generated/prisma/client.js'
 export const MFA_RETENTION_BUCKETS = [
   'drafts',
   'receipts',
+  'settingsStarts',
+  'logoutReceipts',
   'flows',
   'families',
   'contexts',
@@ -25,6 +27,18 @@ export function retentionSource(
   due: Prisma.Sql
 } {
   const cutoff = new Date(now.getTime() - 86400_000)
+  if (bucket === 'settingsStarts')
+    return {
+      source: Prisma.sql`core.mfa_settings_start_receipts AS r`,
+      columns: Prisma.sql`r."operationId" AS id, r."userId", r."browserContextId", NULL::text AS "flowId"`,
+      due: Prisma.sql`r."expiresAt" <= ${cutoff} AND r."startNotAfter" <= ${now}`,
+    }
+  if (bucket === 'logoutReceipts')
+    return {
+      source: Prisma.sql`core.browser_logout_receipts AS r`,
+      columns: Prisma.sql`r."operationId" AS id, r."userId", r."contextId" AS "browserContextId", NULL::text AS "flowId"`,
+      due: Prisma.sql`r."expiresAt" <= ${cutoff}`,
+    }
   if (bucket === 'drafts' || bucket === 'flows')
     return {
       source: Prisma.sql`core.mfa_flows AS f`,
@@ -78,6 +92,12 @@ export async function pruneRetentionCandidates(
   if (!candidates.length) return 0
   const { due } = retentionSource(bucket, now)
   const ids = Prisma.join(candidates.map((row) => row.id))
+  if (bucket === 'settingsStarts')
+    return tx.$executeRaw(Prisma.sql`
+    DELETE FROM core.mfa_settings_start_receipts AS r WHERE r."operationId" IN (${ids}) AND ${due}`)
+  if (bucket === 'logoutReceipts')
+    return tx.$executeRaw(Prisma.sql`
+    DELETE FROM core.browser_logout_receipts AS r WHERE r."operationId" IN (${ids}) AND ${due}`)
   if (bucket === 'drafts')
     return tx.$executeRaw(Prisma.sql`
     UPDATE core.mfa_flows AS f SET data = '{}'::jsonb WHERE f.id IN (${ids}) AND ${due}`)

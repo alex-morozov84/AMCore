@@ -87,6 +87,7 @@ export class MfaSessionFlowController {
       resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
       body.proofWindowSeconds
     )
+    if (result.kind === 'recorded') return { kind: 'restart_required' }
     if (result.kind !== 'flow') return result
     const status = await this.statuses.read(result.request)
     return {

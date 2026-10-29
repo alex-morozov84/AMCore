@@ -222,7 +222,20 @@ export async function completeBrowserLogin(
     )
     return await stageIssuedBrowserLogin(request, context, handle, issuing, upstream)
   } catch (error) {
-    // Exact parent authority can retire only its own unpublished candidate. It cannot revoke a published winner.
+    const latest = await readBrowserAuthAttempt(request.headers, context).catch(() => null)
+    // A durable staged result can repeat its exact acknowledgement. A lost ACK
+    // is not permission to destroy the retained credential reply.
+    if (!latest || latest.record.state !== 'issuing' || latest.record.id !== issuing.id) throw error
+    const fenced = await updateBrowserAuthAttempt(
+      handle,
+      latest.record,
+      { ...latest.record, state: 'cleanup_needed' },
+      context
+    )
+      .then(() => true)
+      .catch(() => false)
+    if (!fenced) throw error
+    // Only the exact unpublished candidate can be retired; no published winner.
     await postBrowserAuth(
       request,
       context,
@@ -233,12 +246,6 @@ export async function completeBrowserLogin(
         operationId: issuing.completionId,
       },
       issuing.flow.continuation
-    ).catch(() => undefined)
-    await updateBrowserAuthAttempt(
-      handle,
-      issuing,
-      { ...issuing, state: 'cleanup_needed' },
-      context
     ).catch(() => undefined)
     throw error
   }
@@ -323,7 +330,20 @@ export async function publishBrowserLogin(
   if (ack.status !== 200 || !publicationAcknowledgedSchema.safeParse(ack.body).success)
     throw unavailableBrowserContext()
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
-  await updateBrowserAuthAttempt(handle, staged, { ...staged, state: 'published' }, context)
+  await updateBrowserAuthAttempt(handle, staged, { ...staged, state: 'published' }, context).catch(
+    async (error) => {
+      const current = await readBrowserAuthAttempt(request.headers, context)
+      if (
+        !current ||
+        current.record.state !== 'published' ||
+        current.record.id !== staged.id ||
+        current.record.completionId !== staged.completionId ||
+        current.record.vaultId !== staged.vaultId ||
+        current.record.familyId !== staged.familyId
+      )
+        throw error
+    }
+  )
   const response = NextResponse.json({
     user: entry.userSnapshot,
     contextSession: contextSessionBinding(staged.vaultId, { ...entry, version: 1 }),

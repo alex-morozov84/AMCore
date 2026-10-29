@@ -5,8 +5,6 @@ import { useTranslations } from 'next-intl'
 import type { UserResponse } from '@amcore/shared'
 import { ShieldCheckIcon } from 'lucide-react'
 
-import { ConsoleLogoutButton } from '@/features/console-logout'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
 import {
   Sidebar,
@@ -87,10 +85,7 @@ export function ConsoleShell({
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               <ConsoleTimeZoneSwitcher />
               <ConsoleLocaleSwitcher />
-              <ConsoleUserBadge user={user} />
-              {ADMIN_CONSOLE_CONFIG.mode === 'host' && (
-                <ConsoleLogoutButton contextSession={logoutIntent} />
-              )}
+              <ConsoleUserBadge user={user} logoutIntent={logoutIntent} />
             </div>
           </header>
           <div className="w-full p-4 sm:p-6">{children}</div>

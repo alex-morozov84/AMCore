@@ -8,12 +8,10 @@ import {
   ListChecksIcon,
   PlugZapIcon,
   ScrollTextIcon,
-  ShieldCheckIcon,
   UsersIcon,
 } from 'lucide-react'
 
 import {
-  getConsoleAccountSecurityHref,
   getConsoleApiKeysHref,
   getConsoleAuditHref,
   getConsoleBackgroundWorkHref,
@@ -60,12 +58,6 @@ export function useConsoleNavItems(): ConsoleNavItem[] {
       href: getConsoleApiKeysHref(),
       label: t('apiKeys.title'),
       icon: KeyRoundIcon,
-      prefetch: false,
-    },
-    {
-      href: getConsoleAccountSecurityHref(),
-      label: t('accountSecurity'),
-      icon: ShieldCheckIcon,
       prefetch: false,
     },
     { href: getConsoleAuditHref(), label: t('auditTitle'), icon: ScrollTextIcon, prefetch: false },

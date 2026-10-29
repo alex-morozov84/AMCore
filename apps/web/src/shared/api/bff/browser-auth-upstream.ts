@@ -49,7 +49,7 @@ type CredentialPath =
 export async function postBrowserAuth(
   request: Request,
   context: ProductWebContext,
-  record: Pick<BrowserAuthAttempt, 'id' | 'browser'>,
+  record: Pick<BrowserAuthAttempt, 'id' | 'browser' | 'consoleEntry'>,
   path: CredentialPath,
   body: unknown,
   continuation?: string,
@@ -100,6 +100,9 @@ export async function postBrowserAuth(
             }
           : {}),
         ...(continuation ? { 'x-mfa-continuation': continuation } : {}),
+        ...(path === '/auth/login' && record.consoleEntry?.proof
+          ? { 'x-amcore-return-proof': JSON.stringify(record.consoleEntry.proof) }
+          : {}),
         ...(registration
           ? {
               'x-mfa-vault-binding': registration.vaultBinding,

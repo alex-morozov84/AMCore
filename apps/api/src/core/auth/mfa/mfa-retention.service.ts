@@ -23,7 +23,7 @@ import {
 } from './mfa-retention-query.js'
 import { mfaDatabaseClock } from './mfa-transaction.js'
 
-/** Two rounds × five buckets × 100 rows; read-time expiry never depends on this sweep. */
+/** Two bounded rounds; read-time expiry never depends on this sweep. */
 @Injectable()
 export class MfaRetentionService {
   constructor(
@@ -56,6 +56,8 @@ export class MfaRetentionService {
     const counts = {
       drafts: 0,
       receipts: 0,
+      settingsStarts: 0,
+      logoutReceipts: 0,
       flows: 0,
       families: 0,
       contexts: 0,

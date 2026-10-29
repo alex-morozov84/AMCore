@@ -92,6 +92,7 @@ import {
 import { SessionsListResponseDto } from './dto/sessions-list-response.dto.js'
 import { OriginCheckGuard, RefreshTokenGuard } from './guards/index.js'
 import { negotiateLocale } from './locale-negotiation.js'
+import { parseBrowserReturnProof } from './mfa/browser-return-transition.js'
 import { ApiRegistrationPublication } from './mfa/mfa-registration.openapi.js'
 import { registrationBrowserIntent } from './mfa/mfa-registration-publication.js'
 import { PasswordLoginService } from './password-login.service.js'
@@ -194,6 +195,11 @@ export class AuthController {
   }
 
   @Post('login')
+  @ApiHeader({
+    name: 'X-Amcore-Return-Proof',
+    required: false,
+    description: 'Private BFF logout-receipt link; presentation only, never a login proof',
+  })
   @Auth(AuthType.None)
   @ApiHeader({
     name: 'X-Invitation-Auth-Attempt-Id',
@@ -237,6 +243,13 @@ export class AuthController {
     if (handoff ? typeof invitationCredential !== 'string' : invitationCredential !== undefined)
       throw new AppException('Invalid invitation login scope', 401, 'AUTH_HANDOFF_INVALID')
     const browser = browserSessionContext(req)
+    const returnProof = parseBrowserReturnProof(req.headers['x-amcore-return-proof'])
+    if (returnProof && (!browser?.binding || handoff))
+      throw new AppException(
+        'Return metadata requires its own browser entry',
+        403,
+        'AUTH_ORIGIN_REJECTED'
+      )
     if (browser && !browser.binding)
       throw new AppException(
         'Browser bootstrap required before sign-in',
@@ -256,7 +269,9 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
       source: resolveVerifiedVisitorIp(req, this.env) ?? req.ip ?? req.socket?.remoteAddress ?? '',
       ipAddress: resolveSessionIpAddress(req, this.env),
-      frame: browser ? { kind: 'browser', binding: browser.binding! } : { kind: 'direct' },
+      frame: browser
+        ? { kind: 'browser', binding: browser.binding!, returnProof }
+        : { kind: 'direct' },
     })
     if (result.kind === 'pending') {
       res.status(202)

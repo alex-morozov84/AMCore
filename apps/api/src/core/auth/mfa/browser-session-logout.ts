@@ -23,7 +23,7 @@ export async function logoutBrowserSession(
   )
 }
 
-async function lockLogout(
+export async function lockLogout(
   tx: Prisma.TransactionClient,
   binding: BrowserRequestBinding
 ): Promise<{ context: BrowserAuthContext; familyIds: string[]; now: Date }> {
@@ -45,12 +45,12 @@ async function lockLogout(
   return { context, familyIds: participants.familyIds, now: finalNow }
 }
 
-async function retireGeneration(
+export async function retireGeneration(
   tx: Prisma.TransactionClient,
   context: BrowserAuthContext,
   familyIds: string[],
   now: Date
-): Promise<void> {
+): Promise<BrowserAuthContext> {
   await tx.mfaFlow.updateMany({
     where: {
       browserContextId: context.id,
@@ -67,7 +67,7 @@ async function retireGeneration(
     where: { familyId: { in: familyIds }, revokedAt: null },
     data: { revokedAt: now, revocationReason: 'browser-logout' },
   })
-  await tx.browserAuthContext.update({
+  return tx.browserAuthContext.update({
     where: { id: context.id, generation: context.generation },
     data: {
       generation: { increment: 1 },
@@ -79,7 +79,7 @@ async function retireGeneration(
   })
 }
 
-async function assertSelectedRefresh(
+export async function assertSelectedRefresh(
   tx: Prisma.TransactionClient,
   context: BrowserAuthContext,
   refreshHash: string

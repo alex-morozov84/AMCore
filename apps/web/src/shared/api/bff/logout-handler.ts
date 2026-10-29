@@ -13,7 +13,7 @@ import {
 import { getCurrentVaultSession } from './current-session'
 import { isTrustedOrigin } from './origin-guard'
 import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
-import { SESSION_COOKIE_NAME, sessionCookieOptions } from './session-cookie'
+import { SESSION_COOKIE_NAME } from './session-cookie'
 import { redisVaultStore } from './session-vault-store'
 
 import 'server-only'
@@ -57,10 +57,8 @@ export async function handleLogout(
       })
     }
     const response = NextResponse.json({ message: 'Logged out' }, { status: 200 })
-    response.cookies.set(cookieName, '', {
-      ...(context?.cookieOptions ?? sessionCookieOptions()),
-      maxAge: 0,
-    })
+    // Server retirement makes the old handle inert. A delayed logout response
+    // must not erase the primary handle from a newer published login.
     // The stable browser anchor is never rewritten. Old responses cannot restore authority.
     return response
   } catch (error) {

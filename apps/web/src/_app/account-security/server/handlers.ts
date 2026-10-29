@@ -6,7 +6,11 @@ import { productWebRoute } from '@/shared/api/bff/product-web-route'
 import 'server-only'
 
 /** Host-selected pending capabilities never enter the ordinary authenticated proxy. */
-export async function accountMfaRoute(request: Request, frontend: 'site' | 'admin') {
+export async function accountMfaRoute(
+  request: Request,
+  frontend: 'site' | 'admin',
+  startStatus = false
+) {
   const response = await productWebRoute(
     request,
     frontend === 'site' ? 'site-auth' : 'admin-auth',
@@ -17,7 +21,7 @@ export async function accountMfaRoute(request: Request, frontend: 'site' | 'admi
           message: 'Request origin rejected',
           errorCode: 'AUTH_ORIGIN_REJECTED',
         })
-      return handleAccountMfa(request, context)
+      return handleAccountMfa(request, context, startStatus)
     }
   )
   response.headers.set('referrer-policy', 'no-referrer')

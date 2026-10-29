@@ -11,6 +11,9 @@ Sign-in opens `/mfa` when further proof or setup is required. Signed-in users op
 **Sign-in protection** at `/account/security`. Multi-locale builds add the locale
 prefix. Product administration uses its configured placement with these suffixes;
 see [placement and sessions](../product-admin/placement-and-sessions.md).
+In the Operations Console, open your profile menu in the header and select
+**Profile settings**. The profile page stays inside the Console. Protection actions
+open a dialog over that page. The same profile menu contains **Sign out**.
 Pending pages grant no ordinary session. If the account has no local password,
 complete the offered password-recovery path first. An OAuth provider cannot
 replace the protected account's local password or second factor.
@@ -33,7 +36,8 @@ Copying or downloading does not confirm saving. The application cannot erase you
 clipboard, downloads or screenshots. QR generation and code downloads are local.
 
 If a response is lost, select **Check result** before submitting anything again.
-This reads status; it does not repeat the code or mutation. A status read cannot
+This checks the existing operation without resubmitting your code. An unfinished
+session publication can repeat only its existing acknowledgement. A status read cannot
 show a seed or backup set. If setup needs replacement codes, use the connected
 app's next unused code. If the browser could not retain the setup continuation,
 sign in again. The app stays bound; the new flow requires its next unused code.
@@ -70,6 +74,18 @@ code or assume that the browser can always recover a session.
 For either action, check an uncertain result before retrying. A status response
 never redisplays the new codes. A revoked original session or changed browser
 context requires a new sign-in; another login cannot adopt its pending operation.
+If starting an action loses its response, **Check result** restores that exact
+browser operation when its continuation was retained. Otherwise it closes only
+an unchanged start before offering a deliberate new action. If the operation
+already progressed, check the current protection status before doing anything else.
+
+After the final login proof, the browser completes sign-in automatically. If the
+result stays unknown, use **Check result** or **Sign in again**. The deliberate
+`/sign-in-again` route works even when an older session remains. It never signs
+out on a page read. A live unfinished login must be opened and completed or
+canceled before another attempt. Console sign-out records its return destination;
+only the matching next login can use it. An expired or competing return falls
+back to the Console overview.
 
 ## Confirm a sensitive action
 

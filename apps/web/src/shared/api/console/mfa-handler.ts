@@ -9,9 +9,11 @@ import { isTrustedConsoleOrigin } from './origin-guard'
 
 import 'server-only'
 
-export async function handleConsoleMfa(request: Request): Promise<Response> {
+export async function handleConsoleMfa(request: Request, startStatus = false): Promise<Response> {
   if (ADMIN_CONSOLE_CONFIG.mode === 'path')
-    return productWebRoute(request, 'site-auth', (context) => handleAccountMfa(request, context))
+    return productWebRoute(request, 'site-auth', (context) =>
+      handleAccountMfa(request, context, startStatus)
+    )
   let response: Response
   try {
     const context = consoleBrowserContext(request)
@@ -22,7 +24,7 @@ export async function handleConsoleMfa(request: Request): Promise<Response> {
             message: 'Request origin rejected',
             errorCode: 'AUTH_ORIGIN_REJECTED',
           })
-        : await handleAccountMfa(request, context)
+        : await handleAccountMfa(request, context, startStatus)
   } catch (error) {
     response = authFailureResponse(request, error)
   }

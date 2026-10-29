@@ -30,6 +30,15 @@ export function MfaFlow({
   const [method, setMethod] = useState<MfaMethod>('totp')
   const [showEnrollment, setShowEnrollment] = useState(true)
   const command = controller.command.bind(controller)
+  if (
+    ['login', 'initial_setup'].includes(view.purpose) &&
+    ['ready', 'completed'].includes(view.state)
+  )
+    return (
+      <p role="status" aria-busy="true">
+        {t('checking')}
+      </p>
+    )
   if (view.state === 'password_required')
     return (
       <div className="space-y-4">

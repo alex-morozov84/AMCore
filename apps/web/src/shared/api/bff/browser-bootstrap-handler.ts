@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { browserBootstrapResultSchema } from '@amcore/shared'
+import { browserBootstrapResultSchema, SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
@@ -20,6 +20,7 @@ import {
   readBrowserCapability,
   unavailableBrowserContext,
 } from './browser-binding.server'
+import { claimConsoleReturn } from './console-return-claim'
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { isProductMutationTrusted, type ProductWebContext } from './product-web-context.server'
@@ -37,15 +38,12 @@ export async function handleBrowserBootstrap(
   } catch (error) {
     if (!(error instanceof ContextRequestError) || error.errorCode !== 'AUTH_CONTEXT_CHANGED')
       throw error
-    // Never adopt a replacement anchor. Clear local pointers only, then require another explicit sign-in.
+    // This response may arrive after another login. Never delete its cookies.
     const response = apiErrorResponse(request, {
       statusCode: 401,
       errorCode: 'AUTH_CONTEXT_CHANGED',
       message: 'Browser context changed; sign in again',
     })
-    const pending = pendingAuthCookie(context)
-    response.cookies.set(pending.name, '', { ...pending.options, maxAge: 0 })
-    response.cookies.set(context.cookieName, '', { ...context.cookieOptions, maxAge: 0 })
     return response
   }
 }
@@ -58,21 +56,31 @@ async function bootstrap(request: Request, context: ProductWebContext): Promise<
     !/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')
   )
     throw new ContextRequestError(400, 'BAD_REQUEST')
-  if (
-    !z
-      .object({})
-      .strict()
-      .safeParse(await readContextJson(request.body, 2048)).success
-  )
+  const input = z
+    .object({
+      entryId: z.string().uuid().optional(),
+      returnEntryId: z.string().uuid().optional(),
+      entryKind: z.literal('console').optional(),
+      locale: z.enum(SUPPORTED_LOCALES).optional(),
+    })
+    .strict()
+    .safeParse(await readContextJson(request.body, 2048))
+  if (!input.success || (input.data.returnEntryId && !input.data.entryKind))
     throw new ContextRequestError(400, 'BAD_REQUEST')
-  return prepareBrowserAuthAttempt(request, context)
+  return prepareBrowserAuthAttempt(request, context, undefined, input.data)
 }
 
 /** OAuth initiation also creates only neutral state; its provider redirect must round-trip these cookies. */
 export async function prepareBrowserAuthAttempt(
   request: Request,
   context: ProductWebContext,
-  invitation?: InvitedBrowserAttempt
+  invitation?: InvitedBrowserAttempt,
+  entry?: {
+    entryId?: string
+    returnEntryId?: string
+    entryKind?: 'console'
+    locale?: (typeof SUPPORTED_LOCALES)[number]
+  }
 ): Promise<NextResponse> {
   const anchor = readBrowserAnchor(request.headers, context.audience)
   if (
@@ -81,7 +89,20 @@ export async function prepareBrowserAuthAttempt(
       readBrowserCapability(request.headers, pendingAuthCookie(context).name))
   )
     throw changedBrowserContext()
-  if (anchor) await readBrowserAuthAttempt(request.headers, context)
+  if (anchor) {
+    const pending = await readBrowserAuthAttempt(request.headers, context, { allowExpired: true })
+    if (
+      pending &&
+      !pending.record.cancelled &&
+      'flow' in pending.record &&
+      !['published', 'cleanup_needed'].includes(pending.record.state) &&
+      !['completed', 'cancelled', 'restart_required', 'expired'].includes(pending.record.flow.state)
+    ) {
+      if (entry?.entryId && !invitation)
+        return NextResponse.json({ kind: 'resume_required', flowBinding: pending.record.id })
+      throw changedBrowserContext()
+    }
+  }
   const upstream = await fetchBackendResponse(
     `${getBackendBaseUrl()}/api/v1/auth/browser-publications/bootstrap`,
     request.headers,
@@ -118,7 +139,23 @@ export async function prepareBrowserAuthAttempt(
     throw changedBrowserContext()
   const actual = result.kind === 'created' ? result.binding : anchor
   if (!actual) throw changedBrowserContext()
-  const attempt = await createBrowserAuthAttempt(context, actual, result.view, invitation)
+  const returned =
+    entry?.entryKind === 'console' && entry.returnEntryId && !invitation
+      ? await claimConsoleReturn(request, context, entry.returnEntryId, result.view)
+      : undefined
+  const attempt = await createBrowserAuthAttempt(
+    context,
+    actual,
+    result.view,
+    invitation,
+    returned ? { id: returned.record.attemptId, handle: returned.record.pendingHandle } : undefined,
+    entry?.entryKind === 'console'
+      ? {
+          locale: returned?.record.locale ?? entry.locale ?? 'en',
+          ...(returned ? { proof: returned.proof } : {}),
+        }
+      : undefined
+  )
   const response = NextResponse.json({ attemptId: attempt.record.id, browser: result.view })
   response.headers.set('cache-control', 'private, no-store')
   response.headers.set('referrer-policy', 'no-referrer')

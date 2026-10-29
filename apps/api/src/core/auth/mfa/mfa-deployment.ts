@@ -72,7 +72,7 @@ export class MfaDeployment {
       throw new Error('incompatible_protocol')
     const [migration] = await tx.$queryRaw<{ complete: boolean; failed: boolean }[]>`
       SELECT EXISTS (SELECT 1 FROM public._prisma_migrations
-        WHERE migration_name = '20261026190000_mfa_recovery_ticket'
+        WHERE migration_name = '20261029110000_mfa_operation_receipts'
           AND finished_at IS NOT NULL AND rolled_back_at IS NULL) AS complete,
         EXISTS (SELECT 1 FROM public._prisma_migrations
           WHERE finished_at IS NULL AND rolled_back_at IS NULL) AS failed`

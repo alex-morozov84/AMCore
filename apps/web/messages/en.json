@@ -1983,7 +1983,8 @@
       "fileOverviewResult": "Overview: {result}",
       "fileIntegrationResult": "Integrations: {result}"
     },
-    "accountSecurity": "Sign-in protection"
+    "accountSecurity": "Sign-in protection",
+    "profileSettings": "Profile settings"
   },
   "auth": {
     "login": "Sign in",
@@ -2036,7 +2037,10 @@
       "title": "Completing sign-in…",
       "help": "If you are not redirected, select Continue.",
       "continue": "Continue"
-    }
+    },
+    "signInAgainTitle": "Sign in again",
+    "existingSignInHelp": "A sign-in is already in progress. Open it to finish or cancel it before starting another sign-in.",
+    "existingSignInAction": "Open existing sign-in"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -2908,6 +2912,9 @@
     "emergencyFailureHelp": "This is not a backup code. If this code has expired, was already used, or its result was lost, ask the server administrator for a new one.",
     "passwordSetupDescription": "This account needs a password before you can set up sign-in protection. Use password recovery to set your own password.",
     "setPassword": "Set a password",
-    "passwordSetupReturn": "After setting your password, sign in again with your email and password to continue."
+    "passwordSetupReturn": "After setting your password, sign in again with your email and password to continue.",
+    "startAbandoned": "The operation could not be started. No changes were made. Start again from your settings.",
+    "startAdvanced": "This operation has already progressed, but this window cannot restore it. Return to your settings and check the current protection status. Do not repeat the operation before checking.",
+    "returnToSettings": "Back to settings"
   }
 }

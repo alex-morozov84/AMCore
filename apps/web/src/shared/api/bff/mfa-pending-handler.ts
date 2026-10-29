@@ -10,9 +10,7 @@ import {
 
 import { apiErrorResponse } from './api-error-response'
 import {
-  type BrowserAuthAttempt,
-  type BrowserAuthPublication,
-  pendingAuthCookie,
+  markBrowserAuthCancelled,
   readBrowserAuthAttempt,
   updateBrowserAuthAttempt,
 } from './browser-auth-attempt'
@@ -22,88 +20,19 @@ import {
   createBrowserBindingVerifier,
   unavailableBrowserContext,
 } from './browser-binding.server'
-import { completeBrowserLogin, publishBrowserLogin } from './browser-login-handler'
+import { completeBrowserLogin } from './browser-login-handler'
+import { confirmedConsoleReturn } from './console-return-destination'
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { resumeInvitedBrowserPublication } from './invited-browser-login'
+import { currentFlowView, flowView, stagedEntry } from './mfa-flow-view'
+import { reconcileBrowserLogin } from './mfa-reconcile-login'
 import { commandMfaRotation } from './mfa-rotation-command'
 import { settingsSource, startMfaSettings } from './mfa-settings-handler'
 import { commandSetupMfa } from './mfa-setup-command'
 import type { ProductWebContext } from './product-web-context.server'
-import type { VaultEntry } from './session-vault.types'
 
 import 'server-only'
-
-function flowView(
-  record: Extract<BrowserAuthAttempt, { flow: unknown }>,
-  state = record.flow.state
-): MfaBrowserView {
-  return {
-    kind: 'flow',
-    ...(record.invitation ? { invitationFlowId: record.invitation.flowId } : {}),
-    ...(record.flow.returnTo ? { returnTo: record.flow.returnTo } : {}),
-    state,
-    accountLabel: record.accountLabel,
-    flowBinding: record.id,
-    purpose: record.flow.purpose,
-    expiresAt: new Date(
-      Math.min(record.expiresAt, Date.parse(record.flow.expiresAt))
-    ).toISOString(),
-    requiredProofs: state === 'ready' || state === 'completed' ? [] : record.flow.requiredProofs,
-    remainingCodes: record.flow.remainingCodes,
-    generation: record.flow.generation,
-  }
-}
-
-async function currentFlowView(
-  request: Request,
-  context: ProductWebContext,
-  record: Extract<BrowserAuthAttempt, { flow: unknown }>
-): Promise<MfaBrowserView> {
-  if (record.flow.nextAction === 'recovery_ticket')
-    return { kind: 'recovery_ticket', accountLabel: record.accountLabel, flowBinding: record.id }
-  const result = await postBrowserAuth(
-    request,
-    context,
-    record,
-    '/auth/mfa/status',
-    { purpose: record.flow.purpose },
-    record.flow.continuation
-  )
-  const status = mfaStatusSchema.safeParse(result.body)
-  if (result.status !== 200 || !status.success) throw unavailableBrowserContext()
-  return {
-    ...status.data,
-    expiresAt: new Date(
-      Math.min(record.expiresAt, Date.parse(status.data.expiresAt))
-    ).toISOString(),
-    kind: 'flow',
-    accountLabel: record.accountLabel,
-    flowBinding: record.id,
-    ...(record.invitation ? { invitationFlowId: record.invitation.flowId } : {}),
-    ...(record.flow.returnTo ? { returnTo: record.flow.returnTo } : {}),
-  }
-}
-
-async function stagedEntry(
-  context: ProductWebContext,
-  record: BrowserAuthPublication
-): Promise<VaultEntry> {
-  const entry = await context.store.get(record.vaultId)
-  const binding = entry?.browser
-  if (
-    !entry ||
-    !binding ||
-    entry.audience !== context.audience ||
-    binding.familyId !== record.familyId ||
-    binding.securityVersion !== record.securityVersion ||
-    binding.contextId !== record.browser.contextId ||
-    binding.generation !== record.browser.generation
-  )
-    throw changedBrowserContext()
-  // A pending entry is usable only by the restricted settlement path. Published recovery checks primary below.
-  return entry
-}
 
 export async function inspectPendingMfa(
   request: Request,
@@ -119,6 +48,7 @@ export async function inspectPendingMfa(
   const attempt = await readBrowserAuthAttempt(request.headers, context)
   if (!attempt || !('flow' in attempt.record)) return NextResponse.json({ kind: 'unavailable' })
   const record = attempt.record
+  if (record.cancelled) return NextResponse.json(flowView(record, 'cancelled'))
   if (
     record.sourceFingerprint &&
     (await settingsSource(request, context)).sourceFingerprint !== record.sourceFingerprint
@@ -173,7 +103,12 @@ export async function inspectPendingMfa(
     throw changedBrowserContext()
   const entry = await stagedEntry(context, record)
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
-  const response = NextResponse.json(flowView(record, 'completed'))
+  const consoleReturn = await confirmedConsoleReturn(request, context, record, entry)
+  const response = NextResponse.json({
+    ...flowView(record, 'completed'),
+    publication: 'confirmed',
+    ...(consoleReturn ? { consoleReturn } : {}),
+  })
   if (record.invitation) {
     const settled = await resumeInvitedBrowserPublication(
       request,
@@ -267,9 +202,9 @@ export async function commandPendingMfa(
         record.completionId,
         command.data.operationId
       )
-      const final = NextResponse.json({
-        view: { ...result.view, state: 'completed', requiredProofs: [] },
-      })
+      const retained = await readBrowserAuthAttempt(request.headers, context)
+      if (!retained) throw changedBrowserContext()
+      const final = await reconcileBrowserLogin(request, context, retained.handle, retained.record)
       for (const cookie of completed.cookies.getAll()) final.cookies.set(cookie)
       return final
     }
@@ -277,11 +212,10 @@ export async function commandPendingMfa(
   if (command.data.action === 'cancel') {
     const cancelled = await postBrowserAuth(request, context, record, '/auth/logout', {})
     if (cancelled.status !== 204) throw unavailableBrowserContext()
+    await markBrowserAuthCancelled(handle, record, context)
     if ('vaultId' in record) await context.store.delete(record.vaultId).catch(() => undefined)
     const response = NextResponse.json({ view: flowView(record, 'cancelled') })
-    const pending = pendingAuthCookie(context)
-    response.cookies.set(pending.name, '', { ...pending.options, maxAge: 0 })
-    response.cookies.set(context.cookieName, '', { ...context.cookieOptions, maxAge: 0 })
+    // Exact server retirement is sufficient; a delayed response clears no newer cookie.
     return response
   }
   if (['verify', 'confirm_password'].includes(command.data.action) && record.state === 'flow') {
@@ -364,28 +298,8 @@ export async function commandPendingMfa(
     }
     return NextResponse.json({ view })
   }
-  if (command.data.action === 'complete_login') {
-    let completed: NextResponse
-    if (record.state === 'flow')
-      completed = await completeBrowserLogin(
-        request,
-        context,
-        handle,
-        record,
-        command.data.operationId
-      )
-    else if (record.state === 'staged')
-      completed = await publishBrowserLogin(
-        request,
-        context,
-        handle,
-        record,
-        await stagedEntry(context, record)
-      )
-    else throw changedBrowserContext()
-    const response = NextResponse.json({ view: flowView(record, 'completed') })
-    for (const cookie of completed.cookies.getAll()) response.cookies.set(cookie)
-    return response
+  if (['complete_login', 'settle_login', 'reconcile_login'].includes(command.data.action)) {
+    return reconcileBrowserLogin(request, context, handle, record)
   }
   throw new ContextRequestError(503, 'SERVICE_UNAVAILABLE')
 }

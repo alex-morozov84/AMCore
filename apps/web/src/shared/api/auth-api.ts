@@ -34,19 +34,43 @@ interface MessageResponse {
 export type AuthActionBase = '/auth' | '/product-admin/auth'
 export type BrowserLoginResponse = UserEnvelope | MfaBrowserSignInPending
 
+/** A live attempt requires an explicit decision before new credentials are dispatched. */
+export class PendingBrowserFlowError extends Error {
+  constructor(public readonly flowBinding: string) {
+    super('PENDING_BROWSER_FLOW')
+  }
+}
+
 async function passwordSignIn(
   base: AuthActionBase,
-  data: LoginInput
+  data: LoginInput,
+  entry?: {
+    entryId: string
+    returnEntryId?: string
+    entryKind?: 'console'
+    locale: SupportedLocale
+  }
 ): Promise<BrowserLoginResponse> {
-  const bootstrap = await apiClient.post<{ attemptId: string }>(`${base}/browser-context`, {})
+  const bootstrap = await apiClient.post<
+    { attemptId: string } | { kind: 'resume_required'; flowBinding: string }
+  >(`${base}/browser-context`, entry ?? {})
+  if ('kind' in bootstrap) throw new PendingBrowserFlowError(bootstrap.flowBinding)
   return apiClient.post<BrowserLoginResponse>(`${base}/login`, data, {
     headers: { 'x-amcore-login-attempt': bootstrap.attemptId },
   })
 }
 
-export function authActions(base: AuthActionBase) {
+export function authActions(
+  base: AuthActionBase,
+  entry?: {
+    entryId: string
+    returnEntryId?: string
+    entryKind?: 'console'
+    locale: SupportedLocale
+  }
+) {
   return {
-    login: (data: LoginInput) => passwordSignIn(base, data),
+    login: (data: LoginInput) => passwordSignIn(base, data, entry),
     logout: (contextSession?: string) =>
       apiClient.post<MessageResponse>(`${base}/logout`, undefined, {
         headers: contextSession ? { 'x-amcore-context-session': contextSession } : {},

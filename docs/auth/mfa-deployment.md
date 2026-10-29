@@ -32,7 +32,7 @@ maintenance boundary. Initial setup becomes available after activation.
 Build with `BUILD_SOURCE_COMMIT` set to the reviewed full Git commit. The normal
 API/web build writes `mfa-artifact.json`. API/worker images contain it at
 `/app/dist/mfa-artifact.json`; the web image contains it at
-`/app/apps/web/mfa-artifact.json`. A local build without a pinned commit writes
+`/apps/web/mfa-artifact.json`. A local build without a pinned commit writes
 `sourceCommit: null`; deployment preflight refuses that artifact.
 
 Collect the artifact from **each actual serving instance**, together with its
@@ -41,7 +41,7 @@ pinned image digest. For the reference Compose stack with one instance per role:
 ```bash
 docker compose exec -T api cat /app/dist/mfa-artifact.json > api-artifact.json
 docker compose exec -T worker cat /app/dist/mfa-artifact.json > worker-artifact.json
-docker compose exec -T web cat /app/apps/web/mfa-artifact.json > web-artifact.json
+docker compose exec -T web cat /apps/web/mfa-artifact.json > web-artifact.json
 ```
 
 For scaled services, collect every replica separately. Make `mfa-fleet.json` with

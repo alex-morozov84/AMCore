@@ -27,6 +27,7 @@ export function AccountSecurityClient({ placement }: { placement: AccountSecurit
   const [controller] = useState(
     () =>
       new AccountMfaController({
+        recoveryScope: `${placement.apiBase}:flow:${typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('flow') ?? '')}`,
         inspect: (operationId, flowBinding) =>
           apiClient.get<MfaBrowserView>(
             `${placement.apiBase}${operationId ? `?operationId=${encodeURIComponent(operationId)}` : ''}`,
@@ -38,6 +39,12 @@ export function AccountSecurityClient({ placement }: { placement: AccountSecurit
             }
           ),
         command: (command) => apiClient.post<MfaBrowserResult>(placement.apiBase, command),
+        resolveStart: (operationId, purpose) =>
+          apiClient.post<MfaBrowserResult>(`${placement.apiBase}/settings-start/status`, {
+            action: 'status',
+            operationId,
+            purpose,
+          }),
       })
   )
   useEffect(
@@ -60,17 +67,22 @@ export function AccountSecurityClient({ placement }: { placement: AccountSecurit
               operationId: crypto.randomUUID(),
               flowBinding,
             })
-          else
+          else if (controller.getSessionIntent())
             await apiClient.post(placement.logoutPath, undefined, {
               headers: { 'x-amcore-context-session': controller.getSessionIntent() ?? '' },
             })
-          router.replace(placement.loginHref)
+          const restart = placement.loginHref.replace(/\/login$/, '/sign-in-again')
+          router.replace(`${restart}?entryId=${crypto.randomUUID()}`)
         } finally {
           queryClient.clear()
         }
       }}
       onComplete={() => {
         const view = controller.getSnapshot().view
+        if (view?.kind === 'flow' && view.purpose === 'rotate_codes') {
+          void controller.resetToSettings()
+          return
+        }
         if (view?.kind === 'flow' && view.invitationFlowId) {
           router.replace(
             frontendAuthPath(
@@ -78,6 +90,8 @@ export function AccountSecurityClient({ placement }: { placement: AccountSecurit
               `/invite/flow/${view.invitationFlowId}`
             )
           )
+        } else if (view?.kind === 'flow' && view.consoleReturn) {
+          router.replace(view.consoleReturn.href, { locale: view.consoleReturn.locale })
         } else if (view?.kind === 'flow' && view.returnTo) {
           router.replace(productAdminReturnPath(view.returnTo), { locale: view.returnTo.locale })
         } else router.replace(placement.completeHref)

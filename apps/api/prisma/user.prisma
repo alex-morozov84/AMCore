@@ -106,6 +106,8 @@ model User {
   authFamilies            AuthSessionFamily[]
   mfaFlows                MfaFlow[]
   mfaBudget               MfaAttemptBudget?
+  mfaSettingsStarts       MfaSettingsStartReceipt[]
+  browserLogoutReceipts   BrowserLogoutReceipt[]
   accounts                OAuthAccount[]
   sessions                Session[]
   settings                UserSettings?

@@ -8,7 +8,7 @@ import { AccountMfaController, AccountMfaJourney } from '@/features/account-mfa'
 import { apiClient } from '@/shared/api/http-client'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
-import { getConsoleOverviewHref } from '@/shared/lib/console-public-href'
+import { getConsoleOverviewHref, getConsoleSignInAgainHref } from '@/shared/lib/console-public-href'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 export function ConsoleAccountSecurityClient() {
@@ -18,6 +18,7 @@ export function ConsoleAccountSecurityClient() {
   const [controller] = useState(
     () =>
       new AccountMfaController({
+        recoveryScope: `console:flow:${typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('flow') ?? '')}`,
         inspect: (operationId, flowBinding) =>
           apiClient.get<MfaBrowserView>(
             `${apiBase}${operationId ? `?operationId=${encodeURIComponent(operationId)}` : ''}`,
@@ -41,7 +42,12 @@ export function ConsoleAccountSecurityClient() {
   return (
     <AccountMfaJourney
       controller={controller}
-      onComplete={() => router.replace(getConsoleOverviewHref())}
+      onComplete={() => {
+        const view = controller.getSnapshot().view
+        const target = view?.kind === 'flow' ? view.consoleReturn : undefined
+        if (target) router.replace(target.href, { locale: target.locale })
+        else router.replace(getConsoleOverviewHref())
+      }}
       onExit={async () => {
         try {
           const host = ADMIN_CONSOLE_CONFIG.mode === 'host'
@@ -52,7 +58,7 @@ export function ConsoleAccountSecurityClient() {
               operationId: crypto.randomUUID(),
               flowBinding,
             })
-          else
+          else if (controller.getSessionIntent())
             await apiClient.post(
               host ? getConsolePublicApiPath('/auth/logout') : '/auth/logout',
               undefined,
@@ -60,7 +66,7 @@ export function ConsoleAccountSecurityClient() {
                 headers: { 'x-amcore-context-session': controller.getSessionIntent() ?? '' },
               }
             )
-          router.replace('/login')
+          router.replace(`${getConsoleSignInAgainHref()}?entryId=${crypto.randomUUID()}`)
         } finally {
           queryClient.clear()
         }

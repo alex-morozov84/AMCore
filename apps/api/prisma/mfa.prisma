@@ -178,3 +178,55 @@ model MfaAttemptBudget {
   @@map("mfa_attempt_budgets")
   @@schema("core")
 }
+
+model MfaSettingsStartReceipt {
+  operationId           String   @id
+  userId                String
+  sourceFamilyId        String
+  sourceSecurityVersion Int
+  sourceSessionId       String
+  browserContextId      String
+  generation            Int
+  audience              String
+  bindingHash           String
+  purpose               String
+  startNotAfter         DateTime
+  state                 String
+  flowId                String?
+  expiresAt             DateTime
+  createdAt             DateTime @default(now())
+  user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, sourceFamilyId])
+  @@map("mfa_settings_start_receipts")
+  @@schema("core")
+}
+
+model BrowserLogoutReceipt {
+  operationId           String   @id
+  returnEntryId         String   @unique
+  credentialHash        String
+  userId                String
+  sourceFamilyId        String
+  securityVersion       Int
+  sourceSessionId       String
+  contextId             String
+  audience              String
+  bindingHash           String
+  beforeGeneration      Int
+  afterGeneration       Int
+  expiresAt             DateTime
+  committedAt           DateTime @default(now())
+  neutralAttemptId      String?  @unique
+  reservedFlowId        String?  @unique
+  reservedGeneration    Int?
+  completionId          String?
+  publishedFamilyId     String?
+  user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([contextId])
+  @@map("browser_logout_receipts")
+  @@schema("core")
+}

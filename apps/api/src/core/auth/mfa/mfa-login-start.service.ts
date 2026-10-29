@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { z } from 'zod'
 
-import { SystemRole } from '@amcore/shared'
+import { type BrowserReturnProof, SystemRole } from '@amcore/shared'
 
 import { PrismaService } from '../../../prisma/index.js'
 import { lockInvitationAuthAttempt } from '../../invitations/invitation-auth-handoff.js'
 
 import type { BrowserRequestBinding } from './browser-binding.js'
 import { lockBrowserLoginBinding, reserveBrowserLogin } from './browser-login-reservation.js'
+import { linkReturnReservation } from './browser-return-transition.js'
 import { chargeFlowStart } from './mfa-account-budgets.js'
 import { accountRequiresMfa } from './mfa-account-policy.js'
 import { continuationHash, directFlowBinding, type FlowRequest } from './mfa-flow-lock.js'
@@ -45,7 +46,9 @@ type LoginIdentity = Pick<
   'userId' | 'securityVersion' | 'protectedAccount' | 'verifiedAt' | 'matches'
 >
 
-export type LoginFrame = { kind: 'browser'; binding: BrowserRequestBinding } | { kind: 'direct' }
+export type LoginFrame =
+  | { kind: 'browser'; binding: BrowserRequestBinding; returnProof?: BrowserReturnProof }
+  | { kind: 'direct' }
 export type LoginStart =
   | {
       kind: 'ordinary' | 'mfa' | 'recovery_ticket_required'
@@ -201,6 +204,18 @@ export class MfaLoginStartService {
           if (browser && !context) throw new ReservationChanged()
           const authorityKind = stored?.emergencyRequired ? 'recovery_pending' : 'identity'
           const bindingHash = context ? browser!.bindingHash : directFlowBinding(credential)!
+          const returnEntry =
+            context && browser && frame.kind === 'browser' && !invitation
+              ? await linkReturnReservation(
+                  tx,
+                  frame.returnProof,
+                  browser,
+                  context,
+                  flowId,
+                  identity.userId,
+                  stored?.securityVersion ?? 0
+                )
+              : undefined
           await tx.mfaFlow.create({
             data: {
               id: flowId,
@@ -216,6 +231,7 @@ export class MfaLoginStartService {
               expiresAt,
               primaryAt: method === 'password' ? identity.verifiedAt : null,
               data: {
+                ...(returnEntry ? { returnEntry } : {}),
                 ...(invitation ? { invitation } : {}),
                 ...(oauth && {
                   identity: {

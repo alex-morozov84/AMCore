@@ -3,10 +3,12 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { mfaSessionFlowResultSchema } from '@amcore/shared'
 import {
   type BrowserContextView,
+  browserReturnProofSchema,
   browserRevisionSchema,
   type MfaFactorBindingResult,
   type MfaRecoveryTicketResult,
   passwordLoginPendingSchema,
+  SUPPORTED_LOCALES,
 } from '@amcore/shared'
 import { z } from 'zod'
 
@@ -34,6 +36,11 @@ const base = z
     anchorHash: z.string().regex(/^[a-f0-9]{64}$/),
     browser: browserRevisionSchema,
     expiresAt: z.number().int().positive(),
+    cancelled: z.boolean().optional(),
+    consoleEntry: z
+      .object({ locale: z.enum(SUPPORTED_LOCALES), proof: browserReturnProofSchema.optional() })
+      .strict()
+      .optional(),
   })
   .strict()
 export const invitedBrowserAttemptSchema = z
@@ -86,6 +93,15 @@ export type BrowserAuthAttempt = z.infer<typeof browserAuthAttemptSchema>
 export type BrowserAuthFlow = z.infer<typeof flow>
 export type BrowserAuthPublication = z.infer<typeof staged>
 
+/** Called only after the API confirmed exact-source cancellation; never clears a cookie. */
+export async function markBrowserAuthCancelled(
+  handle: string,
+  current: BrowserAuthAttempt,
+  context: ProductWebContext
+) {
+  return writeBrowserAuthAttempt(handle, current, { ...current, cancelled: true }, context)
+}
+
 export function pendingAuthCookie(context: ProductWebContext) {
   return {
     ...browserAnchorCookie(context.audience),
@@ -117,11 +133,15 @@ export async function createBrowserAuthAttempt(
   context: ProductWebContext,
   anchor: string,
   view: BrowserContextView,
-  invitation?: InvitedBrowserAttempt
+  invitation?: InvitedBrowserAttempt,
+  identity?: { handle: string; id: string },
+  consoleEntry?: BrowserAuthAttempt['consoleEntry']
 ) {
-  const handle = randomBytes(32).toString('base64url')
+  const handle = identity
+    ? credential.parse(identity.handle)
+    : randomBytes(32).toString('base64url')
   const record: BrowserAuthAttempt = {
-    id: randomUUID(),
+    id: identity ? z.string().uuid().parse(identity.id) : randomUUID(),
     version: 1,
     state: 'ready',
     ...(invitation ? { invitation } : {}),
@@ -130,17 +150,36 @@ export async function createBrowserAuthAttempt(
     anchorHash: anchorHash(anchor),
     browser: { contextId: view.contextId, generation: view.generation },
     expiresAt: Math.min(Date.parse(view.expiresAt), Date.now() + 900000),
+    ...(consoleEntry ? { consoleEntry } : {}),
   }
   if (record.expiresAt <= Date.now()) throw changedBrowserContext()
-  await storage(async () => {
+  const saved = await storage(async () => {
     const result = await (
       await getWebRedisClient()
     ).set(attemptKey(handle, context), JSON.stringify(record), {
       condition: 'NX',
       expiration: { type: 'PXAT', value: record.expiresAt },
     })
-    if (result !== 'OK') throw new SessionVaultUnavailableError(undefined)
+    return result
   })
+  if (saved !== 'OK') {
+    if (!identity) throw new SessionVaultUnavailableError(undefined)
+    const raw = await storage(async () =>
+      (await getWebRedisClient()).get(attemptKey(handle, context))
+    )
+    const existing = browserAuthAttemptSchema.parse(JSON.parse(raw ?? 'null'))
+    if (
+      existing.id !== record.id ||
+      existing.anchorHash !== record.anchorHash ||
+      existing.origin !== record.origin ||
+      existing.audience !== record.audience ||
+      existing.browser.contextId !== record.browser.contextId ||
+      existing.browser.generation !== record.browser.generation ||
+      existing.expiresAt <= Date.now()
+    )
+      throw changedBrowserContext()
+    return { handle, record: existing }
+  }
   return { handle, record }
 }
 
@@ -150,22 +189,39 @@ export async function createSessionAuthAttempt(
   anchor: string,
   accountLabel: string,
   sourceFingerprint: string,
-  result: Extract<z.infer<typeof mfaSessionFlowResultSchema>, { kind: 'mfa' }>
+  result: Extract<z.infer<typeof mfaSessionFlowResultSchema>, { kind: 'mfa' }>,
+  identity?: { handle: string; id: string; completionId: string; vaultBinding: string }
 ) {
   if (!result.browser || !['rotate_codes', 'replace_factor'].includes(result.purpose))
     throw changedBrowserContext()
-  const created = await createBrowserAuthAttempt(context, anchor, {
-    ...result.browser,
-    expiresAt: result.expiresAt,
-    state: 'published',
-  })
+  const created = await createBrowserAuthAttempt(
+    context,
+    anchor,
+    {
+      ...result.browser,
+      expiresAt: result.expiresAt,
+      state: 'published',
+    },
+    undefined,
+    identity
+  )
+  if ('flow' in created.record) {
+    if (
+      created.record.sourceFingerprint !== sourceFingerprint ||
+      created.record.flow.continuation !== result.continuation ||
+      created.record.flow.purpose !== result.purpose
+    )
+      throw changedBrowserContext()
+    return { handle: created.handle, record: created.record }
+  }
+  if (created.record.state !== 'ready') throw changedBrowserContext()
   const next: BrowserAuthFlow = {
     ...created.record,
     state: 'flow',
     accountLabel,
     sourceFingerprint,
-    completionId: randomUUID(),
-    vaultBinding: randomBytes(32).toString('base64url'),
+    completionId: identity?.completionId ?? randomUUID(),
+    vaultBinding: identity?.vaultBinding ?? randomBytes(32).toString('base64url'),
     flow: result,
     expiresAt: Math.min(created.record.expiresAt, Date.parse(result.expiresAt)),
   }
@@ -176,14 +232,18 @@ export async function createSessionAuthAttempt(
 
 export async function readBrowserAuthAttempt(
   source: Headers,
-  context: ProductWebContext
+  context: ProductWebContext,
+  options: { allowExpired?: boolean } = {}
 ): Promise<{ handle: string; record: BrowserAuthAttempt } | null> {
   const handle = readBrowserCapability(source, pendingAuthCookie(context).name)
   if (!handle) return null
   const raw = await storage(async () =>
     (await getWebRedisClient()).get(attemptKey(handle, context))
   )
-  if (!raw) throw changedBrowserContext()
+  if (!raw) {
+    if (options.allowExpired) return null
+    throw changedBrowserContext()
+  }
   let decoded: unknown
   try {
     decoded = JSON.parse(raw)
@@ -197,10 +257,13 @@ export async function readBrowserAuthAttempt(
     !anchor ||
     record.data.anchorHash !== anchorHash(anchor) ||
     record.data.origin !== context.origin ||
-    record.data.audience !== context.audience ||
-    record.data.expiresAt <= Date.now()
+    record.data.audience !== context.audience
   )
     throw changedBrowserContext()
+  if (record.data.expiresAt <= Date.now()) {
+    if (options.allowExpired) return null
+    throw changedBrowserContext()
+  }
   return { handle, record: record.data }
 }
 

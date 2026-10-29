@@ -1,5 +1,6 @@
 import type { Prisma } from '../../../generated/prisma/client.js'
 
+import { consumeReturnPublication } from './browser-return-transition.js'
 import { lockPublication, type PublicationCommand } from './mfa-publication-authority.js'
 import { mfaDatabaseClock } from './mfa-transaction.js'
 
@@ -33,6 +34,13 @@ export async function settlePublication(
     })
   }
   await tx.mfaFlow.update({ where: { id: flow.id }, data: { state: 'completed' } })
+  await consumeReturnPublication(
+    tx,
+    flow,
+    command.operationId,
+    family.id,
+    context?.generation ?? null
+  )
   const finalNow = await mfaDatabaseClock(tx)
   if (
     !family.publicationDeadline ||

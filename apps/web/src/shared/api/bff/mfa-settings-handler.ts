@@ -1,21 +1,14 @@
 import { createHash } from 'node:crypto'
 
 import { NextResponse } from 'next/server'
-import {
-  type MfaBrowserCommand,
-  mfaSessionFlowResultSchema,
-  mfaSettingsViewSchema,
-  mfaStatusSchema,
-} from '@amcore/shared'
+import { type MfaBrowserCommand, mfaSettingsViewSchema } from '@amcore/shared'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
-import { createSessionAuthAttempt, pendingAuthCookie } from './browser-auth-attempt'
 import {
   browserSessionHeaders,
   changedBrowserContext,
   createBrowserBindingVerifier,
-  readBrowserAnchor,
   readBrowserCapability,
   unavailableBrowserContext,
 } from './browser-binding.server'
@@ -23,6 +16,7 @@ import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { contextSessionBinding } from './context-session'
 import { ensureFreshSession } from './ensure-fresh-session'
+import { settingsStartReceipt } from './mfa-settings-start-receipt'
 import type { ProductWebContext } from './product-web-context.server'
 import { createUpstreamRefresh } from './upstream-refresh'
 
@@ -54,10 +48,11 @@ async function callSettings(
   request: Request,
   context: ProductWebContext,
   source: Awaited<ReturnType<typeof settingsSource>>,
-  body?: unknown
+  body?: unknown,
+  path?: 'settings-start' | 'settings-start/abandon'
 ) {
   const response = await fetchBackendResponse(
-    `${getBackendBaseUrl()}/api/v1/auth/mfa/${body ? 'session-flow' : 'settings'}`,
+    `${getBackendBaseUrl()}/api/v1/auth/mfa/${path ?? (body ? 'session-flow' : 'settings')}`,
     request.headers,
     {
       method: body ? 'POST' : 'GET',
@@ -99,54 +94,26 @@ export async function startMfaSettings(
     command.generation
   )
     throw new ContextRequestError(400, 'BAD_REQUEST')
-  const purpose = command.action === 'start_code_rotation' ? 'rotate_codes' : 'replace_factor'
   if (!['start_code_rotation', 'start_replacement'].includes(command.action))
     throw new ContextRequestError(400, 'BAD_REQUEST')
   const source = await settingsSource(request, context)
-  const result = mfaSessionFlowResultSchema.parse(
-    await callSettings(request, context, source, {
-      purpose,
-      operationId: command.operationId,
-    })
+  return settingsStartReceipt(request, context, source, command, (path, body) =>
+    callSettings(request, context, source, body, path)
   )
-  if (result.kind === 'limited')
-    throw new ContextRequestError(429, 'RATE_LIMIT_EXCEEDED', result.retryAfter)
-  if (result.kind === 'restart_required') throw changedBrowserContext()
-  if (result.kind !== 'mfa') throw unavailableBrowserContext()
-  if (
-    !result.browser ||
-    result.browser.contextId !== source.entry.browser?.contextId ||
-    result.browser.generation !== source.entry.browser.generation ||
-    result.purpose !== purpose
-  )
-    throw changedBrowserContext()
-  const anchor = readBrowserAnchor(request.headers, context.audience)
-  if (!anchor) throw changedBrowserContext()
-  const created = await createSessionAuthAttempt(
+}
+
+export async function resolveMfaSettingsStart(
+  request: Request,
+  context: ProductWebContext,
+  command: MfaBrowserCommand
+) {
+  const source = await settingsSource(request, context)
+  return settingsStartReceipt(
+    request,
     context,
-    anchor,
-    source.entry.userSnapshot.email,
-    source.sourceFingerprint,
-    result
+    source,
+    command,
+    (path, body) => callSettings(request, context, source, body, path),
+    true
   )
-  const status = mfaStatusSchema.parse({
-    kind: 'mfa',
-    purpose: result.purpose,
-    state: result.state,
-    expiresAt: result.expiresAt,
-    requiredProofs: result.requiredProofs,
-    remainingCodes: result.remainingCodes,
-    generation: result.generation,
-  })
-  const response = NextResponse.json({
-    view: {
-      ...status,
-      kind: 'flow',
-      flowBinding: created.record.id,
-      accountLabel: created.record.accountLabel,
-    },
-  })
-  const cookie = pendingAuthCookie(context)
-  response.cookies.set(cookie.name, created.handle, cookie.options)
-  return response
 }
