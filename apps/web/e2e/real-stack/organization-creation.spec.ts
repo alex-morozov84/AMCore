@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test'
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 for (const locale of SUPPORTED_LOCALES) {
@@ -21,7 +21,7 @@ for (const locale of SUPPORTED_LOCALES) {
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationCreation
     const email = uniqueEmail(`slug-conflict-${locale}`)
-    const registration = await context.request.post('/api/auth/register', {
+    const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
       headers: { origin: target.origins.product },
       data: { email, password: TEST_PASSWORD },
     })
@@ -74,7 +74,7 @@ for (const locale of SUPPORTED_LOCALES) {
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationCreation
     const email = uniqueEmail(`create-${locale}`)
-    const registration = await context.request.post('/api/auth/register', {
+    const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
       headers: { origin: target.origins.product },
       data: { email, password: TEST_PASSWORD },
     })

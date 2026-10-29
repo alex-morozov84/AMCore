@@ -6,6 +6,8 @@ import request from 'supertest'
 
 import type { PrismaService } from '../src/prisma'
 
+import { protectedSession } from './protected-session.helper'
+
 /** Mount path of the board in the e2e harness (it applies no global prefix). */
 export const BOARD = '/admin/queues'
 
@@ -16,25 +18,28 @@ export function queueOf(app: INestApplication, name: string): Queue {
   return app.get<Queue>(getQueueToken(name), { strict: false })
 }
 
-/** Registers a user, promotes it to SUPER_ADMIN in place and returns its refresh cookie. */
-export async function superAdminCookie(
+/** Register/promote a fixture, then perform password + MFA and exact publication. */
+export async function superAdminSession(
   app: INestApplication,
   prisma: PrismaService,
   email = 'board-admin@example.com',
   prefix = ''
-): Promise<string> {
+): Promise<{ cookie: string; accessToken: string }> {
   const res = await request(app.getHttpServer())
     .post(`${prefix}/auth/register`)
     .send({ email, password: 'StrongP@ss123' })
     .expect(201)
-  const setCookie = res.headers['set-cookie'] as unknown as string[]
-  const cookie = setCookie.find((c) => c.startsWith('refresh_token='))?.split(';')[0]
-  if (!cookie) throw new Error('no refresh_token cookie in response')
   await prisma.user.update({
     where: { id: res.body.user.id as string },
     data: { systemRole: 'SUPER_ADMIN' },
   })
-  return cookie
+  return protectedSession(app, prisma, res.body.user.id as string, email, 'StrongP@ss123', prefix)
+}
+
+export async function superAdminCookie(
+  ...args: Parameters<typeof superAdminSession>
+): Promise<string> {
+  return (await superAdminSession(...args)).cookie
 }
 
 /**

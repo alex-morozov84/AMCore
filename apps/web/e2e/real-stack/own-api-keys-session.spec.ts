@@ -8,7 +8,7 @@ import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 test.afterEach(({ page }, info) => closeCredentialPage(page, info))
@@ -25,7 +25,9 @@ for (const change of ['same-user-login', 'other-user-login'] as const) {
       headers: { origin: target.origins.product },
       data: { email, password: TEST_PASSWORD },
     }
-    expect((await context.request.post('/api/auth/register', auth)).status()).toBe(201)
+    expect(
+      (await browserCredentialRequest(context.request, '/api/auth/register', auth)).status()
+    ).toBe(201)
     const login = await directApi('auth/login', auth.data)
     const organization = await directApi(
       'organizations',
@@ -69,11 +71,13 @@ for (const change of ['same-user-login', 'other-user-login'] as const) {
     await dialog.getByRole('button', { name: t.create, exact: true }).click()
     await ready
     if (change === 'same-user-login')
-      expect((await context.request.post('/api/auth/login', auth)).status()).toBe(200)
+      expect(
+        (await browserCredentialRequest(context.request, '/api/auth/login', auth)).status()
+      ).toBe(200)
     else
       expect(
         (
-          await context.request.post('/api/auth/register', {
+          await browserCredentialRequest(context.request, '/api/auth/register', {
             ...auth,
             data: { ...auth.data, email: uniqueEmail('new-owner') },
           })

@@ -9,7 +9,7 @@ import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 test.afterEach(({ page }, info) => closeCredentialPage(page, info))
@@ -26,7 +26,7 @@ test('personal navigation, full-list filters, details, URL history and independe
   const email = uniqueEmail('key-inventory')
   expect(
     (
-      await context.request.post('/api/auth/register', {
+      await browserCredentialRequest(context.request, '/api/auth/register', {
         headers: { origin: target.origins.product },
         data: { email, password: TEST_PASSWORD },
       })

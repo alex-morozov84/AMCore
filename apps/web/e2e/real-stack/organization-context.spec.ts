@@ -5,7 +5,7 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi, proveOwnedRefresh } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 test('organization foundation: ordered lifecycle, targets, session fence and responsive UI', async ({
@@ -18,7 +18,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   const email = uniqueEmail('organization-context')
   const ui = organizationUi()
   const origin = activeTarget().origins.product
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin },
     data: { email, password: TEST_PASSWORD },
   })
@@ -156,7 +156,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   const beforeChanged = calls.length
   expect(
     (
-      await context.request.post('/api/auth/login', {
+      await browserCredentialRequest(context.request, '/api/auth/login', {
         headers: { origin },
         data: { email, password: TEST_PASSWORD },
       })
@@ -182,7 +182,7 @@ test('empty discovery and pagination remain distinct from failed authority', asy
   const email = uniqueEmail('org-empty')
   expect(
     (
-      await context.request.post('/api/auth/register', {
+      await browserCredentialRequest(context.request, '/api/auth/register', {
         headers: { origin },
         data: { email, password: TEST_PASSWORD },
       })

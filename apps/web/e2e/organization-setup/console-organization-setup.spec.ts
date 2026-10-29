@@ -5,6 +5,7 @@ import { coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
 
@@ -42,7 +43,11 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await page.goto(localizedFrontendUrl(m.origins.console, coerceSupportedLocale('en'), 'login'))
   await page.getByRole('textbox', { name: login.email, exact: true }).fill(operator)
   await page.getByLabel(login.password, { exact: true }).fill(SETUP_PASSWORD)
+  const signIn = page.waitForResponse(
+    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: login.login, exact: true }).click()
+  if ((await signIn).status() === 202) await completeMfaSignIn(page, operator)
   await page.waitForURL(
     (url) =>
       url.origin === m.origins.console &&

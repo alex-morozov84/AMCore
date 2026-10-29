@@ -85,6 +85,9 @@ sessions** keeps only the current backend session and revokes that account's
 other sessions, including website, staff and Console sessions. Sessions belonging
 to a different account are unaffected. These are broader account actions.
 Previously admitted API requests may finish after logout or a permission change.
+A denied page receives only the logout intent for its already-verified session.
+It reuses request-memoized admission, without fetching the profile or adding a probe.
+If current admission cannot be proved, sign-out is disabled; no unbound logout is sent.
 
 The sidebar collapses to icons with localized tooltips. Dashboard comes first.
 The website link is at the bottom and preserves the active language. Pages use

@@ -7,7 +7,12 @@ import {
 } from '@amcore/shared'
 import { expect, request, test } from '@playwright/test'
 
-import { TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import {
+  logoutViaApi,
+  postBrowserCredentials,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from '../real-stack/helpers'
 import { inviteRecipient, membershipCount } from '../real-stack/invitation-recipient.helpers'
 import { activeTarget } from '../support/managed-target.mjs'
 
@@ -22,15 +27,13 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
   const invitation = await inviteRecipient(email)
   expect(
     (
-      await context.request.post(new URL('/api/auth/register', origin).href, {
-        headers,
-        data: { email, password: TEST_PASSWORD },
+      await postBrowserCredentials(context.request, origin, '/api/auth/register', {
+        email,
+        password: TEST_PASSWORD,
       })
     ).status()
   ).toBe(201)
-  expect(
-    (await context.request.post(new URL('/api/auth/logout', origin).href, { headers })).ok()
-  ).toBe(true)
+  expect((await logoutViaApi(context.request, origin)).ok()).toBe(true)
   // RequestContext follows the real bootstrap and stores cookies without executing
   // page scripts, so the UI cannot automatically confirm this issued handoff.
   const ingress = await context.request.get(
@@ -60,9 +63,9 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
     ignoreHTTPSErrors: true,
   })
   try {
-    const replacement = await independent.post(new URL('/api/auth/register', origin).href, {
-      headers,
-      data: { email: uniqueEmail('issued-ack-replacement'), password: TEST_PASSWORD },
+    const replacement = await postBrowserCredentials(independent, origin, '/api/auth/register', {
+      email: uniqueEmail('issued-ack-replacement'),
+      password: TEST_PASSWORD,
     })
     expect(replacement.status()).toBe(201)
     const cookies = (await independent.storageState()).cookies.filter(

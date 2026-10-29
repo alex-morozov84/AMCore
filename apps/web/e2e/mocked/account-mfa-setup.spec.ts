@@ -87,6 +87,7 @@ for (const { locale, messages, width } of [
       requiredProofs: [],
       remainingCodes: generation ? 10 : 0,
       generation,
+      ...(state === 'completed' ? { publication: 'confirmed' } : {}),
     })
     await page.route('**/api/auth/mfa*', async (route) => {
       if (route.request().method() === 'GET') return route.fulfill({ json: view() })
@@ -139,7 +140,7 @@ for (const { locale, messages, width } of [
           },
         })
       }
-      expect(command.action).toBe('complete_login')
+      expect(command.action).toBe('reconcile_login')
       state = 'completed'
       return route.fulfill({ json: { view: view() } })
     })
@@ -156,9 +157,8 @@ for (const { locale, messages, width } of [
     await expectNoAxeViolations(page)
     await finish.click()
     await page.getByRole('button', { name: messages.checkResult, exact: true }).click()
-    await page.getByRole('button', { name: messages.continue, exact: true }).click()
-    await expect(page.getByText(messages.enabled, { exact: true })).toBeVisible()
-    expect(actions).toEqual(['start_enrollment', 'verify', 'acknowledge_codes', 'complete_login'])
+    await page.waitForURL((url) => url.pathname === `/${locale}` || url.pathname === `/${locale}/`)
+    expect(actions).toEqual(['start_enrollment', 'verify', 'acknowledge_codes', 'reconcile_login'])
     await expectNoAxeViolations(page)
   })
 }

@@ -8,7 +8,7 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 test('member keys: scoped list, confirmation, permanent revoke and unknown-result recovery', async ({
   page,
@@ -21,7 +21,7 @@ test('member keys: scoped list, confirmation, permanent revoke and unknown-resul
   )
   const t = catalogue.memberApiKeys
   const email = uniqueEmail('member-keys')
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin: target.origins.product },
     data: { email, password: TEST_PASSWORD },
   })

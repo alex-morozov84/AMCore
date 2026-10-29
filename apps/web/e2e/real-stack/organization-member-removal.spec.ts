@@ -9,7 +9,7 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 test('member removal: cancellation, last ADMIN, lost acknowledgment, narrow RU and own removal', async ({
   page,
@@ -20,7 +20,7 @@ test('member removal: cancellation, last ADMIN, lost acknowledgment, narrow RU a
   const email = uniqueEmail('remove-admin')
   expect(
     (
-      await context.request.post('/api/auth/register', {
+      await browserCredentialRequest(context.request, '/api/auth/register', {
         headers: { origin: target.origins.product },
         data: { email, password: TEST_PASSWORD },
       })

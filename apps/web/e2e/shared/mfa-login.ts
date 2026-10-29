@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { Messages } from 'next-intl'
-import { DEFAULT_LOCALE, type MfaBrowserResult } from '@amcore/shared'
+import { coerceSupportedLocale, DEFAULT_LOCALE, type MfaBrowserResult } from '@amcore/shared'
 import { expect, type Locator, type Page } from '@playwright/test'
 import { generate } from 'otplib'
 
@@ -65,10 +65,9 @@ export async function completeMfaSignIn(page: Page, email: string): Promise<void
       await page.getByLabel(t.backupCode, { exact: true }).fill(code)
       result = await clickCommand(page, page.getByRole('button', { name: t.signIn, exact: true }))
     }
-    if (result.view.kind === 'flow' && result.view.state === 'ready')
-      result = await clickCommand(page, page.getByRole('button', { name: t.continue, exact: true }))
-    expect(result.view.kind === 'flow' ? result.view.state : result.view.kind).toBe('completed')
-    await page.getByRole('button', { name: t.continue, exact: true }).click()
+    expect(result.view.kind).toBe('flow')
+    expect(['ready', 'completed']).toContain(result.view.kind === 'flow' && result.view.state)
+    // The application reconciles publication and navigates automatically after the proof.
     await page.waitForURL((url) => !url.pathname.endsWith('/mfa'))
   } catch (error) {
     throw redactMfaFailure(error, secrets)
@@ -78,12 +77,13 @@ export async function completeMfaSignIn(page: Page, email: string): Promise<void
 /** Completes the second proof in the existing sensitive-action dialog. */
 export async function completeMfaStepUp(page: Page, email: string): Promise<void> {
   const target = activeTarget()
+  const locale = coerceSupportedLocale(new URL(page.url()).pathname.split('/')[1] ?? DEFAULT_LOCALE)
   const t = JSON.parse(
-    readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
+    readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
   ).accountMfa as Messages['accountMfa']
   try {
     const title = JSON.parse(
-      readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
+      readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).console.stepUpTitle as string
     const dialog = page.getByRole('dialog', { name: title, exact: true })
     await expect(dialog.getByLabel(t.appCode, { exact: true })).toBeVisible()

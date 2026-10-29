@@ -110,7 +110,8 @@ describe('queue board — early responses of the mount (production order)', () =
       .send('{bad')
     expect(res.status).toBe(400)
     expect(res.headers['content-security-policy'] ?? '').not.toContain("script-src 'self'")
-    expect(res.headers['cache-control'] ?? '').not.toBe('private, no-store')
+    // Auth independently prohibits caching, including malformed requests.
+    expect(res.headers['cache-control']).toBe('private, no-store')
   })
 
   describe('static files of the board', () => {

@@ -1,5 +1,6 @@
 import { createInvitationOperationId } from '@amcore/shared'
 
+import { deleteOwnedFamilies } from '../src/core/auth/session-revocation.js'
 import { ProvisioningLimiterService } from '../src/core/organizations/provisioning/provisioning-limiter.service'
 
 import { type E2ETestContext, seedSystemRoles, setupE2ETest, teardownE2ETest } from './helpers'
@@ -34,10 +35,7 @@ describe('Administrator authority after transaction waits (e2e)', () => {
     const admission = import.meta.jest
       .spyOn(context.app.get(ProvisioningLimiterService), 'consume')
       .mockImplementationOnce(async () => {
-        await context.prisma.session.updateMany({
-          where: { userId: fixture.operatorId },
-          data: { revokedAt: new Date() },
-        })
+        await deleteOwnedFamilies(context.prisma, fixture.operatorId)
       })
     try {
       const response = await fixture
@@ -45,8 +43,8 @@ describe('Administrator authority after transaction waits (e2e)', () => {
         .post(`/admin/organizations/${orgId}/administrator-invitations`)
         .auth(fixture.token, { type: 'bearer' })
         .send({ operationId, email: 'another@e2e.amcore.test', reason: 'TEST-49 session boundary' })
-      expect(response.status).toBe(403)
-      expect(response.body.errorCode).toBe('STEP_UP_REQUIRED')
+      expect(response.status).toBe(409)
+      expect(response.body.errorCode).toBe('SESSION_CHANGED')
       expect(
         await context.prisma.organizationAdministratorInvitation.findMany({
           where: { organizationId: orgId },
@@ -105,14 +103,11 @@ describe('Administrator authority after transaction waits (e2e)', () => {
         .then((response) => response)
       pending = request
       await fence.waitFor(request)
-      await context.prisma.session.updateMany({
-        where: { userId: fixture.operatorId },
-        data: { revokedAt: new Date() },
-      })
+      await deleteOwnedFamilies(context.prisma, fixture.operatorId)
       fence.release()
       const response = await request
-      expect(response.status).toBe(403)
-      expect(response.body.errorCode).toBe('STEP_UP_REQUIRED')
+      expect(response.status).toBe(409)
+      expect(response.body.errorCode).toBe('SESSION_CHANGED')
       expect(await context.prisma.memberRole.count({ where: { memberId: member.id } })).toBe(0)
       expect(
         (await context.prisma.organization.findUniqueOrThrow({ where: { id: orgId } })).aclVersion

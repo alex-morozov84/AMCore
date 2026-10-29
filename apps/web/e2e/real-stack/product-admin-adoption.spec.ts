@@ -10,7 +10,7 @@ import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 // This declaration follows the spec into discovered CI, including failure/retry.
@@ -80,7 +80,7 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   const email = uniqueEmail('adopter-owner')
   expect(
     (
-      await context.request.post('/api/auth/register', {
+      await browserCredentialRequest(context.request, '/api/auth/register', {
         headers: { origin: target.origins.product },
         data: { email, password: TEST_PASSWORD },
       })
@@ -293,7 +293,7 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   ownedContexts.push(staff)
   expect(
     (
-      await staff.request.post(`${target.origins.product}/api/auth/login`, {
+      await browserCredentialRequest(staff.request, `${target.origins.product}/api/auth/login`, {
         headers: { origin: target.origins.product },
         data: { email: colleagueEmail, password: TEST_PASSWORD },
       })

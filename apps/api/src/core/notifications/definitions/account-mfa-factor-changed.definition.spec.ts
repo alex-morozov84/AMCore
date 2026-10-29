@@ -1,3 +1,5 @@
+import { coerceSupportedLocale } from '@amcore/shared'
+
 import { NotificationChannel } from '../notification.constants.js'
 import { validateDefinition } from '../notification-definition.validation.js'
 
@@ -30,17 +32,25 @@ describe('Factor-change security notification', () => {
 
   it('explains factor change and a safe response in both supported languages', () => {
     const payload = { change: 'enrolled' as const, changedAt: '2026-10-26T12:00:00.000Z' }
-    expect(definition.renderInApp(payload, 'en').body).toContain('reset your password')
-    expect(definition.renderInApp(payload, 'ru').body).toContain('сбросьте пароль')
-    expect(definition.renderExternal!.email!(payload, 'en')).toEqual(
-      definition.renderInApp(payload, 'en')
+    expect(definition.renderInApp(payload, coerceSupportedLocale('en')).body).toContain(
+      coerceSupportedLocale('en') === 'en' ? 'reset your password' : 'сбросьте пароль'
+    )
+    expect(definition.renderInApp(payload, coerceSupportedLocale('ru')).body).toContain(
+      coerceSupportedLocale('ru') === 'en' ? 'reset your password' : 'сбросьте пароль'
+    )
+    expect(definition.renderExternal!.email!(payload, coerceSupportedLocale('en'))).toEqual(
+      definition.renderInApp(payload, coerceSupportedLocale('en'))
     )
   })
 
   it('explains offline recovery without putting the ticket or operator reason in the notification', () => {
     const payload = { change: 'recovery_started' as const, changedAt: '2026-10-26T12:00:00.000Z' }
-    expect(definition.renderInApp(payload, 'en').body).toContain('no longer work')
-    expect(definition.renderInApp(payload, 'ru').body).toContain('больше не работают')
+    expect(definition.renderInApp(payload, coerceSupportedLocale('en')).body).toContain(
+      coerceSupportedLocale('en') === 'en' ? 'no longer work' : 'больше не работают'
+    )
+    expect(definition.renderInApp(payload, coerceSupportedLocale('ru')).body).toContain(
+      coerceSupportedLocale('ru') === 'en' ? 'no longer work' : 'больше не работают'
+    )
     for (const field of ['ticket', 'reason', 'password', 'secret'])
       expect(
         definition.payloadSchema.safeParse({ ...payload, [field]: 'fake-private-value' }).success

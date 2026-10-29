@@ -9,7 +9,7 @@ import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 // Never retain one-time credentials in browser artifacts, including a failed assertion.
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
@@ -30,7 +30,7 @@ for (const locale of SUPPORTED_LOCALES) {
     )
     const t = messages.ownApiKeys
     const email = uniqueEmail('own-keys')
-    const registration = await context.request.post('/api/auth/register', {
+    const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
       headers: { origin: target.origins.product },
       data: { email, password: TEST_PASSWORD },
     })

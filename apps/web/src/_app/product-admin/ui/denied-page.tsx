@@ -22,10 +22,12 @@ const actions = authActions('/product-admin/auth')
 export function ProductAdminDenied({
   siteOrigin,
   logoutLabel,
+  contextSession,
   showOrganizationList = true,
 }: {
   siteOrigin: string
   logoutLabel: string
+  contextSession?: string
   showOrganizationList?: boolean
 }) {
   const t = useTranslations('productAdmin')
@@ -33,7 +35,7 @@ export function ProductAdminDenied({
   const router = useRouteProgressRouter()
   const cache = useQueryClient()
   const logout = useMutation({
-    mutationFn: actions.logout,
+    mutationFn: () => actions.logout(contextSession),
     retry: false,
     onSuccess: () => {
       cache.clear()
@@ -68,7 +70,11 @@ export function ProductAdminDenied({
         <p className="text-sm text-muted-foreground">
           {t(PRODUCT_ADMIN_CONFIG.mode === 'path' ? 'sharedLogout' : 'separateLogout')}
         </p>
-        <Button variant="outline" disabled={logout.isPending} onClick={() => logout.mutate()}>
+        <Button
+          variant="outline"
+          disabled={logout.isPending || !contextSession}
+          onClick={() => logout.mutate()}
+        >
           {logoutLabel}
         </Button>
       </CardContent>

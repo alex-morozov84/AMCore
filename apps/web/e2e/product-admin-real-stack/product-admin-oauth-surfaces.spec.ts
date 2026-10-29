@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
-import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { appleBrowserFixture } from './apple-browser-fixture'
@@ -82,13 +82,7 @@ for (const scenario of [
       const page = await context.newPage()
       if (scenario === 'unverified') {
         await registerViaUi(page, email)
-        expect(
-          (
-            await context.request.post(`${product}/api/auth/logout`, {
-              headers: { Origin: product },
-            })
-          ).status()
-        ).toBe(200)
+        expect((await logoutViaApi(context.request, product)).status()).toBe(200)
       }
       const before = accountCounts(email)
       const seen = await appleBrowserFixture(context, product, email, true, {

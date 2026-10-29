@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { createInvitationOperationId, DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
 import { type APIResponse, expect, request, test } from '@playwright/test'
 
+import { browserCredentialRequest } from '../real-stack/helpers'
 import { TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
 import { inviteRecipient, membershipCount } from '../real-stack/invitation-recipient.helpers'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
@@ -128,10 +129,14 @@ test('HTTPS: established-owner independent tabs and replacement session cannot u
   const second = await inviteRecipient(email)
   expect(
     (
-      await context.request.post(new URL('/api/auth/register', target.origins.product).href, {
-        headers: { origin: target.origins.product },
-        data: { email, password: TEST_PASSWORD },
-      })
+      await browserCredentialRequest(
+        context.request,
+        new URL('/api/auth/register', target.origins.product).href,
+        {
+          headers: { origin: target.origins.product },
+          data: { email, password: TEST_PASSWORD },
+        }
+      )
     ).status()
   ).toBe(201)
   // This fixture owns only readiness setup, not verification transport (proved separately).
@@ -189,10 +194,14 @@ test('HTTPS: established-owner independent tabs and replacement session cannot u
   ).toBe(true)
   expect(
     (
-      await context.request.post(new URL('/api/auth/register', target.origins.product).href, {
-        headers: { origin: target.origins.product },
-        data: { email: uniqueEmail('https-replacement'), password: TEST_PASSWORD },
-      })
+      await browserCredentialRequest(
+        context.request,
+        new URL('/api/auth/register', target.origins.product).href,
+        {
+          headers: { origin: target.origins.product },
+          data: { email: uniqueEmail('https-replacement'), password: TEST_PASSWORD },
+        }
+      )
     ).status()
   ).toBe(201)
   const rejected = await context.request.post(

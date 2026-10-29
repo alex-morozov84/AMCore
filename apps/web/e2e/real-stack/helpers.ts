@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { type APIRequestContext, expect, type Page } from '@playwright/test'
 
 import { completeMfaSignIn } from '../shared/mfa-login'
 import { resetMfaDomainSourceBudgets } from '../support/mfa-domain-fixture.mjs'
@@ -75,4 +75,53 @@ export async function loginViaUi(
 export async function signOutViaUi(page: Page): Promise<void> {
   await page.getByRole('button', { name: /account menu/i }).click()
   await page.getByRole('menuitem', { name: /sign out/i }).click()
+}
+
+/** Preserve the current-session fence when a fixture signs out without opening the menu. */
+export async function logoutViaApi(
+  request: APIRequestContext,
+  origin: string,
+  path = '/api/auth/logout'
+) {
+  const current = await request.get(new URL('/api/auth/me', origin).href)
+  expect(current.status()).toBe(200)
+  const contextSession = current.headers()['x-amcore-context-session']
+  expect(contextSession).toBeTruthy()
+  return request.post(new URL(path, origin).href, {
+    headers: { Origin: origin, 'x-amcore-context-session': contextSession! },
+  })
+}
+
+/** Establish the exact browser attempt before testing a credential endpoint directly. */
+export async function postBrowserCredentials(
+  request: APIRequestContext,
+  origin: string,
+  path: string,
+  data: Record<string, unknown>
+) {
+  return browserCredentialRequest(request, path, {
+    headers: { Origin: origin },
+    data,
+  })
+}
+
+/** Retain request options while upgrading legacy positive browser fixtures to attempt-bound auth. */
+export async function browserCredentialRequest(
+  request: APIRequestContext,
+  url: string,
+  options: NonNullable<Parameters<APIRequestContext['post']>[1]>
+) {
+  const origin = options.headers?.origin ?? options.headers?.Origin
+  if (!origin) throw new Error('Browser credential fixture requires its same-origin header')
+  const bootstrap = await request.post(new URL('/api/auth/browser-context', origin).href, {
+    headers: { Origin: origin },
+    data: {},
+  })
+  expect(bootstrap.status()).toBe(200)
+  const { attemptId } = await bootstrap.json()
+  expect(typeof attemptId).toBe('string')
+  return request.post(new URL(url, origin).href, {
+    ...options,
+    headers: { ...options.headers, 'x-amcore-login-attempt': attemptId },
+  })
 }

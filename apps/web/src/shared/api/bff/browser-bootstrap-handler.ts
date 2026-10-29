@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { browserBootstrapResultSchema, SUPPORTED_LOCALES } from '@amcore/shared'
+import { browserBootstrapResultSchema, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
@@ -175,7 +175,7 @@ export async function prepareBrowserAuthAttempt(
     if (returned)
       returnIdentity = { id: returned.record.attemptId, handle: returned.record.pendingHandle }
     navigation = {
-      locale: returned?.record.locale ?? entry.locale ?? 'en',
+      locale: returned?.record.locale ?? entry.locale ?? DEFAULT_LOCALE,
       ...(returned ? { proof: returned.proof } : {}),
     }
   }

@@ -8,7 +8,7 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 // Real BFF, real API, real browser: the ready roles list and role page end to end. Uses only the
 // active managed test stand and an account created by this test.
@@ -25,7 +25,7 @@ test('roles: create, edit, protect an unsaved draft, confirm full control and de
   const nav = catalogue.organizationNav
   const like = (text: string) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const email = uniqueEmail('roles-ui')
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin: target.origins.product },
     data: { email, password: TEST_PASSWORD },
   })

@@ -11,7 +11,7 @@ import { expect, type Route, test } from '@playwright/test'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 for (const locale of SUPPORTED_LOCALES)
   test(`manager ${locale}: primary faults, dirty generation, unknown recovery and late retirement`, async ({
@@ -23,7 +23,7 @@ for (const locale of SUPPORTED_LOCALES)
     const ownerEmail = uniqueEmail('manager-fault-owner')
     expect(
       (
-        await context.request.post('/api/auth/register', {
+        await browserCredentialRequest(context.request, '/api/auth/register', {
           headers: { origin: target.origins.product },
           data: { email: ownerEmail, password: TEST_PASSWORD },
         })
@@ -204,7 +204,7 @@ for (const locale of SUPPORTED_LOCALES)
     const replacement = uniqueEmail('replacement-session')
     expect(
       (
-        await context.request.post('/api/auth/register', {
+        await browserCredentialRequest(context.request, '/api/auth/register', {
           headers: { origin: target.origins.product },
           data: { email: replacement, password: TEST_PASSWORD },
         })

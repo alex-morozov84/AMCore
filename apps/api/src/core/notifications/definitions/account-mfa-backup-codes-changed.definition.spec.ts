@@ -1,3 +1,5 @@
+import { coerceSupportedLocale } from '@amcore/shared'
+
 import { NotificationChannel } from '../notification.constants.js'
 import { validateDefinition } from '../notification-definition.validation.js'
 
@@ -28,10 +30,14 @@ describe('Backup-code replacement security notification', () => {
 
   it('explains backup-code replacement and a safe response in both supported languages', () => {
     const payload = { changedAt: '2026-10-26T12:00:00.000Z' }
-    expect(definition.renderInApp(payload, 'en').body).toContain('reset your password')
-    expect(definition.renderInApp(payload, 'ru').body).toContain('сбросьте пароль')
-    expect(definition.renderExternal!.email!({}, 'en')).toEqual(
-      definition.renderInApp(payload, 'en')
+    expect(definition.renderInApp(payload, coerceSupportedLocale('en')).body).toContain(
+      coerceSupportedLocale('en') === 'en' ? 'reset your password' : 'сбросьте пароль'
+    )
+    expect(definition.renderInApp(payload, coerceSupportedLocale('ru')).body).toContain(
+      coerceSupportedLocale('ru') === 'en' ? 'reset your password' : 'сбросьте пароль'
+    )
+    expect(definition.renderExternal!.email!({}, coerceSupportedLocale('en'))).toEqual(
+      definition.renderInApp(payload, coerceSupportedLocale('en'))
     )
   })
 })

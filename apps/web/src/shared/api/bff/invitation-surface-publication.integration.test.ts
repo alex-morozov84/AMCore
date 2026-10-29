@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 
 import type * as Shared from '@amcore/shared'
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis'
@@ -7,6 +7,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 const settings = vi.hoisted(() => ({
   mode: 'path' as 'path' | 'host',
   sessionId: undefined as string | undefined,
+  probe: {} as Record<string, unknown>,
+  probeAllowed: true,
 }))
 vi.mock('next/headers', () => ({
   cookies: async () => ({
@@ -14,6 +16,12 @@ vi.mock('next/headers', () => ({
   }),
 }))
 vi.mock('server-only', () => ({}))
+// This Redis fixture models the primary probe; cryptographic/browser admission has HTTP suites.
+vi.mock('../backend-transport', () => ({
+  getBackendBaseUrl: () => 'https://api.example.test',
+  fetchBackendResponse: async () =>
+    Response.json(settings.probe, { status: settings.probeAllowed ? 200 : 401 }),
+}))
 vi.mock('@amcore/shared', async (original) => {
   const actual = await original<typeof Shared>()
   return {
@@ -91,11 +99,20 @@ async function staged(context: ProductWebContext) {
   await invitationOwnerStore.create(hash, reserved.owner, context)
   const entry: VaultRecord = {
     audience: context.audience,
+    browser: {
+      audience: context.audience,
+      contextId: randomUUID(),
+      generation: 1,
+      familyId: 'surface-family',
+      securityVersion: 1,
+    },
     accessToken: '<fake-access>',
     refreshToken: '<fake-refresh>',
     accessTokenExpiresAt: now + 900000,
     userSnapshot: { id: 'surface-user' } as VaultRecord['userSnapshot'],
   }
+  settings.probe = { status: 'current', ...entry.browser, userId: entry.userSnapshot.id }
+  settings.probeAllowed = true
   const deadline = now + 60000
   const id = await stageInvitationSession({
     context,
@@ -182,10 +199,13 @@ describe('published invited OAuth recovery requires the current selected session
         method: 'POST',
         headers: {
           host: new URL(selected.origin).host,
-          cookie: `__Host-amcore_admin_invite_browser=${value.proof}; ${selected.cookieName}=${value.id}`,
+          cookie: `__Host-amcore_admin_invite_browser=${value.proof}; ${selected.cookieName}=${value.id}; ${selected.audience === 'product' ? 'amcore_browser_context' : '__Host-amcore_staff_context'}=${'a'.repeat(43)}`,
         },
       })
       const recovered = { flowId: value.next.flows[0]!.binding.flowId, locale: 'en' }
+      settings.probeAllowed = false
+      await expect(recoverPublishedInvitedOAuth(request, ticket, selected)).rejects.toThrow()
+      settings.probeAllowed = true
       expect(await recoverPublishedInvitedOAuth(request, ticket, selected)).toEqual(recovered)
       expect(await recoverPublishedInvitedOAuth(request, ticket, selected)).toEqual(recovered)
       expect((await invitationOwnerStore.get(value.hash, selected.origin, selected))!.version).toBe(

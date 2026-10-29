@@ -18,6 +18,17 @@ export async function acceptAdministrator(
   const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block' })
   try {
     const page = await context.newPage()
+    const failures: Array<{ action: string; status: number; errorCode?: string }> = []
+    page.on('response', async (response) => {
+      const path = new URL(response.url()).pathname
+      if (!path.startsWith('/api/invitation-flows/') || response.ok()) return
+      const body = await response.json().catch(() => ({}))
+      failures.push({
+        action: path.split('/').at(-1)!,
+        status: response.status(),
+        errorCode: body.errorCode,
+      })
+    })
     await openProvisioningMail(page, email, 'invite/accept', origin)
     const consent = messages.invitationRecipient
     await expect(page.getByRole('heading', { name: consent.signInTitle })).toBeVisible()
@@ -25,7 +36,12 @@ export async function acceptAdministrator(
     const registration = page.getByRole('tabpanel', { name: messages.auth.register, exact: true })
     await registration.getByLabel(messages.auth.password, { exact: true }).fill(SETUP_PASSWORD)
     await registration.getByRole('button', { name: messages.auth.register, exact: true }).click()
-    await expect(page.getByRole('heading', { name: consent.verifyTitle })).toBeVisible()
+    await expect(async () => {
+      await expect(
+        page.getByRole('heading', { name: consent.verifyTitle }),
+        JSON.stringify(failures)
+      ).toBeVisible()
+    }).toPass({ timeout: 6000 })
     const userId = guardedSql('SELECT id FROM core.users WHERE "emailCanonical"=:\'email\';', {
       email,
     }).trim()
