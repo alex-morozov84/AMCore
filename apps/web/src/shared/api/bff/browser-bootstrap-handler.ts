@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { browserBootstrapResultSchema, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import {
+  browserBootstrapResultSchema,
+  // AMCORE_CONSOLE_RETURN_LOCALE_START
+  DEFAULT_LOCALE,
+  // AMCORE_CONSOLE_RETURN_LOCALE_END
+  SUPPORTED_LOCALES,
+} from '@amcore/shared'
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'

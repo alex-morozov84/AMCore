@@ -69,7 +69,8 @@ function catalogueObject(model, locale, ctx) {
 
 export function singleCatalogueFixture(model, { locale, variant }, ctx) {
   if (variant === 'mfa-setup' || variant === 'mfa-story') {
-    singleCatalogueFixture(model, { locale, variant: 'catalogue-pair' }, ctx)
+    if (variant === 'mfa-story')
+      singleCatalogueFixture(model, { locale, variant: 'catalogue-pair' }, ctx)
     singleMfaFixture(model, { locale, variant }, ctx)
     return
   }

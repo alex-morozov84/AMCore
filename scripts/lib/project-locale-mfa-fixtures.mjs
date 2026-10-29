@@ -53,4 +53,11 @@ export function singleMfaFixture(model, { locale, variant }, ctx) {
     { ...ctx, describe: 'MFA selected error catalogue' }
   )
   model.replaceNode(catalogue, locale, ctx)
+  const other = locale === 'en' ? 'ru' : 'en'
+  const unused = findUniqueNode(
+    model,
+    (node) => ts.isImportDeclaration(node) && node.importClause?.name?.text === other,
+    { ...ctx, describe: 'unselected MFA catalogue import' }
+  )
+  model.removeNode(unused, ctx)
 }

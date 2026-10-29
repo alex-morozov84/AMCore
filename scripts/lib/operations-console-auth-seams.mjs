@@ -1,6 +1,6 @@
 /** Console presentation glue is removed while account MFA and its authority remain. */
 export const operationsConsoleAuthSeams = [
-  ['browser-bootstrap-handler.ts', ['IMPORT', 'INPUT', 'VALIDATION', 'TYPE', 'BINDING']],
+  ['browser-bootstrap-handler.ts', ['IMPORT', 'LOCALE', 'INPUT', 'VALIDATION', 'TYPE', 'BINDING']],
   ['mfa-pending-handler.ts', ['IMPORT', 'DESTINATION', 'RESULT']],
   ['mfa-reconcile-login.ts', ['IMPORT', 'DESTINATION', 'RESULT']],
 ].flatMap(([file, blocks]) =>

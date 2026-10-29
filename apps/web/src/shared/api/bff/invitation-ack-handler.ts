@@ -97,6 +97,7 @@ export function invitationAckHandler(
                   method: 'POST',
                   expectedStatus: 200,
                   accessToken: snapshot.session.entry.accessToken,
+                  session: snapshot.session.entry,
                   handoff: { attemptId: id, cleanupKey: handoff.cleanupKey },
                 }
               )

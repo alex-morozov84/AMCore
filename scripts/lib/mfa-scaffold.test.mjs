@@ -132,7 +132,7 @@ for (const [name, flags] of recipes) {
           )
         assert.doesNotMatch(
           read('apps/web/src/shared/api/bff/browser-bootstrap-handler.ts'),
-          /console-return-claim/
+          /console-return-claim|DEFAULT_LOCALE/
         )
         assert.match(read('docs/auth/mfa-browser.md'), /Sign in without your phone/)
         assert.doesNotMatch(

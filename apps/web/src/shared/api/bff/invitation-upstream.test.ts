@@ -1,11 +1,16 @@
 // @vitest-environment node
+import { BROWSER_AUTH_HEADERS } from '@amcore/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { invitationBackend, InvitationBackendError } from './invitation-upstream'
+import type { ProductWebContext } from './product-web-context.server'
 
 vi.mock('server-only', () => ({}))
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 const options = {
   method: 'POST' as const,
   expectedStatus: 201 as const,
@@ -125,4 +130,65 @@ describe('invitation direct transport', () => {
       refreshToken: 'fake-refresh',
     })
   })
+})
+
+describe('invitation browser session transport', () => {
+  const context = { audience: 'staff' } as ProductWebContext
+  const session = {
+    audience: 'staff' as const,
+    browser: {
+      audience: 'staff' as const,
+      contextId: '01900000-0000-7000-8000-000000000001',
+      generation: 2,
+      familyId: 'fixture-family',
+      securityVersion: 1,
+    },
+  }
+  const source = () =>
+    new Headers({
+      cookie: `__Host-amcore_staff_context=${'a'.repeat(43)}`,
+      [BROWSER_AUTH_HEADERS.generation]: '999',
+      [BROWSER_AUTH_HEADERS.contextId]: 'untrusted-context',
+      [BROWSER_AUTH_HEADERS.key]: 'untrusted-key',
+    })
+  it.each(['access', 'refresh'] as const)(
+    'binds %s credentials to the server-selected vault entry',
+    async (kind) => {
+      vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'k'.repeat(32))
+      const fetch = vi.fn().mockResolvedValue(Response.json({ status: 'example' }, { status: 201 }))
+      vi.stubGlobal('fetch', fetch)
+      await invitationBackend('/auth/invites/continuations/inspect', schema, {
+        ...options,
+        context,
+        session,
+        source: source(),
+        ...(kind === 'access'
+          ? { accessToken: '<fake-access>' }
+          : { refreshToken: '<fake-refresh>' }),
+      })
+      const headers = new Headers(fetch.mock.calls[0]![1].headers)
+      expect(headers.get(BROWSER_AUTH_HEADERS.generation)).toBe('2')
+      expect(headers.get(BROWSER_AUTH_HEADERS.contextId)).toBe(session.browser.contextId)
+      expect(headers.get(BROWSER_AUTH_HEADERS.binding)).toBe('a'.repeat(43))
+      expect(headers.get(BROWSER_AUTH_HEADERS.audience)).toBe('staff')
+      expect(headers.get(BROWSER_AUTH_HEADERS.key)).toBe('k'.repeat(32))
+    }
+  )
+  it.each([undefined, { audience: 'product' as const, browser: session.browser }])(
+    'refuses absent or mismatched vault authority before HTTP',
+    async (entry) => {
+      const fetch = vi.fn()
+      vi.stubGlobal('fetch', fetch)
+      await expect(
+        invitationBackend('/auth/invites/continuations/inspect', schema, {
+          ...options,
+          context,
+          session: entry,
+          source: source(),
+          accessToken: '<fake-access>',
+        })
+      ).rejects.toMatchObject({ errorCode: 'AUTH_CONTEXT_CHANGED' })
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  )
 })

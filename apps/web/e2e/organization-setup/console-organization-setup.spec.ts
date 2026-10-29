@@ -15,6 +15,17 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   page,
 }) => {
   const m = activeTarget()
+  const responses: Array<{ action: string; status: number; errorCode?: string }> = []
+  page.on('response', async (response) => {
+    const path = new URL(response.url()).pathname
+    if (!path.includes('/organization-establishment/')) return
+    const body = await response.json().catch(() => ({}))
+    responses.push({
+      action: path.split('/').at(-1)!,
+      status: response.status(),
+      errorCode: body.errorCode,
+    })
+  })
   const text = (locale: string) =>
     JSON.parse(readFileSync(join(m.snapshot, `apps/web/messages/${locale}.json`), 'utf8')).console
       .organizationSetup
@@ -71,7 +82,13 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expect(setup.getByText(en.unknown, { exact: true })).toBeVisible()
   await page.unroute(preparePattern)
   await page.reload()
-  await setup.getByRole('button', { name: en.repeat, exact: true }).click()
+  const repeat = setup.getByRole('button', { name: en.repeat, exact: true })
+  try {
+    await expect(repeat).toBeVisible()
+  } catch {
+    throw new Error(`Setup recovery unavailable: ${JSON.stringify(responses)}`)
+  }
+  await repeat.click()
   await expect(setup.getByText(en.unverified, { exact: true })).toBeVisible()
   await expect(setup.getByText(en.mailHelp, { exact: true })).toBeVisible()
   await expect(setup.getByRole('button', { name: en.continue, exact: true })).toHaveCount(0)

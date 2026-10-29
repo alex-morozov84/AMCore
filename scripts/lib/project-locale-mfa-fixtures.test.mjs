@@ -30,6 +30,7 @@ for (const locale of ['en', 'ru']) {
     const output = apply('mfa-setup', locale)
     assert.doesNotMatch(output, /\/\$\{locale\}\/mfa/)
     assert.doesNotMatch(output, /locale === 'en'/)
+    assert.doesNotMatch(output, new RegExp(`import ${locale === 'en' ? 'ru' : 'en'} from`))
     assert.equal((output.match(/page\.goto\('\/mfa'\)/g) ?? []).length, 2)
     assert.match(output, new RegExp(`locale: '${locale}'`))
     assert.doesNotMatch(output, new RegExp(`locale: '${locale === 'en' ? 'ru' : 'en'}'`))

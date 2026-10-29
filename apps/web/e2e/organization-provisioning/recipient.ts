@@ -21,7 +21,7 @@ export async function acceptAdministrator(
     const failures: Array<{ action: string; status: number; errorCode?: string }> = []
     page.on('response', async (response) => {
       const path = new URL(response.url()).pathname
-      if (!path.startsWith('/api/invitation-flows/') || response.ok()) return
+      if (!path.includes('/invitation-flows/')) return
       const body = await response.json().catch(() => ({}))
       failures.push({
         action: path.split('/').at(-1)!,
@@ -36,12 +36,11 @@ export async function acceptAdministrator(
     const registration = page.getByRole('tabpanel', { name: messages.auth.register, exact: true })
     await registration.getByLabel(messages.auth.password, { exact: true }).fill(SETUP_PASSWORD)
     await registration.getByRole('button', { name: messages.auth.register, exact: true }).click()
-    await expect(async () => {
-      await expect(
-        page.getByRole('heading', { name: consent.verifyTitle }),
-        JSON.stringify(failures)
-      ).toBeVisible()
-    }).toPass({ timeout: 6000 })
+    try {
+      await expect(page.getByRole('heading', { name: consent.verifyTitle })).toBeVisible()
+    } catch {
+      throw new Error(`Recipient verification not reached: ${JSON.stringify(failures)}`)
+    }
     const userId = guardedSql('SELECT id FROM core.users WHERE "emailCanonical"=:\'email\';', {
       email,
     }).trim()

@@ -75,6 +75,7 @@ export function invitationReadHandler(
                   expectedStatus: 200,
                   credential: flow.credential,
                   accessToken: session!.accessToken,
+                  session: session!,
                 }
               )
         await assertInvitationReadCurrent(snapshot)

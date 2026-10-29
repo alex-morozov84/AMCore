@@ -67,6 +67,7 @@ export function invitationAcceptHandler(
                 expectedStatus: 200,
                 credential: flow.credential,
                 accessToken: session.accessToken,
+                session,
                 operationId: input.operationId,
                 body: {
                   continuation: true,

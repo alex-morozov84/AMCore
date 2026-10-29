@@ -4,9 +4,11 @@ import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 import { parseRetryAfterSeconds } from '../retry-after'
 import { classifyThrown } from '../server/classify'
 
+import { browserSessionHeaders } from './browser-binding.server'
 import { readContextJson } from './context-body-budget'
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
+import type { VaultRecord } from './session-vault.types'
 import { extractCookieValue } from './set-cookie'
 
 import 'server-only'
@@ -34,6 +36,7 @@ type RequestOptions = {
   body?: unknown
   credential?: string
   accessToken?: string
+  session?: Pick<VaultRecord, 'audience' | 'browser'>
   refreshToken?: string
   operationId?: string
   handoff?: { attemptId: string; cleanupKey: string }
@@ -48,6 +51,13 @@ async function fetchInvitationResponse(
     ...sessionMetadataHeaders(options.source),
     ...options.context?.apiHeaders,
   })
+  // Vault authority, never incoming private headers or decoded JWT claims, selects the binding.
+  if (options.context && (options.accessToken || options.refreshToken)) {
+    for (const [name, value] of Object.entries(
+      browserSessionHeaders(options.source, options.context.audience, options.session ?? {})
+    ))
+      headers.set(name, value)
+  }
   const language = options.source.get('accept-language')
   if (language) headers.set('accept-language', language)
   if (options.body !== undefined) headers.set('content-type', 'application/json')

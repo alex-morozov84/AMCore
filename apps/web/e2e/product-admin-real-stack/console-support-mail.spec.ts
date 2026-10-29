@@ -94,7 +94,7 @@ test('operator recovery and verification use real localized website mail with sa
 
   // A stale session must reauthenticate; cancelling it never starts transport.
   guardedSql(
-    'UPDATE core.sessions SET "lastAuthAt"=now()-interval \'1 day\' WHERE "userId"=:\'id\';',
+    'UPDATE core.auth_session_families SET "primaryAt"=now()-interval \'1 day\', "mfaAt"=now()-interval \'1 day\' WHERE "userId"=:\'id\';',
     { id: prepared.userId }
   )
   await card.getByRole('button', { name: t.email_verification.button, exact: true }).click()
@@ -270,7 +270,7 @@ test('operator recovery and verification use real localized website mail with sa
   ).toBe(404)
 
   guardedSql(
-    `UPDATE core.sessions SET "lastAuthAt"=now()-interval '1 day' WHERE "userId"=:'id';
+    `UPDATE core.auth_session_families SET "primaryAt"=now()-interval '1 day', "mfaAt"=now()-interval '1 day' WHERE "userId"=:'id';
     UPDATE core.users SET "passwordHash"=NULL WHERE id=:'id';`,
     { id: prepared.userId }
   )
@@ -278,7 +278,6 @@ test('operator recovery and verification use real localized website mail with sa
   await confirm.getByRole('button', { name: t.send, exact: true }).click()
   await dialog.getByLabel(operatorCopy.console.loginPassword, { exact: true }).fill(SETUP_PASSWORD)
   await dialog.locator('button[type="submit"]').click()
-  await completeMfaStepUp(page, operator)
   await expect(
     dialog.getByText(operatorCopy.errors.STEP_UP_METHOD_UNAVAILABLE, { exact: true })
   ).toBeVisible()

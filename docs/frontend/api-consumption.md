@@ -142,7 +142,11 @@ but its browser adapter returns200 with `{binding,data:{status:"revoked"}}` afte
 checking that precise204 acknowledgment. A generic proxy cannot enter the closed
 organization family. Personal recipient journeys instead use
 `/api/invitation-flows/{flowId}` and `/api/invitation-operations/{operationId}`.
-See the [browser contract](../auth/invites.md#browser-bff-contract) and
+Authenticated recipient requests, including inspection, verification, consent and
+account switching, pass the selected vault entry to `invitationBackend`. The
+transport derives private browser headers from that entry and the actual anchor
+cookie. It never accepts those headers from browser input. See the
+[browser contract](../auth/invites.md#browser-bff-contract) and
 [custom composition](../product-admin/integration.md#custom-invitation-forms).
 
 ## Server Components: direct backend transport (ADR-079)
