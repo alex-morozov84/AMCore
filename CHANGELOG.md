@@ -72,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cache-manager`, `@nestjs/cache-manager` and `@keyv/redis` dependencies are removed from
   the API. See `docs/auth/concepts.md#api-key-and-invitation-failure-counters`.
 
+- The Redis client is updated to `@redis/client` 6.3.0 in the API and the web server (Node 20
+  or later). Both keep RESP 2 and a 5 s first keepalive probe. An ordinary command now fails
+  after waiting 5 s to be written during a reconnect; before, it waited without limit.
+  Commands already sent, `MULTI` batches and total request time are not covered by that limit.
+  See `docs/backend/architecture-and-conventions.md`.
+
 - Welcome-email delivery stops automatic recovery after uncertain provider results, including current Resend429 responses. Conservative policy2 removes provider-clock qualification and adds an offline upgrade procedure. Direct-secret and notification recovery remain separate.
 
 - Client translation payloads contain explicitly selected root, shell and section

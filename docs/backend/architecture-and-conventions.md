@@ -59,6 +59,23 @@ AMCore is a **modular monolith**. The rules that keep it modular:
     `redis-transport-stall` fixture
     ([`apps/api/test/fixtures`](../../apps/api/test/fixtures/redis-transport-stall.ts))
     to hold replies from a real server.
+  - **The shared client has one fixed contract.** The API
+    ([`redis-client-options.ts`](../../apps/api/src/infrastructure/redis/redis-client-options.ts))
+    and the web BFF
+    ([`redis-client-options.ts`](../../apps/web/src/shared/api/bff/redis-client-options.ts))
+    each build their `@redis/client` 6 client from one options function. RESP 2 is explicit,
+    so the client never sends `HELLO` or enables maintenance notifications. An ordinary
+    command waits at most 5000 ms to be written; this covers reconnect backoff and write
+    backpressure, and a per-call limit is shorter and wins. The first keepalive probe goes
+    out after 5000 ms of idle. There is deliberately no `socketTimeout`, because it would
+    disconnect idle subscriber connections. Do not create a client with bare `createClient`
+    for code that production injects; tests use `appClientOptions()` (a convention, not a lint rule).
+  - **What the 5000 ms limit does not bound:** connecting, a command already written (its
+    outcome stays unknown), a `MULTI` or pipeline batch (the user cache uses `MULTI` for
+    tags and invalidation, and it waits in a reconnect backoff without a limit), the whole
+    HTTP request, or the total number of queued commands. A Redis error in the user or
+    permissions cache is not caught: it reaches the caller and the global filter answers
+    `500`. Only lock contention falls back to the database.
 
 `core/` holds domain modules (auth, organizations, api-keys, admin).
 `infrastructure/` holds cross-cutting providers (email, queue, storage, redis,
