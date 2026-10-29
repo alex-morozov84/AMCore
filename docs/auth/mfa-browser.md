@@ -85,7 +85,9 @@ result stays unknown, use **Check result** or **Sign in again**. The deliberate
 out on a page read. A live unfinished login must be opened and completed or
 canceled before another attempt. Console sign-out records its return destination;
 only the matching next login can use it. An expired or competing return falls
-back to the Console overview.
+back to the Console overview. If the sign-out result cannot be confirmed, select
+**Start a new sign-in**. This drops the previous return destination and asks you
+to sign in again. It does not claim that the earlier sign-out succeeded.
 
 ## Confirm a sensitive action
 

@@ -16,6 +16,7 @@ import {
   readBrowserAnchor,
   unavailableBrowserContext,
 } from './browser-binding.server'
+import { ContextRequestError } from './context-errors'
 import type { ProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
 
@@ -29,7 +30,11 @@ const receiptSchema = z
     sourceFingerprint: z.string(),
     startNotAfter: z.iso.datetime(),
     expiresAt: z.number(),
-    phase: z.enum(['prepared', 'dispatched', 'retained', 'abandoning', 'abandoned']),
+    phase: z.enum(['prepared', 'dispatched', 'retained', 'abandoning', 'abandoned', 'refused']),
+    refusal: z
+      .object({ status: z.number().int(), errorCode: z.string(), retryAt: z.number().optional() })
+      .strict()
+      .optional(),
     handle: z.string(),
     id: z.string().uuid(),
     completionId: z.string().uuid(),
@@ -154,10 +159,40 @@ export async function settingsStartReceipt(
     throw changedBrowserContext()
   if (record.phase === 'retained')
     return expose(request, context, record, source.entry.userSnapshot.email)
+  if (record.phase === 'refused') {
+    const refusal = record.refusal
+    if (!refusal) throw unavailableBrowserContext()
+    throw new ContextRequestError(
+      refusal.status,
+      refusal.errorCode,
+      refusal.retryAt === undefined
+        ? undefined
+        : Math.max(0, Math.ceil((refusal.retryAt - Date.now()) / 1000))
+    )
+  }
   const input = { operationId: record.operationId, purpose, startNotAfter: record.startNotAfter }
   if (record.phase === 'prepared' && !resolveOnly) {
     record = await transition(name, record, { phase: 'dispatched' })
-    const reply = mfaSessionFlowResultSchema.parse(await upstream('settings-start', input))
+    let reply
+    try {
+      reply = mfaSessionFlowResultSchema.parse(await upstream('settings-start', input))
+      if (reply.kind === 'limited')
+        throw new ContextRequestError(429, 'RATE_LIMIT_EXCEEDED', reply.retryAfter)
+      if (reply.kind === 'restart_required') throw changedBrowserContext()
+    } catch (error) {
+      if (error instanceof ContextRequestError && [401, 409, 429].includes(error.status))
+        await transition(name, record, {
+          phase: 'refused',
+          refusal: {
+            status: error.status,
+            errorCode: error.errorCode,
+            ...(error.retryAfterSeconds === undefined
+              ? {}
+              : { retryAt: Date.now() + error.retryAfterSeconds * 1000 }),
+          },
+        })
+      throw error
+    }
     if (reply.kind !== 'mfa') throw unavailableBrowserContext()
     record = await transition(name, record, {
       phase: 'retained',

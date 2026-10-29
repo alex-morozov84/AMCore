@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
+import * as argon2 from 'argon2'
+
 import { BrowserLogoutReceiptService } from '../src/core/auth/mfa/browser-logout-receipt.service.js'
 import { linkReturnReservation } from '../src/core/auth/mfa/browser-return-transition.js'
 import { mfaCredential } from '../src/core/auth/mfa/mfa-secrets.js'
@@ -8,6 +10,7 @@ import { hashRefreshToken } from '../src/core/auth/utils/refresh-token-hash.js'
 import type { PrismaService } from '../src/prisma/index.js'
 
 import { createAuthorityAccount } from './mfa-authority.fixture.js'
+import { loginStartFixture } from './mfa-login-start.fixture.js'
 import { MfaProofFixture } from './mfa-proof.fixture.js'
 
 describe('Exact logout receipt and presentation-only return chain on PostgreSQL', () => {
@@ -124,5 +127,48 @@ describe('Exact logout receipt and presentation-only return chain on PostgreSQL'
     expect(await f.db.browserAuthContext.findUniqueOrThrow({ where: { id: later.id } })).toEqual(
       later
     )
+  })
+  it('rejects delayed original logout after a fresh credential reservation without a receipt', async () => {
+    const f = await prepared()
+    await f.db.mfaProtocol.upsert({
+      where: { id: 'platform' },
+      create: { id: 'platform', state: 'active' },
+      update: { state: 'active', version: 1 },
+    })
+    await expect(f.service.resolve(f.requestBinding, f.input)).resolves.toMatchObject({
+      state: 'not_found',
+    })
+    await f.db.user.update({
+      where: { id: f.user.id },
+      data: { email: 'original@example.test', emailCanonical: 'original@example.test' },
+    })
+    const password = '<fake-new-entry-password>'
+    const login = await loginStartFixture(fixture, await argon2.hash(password))
+    const reserved = await login.service.password(
+      login.user.email,
+      password,
+      'source',
+      { kind: 'browser', binding: f.requestBinding },
+      randomUUID()
+    )
+    expect(reserved.kind).toBe('mfa')
+    const before = await f.db.browserAuthContext.findUniqueOrThrow({
+      where: { id: f.requestBinding.contextId },
+    })
+    expect(before).toMatchObject({ generation: 2, state: 'reserved' })
+    await expect(f.service.resolve(f.requestBinding, f.input, f.input)).rejects.toMatchObject({
+      errorCode: 'SESSION_CHANGED',
+    })
+    expect(await f.db.browserAuthContext.findUniqueOrThrow({ where: { id: before.id } })).toEqual(
+      before
+    )
+    expect(
+      await f.db.browserLogoutReceipt.count({ where: { operationId: f.input.operationId } })
+    ).toBe(0)
+    expect(
+      await f.db.mfaFlow.count({
+        where: { browserContextId: before.id, publicationGeneration: 2, state: 'open' },
+      })
+    ).toBe(1)
   })
 })

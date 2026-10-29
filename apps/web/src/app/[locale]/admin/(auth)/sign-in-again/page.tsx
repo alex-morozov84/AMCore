@@ -1,5 +1,5 @@
 import { SignInAgainMount } from '@/_app/account-security'
-import { getConsoleOverviewHref } from '@/shared/lib/console-public-href'
+import { getConsoleOverviewHref, getConsoleSignInAgainHref } from '@/shared/lib/console-public-href'
 
 export default async function SignInAgain({
   searchParams,
@@ -15,6 +15,7 @@ export default async function SignInAgain({
         mfaHref: '/mfa',
         destination: getConsoleOverviewHref(),
         entryKind: 'console',
+        freshEntryHref: getConsoleSignInAgainHref(),
       }}
     />
   )

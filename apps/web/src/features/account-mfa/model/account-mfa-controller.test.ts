@@ -128,3 +128,38 @@ describe('account MFA secret and command containment', () => {
     expect(controller.getSecrets()).toEqual({})
   })
 })
+
+it.each([429, 401, 503] as const)(
+  'classifies settings-start HTTP %s without replaying it',
+  async (status) => {
+    const settings: MfaBrowserView = {
+      kind: 'settings',
+      accountLabel: 'Fixture',
+      protected: true,
+      eligible: true,
+      remainingCodes: 10,
+    }
+    const command = vi.fn(async (): Promise<MfaBrowserResult> => {
+      throw new ApiRequestError(status, undefined, status === 429 ? 37 : undefined)
+    })
+    const resolveStart = vi.fn(async () => ({ view: settings }))
+    const inspect = vi.fn(async () => settings)
+    const controller = new AccountMfaController({ inspect, command, resolveStart })
+    await controller.inspect()
+    await controller.command({ action: 'start_code_rotation' })
+    expect(controller.getSnapshot().phase).toBe(
+      status === 429 ? 'ready' : status === 401 ? 'changed' : 'unknown'
+    )
+    if (status === 429) {
+      expect((controller.getSnapshot().error as ApiRequestError).retryAfterSeconds).toBe(37)
+      expect(controller.getRecoveryReference()).toBeUndefined()
+      await controller.inspect()
+      expect(resolveStart).not.toHaveBeenCalled()
+    } else if (status === 503) {
+      expect(controller.getRecoveryReference()?.startPurpose).toBe('rotate_codes')
+      await controller.reconcile()
+      expect(resolveStart).toHaveBeenCalledTimes(1)
+    }
+    expect(command).toHaveBeenCalledTimes(1)
+  }
+)

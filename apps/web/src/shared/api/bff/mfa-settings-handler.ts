@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { type MfaBrowserCommand, mfaSettingsViewSchema } from '@amcore/shared'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+import { parseRetryAfterSeconds } from '../retry-after'
 
 import {
   browserSessionHeaders,
@@ -68,6 +69,12 @@ async function callSettings(
     }
   )
   if ([401, 409].includes(response.status)) throw changedBrowserContext()
+  if (response.status === 429)
+    throw new ContextRequestError(
+      429,
+      'RATE_LIMIT_EXCEEDED',
+      parseRetryAfterSeconds(response.headers)
+    )
   if (!response.ok) throw unavailableBrowserContext()
   return readContextJson(response.body, 16384)
 }

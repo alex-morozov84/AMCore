@@ -200,6 +200,10 @@ export class AccountMfaController {
         )
       : new ClientStateError(ClientErrorCode.UNKNOWN_ERROR)
     const refused = status !== undefined && [400, 403, 404, 422, 429].includes(status)
+    if (refused && this.startPurpose && !this.flowBinding) {
+      this.startPurpose = undefined
+      this.state = { ...this.state, operationId: undefined }
+    }
     if (mutation && !refused) {
       this.secrets = {}
       this.update({ ...this.state, phase: 'unknown', error: safeError })

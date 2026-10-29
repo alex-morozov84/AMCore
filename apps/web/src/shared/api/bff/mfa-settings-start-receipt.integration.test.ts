@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 
+import { ContextRequestError } from './context-errors'
 import { settingsStartReceipt } from './mfa-settings-start-receipt'
 import { resolveProductWebContext } from './product-web-context.server'
 import { getWebRedisClient } from './redis-client'
@@ -143,5 +144,40 @@ it('does not expose a retained flow to another browser anchor', async () => {
   await expect(
     settingsStartReceipt(other, f.context, f.source, f.command, upstream, true)
   ).rejects.toThrow()
+  expect(upstream).toHaveBeenCalledTimes(1)
+})
+
+it.each([
+  [{ kind: 'limited', retryAfter: 37 }, 429, 'RATE_LIMIT_EXCEEDED', 37],
+  [{ kind: 'restart_required' }, 401, 'AUTH_CONTEXT_CHANGED', undefined],
+] as const)(
+  'retains a definitive %j refusal without redispatch or abandonment',
+  async (reply, status, errorCode, delay) => {
+    const f = fixture()
+    const upstream = vi.fn(async () => reply)
+    await expect(
+      settingsStartReceipt(f.request, f.context, f.source, f.command, upstream)
+    ).rejects.toMatchObject({ status, errorCode, retryAfterSeconds: delay })
+    await expect(
+      settingsStartReceipt(f.request, f.context, f.source, f.command, upstream, true)
+    ).rejects.toMatchObject({ status, errorCode })
+    await expect(
+      settingsStartReceipt(f.request, f.context, f.source, f.command, upstream)
+    ).rejects.toMatchObject({ status, errorCode })
+    expect(upstream).toHaveBeenCalledTimes(1)
+  }
+)
+
+it('retains an HTTP rate refusal without retrying the dispatched start', async () => {
+  const f = fixture()
+  const upstream = vi.fn(async () => {
+    throw new ContextRequestError(429, 'RATE_LIMIT_EXCEEDED', 37)
+  })
+  await expect(
+    settingsStartReceipt(f.request, f.context, f.source, f.command, upstream)
+  ).rejects.toMatchObject({ status: 429, retryAfterSeconds: 37 })
+  await expect(
+    settingsStartReceipt(f.request, f.context, f.source, f.command, upstream, true)
+  ).rejects.toMatchObject({ status: 429, errorCode: 'RATE_LIMIT_EXCEEDED' })
   expect(upstream).toHaveBeenCalledTimes(1)
 })

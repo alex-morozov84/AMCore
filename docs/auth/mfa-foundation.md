@@ -300,10 +300,24 @@ A restored page reads nonsecret status; it cannot redisplay an issued set.
 A changed-session response removes the previous identity and secrets.
 Backend services separately enforce family and publication authority.
 
-An uncertain mutation result offers a status-only read with the operation ID.
-It does not automatically repeat the password, code or mutation. An ordinary
-refusal keeps the form available. The server must still own proof freshness,
-one-time consumption, rate limits, family binding and transaction outcomes.
+Read-only status checks reveal nonsecret state. Recovery can also send an
+origin-checked, bounded command. `reconcile_login` may perform the canonical first
+completion dispatch or acknowledge the exact staged publication. Settings-start
+resolution may atomically abandon an unprogressed start or create a tombstone
+that rejects its delayed delivery. Exact logout-result lookup is read-only;
+claiming that logout's return binds it to one neutral attempt. These operations
+never replay a password, code or another attempt's credentials. Use the
+[typed browser commands](../../packages/shared/src/schemas/mfa-browser.ts) and
+[logout receipts](../../packages/shared/src/schemas/browser-logout-receipt.ts)
+with the [API reference](reference.md).
+
+A known rate refusal preserves `429`, its error code and `Retry-After`; it does
+not enter unknown-result recovery or automatically start another flow. A changed
+source requires a new sign-in. If a Console logout cannot be confirmed, offer an
+explicit new sign-in without the old return reference; successful admission then
+opens the overview. Never infer logout success from a missing receipt. The server
+still owns proof freshness, one-time consumption, rate limits, family binding and
+transaction outcomes.
 
 ## Extend MFA to other users
 
