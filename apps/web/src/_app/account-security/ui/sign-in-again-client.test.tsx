@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 
@@ -43,7 +44,7 @@ it('offers an explicit fresh Console entry after an unknown logout without repla
   )
   render(
     <NextIntlClientProvider
-      locale="en"
+      locale={DEFAULT_LOCALE}
       messages={{
         auth: {
           existingSignInHelp: 'Existing sign-in',
@@ -65,7 +66,7 @@ it('offers an explicit fresh Console entry after an unknown logout without repla
         }}
         entryId={crypto.randomUUID()}
         returnEntryId={crypto.randomUUID()}
-        locale="en"
+        locale={DEFAULT_LOCALE}
       />
     </NextIntlClientProvider>
   )

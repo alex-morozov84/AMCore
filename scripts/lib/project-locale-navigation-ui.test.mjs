@@ -80,3 +80,20 @@ test('pathname merge rejects an unsupported namespace import before materializat
     copy.cleanup()
   }
 })
+
+for (const locale of ['en', 'ru']) {
+  test(`Console logout pathname uses native navigation and preserves return metadata for ${locale}`, () => {
+    const pathname = 'apps/web/src/features/console-logout/ui/ConsoleLogoutButton.tsx'
+    const projected = materializeProjectContentPath(
+      process.cwd(),
+      pathname,
+      buildLocaleNavigationFacts(locale).filter((fact) => fact.path === pathname)
+    ).after
+    assert.match(projected, /import \{ usePathname \} from 'next\/navigation'/)
+    assert.doesNotMatch(projected, /@\/i18n\/navigation/)
+    assert.match(projected, /const locale = useLocale\(\)/)
+    assert.match(projected, /\{ destination: pathname, locale \}/)
+    assert.match(projected, /'x-amcore-context-session': contextSession/)
+    assert.match(projected, /'x-amcore-return-entry': entry.returnEntryId/)
+  })
+}

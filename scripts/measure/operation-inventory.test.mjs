@@ -36,10 +36,11 @@ describe('operation inventory against the real plans', () => {
       // setup fixture edits, three RU notification-definition edits and one
       // disabled-Console proof-module deletion (+12 final operations).
       // Post-preview profile/return ownership, re-entry route moves and strict MFA locale
-      // navigation add 30 operations, 38 facts, 61 claims and 28 final operations.
+      // navigation add 33 operations, 41 facts, 64 claims and 30 final operations.
+      // Logout pathname adds three locale edits; Console-off absorbs one into deletion.
       // Grouped code/doc seams are shared/Console semantic facts on the same final edit.
       // Providers/manifests/scenarios remain unchanged. Raw inventory is independently inspected.
-      { name: 'measured operations', expected: 1037, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 1040, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -58,17 +59,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1420,
+        expected: 1423,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2307,
+        expected: 2310,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 1008,
+        expected: 1010,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

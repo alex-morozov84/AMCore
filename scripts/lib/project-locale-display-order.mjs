@@ -3,6 +3,7 @@ import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
 import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
 
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/features/console-logout/ui/ConsoleLogoutButton.tsx',
   'apps/web/src/_app/account-security/ui/client.tsx',
   'apps/web/src/_app/account-security/ui/sign-in-again-client.tsx',
   'apps/web/src/_app/console-account-security/ui/client.tsx',
