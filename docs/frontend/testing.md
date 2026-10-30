@@ -155,6 +155,189 @@ Successful and failed GitHub lanes retain reports/test results/inventories for
 seven days; inspect retries separately from clean passes. The unchanged mandatory
 `Web E2E` result requires every applicable lane to succeed.
 
+## Lighthouse audits
+
+Use Lighthouse to inspect loaded pages in a production build. It reports performance,
+accessibility, best practices and SEO. Automated accessibility defects and failed
+resource/indexing expectations fail the audit even when a category score is green.
+Timing, category scores and image opportunities are information, without new score thresholds.
+Manual checks remain unverified. Existing axe, translation and JavaScript budget checks still apply.
+
+### Prepare and run locally
+
+1. Install the frozen dependencies with the supported Node/pnpm versions. Start Docker.
+2. Run `pnpm audit:web:browser`. This verifies the pinned Chrome binary in the shared
+   Puppeteer cache. It downloads only a missing admitted version. A hash mismatch
+   stops preparation; it never deletes a cache or silently selects another browser.
+3. Run `pnpm audit:web:plan` to inspect enabled scenarios and their owning lanes.
+4. Run `pnpm audit:web path-standard` from the repository root. It creates a new
+   isolated managed stand, builds once and runs the assigned audits. It does not
+   replace the ordinary E2E suite. No arbitrary URL, owner preview or `.env` target is accepted.
+5. Open each HTML report under the printed `.amcore/lighthouse-results/<run>/<attempt>/<lane>/bundle`
+   directory. Read `manifest.json` for the exact source/build, validity and policy outcomes.
+   A failed or missing report never counts as a pass. Keep JSON beside HTML for hash verification.
+
+```text
+Plan -> own build and fixtures -> actual-page identity -> Lighthouse
+     -> validity and defect policy -> safe bundle -> owned cleanup
+```
+
+A stopped stand created by this audit command can be reused with
+`pnpm audit:web path-standard --reuse <stand-id>`. The runner first compares every
+application/package/Docker/patch input, root manifest and lockfile with its frozen
+snapshot. Changed compiled inputs require a new build. A host-only tooling repair
+can update the stopped snapshot's scripts while retaining the exact image IDs.
+The manifest records the original build-source hash and the current tooling hash
+separately. Recovery must first prove all old children absent. This option rejects
+preview-purpose and non-audit stands; it is unavailable in CI.
+
+The command prints its exact stand ID. It stops containers and the network after
+completion but keeps its owned images/volumes for report review and verified reuse.
+When review is complete, run `pnpm stand down --id <stand-id> --purge` to delete
+those resources. This command must name the audit's ID. Preserve unrelated stands.
+After a crash, first follow managed recovery without `--purge` if the build is
+needed for reuse. A live or unproved child blocks recovery and cleanup.
+
+The pinned browser platforms are Linux x64 and Apple Silicon macOS.
+Local runtime checks cover Apple Silicon; Linux hosted runtime admission remains pending.
+On Linux, install system dependencies with
+`pnpm --filter web exec playwright install --with-deps chromium` before the audit.
+This may require administrator rights. A pinned binary hash alone does not prove
+that its shared libraries are available. On `browser-launch` failure, preserve the
+safe run/stand identity and ask the maintainer to diagnose the Linux prerequisites;
+do not remove a verified browser cache or assume a successful measurement.
+Other platforms stop with `browser-platform-not-admitted`; admit their binary hash
+and runtime compatibility separately. HTTPS stands use the existing managed relay
+and disposable certificate. No production CSP or authentication bypass is added.
+
+`path-standard` owns the anonymous login page in every composition. It also owns
+members in product-administration path mode. In product-administration host mode,
+run `pnpm audit:web staff-oauth` for members on the staff origin. That lane uses
+real password/MFA admission; its name does not turn the audit into a provider mock.
+
+<!-- AMCORE_CONSOLE_LIGHTHOUSE_TESTING_START -->
+
+The enabled Operations Console Overview belongs to `path-standard` in path mode.
+In host mode, run `pnpm audit:web host` for its separate owning stand. Canonical
+URL helpers resolve the configured locale and slug. Removing Console removes its
+scenario catalogue and fixture contributions; it does not remove product audits.
+
+<!-- AMCORE_CONSOLE_LIGHTHOUSE_TESTING_END -->
+
+At most three initial scenarios and three existing owning lanes apply. Each owner
+reuses its own production build/stack and runs one audit per assigned scenario.
+Mocked, disruptive, setup and other integration lanes do not silently run audits.
+`node scripts/e2e-ci.mjs --all` retains all applicable ordinary E2E lanes and adds
+only their explicit audit assignments. Local execution stays sequential.
+
+### Interpret a failure and recover
+
+The runner verifies the expected account, audience, origin, path and loaded data
+before and after navigation. Credential setup, MFA, expired sessions, wrong accounts,
+error views and incomplete content cannot become successful measurements. Only the
+explicitly empty anonymous login form may enter a report. Credentials, cookies,
+session states, traces and arbitrary browser exceptions stay outside the export allowlist.
+
+A required HTTP429 response makes the measurement invalid. Diagnose the exact
+request and budget from the admitted stand's metrics and bounded fixture observations
+before changing pacing. Do not disable production limits or retry until green.
+An invalid measurement differs from a valid report with a policy failure.
+There is no supported automatic429 reset or post-stop metrics replay. Stop and
+retain the safe run ID, stand ID, manifest and failure stage for the maintainer.
+The maintainer must correlate the failed request with server evidence and
+`rate_limit_decisions_total{policy,outcome,role}` from the owned runtime; see
+[observability metrics](../operations/observability.md). That counter alone cannot
+identify a request or exhausted key. Missing evidence stays unresolved. Any new
+diagnostic runtime needs its own authorization; it cannot repair the old result.
+
+Missing labels, button names and applicable image alternative text fail individual
+accessibility rules. A green94 can therefore fail. A private page must retain noindex;
+a public descriptor must match the product's actual indexing configuration. Do not
+open a private page to improve Lighthouse's raw SEO score.
+
+Each case has a90-second deadline including fixture/sign-in and output. The audit
+phase has15 minutes, with30 seconds reserved for export. Forced child termination
+has30 seconds; cleanup has a separate120-second reserve. The runner preserves
+all earlier failure causes. On cleanup-incomplete, inspect the exact new stand and
+use the [managed recovery procedure](../operations/local-stands.md); never prune
+unrelated resources. Keep reusable dependency/browser caches. A tool error does
+not authorize rebuilding an unchanged application or deleting an admitted cache.
+
+Local acceptance can use `pnpm audit:web path-standard --acceptance` on a fresh
+stand whose owner includes members. It adds controlled wrong-user, failed-login,
+mid-audit expiry and forced sign-in/audit stalls. These controls use only its own
+fixture and private temporary browser state. They are acceptance checks, not
+extra default audits or throughput measurements.
+
+### Extend downstream coverage
+
+The generic catalogue is `apps/web/e2e/lighthouse/catalogue.json`. Each scenario
+specifies its stable ID, scope, route template, indexing expectation and required
+individual audit IDs. Keep fixture/readiness changes in the test adapter. Do not
+create product endpoints or put Node tooling in application runtime imports.
+
+The catalogue's coverage rows classify every built page family as `audited`,
+`representative` or `excluded`. Representatives name an existing scenario and state
+what remains unverified. Exclusions require a concrete reason. A representative
+cannot certify unopened dialogs or independent page content. Unknown, removed,
+duplicate or unclassified built routes fail. The collector reads the actual
+version-checked Next manifest from the same production artifact; it does not treat
+the catalogue as proof that a page was built or visited.
+
+After updating the catalogue, run `pnpm audit:web:plan` and `pnpm test:lighthouse`.
+To inspect actual coverage after a production build in the same checkout, run:
+
+```sh
+node --input-type=module -e "import {collectCoverage} from './scripts/lib/lighthouse-coverage.mjs'; console.log(JSON.stringify(collectCoverage(process.cwd()), null, 2))"
+```
+
+An unknown page fails with `missing-or-empty-coverage`; a stale or duplicate row
+fails with `duplicate-or-stale-coverage`. Add or correct the exact family shown by
+the built manifest, then rerun this collector. Run the assigned `pnpm audit:web <lane>`
+on a fresh stand to prove fixture/readiness and actual navigation. Collector success
+alone does not prove an audit. Check route budgets against that same production build.
+
+Register optional shared contributions through existing ownership seams. Test the
+actual generated output's full authoring types with `pnpm --filter web typecheck`,
+production build, route budgets and runtime. A single-EN product checks its own EN
+composition; it need not manufacture an RU product. Changes to the upstream
+initializer or shared adapter additionally require a separate generated single-RU
+copy, full authoring typecheck and its own build/budget/runtime evidence. Adding scenarios changes cost; admit the revised count
+and owning lanes explicitly rather than extending a phase silently.
+
+### CI evidence and admission
+
+The existing Web E2E aggregate requires every original lane outcome and the exact
+current-run/attempt status envelopes. Non-owners explicitly report N/A. Owners
+upload a bounded `payload.json.gz` archive, then envelopes containing returned artifact IDs and archive/manifest hashes. The
+aggregate independently resolves ownership, retrieves those IDs and checks hashes,
+source/config/build identity, coverage and scenario outcomes. Earlier test, report,
+transfer or cleanup failures remain failures.
+
+Candidate ceilings are40 minutes per owning job,20 per non-owner and5 for the
+aggregate. Report pairs allow8MiB; bundles allow256MiB and200 files, retained seven days.
+Transfer and aggregate actions use absolute phase deadlines in addition to GitHub's
+minute-based fallback. No phase spends the owned termination/cleanup reserve.
+Hosted cold/warm cost and real upload/download/hash admission must pass before CI
+adoption. Tracked workflow configuration alone proves neither hosted compatibility
+nor live repository enforcement. See [CI security](../operations/ci-security.md).
+
+There is no supported manual re-upload/reclassification or standalone artifact
+recovery command. On missing retrieval, preserve the available safe bundle and
+status envelope, including run/attempt, artifact ID and hashes. Ask the authorized
+maintainer to inspect that run's Actions artifact. Do not count a manual download,
+renamed file or later run as the aggregate's original verified retrieval. Expired
+or missing artifacts leave that run incomplete; they cannot become a pass.
+
+Before activating this candidate in a fork, the maintainer must obtain authority
+for hosted execution and approve a concrete cold/warm sampling plan. Record the
+runner, commit/lock/browser/config, original lane outcomes, build/audit counts,
+job and phase durations, termination/cleanup durations, archive bytes and artifact
+IDs plus upload/retrieval/hash results. Review the measurements against every
+candidate reserve and record an explicit admission decision. No universal sample
+count or cost is established. Until that review passes, stop before CI adoption;
+there is no self-service activation procedure or cost promise.
+
 ## Stable accessibility scans
 
 Use `expectNoAxeViolations(page)` from `e2e/shared/axe.ts`. It waits for loaded

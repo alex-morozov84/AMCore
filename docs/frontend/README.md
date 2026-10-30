@@ -34,6 +34,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 ## Start here
 
+- Auditing loaded pages with Lighthouse → [Automatic audits](./testing.md#lighthouse-audits)
+
 - Connecting administration to a product → [Adoption recipes and custom styling](../product-admin/adoption.md)
 
 - Designing or reviewing a user journey → [Short UI/UX checklist](./ux-checklist.md)

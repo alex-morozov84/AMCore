@@ -73,6 +73,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 # monorepo-rooted: the server entrypoint is at apps/web/server.js and the traced
 # node_modules (incl. @amcore/shared) sit at the standalone root.
 COPY --from=build /app/apps/web/.next/standalone ./
+# Read-only audit provenance from the same production build; no new HTTP endpoint.
+COPY --from=build /app/apps/web/.next/app-path-routes-manifest.json ./apps/web/.next/app-path-routes-manifest.json
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
 

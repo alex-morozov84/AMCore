@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import {
   BROWSER_AUTH_HEADERS,
+  DEFAULT_LOCALE,
   loginSchema,
   registerSchema,
   type UserResponse,
@@ -74,7 +75,7 @@ const user: UserResponse = {
   name: null,
   avatarUrl: null,
   phone: null,
-  locale: 'en',
+  locale: DEFAULT_LOCALE,
   timezone: 'UTC',
   createdAt: new Date(0).toISOString(),
   lastLoginAt: null,
@@ -906,14 +907,14 @@ describe('Browser password/MFA publication with actual Redis', () => {
     ).length
     const recovered = await handleOAuthExchange(
       request('/api/auth/oauth/complete', {}),
-      { ticket, locale: 'en' },
+      { ticket, locale: DEFAULT_LOCALE },
       context()
     )
     expect(recovered.status).toBe(303)
     expect(recovered.cookies.get('amcore_session')?.value).toBe(publishedId)
     const wrong = await handleOAuthExchange(
       request('/api/auth/oauth/complete', {}),
-      { ticket: 'u'.repeat(43), locale: 'en' },
+      { ticket: 'u'.repeat(43), locale: DEFAULT_LOCALE },
       context()
     )
     expect(wrong.cookies.get('amcore_session')).toBeUndefined()

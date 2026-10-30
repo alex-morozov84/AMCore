@@ -36,7 +36,11 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
     ['success', 'cancelled'],
     ['success', 'skipped'],
   ]) {
-    const script = gate.steps[0].run.replace('node -e ', '').trim().slice(1, -1)
+    const script = gate.steps
+      .find((step) => step.name === 'Require every planned E2E lane to succeed')
+      .run.replace('node -e ', '')
+      .trim()
+      .slice(1, -1)
     const result = spawnSync(process.execPath, ['-e', script], {
       env: {
         E2E_RESULTS: JSON.stringify(

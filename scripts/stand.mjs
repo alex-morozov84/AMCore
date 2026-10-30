@@ -7,13 +7,27 @@ import { root, load, lease } from './stand/state.mjs'
 import { boot } from './stand/boot.mjs'
 import { cleanup, dataAdmission } from './stand/ownership.mjs'
 import { test } from './stand/playwright.mjs'
-import { stopChildren, setJournal, requestCancellation, allowCleanup } from './stand/process.mjs'
+import {
+  stopChildren,
+  setJournal,
+  requestCancellation,
+  allowCleanup,
+  setProcessDeadline,
+} from './stand/process.mjs'
 
 const [action = 'help', ...args] = process.argv.slice(2)
 const value = (flag, fallback) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : fallback)
 const lane = value('--lane', 'real-stack')
 const group = value('--ci-group')
 const fixture = value('--fixture')
+const auditOnly = args.includes('--audit-only')
+const reuseAudit = args.includes('--reuse-audit')
+if (reuseAudit && (!auditOnly || process.env.CI === 'true'))
+  throw new Error('Audit reuse is local-only')
+const auditOwner = process.env.AMCORE_AUDIT_OWNER
+if (auditOnly && (!auditOwner || process.env.CI === 'true'))
+  throw new Error('Audit-only requires explicit local audit dispatcher')
+if (auditOwner) setProcessDeadline(Number(process.env.AMCORE_AUDIT_EPOCH) + 20 * 60_000)
 const edge = value('--edge')
 if (edge && (edge !== 'nginx' || action !== 'e2e' || lane !== 'product-admin-real-stack'))
   throw new Error('--edge nginx requires product-admin-real-stack E2E')
@@ -136,7 +150,10 @@ async function execute() {
       m = existing
       if (lane !== 'mocked' && !['stopped', 'allocated', 'configured'].includes(m.state))
         await dataAdmission(m)
-      await refresh(m)
+      if (reuseAudit) {
+        const { refreshAuditTools } = await import('./lighthouse/reuse.mjs')
+        m = await refreshAuditTools(id, root)
+      } else await refresh(m)
     } else
       m = await create(
         id,
@@ -173,7 +190,7 @@ async function execute() {
         handled = true
       }
       // AMCORE_CONSOLE_PROXY_SMOKE_END
-      if (!handled) await test(m, lane, held.token, extra, group)
+      if (!handled) await test(m, lane, held.token, extra, group, auditOnly)
     } else if (action === 'preview') {
       const { preview } = await import('./stand/preview.mjs')
       await preview(m, value('--profile', 'default'))
@@ -181,10 +198,14 @@ async function execute() {
   } finally {
     await stopChildren()
     allowCleanup()
+    if (auditOwner)
+      setProcessDeadline(
+        Math.min(Date.now() + 120_000, Number(process.env.AMCORE_AUDIT_EPOCH) + 37.5 * 60_000)
+      )
     let cleanupError
     if (m && action === 'e2e' && lane !== 'mocked') {
       try {
-        await cleanup(m, true) // records its own failure/incomplete state
+        await cleanup(m, !auditOnly) // Local audits stop for review/reuse; CI E2E still purges.
       } catch (e) {
         cleanupError = e
       }

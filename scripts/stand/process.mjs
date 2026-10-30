@@ -3,6 +3,11 @@ import { spawn } from 'node:child_process'
 import { processTable, observeGroup, observeTree } from './process-groups.mjs'
 import { setRetirementJournal } from './retirement-audit.mjs'
 
+let processDeadline
+export function setProcessDeadline(deadline) {
+  processDeadline = deadline
+}
+
 const allowed = ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'TERM', 'CI']
 export function cleanEnvironment(extra = {}, source = process.env) {
   return {
@@ -67,6 +72,12 @@ export function run(
   args,
   { cwd, env = cleanEnvironment(), capture = false, input, signal, graceful = false } = {}
 ) {
+  if (processDeadline !== undefined) {
+    if (processDeadline <= Date.now())
+      return Promise.reject(new Error('Managed phase deadline exhausted'))
+    const deadlineSignal = globalThis.AbortSignal.timeout(processDeadline - Date.now())
+    signal = signal ? globalThis.AbortSignal.any([signal, deadlineSignal]) : deadlineSignal
+  }
   if (cancelled) return Promise.reject(new Error('Stand interrupted; new subprocess refused'))
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
