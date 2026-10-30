@@ -22,7 +22,13 @@ export const API_GLOBAL_PREFIX = 'api/v1'
 export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
   return new DocumentBuilder()
     .setTitle('AMCore API')
-    .setDescription('AMCore API documentation')
+    .setDescription(
+      'AMCore API documentation.\n\n' +
+        'Any authenticated request, and the OAuth sign-in steps, can answer `503` with ' +
+        '`errorCode` `SERVICE_UNAVAILABLE` ("Authentication temporarily unavailable") when a ' +
+        'dependency the authentication path needs (for example Redis) is slow or down. The ' +
+        'handler did not run; retry later with backoff. See docs/auth/redis-outage.md.'
+    )
     .setVersion('0.0.1')
     .addBearerAuth()
     .addBearerAuth(
