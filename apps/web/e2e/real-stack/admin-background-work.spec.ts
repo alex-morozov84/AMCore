@@ -99,14 +99,13 @@ test('path-mode Background work shows no rows while Redis stalls and recovers af
   test.setTimeout(240_000)
   await signInAsOperator(page, 'admin-background-work-outage')
   settingsProof('pause-redis') // CLIENT PAUSE 40000 ALL on the stand's own Redis
-  // Session admission is bounded: the request answers a temporary failure (or times out) and shows no queue rows.
-  const body = await page.request
-    .get(URL, { timeout: 8_000 })
-    .then((response) => response.text())
-    .catch(() => 'stalled')
-  // The Console shell may keep its heading; what must be absent is any queue data.
+  // Session admission is bounded: the request must ANSWER (no swallowed hang or failure) with the
+  // generic temporary state, and nothing identity-bearing or queue-related may be rendered.
+  const response = await page.request.get(URL, { timeout: 8_000 })
+  const body = await response.text()
+  expect(body).toMatch(/temporarily unavailable/i)
   expect(body).not.toContain('data-slot="table"')
-  expect(body).not.toContain('Background queues</caption>')
+  expect(body).not.toContain('data-sidebar')
   // After the stall ends the screen works again without any manual intervention.
   await expect(async () => {
     await page.goto(URL)

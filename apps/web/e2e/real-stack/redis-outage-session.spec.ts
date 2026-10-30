@@ -11,7 +11,11 @@ import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 // machine, not guarantees.
 test.describe.configure({ mode: 'serial' })
 
-const STAGE_BOUND_MS = 3000 + 1500
+// Wall-clock bound of the real stack: the 3 s admission contract is proven with a controlled clock
+// in the unit tests; here one HTTP round trip and process scheduling may add up to TOLERANCE_MS.
+const ADMISSION_MS = 3000
+const TOLERANCE_MS = 1000
+const WALL_CLOCK_BOUND_MS = ADMISSION_MS + TOLERANCE_MS
 
 interface VaultEntry {
   version: number
@@ -108,10 +112,10 @@ test('a stalled Redis refuses session requests within the admission budget, keep
     const started = performance.now()
     const refused = await context.request.get('/api/auth/me', { timeout: 15_000 })
     const elapsed = performance.now() - started
-    // Never forwarded upstream without proven authentication.
+    // Observed refusal only: whether the protected backend handler was reached is not asserted.
     expect(refused.status()).toBe(503)
     expect(await refused.json()).toMatchObject({ errorCode: 'SERVICE_UNAVAILABLE' })
-    expect(elapsed).toBeLessThan(STAGE_BOUND_MS + 1500)
+    expect(elapsed).toBeLessThan(WALL_CLOCK_BOUND_MS)
     // The cookie is untouched by the failure.
     expect((await context.cookies()).find((c) => c.name === 'amcore_session')?.value).toBe(cookie)
 
@@ -125,7 +129,9 @@ test('a stalled Redis refuses session requests within the admission budget, keep
   }
 })
 
-test('a refresh runs once for concurrent requests and publishes one new version', async ({
+// Narrow claim: six concurrent requests on an aged entry succeed and ONE new version appears. Owner
+// count and overlap in the refresh phase are not observed here (open: held-refresh overlap control).
+test('concurrent requests on an aged entry all succeed and publish exactly one new version', async ({
   browser,
   baseURL,
 }) => {
@@ -150,7 +156,9 @@ test('a refresh runs once for concurrent requests and publishes one new version'
   }
 })
 
-test('a caller that leaves during a stalled refresh does not end the session', async ({
+// Narrow claim: a request refused during a stall leaves the aged entry in place and it refreshes
+// after recovery. An already-running refresh surviving caller departure is NOT proven here (open).
+test('an aged entry survives a request refused during a stall and refreshes after recovery', async ({
   browser,
   baseURL,
 }) => {
@@ -165,10 +173,9 @@ test('a caller that leaves during a stalled refresh does not end the session', a
     const started = performance.now()
     const refused = await context.request.get('/api/auth/me', { timeout: 15_000 })
     expect(refused.status()).toBe(503)
-    expect(performance.now() - started).toBeLessThan(STAGE_BOUND_MS + 1500)
+    expect(performance.now() - started).toBeLessThan(WALL_CLOCK_BOUND_MS)
 
-    // After the stall the session is still usable: the stored entry was never deleted and the
-    // refresh completes without backend reuse detection.
+    // After the stall the stored entry still exists and a new request refreshes it normally.
     await untilServed(context, 40_000)
     expect(await readEntry(cookie)).not.toBeNull()
     expect((await context.request.get('/api/auth/me')).status()).toBe(200)
@@ -207,7 +214,7 @@ test('a replayed stale refresh token is rejected by the backend and ends the sto
   }
 })
 
-test('a protected page during a stalled Redis does not sign the user out', async ({
+test('a protected page shows the temporary state during a stall, then the page again after recovery', async ({
   browser,
   baseURL,
 }) => {
@@ -218,18 +225,20 @@ test('a protected page during a stalled Redis does not sign the user out', async
     const cookie = await signedIn(context, origin)
     const page = await context.newPage()
     await page.goto('/en')
-    expect(page.url()).not.toContain('/login')
+    await expect(page.getByText(/^Welcome/)).toBeVisible()
 
     pauseRedis(6000)
-    await page.goto('/en', { timeout: 20_000 }).catch(() => null)
-    // A temporary failure is not "logged out": no redirect to the sign-in page.
-    expect(page.url()).not.toContain('/login')
+    // The navigation must complete: a failed navigation is not accepted as "not signed out".
+    await page.goto('/en', { timeout: 20_000 })
+    await expect(page).toHaveURL(/\/en\/?$/)
+    await expect(page.getByText(/usually temporary|temporarily unavailable/i).first()).toBeVisible()
+    await expect(page.getByText(/^Welcome/)).toHaveCount(0)
     expect((await context.cookies()).find((c) => c.name === 'amcore_session')?.value).toBe(cookie)
 
     await sleep(7000)
     await expect(async () => {
       await page.goto('/en')
-      expect(page.url()).not.toContain('/login')
+      await expect(page.getByText(/^Welcome/)).toBeVisible({ timeout: 3000 })
     }).toPass({ timeout: 40_000, intervals: [1000, 3000] })
     expect(await readEntry(cookie)).not.toBeNull()
   } finally {
