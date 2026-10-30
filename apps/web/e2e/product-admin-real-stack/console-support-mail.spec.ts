@@ -6,6 +6,7 @@ import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { completeMfaSignIn, completeMfaStepUp } from '../shared/mfa-login'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
 import { openSecretMail } from '../support/secret-mail'
@@ -64,7 +65,11 @@ test('operator recovery and verification use real localized website mail with sa
   await page.goto(localizedFrontendUrl(consoleOrigin, baseLocale, 'login'))
   await page.getByLabel(loginCopy.auth.email, { exact: true }).fill(operator)
   await page.getByLabel(loginCopy.auth.password, { exact: true }).fill(SETUP_PASSWORD)
+  const signIn = page.waitForResponse(
+    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: loginCopy.auth.login, exact: true }).click()
+  if ((await signIn).status() === 202) await completeMfaSignIn(page, operator)
   await page.waitForURL((url) => url.origin === consoleOrigin && !url.pathname.endsWith('/login'))
   await page.goto(
     localizedFrontendUrl(consoleOrigin, operatorLocale, `${consolePath}/users/${target}`)
@@ -89,7 +94,7 @@ test('operator recovery and verification use real localized website mail with sa
 
   // A stale session must reauthenticate; cancelling it never starts transport.
   guardedSql(
-    'UPDATE core.sessions SET "lastAuthAt"=now()-interval \'1 day\' WHERE "userId"=:\'id\';',
+    'UPDATE core.auth_session_families SET "primaryAt"=now()-interval \'1 day\', "mfaAt"=now()-interval \'1 day\' WHERE "userId"=:\'id\';',
     { id: prepared.userId }
   )
   await card.getByRole('button', { name: t.email_verification.button, exact: true }).click()
@@ -119,6 +124,7 @@ test('operator recovery and verification use real localized website mail with sa
   ).toBe('0')
   await dialog.getByLabel(operatorCopy.console.loginPassword, { exact: true }).fill(SETUP_PASSWORD)
   await dialog.locator('button[type="submit"]').click()
+  await completeMfaStepUp(page, operator)
   await expect(card.getByText(t.summary.accepted, { exact: true })).toBeVisible()
   await expect(page.getByText(t.toast.accepted, { exact: true })).toBeVisible()
   await expect(dialog).toHaveCount(0)
@@ -264,7 +270,7 @@ test('operator recovery and verification use real localized website mail with sa
   ).toBe(404)
 
   guardedSql(
-    `UPDATE core.sessions SET "lastAuthAt"=now()-interval '1 day' WHERE "userId"=:'id';
+    `UPDATE core.auth_session_families SET "primaryAt"=now()-interval '1 day', "mfaAt"=now()-interval '1 day' WHERE "userId"=:'id';
     UPDATE core.users SET "passwordHash"=NULL WHERE id=:'id';`,
     { id: prepared.userId }
   )

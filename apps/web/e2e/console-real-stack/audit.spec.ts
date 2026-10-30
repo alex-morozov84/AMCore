@@ -1,3 +1,4 @@
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -35,7 +36,8 @@ test('host Audit uses the isolated console session and closes after demotion', a
       response.url().endsWith('/api/auth/login') && response.request().method() === 'POST'
   )
   await page.getByRole('button', { name: /sign in/i }).click()
-  expect((await loginResponse).status()).toBe(204)
+  await completeMfaSignIn(page, email)
+  expect((await loginResponse).status()).toBe(202)
   await expect(page).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )

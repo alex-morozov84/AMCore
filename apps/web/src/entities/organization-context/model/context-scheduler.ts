@@ -42,6 +42,7 @@ export function createOrganizationContextScheduler(
   let retryTimer: ReturnType<typeof setTimeout> | undefined
   let pending: Promise<void> | undefined
   let run: OrganizationContextRun | undefined
+  let authorityRun: OrganizationContextRun | undefined
   let validatedIdentity = false
   let initialPending = true
   const update = (next: OrganizationContextState) => {
@@ -69,6 +70,7 @@ export function createOrganizationContextScheduler(
       current.signal.throwIfAborted()
       await deps.beforeAuthority?.()
       current.signal.throwIfAborted()
+      authorityRun = current
       const data = await deps.authority(selectedInput, binding, current.signal)
       if (data.binding !== binding) {
         lease.publish(current, () => update({ target, status: 'changed' }))
@@ -88,14 +90,15 @@ export function createOrganizationContextScheduler(
           target,
           error,
           retryAt: retryDelay > 0 ? Date.now() + retryDelay : undefined,
-          status:
-            getErrorCode(error) === 'CONTEXT_SESSION_CHANGED'
-              ? 'changed'
-              : status === 401
-                ? 'missing'
-                : status === 403 || status === 404
-                  ? 'denied'
-                  : 'error',
+          status: ['CONTEXT_SESSION_CHANGED', 'AUTH_CONTEXT_CHANGED'].includes(
+            getErrorCode(error) ?? ''
+          )
+            ? 'changed'
+            : status === 401
+              ? 'missing'
+              : status === 403 || status === 404
+                ? 'denied'
+                : 'error',
         })
         if (retryDelay > 0)
           retryTimer = setTimeout(() => {
@@ -103,6 +106,8 @@ export function createOrganizationContextScheduler(
             update({ ...state, retryAt: undefined })
           }, retryDelay)
       })
+    } finally {
+      if (authorityRun === current) authorityRun = undefined
     }
   }
 
@@ -149,7 +154,14 @@ export function createOrganizationContextScheduler(
       }
     },
     activate() {
-      if (pending || state.status === 'changed' || state.status === 'missing') return pending
+      // An in-flight identity check is safe to join: its following domain read is fenced.
+      // A domain response may already be authorized under the previous browser session.
+      if (
+        (pending && authorityRun !== run) ||
+        state.status === 'changed' ||
+        state.status === 'missing'
+      )
+        return pending
       if (state.retryAt && Date.now() < state.retryAt) return
       if (timer) clearTimeout(timer)
       lease.retire()
@@ -186,6 +198,7 @@ export function createOrganizationContextScheduler(
       pending = undefined
       lease.retire()
       run = undefined
+      authorityRun = undefined
       validatedIdentity = false
     },
     async action<T>(

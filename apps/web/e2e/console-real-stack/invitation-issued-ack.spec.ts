@@ -2,16 +2,21 @@ import {
   DEFAULT_LOCALE,
   invitationFlowAuthResponseSchema,
   invitationFlowContextResponseSchema,
-  invitationFlowPendingResponseSchema,
   localizedFrontendUrl,
 } from '@amcore/shared'
 import { expect, request, test } from '@playwright/test'
 
-import { TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import {
+  browserCredentialRequest,
+  logoutViaApi,
+  postBrowserCredentials,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from '../real-stack/helpers'
 import { inviteRecipient, membershipCount } from '../real-stack/invitation-recipient.helpers'
 import { activeTarget } from '../support/managed-target.mjs'
 
-test('HTTPS: a genuinely issued pending handoff rejects ACK after another session is published', async ({
+test('HTTPS: a confirmed invitation handoff rejects replay after another browser session is published', async ({
   context,
 }) => {
   const target = activeTarget()
@@ -22,47 +27,61 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
   const invitation = await inviteRecipient(email)
   expect(
     (
-      await context.request.post(new URL('/api/auth/register', origin).href, {
-        headers,
-        data: { email, password: TEST_PASSWORD },
+      await postBrowserCredentials(context.request, origin, '/api/auth/register', {
+        email,
+        password: TEST_PASSWORD,
       })
     ).status()
   ).toBe(201)
-  expect(
-    (await context.request.post(new URL('/api/auth/logout', origin).href, { headers })).ok()
-  ).toBe(true)
-  // RequestContext follows the real bootstrap and stores cookies without executing
-  // page scripts, so the UI cannot automatically confirm this issued handoff.
+  expect((await logoutViaApi(context.request, origin)).ok()).toBe(true)
+  // Ordinary password invitation confirmation is server-owned and precedes publication.
+  // No page script or membership consent is involved in this HTTP-only journey.
   const ingress = await context.request.get(
     localizedFrontendUrl(origin, DEFAULT_LOCALE, `invite/accept?token=${invitation.token}`)
   )
   expect(ingress.ok()).toBe(true)
+  expect(new URL(ingress.url()).pathname).toContain('/invite/flow/')
   const flowId = new URL(ingress.url()).pathname.split('/').at(-1)
   const root = `/api/invitation-flows/${flowId}`
   const current = await context.request.get(new URL(`${root}/context`, origin).href)
   expect(current.status()).toBe(200)
   const { binding } = invitationFlowContextResponseSchema.parse(await current.json())
-  const login = await context.request.post(new URL(`${root}/login`, origin).href, {
-    headers,
-    data: { binding, email, password: TEST_PASSWORD },
-  })
+  const login = await browserCredentialRequest(
+    context.request,
+    new URL(`${root}/login`, origin).href,
+    {
+      headers,
+      data: { binding, email, password: TEST_PASSWORD },
+    }
+  )
   expect(login.status()).toBe(200)
   const issued = invitationFlowAuthResponseSchema.parse(await login.json())
-  const pending = await context.request.get(new URL(`${root}/context`, origin).href)
-  expect(pending.status()).toBe(200)
-  expect(invitationFlowPendingResponseSchema.parse(await pending.json())).toEqual({
-    state: 'completing_signin',
-    binding: issued.binding,
-    handoff: issued.handoff,
-  })
+  expect(issued.binding.sessionBinding).not.toBeNull()
+  const confirmed = await context.request.get(new URL(`${root}/context`, origin).href)
+  expect(confirmed.status()).toBe(200)
+  expect(invitationFlowContextResponseSchema.parse(await confirmed.json()).binding).toEqual(
+    issued.binding
+  )
+  const admitted = await context.request.get(new URL('/api/auth/me', origin).href)
+  expect(admitted.status()).toBe(200)
+  expect((await admitted.json()).user.email).toBe(email)
+  expect(membershipCount(email, invitation.org.id)).toBe('0')
   const independent = await request.newContext({
     proxy: { server: target.relay },
     ignoreHTTPSErrors: true,
+    // A competing login is another request from the same browser anchor.
+    // A different anchor would prove only cookie substitution, not supersession.
+    storageState: {
+      cookies: (await context.cookies(origin)).filter(
+        (cookie) => cookie.name === 'amcore_browser_context'
+      ),
+      origins: [],
+    },
   })
   try {
-    const replacement = await independent.post(new URL('/api/auth/register', origin).href, {
-      headers,
-      data: { email: uniqueEmail('issued-ack-replacement'), password: TEST_PASSWORD },
+    const replacement = await postBrowserCredentials(independent, origin, '/api/auth/register', {
+      email: uniqueEmail('issued-ack-replacement'),
+      password: TEST_PASSWORD,
     })
     expect(replacement.status()).toBe(201)
     const cookies = (await independent.storageState()).cookies.filter(

@@ -6,7 +6,8 @@ import { verifyUrlOnlyLocale } from '../shared/url-only-locale-journey'
 
 test('whole host-Console pending MFA document adds no product profile calls', async ({ page }) => {
   await verifyUrlOnlyLocale(page, '/mfa', {
-    en: en.accountMfa.unavailable,
-    ru: ru.accountMfa.unavailable,
+    title: { en: en.meta.title, ru: ru.meta.title },
+    en: en.accountMfa.sessionChanged,
+    ru: ru.accountMfa.sessionChanged,
   })
 })

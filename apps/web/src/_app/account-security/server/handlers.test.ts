@@ -29,12 +29,22 @@ function request(host: string, method = 'GET', origin?: string) {
     method,
     headers: {
       host,
+      ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
       ...(origin ? { origin } : {}),
       cookie: 'amcore_session=<fake-session>; __Host-amcore_staff_session=<fake-staff>',
       authorization: 'Bearer <fake-credential>',
     },
+    ...(method === 'POST'
+      ? {
+          body: JSON.stringify({
+            action: 'start_enrollment',
+            operationId: '01900000-0000-7000-8000-000000000001',
+            flowBinding: '01900000-0000-7000-8000-000000000002',
+          }),
+        }
+      : {}),
   })
-  vi.spyOn(input, 'json').mockRejectedValue(new Error('Body must not be read while dormant'))
+  vi.spyOn(input, 'json').mockRejectedValue(new Error('Use only the bounded stream parser'))
   return input
 }
 function privateResponse(response: Response) {
@@ -42,17 +52,17 @@ function privateResponse(response: Response) {
   expect(response.headers.get('set-cookie')).toBeNull()
   expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow')
 }
-describe('dormant account MFA BFF', () => {
+describe('account MFA BFF without a valid session or continuation', () => {
   it.each(['site', 'admin'] as const)(
     'does not start or reveal a flow through %s',
     async (frontend) => {
       const input = request('shop.example')
       const read = await accountMfaRoute(input, frontend)
-      expect(await read.json()).toEqual({ kind: 'unavailable' })
+      expect(read.status).toBe(401)
       privateResponse(read)
       const command = request('shop.example', 'POST', 'https://shop.example')
       const response = await accountMfaRoute(command, frontend)
-      expect(response.status).toBe(503)
+      expect(response.status).toBe(401)
       expect(command.json).not.toHaveBeenCalled()
       privateResponse(response)
     }
@@ -71,7 +81,7 @@ describe('dormant account MFA BFF', () => {
     expect((await accountMfaRoute(request('office.example'), 'site')).status).toBe(404)
     expect((await accountMfaRoute(request('shop.example'), 'admin')).status).toBe(404)
     const response = await accountMfaRoute(request('office.example'), 'admin')
-    expect(await response.json()).toEqual({ kind: 'unavailable' })
+    expect(response.status).toBe(401)
     privateResponse(response)
     expect(
       (await accountMfaRoute(request('office.example', 'POST', 'https://shop.example'), 'admin'))
@@ -80,6 +90,6 @@ describe('dormant account MFA BFF', () => {
     expect(
       (await accountMfaRoute(request('office.example', 'POST', 'https://office.example'), 'admin'))
         .status
-    ).toBe(503)
+    ).toBe(401)
   })
 })

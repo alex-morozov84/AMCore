@@ -40,7 +40,10 @@ export const invitationFlowInspectResponseSchema = z.strictObject({
 })
 export const invitationFlowAuthResponseSchema = z.strictObject({
   binding: invitationFlowBindingSchema,
-  data: z.strictObject({ user: userResponseSchema }),
+  data: z.strictObject({
+    user: userResponseSchema,
+    contextSession: invitationSessionBindingSchema.optional(),
+  }),
   handoff: z.strictObject({ attemptId: invitationFlowIdSchema }),
 })
 export const invitationFlowAcceptResponseSchema = z.strictObject({

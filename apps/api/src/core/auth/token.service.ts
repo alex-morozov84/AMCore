@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { randomBytes } from 'crypto'
 
-import { type SystemRole } from '@amcore/shared'
+import { type SessionAuthorityClaims, type SystemRole } from '@amcore/shared'
 
 import { UnauthorizedException } from '../../common/exceptions/index.js'
 import { EnvService } from '../../env/env.service.js'
 
 import { hashRefreshToken } from './utils/refresh-token-hash.js'
 
-export interface AccessTokenPayload {
+export interface AccessTokenPayload extends SessionAuthorityClaims {
   sub: string
   email: string
   systemRole: SystemRole
@@ -42,8 +42,8 @@ export class TokenService {
   }
 
   /** Verify access token */
-  verifyAccessToken(token: string): AccessTokenPayload {
-    return this.jwtService.verify<AccessTokenPayload>(token)
+  verifyAccessToken(token: string): AccessTokenPayload & { exp?: number; iat?: number } {
+    return this.jwtService.verify<AccessTokenPayload & { exp?: number; iat?: number }>(token)
   }
 
   /** Generate random refresh token */

@@ -79,12 +79,14 @@ test('every declared matcher pattern resolves in the current repository', () => 
   assert.doesNotThrow(() => validateDeclarationTree(declaration, files))
 })
 
-test('product-admin and lifecycle Console seams select full generated verification', () => {
+test('product-admin, MFA and lifecycle Console seams select full generated verification', () => {
   for (const pathname of [
     'docs/product-admin/organization-establishment.md',
     'docs/product-admin/organization-provisioning.md',
     'docs/product-admin/organization-administration.md',
     'docs/operations/api-key-lifecycle.md',
+    'docs/auth/mfa-browser.md',
+    'docs/auth/mfa-foundation.md',
   ]) {
     const matched = declaration.inputs.filter((input) => entryMatches(input, pathname))
     assert.ok(

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import type { SchemaDto } from './schema-dto.js'
 
 export const RESPONSE_SCHEMA = 'amcore:response-schema'
+export const RESPONSE_SCHEMAS_BY_STATUS = 'amcore:response-schemas-by-status'
 
 type Result<D extends SchemaDto | [SchemaDto]> = D extends [SchemaDto<infer S>]
   ? Array<z.input<S>>

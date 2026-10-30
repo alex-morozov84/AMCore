@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { logoutViaApi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { getBrowserFixture } from './get-browser-fixture'
@@ -24,13 +24,7 @@ for (const provider of ['google', 'github'] as const) {
       try {
         const page = await context.newPage()
         await registerViaUi(page, email)
-        expect(
-          (
-            await context.request.post(`${product}/api/auth/logout`, {
-              headers: { Origin: product },
-            })
-          ).status()
-        ).toBe(200)
+        expect((await logoutViaApi(context.request, product)).status()).toBe(200)
         const seen = await getBrowserFixture(context, origin, email, provider, surface)
         await page.goto(
           `${origin}/api/${surface === 'admin' ? 'product-admin/' : ''}auth/oauth/${provider}`

@@ -1,10 +1,11 @@
 import { cookies } from 'next/headers'
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, type BrowserAudience } from '@amcore/shared'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { apiErrorResponse } from './api-error-response'
 import { authFailureResponse } from './auth-failure-response'
+import { browserSessionHeaders, createBrowserBindingVerifier } from './browser-binding.server'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isTrustedOrigin } from './origin-guard'
 import {
@@ -49,6 +50,7 @@ async function getVaultEntryOrFailure(
       expectedAudience: context?.audience,
       lock: context?.lock ?? redisVaultLock,
       upstreamRefresh: createUpstreamRefresh(request.headers, context),
+      verifyBinding: createBrowserBindingVerifier(request.headers, context?.audience ?? 'product'),
     })
   } catch (error) {
     return authFailureResponse(request, error)
@@ -61,8 +63,14 @@ async function getVaultEntryOrFailure(
  * never authorization); omitted entirely for the DELETE handlers, which
  * have no locale-dependent response.
  */
-function authHeaders(entry: VaultEntry, acceptLanguage?: string | null): Headers {
+function authHeaders(
+  entry: VaultEntry,
+  source: Headers,
+  audience: BrowserAudience,
+  acceptLanguage?: string | null
+): Headers {
   const headers = new Headers({
+    ...browserSessionHeaders(source, audience, entry),
     Authorization: `Bearer ${entry.accessToken}`,
     Cookie: `${REFRESH_COOKIE_NAME}=${entry.refreshToken}`,
   })
@@ -88,12 +96,16 @@ export async function handleGetSessions(
   const upstream = new URL(`${API_URL}/api/v1/auth/sessions`)
   upstream.search = new URL(request.url).search
 
+  const audience = context?.audience ?? 'product'
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
       headers: context
-        ? frontendApiHeaders(context, authHeaders(entry, request.headers.get('accept-language')))
-        : authHeaders(entry, request.headers.get('accept-language')),
+        ? frontendApiHeaders(
+            context,
+            authHeaders(entry, request.headers, audience, request.headers.get('accept-language'))
+          )
+        : authHeaders(entry, request.headers, audience, request.headers.get('accept-language')),
     })
   } catch {
     return apiErrorResponse(request, {
@@ -126,11 +138,14 @@ export async function handleDeleteSession(
   if (entry instanceof Response) return entry
 
   const upstream = `${API_URL}/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`
+  const audience = context?.audience ?? 'product'
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetchBackendResponse(upstream, request.headers, {
       method: 'DELETE',
-      headers: context ? frontendApiHeaders(context, authHeaders(entry)) : authHeaders(entry),
+      headers: context
+        ? frontendApiHeaders(context, authHeaders(entry, request.headers, audience))
+        : authHeaders(entry, request.headers, audience),
     })
   } catch {
     return apiErrorResponse(request, {
@@ -161,6 +176,7 @@ export async function handleDeleteOtherSessions(
   const entry = await getVaultEntryOrFailure(request, context)
   if (entry instanceof Response) return entry
 
+  const audience = context?.audience ?? 'product'
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetchBackendResponse(
@@ -168,7 +184,9 @@ export async function handleDeleteOtherSessions(
       request.headers,
       {
         method: 'DELETE',
-        headers: context ? frontendApiHeaders(context, authHeaders(entry)) : authHeaders(entry),
+        headers: context
+          ? frontendApiHeaders(context, authHeaders(entry, request.headers, audience))
+          : authHeaders(entry, request.headers, audience),
       }
     )
   } catch {

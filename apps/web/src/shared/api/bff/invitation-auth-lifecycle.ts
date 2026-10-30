@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 
 import { PRODUCT_ADMIN_CONFIG } from '@amcore/shared'
 
+import { createBrowserBindingVerifier } from './browser-binding.server'
 import { withinContextDeadline } from './context-deadline'
 import { invitationCookiePolicy, readInvitationOwner } from './invitation-cookie'
 import { invitationFlowChanged, retireInvitationFlows } from './invitation-flow-authority'
@@ -9,6 +10,7 @@ import { withInvitationOwnerLease } from './invitation-owner-lease'
 import { invitationOwnerHash, invitationOwnerStore } from './invitation-owner-store'
 import { invitationRequestAuthority } from './invitation-request-authority'
 import { type ProductWebContext, resolveProductWebContext } from './product-web-context.server'
+import type { VaultRecord } from './session-vault.types'
 
 import 'server-only'
 
@@ -74,7 +76,11 @@ export async function assertOrdinaryOAuthAllowed(request: Request, context?: Pro
 export async function retireFlowsForOrdinaryAuth(
   request: Request,
   session: { sessionId: string; actorId: string } | null,
-  options?: { rejectPendingHandoff: true },
+  options?: {
+    rejectPendingHandoff?: true
+    verifyPublication?: () => Promise<void>
+    onlyIfBindingChanged?: boolean
+  },
   context?: ProductWebContext
 ) {
   for (const authority of authorities(request, context)) {
@@ -97,8 +103,11 @@ export async function retireFlowsForOrdinaryAuth(
           authority.ownerHash,
           signal,
           async () => {
+            // Recheck inside the owner lease: a delayed publication cannot retire a newer login's flows.
+            await options?.verifyPublication?.()
             const owner = await ordinaryOwner(authority)
             if (!owner) return
+            if (options?.onlyIfBindingChanged && owner.sessionBinding === binding) return
             if (options?.rejectPendingHandoff && hasPending(owner)) throw invitationFlowChanged()
             signal.throwIfAborted()
             if (
@@ -151,4 +160,23 @@ export async function cancelInvitedOAuthForOrdinaryStart(
       10000
     )
   }
+}
+
+/** Replaying the same publication preserves flows opened afterwards under that exact session. */
+export async function retirePublishedInvitationFlows(
+  request: Request,
+  context: ProductWebContext,
+  sessionId: string,
+  entry: VaultRecord
+): Promise<void> {
+  const verify = createBrowserBindingVerifier(request.headers, context.audience)
+  await retireFlowsForOrdinaryAuth(
+    request,
+    { sessionId, actorId: entry.userSnapshot.id },
+    {
+      onlyIfBindingChanged: true,
+      verifyPublication: () => verify(entry),
+    },
+    context
+  )
 }

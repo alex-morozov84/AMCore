@@ -28,6 +28,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 import {
   AiApprovalState,
@@ -399,10 +400,7 @@ describe('AI human takeover lifecycle (e2e)', () => {
     /** Promote to SUPER_ADMIN and log back in for a FRESH token carrying the updated role. */
     async function promoteSuperAdmin(userId: string, email: string): Promise<string> {
       await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-      const res = await request(server())
-        .post('/auth/login')
-        .send({ email, password: 'StrongP@ss123' })
-        .expect(200)
+      const res = await loginDomainOperator(context, { email, password: 'StrongP@ss123' })
       return res.body.accessToken as string
     }
 
@@ -465,9 +463,9 @@ describe('AI human takeover lifecycle (e2e)', () => {
       const admin = await registerHttp('admin-a@example.com')
       const adminToken = await promoteSuperAdmin(admin.userId, 'admin-a@example.com')
       // Age the operator's session past the step-up window.
-      await prisma.session.updateMany({
+      await prisma.authSessionFamily.updateMany({
         where: { userId: admin.userId },
-        data: { lastAuthAt: new Date(0) },
+        data: { primaryAt: new Date(0), mfaAt: new Date(0) },
       })
 
       const res = await request(server())

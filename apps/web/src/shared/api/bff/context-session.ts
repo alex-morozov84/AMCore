@@ -9,6 +9,9 @@ import 'server-only'
 
 export const CONTEXT_SESSION_HEADER = 'x-amcore-context-session'
 
+// Only the exact capture object can consume its already-completed first-read check once.
+const verifiedCaptures = new WeakMap<object, VaultEntry>()
+
 export function validateExpectedContextSession(expected: string | undefined): void {
   if (!expected || !/^[a-f0-9]{64}$/.test(expected)) {
     throw new ContextRequestError(400, 'BAD_REQUEST')
@@ -42,10 +45,13 @@ export async function captureContextSession(
   if (!sessionId) throw new SessionNotFoundError('missing')
   const entry = await deps.store.get(sessionId)
   if (!entry) throw new SessionNotFoundError('missing')
+  await deps.verifyBinding(entry)
   const binding = contextSessionBinding(sessionId, entry)
   if (!bootstrap && expected !== binding)
     throw new ContextRequestError(409, 'CONTEXT_SESSION_CHANGED')
-  return { sessionId, entry, binding }
+  const captured = { sessionId, entry, binding }
+  verifiedCaptures.set(captured, entry)
+  return captured
 }
 
 /** Reuse the captured first read, while retaining the existing refresh lock/CAS re-read. */
@@ -66,7 +72,19 @@ export async function freshContextSession(
       return deps.store.get(sessionId)
     },
   }
-  const entry = await ensureFreshSession(captured.sessionId, { ...deps, store })
+  // captureContextSession already checked this exact first read in this request.
+  // Lock re-reads and every refreshed/replaced record still need a new primary check.
+  let capturedProof = verifiedCaptures.get(captured) === captured.entry
+  verifiedCaptures.delete(captured)
+  const verifyBinding = async (entry: VaultEntry) => {
+    if (capturedProof && entry === captured.entry) {
+      capturedProof = false
+      return
+    }
+    capturedProof = false
+    await deps.verifyBinding(entry)
+  }
+  const entry = await ensureFreshSession(captured.sessionId, { ...deps, store, verifyBinding })
   if (
     contextSessionBinding(captured.sessionId, entry, captured.bindingVersion ?? 2) !==
     captured.binding

@@ -1,6 +1,8 @@
 import { localeContent, localeDelete } from './project-locale-fact-helpers.mjs'
 
 const catalogueFixtures = [
+  ['apps/web/src/shared/ui/console-step-up-dialog.stories.tsx', 'mfa-story'],
+  ['apps/web/e2e/mocked/account-mfa-setup.spec.ts', 'mfa-setup'],
   ['apps/web/.storybook/preview.tsx', 'invitation'],
   [
     'apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx',

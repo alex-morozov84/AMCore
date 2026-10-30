@@ -2,6 +2,7 @@ import type {
   InvitationFlowAuthResponse,
   InvitationFlowBinding,
   LoginInput,
+  MfaBrowserSignInPending,
   RegisterInput,
   UserResponse,
 } from '@amcore/shared'
@@ -13,6 +14,7 @@ import type { CredentialFormAdapter } from '@/shared/lib/credential-form-adapter
 interface Continuation {
   binding: InvitationFlowBinding
   isCurrent(): boolean
+  onMfaRequired?(flowBinding: string): void | Promise<void>
   onStart?(): void
   onHandoff(binding: InvitationFlowBinding, attemptId: string): void
   onConfirmed(binding: InvitationFlowBinding, user: UserResponse): void
@@ -31,19 +33,28 @@ export function createInvitationCredentialAdapters(
     'login' | 'register' | 'acknowledge'
   > = invitationFlowClient
 ) {
-  function adapter<TInput>(
-    authenticate: (input: TInput, signal: AbortSignal) => Promise<InvitationFlowAuthResponse>
-  ): CredentialFormAdapter<TInput> {
+  function adapter<TInput, TPending extends MfaBrowserSignInPending = never>(
+    authenticate: (
+      input: TInput,
+      signal: AbortSignal
+    ) => Promise<InvitationFlowAuthResponse | TPending>,
+    allowMfa = false
+  ): CredentialFormAdapter<TInput, TPending> {
     let confirmed: InvitationFlowAuthResponse | undefined
     let started = false
     return {
       isCurrent: () => continuation.isCurrent(),
+      onMfaRequired: continuation.onMfaRequired,
       async submit(input) {
         if (started || !continuation.isCurrent()) changed()
         started = true
         try {
           continuation.onStart?.()
           const response = await authenticate(input, AbortSignal.timeout(15000))
+          if ('kind' in response) {
+            if (!allowMfa || !continuation.isCurrent()) changed()
+            return response as TPending
+          }
           if (
             !continuation.isCurrent() ||
             response.binding.flowId !== continuation.binding.flowId ||
@@ -79,8 +90,9 @@ export function createInvitationCredentialAdapters(
     }
   }
   return {
-    login: adapter<LoginInput>((input, signal) =>
-      transport.login({ ...input, binding: continuation.binding }, signal)
+    login: adapter<LoginInput, MfaBrowserSignInPending>(
+      (input, signal) => transport.login({ ...input, binding: continuation.binding }, signal),
+      true
     ),
     register: adapter<RegisterInput>((input, signal) =>
       transport.register(

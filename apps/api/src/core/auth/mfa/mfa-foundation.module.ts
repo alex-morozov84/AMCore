@@ -7,7 +7,7 @@ import { MfaEncryptionService } from './mfa-encryption.service.js'
 import { MfaFoundationService } from './mfa-foundation.service.js'
 import { MfaProofRepository } from './mfa-proof.repository.js'
 
-/** No HTTP controllers, enrollment, publication or activation surface at this stage. */
+/** Shared local protocol/key startup fence for API and worker; activation remains deployment-owned. */
 @Module({
   imports: [EnvModule, PrismaModule],
   providers: [MfaFoundationService, MfaEncryptionService, MfaProofRepository],

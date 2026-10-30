@@ -1,6 +1,8 @@
 # OAuth — Social Login & Account Linking
 
-OAuth lets users sign in with accounts they already trust — Google, GitHub, Apple, or Telegram — without creating a separate password.
+OAuth lets users sign in with accounts they already trust — Google, GitHub, Apple, or Telegram — without creating a separate password for ordinary unprotected accounts. Protected
+accounts must also prove their local password and app or backup code. MFA requires the separately approved
+[deployment activation](mfa-deployment.md).
 
 ---
 
@@ -48,13 +50,19 @@ Telegram remains link-only. Its website `TELEGRAM_CALLBACK_URL` uses
 mode; path mode uses the website origin with that admin API prefix. Start linking
 from the selected signed-in account. Do not add Telegram as a standalone login.
 
-State and exchange tickets bind frontend, placement, callback, backend session and
-allowlisted return destination. Admin uses separate nonce/temporary cookies;
+State and exchange tickets bind frontend, placement, callback, exact browser attempt
+and allowlisted return destination. Login callbacks capture an account-version snapshot and create no session,
+including invitation-bound login. Admin uses separate nonce/temporary cookies;
 Apple's cross-site POST cookie remains restricted to its exact callback path.
 GitHub sends S256 PKCE on new starts; pre-upgrade state retains its old exchange
 contract until drained. Do not transfer a product cookie/token through a redirect.
-Linking authenticates the selected account when the link starts. Telegram is
-link-only. See [placement and sessions](../product-admin/placement-and-sessions.md)
+Linking authenticates the selected account when the link starts. A protected
+account also needs fresh local password and second-factor proofs. Its one-time
+state retains the original family, security version and browser binding. The
+callback rechecks that authority before committing attachment. Successful protected
+linking requires a new sign-in; see [linking consequences](#after-successful-linking).
+Revocation, expiry or a browser change refuses the link; a newer session cannot
+replace the original authority. Telegram is link-only. See [placement and sessions](../product-admin/placement-and-sessions.md)
 for hostname isolation, old links and coordinated deployment.
 
 The signed Apple protocol fixture exercises the real OIDC client and provider
@@ -119,13 +127,13 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
    - Fetches user profile from ID token
    - Finds existing user by (provider + providerId) or email
    - Creates user if new
-   - Creates session
-   - Issues a one-time login ticket
+   - Captures account identity and security version, without creating a session
+   - Issues a one-time login ticket bound to a short-lived browser nonce
    │
    ▼
 7. Redirects to frontend:
    https://amcore.dev/{locale}/auth/callback?ticket=...
-   + sets refresh_token cookie
+   + sets a60-second HttpOnly callback-binding nonce in refresh_token
    │
    ▼
 8. Frontend exchanges ticket:
@@ -134,8 +142,9 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
    Body: { "ticket": "..." }
    │
    ▼
-9. Backend validates ticket + refresh session binding
-   and returns { accessToken }
+9. Backend validates ticket + callback nonce + current account version
+   Ordinary API clients receive credentials. Browser clients and protected
+   accounts receive202 with a restricted continuation, without ordinary access.
 ```
 
 **PKCE** (Proof Key for Code Exchange) prevents authorization code interception attacks. The `code_verifier` is never sent to the browser — only the hash goes to the provider.
@@ -144,14 +153,19 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 with a short-lived browser binding cookie, so the callback is tied both to the
 server-side flow state and to the browser that started the login/link flow.
 
+Exchange tickets contain 256 random bits. SHA-256 fingerprints correlate one-use tickets
+with their retained browser attempt; they do not store or verify human passwords.
+For direct API sessions, the HttpOnly/Strict refresh cookie carries a random 256-bit
+session handle. The server stores its digest, not a password in that cookie.
+
 **How `apps/web` adapts this (ADR-068).** The diagram above describes the
-unchanged direct/native API contract. The reference web frontend uses its own
+direct/native API transport. The reference web frontend uses its own
 origin for browser requests and calls the API server-side. Provider authorization,
 state, browser binding, PKCE and token verification still execute normally.
 
-OAuth has a narrow browser-cookie exception: after the provider callback, the
-browser briefly holds a backend refresh token in a host-only HttpOnly/Strict
-cookie. Site uses `refresh_token`; admin relays it as
+After a provider login callback, the browser briefly holds a callback-binding
+nonce in a host-only HttpOnly/Strict cookie. It is not a refresh credential and
+has no Session row. Site uses `refresh_token`; admin relays it as
 `__Host-amcore_admin_oauth_refresh` with Secure and a60-second lifetime. No backend
 credential enters JavaScript, rendered props, JSON, local storage or telemetry.
 The completed session uses the selected opaque app cookie instead.
@@ -177,7 +191,10 @@ The completed session uses the selected opaque app cookie instead.
   exact non-null Origin, including port, are checked before any credential,
   recovery, cleanup or upstream effect. No Referer or missing-Origin fallback.
 - The admitted server-side operation exchanges the one-use ticket with the
-  matching refresh family, fetches the profile and publishes the selected vault.
+  matching callback nonce and exact pending browser attempt. It retains the
+  continuation before requesting credentials and stages the selected vault before
+  publication. Protected accounts continue on the MFA page with local password
+  and second-factor requirements. A provider identity never proves local MFA.
   Every post-completion navigation is303. It clears the exact temporary cookie;
   persistent sessions on other hosts remain intact.
 
@@ -186,7 +203,11 @@ Provider -> BFF callback -> public completion document (no auth effects)
                                 |
                       native same-origin POST
                                 |
-                   ticket/family check -> selected vault ->303 destination
+                   ticket/attempt check -> restricted continuation
+                                |
+                     local proofs when required
+                                |
+                     pending vault -> publication ->303 destination
 ```
 
 Only the completion GET document uses `Referrer-Policy: strict-origin`: Referer
@@ -197,15 +218,20 @@ Do not restore the default strict-origin-when-cross-origin on the document: it
 would send its full URL in same-origin Referer. Preserve nonce CSP/form-action
 self, no-store and noindex; verify these policies through the public edge.
 
-A ticket expires after60seconds. Missing cookie, expiry or definitive rejection
-returns to the selected login with a localized error; start ordinary login anew.
-Do not automatically retry an exchange after an unknown result. For ordinary login,
-open the selected login page again. If it opens your signed-in workspace, continue
-there; otherwise start a new OAuth login. Do not resubmit the old completion form.
-Invited completion
-keeps its publication/ACK and bounded current-session recovery protocol. Recovery
-requires the matching published app session, ticket hash and flow/surface; an
-invitation owner proof alone cannot reconstruct a login or double-publish it.
+A ticket expires after60seconds. Missing initial callback nonce, expiry or definitive
+rejection returns to the selected login with a localized error. Start a new login.
+A lost ordinary publication response can recover only its already published app
+cookie, within the retained journal deadline, using the same ticket hash, pending
+cookie and actual browser anchor. This status path never repeats exchange or
+publishes a pending family. An unrelated ticket cannot adopt the selected session.
+If recovery fails, start a new login; do not automatically repeat credential work.
+Invited login retains the exact invitation attempt with the neutral browser intent.
+The exchange rechecks its recipient, generation, continuation and expiry. A
+protected account must provide its local password and second factor. The combined
+confirmation validates the pending session without granting ordinary rights first.
+One transaction confirms the handoff and publishes the family. Lost-response
+recovery requires the same pending browser intent, anchor and invitation owner;
+it cannot issue a second family.
 See [invitation recovery](invites.md). Accepting membership remains a separate step.
 
 Source: `apps/web/src/shared/api/bff/oauth-provider-proxy.ts`,
@@ -251,16 +277,19 @@ session-swap), and PKCE — where the provider supports it — protects code red
 After a successful login, the frontend receives:
 
 - A one-time login ticket in the query string: `?ticket=...`
-- A `refresh_token` cookie
+- A60-second callback-binding nonce in the `refresh_token` cookie, not a session
 
 The frontend should exchange the ticket with `POST /api/v1/auth/oauth/exchange`.
-The access token is returned in the response body and is never placed in a URL.
+An ordinary independent client receives credentials. A browser client or protected
+account receives202 and must complete its restricted continuation. Tokens never
+appear in a URL.
 (`apps/web`'s reference implementation does this exchange server-side — see the
 ADR-068 note above — so its own browser-facing surface never sees this call at all.)
 
 The ticket is single-use, stored in Redis under a SHA-256-derived key, and expires
 after 60 seconds. The exchange also requires the `refresh_token` cookie and
-verifies that the ticket is bound to the same session.
+verifies the callback nonce, exact browser attempt when present, and current
+account-version snapshot. It does not adopt a different live session.
 
 See [CSRF Posture](./csrf.md) for the broader bearer-first CSRF policy and why
 OAuth login needs browser-bound state in addition to the server-side `state`
@@ -269,7 +298,7 @@ record.
 Production deployments should avoid logging query strings for OAuth callback
 routes, because callback URLs still contain short-lived login tickets.
 
-> **Note:** On login, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. Linking an existing account by email requires the provider to verify that email. An unverified email claim cannot create that link. Ordinary admin login cannot create a new account; a validated invitation can permit it.
+> **Note:** On login, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. Linking an existing account by email requires the provider to verify that email. An unverified email claim cannot create that link. Protected accounts must attach a new provider from a locally confirmed signed-in session; verified provider email alone cannot create that attachment. Ordinary admin login cannot create a new account; a validated invitation can permit it.
 
 ---
 
@@ -290,8 +319,12 @@ curl -X POST https://api.amcore.dev/api/v1/auth/oauth/exchange \
 }
 ```
 
-The refresh token is not rotated by this endpoint. It is only validated to bind
-the ticket to the session created during the OAuth callback.
+The callback cookie binds the one-time identity ticket to this exchange; it does
+not itself grant a session. An ordinary independent API client can receive the
+credential response above. Protected accounts and private browser admission receive
+`202` with a restricted continuation instead. Finish the required local proofs and
+exact publication before using ordinary credentials; see
+[password and publication transport](mfa-foundation.md#password-and-publication-transport).
 
 ---
 
@@ -344,9 +377,24 @@ Authorization: Bearer eyJhbGci...
 
 The flow is identical to regular OAuth login, except:
 
-1. The state stored in Redis includes `mode: "link"` and the user's `userId`
-2. After the callback, instead of creating a session, the provider is attached to the user
-3. The user is redirected to `/{locale}/settings/linked-accounts?linked=google`
+1. Redis stores `mode: "link"` and the account ID. Protected linking also captures the original session authority with a five-minute deadline.
+2. The callback attaches the provider without creating a session. Protected linking rechecks current authority and local proof freshness under the account lock.
+3. Protected accounts return to the selected frontend's localized `/login?linked=google`.
+   Ordinary accounts retain their linked-accounts destination. See the outcome below.
+
+### After successful linking
+
+For a protected account, provider attachment advances the account security version
+and revokes previous sessions and pending continuations in the same transaction.
+The source session is revoked too. Factor identity, accepted TOTP step and backup
+codes remain unchanged. A failed transaction rolls both attachment and revocation
+back. Replaying a consumed callback does not issue another session or renew proofs.
+
+The callback returns to the selected frontend's login page. Sign in again and
+complete the required local password and app or unused backup-code proof.
+Linking creates no replacement session. An old browser/API session cannot refresh
+or continue a pending action; another session cannot adopt that operation.
+Ordinary unprotected linking keeps its existing session policy.
 
 ### Linking flow
 
@@ -365,7 +413,8 @@ Callback: /api/v1/auth/oauth/github/callback
 Backend:
   - mode == "link" → attach GitHub account to user "cm1abc..."
   - If GitHub account is already linked to a DIFFERENT user → error
-  - Success → redirect to /{locale}/settings/linked-accounts?linked=github
+  - Protected success → revoke old authority → redirect to localized login
+  - Ordinary success → existing linked-accounts destination
 ```
 
 **Errors:**

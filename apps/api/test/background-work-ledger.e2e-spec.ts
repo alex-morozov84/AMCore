@@ -20,6 +20,8 @@ import { BackgroundControlBudgets } from '../src/core/admin/background-control-b
 import { BackgroundControlMaintenance } from '../src/core/admin/background-control-maintenance'
 import { BackgroundControlReservations } from '../src/core/admin/background-control-reservations'
 import { AuditLogService } from '../src/core/audit/audit-log.service'
+import { MfaEncryptionService } from '../src/core/auth/mfa/mfa-encryption.service.js'
+import { createTotpSecret } from '../src/core/auth/mfa/mfa-totp.js'
 import { EnvService } from '../src/env/env.service'
 import { PrismaClient } from '../src/generated/prisma/client'
 import { backgroundControlTransaction } from '../src/infrastructure/background-work/control-transaction'
@@ -126,7 +128,57 @@ describe('Background-work ADMIN ledger', () => {
         expiresAt: new Date(Date.now() + 60_000),
       },
     })
-    principal = { type: 'jwt', sub: user.id, sid: session.id, systemRole: SystemRole.SuperAdmin }
+    // Explicit post-enrollment authority in this owned standalone DB; no runtime auth bypass.
+    await prisma.mfaProtocol.upsert({
+      where: { id: 'platform' },
+      create: { id: 'platform', state: 'active' },
+      update: { state: 'active' },
+    })
+    await prisma.mfaAccount.create({
+      data: { userId: user.id, required: true, setupComplete: true },
+    })
+    const factorId = uuidv7()
+    const codec = new MfaEncryptionService(
+      new EnvService(
+        new ConfigService({
+          MFA_ACTIVE_KEY_ID: 'ledger-fixture',
+          MFA_ENCRYPTION_KEYS: JSON.stringify({
+            'ledger-fixture': Buffer.alloc(32, 4).toString('base64'),
+          }),
+        })
+      )
+    )
+    await prisma.mfaFactor.create({
+      data: {
+        id: factorId,
+        userId: user.id,
+        ...codec.encrypt(user.id, factorId, createTotpSecret(email).secret),
+      },
+    })
+    await prisma.authSessionFamily.create({
+      data: {
+        id: session.familyId,
+        userId: user.id,
+        securityVersion: 0,
+        primaryMethod: 'password',
+        primaryAt: session.lastAuthAt,
+        primaryProofId: uuidv7(),
+        mfaMethod: 'totp',
+        mfaAt: session.lastAuthAt,
+        mfaProofId: uuidv7(),
+        factorVersion: 1,
+        publicationState: 'published',
+        expiresAt: session.expiresAt,
+      },
+    })
+    principal = {
+      type: 'jwt',
+      sub: user.id,
+      sid: session.id,
+      fid: session.familyId,
+      securityVersion: 0,
+      systemRole: SystemRole.SuperAdmin,
+    }
   })
 
   function command(): WorkCommand {

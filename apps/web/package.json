@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3002",
-    "build": "node ../../scripts/check-product-admin-placement.mjs && node ../../scripts/render-product-admin-edge.mjs --check && next build",
+    "build": "node ../../scripts/check-product-admin-placement.mjs && node ../../scripts/render-product-admin-edge.mjs --check && next build && node ../../scripts/write-mfa-artifact.mjs web",
     "start": "next start",
     "lint": "node ../../scripts/lint.mjs --scope web && stylelint \"src/**/*.css\"",
     "typecheck": "tsc --noEmit",

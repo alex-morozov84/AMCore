@@ -96,6 +96,11 @@ import { UpdateSystemRoleDto } from './dto/update-system-role.dto.js'
  */
 @ApiTags('admin')
 @ApiBearerAuth()
+@ApiResponse({
+  status: 409,
+  description:
+    'SESSION_CHANGED — current family, account security version or actual browser authority changed; no refresh fallback',
+})
 @Controller('admin')
 @Auth(AuthType.Bearer)
 @SystemRoles(SystemRole.SuperAdmin)
@@ -298,7 +303,7 @@ export class AdminController {
   @ApiResponse({
     status: 403,
     description:
-      'SUPER_ADMIN required, or STEP_UP_REQUIRED (session not recently re-authenticated)',
+      'SUPER_ADMIN required, or STEP_UP_REQUIRED (current session proofs are not fresh enough)',
   })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded for this privileged operation' })
   @SchemaResponse({ type: AdminUserResponseDto, status: 200, description: 'Updated user' })

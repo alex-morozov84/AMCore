@@ -5,7 +5,12 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { NotFoundException } from '../../common/exceptions'
 import { GeoIpService } from '../../infrastructure/geoip/geoip.service'
 
-import { createMockContext, type MockContext, mockContextToPrisma } from './auth-context.testkit'
+import {
+  createMockContext,
+  installOrdinaryPrimaryFixture,
+  type MockContext,
+  mockContextToPrisma,
+} from './auth-context.testkit'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
@@ -51,7 +56,14 @@ describe('SessionService', () => {
 
   beforeEach(() => {
     mockCtx = createMockContext()
-    mockCtx.prisma.$queryRaw.mockResolvedValue([])
+    installOrdinaryPrimaryFixture(mockCtx, mockUser)
+    mockCtx.prisma.user.findUnique.mockImplementation(((args: { where: { id?: string } }) =>
+      Promise.resolve({
+        ...mockUser,
+        id: args.where.id ?? mockUser.id,
+        mfaAccount: null,
+        mfaFactor: null,
+      })) as unknown as typeof mockCtx.prisma.user.findUnique)
 
     tokenService = {
       generateRefreshToken: jest.fn(),
@@ -230,6 +242,7 @@ describe('SessionService', () => {
 
       expect(mockCtx.prisma.session.updateMany).toHaveBeenCalledWith({
         where: {
+          userId: 'user-123',
           familyId: 'family-123',
           revokedAt: null,
         },
@@ -311,7 +324,16 @@ describe('SessionService', () => {
         },
       })
 
-      expect(result).toEqual({ refreshToken: newRawToken, sessionId: mockSession.id })
+      expect(result).toEqual({
+        refreshToken: newRawToken,
+        sessionId: mockSession.id,
+        accessClaims: {
+          sub: mockUser.id,
+          email: mockUser.email,
+          systemRole: mockUser.systemRole,
+          sid: mockSession.id,
+        },
+      })
     })
 
     it('should throw unauthorized if old session not found', async () => {
@@ -324,18 +346,30 @@ describe('SessionService', () => {
       ).rejects.toThrow('Invalid refresh token')
     })
 
+    it('rejects a request that tries to rotate a different owner without revoking the source', async () => {
+      mockCtx.prisma.session.findUnique.mockResolvedValue(mockSession)
+      await expect(
+        sessionService.rotateRefreshToken('old-hash', { userId: 'other-owner' })
+      ).rejects.toMatchObject({ errorCode: 'TOKEN_INVALID' })
+      expect(mockCtx.prisma.session.updateMany).not.toHaveBeenCalled()
+      expect(mockCtx.prisma.session.create).not.toHaveBeenCalled()
+    })
+
     it('should preserve user context during rotation', async () => {
+      installOrdinaryPrimaryFixture(mockCtx, { ...mockUser, id: 'user-456' })
       tokenService.generateRefreshToken.mockReturnValue('new-token')
       tokenService.hashRefreshToken.mockReturnValue('new-hash')
-      tokenService.getRefreshTokenExpiration.mockReturnValue(new Date())
+      tokenService.getRefreshTokenExpiration.mockReturnValue(new Date(Date.now() + 86_400_000))
 
       mockCtx.prisma.session.findUnique.mockResolvedValue({
         ...mockSession,
+        userId: 'user-456',
         refreshToken: 'old-hash',
       })
       mockCtx.prisma.session.updateMany.mockResolvedValue({ count: 1 })
       mockCtx.prisma.session.create.mockResolvedValue({
         ...mockSession,
+        userId: 'user-456',
         refreshToken: 'new-hash',
       })
 
@@ -378,6 +412,7 @@ describe('SessionService', () => {
 
       expect(mockCtx.prisma.session.updateMany).toHaveBeenCalledWith({
         where: {
+          userId: 'user-123',
           familyId: 'family-123',
           revokedAt: null,
         },
@@ -391,17 +426,19 @@ describe('SessionService', () => {
   })
 
   describe('deleteByRefreshToken', () => {
+    beforeEach(() => mockCtx.prisma.session.findUnique.mockResolvedValue(mockSession))
     it('should delete session by hashed token', async () => {
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 1 })
 
       await sessionService.deleteByRefreshToken('hashed-token-123')
 
       expect(mockCtx.prisma.session.deleteMany).toHaveBeenCalledWith({
-        where: { refreshToken: 'hashed-token-123' },
+        where: { userId: mockSession.userId, familyId: mockSession.familyId },
       })
     })
 
     it('should not throw error if session not found', async () => {
+      mockCtx.prisma.session.findUnique.mockResolvedValue(null)
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 0 })
 
       await expect(sessionService.deleteByRefreshToken('non-existent')).resolves.not.toThrow()
@@ -597,6 +634,7 @@ describe('SessionService', () => {
   })
 
   describe('deleteSession', () => {
+    beforeEach(() => mockCtx.prisma.session.findFirst.mockResolvedValue(mockSession))
     it('should delete specific session for user', async () => {
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 1 })
 
@@ -604,23 +642,25 @@ describe('SessionService', () => {
 
       expect(mockCtx.prisma.session.deleteMany).toHaveBeenCalledWith({
         where: {
-          id: 'session-123',
+          familyId: 'family-123',
           userId: 'user-123',
         },
       })
     })
 
     it('should throw NotFoundException if userId mismatch', async () => {
+      mockCtx.prisma.session.findFirst.mockResolvedValue(null)
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 0 })
 
       await expect(sessionService.deleteSession('session-123', 'wrong-user')).rejects.toThrow(
         NotFoundException
       )
 
-      expect(mockCtx.prisma.session.deleteMany).toHaveBeenCalled()
+      expect(mockCtx.prisma.session.deleteMany).not.toHaveBeenCalled()
     })
 
     it('should throw NotFoundException for non-existent session', async () => {
+      mockCtx.prisma.session.findFirst.mockResolvedValue(null)
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 0 })
 
       await expect(sessionService.deleteSession('non-existent', 'user-123')).rejects.toThrow(
@@ -630,6 +670,7 @@ describe('SessionService', () => {
   })
 
   describe('deleteOtherSessions', () => {
+    beforeEach(() => mockCtx.prisma.session.findUnique.mockResolvedValue(mockSession))
     it('should delete all sessions except current', async () => {
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 3 })
 
@@ -638,7 +679,7 @@ describe('SessionService', () => {
       expect(mockCtx.prisma.session.deleteMany).toHaveBeenCalledWith({
         where: {
           userId: 'user-123',
-          NOT: { refreshToken: 'current-hash' },
+          familyId: { not: mockSession.familyId },
         },
       })
     })
@@ -652,6 +693,11 @@ describe('SessionService', () => {
     })
 
     it('should handle deletion of multiple sessions', async () => {
+      installOrdinaryPrimaryFixture(mockCtx, { ...mockUser, id: 'user-with-many' })
+      mockCtx.prisma.session.findUnique.mockResolvedValue({
+        ...mockSession,
+        userId: 'user-with-many',
+      })
       mockCtx.prisma.session.deleteMany.mockResolvedValue({ count: 10 })
 
       await sessionService.deleteOtherSessions('user-with-many', 'current')
@@ -756,7 +802,7 @@ describe('SessionService', () => {
       await sessionService.deleteByRefreshToken('hash-2')
 
       expect(mockCtx.prisma.session.deleteMany).toHaveBeenCalledWith({
-        where: { refreshToken: 'hash-2' },
+        where: { userId: mockSession.userId, familyId: mockSession.familyId },
       })
     })
   })

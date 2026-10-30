@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 
+import { MfaAuthorityReader } from '../../../core/auth/mfa/mfa-authority-reader.service.js'
 import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service.js'
 import { PrivilegedRoleService } from '../../../core/auth/privileged-role.service.js'
+import { BrowserSessionContextService } from '../../../core/frontend-context/browser-session-context.service.js'
 import { EnvModule } from '../../../env/env.module.js'
 import { EnvService } from '../../../env/env.service.js'
 
@@ -30,6 +32,8 @@ import { BullBoardBearerAuthService } from './bull-board-bearer-auth.service.js'
   providers: [
     BullBoardAuthService,
     BullBoardBearerAuthService,
+    MfaAuthorityReader,
+    BrowserSessionContextService,
     PrivilegedRoleService,
     PrivilegedAdmissionService,
   ],

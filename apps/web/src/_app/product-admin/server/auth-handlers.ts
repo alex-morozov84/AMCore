@@ -6,6 +6,7 @@ import {
   verifyEmailSchema,
 } from '@amcore/shared'
 
+import { handleBrowserBootstrap } from '@/shared/api/bff/browser-bootstrap-handler'
 import { handleCredentialAuth } from '@/shared/api/bff/credential-auth-handler'
 import { handleLogout } from '@/shared/api/bff/logout-handler'
 import {
@@ -19,6 +20,8 @@ import { handlePublicAuthAction } from '@/shared/api/bff/public-auth-action'
 import 'server-only'
 
 export const productAdminAuthHandlers = {
+  browserContext: (request: Request) =>
+    productWebRoute(request, 'admin-auth', (context) => handleBrowserBootstrap(request, context)),
   link: (request: Request, provider: string) =>
     productWebRoute(request, 'admin-auth', (context) => proxyOAuthLink(request, provider, context)),
   authorize: (request: Request, provider: string) =>

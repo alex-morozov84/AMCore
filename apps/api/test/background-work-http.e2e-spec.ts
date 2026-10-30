@@ -55,6 +55,7 @@ import {
   startWebAppContext,
   teardownE2ETest,
 } from './helpers'
+import { seedDomainOperatorSession } from './operator-auth.fixture.js'
 
 const base = '/api/v1/admin/background-work'
 
@@ -182,10 +183,7 @@ describe('One registration → shared privileged HTTP observation/control', () =
       },
     })
     return signAccessToken(context.app, {
-      sub: user.id,
-      sid: session.id,
-      email,
-      systemRole: 'SUPER_ADMIN',
+      ...(await seedDomainOperatorSession(context, session.id)),
     })
   }
 
@@ -379,6 +377,8 @@ describe('One registration → shared privileged HTTP observation/control', () =
     const unprivileged = signAccessToken(context.app, {
       sub: decoded.sub,
       sid: decoded.sid,
+      fid: decoded.fid,
+      securityVersion: decoded.securityVersion,
       email: decoded.email,
       systemRole: 'USER',
     })
@@ -564,6 +564,8 @@ describe('One registration → shared privileged HTTP observation/control', () =
       type: 'jwt' as const,
       sub: claims.sub as string,
       sid: claims.sid as string,
+      fid: claims.fid as string,
+      securityVersion: claims.securityVersion as number,
       systemRole: SystemRole.SuperAdmin,
     }
     const summary = (await catalogue()).find((row) => row.id === imageWork.id)!

@@ -23,6 +23,8 @@ export function ProductAdminLoginForm({
       adapter={{
         submit: actions.login,
         isCurrent: () => true,
+        onMfaRequired: (flowBinding) =>
+          router.replace(`${productAdminPath('/mfa')}?flow=${encodeURIComponent(flowBinding)}`),
         onSuccess: ({ user }) =>
           router.replace(destination, { locale: targetLocale ?? user.locale }),
       }}

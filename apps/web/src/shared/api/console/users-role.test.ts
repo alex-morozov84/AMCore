@@ -31,7 +31,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'access-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'access-token',
+    bindingHeaders: {},
+  })
 })
 
 describe('handleConsoleUserRoleUpdate', () => {

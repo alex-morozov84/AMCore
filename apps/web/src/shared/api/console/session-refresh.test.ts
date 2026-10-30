@@ -33,6 +33,7 @@ it('retains the console audience when refresh writes through CAS', async () => {
   const refreshed = await ensureFreshSession('session-1', {
     store,
     lock,
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn().mockResolvedValue({
       accessToken: 'fresh-access-token',
       refreshToken: 'refreshed-token',

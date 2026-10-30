@@ -181,7 +181,10 @@ export function getConsoleIntegrationsHref(): string {
 
 /** Account settings follow Console topology; account MFA itself survives Console removal. */
 export function getConsoleAccountSecurityHref(): string {
-  return `${getConsoleOverviewHref().replace(/\/$/, '')}/account/security`
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/profile`
+}
+export function getConsoleSignInAgainHref(): string {
+  return `${getConsoleOverviewHref().replace(/\/$/, '')}/sign-in-again`
 }
 
 /** Display-only normalization of the host edge's physical rewrite target. Never an auth selector. */

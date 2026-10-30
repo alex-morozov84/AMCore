@@ -48,8 +48,9 @@ introspection endpoint. Login/refresh/step-up issuance rules are unchanged.
 
 Privileged JWT claims are intersected with primary role before ability construction
 and all platform bypasses. `SystemRoles` additionally checks the original claim
-and primary role against its exact required set. API-key authentication's already
-loaded owner role is reused without widening scopes or accepted credentials.
+and primary role against its exact required set. API keys operate as `USER` with
+current explicit organization grants and scopes. An owner's platform role is
+audit provenance; it never supplies a synthetic platform grant to the key.
 
 Organization team administration is separately authorized by exact unrestricted
 `manage:TeamAccess`, matching org context and live membership (the existing JWT
@@ -73,9 +74,21 @@ alone:
   status and body for existing and unknown recipients; this does not promise
   constant-time execution or indistinguishable email delivery. See the
   [invitation contract](invites.md) for its precise limits.
-- **`POST /auth/logout` always returns `204`,** even without a valid cookie.
+- **Password admission (`POST /auth/login`)** returns 202 with a restricted
+  continuation when further proof is required. A 202 response never contains
+  an access token or refresh cookie. Private browser admission also returns
+  this intermediate result for ordinary users, without a human MFA challenge.
+  Independent ordinary API clients retain the 200 credential response.
+  Protected accounts receive 503 in prepared deployments. See
+  [password and publication transport](mfa-foundation.md#password-and-publication-transport)
+  for publication acknowledgement and deployment requirements.
+- **`POST /auth/logout` returns `204` without a legacy cookie.**
+  Browser-bound credentials additionally require their actual private browser
+  generation. Changed authority returns terminal `409 SESSION_CHANGED`, without
+  falling back to legacy logout. See the [session authority](mfa-foundation.md#session-admission).
 - **`POST /auth/reset-password` side effects:** the token is consumed atomically
-  with the password update (single-use under concurrency). Session deletion and
+  with the password update (single-use under concurrency), account security-version
+  change and existing family/session revocation. Physical session cleanup and
   cache invalidation follow the commit and can fail after the change. The account email is
   marked **verified** (the reset proves mailbox control), and an
   `account.password_changed` security notification is emitted.
@@ -85,6 +98,10 @@ alone:
   refreshes the existing session server-side — it does **not** create a session
   or rotate the refresh token, and a silent `POST /auth/refresh` does **not**
   refresh the window.
+  Protected accounts can return `202` with
+  `{ "kind": "proof_required", "requiredProofs": ["second_factor"] }` instead
+  of a token. This verifies only the password; do not retry the sensitive action
+  as though MFA were complete. Activation requires the separate [deployment procedure](mfa-deployment.md).
 
 ---
 
@@ -144,24 +161,25 @@ A raw API consumer (a script, an integration, a log pipeline) may of course read
 
 Returned in the response root `errorCode`:
 
-| Code                            | HTTP | Meaning                                                               |
-| ------------------------------- | ---- | --------------------------------------------------------------------- |
-| `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                    |
-| `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable       |
-| `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                        |
-| `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                        |
-| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)  |
-| `SERVICE_UNAVAILABLE`           | 503  | A failure-protection counter could not be checked; repeat later       |
-| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session                                          |
-| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                |
-| `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                              |
-| `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                     |
-| `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email                                         |
-| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: provider env vars missing                                      |
-| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user                        |
-| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed                                   |
-| `STEP_UP_REQUIRED`              | 403  | Destructive admin op needs recent re-auth — call `POST /auth/step-up` |
-| `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: OAuth-only account, no password                   |
+| Code                            | HTTP | Meaning                                                                                                                                |
+| ------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                                                                                     |
+| `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable                                                                        |
+| `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                                                                                         |
+| `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                                                                                         |
+| `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)                                                                   |
+| `SERVICE_UNAVAILABLE`           | 503  | A failure-protection counter could not be checked; repeat later                                                                        |
+| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session                                                                                                           |
+| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                                                                                 |
+| `SESSION_CHANGED`               | 409  | Family, account version or actual browser authority changed; stop the operation without refresh fallback                               |
+| `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                                                                                               |
+| `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                                                                                      |
+| `OAUTH_EMAIL_REQUIRED`          | 400  | OAuth: provider gave no email                                                                                                          |
+| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | OAuth: provider env vars missing                                                                                                       |
+| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Link: provider account belongs to another user                                                                                         |
+| `OAUTH_TICKET_INVALID`          | 401  | OAuth: login ticket exchange failed                                                                                                    |
+| `STEP_UP_REQUIRED`              | 403  | Sensitive action needs recent proof; legacy password step-up remains, while protected-account admission names `details.requiredProofs` |
+| `STEP_UP_METHOD_UNAVAILABLE`    | 403  | Step-up impossible: OAuth-only account, no password                                                                                    |
 
 ### Invitation and signup errors
 
@@ -216,10 +234,11 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 | `STEP_UP_MAX_AGE_SECONDS`         | `600`                | Recent-auth window for step-up-guarded ops                                      |
 | `SUPPORT_EMAIL`                   | `support@amcore.com` | Support/contact address for transactional email                                 |
 
-### Dormant MFA keyring
+### MFA keyring
 
-`MFA_ACTIVE_KEY_ID` and `MFA_ENCRYPTION_KEYS` are optional internal encryption
-inputs. They have no defaults and do not activate MFA. The keyring is a secret
+`MFA_ACTIVE_KEY_ID` and `MFA_ENCRYPTION_KEYS` have no defaults and do not activate
+MFA. Prepared deployments can omit them. API/worker startup requires the current
+key after protocol activation. The keyring is a secret
 JSON mapping of IDs to base64-encoded 32-byte keys. See the
 [foundation reference](mfa-foundation.md#encryption-configuration) for its scope.
 

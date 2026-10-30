@@ -5,7 +5,7 @@ import { adminQueuesResponseSchema } from '@amcore/shared'
 
 import type { PrismaService } from '../src/prisma'
 
-import { superAdminCookie } from './bull-board.helper'
+import { superAdminSession } from './bull-board.helper'
 import { type E2ETestContext, seedSystemRoles, setupE2ETest, teardownE2ETest } from './helpers'
 
 /**
@@ -15,7 +15,6 @@ import { type E2ETestContext, seedSystemRoles, setupE2ETest, teardownE2ETest } f
  * import) must not mount anything or be reported as available. This file is its own module cache,
  * so the import-time decision is not shared with any other suite.
  */
-const PASSWORD = 'StrongP@ss123'
 
 describe('queue board — booted production process without the flag', () => {
   let context: E2ETestContext
@@ -32,12 +31,14 @@ describe('queue board — booted production process without the flag', () => {
     app = context.app
     prisma = context.prisma
     await seedSystemRoles(prisma)
-    cookie = await superAdminCookie(app, prisma, 'disabled-admin@example.com', '/api/v1')
-    const login = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email: 'disabled-admin@example.com', password: PASSWORD })
-      .expect(200)
-    accessToken = login.body.accessToken as string
+    const authenticated = await superAdminSession(
+      app,
+      prisma,
+      'disabled-admin@example.com',
+      '/api/v1'
+    )
+    cookie = authenticated.cookie
+    accessToken = authenticated.accessToken
   }, 120000)
 
   afterAll(async () => {

@@ -53,6 +53,8 @@
     "TOKEN_INVALID": "This link is invalid or has expired.",
     "RATE_LIMIT_EXCEEDED": "Too many attempts. Please wait a moment and try again.",
     "AUTH_ORIGIN_REJECTED": "This request came from an unrecognized origin.",
+    "SESSION_CHANGED": "Your session changed. Sign in again.",
+    "AUTH_CONTEXT_CHANGED": "Your sign-in session changed. Sign in again.",
     "SESSION_NOT_FOUND": "That session no longer exists.",
     "CONTEXT_SESSION_CHANGED": "Your session changed. Reload the page to continue.",
     "UNAUTHORIZED": "Please sign in to continue.",
@@ -351,6 +353,17 @@
         "api_key_created": "API key created",
         "api_key_revoked": "API key revoked",
         "auth_step_up_failed": "Fresh authentication failed",
+        "auth_mfa_backup_codes_replaced": "New MFA backup codes generated",
+        "auth_mfa_backup_codes_saved": "MFA backup codes saved",
+        "auth_mfa_setup_completed": "MFA setup completed",
+        "auth_mfa_factor_enrolled": "MFA app connected",
+        "auth_mfa_factor_replaced": "MFA app replaced",
+        "auth_mfa_protocol_activated": "MFA deployment activated",
+        "auth_mfa_offline_recovery_started": "Offline MFA recovery started",
+        "auth_mfa_recovery_ticket_redeemed": "Recovery enrollment ticket used",
+        "auth_mfa_proof_verified": "Sign-in factor verified",
+        "auth_mfa_verification_failed": "MFA verification failed",
+        "auth_mfa_backup_code_used": "MFA backup code used",
         "auth_step_up_succeeded": "Fresh authentication succeeded",
         "org_invite_accepted": "Organization invitation accepted",
         "org_invite_created": "Organization invitation created",
@@ -1473,6 +1486,10 @@
         "details": "Details:"
       },
       "jobs": {
+        "mfa-retention": {
+          "name": "MFA cleanup",
+          "purpose": "Removes expired MFA drafts and retained session records in bounded batches."
+        },
         "cleanup": {
           "name": "Cleanup of expired records",
           "purpose": "Deletes expired sessions, tokens, API keys and invitations."
@@ -1966,7 +1983,10 @@
       "fileOverviewResult": "Overview: {result}",
       "fileIntegrationResult": "Integrations: {result}"
     },
-    "accountSecurity": "Sign-in protection"
+    "accountSecurity": "Sign-in protection",
+    "profileSettings": "Profile settings",
+    "logoutReturnUnknown": "We could not confirm the sign-out result. You can start a new sign-in without returning to the previous page. After signing in, the Console overview opens.",
+    "freshSignIn": "Start a new sign-in"
   },
   "auth": {
     "login": "Sign in",
@@ -2019,7 +2039,10 @@
       "title": "Completing sign-in…",
       "help": "If you are not redirected, select Continue.",
       "continue": "Continue"
-    }
+    },
+    "signInAgainTitle": "Sign in again",
+    "existingSignInHelp": "A sign-in is already in progress. Open it to finish or cancel it before starting another sign-in.",
+    "existingSignInAction": "Open existing sign-in"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -2891,6 +2914,9 @@
     "emergencyFailureHelp": "This is not a backup code. If this code has expired, was already used, or its result was lost, ask the server administrator for a new one.",
     "passwordSetupDescription": "This account needs a password before you can set up sign-in protection. Use password recovery to set your own password.",
     "setPassword": "Set a password",
-    "passwordSetupReturn": "After setting your password, sign in again with your email and password to continue."
+    "passwordSetupReturn": "After setting your password, sign in again with your email and password to continue.",
+    "startAbandoned": "The operation could not be started. No changes were made. Start again from your settings.",
+    "startAdvanced": "This operation has already progressed, but this window cannot restore it. Return to your settings and check the current protection status. Do not repeat the operation before checking.",
+    "returnToSettings": "Back to settings"
   }
 }

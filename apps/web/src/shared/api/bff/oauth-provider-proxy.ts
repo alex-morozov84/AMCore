@@ -1,5 +1,14 @@
+import { BROWSER_AUTH_HEADERS } from '@amcore/shared'
+
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
+import {
+  browserAnchorCookie,
+  browserSessionHeaders,
+  privateBrowserHeaders,
+  readBrowserAnchor,
+} from './browser-binding.server'
+import { prepareBrowserAuthAttempt } from './browser-bootstrap-handler'
 import { ContextRequestError } from './context-errors'
 import { getOptionalSessionEntry } from './dal'
 import { cancelInvitedOAuthForOrdinaryStart } from './invitation-auth-lifecycle'
@@ -118,10 +127,10 @@ async function authorize(
             proof,
             signal,
             context
-          ),
+          ).then((response) => relayResponse(response, provider, context)),
         context
       )
-      return relayResponse(upstream, provider, context)
+      return upstream
     } catch (error) {
       return new Response(null, {
         status: error instanceof ContextRequestError ? error.status : 503,
@@ -134,14 +143,34 @@ async function authorize(
     }
   }
   await cancelInvitedOAuthForOrdinaryStart(request, context)
+  if (!context) throw new ContextRequestError(503, 'SERVICE_UNAVAILABLE')
+  const bootstrap = await prepareBrowserAuthAttempt(request, context)
+  const prepared = (await bootstrap.json()) as {
+    attemptId: string
+    browser: { contextId: string; generation: number }
+  }
+  const anchor =
+    bootstrap.cookies.get(browserAnchorCookie(context.audience).name)?.value ??
+    readBrowserAnchor(request.headers, context.audience)
+  if (!anchor) throw new ContextRequestError(401, 'AUTH_CONTEXT_CHANGED')
+  const proof = new Headers({
+    ...privateBrowserHeaders(context.audience),
+    [BROWSER_AUTH_HEADERS.binding]: anchor,
+    [BROWSER_AUTH_HEADERS.contextId]: prepared.browser.contextId,
+    [BROWSER_AUTH_HEADERS.generation]: String(prepared.browser.generation),
+    'x-amcore-oauth-attempt': prepared.attemptId,
+  })
   const upstream = await fetchUpstream(
     request,
     `/auth/oauth/${encodeURIComponent(provider)}`,
-    undefined,
+    proof,
     undefined,
     context
   )
-  return relayResponse(upstream, provider, context)
+  const response = relayResponse(upstream, provider, context)
+  for (const cookie of bootstrap.headers.getSetCookie())
+    response.headers.append('set-cookie', cookie)
+  return response
 }
 
 /** Document navigation failures return to the human-facing login form. */
@@ -209,12 +238,17 @@ export async function proxyOAuthLink(
     throw new ContextRequestError(403, 'AUTH_ORIGIN_REJECTED')
   if (!['google', 'github', 'apple', 'telegram'].includes(provider))
     throw new ContextRequestError(404, 'NOT_FOUND')
-  const entry = await getOptionalSessionEntry('admin-auth')
+  const entry = await getOptionalSessionEntry(
+    context.frontend === 'admin' ? 'admin-auth' : 'site-auth'
+  )
   if (!entry) throw new ContextRequestError(401, 'UNAUTHORIZED')
   const upstream = await fetchUpstream(
     request,
     `/auth/oauth/${provider}/link`,
-    new Headers({ authorization: `Bearer ${entry.accessToken}` }),
+    new Headers({
+      authorization: `Bearer ${entry.accessToken}`,
+      ...browserSessionHeaders(request.headers, context.audience, entry),
+    }),
     undefined,
     context
   )

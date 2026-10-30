@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ContextRequestError } from '@/shared/api/bff/context-errors'
+
+vi.mock('@/shared/api/bff/mfa-source-operation', () => ({
+  startSourceReauthentication: vi.fn(),
+  completeSourceReauthentication: vi.fn(),
+}))
 vi.mock('server-only', () => ({}))
 vi.mock('./authenticated-proxy', () => ({
   isConsoleRequestOriginTrusted: vi.fn(),
@@ -9,6 +15,11 @@ vi.mock('./authenticated-proxy', () => ({
 
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
+
+import {
+  completeSourceReauthentication,
+  startSourceReauthentication,
+} from '@/shared/api/bff/mfa-source-operation'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 import { handleConsoleStepUp } from './step-up'
@@ -31,7 +42,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'access-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'access-token',
+    bindingHeaders: {},
+  })
 })
 
 describe('handleConsoleStepUp', () => {
@@ -104,4 +118,42 @@ describe('handleConsoleStepUp', () => {
 
     expect(response.status).toBe(503)
   })
+})
+
+it('keeps upstream 202 pending and returns only a source-bound public handle', async () => {
+  fetchMock.mockResolvedValue(
+    jsonResponse({ kind: 'proof_required', requiredProofs: ['second_factor'] }, 202)
+  )
+  const pending = {
+    kind: 'proof_required' as const,
+    flowBinding: crypto.randomUUID(),
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    requiredProofs: ['second_factor' as const],
+  }
+  vi.mocked(startSourceReauthentication).mockResolvedValue(pending)
+  const result = await handleConsoleStepUp(request())
+  expect(result.status).toBe(202)
+  expect(await result.json()).toEqual(pending)
+})
+it('accepts only a fully completed source flow as 204', async () => {
+  vi.mocked(completeSourceReauthentication).mockResolvedValue(undefined)
+  const body = { flowBinding: crypto.randomUUID(), operationId: crypto.randomUUID() }
+  const result = await handleConsoleStepUp(request(body))
+  expect(result.status).toBe(204)
+  expect(fetchMock).not.toHaveBeenCalled()
+})
+it('never reports malformed successful upstream bodies as completed', async () => {
+  fetchMock.mockResolvedValue(jsonResponse({ unexpected: true }, 200))
+  expect((await handleConsoleStepUp(request())).status).toBe(503)
+})
+
+it('preserves a source-flow budget refusal and Retry-After instead of completing step-up', async () => {
+  vi.mocked(completeSourceReauthentication).mockRejectedValue(
+    new ContextRequestError(429, 'RATE_LIMIT_EXCEEDED', 60)
+  )
+  const result = await handleConsoleStepUp(
+    request({ flowBinding: crypto.randomUUID(), operationId: crypto.randomUUID() })
+  )
+  expect(result.status).toBe(429)
+  expect(result.headers.get('retry-after')).toBe('60')
 })

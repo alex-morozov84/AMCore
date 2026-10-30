@@ -38,7 +38,7 @@ async function read(request: Request, path: string): Promise<Response> {
     const response = await fetchBackendResponse(`${API_URL}${path}`, request.headers, {
       method: 'GET',
       cache: 'no-store',
-      headers: forwardRequestHeaders(request.headers, resolved.token),
+      headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(TIMEOUT_MS)]),
     })
     const headers = forwardResponseHeaders(response.headers)

@@ -18,6 +18,13 @@ test('actual Compose rendering replaces poisoned ports/environment with owned lo
     await configuration(m)
     assert.equal(m.model.services.postgres.ports, undefined)
     assert.equal(m.model.services.api.environment.GEOIP_ENABLED, 'false')
+    const keys = m.model.services.api.environment.MFA_ENCRYPTION_KEYS
+    assert.equal(m.model.services.api.environment.MFA_ACTIVE_KEY_ID, 'managed-e2e')
+    assert.equal(m.model.services.worker.environment.MFA_ENCRYPTION_KEYS, keys)
+    for (const service of ['web', 'seed', 'migrate']) {
+      assert.equal(m.model.services[service].environment.MFA_ENCRYPTION_KEYS, undefined)
+      assert.equal(m.model.services[service].environment.MFA_ACTIVE_KEY_ID, undefined)
+    }
     assert.equal(
       m.model.services.api.environment.DATABASE_URL,
       m.model.services.migrate.environment.E2E_DATABASE_URL

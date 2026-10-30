@@ -45,7 +45,7 @@ describe('PrivilegedAdmissionService', () => {
     expect(result.principal.systemRole).toBe(SystemRole.User)
   })
 
-  it('reuses authenticated API-key owner primary role without another DB read', async () => {
+  it('projects every API key to USER without consulting owner role as a grant', async () => {
     const key: RequestPrincipal = {
       ...jwt(),
       type: 'api_key',
@@ -54,7 +54,8 @@ describe('PrivilegedAdmissionService', () => {
       aclVersion: 2,
     }
     const result = await service.resolve(key, [SystemRole.SuperAdmin])
-    expect(result.currentRole).toBe(SystemRole.SuperAdmin)
+    expect(result.currentRole).toBe(SystemRole.User)
+    expect(result.principal.systemRole).toBe(SystemRole.User)
     expect(result.principal.scopes).toEqual(['read:User'])
     expect(getCurrentSystemRole).not.toHaveBeenCalled()
     key.scopes!.push('manage:TeamAccess')
@@ -67,5 +68,32 @@ describe('PrivilegedAdmissionService', () => {
     const outage = new Error('primary unavailable')
     getCurrentSystemRole.mockRejectedValue(outage)
     await expect(service.resolve(jwt())).rejects.toBe(outage)
+  })
+  it('reuses only evidence returned for the identical admitted principal and preserves role intersection', async () => {
+    const privileged = jwt()
+    expect(
+      (
+        await service.resolve(privileged, [], {
+          principal: privileged,
+          currentRole: SystemRole.User,
+        })
+      ).principal.systemRole
+    ).toBe(SystemRole.User)
+    const ordinary = jwt(SystemRole.User)
+    expect(
+      (
+        await service.resolve(ordinary, [SystemRole.User], {
+          principal: ordinary,
+          currentRole: SystemRole.SuperAdmin,
+        })
+      ).principal.systemRole
+    ).toBe(SystemRole.User)
+    expect(getCurrentSystemRole).not.toHaveBeenCalled()
+    getCurrentSystemRole.mockResolvedValue(SystemRole.User)
+    await service.resolve(privileged, [], {
+      principal: { ...privileged },
+      currentRole: SystemRole.SuperAdmin,
+    })
+    expect(getCurrentSystemRole).toHaveBeenCalledTimes(1)
   })
 })

@@ -8,7 +8,7 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 // The row actions live behind one menu trigger; the visible trigger belongs to the current layout.
 const rowMenu = (page: Page, t: Record<string, string>, email: string) =>
@@ -34,7 +34,7 @@ test('members: real BFF, complete draft, Enter filtering, self-warning, responsi
   test.setTimeout(180000)
   const target = activeTarget()
   const email = uniqueEmail('member-roles')
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin: target.origins.product },
     data: { email, password: TEST_PASSWORD },
   })

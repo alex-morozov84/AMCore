@@ -83,19 +83,47 @@ describe('AbilityFactory', () => {
       expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
     })
 
-    // AK-02 (closed 2026-05-16, Stage 3): SUPER_ADMIN early return must not
-    // bypass apiKey.scopes.
-    //
-    // Stage 4 / AK-09 unified the super-admin path with the normal flow:
-    // SUPER_ADMIN principals synthesize a single owner permission
-    // `manage:all` and pass through applyScopes. The intersection
-    // algorithm naturally narrows it by scope. As a consequence, two
-    // tests below differ from their Stage 3 form — wildcard scopes
-    // (read:all, manage:Organization) now intersect correctly with the
-    // synthetic owner permission and produce real rules instead of being
-    // dropped wholesale. `manage:all` scope remains dropped (defense-in-
-    // depth until AK-05 scope registry).
+    // API keys use explicit organization grants even when their owner is a platform operator.
     describe('AK-02: SUPER_ADMIN api-key scope enforcement', () => {
+      beforeEach(() => {
+        permissionsCache.getPermissions.mockResolvedValue([
+          {
+            id: 'org-user-read',
+            action: 'read',
+            subject: 'User',
+            conditions: { id: '${user.sub}' },
+            fields: ['id'],
+            inverted: false,
+            organizationId: 'org-1',
+          },
+          {
+            id: 'org-management',
+            action: 'manage',
+            subject: 'Organization',
+            conditions: { id: '${user.organizationId}' },
+            fields: [],
+            inverted: false,
+            organizationId: 'org-1',
+          },
+        ])
+      })
+
+      it('does not synthesize platform grants when an operator has no organization permissions', async () => {
+        permissionsCache.getPermissions.mockResolvedValue([])
+        const principal: RequestPrincipal = {
+          type: 'api_key',
+          sub: 'admin-1',
+          systemRole: SystemRole.SuperAdmin,
+          organizationId: 'org-1',
+          aclVersion: 5,
+          scopes: ['read:all'],
+        }
+        const ability = await factory.createForUser(await admissionForTest(principal))
+        expect(ability.can(Action.Read, Subject.User)).toBe(false)
+        expect(ability.can(Action.Read, Subject.Organization)).toBe(false)
+        expect(ability.can(Action.Manage, Subject.All)).toBe(false)
+      })
+
       it('SUPER_ADMIN api-key with read:User can only read:User', async () => {
         const principal: RequestPrincipal = {
           type: 'api_key',
@@ -112,7 +140,7 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Create, Subject.Organization)).toBe(false)
         expect(ability.can(Action.Delete, Subject.User)).toBe(false)
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
-        expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+        expect(permissionsCache.getPermissions).toHaveBeenCalledWith('admin-1', 'org-1', 5)
         expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
       })
 
@@ -131,7 +159,7 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Read, Subject.User)).toBe(false)
         expect(ability.can(Action.Manage, Subject.All)).toBe(false)
         expect(ability.can(Action.Create, Subject.Organization)).toBe(false)
-        expect(permissionsCache.getPermissions).not.toHaveBeenCalled()
+        expect(permissionsCache.getPermissions).toHaveBeenCalledWith('admin-1', 'org-1', 5)
         expect(orgAclVersion.getCurrent).not.toHaveBeenCalled()
       })
 
@@ -156,12 +184,8 @@ describe('AbilityFactory', () => {
         expect(ability.can(Action.Create, Subject.Organization)).toBe(false)
       })
 
-      // Stage 4 / AK-09 changed this from "dropped wholesale" to
-      // "intersected correctly". `read:all` intersected with the synthetic
-      // owner permission `manage:all` produces `read:all`, so the key can
-      // read any subject. `manage:Organization` intersected likewise
-      // produces `manage:Organization`.
-      it('SUPER_ADMIN api-key with read:all reads any subject (AK-09)', async () => {
+      // Wildcard scopes narrow only explicit organization grants; they add no platform authority.
+      it('SUPER_ADMIN api-key with read:all reads only granted organization subjects', async () => {
         const principal: RequestPrincipal = {
           type: 'api_key',
           sub: 'admin-1',

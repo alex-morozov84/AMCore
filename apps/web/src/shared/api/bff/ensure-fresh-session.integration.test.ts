@@ -51,7 +51,12 @@ describe('ensureFreshSession single-flight refresh against real Redis', () => {
       }
     })
 
-    const deps = { store: redisVaultStore, lock: redisVaultLock, upstreamRefresh }
+    const deps = {
+      store: redisVaultStore,
+      lock: redisVaultLock,
+      verifyBinding: async () => undefined,
+      upstreamRefresh,
+    }
     const [first, second] = await Promise.all([
       ensureFreshSession(sessionId, deps),
       ensureFreshSession(sessionId, deps),

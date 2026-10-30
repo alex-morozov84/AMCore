@@ -9,6 +9,7 @@ import type { ZodType } from 'zod'
 import { fetchBackendResponse } from '../backend-transport'
 import { parseRetryAfterSeconds } from '../retry-after'
 
+import { browserSessionHeaders } from './browser-binding.server'
 import { readContextJson } from './context-body-budget'
 import { withinContextDeadline } from './context-deadline'
 import { ContextRequestError } from './context-errors'
@@ -103,6 +104,14 @@ export async function executeContextOperation<T>(
       const session = await freshContextSession(captured, deps)
       signal.throwIfAborted()
       const headers = forwardRequestHeaders(input.headers, session.accessToken)
+      for (const [name, value] of Object.entries(
+        browserSessionHeaders(
+          input.headers,
+          deps.webContext?.audience ?? session.audience ?? 'product',
+          session
+        )
+      ))
+        headers.set(name, value)
       if (deps.webContext) {
         for (const [key, value] of frontendApiHeaders(deps.webContext)) headers.set(key, value)
       }

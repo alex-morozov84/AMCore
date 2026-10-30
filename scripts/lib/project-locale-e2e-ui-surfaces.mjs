@@ -136,6 +136,7 @@ export const E2E_UI_PROFILES = Object.freeze({
     ["'Cancel'", "'Отмена'"],
   ],
   consoleSessions: [
+    ["'Sessions (1 total)'", "'Сессии (всего: 1)'"],
     ["'Sessions (2 total)'", "'Сессии (всего: 2)'"],
     ["'Refresh'", "'Обновить'"],
     ['/sessions \\(/i', '/сессии \\(/i'],
@@ -227,7 +228,7 @@ export const E2E_UI_SURFACES = Object.freeze([
   surface(
     'apps/web/e2e/real-stack/admin-sessions/sessions.spec.ts',
     ['auth', 'consoleSessions'],
-    27
+    23
   ),
   surface('apps/web/e2e/console-real-stack/sessions.spec.ts', ['console', 'consoleSessions'], 10),
   surface('apps/web/e2e/console-real-stack/session-isolation.spec.ts', ['console'], 5),

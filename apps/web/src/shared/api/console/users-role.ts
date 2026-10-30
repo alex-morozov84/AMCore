@@ -53,7 +53,7 @@ export async function handleConsoleUserRoleUpdate(
       request.headers,
       {
         method: 'PATCH',
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
         body: JSON.stringify(parsed.data),
       }
     )

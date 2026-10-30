@@ -19,8 +19,10 @@ import { EnvService } from '../../env/env.service.js'
 import { RateLimit } from '../../infrastructure/throttling/index.js'
 import { AuthService } from '../auth/auth.service.js'
 import { Auth } from '../auth/decorators/auth.decorator.js'
-import { AuthResponseDto } from '../auth/dto/index.js'
+import { PasswordLoginResponseDto } from '../auth/dto/index.js'
 import { negotiateLocale } from '../auth/locale-negotiation.js'
+import { ApiRegistrationPublication } from '../auth/mfa/mfa-registration.openapi.js'
+import { registrationBrowserIntent } from '../auth/mfa/mfa-registration-publication.js'
 import {
   OrganizationContextBoundary,
   RequestContextPolicy,
@@ -85,6 +87,7 @@ export class InvitationPublicController {
   }
 
   @Post('register')
+  @ApiRegistrationPublication()
   @RequestContextPolicy({ kind: 'personal' })
   @RateLimit({ rate: 5, per: 3600000, burst: 5 })
   @ApiHeader({ name: 'X-Invitation-Continuation', required: true })
@@ -95,7 +98,7 @@ export class InvitationPublicController {
     description:
       'The user, its first session, the authentication handoff and its email-verification token are created in one transaction; the invitation expiry is checked last. If it fails, its writes roll back. After the commit the response can still be lost: sign in or reset the password instead of submitting again. A canonical-email conflict returns 409 EMAIL_ALREADY_EXISTS.',
   })
-  @SchemaResponse({ type: AuthResponseDto, status: 201 })
+  @SchemaResponse({ type: PasswordLoginResponseDto, status: 201 })
   async register(
     @Body({ schema: InvitedRegisterDto.schema }) dto: InvitedRegisterDto,
     @Headers('x-invitation-continuation') credential: string,
@@ -103,6 +106,7 @@ export class InvitationPublicController {
     @Res({ passthrough: true }) res: Response
   ): Promise<Omit<Awaited<ReturnType<AuthService['registerInvited']>>, 'refreshToken'>> {
     const result = await this.auth.registerInvited(dto, credential, {
+      registrationBrowser: registrationBrowserIntent(req),
       handoff: invitationHandoffProof(
         req.headers['x-invitation-auth-attempt-id'],
         req.headers['x-invitation-handoff-key']
@@ -119,6 +123,10 @@ export class InvitationPublicController {
       path: '/',
       maxAge: 7 * 86400 * ('raw' in res ? 1 : 1000),
     })
-    return { user: result.user, accessToken: result.accessToken }
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+      ...(result.publication ? { publication: result.publication } : {}),
+    }
   }
 }

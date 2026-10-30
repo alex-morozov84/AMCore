@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
-import { activeTarget } from '../support/managed-target.mjs'
+import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import {
   countAuditViews,
@@ -230,6 +230,16 @@ test('Audit-view events are hidden until the operator enables them', async ({ pa
   await page.context().clearCookies()
   await loginViaUi(page, email)
   await expect(page).toHaveURL(/\/en\/?$/)
+  // Seed an owned read event inside the initial time window. Later page reads
+  // occur after that fixed window and are not guaranteed to be its first row.
+  expect(
+    guardedSql(
+      `INSERT INTO core.audit_log (id, "createdAt", "actorType", "actorId", action, category, metadata)
+     SELECT :'marker', now(), 'USER', id, 'admin.audit_logs.viewed', 'SECURITY', '{}'::jsonb
+     FROM core.users WHERE "emailCanonical" = :'email';`,
+      { marker: randomUUID(), email }
+    ).trim()
+  ).toBe('INSERT 0 1')
   await page.goto('/en/admin/audit?limit=1')
   await expect(page.getByRole('heading', { name: 'Audit' })).toBeVisible()
   await expect(page.getByRole('table')).not.toContainText('admin.audit_logs.viewed')

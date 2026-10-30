@@ -13,6 +13,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 const ROUTE = '/admin/background-work/queues'
 const PASSWORD = 'StrongP@ss123'
@@ -51,10 +52,7 @@ describe('Admin background-work queues (e2e)', () => {
   async function makeSuperAdmin(email: string) {
     const { userId } = await register(email)
     await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const res = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200)
+    const res = await loginDomainOperator(context, { email, password: PASSWORD })
     return { userId, token: res.body.accessToken as string }
   }
 
@@ -173,6 +171,7 @@ describe('Admin background-work queues (e2e)', () => {
     await request(app.getHttpServer())
       .get(ROUTE)
       .set('Authorization', `Bearer ${b.token}`)
-      .expect(403)
+      .expect(409)
+      .expect(({ body }) => expect(body.errorCode).toBe('SESSION_CHANGED'))
   })
 })

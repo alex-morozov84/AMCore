@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 
 import { scanAccessibility } from '../shared/axe'
+import { completeMfaStepUp } from '../shared/mfa-login'
 import { guardedSql } from '../support/managed-target.mjs'
 
 import { ageSessionLastAuthAt, getUserId, setSystemRole } from './admin-helpers'
@@ -81,6 +82,7 @@ test('platform key discovery, captured bulk step-up, lifecycle history and respo
   await expect(stepUp).toBeVisible()
   await stepUp.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUp.getByRole('button', { name: /confirm|continue|verify/i }).click()
+  await completeMfaStepUp(page, email)
   await expect(page.getByRole('row').filter({ hasText: 'Lifecycle 00' })).toContainText('Revoked')
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeFocused()
   expect(mutations).toEqual([403, 200])

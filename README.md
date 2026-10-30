@@ -10,6 +10,11 @@
 
 ## Overview
 
+[Operator MFA](docs/auth/mfa-browser.md) supports authenticator apps and one-use
+backup codes. [Deployment and recovery](docs/auth/mfa-deployment.md) require
+separate activation approval. The mechanism is account-owned; see
+[extending MFA to other users](docs/auth/mfa-foundation.md#extend-mfa-to-other-users).
+
 [Create an organization for another person](docs/product-admin/organization-provisioning.md) through Console or the protected API, with invitation recovery.
 
 AMCore is a production-oriented application starter for building secure, modular

@@ -14,6 +14,8 @@ import {
   signAccessToken,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
+import { reauthenticateDomainOperator } from './operator-step-up.fixture.js'
 
 describe('Admin (e2e)', () => {
   let app: INestApplication
@@ -50,10 +52,10 @@ describe('Admin (e2e)', () => {
       data: { systemRole: 'SUPER_ADMIN' },
     })
     // Login again to get a fresh token with updated role from DB
-    const res = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'superadmin@example.com', password: 'StrongP@ss123' })
-      .expect(200)
+    const res = await loginDomainOperator(context, {
+      email: 'superadmin@example.com',
+      password: 'StrongP@ss123',
+    })
     return res.body.accessToken as string
   }
 
@@ -282,16 +284,16 @@ describe('Admin (e2e)', () => {
 
     describe('GET /admin/organizations?search=&sortBy=', () => {
       it('matches by name OR slug, case-insensitively', async () => {
-        const { userId, token: userToken } = await registerAndGetToken('superadmin@example.com')
+        const { userId } = await registerAndGetToken('superadmin@example.com')
         const superToken = await promoteToSuperAdmin(userId)
         await request(app.getHttpServer())
           .post('/organizations')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${superToken}`)
           .send({ name: 'Acme Rockets' })
           .expect(201)
         await request(app.getHttpServer())
           .post('/organizations')
-          .set('Authorization', `Bearer ${userToken}`)
+          .set('Authorization', `Bearer ${superToken}`)
           .send({ name: 'Umbrella Corp' })
           .expect(201)
 
@@ -642,14 +644,15 @@ describe('Admin (e2e)', () => {
 
   describe('GET /admin/organizations', () => {
     it('returns all organizations for SUPER_ADMIN', async () => {
-      const { userId, token: userToken } = await registerAndGetToken('superadmin@example.com')
+      const { userId } = await registerAndGetToken('superadmin@example.com')
       const superToken = await promoteToSuperAdmin(userId)
 
-      // Create an org as the user (before promoting, doesn't matter)
+      // Use the admitted family after promotion; the earlier token lost authority.
       await request(app.getHttpServer())
         .post('/organizations')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${superToken}`)
         .send({ name: 'Test Org' })
+        .expect(201)
 
       const res = await request(app.getHttpServer())
         .get('/admin/organizations')
@@ -863,10 +866,7 @@ describe('Admin (e2e)', () => {
     async function makeSuperAdmin(email: string) {
       const { userId } = await registerAndGetToken(email)
       await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-      const res = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email, password: 'StrongP@ss123' })
-        .expect(200)
+      const res = await loginDomainOperator(context, { email, password: 'StrongP@ss123' })
       return {
         userId,
         token: res.body.accessToken as string,
@@ -904,7 +904,8 @@ describe('Admin (e2e)', () => {
       await request(app.getHttpServer())
         .get('/admin/users')
         .set('Authorization', `Bearer ${b.token}`)
-        .expect(403)
+        .expect(409)
+        .expect(({ body }) => expect(body.errorCode).toBe('SESSION_CHANGED'))
     })
 
     it('denies a demoted SUPER_ADMIN on the next access-probe request', async () => {
@@ -925,7 +926,8 @@ describe('Admin (e2e)', () => {
       await request(app.getHttpServer())
         .get('/admin/access')
         .set('Authorization', `Bearer ${b.token}`)
-        .expect(403)
+        .expect(409)
+        .expect(({ body }) => expect(body.errorCode).toBe('SESSION_CHANGED'))
     })
 
     it('denies a demoted SUPER_ADMIN on the next overview request', async () => {
@@ -946,7 +948,8 @@ describe('Admin (e2e)', () => {
       await request(app.getHttpServer())
         .get('/admin/overview')
         .set('Authorization', `Bearer ${b.token}`)
-        .expect(403)
+        .expect(409)
+        .expect(({ body }) => expect(body.errorCode).toBe('SESSION_CHANGED'))
     })
 
     it('T1: a demoted SUPER_ADMIN cannot refresh (sessions revoked)', async () => {
@@ -986,20 +989,21 @@ describe('Admin (e2e)', () => {
         .send({ systemRole: SystemRole.SuperAdmin })
         .expect(200)
 
-      // The OLD token still carries the USER claim → still 403 (no silent elevation).
+      // Promotion revokes the old family; its USER claim cannot gain operator rights.
       await request(app.getHttpServer())
         .get('/admin/users')
         .set('Authorization', `Bearer ${oldUserToken}`)
-        .expect(403)
+        .expect(409)
+        .expect(({ body }) => expect(body.errorCode).toBe('SESSION_CHANGED'))
 
       // The old refresh session was revoked on promotion → cannot silently mint an SA token.
       await request(app.getHttpServer()).post('/auth/refresh').set('Cookie', oldCookie).expect(401)
 
       // Only a fresh re-login yields a working SUPER_ADMIN token.
-      const relogin = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'promoted@example.com', password: 'StrongP@ss123' })
-        .expect(200)
+      const relogin = await loginDomainOperator(context, {
+        email: 'promoted@example.com',
+        password: 'StrongP@ss123',
+      })
       await request(app.getHttpServer())
         .get('/admin/users')
         .set('Authorization', `Bearer ${relogin.body.accessToken}`)
@@ -1025,10 +1029,7 @@ describe('Admin (e2e)', () => {
         where: { id: reg.body.user.id as string },
         data: { systemRole: 'SUPER_ADMIN' },
       })
-      const login = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email, password: PASSWORD })
-        .expect(200)
+      const login = await loginDomainOperator(context, { email, password: PASSWORD })
       return {
         userId: reg.body.user.id as string,
         token: login.body.accessToken as string,
@@ -1038,9 +1039,12 @@ describe('Admin (e2e)', () => {
 
     // Age the actor's live sessions past the 10-min step-up window.
     async function ageSessions(userId: string) {
-      await prisma.session.updateMany({
+      await prisma.authSessionFamily.updateMany({
         where: { userId, revokedAt: null },
-        data: { lastAuthAt: new Date(Date.now() - 60 * 60 * 1000) },
+        data: {
+          primaryAt: new Date(Date.now() - 60 * 60 * 1000),
+          mfaAt: new Date(Date.now() - 60 * 60 * 1000),
+        },
       })
     }
 
@@ -1079,11 +1083,7 @@ describe('Admin (e2e)', () => {
         .send({ systemRole: SystemRole.SuperAdmin })
         .expect(403)
 
-      await request(app.getHttpServer())
-        .post('/auth/step-up')
-        .set('Authorization', `Bearer ${a.token}`)
-        .send({ password: PASSWORD })
-        .expect(200)
+      await reauthenticateDomainOperator(context, a.token, PASSWORD)
 
       // Server-side session freshness: the same token now passes.
       await request(app.getHttpServer())
@@ -1112,7 +1112,7 @@ describe('Admin (e2e)', () => {
       expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
     })
 
-    it('legacy token without sid: 200 on listing, 403 STEP_UP_REQUIRED on destructive op', async () => {
+    it('legacy protected token without family authority cannot list or mutate', async () => {
       const a = await makeSuperAdmin('sa-nosid@example.com')
       const { userId: targetId } = await registerAndGetToken('target-nosid@example.com')
 
@@ -1125,18 +1125,18 @@ describe('Admin (e2e)', () => {
       await request(app.getHttpServer())
         .get('/admin/users')
         .set('Authorization', `Bearer ${legacyToken}`)
-        .expect(200)
+        .expect(409)
 
       const res = await request(app.getHttpServer())
         .patch(`/admin/users/${targetId}`)
         .set('Authorization', `Bearer ${legacyToken}`)
         .send({ systemRole: SystemRole.SuperAdmin })
-        .expect(403)
+        .expect(409)
 
-      expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+      expect(res.body.errorCode).toBe('SESSION_CHANGED')
     })
 
-    it('non-live session → 403 STEP_UP_REQUIRED before any password check (no oracle)', async () => {
+    it('protected token without a live family fails before any password check', async () => {
       const a = await makeSuperAdmin('sa-oracle@example.com')
       // sid points at a session that does not exist → fail closed regardless of
       // the password, so step-up cannot be used to probe credentials.
@@ -1151,9 +1151,9 @@ describe('Admin (e2e)', () => {
         .post('/auth/step-up')
         .set('Authorization', `Bearer ${ghostToken}`)
         .send({ password: PASSWORD })
-        .expect(403)
+        .expect(409)
 
-      expect(res.body.errorCode).toBe('STEP_UP_REQUIRED')
+      expect(res.body.errorCode).toBe('SESSION_CHANGED')
     })
 
     it('password-less (OAuth-only) account with a live session → STEP_UP_METHOD_UNAVAILABLE', async () => {
@@ -1161,7 +1161,7 @@ describe('Admin (e2e)', () => {
         data: {
           email: 'oauth-only@example.com',
           emailCanonical: 'oauth-only@example.com',
-          systemRole: 'SUPER_ADMIN',
+          systemRole: 'USER',
           passwordHash: null,
         },
       })
@@ -1179,7 +1179,7 @@ describe('Admin (e2e)', () => {
       const token = signAccessToken(app, {
         sub: user.id,
         email: user.email,
-        systemRole: 'SUPER_ADMIN',
+        systemRole: 'USER',
         sid: session.id,
       })
 

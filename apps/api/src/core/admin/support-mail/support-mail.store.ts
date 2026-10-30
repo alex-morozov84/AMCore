@@ -6,6 +6,9 @@ import { AppException, ForbiddenException } from '../../../common/exceptions/ind
 import type { Prisma, SupportMailAttempt } from '../../../generated/prisma/client.js'
 import { acquireSharedXactLock, acquireXactLock, PrismaService } from '../../../prisma/index.js'
 import { authMailClock, lockAuthMailTokens } from '../../auth/auth-mail-token-lock.js'
+import { requireMfaAdmission } from '../../auth/mfa/mfa-admission-result.js'
+import { MfaAuthorityReader } from '../../auth/mfa/mfa-authority-reader.service.js'
+import { principalBrowserBinding } from '../../auth/mfa/mfa-principal-binding.js'
 import { sessionCoordinationLockKey } from '../../auth/session-lock-key.js'
 
 import { MAIL_USER_SELECT, type MailUser } from './support-mail.common.js'
@@ -43,24 +46,32 @@ export class SupportMailStore {
     }
     for (const id of [...new Set([actor.sub, targetId])].sort())
       await tx.$queryRaw`SELECT id FROM core.users WHERE id=${id} FOR SHARE`
-    await tx.$queryRaw`SELECT id FROM core.sessions WHERE id=${actor.sid} FOR SHARE`
     const operator = await tx.user.findUnique({
       where: { id: actor.sub },
       select: { systemRole: true },
     })
-    const session = await tx.session.findUnique({ where: { id: actor.sid } })
-    const now = await authMailClock(tx)
-    if (
-      operator?.systemRole !== 'SUPER_ADMIN' ||
-      !session ||
-      session.userId !== actor.sub ||
-      session.revokedAt ||
-      session.expiresAt <= now
-    )
-      throw this.forbidden()
+    if (operator?.systemRole !== 'SUPER_ADMIN') throw this.forbidden()
+    await this.admitSession(tx, actor)
     const user = await tx.user.findUnique({ where: { id: targetId }, select: MAIL_USER_SELECT })
     if (!user) throw this.notFound()
     return user
+  }
+
+  private async admitSession(tx: Prisma.TransactionClient, actor: RequestPrincipal): Promise<void> {
+    if (actor.fid !== undefined || actor.browserBound !== undefined) {
+      requireMfaAdmission(
+        await new MfaAuthorityReader(tx).readForRuntime(
+          { ...actor, email: actor.email ?? '' },
+          principalBrowserBinding(actor)
+        )
+      )
+      return
+    }
+    await tx.$queryRaw`SELECT id FROM core.sessions WHERE id=${actor.sid} FOR SHARE`
+    const session = await tx.session.findUnique({ where: { id: actor.sid } })
+    const now = await authMailClock(tx)
+    if (!session || session.userId !== actor.sub || session.revokedAt || session.expiresAt <= now)
+      throw this.forbidden()
   }
 
   async attempt(

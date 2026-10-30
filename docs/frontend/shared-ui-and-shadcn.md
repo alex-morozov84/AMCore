@@ -84,6 +84,13 @@ Supply localized `showLabel` and `hideLabel`, and ordinary input props (includin
 form ref, id, autocomplete and disabled state). The component owns only visibility;
 downstreams can reuse it independently of the ready authentication forms.
 
+Use `MfaCodeInput` from `@/shared/ui/mfa-code-input` for app and backup-code fields.
+Pass the proof `method`, controlled `value`, `onValueChange` and the form ref/id.
+The app method preserves leading zeros, accepts a whole pasted code with spaces
+and limits input to six digits. It supplies numeric input mode and one-time-code
+autocomplete. Backup codes retain their full text. The owning form supplies the
+localized label, errors and explicit submit action; typing never submits it.
+
 `PageTitle` from `@/shared/ui/page-title` reserves the heading height and renders
 a skeleton when children are unavailable. Protected names may be provided from a
 fresh server-authorized response during initial loading; subsequent authority

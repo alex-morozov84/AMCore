@@ -6,6 +6,8 @@ import type { UserResponse } from '@amcore/shared'
 
 import { redirect } from '@/i18n/navigation'
 
+import { createBrowserBindingVerifier } from './browser-binding.server'
+import { ContextRequestError } from './context-errors'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { isInvalidRefreshError, SessionNotFoundError, SessionRefreshUnsafeError } from './errors'
 import { type ProductRouteKind, resolveProductWebContext } from './product-web-context.server'
@@ -52,9 +54,11 @@ export const getOptionalSessionEntry = cache(
         expectedAudience: context.audience,
         lock: context.lock,
         upstreamRefresh: createUpstreamRefresh(source, context),
+        verifyBinding: createBrowserBindingVerifier(source, context.audience),
       })
     } catch (error) {
       if (
+        (error instanceof ContextRequestError && error.status === 401) ||
         error instanceof SessionNotFoundError ||
         error instanceof SessionRefreshUnsafeError ||
         isInvalidRefreshError(error)

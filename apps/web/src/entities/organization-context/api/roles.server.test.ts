@@ -13,7 +13,12 @@ import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
-import { FakeVaultStore, freshRefresh, makeEntry } from '@/shared/api/bff/test-fakes'
+import {
+  browserTestHeaders,
+  FakeVaultStore,
+  freshRefresh,
+  makeBrowserEntry,
+} from '@/shared/api/bff/test-fakes'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 
 import {
@@ -26,6 +31,9 @@ import {
   saveRoleDefinition,
 } from './roles.server'
 
+beforeEach(() =>
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-domain-browser-transport-key-at-least-32>')
+)
 vi.mock('server-only', () => ({}))
 vi.mock('@/shared/api/backend-transport', () => ({
   fetchBackendResponse: vi.fn(),
@@ -64,13 +72,16 @@ function detailOfSize(bytes: number) {
   return value
 }
 function setup(respond: () => Response) {
-  const entry = makeEntry({ userSnapshot: { id: 'actor', email: 'a@example.test' } as never })
+  const entry = makeBrowserEntry({
+    userSnapshot: { id: 'actor', email: 'a@example.test' } as never,
+  })
   const store = new FakeVaultStore()
   store.seed('session-x', entry)
   const fetch = vi.fn(async () => respond())
   const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: vi.fn().mockResolvedValue('session-x'),
     apiBase: 'http://api.test',
@@ -80,7 +91,7 @@ function setup(respond: () => Response) {
   vi.mocked(productContextDeps).mockReturnValue(deps)
   const input = {
     expectedSession: contextSessionBinding('session-x', entry),
-    headers: new Headers({ authorization: 'Bearer browser-token', cookie: 'x=1' }),
+    headers: browserTestHeaders({ authorization: 'Bearer browser-token' }),
   }
   return { fetch, input }
 }

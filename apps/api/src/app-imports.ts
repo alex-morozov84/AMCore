@@ -198,6 +198,9 @@ export const webImports: Imports = [
  */
 export function workerImports(): Imports {
   return [
+    import('./core/auth/mfa/mfa-maintenance.module.js').then(({ MfaMaintenanceModule }) => ({
+      module: MfaMaintenanceModule,
+    })),
     import('./core/admin/background-control-worker.module.js').then(
       ({ BackgroundControlWorkerModule }) => ({ module: BackgroundControlWorkerModule })
     ),

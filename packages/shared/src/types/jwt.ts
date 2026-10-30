@@ -1,7 +1,13 @@
 import type { SystemRole } from '../enums/roles'
 
 // What gets encoded into JWT token
-export interface JwtPayload {
+export interface SessionAuthorityClaims {
+  fid?: string
+  securityVersion?: number
+  browserBound?: true
+}
+
+export interface JwtPayload extends SessionAuthorityClaims {
   sub: string
   email: string
   systemRole: SystemRole

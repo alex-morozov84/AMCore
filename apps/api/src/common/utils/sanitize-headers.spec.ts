@@ -1,6 +1,36 @@
 import { sanitizeHeaders } from './sanitize-headers'
 
 describe('sanitizeHeaders', () => {
+  it('removes MFA and invitation capabilities from copied exception headers', () => {
+    expect(
+      sanitizeHeaders({
+        'X-Mfa-Continuation': '<fake-mfa-continuation>',
+        'x-mfa-vault-binding': ['<fake-vault-binding>'],
+        'X-Invitation-Continuation': '<fake-invitation-continuation>',
+        'x-invitation-handoff-key': '<fake-handoff-key>',
+        host: 'example.test',
+      })
+    ).toEqual({
+      'X-Mfa-Continuation': '[REDACTED]',
+      'x-mfa-vault-binding': '[REDACTED]',
+      'X-Invitation-Continuation': '[REDACTED]',
+      'x-invitation-handoff-key': '[REDACTED]',
+      host: 'example.test',
+    })
+  })
+  it('redacts copied BFF transport secrets case-insensitively before exception logging', () => {
+    expect(
+      sanitizeHeaders({
+        'X-Amcore-Web-Context-Key': 'fake-web-key',
+        'X-Amcore-Browser-Context-Key': 'fake-browser-key',
+        'X-Amcore-Browser-Binding': ['fake-binding-a', 'fake-binding-b'],
+      })
+    ).toEqual({
+      'X-Amcore-Web-Context-Key': '[REDACTED]',
+      'X-Amcore-Browser-Context-Key': '[REDACTED]',
+      'X-Amcore-Browser-Binding': '[REDACTED]',
+    })
+  })
   it('returns an empty object for undefined / null input', () => {
     expect(sanitizeHeaders(undefined)).toEqual({})
     expect(sanitizeHeaders(null)).toEqual({})

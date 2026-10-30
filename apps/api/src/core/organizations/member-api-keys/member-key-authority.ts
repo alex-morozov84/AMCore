@@ -30,6 +30,8 @@ export async function authorizeMemberKeys(
   const { principal, admission, key } = actor
   if (principal.organizationId !== orgId) throw new ForbiddenException()
   const synthetic =
+    principal.type === 'jwt' &&
+    admission.authenticated.type === 'jwt' &&
     liveRole === SystemRole.SuperAdmin &&
     principal.systemRole === SystemRole.SuperAdmin &&
     admission.authenticated.systemRole === SystemRole.SuperAdmin

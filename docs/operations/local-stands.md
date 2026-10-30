@@ -721,7 +721,9 @@ pnpm stand preview --id account-security-review --profile account-mfa-ui
 ```
 
 Open its printed product URL followed by `/mfa`, with the locale prefix when
-locales are enabled. The demonstration needs no login. Use a made-up password.
+locales are enabled. The demonstration needs no login. Its managed check verifies only the demo USER
+account; it does not attempt password-only operator access. Existing operator
+records stay unchanged when refreshing this preview. Use a made-up password.
 Scan its public test QR with an authenticator app and enter the current code.
 The preview rejects invalid codes. Backup-code examples appear in the demo panel.
 The additional examples show password setup and a separate server-issued ticket.
@@ -732,3 +734,31 @@ It never enables backend MFA, binds a factor or grants account access. Reloading
 resets the UI example. Existing demo accounts and normal login remain separate.
 The managed inspection completes one setup/code-saving journey without tracing
 or capturing secret steps. Do not treat simulation as backend security evidence.
+
+### MFA in disposable browser tests
+
+Docker E2E stands receive their own generated MFA encryption key. After the runner
+validates its lease, database marker and owned resources, it seeds protocol version1
+as active in that disposable database. This is test setup, not deployment preflight
+or activation evidence. Preview stands and ordinary Compose deployments do not receive
+this test configuration.
+
+Run the real enrollment, backup sign-in and code-rotation journey with:
+
+```sh
+pnpm stand e2e --lane real-stack -- operator-mfa.spec.ts
+```
+
+This scenario uses the real API, BFF, Redis and browser. It provisions an operator
+only in the owned test database and completes the normal enrollment interface.
+It disables trace, video, screenshots and Playwright's automatic error-context
+DOM snapshot. It also removes matcher-supplied DOM snapshots from test errors,
+while retaining failure messages, stacks and verdicts. Docker E2E uses a step-free
+list reporter because HTML step titles can retain filled factor codes. These rules
+keep factor seeds and backup codes out of failure artifacts.
+Domain success fixtures reset only their disposable MFA source-budget keys before
+creating a fresh test account. The guarded executor validates the live invocation
+and Redis resource first. Limiter tests use their own setup and retain real budgets;
+this reset changes no production limits, factors, sessions or browser authority.
+The runner removes the disposable stack after the attempt. A failed attempt remains
+failed; test setup does not certify a production deployment.

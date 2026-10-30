@@ -17,7 +17,7 @@ their organization role.
 | [Users](users.md)                         | Find users, inspect sign-in setup and memberships, send recovery/verification mail, investigate security events, manage roles and sessions. |
 | [Organizations](organizations.md)         | Create organizations and invite their first ADMIN; initial setup, inventory and members.                                                    |
 | [API keys](api-keys.md)                   | Inspect credential metadata and irreversibly revoke one or selected keys.                                                                   |
-| [Sign-in protection](account-security.md) | Inspect the dormant account-security screen; MFA setup remains unavailable.                                                                 |
+| [Sign-in protection](account-security.md) | Manage the authenticator app and one-use backup codes after approved deployment activation.                                                 |
 | [Audit](audit.md)                         | Browse recent system events and narrow them by action, identity, or time.                                                                   |
 
 The Console also has a [configuration and deployment guide](configuration.md)

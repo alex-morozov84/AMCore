@@ -12,10 +12,12 @@ export function MfaSecuritySettings({
   view,
   pending,
   onAction,
+  confirmActions = true,
 }: {
   view: Extract<MfaBrowserView, { kind: 'settings' }>
   pending: boolean
   onAction: (action: MfaBrowserAction) => void
+  confirmActions?: boolean
 }) {
   const t = useTranslations('accountMfa')
   const [confirm, setConfirm] = useState<'rotate' | 'replace'>()
@@ -39,14 +41,22 @@ export function MfaSecuritySettings({
         <h2 className="font-semibold">{t('backupCodesTitle')}</h2>
         <p>{t('remainingCodes', { count: view.remainingCodes })}</p>
         {view.remainingCodes === 0 && <p>{t('noCodesLeft')}</p>}
-        <Button variant="outline" disabled={pending} onClick={() => setConfirm('rotate')}>
+        <Button
+          variant="outline"
+          disabled={pending}
+          onClick={() => (confirmActions ? setConfirm('rotate') : onAction('start_code_rotation'))}
+        >
           {t('newCodes')}
         </Button>
       </section>
       <section className="space-y-3">
         <h2 className="font-semibold">{t('authenticator')}</h2>
         <p>{t('replaceDescription')}</p>
-        <Button variant="outline" disabled={pending} onClick={() => setConfirm('replace')}>
+        <Button
+          variant="outline"
+          disabled={pending}
+          onClick={() => (confirmActions ? setConfirm('replace') : onAction('start_replacement'))}
+        >
           {t('replaceApp')}
         </Button>
       </section>

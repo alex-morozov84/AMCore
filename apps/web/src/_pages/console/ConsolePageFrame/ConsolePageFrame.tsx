@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { Suspense } from 'react'
 import { cookies } from 'next/headers'
 
-import { getConsoleAwareUser } from '@/shared/api/console/access-token'
+import { ClientMessages } from '@/i18n/client-message-boundary'
+import { getConsoleAwareUser, getConsoleLogoutIntent } from '@/shared/api/console/access-token'
 import { getConsoleLogSearchTarget } from '@/shared/lib/console-log-search-target'
 import { LogSearchTargetProvider } from '@/shared/lib/log-search-context'
 import { requireSuperAdmin } from '@/shared/lib/require-super-admin'
@@ -24,10 +25,16 @@ export async function ConsolePageFrame({ children, fallback }: ConsolePageFrameP
   const defaultSidebarOpen = sidebarCookie === undefined ? undefined : sidebarCookie === 'true'
   const user = await getConsoleAwareUser()
   return (
-    <ConsoleShell user={user} defaultSidebarOpen={defaultSidebarOpen}>
-      <LogSearchTargetProvider target={getConsoleLogSearchTarget()}>
-        <Suspense fallback={fallback}>{children}</Suspense>
-      </LogSearchTargetProvider>
-    </ConsoleShell>
+    <ClientMessages namespaces={['accountMfa']}>
+      <ConsoleShell
+        logoutIntent={await getConsoleLogoutIntent()}
+        user={user}
+        defaultSidebarOpen={defaultSidebarOpen}
+      >
+        <LogSearchTargetProvider target={getConsoleLogSearchTarget()}>
+          <Suspense fallback={fallback}>{children}</Suspense>
+        </LogSearchTargetProvider>
+      </ConsoleShell>
+    </ClientMessages>
   )
 }

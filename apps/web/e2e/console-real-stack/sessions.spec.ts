@@ -1,3 +1,4 @@
+import { completeMfaSignIn, completeMfaStepUp } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -37,6 +38,7 @@ test('host session helper preserves current UA on actual vault rotation; Session
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(page, email)
   await expect(page).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
@@ -84,8 +86,9 @@ test('host session helper preserves current UA on actual vault rotation; Session
   await expect(stepUp).toBeVisible()
   await stepUp.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUp.getByRole('button', { name: /confirm/i }).click()
+  await completeMfaStepUp(page, email)
   await expect(page.getByText('No active sessions.', { exact: true })).toBeVisible()
-  expect(responses).toEqual([204])
+  expect(responses).toEqual([202, 204])
   await admin.close()
   await product.close()
 })

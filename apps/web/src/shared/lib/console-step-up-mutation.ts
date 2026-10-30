@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, type MfaProof, type MfaStepUpPending } from '@amcore/shared'
 import { useMutation } from '@tanstack/react-query'
 
 import { getErrorCode, useApiError } from '@/shared/api'
@@ -9,7 +9,10 @@ import { consoleApi } from '@/shared/api/console-api'
 import { toast } from '@/shared/ui/toast'
 
 export type StepUpPhase =
-  { kind: 'closed' } | { kind: 'open' } | { kind: 'error'; message: string; terminal: boolean }
+  | { kind: 'closed' }
+  | { kind: 'open' }
+  | { kind: 'proof'; flow: MfaStepUpPending; message?: string; unknown?: boolean }
+  | { kind: 'error'; message: string; terminal: boolean }
 
 interface UseStepUpMutationOptions<TResult> {
   /** The caller's own action — e.g. a role change or a session revoke. */
@@ -36,6 +39,7 @@ export function useStepUpMutation<TResult>({
   onError,
 }: UseStepUpMutationOptions<TResult>) {
   const describeError = useApiError()
+  const proofFlow = useRef<MfaStepUpPending | null>(null)
   const continuation = useRef(0)
   useEffect(
     () => () => {
@@ -47,11 +51,21 @@ export function useStepUpMutation<TResult>({
 
   const primaryMutation = useMutation({ mutationFn, retry: false })
   const stepUpMutation = useMutation({
-    mutationFn: (password: string) => consoleApi.stepUp(password),
+    mutationFn: (input: string | MfaProof | null) => {
+      if (typeof input === 'string') return consoleApi.stepUp(input)
+      const flow = proofFlow.current
+      if (!flow) throw new Error('Source proof flow required')
+      return consoleApi.stepUpProof({
+        flowBinding: flow.flowBinding,
+        operationId: crypto.randomUUID(),
+        ...(input ? { proof: input } : {}),
+      })
+    },
     retry: false,
   })
 
   async function confirm() {
+    proofFlow.current = null
     const epoch = ++continuation.current
     try {
       const result = await primaryMutation.mutateAsync()
@@ -66,17 +80,36 @@ export function useStepUpMutation<TResult>({
     }
   }
 
-  async function submitStepUp(password: string) {
+  async function submitStepUp(input: string | MfaProof | null) {
     const epoch = continuation.current
     try {
-      await stepUpMutation.mutateAsync(password)
+      const next = await stepUpMutation.mutateAsync(input)
+      if (epoch !== continuation.current) return
+      if (next) {
+        proofFlow.current = next
+        if (next.requiredProofs.includes('password')) {
+          proofFlow.current = null
+          setStepUp({ kind: 'open' })
+        } else setStepUp({ kind: 'proof', flow: next })
+        return
+      }
     } catch (error) {
       if (epoch !== continuation.current) return
-      setStepUp({
-        kind: 'error',
-        message: describeError(error).message,
-        terminal: isTerminalStepUpFailure(error),
-      })
+      if (proofFlow.current && !isTerminalStepUpFailure(error)) {
+        const code = getErrorCode(error)
+        setStepUp({
+          kind: 'proof',
+          flow: proofFlow.current,
+          message: describeError(error).message,
+          unknown:
+            code !== AuthErrorCode.MFA_INVALID_PROOF && code !== AuthErrorCode.RATE_LIMIT_EXCEEDED,
+        })
+      } else
+        setStepUp({
+          kind: 'error',
+          message: describeError(error).message,
+          terminal: isTerminalStepUpFailure(error),
+        })
       return
     }
     if (epoch === continuation.current) await retryAfterStepUp(epoch)
@@ -110,6 +143,7 @@ export function useStepUpMutation<TResult>({
     submitStepUp,
     closeStepUp: () => {
       continuation.current += 1
+      proofFlow.current = null
       setStepUp({ kind: 'closed' })
     },
   }
@@ -118,6 +152,9 @@ export function useStepUpMutation<TResult>({
 function isTerminalStepUpFailure(error: unknown): boolean {
   const code = getErrorCode(error)
   return (
-    code === AuthErrorCode.STEP_UP_REQUIRED || code === AuthErrorCode.STEP_UP_METHOD_UNAVAILABLE
+    code === AuthErrorCode.STEP_UP_REQUIRED ||
+    code === AuthErrorCode.STEP_UP_METHOD_UNAVAILABLE ||
+    code === AuthErrorCode.AUTH_CONTEXT_CHANGED ||
+    code === AuthErrorCode.SESSION_CHANGED
   )
 }

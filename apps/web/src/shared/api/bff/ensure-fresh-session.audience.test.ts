@@ -29,7 +29,13 @@ describe('audience before refresh', () => {
       const lock = { acquire: vi.fn(), renew: vi.fn(), release: vi.fn() }
       const upstreamRefresh = vi.fn()
       await expect(
-        ensureFreshSession('opaque-id', { store, lock, upstreamRefresh, expectedAudience: 'staff' })
+        ensureFreshSession('opaque-id', {
+          store,
+          lock,
+          verifyBinding: async () => undefined,
+          upstreamRefresh,
+          expectedAudience: 'staff',
+        })
       ).rejects.toThrow()
       expect(lock.acquire).not.toHaveBeenCalled()
       expect(upstreamRefresh).not.toHaveBeenCalled()
@@ -46,7 +52,13 @@ describe('audience before refresh', () => {
     const lock = { acquire: vi.fn().mockResolvedValue('lease'), renew: vi.fn(), release: vi.fn() }
     const upstreamRefresh = vi.fn()
     await expect(
-      ensureFreshSession('opaque-id', { store, lock, upstreamRefresh, expectedAudience: 'staff' })
+      ensureFreshSession('opaque-id', {
+        store,
+        lock,
+        verifyBinding: async () => undefined,
+        upstreamRefresh,
+        expectedAudience: 'staff',
+      })
     ).rejects.toThrow()
     expect(lock.release).toHaveBeenCalledWith('opaque-id', 'lease')
     expect(upstreamRefresh).not.toHaveBeenCalled()

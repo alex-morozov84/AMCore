@@ -5,6 +5,7 @@ import { ensureFreshSession } from './ensure-fresh-session'
 import { isTrustedOrigin } from './origin-guard'
 import { handleDeleteOtherSessions, handleDeleteSession } from './sessions-handler'
 import { fakeVaultEntry, mockSessionCookie } from './sessions-handler.test-helpers'
+import { browserTestHeaders } from './test-fakes'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ cookies: vi.fn(), headers: vi.fn(async () => new Headers()) }))
@@ -13,7 +14,10 @@ vi.mock('./upstream-refresh', () => ({ createUpstreamRefresh: vi.fn(() => vi.fn(
 vi.mock('./origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 
 function makeRequest(): Request {
-  return new Request('http://next.internal/api/auth/sessions', { method: 'DELETE' })
+  return new Request('http://next.internal/api/auth/sessions', {
+    method: 'DELETE',
+    headers: browserTestHeaders(),
+  })
 }
 
 beforeEach(() => {

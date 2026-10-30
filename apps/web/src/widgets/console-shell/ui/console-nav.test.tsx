@@ -53,7 +53,7 @@ const inProvider = (node: React.ReactNode) =>
 beforeEach(() => pathname.mockReturnValue('/admin'))
 
 describe('Console navigation', () => {
-  it('lists nine sections with Scheduled jobs after Background work and Integrations before Users', () => {
+  it('lists eight sections and leaves account settings to the profile menu', () => {
     inProvider(<Items />)
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Overview',
@@ -63,7 +63,6 @@ describe('Console navigation', () => {
       'Users',
       'Organizations',
       'API keys',
-      'Sign-in protection',
       'Audit',
     ])
   })

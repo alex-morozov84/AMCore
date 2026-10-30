@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { appleBrowserFixture } from './apple-browser-fixture'
@@ -23,11 +23,7 @@ for (const automatic of [true, false]) {
     try {
       const page = await setup.newPage()
       await registerViaUi(page, member)
-      expect(
-        (
-          await setup.request.post(`${product}/api/auth/logout`, { headers: { Origin: product } })
-        ).status()
-      ).toBe(200)
+      expect((await logoutViaApi(setup.request, product)).status()).toBe(200)
       await registerViaUi(page, buyer)
       const context = automatic
         ? setup

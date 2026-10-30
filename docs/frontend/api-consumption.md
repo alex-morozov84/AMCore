@@ -97,6 +97,13 @@ stores the session in the Redis vault and retires earlier invitation flows. The 
 commit and the publication are separate, so publication can fail after the account
 exists.
 
+The browser first completes `/api/auth/browser-context` and echoes its nonsecret
+attempt identifier. The BFF retains its private proposal before creating the
+account. The API commits the account, pending family/session and email token in
+one transaction. The BFF prepares Redis state and confirms the exact publication
+before setting a session cookie. Invitation registration confirms its handoff in
+that same publication transaction; it never accepts membership.
+
 | What the BFF observed                                                                                                                                                                | Response                                                         | Meaning                                                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | The API answered exactly `201` with a valid body and the session was published                                                                                                       | `201 { user }` and the session cookie                            | The person is signed in                                                                                                          |
@@ -128,6 +135,12 @@ sees, see [Redis memory](../operations/capacity.md#redis-memory).
 
 ## Invitation adapters
 
+After logout, the old session cookie can remain inert. A missing vault entry
+supplies no identity to public invitation admission. Existing flows still match
+their original session binding. A present vault entry must pass primary
+verification; refusal or unavailability never falls back to anonymous admission.
+Every new sign-in still requires the exact primary publication protocol.
+
 Organization invitation management uses the dedicated personal, session-fenced
 `/api/product-access/organizations/{id}/invites` family. Its safe responses include
 `binding` and `data`; create/reissue return202. Direct API revoke returns an empty204,
@@ -135,7 +148,11 @@ but its browser adapter returns200 with `{binding,data:{status:"revoked"}}` afte
 checking that precise204 acknowledgment. A generic proxy cannot enter the closed
 organization family. Personal recipient journeys instead use
 `/api/invitation-flows/{flowId}` and `/api/invitation-operations/{operationId}`.
-See the [browser contract](../auth/invites.md#browser-bff-contract) and
+Authenticated recipient requests, including inspection, verification, consent and
+account switching, pass the selected vault entry to `invitationBackend`. The
+transport derives private browser headers from that entry and the actual anchor
+cookie. It never accepts those headers from browser input. See the
+[browser contract](../auth/invites.md#browser-bff-contract) and
 [custom composition](../product-admin/integration.md#custom-invitation-forms).
 
 ## Server Components: direct backend transport (ADR-079)

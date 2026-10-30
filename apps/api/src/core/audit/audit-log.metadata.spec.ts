@@ -1,5 +1,26 @@
 import { sanitizeAuditMetadata } from './audit-log.metadata'
 
+describe('MFA audit metadata', () => {
+  it('records bounded operation/method and drops credentials and invalid fields', () => {
+    expect(
+      sanitizeAuditMetadata('auth.mfa_backup_code_used', {
+        operationId: '0199c011-0000-7000-8000-000000000001',
+        method: 'recovery_code',
+        code: 'fake-code',
+        seed: 'fake-seed',
+        password: 'fake-password',
+        token: 'fake-token',
+      })
+    ).toEqual({ operationId: '0199c011-0000-7000-8000-000000000001', method: 'recovery_code' })
+    expect(
+      sanitizeAuditMetadata('auth.mfa_verification_failed', {
+        operationId: 'unbounded request body',
+        reason: 'raw-error-or-code',
+      })
+    ).toEqual({})
+  })
+})
+
 describe('background control strict audit metadata', () => {
   it('retains bounded command evidence and drops raw business/transport content', () => {
     const result = sanitizeAuditMetadata('background_work.command_outcome', {

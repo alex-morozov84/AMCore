@@ -17,12 +17,13 @@ export default defineConfig({
   // Fixture writes include live ownership/marker checks; browser assertions keep their own limits.
   timeout: 120_000,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // Initial setup commits once; a retry requires a fresh managed database and Redis.
+  retries: activeTarget().fixtureProfile === 'organization-setup' ? 0 : process.env.CI ? 1 : 0,
   workers: 1,
   use: {
     ...testOptions(),
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: 'off',
+    screenshot: 'off',
     serviceWorkers: 'block',
   },
   projects: [{ name: 'console-real-stack', use: { ...devices['Desktop Chrome'] } }],

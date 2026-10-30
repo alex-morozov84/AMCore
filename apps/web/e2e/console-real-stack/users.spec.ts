@@ -1,3 +1,4 @@
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -31,6 +32,7 @@ test('host-mode Users inventory uses only the isolated console session', async (
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )

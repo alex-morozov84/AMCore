@@ -1,5 +1,7 @@
 import ts from 'typescript'
 
+import { singleMfaFixture } from './project-locale-mfa-fixtures.mjs'
+
 import { findAllNodes, findUniqueNode } from './path-algebra-ast-query.mjs'
 
 const COPY = {
@@ -66,6 +68,12 @@ function catalogueObject(model, locale, ctx) {
 }
 
 export function singleCatalogueFixture(model, { locale, variant }, ctx) {
+  if (variant === 'mfa-setup' || variant === 'mfa-story') {
+    if (variant === 'mfa-story')
+      singleCatalogueFixture(model, { locale, variant: 'catalogue-pair' }, ctx)
+    singleMfaFixture(model, { locale, variant }, ctx)
+    return
+  }
   if (variant === 'catalogue-pair') {
     for (const source of ['en', 'ru']) {
       const [catalogue, ...extra] = jsonImports(model, source)
@@ -142,4 +150,6 @@ export const fixtureParams = (params) =>
     'storage-setting',
     'invitation',
     'catalogue-pair',
+    'mfa-setup',
+    'mfa-story',
   ].includes(params.variant)

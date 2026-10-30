@@ -6,6 +6,7 @@ import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { setSystemRole } from './helpers'
@@ -46,6 +47,7 @@ test('host-mode Overview panel renders real readiness, version and process role,
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
@@ -122,6 +124,7 @@ test('host-mode Overview panel denies a demoted session with a live re-check, no
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
@@ -162,6 +165,7 @@ test('host-mode Overview locale switcher stays on the console host and switches 
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )

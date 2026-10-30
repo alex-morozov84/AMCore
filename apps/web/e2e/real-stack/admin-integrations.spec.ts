@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { completeMfaStepUp } from '../shared/mfa-login'
 
 import { ageSessionLastAuthAt, setEmailVerified, setSystemRole } from './admin-helpers'
 import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
@@ -72,6 +73,7 @@ test('path-mode Integrations sends one test email after a recent password check 
   await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: 'Confirm' }).click()
 
+  await completeMfaStepUp(page, email)
   await expect(page.getByText(/Simulated\. The mock provider is in use/)).toBeVisible()
   expect(prepares).toHaveLength(1)
   // The first POST was refused for the missing password check, the retry carried the same id.

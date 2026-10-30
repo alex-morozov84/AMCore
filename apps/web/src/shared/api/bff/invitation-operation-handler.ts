@@ -37,6 +37,7 @@ export function invitationOperationHandler(
             method: 'GET',
             expectedStatus: 200,
             accessToken: session.accessToken,
+            session,
           }
         )
         signal.throwIfAborted()

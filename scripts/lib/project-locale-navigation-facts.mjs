@@ -1,6 +1,12 @@
 import { localeContent } from './project-locale-fact-helpers.mjs'
 
 const facts = {
+  'locale.navigation-mfa': [
+    'apps/web/src/_app/account-security/ui/client.tsx',
+    'apps/web/src/_app/account-security/ui/sign-in-again-client.tsx',
+    'apps/web/src/_app/console-account-security/ui/client.tsx',
+  ],
+  'locale.navigation-mfa-redirect': ['apps/web/src/_app/console-account-security/index.tsx'],
   'locale.navigation-admin-login': ['apps/web/src/_app/product-admin/ui/login-form.tsx'],
   'locale.navigation-selected-redirect': [
     'apps/web/src/_app/auth-completion/index.tsx',
@@ -28,6 +34,7 @@ const facts = {
   // Import only `usePathname`, nothing else - a plain adapter swap, not the
   // file-specific `locale.navigation-adapter` branches above.
   'locale.navigation-plain-pathname': [
+    'apps/web/src/features/console-logout/ui/ConsoleLogoutButton.tsx',
     'apps/web/src/_app/organization-access/ui/navigation-entry.tsx',
     'apps/web/src/widgets/own-api-keys/ui/own-api-keys-host.tsx',
     'apps/web/src/widgets/console-shell/ui/ConsoleNavigation.tsx',

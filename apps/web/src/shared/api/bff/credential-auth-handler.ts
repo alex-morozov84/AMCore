@@ -4,6 +4,10 @@ import type { ZodType } from 'zod'
 
 import { apiErrorResponse, zodValidationErrors } from './api-error-response'
 import { revokeBackendSession } from './backend-session-revocation'
+import { handleBrowserPassword, stageIssuedBrowserLogin } from './browser-login-handler'
+import { prepareBrowserRegistration } from './browser-registration'
+import { readContextJson } from './context-body-budget'
+import { ContextRequestError } from './context-errors'
 import { SessionVaultUnavailableError } from './errors'
 import { retireFlowsForOrdinaryAuth } from './invitation-auth-lifecycle'
 import { mintSession } from './mint-session'
@@ -42,9 +46,16 @@ export interface CredentialAuthOptions<TInput> {
 async function callRegistration<TInput>(
   request: Request,
   options: CredentialAuthOptions<TInput>,
-  body: unknown
+  body: unknown,
+  prepared?: Awaited<ReturnType<typeof prepareBrowserRegistration>>
 ): Promise<UpstreamAuthResult<UserResponse> | null> {
-  const registered = await callUpstreamRegister(options.backendPath, body, request, options.context)
+  const registered = await callUpstreamRegister(
+    options.backendPath,
+    body,
+    request,
+    options.context,
+    prepared
+  )
   if (registered.outcome === 'unknown') {
     if (registered.refreshToken)
       await revokeBackendSession(registered.refreshToken, request.headers)
@@ -58,6 +69,7 @@ async function callRegistration<TInput>(
     user: registered.user,
     accessToken: registered.accessToken,
     refreshToken: registered.refreshToken,
+    ...(registered.publication ? { publication: registered.publication } : {}),
   }
 }
 
@@ -97,7 +109,11 @@ export async function handleCredentialAuth<TInput>(
     })
   }
 
-  const rawBody = await request.json().catch(() => null)
+  if (!options.registration && new URL(request.url).search)
+    throw new ContextRequestError(400, 'BAD_REQUEST')
+  const rawBody = options.registration
+    ? await request.json().catch(() => null)
+    : await readContextJson(request.body, 2048)
   const parsed = options.schema.safeParse(rawBody)
   if (!parsed.success) {
     return apiErrorResponse(request, {
@@ -108,9 +124,14 @@ export async function handleCredentialAuth<TInput>(
   }
 
   let upstream: UpstreamAuthResult<UserResponse> | null
+  let registration: Awaited<ReturnType<typeof prepareBrowserRegistration>> | undefined
   try {
+    if (!options.registration && options.backendPath === '/auth/login' && context)
+      return await handleBrowserPassword(request, context, parsed.data)
+    if (options.registration && context)
+      registration = await prepareBrowserRegistration(request, context)
     upstream = options.registration
-      ? await callRegistration(request, options, parsed.data)
+      ? await callRegistration(request, options, parsed.data, registration)
       : await callUpstreamAuth<UserResponse>(options.backendPath, parsed.data, request, context)
   } catch (error) {
     if (error instanceof UpstreamAuthError) {
@@ -126,6 +147,35 @@ export async function handleCredentialAuth<TInput>(
 
   // Created, but there is no session this layer could revoke or publish.
   if (!upstream) return registrationSignInRequiredResponse(request)
+
+  if (registration && context) {
+    try {
+      const completed = await stageIssuedBrowserLogin(
+        request,
+        context,
+        registration.handle,
+        registration.record,
+        {
+          status: 201,
+          body: {
+            user: upstream.user,
+            accessToken: upstream.accessToken,
+            publication: upstream.publication,
+          },
+          refreshToken: upstream.refreshToken,
+        },
+        201
+      )
+      const sessionId = completed.cookies.get(context.cookieName)?.value
+      if (!sessionId) throw new ContextRequestError(503, 'SERVICE_UNAVAILABLE')
+      return new NextResponse(completed.body, {
+        status: options.successStatus,
+        headers: completed.headers,
+      })
+    } catch (error) {
+      return publicationFailure(request, options, error)
+    }
+  }
 
   let minted
   try {

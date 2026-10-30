@@ -4,6 +4,7 @@ import type { Request } from 'express'
 
 import { EnvModule } from '../../env/env.module.js'
 
+import { BrowserSessionContextService } from './browser-session-context.service.js'
 import { FrontendContextService } from './frontend-context.service.js'
 
 @Injectable()
@@ -20,7 +21,11 @@ class FrontendContextGuard implements CanActivate {
 @Global()
 @Module({
   imports: [EnvModule],
-  providers: [FrontendContextService, { provide: APP_GUARD, useClass: FrontendContextGuard }],
-  exports: [FrontendContextService],
+  providers: [
+    FrontendContextService,
+    BrowserSessionContextService,
+    { provide: APP_GUARD, useClass: FrontendContextGuard },
+  ],
+  exports: [FrontendContextService, BrowserSessionContextService],
 })
 export class FrontendContextModule {}

@@ -6,7 +6,13 @@ import { join } from 'node:path'
 import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
 import { expect, request, test } from '@playwright/test'
 
-import { TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { browserCredentialRequest } from '../real-stack/helpers'
+import {
+  logoutViaApi,
+  postBrowserCredentials,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from '../real-stack/helpers'
 import { inviteRecipient, membershipCount } from '../real-stack/invitation-recipient.helpers'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
@@ -36,21 +42,24 @@ test('deployed closed signup: reject new email/OAuth, allow existing login and i
       { id: randomUUID(), email, hash }
     )
   ).toContain('INSERT 0 1')
-  const register = await context.request.post(
-    new URL('/api/auth/register', target.origins.product).href,
-    {
-      headers: { origin: target.origins.product },
-      data: { email: uniqueEmail('closed-email'), password: TEST_PASSWORD },
-    }
+  const register = await postBrowserCredentials(
+    context.request,
+    target.origins.product,
+    '/api/auth/register',
+    { email: uniqueEmail('closed-email'), password: TEST_PASSWORD }
   )
   expect(register.status()).toBe(403)
   expect((await register.json()).errorCode).toBe('PUBLIC_SIGNUP_DISABLED')
   expect(
     (
-      await context.request.post(new URL('/api/auth/login', target.origins.product).href, {
-        headers: { origin: target.origins.product },
-        data: { email, password: TEST_PASSWORD },
-      })
+      await browserCredentialRequest(
+        context.request,
+        new URL('/api/auth/login', target.origins.product).href,
+        {
+          headers: { origin: target.origins.product },
+          data: { email, password: TEST_PASSWORD },
+        }
+      )
     ).status()
   ).toBe(200)
   const oauth = await request.newContext({
@@ -95,9 +104,7 @@ test('deployed closed signup: reject new email/OAuth, allow existing login and i
   }
   const invited = uniqueEmail('closed-invited')
   const { org, token } = await inviteRecipient(invited, email)
-  await context.request.post(new URL('/api/auth/logout', target.origins.product).href, {
-    headers: { origin: target.origins.product },
-  })
+  await logoutViaApi(context.request, target.origins.product)
   await page.goto(
     localizedFrontendUrl(target.origins.product, DEFAULT_LOCALE, `invite/accept?token=${token}`)
   )

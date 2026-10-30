@@ -2,11 +2,17 @@ import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
 
 import { guardedExec } from '../support/managed-target.mjs'
+import {
+  resetBrowserProbeDomainBudget,
+  resetMfaDomainSourceBudgets,
+} from '../support/mfa-domain-fixture.mjs'
 
 /** Reset only the shared IP fixture budget on the leased, isolated serial E2E stand.
  * Both registration IP ceilings reset; per-email and unrelated budgets remain intact. Production limits are unchanged.
  */
 export function resetInvitationRegistrationIpBudget() {
+  resetMfaDomainSourceBudgets()
+  resetBrowserProbeDomainBudget()
   const removed = guardedExec(
     'redis',
     'redis-cli',

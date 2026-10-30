@@ -81,10 +81,10 @@ describe('ScheduledJob on the real scheduler', () => {
   it('fires on the schedule it declares, one tick per period', () => {
     expect(seen.cronStarts.length).toBeGreaterThanOrEqual(2)
     expect(seen.cronStarts.length).toBeLessThanOrEqual(4)
-    for (let i = 1; i < seen.cronStarts.length; i += 1)
-      expect((seen.cronStarts[i] as number) - (seen.cronStarts[i - 1] as number)).toBeGreaterThan(
-        800
-      )
+    // Cron schedules calendar seconds, not a minimum delay after the last callback.
+    // A delayed tick and the following on-time tick can start less than 800 ms apart.
+    const calendarSeconds = seen.cronStarts.map((start) => Math.floor(start / 1000))
+    expect(new Set(calendarSeconds).size).toBe(calendarSeconds.length)
     expect(seen.intervalStarts.length).toBeGreaterThanOrEqual(10)
   })
 

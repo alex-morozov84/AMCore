@@ -107,7 +107,9 @@ node scripts/e2e-ci.mjs --all
 ```
 
 This invokes the same lane commands as GitHub with `CI=true`: forbidden `.only`,
-one browser worker per stand and one retry. Locally the lanes run sequentially
+one browser worker per stand and one retry for repeatable fixtures. Initial
+organization setup has no retry on the same database: a completed bootstrap closes
+that procedure. A new attempt requires a new managed stand. Locally the lanes run sequentially
 on one machine; GitHub runs each lane on a separate Ubuntu runner. This proves
 matching commands, inventory and settings, not identical OS, hardware or cache timings.
 A nonzero, cancelled or missing lane cannot produce a successful aggregate result.
@@ -122,6 +124,9 @@ HTTPS host tests when the Console is retained. Every Docker lane owns fresh
 Postgres, Redis, origins, volumes, lease, marker and cleanup. Keep `workers: 1`:
 Redis pauses, runtime-setting revisions and registration IP budgets are shared
 within a stand. Unique emails do not isolate those mechanisms.
+Domain fixtures reset only their known MFA source and browser-probe IP budgets
+on the leased disposable stand before an independent journey. Limiter tests do
+not use these resets. Domain success is not a production capacity measurement.
 
 Run one lane with `node scripts/e2e-ci.mjs path-standard` (also `safety`, `mocked`,
 `path-disruptive` and `host` when applicable). New ordinary specs automatically join
@@ -164,11 +169,15 @@ reports a contrast failure the person never sees. A region that never finishes l
 message saying so. A test whose subject is the busy state itself passes `{ allowBusy: true }`. The same
 rule applies to counting requests: take the baseline only once the previous step is idle, and compare
 request lists with `expect.poll` rather than sampling once.
+For session-replacement races, use controlled response barriers for exact request counts;
+keep the assertion that old data stays hidden independent of background-event timing.
 For a deliberately scoped scan use `scanAccessibility(page, { include, rules })`
 from the same module and retain assertions on both violations and scanned nodes.
 
 Assert the intended UI state first (for example a loaded view or an open dialog).
 Visual stability does not prove hydration, completed data loading or authority.
+Metadata can stream after the visible UI. Before a document scan, assert the exact
+expected catalogue title for the selected locale; a nonempty stale title is insufficient.
 Do not scan a skeleton when the scenario is meant to prove the loaded form.
 Keep normal-motion and reduced-motion behavior checks in their own scenarios.
 Oxlint rejects direct runtime imports of axe in E2E outside the shared helper,

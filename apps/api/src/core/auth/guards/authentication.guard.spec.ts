@@ -5,7 +5,9 @@ import { AuthErrorCode, AuthType } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
+import type { BrowserSessionContextService } from '../../frontend-context/browser-session-context.service'
 import { AbilityFactory } from '../casl/ability.factory'
+import type { MfaJwtAdmissionService } from '../mfa/mfa-jwt-admission.service.js'
 import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
 import {
   OrganizationContextBoundary,
@@ -101,7 +103,9 @@ describe('AuthenticationGuard', () => {
       } as unknown as PrivilegedAdmissionService,
       {
         resolve: async (_context: unknown, admission: unknown) => ({ admission }),
-      } as unknown as OrganizationContextResolver
+      } as unknown as OrganizationContextResolver,
+      { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
+      { verify: () => undefined } as unknown as BrowserSessionContextService
     )
   })
 
@@ -143,12 +147,48 @@ describe('AuthenticationGuard', () => {
       } as unknown as PrivilegedAdmissionService,
       {
         resolve: async (_context: unknown, admission: unknown) => ({ admission }),
-      } as unknown as OrganizationContextResolver
+      } as unknown as OrganizationContextResolver,
+      { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
+      { verify: () => undefined } as unknown as BrowserSessionContextService
     )
     await expect(candidate.canActivate(context)).rejects.toBe(failure)
     expect(request.ability).toBeUndefined()
     expect(policies.canActivate).not.toHaveBeenCalled()
     expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+  })
+
+  it('propagates terminal MFA denial before privileges/ability without API-key fallback', async () => {
+    const denied = new AppException('Session authority changed', 409, AuthErrorCode.SESSION_CHANGED)
+    const request = { user: { type: 'jwt', sub: 'actor' }, ability: undefined }
+    const context = {
+      ...createContext(),
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext
+    jwtAuthGuard.canActivate.mockResolvedValue(true)
+    const resolve = jest.fn()
+    const createAuthorizationContext = jest.fn()
+    const candidate = new AuthenticationGuard(
+      reflector as unknown as Reflector,
+      jwtAuthGuard as unknown as JwtAuthGuard,
+      apiKeyGuard as unknown as ApiKeyGuard,
+      { createAuthorizationContext } as unknown as AbilityFactory,
+      { requiredRoles: () => [] } as unknown as SystemRolesGuard,
+      {} as unknown as PoliciesGuard,
+      {} as unknown as TeamAccessGuard,
+      { resolve } as unknown as PrivilegedAdmissionService,
+      {} as unknown as OrganizationContextResolver,
+      {
+        assert: async () => {
+          throw denied
+        },
+      } as unknown as MfaJwtAdmissionService,
+      { verify: () => undefined } as unknown as BrowserSessionContextService
+    )
+    await expect(candidate.canActivate(context)).rejects.toBe(denied)
+    expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+    expect(resolve).not.toHaveBeenCalled()
+    expect(createAuthorizationContext).not.toHaveBeenCalled()
+    expect(request.ability).toBeUndefined()
   })
 
   it('TeamAccess authorization denial never retries a second credential', async () => {
@@ -178,7 +218,9 @@ describe('AuthenticationGuard', () => {
       } as unknown as PrivilegedAdmissionService,
       {
         resolve: async (_context: unknown, admission: unknown) => ({ admission }),
-      } as unknown as OrganizationContextResolver
+      } as unknown as OrganizationContextResolver,
+      { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
+      { verify: () => undefined } as unknown as BrowserSessionContextService
     )
     await expect(candidate.canActivate(ctx)).rejects.toBe(denied)
     expect(contextFactory.createAuthorizationContext).toHaveBeenCalledTimes(1)

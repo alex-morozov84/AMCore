@@ -31,7 +31,10 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'server-only-access' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'server-only-access',
+    bindingHeaders: {},
+  })
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
 })
 

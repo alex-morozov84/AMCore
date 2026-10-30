@@ -32,7 +32,10 @@ const request = (body = JSON.stringify(input)) =>
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: '<fake-access-token>' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: '<fake-access-token>',
+    bindingHeaders: {},
+  })
   upstream.mockResolvedValue(new Response('{}', { headers: { 'set-cookie': 'unexpected=1' } }))
 })
 

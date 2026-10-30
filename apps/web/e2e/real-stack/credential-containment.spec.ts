@@ -115,9 +115,8 @@ test('user-only auth, authenticated denial, internal refresh and direct org API 
     )
     if (!cookie) throw new Error('Test-created cookie missing')
     await proveOwnedRefresh(cookie.value, user, async () => {
-      const me = await context.request.get('/api/auth/me', {
-        headers: { cookie: `amcore_session=${cookie.value}` },
-      })
+      // Keep the owned cookie jar, including the mandatory stable browser anchor.
+      const me = await context.request.get('/api/auth/me')
       expect(me.status()).toBe(200)
       await safeJson(me)
     })

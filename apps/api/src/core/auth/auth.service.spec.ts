@@ -12,9 +12,16 @@ import type { AuditLogService } from '../audit'
 
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
-import { createMockContext, type MockContext, mockContextToPrisma } from './auth-context.testkit'
+import {
+  createMockContext,
+  installOrdinaryPrimaryFixture,
+  type MockContext,
+  mockContextToPrisma,
+} from './auth-context.testkit'
 import { EmailIdentityService } from './email-identity.service'
 import { LoginRateLimiterService } from './login-rate-limiter.service'
+import { MfaPasswordIdentityService } from './mfa/mfa-password-identity.service'
+import { PasswordStepUpService } from './password-step-up.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 import { TokenManagerService } from './token-manager.service'
@@ -101,7 +108,7 @@ describe('AuthService', () => {
       findByRefreshToken: jest.fn(),
       rotateRefreshToken: jest.fn(),
       deleteByRefreshToken: jest.fn(),
-      deleteAllByUserId: jest.fn(),
+      deleteRevokedByUserId: jest.fn(),
       getUserSessions: jest.fn(),
       deleteSession: jest.fn(),
       deleteOtherSessions: jest.fn(),
@@ -127,6 +134,7 @@ describe('AuthService', () => {
     mockEnvService = {
       get: jest.fn((key: string) => {
         const values: Record<string, string | number | boolean> = {
+          STEP_UP_MAX_AGE_SECONDS: 600,
           AUTH_PUBLIC_SIGNUP_ENABLED: true,
           FRONTEND_URL: 'https://app.example.com',
           PASSWORD_RESET_EXPIRY_MINUTES: 15,
@@ -165,12 +173,18 @@ describe('AuthService', () => {
       mockUserCacheService as never,
       mockEnvService as never,
       new EmailIdentityService(),
-      mockAuditLog as never,
       mockLoginRateLimiter,
       mockNotifications as never,
       mockLogger,
       {} as never,
-      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never
+      { getPublicUrl: (key: string) => `https://files.test/${key}` } as never,
+      new PasswordStepUpService(
+        prisma,
+        mockLoginRateLimiter,
+        mockTokenService,
+        mockAuditLog as unknown as AuditLogService,
+        mockEnvService as unknown as EnvService
+      )
     )
 
     jest.clearAllMocks()
@@ -576,106 +590,58 @@ describe('AuthService', () => {
     })
   })
 
-  describe('login', () => {
-    const loginInput: LoginInput = {
-      email: 'test@example.com',
-      password: 'Password123',
+  describe('password identity used by the real MFA-aware login', () => {
+    const input = { email: 'Test@Example.COM', password: 'Password123' }
+    const source = '192.168.1.1'
+    function identities() {
+      mockCtx.prisma.$queryRaw.mockResolvedValue([{ now: new Date() }])
+      return new MfaPasswordIdentityService(
+        mockContextToPrisma(mockCtx),
+        new EmailIdentityService(),
+        mockLoginRateLimiter
+      )
     }
-
-    const requestInfo = {
-      userAgent: 'Mozilla/5.0',
-      ipAddress: '192.168.1.1',
-      sessionIpAddress: '192.168.1.1',
-    }
-
-    it('should login user successfully', async () => {
+    it('returns verified identity without creating a session or issuing tokens', async () => {
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
       ;(argon2.verify as jest.Mock).mockResolvedValue(true)
-      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
-      mockTokenService.generateAccessToken.mockReturnValue('access-token-123')
-      mockSessionService.createSession.mockResolvedValue(
-        mockCreateSessionResult('refresh-token-456') as never
-      )
-
-      const result = await authService.login(loginInput, requestInfo)
-
-      expect(argon2.verify).toHaveBeenCalledWith(mockUser.passwordHash, loginInput.password)
-      expect(result.accessToken).toBe('access-token-123')
-      expect(result.refreshToken).toBe('refresh-token-456')
-    })
-
-    it('should throw AppException if user not found', async () => {
-      mockCtx.prisma.user.findUnique.mockResolvedValue(null)
-
-      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
-      expect(argon2.verify).not.toHaveBeenCalled()
-    })
-
-    it('should throw AppException if password is invalid', async () => {
-      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      ;(argon2.verify as jest.Mock).mockResolvedValue(false)
-
-      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
-    })
-
-    it('should consume rate limit on failed login', async () => {
-      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      ;(argon2.verify as jest.Mock).mockResolvedValue(false)
-
-      await authService.login(loginInput, requestInfo).catch(() => undefined)
-
-      expect(mockLoginRateLimiter.consume).toHaveBeenCalledWith(
-        loginInput.email,
-        requestInfo.ipAddress
-      )
-    })
-
-    it('should reset rate limit on successful login', async () => {
-      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      ;(argon2.verify as jest.Mock).mockResolvedValue(true)
-      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
-      mockTokenService.generateAccessToken.mockReturnValue('token')
-      mockSessionService.createSession.mockResolvedValue(
-        mockCreateSessionResult('refresh') as never
-      )
-
-      await authService.login(loginInput, requestInfo)
-
-      expect(mockLoginRateLimiter.reset).toHaveBeenCalledWith(
-        loginInput.email,
-        requestInfo.ipAddress
-      )
-    })
-
-    it('should lookup and rate-limit login by canonical email', async () => {
-      const mixedCaseLogin = { email: 'Test@Example.COM', password: 'Password123' }
-
-      mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
-      ;(argon2.verify as jest.Mock).mockResolvedValue(true)
-      mockCtx.prisma.user.update.mockResolvedValue({ ...mockUser, lastLoginAt: new Date() })
-      mockTokenService.generateAccessToken.mockReturnValue('token')
-      mockSessionService.createSession.mockResolvedValue(
-        mockCreateSessionResult('refresh') as never
-      )
-
-      await authService.login(mixedCaseLogin, requestInfo)
-
-      expect(mockLoginRateLimiter.check).toHaveBeenCalledWith(
-        'test@example.com',
-        requestInfo.ipAddress
-      )
-      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { emailCanonical: 'test@example.com' },
+      const result = await identities().verify(input.email, input.password, source)
+      expect(result).toMatchObject({
+        userId: mockUser.id,
+        securityVersion: 0,
+        protectedAccount: false,
       })
-    })
-
-    it('should throw 429 when rate limit is exceeded', async () => {
-      mockLoginRateLimiter.check.mockRejectedValue(
-        new AppException('Too many failed login attempts', 429)
+      expect(mockLoginRateLimiter.check).toHaveBeenCalledWith('test@example.com', source)
+      expect(mockLoginRateLimiter.reset).toHaveBeenCalledWith('test@example.com', source)
+      expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { emailCanonical: 'test@example.com' } })
       )
-
-      await expect(authService.login(loginInput, requestInfo)).rejects.toThrow(AppException)
+      expect(mockSessionService.createSession).not.toHaveBeenCalled()
+      expect(mockTokenService.generateAccessToken).not.toHaveBeenCalled()
+    })
+    it.each(['missing-user', 'missing-hash', 'wrong-password'])(
+      'charges %s once and returns no identity',
+      async (failure) => {
+        mockCtx.prisma.user.findUnique.mockResolvedValue(
+          failure === 'missing-user'
+            ? null
+            : {
+                ...mockUser,
+                passwordHash: failure === 'missing-hash' ? null : mockUser.passwordHash,
+              }
+        )
+        ;(argon2.verify as jest.Mock).mockResolvedValue(false)
+        expect(await identities().verify(input.email, input.password, source)).toBeNull()
+        expect(mockLoginRateLimiter.consume).toHaveBeenCalledWith('test@example.com', source)
+        expect(mockLoginRateLimiter.reset).not.toHaveBeenCalled()
+      }
+    )
+    it('checks the password limiter before identity lookup or Argon2', async () => {
+      mockLoginRateLimiter.check.mockRejectedValue(new AppException('Limited', 429))
+      await expect(identities().verify(input.email, input.password, source)).rejects.toThrow(
+        AppException
+      )
       expect(mockCtx.prisma.user.findUnique).not.toHaveBeenCalled()
+      expect(argon2.verify).not.toHaveBeenCalled()
     })
   })
 
@@ -698,6 +664,18 @@ describe('AuthService', () => {
       sid: 'session-123',
     }
 
+    beforeEach(() => {
+      installOrdinaryPrimaryFixture(mockCtx, mockUser)
+      mockCtx.prisma.session.findUnique.mockResolvedValue({
+        id: 'session-123',
+        userId: principal.sub,
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 3600_000),
+        familyId: 'legacy-family',
+      } as never)
+      mockCtx.prisma.session.updateMany.mockResolvedValue({ count: 1 })
+    })
+
     it('rejects a token without sid (STEP_UP_REQUIRED) without touching the session', async () => {
       await expect(
         authService.stepUp({ ...principal, sid: undefined }, 'pw', '1.2.3.4')
@@ -709,7 +687,7 @@ describe('AuthService', () => {
     it('rejects a non-live session BEFORE any password work (no password oracle)', async () => {
       // Stolen-but-revoked/expired token: must fail closed before loading the
       // user, hitting the limiter, or verifying the password.
-      mockSessionService.hasLiveSession.mockResolvedValue(false)
+      mockCtx.prisma.session.findUnique.mockResolvedValue(null)
 
       await expect(authService.stepUp(principal, 'pw', '1.2.3.4')).rejects.toMatchObject({
         errorCode: AuthErrorCode.STEP_UP_REQUIRED,
@@ -754,7 +732,7 @@ describe('AuthService', () => {
       mockSessionService.hasLiveSession.mockResolvedValue(true)
       mockCtx.prisma.user.findUnique.mockResolvedValue(mockUser)
       ;(argon2.verify as jest.Mock).mockResolvedValue(true)
-      mockSessionService.touchLastAuth.mockResolvedValue(0)
+      mockCtx.prisma.session.updateMany.mockResolvedValue({ count: 0 })
 
       await expect(authService.stepUp(principal, 'right', '1.2.3.4')).rejects.toMatchObject({
         errorCode: AuthErrorCode.STEP_UP_REQUIRED,
@@ -771,7 +749,16 @@ describe('AuthService', () => {
       const result = await authService.stepUp(principal, 'right', '1.2.3.4')
 
       expect(result).toEqual({ accessToken: 'fresh-access-token' })
-      expect(mockSessionService.touchLastAuth).toHaveBeenCalledWith('session-123', 'user-123')
+      expect(mockCtx.prisma.session.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'session-123',
+            userId: 'user-123',
+            revokedAt: null,
+          }),
+          data: { lastAuthAt: expect.any(Date) },
+        })
+      )
       expect(mockLoginRateLimiter.reset).toHaveBeenCalledWith(mockUser.emailCanonical, '1.2.3.4')
       expect(mockTokenService.generateAccessToken).toHaveBeenCalledWith({
         sub: 'user-123',
@@ -783,7 +770,8 @@ describe('AuthService', () => {
         expect.objectContaining({
           action: 'auth.step_up_succeeded',
           actorId: mockUser.id,
-        })
+        }),
+        { tx: mockCtx.prisma }
       )
       // No new session, no rotation.
       expect(mockSessionService.createSession).not.toHaveBeenCalled()
@@ -1036,7 +1024,16 @@ describe('AuthService', () => {
           new AppException('Invalid token', 401, AuthErrorCode.TOKEN_INVALID)
         )
       mockCtx.prisma.user.update.mockResolvedValue(mockUser)
-      mockSessionService.deleteAllByUserId.mockResolvedValue(undefined)
+      mockCtx.prisma.$queryRaw.mockResolvedValue([{ now: new Date() }])
+      mockCtx.prisma.mfaAccount.upsert.mockResolvedValue({
+        userId: mockUser.id,
+        securityVersion: 1,
+        required: false,
+        setupComplete: false,
+        emergencyRequired: false,
+        codeGeneration: 0,
+      })
+      mockSessionService.deleteRevokedByUserId.mockResolvedValue(undefined)
     }
 
     it('should reset password, promote emailVerified, and emit the security notification', async () => {
@@ -1051,7 +1048,7 @@ describe('AuthService', () => {
         'password-reset',
         undefined
       )
-      expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
+      expect(mockSessionService.deleteRevokedByUserId).toHaveBeenCalledWith(mockUser.id)
       expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
       // The reset transaction promotes emailVerified (proves mailbox control).
       expect(mockCtx.prisma.user.update).toHaveBeenCalledWith(
@@ -1082,7 +1079,7 @@ describe('AuthService', () => {
       ).resolves.toBeUndefined()
 
       expect(mockCtx.prisma.user.update).toHaveBeenCalled()
-      expect(mockSessionService.deleteAllByUserId).toHaveBeenCalledWith(mockUser.id)
+      expect(mockSessionService.deleteRevokedByUserId).toHaveBeenCalledWith(mockUser.id)
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ userId: mockUser.id }),
         expect.stringContaining('Failed to emit password-changed notification')
@@ -1094,7 +1091,8 @@ describe('AuthService', () => {
       async (failure) => {
         arrangeResetMocks()
         const error = new Error('follow-up unavailable')
-        if (failure === 'sessions') mockSessionService.deleteAllByUserId.mockRejectedValue(error)
+        if (failure === 'sessions')
+          mockSessionService.deleteRevokedByUserId.mockRejectedValue(error)
         else mockUserCacheService.invalidateUser.mockRejectedValue(error)
 
         await expect(authService.resetPassword('a'.repeat(64), 'NewPassword123')).rejects.toBe(
@@ -1107,6 +1105,11 @@ describe('AuthService', () => {
           data: { passwordHash: 'new-hashed-password', emailVerified: true },
         })
         expect(mockCtx.prisma.$transaction).toHaveBeenCalledTimes(1)
+        expect(mockCtx.prisma.authSessionFamily.updateMany).toHaveBeenCalledWith({
+          where: { userId: mockUser.id, revokedAt: null },
+          data: { revokedAt: expect.any(Date) },
+        })
+        expect(mockCtx.prisma.mfaAccount.upsert).toHaveBeenCalledTimes(1)
         expect(mockNotifications.notify).not.toHaveBeenCalled()
         expect(mockUserCacheService.invalidateUser).toHaveBeenCalledTimes(
           failure === 'sessions' ? 0 : 1
@@ -1123,7 +1126,7 @@ describe('AuthService', () => {
 
       // The losing reset must not change the password, drop sessions, or emit the alert.
       expect(mockCtx.prisma.user.update).not.toHaveBeenCalled()
-      expect(mockSessionService.deleteAllByUserId).not.toHaveBeenCalled()
+      expect(mockSessionService.deleteRevokedByUserId).not.toHaveBeenCalled()
       expect(mockNotifications.notify).not.toHaveBeenCalled()
     })
   })
@@ -1214,12 +1217,33 @@ describe('AuthService', () => {
         socket: { remoteAddress: trust === 'untrusted' ? '172.20.0.6' : '172.20.0.5' },
         headers: { 'user-agent': 'Visitor browser', 'x-amcore-client-ip': '8.8.8.8' },
       } as unknown as Request
+      const identities = new MfaPasswordIdentityService(
+        mockContextToPrisma(mockCtx),
+        new EmailIdentityService(),
+        mockLoginRateLimiter
+      )
+      mockCtx.prisma.$queryRaw.mockResolvedValue([{ now: new Date() }])
       const controller = new AuthController(
         authService,
         {} as never,
         mockSessionService,
         mockTokenService,
-        mockEnvService as unknown as EnvService
+        mockEnvService as unknown as EnvService,
+        {
+          begin: async (
+            input: LoginInput,
+            metadata: { source: string; ipAddress: string; userAgent: string }
+          ) => {
+            const identity = await identities.verify(input.email, input.password, metadata.source)
+            if (!identity) throw new AppException('Invalid password', 401)
+            // This test isolates identity/metadata; actual durable issuance is covered through HTTP.
+            return {
+              kind: 'complete',
+              body: { user: {}, accessToken: 'test-access' },
+              refreshToken: 'test-refresh',
+            }
+          },
+        } as never
       )
       mockCtx.prisma.user.findUnique.mockResolvedValue(
         outcome === 'missing-user'
@@ -1252,14 +1276,7 @@ describe('AuthService', () => {
       expect(mockLoginRateLimiter.consume.mock.calls).toEqual(
         !success && !limited ? [['test@example.com', limiterIp]] : []
       )
-      const expectedSession = expect.objectContaining({
-        ipAddress: ['disabled', 'untrusted'].includes(trust) ? req.ip : '8.8.8.8',
-        userAgent: 'Visitor browser',
-      })
-      expect(mockSessionService.createSession.mock.calls).toEqual(
-        success ? [[expectedSession]] : []
-      )
-      expect(mockTokenService.generateAccessToken).toHaveBeenCalledTimes(success ? 1 : 0)
+      expect(mockSessionService.createSession).not.toHaveBeenCalled()
       expect(mockCtx.prisma.user.findUnique).toHaveBeenCalledTimes(limited ? 0 : 1)
       expect(argon2.verify).toHaveBeenCalledTimes(
         ['limited', 'missing-user', 'missing-hash'].includes(outcome) ? 0 : 1

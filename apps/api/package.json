@@ -11,7 +11,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "nest start --watch",
-    "build": "pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs",
+    "build": "pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs && node ../../scripts/write-mfa-artifact.mjs api-worker",
     "start": "node dist/main.js",
     "start:prod": "NODE_ENV=production node dist/main.js",
     "lint": "node ../../scripts/lint.mjs --scope api",
@@ -31,6 +31,7 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "organization:setup": "tsx src/cli/organization-setup.ts",
+    "auth:mfa": "tsx src/cli/mfa-maintenance.ts",
     "telegram:setup": "tsx src/cli/telegram-setup.ts",
     "storage:check": "tsx src/cli/storage-check.ts",
     "lint:fix": "node ../../scripts/lint.mjs --scope api --fix",

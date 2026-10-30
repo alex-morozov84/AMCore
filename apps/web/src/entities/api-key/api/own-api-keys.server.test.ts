@@ -5,7 +5,12 @@ import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
-import { FakeVaultStore, freshRefresh, makeEntry } from '@/shared/api/bff/test-fakes'
+import {
+  browserTestHeaders,
+  FakeVaultStore,
+  freshRefresh,
+  makeBrowserEntry,
+} from '@/shared/api/bff/test-fakes'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 
 import {
@@ -16,6 +21,9 @@ import {
   verifyOwnApiKeySession,
 } from './own-api-keys.server'
 
+beforeEach(() =>
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-domain-browser-transport-key-at-least-32>')
+)
 vi.mock('server-only', () => ({}))
 vi.mock('@/shared/api/backend-transport', () => ({
   fetchBackendResponse: vi.fn(),
@@ -35,13 +43,16 @@ const created = {
   createdAt: '2026-10-19T00:00:00.000Z',
 }
 function setup(response: () => Response) {
-  const entry = makeEntry({ userSnapshot: { id: 'actor', email: 'a@example.test' } as never })
+  const entry = makeBrowserEntry({
+    userSnapshot: { id: 'actor', email: 'a@example.test' } as never,
+  })
   const store = new FakeVaultStore()
   store.seed('session-a', entry)
   const fetch = vi.fn(async () => response())
   const deps: ContextExecutorDeps & { fetch: typeof globalThis.fetch } = {
     store,
     lock: new SimpleLock(),
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: vi.fn().mockResolvedValue('session-a'),
     apiBase: 'http://api.test',
@@ -51,7 +62,7 @@ function setup(response: () => Response) {
   vi.mocked(productContextDeps).mockReturnValue(deps)
   const input = {
     expectedSession: contextSessionBinding('session-a', entry),
-    headers: new Headers(),
+    headers: browserTestHeaders(),
   }
   return { input, fetch, deps, entry }
 }

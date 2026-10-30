@@ -1,7 +1,10 @@
 // Schemas public API
+export * from './browser-publication'
 export * from './frontend-context'
 export * from './mfa'
 export * from './mfa-browser'
+export * from './mfa-enrollment'
+export * from './mfa-login'
 
 // Auth schemas
 export {
@@ -44,6 +47,9 @@ export {
   type SessionsListResponse,
   sessionsListResponseSchema,
   type StepUpInput,
+  stepUpPendingSchema,
+  type StepUpResponse,
+  stepUpResponseSchema,
   stepUpSchema,
   // Locale contract
   supportedLocaleSchema,
@@ -450,6 +456,7 @@ export * from './admin-support-mail'
 export * from './ai-approval-intent'
 export { type SignupPolicyResponse, signupPolicyResponseSchema } from './auth'
 export * from './background-work'
+export * from './browser-logout-receipt'
 export {
   type BoardRenderContext,
   boardRenderContextSchema,
@@ -470,6 +477,8 @@ export * from './invite'
 export * from './member-access'
 export * from './member-access-budget'
 export * from './member-api-keys'
+export * from './mfa-session-flow'
+export * from './mfa-settings-start'
 export * from './organization-administration'
 export * from './organization-establishment'
 export * from './organization-members'

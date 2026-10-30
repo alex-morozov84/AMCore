@@ -7,6 +7,10 @@ This guide has three parts: which backup strategy fits your deployment, the
 optional compose `backup`/`restore` profiles this repo ships, and what's
 deliberately out of scope.
 
+For MFA-protected deployments, retain the matching keyring and compatible image/
+protocol policy with each database backup. Follow [MFA restore and key maintenance](../auth/mfa-deployment.md#unknown-results-and-repair)
+before reopening ingress. A database copy alone cannot decrypt stored factors.
+
 ## Which strategy fits your deployment
 
 ### Managed database (recommended default)

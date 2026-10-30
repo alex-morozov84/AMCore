@@ -30,6 +30,15 @@ export function MfaFlow({
   const [method, setMethod] = useState<MfaMethod>('totp')
   const [showEnrollment, setShowEnrollment] = useState(true)
   const command = controller.command.bind(controller)
+  if (
+    ['login', 'initial_setup'].includes(view.purpose) &&
+    ['ready', 'completed'].includes(view.state)
+  )
+    return (
+      <p role="status" aria-busy="true">
+        {t('checking')}
+      </p>
+    )
   if (view.state === 'password_required')
     return (
       <div className="space-y-4">
@@ -110,24 +119,6 @@ export function MfaFlow({
           )}
         </p>
         {lost && <p>{t('rotateWarning')}</p>}
-        {!setupOnly && (
-          <Button
-            variant="link"
-            disabled={pending}
-            onClick={() => setMethod(selected === 'totp' ? 'recovery_code' : 'totp')}
-          >
-            {t(selected === 'totp' ? 'noApp' : 'backToApp')}
-          </Button>
-        )}
-        {view.purpose === 'login' && !lost && (
-          <Button
-            variant="link"
-            disabled={pending}
-            onClick={() => void command({ action: 'start_recovery' })}
-          >
-            {t('emergencyEntry')}
-          </Button>
-        )}
         <MfaProofForm
           key={selected}
           method={selected}
@@ -136,6 +127,26 @@ export function MfaFlow({
           submitLabel={t(lost ? 'newCodes' : view.purpose === 'login' ? 'signIn' : 'continue')}
           onSubmit={(proof) => void command({ action: lost ? 'recover_codes' : 'verify', proof })}
         />
+        <div className="flex flex-wrap gap-2">
+          {!setupOnly && (
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => setMethod(selected === 'totp' ? 'recovery_code' : 'totp')}
+            >
+              {t(selected === 'totp' ? 'noApp' : 'backToApp')}
+            </Button>
+          )}
+          {view.purpose === 'login' && !lost && (
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => void command({ action: 'start_recovery' })}
+            >
+              {t('emergencyEntry')}
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
@@ -161,7 +172,7 @@ export function MfaFlow({
                 action:
                   view.purpose === 'rotate_codes'
                     ? 'rotate_codes'
-                    : view.purpose === 'initial_setup' || view.purpose === 'replace_factor'
+                    : view.purpose === 'replace_factor'
                       ? 'start_enrollment'
                       : view.purpose === 'reauthenticate'
                         ? 'complete_confirmation'

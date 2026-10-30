@@ -25,6 +25,9 @@ and rollout to receive the update.
 For password-accounting upgrades, the [stopped-writer procedure](#password-limiter-upgrade-and-rollback)
 overrides general rolling/blue-green examples below.
 
+Operator MFA has a separate [closed-ingress activation procedure](../auth/mfa-deployment.md).
+Building or upgrading an image does not activate the durable protocol.
+
 ## Branch, release & environments model
 
 AMCore uses **GitHub Flow**: a single protected trunk `main`, short-lived PR

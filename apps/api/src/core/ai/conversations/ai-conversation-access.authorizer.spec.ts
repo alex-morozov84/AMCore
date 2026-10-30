@@ -3,6 +3,8 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { BadRequestException, NotFoundException } from '../../../common/exceptions'
+import type { MfaPrimaryProjection } from '../../auth/mfa/mfa-primary-projection.schema.js'
+import { protectedUnitProjection } from '../../auth/mfa/mfa-primary-projection.testkit.js'
 
 import { AiConversationAccessAuthorizer } from './ai-conversation-access.authorizer'
 
@@ -30,23 +32,19 @@ const operatorPrincipal = {
   sub: 'admin-9',
   systemRole: SystemRole.SuperAdmin,
   sid: 'sess-admin',
+  fid: 'operator-family',
+  securityVersion: 0,
 } as RequestPrincipal
-
-function freshSession(userId: string): Record<string, unknown> {
-  return {
-    lastAuthAt: new Date(Date.now() - 10_000),
-    revokedAt: null,
-    expiresAt: new Date(Date.now() + 3_600_000),
-    userId,
-  }
-}
 
 describe('AiConversationAccessAuthorizer', () => {
   let prisma: DeepMockProxy<PrismaService>
+  let projection: MfaPrimaryProjection
   let authorizer: AiConversationAccessAuthorizer
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
+    projection = protectedUnitProjection(operatorPrincipal, new Date(Date.now() - 10000))
+    prisma.$queryRaw.mockResolvedValue([projection])
     const env = { get: jest.fn(() => STEP_UP_WINDOW) } as unknown as EnvService
     authorizer = new AiConversationAccessAuthorizer(prisma, env)
   })
@@ -65,6 +63,14 @@ describe('AiConversationAccessAuthorizer', () => {
     )
   })
 
+  it('does not grant cross-user support access to an API key carrying a legacy operator role', async () => {
+    prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'someone-else' } as never)
+    await expect(
+      authorizer.authorize({ ...operatorPrincipal, type: 'api_key' }, 'conv-1', 'TICKET-1')
+    ).rejects.toThrow(NotFoundException)
+    expect(prisma.session.findUnique).not.toHaveBeenCalled()
+  })
+
   it('authorizes the owner with no step-up and no reason (isCrossUser=false)', async () => {
     prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
     const result = await authorizer.authorize(ownerPrincipal, 'conv-1', undefined)
@@ -78,7 +84,7 @@ describe('AiConversationAccessAuthorizer', () => {
 
   it('requires step-up for a cross-user operator (403 before authorization completes)', async () => {
     prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-    prisma.session.findUnique.mockResolvedValue(null as never) // no fresh session
+    projection.family!.mfaAt = new Date(0) // current family, stale second-factor evidence
     await expect(
       authorizer.authorize(operatorPrincipal, 'conv-1', 'SUPPORT-1')
     ).rejects.toMatchObject({ errorCode: 'STEP_UP_REQUIRED' })
@@ -86,7 +92,6 @@ describe('AiConversationAccessAuthorizer', () => {
 
   it('requires a reason for a cross-user operator (400 when omitted, even if fresh)', async () => {
     prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-    prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
     await expect(authorizer.authorize(operatorPrincipal, 'conv-1', undefined)).rejects.toThrow(
       BadRequestException
     )
@@ -94,7 +99,6 @@ describe('AiConversationAccessAuthorizer', () => {
 
   it('rejects a reason that violates the bounded grammar (400)', async () => {
     prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-    prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
     // A control character is not allowed by the audit-aligned reason grammar.
     await expect(authorizer.authorize(operatorPrincipal, 'conv-1', 'bad\u0001ref')).rejects.toThrow(
       BadRequestException
@@ -103,7 +107,6 @@ describe('AiConversationAccessAuthorizer', () => {
 
   it('authorizes a fresh cross-user operator with a valid reason (isCrossUser=true)', async () => {
     prisma.aiConversation.findUnique.mockResolvedValue({ ownerUserId: 'owner-1' } as never)
-    prisma.session.findUnique.mockResolvedValue(freshSession('admin-9') as never)
     const result = await authorizer.authorize(operatorPrincipal, 'conv-1', 'SUPPORT-1234')
     expect(result).toEqual({
       actor: { userId: 'admin-9', isSuperAdmin: true },

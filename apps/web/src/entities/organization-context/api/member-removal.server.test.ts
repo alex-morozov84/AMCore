@@ -12,7 +12,7 @@ import {
 } from '@/shared/api/bff/context-route-input'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
-import { FakeVaultStore, freshRefresh, makeEntry } from '@/shared/api/bff/test-fakes'
+import { FakeVaultStore, freshRefresh, makeBrowserEntry } from '@/shared/api/bff/test-fakes'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 import { ApiRequestError } from '@/shared/api/http-client'
 
@@ -30,6 +30,9 @@ const route = {
       )
     }),
 }
+beforeEach(() =>
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-domain-browser-transport-key-at-least-32>')
+)
 vi.mock('server-only', () => ({}))
 vi.mock('@/shared/api/backend-transport', () => ({
   fetchBackendResponse: vi.fn(),
@@ -43,12 +46,16 @@ let upstream: ReturnType<typeof vi.fn<typeof fetch>>
 function request(query = 'expectedMemberId=member', extra: RequestInit = {}) {
   return new Request(`${base}?${query}`, {
     method: 'DELETE',
-    headers: { origin: 'http://localhost:3002', 'X-AMCore-Context-Session': binding },
+    headers: {
+      origin: 'http://localhost:3002',
+      cookie: `amcore_browser_context=${'a'.repeat(43)}`,
+      'X-AMCore-Context-Session': binding,
+    },
     ...extra,
   })
 }
 beforeEach(() => {
-  const entry = makeEntry()
+  const entry = makeBrowserEntry()
   const store = new FakeVaultStore()
   store.seed('session', entry)
   binding = contextSessionBinding('session', entry)
@@ -56,6 +63,7 @@ beforeEach(() => {
   vi.mocked(fetchBackendResponse).mockImplementation((url, _source, init) => upstream(url, init))
   vi.mocked(productContextDeps).mockReturnValue({
     store,
+    verifyBinding: async () => undefined,
     lock: new SimpleLock(),
     upstreamRefresh: freshRefresh,
     readSessionId: async () => 'session',
@@ -68,6 +76,7 @@ describe('bodyless removal API -> DAL -> BFF contract', () => {
       request(undefined, {
         headers: {
           origin: 'http://localhost:3002',
+          cookie: `amcore_browser_context=${'a'.repeat(43)}`,
           'X-AMCore-Context-Session': binding,
           authorization: 'Bearer caller-bound-token',
           'x-amcore-organization-id': 'foreign',
@@ -143,6 +152,7 @@ describe('bodyless removal API -> DAL -> BFF contract', () => {
           request(undefined, {
             headers: {
               origin: 'http://localhost:3002',
+              cookie: `amcore_browser_context=${'a'.repeat(43)}`,
               'X-AMCore-Context-Session': 'b'.repeat(64),
             },
           }),

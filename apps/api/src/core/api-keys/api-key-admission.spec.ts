@@ -14,6 +14,14 @@ const owner: RequestPrincipal = {
 }
 
 describe('Request-local cryptographic key evidence', () => {
+  it('retains primary owner role only in request-local evidence while the principal stays USER', () => {
+    const request = {}
+    registerApiKeyAdmission(request, 'verified-key', owner, SystemRole.SuperAdmin)
+    expect(owner.systemRole).toBe(SystemRole.User)
+    expect(apiKeyAdmission(request, owner).ownerSystemRole).toBe(SystemRole.SuperAdmin)
+    expect(owner).not.toHaveProperty('ownerSystemRole')
+  })
+
   it('rejects principal/body key-ID spoofing without cryptographic registration', () => {
     const user = { ...owner, keyId: 'forged-key' }
     const request = {

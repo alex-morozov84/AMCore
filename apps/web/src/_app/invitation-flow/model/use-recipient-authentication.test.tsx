@@ -12,19 +12,41 @@ const { context, createAdapters } = vi.hoisted(() => ({
   context: vi.fn(),
   createAdapters: vi.fn((_input: unknown) => ({})),
 }))
+const navigation = vi.hoisted(() => ({ replace: vi.fn() }))
+vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
+  useRouteProgressRouter: () => navigation,
+}))
 vi.mock('@/entities/invitation-flow', () => ({ invitationFlowClient: { context } }))
 vi.mock('./credential-adapters', () => ({ createInvitationCredentialAdapters: createAdapters }))
 afterEach(() => vi.clearAllMocks())
 const binding = { flowId: 'a'.repeat(22), flowRevision: 1, sessionBinding: null }
-function setup() {
+function setup(actionBase: '/auth' | '/product-admin/auth' = '/auth') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   )
-  return renderHook(() => useRecipientAuthentication(binding, null), { wrapper })
+  return renderHook(() => useRecipientAuthentication(binding, null, actionBase), { wrapper })
 }
 
 describe('recipient pending authentication recovery', () => {
+  it.each(['/auth', '/product-admin/auth'] as const)(
+    'keeps MFA navigation on the selected %s surface',
+    async (actionBase) => {
+      setup(actionBase)
+      const callbacks = createAdapters.mock.calls.at(-1)?.[0] as {
+        onMfaRequired(binding: string): void
+      }
+      const flowBinding = '01900000-0000-7000-8000-000000000000'
+      await act(async () => callbacks.onMfaRequired(flowBinding))
+      expect(navigation.replace).toHaveBeenCalledWith(
+        expect.stringContaining(`/mfa?flow=${flowBinding}`)
+      )
+      const destination = navigation.replace.mock.calls.at(-1)?.[0] as string
+      expect(destination.startsWith('/mfa?')).toBe(actionBase === '/auth')
+      expect(context).not.toHaveBeenCalled()
+    }
+  )
+
   it.each([AuthErrorCode.INVALID_CREDENTIALS, AuthErrorCode.RATE_LIMIT_EXCEEDED])(
     'synchronizes known rejection %s without replaying credentials',
     async (code) => {

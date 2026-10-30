@@ -1,0 +1,11 @@
+# Explicit keyring recipe; this does not change the durable MFA protocol.
+# Keep it in the saved complete COMPOSE_FILE before and after approved activation.
+x-mfa-keys: &mfa-keys
+  MFA_ACTIVE_KEY_ID: ${MFA_ACTIVE_KEY_ID:?Configure the current MFA encryption key ID}
+  MFA_ENCRYPTION_KEYS: ${MFA_ENCRYPTION_KEYS:?Configure the current and retained MFA encryption keys}
+
+services:
+  api:
+    environment: *mfa-keys
+  worker:
+    environment: *mfa-keys

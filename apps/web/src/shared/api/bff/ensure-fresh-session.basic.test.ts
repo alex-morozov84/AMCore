@@ -21,7 +21,12 @@ describe('ensureFreshSession — basics and freshness', () => {
   it('throws SessionNotFoundError when there is no vault entry', async () => {
     const store = new FakeVaultStore()
     await expect(
-      ensureFreshSession('missing', { store, lock: new SimpleLock(), upstreamRefresh: vi.fn() })
+      ensureFreshSession('missing', {
+        store,
+        lock: new SimpleLock(),
+        verifyBinding: async () => undefined,
+        upstreamRefresh: vi.fn(),
+      })
     ).rejects.toBeInstanceOf(SessionNotFoundError)
   })
 
@@ -33,6 +38,7 @@ describe('ensureFreshSession — basics and freshness', () => {
     const result = await ensureFreshSession('s1', {
       store,
       lock: new SimpleLock(),
+      verifyBinding: async () => undefined,
       upstreamRefresh,
     })
 
@@ -48,6 +54,7 @@ describe('ensureFreshSession — basics and freshness', () => {
     const result = await ensureFreshSession('s1', {
       store,
       lock: new SimpleLock(),
+      verifyBinding: async () => undefined,
       upstreamRefresh,
     })
 
@@ -65,6 +72,7 @@ describe('ensureFreshSession — basics and freshness', () => {
       ensureFreshSession('s1', {
         store,
         lock: new NeverAcquiresLock(),
+        verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(freshRefresh),
       })
     ).rejects.toBeInstanceOf(SessionLockTimeoutError)
@@ -80,7 +88,12 @@ describe('ensureFreshSession — basics and freshness', () => {
     const upstreamRefresh = vi.fn(freshRefresh)
 
     await expect(
-      ensureFreshSession('s1', { store: unavailableStore, lock: new SimpleLock(), upstreamRefresh })
+      ensureFreshSession('s1', {
+        store: unavailableStore,
+        lock: new SimpleLock(),
+        verifyBinding: async () => undefined,
+        upstreamRefresh,
+      })
     ).rejects.toBeInstanceOf(SessionVaultUnavailableError)
     expect(upstreamRefresh).not.toHaveBeenCalled()
   })

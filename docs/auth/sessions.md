@@ -119,9 +119,10 @@ A new `refresh_token` cookie is set with the rotated token.
 
 **Errors:**
 
-| Code            | HTTP | When                                                      |
-| --------------- | ---- | --------------------------------------------------------- |
-| `TOKEN_INVALID` | 401  | Cookie missing, token not found in DB, or session expired |
+| Code              | HTTP | When                                                                                                 |
+| ----------------- | ---- | ---------------------------------------------------------------------------------------------------- |
+| `TOKEN_INVALID`   | 401  | Cookie missing, token not found in DB, or session expired                                            |
+| `SESSION_CHANGED` | 409  | Internal family/account/browser authority changed; do not refresh again or select another credential |
 
 ---
 
@@ -203,6 +204,9 @@ curl -X DELETE https://api.amcore.dev/api/v1/auth/sessions/sess_def456 \
 ```
 
 You can only revoke your own sessions. Attempting to delete someone else's session returns `404`.
+Revocation closes the selected row's complete refresh family, including rotated
+token rows. Stored family authority remains retired, so deleting rows cannot
+restore protected access or its session-derived continuations.
 
 **Success response:** `204 No Content`
 
@@ -216,10 +220,17 @@ Signs out all devices except the current one. Useful for "sign out everywhere" f
 
 ```bash
 curl -X DELETE https://api.amcore.dev/api/v1/auth/sessions \
-  -H "Authorization: Bearer eyJhbGci..."
+  -H "Authorization: Bearer eyJhbGci..." \
+  --cookie 'refresh_token=<current-refresh-token>'
 ```
 
 **Success response:** `204 No Content`
+
+The backend retains the refresh cookie's complete current family. A missing cookie
+makes this operation a no-op. An unknown, revoked, expired or foreign keep-token
+returns `409 SESSION_CHANGED` before revocation. Do not retry through another
+credential. Other families retire without an account version change; a separately
+authorized new login remains possible.
 
 As with the list endpoint, `apps/web` uses dedicated BFF handlers for session
 revocation so the backend can still identify the current session from the
@@ -306,29 +317,36 @@ their own issuance lifetime.
 
 ## When sessions are automatically invalidated
 
-Password reset commits the password and token consumption before deleting
-sessions and invalidating the profile cache. A follow-up failure can leave an
-error response after the change; old session rows can remain if deletion fails.
+Password reset commits password, token consumption, account security version and
+existing family/session revocation together. Physical cleanup and profile-cache
+invalidation follow the commit. A follow-up failure can leave an error response
+after the change. Revoked rows can remain if cleanup fails; a new sign-in after
+the reset survives that cleanup.
 Try ordinary sign-in with the chosen password, then inspect/revoke sessions if
 needed. Do not replay the consumed link. See [completion failures](email-auth.md#completion-and-session-failures).
-Already issued access JWTs retain their ordinary expiry.
+Already issued JWTs for never-protected independent clients retain their ordinary
+expiry. Browser and protected credentials also require the current account version.
 
 Sessions don't just expire — they can be invalidated by specific events:
 
-| Event                      | What gets invalidated                 |
-| -------------------------- | ------------------------------------- |
-| Password reset             | All sessions (every device signs out) |
-| Session revoked by user    | That specific session only            |
-| "Sign out everywhere"      | All sessions except current           |
-| Logout                     | Current session only                  |
-| System-role change         | All sessions of the affected user     |
-| Admin-revoked session      | That specific session only            |
-| Admin-revoked all sessions | All sessions of the target user       |
-| Session expired (7 days)   | Cleaned up by nightly job             |
+| Event                      | What gets invalidated                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| Password reset             | All sessions (every device signs out)                                                               |
+| Protected OAuth linking    | All previous sessions and pending continuations; [sign in again](oauth.md#after-successful-linking) |
+| Session revoked by user    | That specific session only                                                                          |
+| "Sign out everywhere"      | All sessions except current                                                                         |
+| Logout                     | Current session only                                                                                |
+| System-role change         | All sessions of the affected user                                                                   |
+| Admin-revoked session      | That specific session only                                                                          |
+| Admin-revoked all sessions | All sessions of the target user                                                                     |
+| Session expired (7 days)   | Cleaned up by nightly job                                                                           |
 
 A **system-role change** (e.g. a `SUPER_ADMIN` promotion or demotion via the
 admin API) revokes **all** of the target user's sessions, so they must
-re-authenticate. This pairs with the system-role freshness check
+re-authenticate. The role, account security version, revocation and audit commit
+together. Audit failure rolls back the change. Later physical cleanup can fail
+without restoring authority, and preserves new sign-ins after the commit.
+This pairs with the system-role freshness check
 ([rbac.md](./rbac.md)): a demotion loses privileged access on the next request,
 and a promotion cannot silently elevate an existing refresh session — it requires
 a fresh login.
@@ -337,7 +355,7 @@ a fresh login.
 
 ## Step-up re-authentication
 
-Each session tracks when it was last authenticated (`lastAuthAt`). Destructive
+Legacy credentials without family claims use their token row's `lastAuthAt`. Destructive
 admin operations — system-role changes, admin session revocation and
 `POST /admin/cleanup` — require
 that timestamp to be recent (within `STEP_UP_MAX_AGE_SECONDS`, default 10
@@ -353,6 +371,24 @@ OAuth-only accounts (no password) cannot use password step-up and receive
 `403 STEP_UP_METHOD_UNAVAILABLE`. Sessions created before this feature shipped
 have a `NULL` `lastAuthAt` and must re-login (or step up) before performing a
 guarded operation.
+
+Family-bearing credentials use the stable family's primary proof instead of the
+historical token row. Refresh can rotate or remove that old row without losing
+the family's proof. A signed family ID never selects another family's proof;
+revocation, expiry, version and browser checks still apply.
+
+Protected-account admission uses the exact current family's password
+and second-factor proof times instead. Each must satisfy the route window, capped
+at ten minutes. A fresh committed backup-code proof can satisfy the second factor
+without consuming another code. Missing proof types appear in
+`details.requiredProofs`; a fresh legacy password timestamp cannot replace them.
+Activation follows the [deployment procedure](mfa-deployment.md).
+
+Password-only step-up updates only primary evidence. When MFA remains stale,
+the protected path returns `202` with `kind: "proof_required"` and
+`requiredProofs`, without an access token. It does not complete the protected
+action. A `200` token retains the original family, security version, browser
+binding marker and organization scope. No new session or refresh token is created.
 
 ---
 

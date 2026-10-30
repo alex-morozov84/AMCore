@@ -54,7 +54,11 @@ export async function fetchConsoleAudit(
       `${API_URL}/api/v1/admin/audit-logs?${auditQueryString(query)}`,
       await headers(),
       {
-        headers: { Authorization: auth.header!, 'X-Correlation-Id': correlationId },
+        headers: {
+          Authorization: auth.header!,
+          ...auth.browserHeaders,
+          'X-Correlation-Id': correlationId,
+        },
         cache: 'no-store',
         signal: AbortSignal.timeout(5_000),
       }

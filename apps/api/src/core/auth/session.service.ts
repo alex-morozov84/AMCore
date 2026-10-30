@@ -14,8 +14,18 @@ import {
 } from '../invitations/invitation-auth-handoff.js'
 import { invitationClock } from '../invitations/invitation-locks.js'
 
+import type { BrowserRequestBinding } from './mfa/browser-binding.js'
+import { logoutBrowserSession } from './mfa/browser-session-logout.js'
+import { issueFamilyAccessToken } from './mfa/mfa-access-issuance.js'
+import { revokeFamilyRows } from './mfa/mfa-family-revocation.js'
+import { readRefreshAuthority, refreshSessionChanged } from './mfa/mfa-refresh-authority.js'
 import { sessionCoordinationLockKey } from './session-lock-key.js'
-import { TokenService } from './token.service.js'
+import {
+  deleteOwnedFamilies,
+  deleteOwnedSession,
+  deleteRefreshFamily,
+} from './session-revocation.js'
+import { type AccessTokenPayload, TokenService } from './token.service.js'
 
 export interface CreateSessionParams {
   handoff?: InvitationHandoffProof
@@ -130,7 +140,10 @@ export class SessionService {
   }
 
   /** Validate refresh token and detect replay/reuse attempts. */
-  async validateRefreshToken(hashedToken: string): Promise<Session & { user: User }> {
+  async validateRefreshToken(
+    hashedToken: string,
+    browser: BrowserRequestBinding | null = null
+  ): Promise<Session & { user: User }> {
     const session = await this.findByRefreshToken(hashedToken)
 
     if (!session) {
@@ -142,7 +155,8 @@ export class SessionService {
     }
 
     if (session.expiresAt < new Date()) {
-      await this.deleteByRefreshToken(hashedToken)
+      // Expiration of an old token row is not a logout of its still-current family.
+      await this.prisma.session.deleteMany({ where: { refreshToken: hashedToken } })
       throw new AppException(
         'Refresh token expired',
         HttpStatus.UNAUTHORIZED,
@@ -152,7 +166,7 @@ export class SessionService {
 
     if (session.revokedAt) {
       if (session.revocationReason === 'rotated') {
-        await this.revokeTokenFamily(session.familyId, 'reuse-detected')
+        await this.revokeTokenFamily(session.userId, session.familyId, 'reuse-detected')
       }
 
       throw new AppException(
@@ -162,6 +176,7 @@ export class SessionService {
       )
     }
 
+    await readRefreshAuthority(this.prisma, session, browser)
     return session
   }
 
@@ -175,16 +190,22 @@ export class SessionService {
    */
   async rotateRefreshToken(
     oldHashedToken: string,
-    params: CreateSessionParams
-  ): Promise<{ refreshToken: string; sessionId: string }> {
+    params: CreateSessionParams,
+    browser: BrowserRequestBinding | null = null
+  ): Promise<{
+    refreshToken: string
+    sessionId: string
+    accessClaims: AccessTokenPayload
+    accessToken?: string
+  }> {
     const refreshToken = this.tokenService.generateRefreshToken()
     const hashedToken = this.tokenService.hashRefreshToken(refreshToken)
     const expiresAt = this.tokenService.getRefreshTokenExpiration()
 
-    const sessionId = await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       const lookup = await tx.session.findUnique({
         where: { refreshToken: oldHashedToken },
-        select: { userId: true },
+        select: { id: true, userId: true, familyId: true },
       })
       if (!lookup) {
         throw new AppException(
@@ -193,6 +214,16 @@ export class SessionService {
           AuthErrorCode.TOKEN_INVALID
         )
       }
+
+      // The attempt coordination lock precedes the account lock, just as publication/confirmation do.
+      const handoffHint = await tx.invitationAuthHandoff.findUnique({
+        where: { sessionId: lookup.id },
+      })
+      if (handoffHint) await acquireXactLock(tx, `invitation-auth-attempt:${handoffHint.attemptId}`)
+
+      const familyHint = await tx.authSessionFamily.findUnique({ where: { id: lookup.familyId } })
+      if (familyHint?.browserContextId)
+        await tx.$queryRaw`SELECT id FROM core.browser_auth_contexts WHERE id = ${familyHint.browserContextId} FOR UPDATE`
 
       // Serialize against a concurrent admin revoke-one/all on the
       // SAME owning user before re-reading validity, so a rotation cannot
@@ -206,7 +237,12 @@ export class SessionService {
         where: { refreshToken: oldHashedToken },
       })
 
-      if (!existing) {
+      if (
+        !existing ||
+        existing.userId !== lookup.userId ||
+        existing.userId !== params.userId ||
+        existing.familyId !== lookup.familyId
+      ) {
         throw new AppException(
           'Invalid refresh token',
           HttpStatus.UNAUTHORIZED,
@@ -226,36 +262,37 @@ export class SessionService {
         )
 
       if (existing.expiresAt < new Date()) {
-        await tx.session.deleteMany({
-          where: { refreshToken: oldHashedToken },
-        })
-        throw new AppException(
-          'Refresh token expired',
-          HttpStatus.UNAUTHORIZED,
-          AuthErrorCode.TOKEN_INVALID
-        )
+        await tx.session.deleteMany({ where: { refreshToken: oldHashedToken } })
+        return {
+          error: new AppException(
+            'Refresh token expired',
+            HttpStatus.UNAUTHORIZED,
+            AuthErrorCode.TOKEN_INVALID
+          ),
+        }
       }
 
       if (existing.revokedAt) {
-        if (existing.revocationReason === 'rotated') {
-          await tx.session.updateMany({
-            where: {
-              familyId: existing.familyId,
-              revokedAt: null,
-            },
-            data: {
-              revokedAt: new Date(),
-              revocationReason: 'reuse-detected',
-            },
-          })
+        if (existing.revocationReason === 'rotated')
+          await revokeFamilyRows(
+            tx,
+            existing.userId,
+            existing.familyId,
+            'reuse-detected',
+            new Date()
+          )
+        return {
+          error: new AppException(
+            'Refresh token is no longer valid',
+            HttpStatus.UNAUTHORIZED,
+            AuthErrorCode.TOKEN_INVALID
+          ),
         }
-
-        throw new AppException(
-          'Refresh token is no longer valid',
-          HttpStatus.UNAUTHORIZED,
-          AuthErrorCode.TOKEN_INVALID
-        )
       }
+
+      const authority = await readRefreshAuthority(tx, existing, browser)
+      if ((authority.family?.browserContextId ?? null) !== (familyHint?.browserContextId ?? null))
+        throw refreshSessionChanged()
 
       const revokeResult = await tx.session.updateMany({
         where: {
@@ -269,22 +306,14 @@ export class SessionService {
       })
 
       if (revokeResult.count === 0) {
-        await tx.session.updateMany({
-          where: {
-            familyId: existing.familyId,
-            revokedAt: null,
-          },
-          data: {
-            revokedAt: new Date(),
-            revocationReason: 'reuse-detected',
-          },
-        })
-
-        throw new AppException(
-          'Refresh token is no longer valid',
-          HttpStatus.UNAUTHORIZED,
-          AuthErrorCode.TOKEN_INVALID
-        )
+        await revokeFamilyRows(tx, existing.userId, existing.familyId, 'reuse-detected', new Date())
+        return {
+          error: new AppException(
+            'Refresh token is no longer valid',
+            HttpStatus.UNAUTHORIZED,
+            AuthErrorCode.TOKEN_INVALID
+          ),
+        }
       }
 
       const created = await tx.session.create({
@@ -301,12 +330,44 @@ export class SessionService {
         },
       })
 
-      return created.id
+      if (authority.family) {
+        await tx.authSessionFamily.update({
+          where: { id: authority.family.id },
+          data: {
+            expiresAt: new Date(
+              Math.max(authority.family.expiresAt.getTime(), expiresAt.getTime())
+            ),
+          },
+        })
+        if (authority.family.browserContextId) {
+          const context = await tx.browserAuthContext.findUniqueOrThrow({
+            where: { id: authority.family.browserContextId },
+          })
+          await tx.browserAuthContext.update({
+            where: { id: context.id },
+            data: {
+              expiresAt: new Date(Math.max(context.expiresAt.getTime(), expiresAt.getTime())),
+            },
+          })
+        }
+      }
+      const accessClaims = { ...authority.claims, sid: created.id }
+      const accessToken = authority.family
+        ? await issueFamilyAccessToken(tx, this.tokenService, accessClaims)
+        : undefined
+      return { sessionId: created.id, accessClaims, accessToken }
     })
 
+    if (outcome.error) throw outcome.error
+    const sessionId = outcome.sessionId
     this.logger.info({ userId: params.userId }, 'Refresh token rotated')
 
-    return { refreshToken, sessionId }
+    return {
+      refreshToken,
+      sessionId,
+      accessClaims: outcome.accessClaims,
+      ...(outcome.accessToken !== undefined && { accessToken: outcome.accessToken }),
+    }
   }
 
   /**
@@ -340,9 +401,11 @@ export class SessionService {
 
   /** Delete session by refresh token hash */
   async deleteByRefreshToken(hashedToken: string): Promise<void> {
-    await this.prisma.session.deleteMany({
-      where: { refreshToken: hashedToken },
-    })
+    await deleteRefreshFamily(this.prisma, hashedToken)
+  }
+
+  async logoutBrowser(binding: BrowserRequestBinding, refreshHash?: string): Promise<void> {
+    await logoutBrowserSession(this.prisma, binding, refreshHash)
   }
 
   /**
@@ -390,37 +453,41 @@ export class SessionService {
 
   /** Delete specific session */
   async deleteSession(sessionId: string, userId: string): Promise<void> {
-    const result = await this.prisma.session.deleteMany({
-      where: { id: sessionId, userId },
-    })
-
-    if (result.count === 0) {
+    if (!(await deleteOwnedSession(this.prisma, userId, sessionId))) {
       throw new NotFoundException('Session', sessionId)
     }
 
     this.logger.info({ sessionId, userId }, 'Session deleted')
   }
 
+  /** Post-reset cleanup must never delete a new sign-in committed after the reset transaction. */
+  async deleteRevokedByUserId(userId: string): Promise<void> {
+    const result = await this.prisma.session.deleteMany({
+      where: { userId, revokedAt: { not: null } },
+    })
+    if (result.count > 0)
+      this.logger.info({ userId, count: result.count }, 'Revoked sessions deleted')
+  }
+
   /** Delete all sessions for user (e.g. after password reset) */
   async deleteAllByUserId(userId: string): Promise<void> {
-    const result = await this.prisma.session.deleteMany({ where: { userId } })
+    const count = await deleteOwnedFamilies(this.prisma, userId)
 
-    if (result.count > 0) {
-      this.logger.info({ userId, count: result.count }, 'All sessions deleted')
+    if (count > 0) {
+      this.logger.info({ userId, count }, 'All sessions deleted')
     }
   }
 
   /** Delete all sessions except current */
-  async deleteOtherSessions(userId: string, currentTokenHash: string): Promise<void> {
-    const result = await this.prisma.session.deleteMany({
-      where: {
-        userId,
-        NOT: { refreshToken: currentTokenHash },
-      },
-    })
+  async deleteOtherSessions(
+    userId: string,
+    currentTokenHash: string,
+    browser: BrowserRequestBinding | null = null
+  ): Promise<void> {
+    const count = await deleteOwnedFamilies(this.prisma, userId, currentTokenHash, browser)
 
-    if (result.count > 0) {
-      this.logger.info({ userId, count: result.count }, 'Other sessions deleted')
+    if (count > 0) {
+      this.logger.info({ userId, count }, 'Other sessions deleted')
     }
   }
 
@@ -435,21 +502,12 @@ export class SessionService {
     }
   }
 
-  private async revokeTokenFamily(familyId: string, reason: string): Promise<void> {
-    const result = await this.prisma.session.updateMany({
-      where: {
-        familyId,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-        revocationReason: reason,
-      },
+  private async revokeTokenFamily(userId: string, familyId: string, reason: string): Promise<void> {
+    const count = await this.prisma.$transaction(async (tx) => {
+      await acquireXactLock(tx, sessionCoordinationLockKey(userId))
+      return revokeFamilyRows(tx, userId, familyId, reason, new Date())
     })
-
-    if (result.count > 0) {
-      this.logger.warn({ familyId, count: result.count, reason }, 'Refresh token family revoked')
-    }
+    if (count > 0) this.logger.warn({ familyId, count, reason }, 'Refresh token family revoked')
   }
 
   private generateSessionFamilyId(): string {

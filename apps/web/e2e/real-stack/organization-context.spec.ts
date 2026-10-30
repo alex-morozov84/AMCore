@@ -2,11 +2,26 @@ import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { observeContextReads, saveContextDiagnostics } from '../support/context-read-diagnostics'
 import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi, proveOwnedRefresh } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
+
+let phase = 'setup'
+let diagnostic: ReturnType<typeof observeContextReads>
+test.beforeEach(async ({ page }) => {
+  phase = 'setup'
+  diagnostic = observeContextReads(page, () => phase)
+})
+test.afterEach(async ({ page }, info) => {
+  await saveContextDiagnostics(info, 'session-fence', {
+    ...(await diagnostic()),
+    pageClosed: page.isClosed(),
+  })
+})
 
 test('organization foundation: ordered lifecycle, targets, session fence and responsive UI', async ({
   page,
@@ -18,7 +33,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   const email = uniqueEmail('organization-context')
   const ui = organizationUi()
   const origin = activeTarget().origins.product
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin },
     data: { email, password: TEST_PASSWORD },
   })
@@ -30,8 +45,9 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
     // Creation availability is independent of the existing authority-read sequence below.
-    if (path.startsWith('/api/product-access/') && !path.endsWith('/creation-policy'))
+    if (path.startsWith('/api/product-access/') && !path.endsWith('/creation-policy')) {
       calls.push(path)
+    }
   })
 
   await page.goto(ui.path())
@@ -117,6 +133,8 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   for (const locale of SUPPORTED_LOCALES)
     for (const dark of [false, true])
       for (const width of [1440, 375]) {
+        // Each presentation variant is independent of source-volume admission.
+        resetBrowserProbeDomainBudget()
         await page.setViewportSize({ width, height: 900 })
         await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light', reducedMotion: 'reduce' })
         await page.goto(organizationUi(locale).path(`/${second.id}`))
@@ -137,6 +155,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
         })
       }
 
+  resetBrowserProbeDomainBudget()
   const lastUi = organizationUi(SUPPORTED_LOCALES.at(-1)!)
   await page
     .getByRole('button', { name: /sidebar|меню|панел/i })
@@ -153,18 +172,27 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     page.getByRole('button', { name: lastUi.text('refresh'), exact: true })
   ).toBeEnabled()
 
-  const beforeChanged = calls.length
+  phase = 'credential-attempt'
   expect(
     (
-      await context.request.post('/api/auth/login', {
+      await browserCredentialRequest(context.request, '/api/auth/login', {
         headers: { origin },
         data: { email, password: TEST_PASSWORD },
       })
     ).status()
   ).toBe(200)
+  phase = 'new-identity'
+  const newIdentity = await context.request.get(new URL('/api/auth/me', origin).href)
+  expect(newIdentity.status()).toBe(200)
+  expect((await newIdentity.json()).user.id).toBe(actor.id)
+  phase = 'focus-after-publication'
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect(page.getByText(lastUi.text('changedTitle'), { exact: true })).toBeVisible()
-  expect(calls.slice(beforeChanged)).toEqual(['/api/product-access/bootstrap'])
+  try {
+    await expect(page.getByText(lastUi.text('changedTitle'), { exact: true })).toBeVisible()
+  } catch {
+    throw new Error(`Session fence outcome: ${JSON.stringify(await diagnostic())}`)
+  }
+  // Exact request counts belong to the controlled session-fence scenarios, not prior navigation timing.
   await expect(page.getByText(second.name, { exact: true })).toHaveCount(0)
   expect(errors).toEqual([])
   // Vault capability checks above mutate only this cookie; never reset shared counters or limits.
@@ -182,7 +210,7 @@ test('empty discovery and pagination remain distinct from failed authority', asy
   const email = uniqueEmail('org-empty')
   expect(
     (
-      await context.request.post('/api/auth/register', {
+      await browserCredentialRequest(context.request, '/api/auth/register', {
         headers: { origin },
         data: { email, password: TEST_PASSWORD },
       })

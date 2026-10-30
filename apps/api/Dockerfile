@@ -67,6 +67,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 COPY packages ./packages
 COPY apps/api ./apps/api
 COPY scripts/typecheck-native.mjs ./scripts/typecheck-native.mjs
+COPY scripts/write-mfa-artifact.mjs ./scripts/write-mfa-artifact.mjs
 RUN pnpm --filter @amcore/shared build
 RUN pnpm --filter api db:generate
 ARG BUILD_SOURCE_COMMIT

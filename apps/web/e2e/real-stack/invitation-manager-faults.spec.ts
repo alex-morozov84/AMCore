@@ -9,9 +9,10 @@ import {
 import { expect, type Route, test } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 for (const locale of SUPPORTED_LOCALES)
   test(`manager ${locale}: primary faults, dirty generation, unknown recovery and late retirement`, async ({
@@ -23,7 +24,7 @@ for (const locale of SUPPORTED_LOCALES)
     const ownerEmail = uniqueEmail('manager-fault-owner')
     expect(
       (
-        await context.request.post('/api/auth/register', {
+        await browserCredentialRequest(context.request, '/api/auth/register', {
           headers: { origin: target.origins.product },
           data: { email: ownerEmail, password: TEST_PASSWORD },
         })
@@ -88,9 +89,11 @@ for (const locale of SUPPORTED_LOCALES)
     await expect(page.locator('[data-slot="alert"]').first()).toBeVisible()
     await expect(invite).toBeDisabled()
     await expect(page.getByRole('row').filter({ hasText: email })).toHaveCount(0)
+    resetBrowserProbeDomainBudget()
     failList = false
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await expect(dialog.getByRole('checkbox', { name: 'VIEWER', exact: true })).toBeChecked()
+    resetBrowserProbeDomainBudget()
     // Independent issuance changes generation while the local complete selection is dirty.
     const list = await directApi(
       `organizations/${org.id}/invites?status=pending`,
@@ -141,6 +144,7 @@ for (const locale of SUPPORTED_LOCALES)
     ).toBeDisabled()
     await page.getByRole('alertdialog').getByRole('button', { name: t.cancel, exact: true }).click()
     await expect(page.getByRole('textbox', { name: t.search, exact: true })).toBeFocused()
+    resetBrowserProbeDomainBudget()
     failList = false
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await expect(row).toBeVisible()
@@ -158,6 +162,7 @@ for (const locale of SUPPORTED_LOCALES)
     await dialog.getByRole('button', { name: t.cancel, exact: true }).click()
     await expect(menu).toBeEnabled()
     await page.unroute('**/invites/role-choices?*')
+    resetBrowserProbeDomainBudget()
     // A committed command with lost browser response is recovered by receipt, not a fresh send.
     let sends = 0
     const lose = async (route: Route) => {
@@ -204,7 +209,7 @@ for (const locale of SUPPORTED_LOCALES)
     const replacement = uniqueEmail('replacement-session')
     expect(
       (
-        await context.request.post('/api/auth/register', {
+        await browserCredentialRequest(context.request, '/api/auth/register', {
           headers: { origin: target.origins.product },
           data: { email: replacement, password: TEST_PASSWORD },
         })

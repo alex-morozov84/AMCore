@@ -1,3 +1,4 @@
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 const standTarget = activeTarget()
@@ -35,6 +36,7 @@ test('host-mode Organizations panel renders real data via the console session, w
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )
@@ -81,6 +83,7 @@ test('host-mode Organizations panel denies a demoted session with a live re-chec
   await consolePage.getByLabel(/email/i).fill(email)
   await consolePage.getByLabel(/^password$/i).fill('Test1234Secure')
   await consolePage.getByRole('button', { name: /sign in/i }).click()
+  await completeMfaSignIn(consolePage, email)
   await expect(consolePage).toHaveURL(
     new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/?$')
   )

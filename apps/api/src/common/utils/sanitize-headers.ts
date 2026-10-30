@@ -21,6 +21,13 @@ const SENSITIVE_HEADERS = new Set([
   // sanitizeHeaders(request.headers) on 500s — a separate path from Pino's req.headers redact — so the
   // header must be redacted here too, or a cross-user operator's reason would leak on an error.
   'x-amcore-operator-reason',
+  'x-amcore-web-context-key',
+  'x-amcore-browser-context-key',
+  'x-amcore-browser-binding',
+  'x-mfa-continuation',
+  'x-mfa-vault-binding',
+  'x-invitation-continuation',
+  'x-invitation-handoff-key',
 ])
 
 const REDACTED = '[REDACTED]'

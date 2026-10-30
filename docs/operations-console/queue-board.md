@@ -40,14 +40,18 @@ Only a current platform `SUPER_ADMIN`. An organization role does not grant acces
 are rejected. The check runs on **every** request the page makes (page, assets and data), against
 the database, not a cache.
 
-| What happens                                          | When the board stops answering                                                                                                                              |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| You sign out of the Console                           | At once for new requests. A tab that is already open keeps what it shows and its next refresh is refused.                                                   |
-| Your sessions are revoked from somewhere else         | When the access token the Console holds expires (15 minutes by default, `JWT_ACCESS_EXPIRATION`): the Console cannot renew it. Not instant.                 |
-| Your access token expires while your session is valid | Never visibly: the Console renews it.                                                                                                                       |
-| You are demoted from `SUPER_ADMIN`                    | On the next request.                                                                                                                                        |
-| You are promoted to `SUPER_ADMIN`                     | After your next sign-in, or when the Console renews your access token (within 15 minutes): a token issued earlier still says you were not an administrator. |
-| Your account is deleted                               | On the next request.                                                                                                                                        |
+| What happens                                          | When the board stops answering                                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| You sign out of the Console                           | At once for new requests. A tab that is already open keeps what it shows and its next refresh is refused. |
+| Your sessions are revoked from somewhere else         | On the next request: current family/browser authority is checked before access.                           |
+| Your access token expires while your session is valid | Never visibly: the Console renews it.                                                                     |
+| You are demoted from `SUPER_ADMIN`                    | On the next request.                                                                                      |
+| You are promoted to `SUPER_ADMIN`                     | After your next sign-in. Refresh never upgrades an earlier USER credential to administrator.              |
+| Your account is deleted                               | On the next request.                                                                                      |
+
+Both Board credentials require current family, account security version and verified
+browser binding. Family revocation or browser replacement refuses the next request;
+unavailable verification fails closed. A neutral browser bootstrap grants no access.
 
 Data already shown is not taken back. A page without access gets a plain not-found response, as
 the rest of the Console does.

@@ -9,7 +9,10 @@ import { InvitationRecipientMount } from './mount'
 import { RecipientOAuthSection } from './recipient-oauth-section'
 
 const f = vi.hoisted(() => ({ admission: vi.fn(), primary: vi.fn(), degraded: vi.fn() }))
-vi.mock('@/shared/api/server/access-token', () => ({ getBackendAccessToken: async () => null }))
+vi.mock('@/shared/api/server/access-token', () => ({
+  getBackendAccessToken: async () => null,
+  getBackendSessionCredential: async () => null,
+}))
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({
   headers: async () => new Headers({ host: 'app.example.test' }),

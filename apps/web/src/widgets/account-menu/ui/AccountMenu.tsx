@@ -28,7 +28,7 @@ import { ProfileDialog } from './ProfileDialog'
 export function AccountMenu({
   logoutOptions,
 }: {
-  logoutOptions?: { submit(): Promise<unknown>; loginHref: string }
+  logoutOptions?: { submit(contextSession?: string): Promise<unknown>; loginHref: string }
 } = {}) {
   const t = useTranslations('account')
   const tAuth = useTranslations('auth')
@@ -68,7 +68,10 @@ export function AccountMenu({
             <UserRound className="size-4" />
             {t('profile')}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => logout.mutate()} disabled={logout.isPending}>
+          <DropdownMenuItem
+            onClick={() => logout.mutate(data?.contextSession)}
+            disabled={logout.isPending}
+          >
             <LogOut className="size-4" />
             {tAuth('logout')}
           </DropdownMenuItem>

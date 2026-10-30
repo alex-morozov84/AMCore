@@ -16,6 +16,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 import { AiArtifactKind, AiRunStatus } from '@/generated/prisma/client'
 
@@ -102,10 +103,7 @@ describe('AI multimodal artifact lifecycle (e2e)', () => {
   /** Promote to SUPER_ADMIN and log back in for a FRESH token carrying the updated role. */
   async function promoteSuperAdmin(userId: string, email: string): Promise<string> {
     await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
-    const res = await request(server())
-      .post('/auth/login')
-      .send({ email, password: 'StrongP@ss123' })
-      .expect(200)
+    const res = await loginDomainOperator(context, { email, password: 'StrongP@ss123' })
     return res.body.accessToken as string
   }
 
@@ -425,9 +423,9 @@ describe('AI multimodal artifact lifecycle (e2e)', () => {
       const { conversationId, artifactId } = await seedOwnedArtifact()
       const admin = await registerHttp('g7-admin-stale@example.com')
       const adminToken = await promoteSuperAdmin(admin.userId, 'g7-admin-stale@example.com')
-      await prisma.session.updateMany({
+      await prisma.authSessionFamily.updateMany({
         where: { userId: admin.userId },
-        data: { lastAuthAt: new Date(0) },
+        data: { primaryAt: new Date(0), mfaAt: new Date(0) },
       })
 
       const res = await request(server())

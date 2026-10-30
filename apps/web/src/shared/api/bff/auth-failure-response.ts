@@ -1,4 +1,7 @@
+import type { NextResponse } from 'next/server'
+
 import { apiErrorResponse } from './api-error-response'
+import { ContextRequestError } from './context-errors'
 import { isInvalidRefreshError, SessionNotFoundError, SessionRefreshUnsafeError } from './errors'
 
 import 'server-only'
@@ -16,7 +19,17 @@ import 'server-only'
  * 5xx) — fails closed as 503 rather than either
  * logging the user out or crashing into an unhandled 500.
  */
-export function authFailureResponse(request: Request, error: unknown): Response {
+export function authFailureResponse(request: Request, error: unknown): NextResponse {
+  if (error instanceof ContextRequestError) {
+    const response = apiErrorResponse(request, {
+      statusCode: error.status,
+      message: 'Session verification failed',
+      errorCode: error.errorCode,
+    })
+    if ((error.status === 429 || error.status === 503) && error.retryAfterSeconds !== undefined)
+      response.headers.set('retry-after', String(error.retryAfterSeconds))
+    return response
+  }
   if (error instanceof SessionNotFoundError || error instanceof SessionRefreshUnsafeError) {
     return apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' })
   }

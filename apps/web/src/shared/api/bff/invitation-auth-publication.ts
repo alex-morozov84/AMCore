@@ -1,5 +1,6 @@
 import type { AuthResponse } from '@amcore/shared'
 
+import type { BrowserVaultBinding } from './browser-binding.server'
 import { contextSessionBinding } from './context-session'
 import { publishInvitationAuth } from './invitation-auth-transition'
 import { invitationFlowChanged } from './invitation-flow-authority'
@@ -24,6 +25,8 @@ export async function publishInvitedCredentials(input: {
   attempt: NonNullable<InvitationVaultFlow['attempt']>
   credentials: { data: AuthResponse; refreshToken: string | null }
   signal: AbortSignal
+  browserBinding?: BrowserVaultBinding
+  publication?: NonNullable<InvitationVaultFlow['handoff']>['publication']
   oauth?: { carrier: InvitationOAuthCarrier; ticketHash: string; backendSessionId: string }
 }) {
   const { snapshot, attempt, credentials, signal } = input
@@ -36,6 +39,7 @@ export async function publishInvitedCredentials(input: {
   if (input.oauth && input.oauth.backendSessionId !== backendId) throw invitationFlowChanged()
   const entry = {
     ...(snapshot.webContext ? { audience: snapshot.webContext.audience } : {}),
+    ...(input.browserBinding ? { browser: input.browserBinding } : {}),
     accessToken: credentials.data.accessToken,
     refreshToken: credentials.refreshToken,
     accessTokenExpiresAt: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
@@ -87,6 +91,12 @@ export async function publishInvitedCredentials(input: {
       },
       Date.now()
     )
+    if (input.publication) {
+      const flow = next.flows.find(
+        (candidate) => candidate.binding.flowId === snapshot.flow.binding.flowId
+      )!
+      flow.handoff = { ...flow.handoff!, publication: input.publication }
+    }
     if (input.oauth) {
       const flow = next.flows.find(
         (candidate) => candidate.binding.flowId === snapshot.flow.binding.flowId

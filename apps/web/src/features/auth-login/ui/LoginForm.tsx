@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { type LoginInput, loginSchema } from '@amcore/shared'
+import { type LoginInput, loginSchema, type MfaBrowserSignInPending } from '@amcore/shared'
 
 import { useLocalizedForm } from '@/shared/hooks'
 import type { CredentialFormAdapter } from '@/shared/lib/credential-form-adapter'
@@ -15,7 +15,7 @@ import { RouteProgressLink } from '@/shared/ui/route-progress-link'
 import { useLogin } from '../model/use-login'
 
 export interface LoginFormProps {
-  adapter?: CredentialFormAdapter<LoginInput>
+  adapter?: CredentialFormAdapter<LoginInput, MfaBrowserSignInPending>
   initialEmail?: string
   disabled?: boolean
   forgotPasswordHref?: string

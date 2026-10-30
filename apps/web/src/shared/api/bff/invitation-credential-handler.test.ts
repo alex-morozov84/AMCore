@@ -89,7 +89,7 @@ function prepare(current: ReturnType<typeof fixture>) {
   })
 }
 describe('dedicated invited credential commands', () => {
-  it('reserves before login issuance and emits only the opaque session cookie and safe ACK projection', async () => {
+  it('refuses unbound legacy login without issuing authentication', async () => {
     const current = fixture()
     prepare(current)
     const response = await invitationCredentialHandler(
@@ -98,7 +98,7 @@ describe('dedicated invited credential commands', () => {
       'login',
       deps
     )
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(503)
     expect(invitationOwnerStore.compareAndSet).toHaveBeenCalledWith(
       current.snapshot.ownerHash,
       1,
@@ -112,22 +112,10 @@ describe('dedicated invited credential commands', () => {
       }),
       undefined
     )
-    expect(invitationBackend).toHaveBeenCalledWith(
-      '/auth/login',
-      expect.anything(),
-      expect.objectContaining({
-        expectedStatus: 200,
-        body: { email: current.user.email, password: 'Test-password-123!' },
-        credential: 'c'.repeat(43),
-        handoff: { attemptId: expect.any(String), cleanupKey: expect.any(String) },
-      })
-    )
-    expect(response.headers.get('set-cookie')).toContain(`amcore_session=${'s'.repeat(43)}`)
-    const body = await response.json()
-    expect(body.handoff).toEqual({ attemptId: 'i'.repeat(22) })
-    expect(JSON.stringify(body)).not.toContain('<test-access>')
-    expect(JSON.stringify(body)).not.toContain('<test-refresh>')
-    expect(recoverFailedInvitationAuth).not.toHaveBeenCalled()
+    expect(invitationBackend).not.toHaveBeenCalled()
+    expect(publishInvitedCredentials).not.toHaveBeenCalled()
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(recoverFailedInvitationAuth).toHaveBeenCalledOnce()
   })
   it('registers without a client-selected email and preserves the created status', async () => {
     const current = fixture()

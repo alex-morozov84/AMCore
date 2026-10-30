@@ -25,6 +25,9 @@ import { StorageService } from '../../infrastructure/storage/index.js'
 import { acquireXactLock, PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
 import { avatarUrlOf } from '../auth/avatar-url.js'
+import { advanceAccountSecurity } from '../auth/mfa/mfa-invalidation.js'
+
+import { AdminCommandAdmission } from './admin-command-admission.js'
 
 /**
  * Prisma `select` allowlist for admin user responses (OA-07).
@@ -175,7 +178,8 @@ export class AdminService {
     private readonly cleanupService: CleanupService,
     private readonly auditLog: AuditLogService,
     private readonly logger: PinoLogger,
-    private readonly storage: StorageService
+    private readonly storage: StorageService,
+    private readonly commandAdmission: AdminCommandAdmission
   ) {
     this.logger.setContext(AdminService.name)
   }
@@ -241,51 +245,57 @@ export class AdminService {
       throw new BusinessRuleViolationException('You cannot change your own system role')
     }
 
-    const { before, after, row } = await this.prisma.$transaction(async (tx) => {
-      await acquireXactLock(tx, 'system-role:SUPER_ADMIN')
+    const { before, after, row } = await this.prisma.$transaction(
+      async (tx) => {
+        await acquireXactLock(tx, 'system-role:SUPER_ADMIN')
+        await this.commandAdmission.assert(tx, actor, [id])
 
-      const target = await tx.user.findUnique({ where: { id }, select: ADMIN_USER_SELECT })
-      if (!target) throw new NotFoundException('User', id)
+        const target = await tx.user.findUnique({ where: { id }, select: ADMIN_USER_SELECT })
+        if (!target) throw new NotFoundException('User', id)
 
-      // No-op: nothing to write, nothing to audit.
-      if (target.systemRole === systemRole) {
-        return { before: target.systemRole, after: target.systemRole, row: target }
-      }
-
-      // Last-SUPER_ADMIN guard for the demotion case only.
-      if (target.systemRole === SystemRole.SuperAdmin && systemRole !== SystemRole.SuperAdmin) {
-        const otherSACount = await tx.user.count({
-          where: { systemRole: SystemRole.SuperAdmin, id: { not: id } },
-        })
-        if (otherSACount === 0) {
-          throw new BusinessRuleViolationException('Cannot demote the last SUPER_ADMIN')
+        // No-op: nothing to write, nothing to audit.
+        if (target.systemRole === systemRole) {
+          return { before: target.systemRole, after: target.systemRole, row: target }
         }
-      }
 
-      const updated = await tx.user.update({
-        where: { id },
-        data: { systemRole },
-        select: ADMIN_USER_SELECT,
-      })
+        // Last-SUPER_ADMIN guard for the demotion case only.
+        if (target.systemRole === SystemRole.SuperAdmin && systemRole !== SystemRole.SuperAdmin) {
+          const otherSACount = await tx.user.count({
+            where: { systemRole: SystemRole.SuperAdmin, id: { not: id } },
+          })
+          if (otherSACount === 0) {
+            throw new BusinessRuleViolationException('Cannot demote the last SUPER_ADMIN')
+          }
+        }
 
-      await this.auditLog.record(
-        {
-          action: 'admin.user.system_role_changed',
-          actorId: actor.sub,
-          actorType: AuditActorType.USER,
-          metadata: {
-            afterSystemRole: updated.systemRole,
-            beforeSystemRole: target.systemRole,
-            pinoEvent: 'auth.admin.system_role_changed',
+        const updated = await tx.user.update({
+          where: { id },
+          data: { systemRole },
+          select: ADMIN_USER_SELECT,
+        })
+        await advanceAccountSecurity(tx, id)
+
+        await this.auditLog.record(
+          {
+            action: 'admin.user.system_role_changed',
+            actorId: actor.sub,
+            actorType: AuditActorType.USER,
+            metadata: {
+              afterSystemRole: updated.systemRole,
+              beforeSystemRole: target.systemRole,
+              pinoEvent: 'auth.admin.system_role_changed',
+            },
+            targetId: id,
+            targetType: AuditTargetType.USER,
           },
-          targetId: id,
-          targetType: AuditTargetType.USER,
-        },
-        { tx }
-      )
+          { tx }
+        )
+        await this.commandAdmission.assert(tx, actor, [id])
 
-      return { before: target.systemRole, after: updated.systemRole, row: updated }
-    })
+        return { before: target.systemRole, after: updated.systemRole, row: updated }
+      },
+      { maxWait: 2000, timeout: 4000 }
+    )
 
     if (before !== after) {
       this.logger.info(
@@ -362,28 +372,17 @@ export class AdminService {
   }
 
   /**
-   * Revoke the target user's sessions after a committed system-role change
-   * (OB-06a / ADR-037, amendment 2026-05-30 — fires on ANY `before !== after`
-   * change, demotion and promotion alike).
-   *
-   * Why both directions: a demotion loses privileged access on the next
-   * request via the `SystemRolesGuard` claim ∩ current-DB-role check; this
-   * revocation additionally signs the user out so a compromised admin's
-   * sessions are killed, and — critically — a promotion cannot silently
-   * elevate an existing lower-privilege refresh session (refresh mints from
-   * the current DB role), so the promoted user must re-authenticate.
-   *
-   * Best-effort and post-commit: the role change is already committed, so a
-   * Redis/DB hiccup here must NOT roll it back or surface as 500 (mirrors the
-   * AK-12 best-effort pattern). A direct `deleteMany` is used rather than
-   * injecting `SessionService` to avoid importing the cycle-heavy `AuthModule`
-   * into `AdminModule`; the semantics are identical. The payloads carry only
-   * CUIDs and a count — the operation never reads a refresh-token value or
-   * hash, so there is no token material to leak.
+   * Best-effort physical cleanup after atomic role/epoch/family revocation.
+   * Deleting only revoked rows preserves independently authorized new sign-ins.
+   * Failure cannot restore old authority or roll back the committed role change.
+   * Direct Prisma access avoids importing the cycle-heavy AuthModule. Logs and
+   * audit contain only actor/target IDs and the actual deleted-row count.
    */
   private async revokeTargetSessions(targetUserId: string, actorUserId: string): Promise<void> {
     try {
-      const { count } = await this.prisma.session.deleteMany({ where: { userId: targetUserId } })
+      const { count } = await this.prisma.session.deleteMany({
+        where: { userId: targetUserId, revokedAt: { not: null } },
+      })
       await this.auditLog.record({
         action: 'admin.user.sessions_revoked',
         actorId: actorUserId,

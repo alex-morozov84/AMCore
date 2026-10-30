@@ -4,6 +4,9 @@ const definitionSeams = [
   ['password-changed', 'account-password-changed.definition.ts', 3],
   ['profile-updated', 'account-profile-updated.definition.ts', 1],
   ['telegram-linked', 'account-telegram-linked.definition.ts', 1],
+  ['mfa-backup-codes-changed', 'account-mfa-backup-codes-changed.definition.ts', 1],
+  ['mfa-backup-used', 'account-mfa-backup-used.definition.ts', 1],
+  ['mfa-factor-changed', 'account-mfa-factor-changed.definition.ts', 2],
 ].map(([id, file, occurrences]) =>
   localeSeam(
     `locale.notification-definition-${id}`,
@@ -37,7 +40,11 @@ export const localeApiNotificationSeams = [
   localeSeam(
     'locale.invite-issuance-snapshot-locale',
     'apps/api/src/core/organizations/invite.service.spec.ts',
-    { identifiers: ['acknowledges known=%s nonmembers uniformly and captures truthful email intent'] },
+    {
+      identifiers: [
+        'acknowledges known=%s nonmembers uniformly and captures truthful email intent',
+      ],
+    },
     ['acknowledges known=%s nonmembers uniformly and captures truthful email intent'],
     'locale.api-link-fixture'
   ),

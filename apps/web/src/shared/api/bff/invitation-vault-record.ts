@@ -4,6 +4,8 @@ import {
   invitationFlowBindingSchema,
   invitationFlowIdSchema,
   invitationSessionBindingSchema,
+  loginPublicationSchema,
+  mfaPurposeSchema,
 } from '@amcore/shared'
 import { z } from 'zod'
 
@@ -29,6 +31,14 @@ const handoffJournalSchema = z.strictObject({
   backendSessionId: z.string().min(1).max(128),
   deadline: z.number().int(),
   confirmed: z.boolean(),
+  publication: loginPublicationSchema
+    .extend({
+      purpose: mfaPurposeSchema,
+      vaultBinding: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+      flowBinding: z.string().uuid(),
+    })
+    .strict()
+    .optional(),
   ticketHash: z
     .string()
     .regex(/^[a-f0-9]{64}$/)

@@ -1,14 +1,17 @@
 import type { SupportedLocale } from '@amcore/shared'
 
+import { handleBrowserBootstrap } from '@/shared/api/bff/browser-bootstrap-handler'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { invitationAcceptHandler } from '@/shared/api/bff/invitation-accept-handler'
 import { invitationAckHandler } from '@/shared/api/bff/invitation-ack-handler'
 import { invitationContextDeps } from '@/shared/api/bff/invitation-context-deps'
 import { invitationCredentialHandler } from '@/shared/api/bff/invitation-credential-handler'
+import { invitationFlowChanged } from '@/shared/api/bff/invitation-flow-authority'
 import { invitationBootstrap, invitationIngress } from '@/shared/api/bff/invitation-ingress'
 import { invitationOAuthReservation } from '@/shared/api/bff/invitation-oauth-reservation'
 import { invitationOperationHandler } from '@/shared/api/bff/invitation-operation-handler'
 import { invitationReadHandler } from '@/shared/api/bff/invitation-read-handler'
+import { captureInvitationRequest } from '@/shared/api/bff/invitation-request-snapshot'
 import { invitationSwitchHandler } from '@/shared/api/bff/invitation-switch-handler'
 import { invitationVerificationHandler } from '@/shared/api/bff/invitation-verification-handler'
 import {
@@ -37,6 +40,12 @@ function flowRequest(
 
 /** Application wiring; route adapters supply code-owned action and identifiers only. */
 export const invitationHandlers = {
+  authContext: (request: Request, id: string) =>
+    flowRequest(request, id, async (deps) => {
+      const snapshot = await captureInvitationRequest(request, id, deps, true)
+      if (snapshot.flow.state !== 'active' || !deps.webContext) throw invitationFlowChanged()
+      return handleBrowserBootstrap(request, deps.webContext)
+    }),
   context: (request: Request, id: string) =>
     flowRequest(request, id, (deps) => invitationReadHandler(request, id, 'context', deps)),
   inspect: (request: Request, id: string) =>

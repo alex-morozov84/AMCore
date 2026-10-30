@@ -1,4 +1,7 @@
+import { headers } from 'next/headers'
+
 import { getOptionalSessionEntry } from '../bff'
+import { browserSessionHeaders } from '../bff/browser-binding.server'
 
 import 'server-only'
 
@@ -12,4 +15,14 @@ import 'server-only'
 export async function getBackendAccessToken(): Promise<string | null> {
   const entry = await getOptionalSessionEntry()
   return entry?.accessToken ?? null
+}
+
+export async function getBackendSessionCredential() {
+  const entry = await getOptionalSessionEntry()
+  return entry
+    ? {
+        accessToken: entry.accessToken,
+        browserHeaders: browserSessionHeaders(await headers(), entry.audience ?? 'product', entry),
+      }
+    : null
 }

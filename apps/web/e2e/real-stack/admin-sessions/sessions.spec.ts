@@ -1,9 +1,10 @@
 import { type Browser, expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations, waitForAnimationsToFinish } from '../../shared/axe'
+import { completeMfaStepUp } from '../../shared/mfa-login'
 import { waitForIdleRegions } from '../../shared/visual-stability'
 import { ageSessionLastAuthAt, countLiveSessions, setSystemRole } from '../admin-helpers'
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../helpers'
+import { loginViaUi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../helpers'
 import { waitForSessionTransitions } from '../sessions-readability'
 
 async function signInAsPathAdmin(page: Page, email: string, create = true) {
@@ -13,10 +14,7 @@ async function signInAsPathAdmin(page: Page, email: string, create = true) {
   if (create) await registerViaUi(page, email, { name: 'Sessions Panel Admin' })
   setSystemRole(email, 'SUPER_ADMIN')
   await page.context().clearCookies()
-  await page.goto('/en/login')
-  await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await loginViaUi(page, email)
   await expect(page).toHaveURL(/\/en\/?$/)
 }
 
@@ -24,10 +22,7 @@ async function signInAsPathAdmin(page: Page, email: string, create = true) {
 async function addExtraSession(browser: Browser, email: string, userAgent: string): Promise<void> {
   const context = await browser.newContext({ userAgent })
   const page = await context.newPage()
-  await page.goto('/en/login')
-  await page.getByRole('textbox', { name: /email/i }).fill(email)
-  await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await loginViaUi(page, email)
   await expect(page).toHaveURL(/\/en\/?$/)
   await context.close()
 }
@@ -154,6 +149,7 @@ test('path-mode: revoking with an aged admin session requires step-up', async ({
   await expect(stepUpDialog).toBeVisible()
   await stepUpDialog.getByLabel(/^password$/i).fill(TEST_PASSWORD)
   await stepUpDialog.getByRole('button', { name: /confirm/i }).click()
+  await completeMfaStepUp(page, adminEmail)
 
   await expect(stepUpDialog).toBeHidden()
   expect(countLiveSessions(targetEmail)).toBe(0)

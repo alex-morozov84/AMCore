@@ -1,13 +1,16 @@
 import type { UserResponse } from '@amcore/shared'
 
+import type { BrowserVaultBinding } from './browser-binding.server'
+
 /**
  * A Next-held record of a browser session's real backend credentials.
  * The browser only ever holds the opaque session id (as the `amcore_session`
  * cookie) that keys this entry — see ADR-068.
  */
 export interface VaultRecord {
-  /** Missing is accepted only for legacy product records. */
+  /** Old persisted records are readable for rejection only; they acquire no inferred browser authority. */
   audience?: 'product' | 'staff' | 'console'
+  browser?: BrowserVaultBinding
   refreshToken: string
   accessToken: string
   /** Epoch milliseconds. */
@@ -74,5 +77,6 @@ export interface UpstreamRefreshError extends Error {
  */
 export type UpstreamRefreshFn = (
   refreshToken: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  browser?: BrowserVaultBinding
 ) => Promise<UpstreamRefreshResult>

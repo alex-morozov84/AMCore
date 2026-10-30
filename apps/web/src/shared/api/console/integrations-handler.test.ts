@@ -23,7 +23,10 @@ const post = (body?: unknown) =>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'access-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'access-token',
+    bindingHeaders: {},
+  })
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
   fetchMock.mockResolvedValue(
     new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })

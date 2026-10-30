@@ -1,105 +1,93 @@
 // @vitest-environment node
+import { NextResponse } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('./origin-guard', () => ({ isTrustedConsoleOrigin: vi.fn() }))
-vi.mock('./access-probe', () => ({ probeConsoleAccessWithToken: vi.fn() }))
-vi.mock('./session', () => ({ mintConsoleSession: vi.fn() }))
-vi.mock('@/shared/api/bff/backend-session-revocation', () => ({ revokeBackendSession: vi.fn() }))
-vi.mock('@/shared/api/bff/upstream-auth', () => ({
-  UpstreamAuthError: class UpstreamAuthError extends Error {},
-  callUpstreamAuth: vi.fn(),
-}))
+vi.mock('@/shared/api/bff/browser-login-handler', () => ({ handleBrowserPassword: vi.fn() }))
 
-import { revokeBackendSession } from '@/shared/api/bff/backend-session-revocation'
-import { callUpstreamAuth } from '@/shared/api/bff/upstream-auth'
+import { handleBrowserPassword } from '@/shared/api/bff/browser-login-handler'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
-import { probeConsoleAccessWithToken } from './access-probe'
 import { handleConsoleLogin } from './auth-handler'
+import { consoleBrowserContext } from './browser-context'
 import { isTrustedConsoleOrigin } from './origin-guard'
-import { mintConsoleSession } from './session'
 
-const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
-const originalMode = ADMIN_CONSOLE_CONFIG.mode
-
-function request(): Request {
-  return new Request('https://console.example.test/api/auth/login', {
+const config = ADMIN_CONSOLE_CONFIG as { mode: 'path' | 'host' }
+const original = config.mode
+function request(path = '/api/console/auth/login', host = 'console.example.test') {
+  return new Request(`https://${host}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@example.test', password: 'Password123' }),
+    headers: { host, 'content-type': 'application/json', origin: `https://${host}` },
+    body: JSON.stringify({ email: 'operator@example.test', password: '<fake-password>' }),
   })
 }
-
 beforeEach(() => {
   vi.clearAllMocks()
-  mutableConfig.mode = 'host'
+  config.mode = 'host'
+  vi.stubEnv('ADMIN_CONSOLE_HOSTNAME', 'console.example.test')
+  vi.stubEnv('ADMIN_CONSOLE_ORIGIN', 'https://console.example.test')
+  vi.stubEnv('FRONTEND_URL', 'https://shop.example.test')
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-console-private-context-key-at-least-32>')
   vi.mocked(isTrustedConsoleOrigin).mockReturnValue(true)
-  vi.mocked(callUpstreamAuth).mockResolvedValue({
-    accessToken: 'access-token',
-    refreshToken: 'refresh-token',
-    user: { id: 'user-1' },
-  } as never)
-  vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'admitted' })
-  vi.mocked(mintConsoleSession).mockResolvedValue('console-session')
-})
-
-describe('handleConsoleLogin', () => {
-  it('rejects non-host mode before authenticating', async () => {
-    mutableConfig.mode = 'path'
-
-    await expect(handleConsoleLogin(request())).resolves.toMatchObject({ status: 404 })
-    expect(callUpstreamAuth).not.toHaveBeenCalled()
-  })
-
-  it('rejects an untrusted browser origin before authenticating', async () => {
-    vi.mocked(isTrustedConsoleOrigin).mockReturnValue(false)
-
-    const response = await handleConsoleLogin(request())
-
-    expect(response.status).toBe(403)
-    expect(callUpstreamAuth).not.toHaveBeenCalled()
-  })
-
-  it('mints only a live-super-admin console session', async () => {
-    const response = await handleConsoleLogin(request())
-
-    expect(response.status).toBe(204)
-    expect(mintConsoleSession).toHaveBeenCalledWith(
-      expect.objectContaining({ accessToken: 'access-token' })
+  vi.mocked(handleBrowserPassword).mockResolvedValue(
+    NextResponse.json(
+      { kind: 'mfa', flowBinding: '01900000-0000-7000-8000-000000000001' },
+      { status: 202 }
     )
-    expect(response.headers.get('set-cookie')).toContain(
-      '__Host-amcore_console_session=console-session'
-    )
-    expect(response.headers.get('set-cookie')).toContain('Secure')
-  })
-
-  it('revokes a rejected backend login without minting a console session', async () => {
-    vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'denied', status: 403 })
-
-    const response = await handleConsoleLogin(request())
-
-    expect(response.status).toBe(403)
-    expect(mintConsoleSession).not.toHaveBeenCalled()
-    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token', expect.any(Headers))
-  })
-
-  it('threads original source through mint-failure compensation', async () => {
-    const incoming = request()
-    vi.mocked(mintConsoleSession).mockRejectedValueOnce(new Error('vault unavailable'))
-    const response = await handleConsoleLogin(incoming)
-    expect(response.status).toBe(503)
-    expect(probeConsoleAccessWithToken).toHaveBeenCalledWith('access-token', incoming.headers)
-    expect(revokeBackendSession).toHaveBeenCalledWith('refresh-token', incoming.headers)
-  })
-  it('fails closed when the live policy probe is unavailable', async () => {
-    vi.mocked(probeConsoleAccessWithToken).mockResolvedValue({ kind: 'upstream-unavailable' })
-
-    await expect(handleConsoleLogin(request())).resolves.toMatchObject({ status: 503 })
-    expect(mintConsoleSession).not.toHaveBeenCalled()
-  })
+  )
 })
-
 afterEach(() => {
-  mutableConfig.mode = originalMode
+  config.mode = original
+  vi.unstubAllEnvs()
+})
+
+describe('Console login shares exact-attempt browser publication', () => {
+  it.each(['path', 'wrong-host'] as const)(
+    'rejects %s before reading credentials',
+    async (kind) => {
+      if (kind === 'path') config.mode = 'path'
+      const response = await handleConsoleLogin(
+        request(undefined, kind === 'wrong-host' ? 'shop.example.test' : undefined)
+      )
+      expect(response.status).toBe(404)
+      expect(handleBrowserPassword).not.toHaveBeenCalled()
+    }
+  )
+  it('rejects an untrusted origin before starting a flow', async () => {
+    vi.mocked(isTrustedConsoleOrigin).mockReturnValue(false)
+    expect((await handleConsoleLogin(request())).status).toBe(403)
+    expect(handleBrowserPassword).not.toHaveBeenCalled()
+  })
+  it('returns restricted MFA unchanged and selects only the console cookie and namespace', async () => {
+    const incoming = request(),
+      response = await handleConsoleLogin(incoming)
+    expect(response.status).toBe(202)
+    expect(await response.json()).toMatchObject({ kind: 'mfa' })
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(handleBrowserPassword).toHaveBeenCalledWith(
+      incoming,
+      expect.objectContaining({
+        audience: 'console',
+        namespace: 'web:console-session:v1',
+        cookieName: '__Host-amcore_console_session',
+        origin: 'https://console.example.test',
+        cookieOptions: expect.objectContaining({ secure: true, httpOnly: true, path: '/' }),
+      }),
+      { email: 'operator@example.test', password: '<fake-password>' }
+    )
+    expect(consoleBrowserContext(incoming).apiHeaders).toEqual({})
+  })
+  it('refuses unexpected query and never starts another issuer', async () => {
+    expect(
+      (await handleConsoleLogin(request('/api/console/auth/login?familyId=other'))).status
+    ).toBe(400)
+    expect(handleBrowserPassword).not.toHaveBeenCalled()
+  })
+  it('fails closed without emitting a cookie when publication is unavailable', async () => {
+    vi.mocked(handleBrowserPassword).mockRejectedValueOnce(new Error('storage unavailable'))
+    const response = await handleConsoleLogin(request())
+    expect(response.status).toBe(503)
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
 })

@@ -29,6 +29,36 @@ function held<T>() {
 }
 
 describe('account MFA secret and command containment', () => {
+  it('retains the original flow intent across concealment and sends it with later status/commands', async () => {
+    const flowBinding = crypto.randomUUID()
+    const view = { ...flow, flowBinding }
+    const inspect = vi.fn(async () => view)
+    const command = vi.fn(async () => ({ view }))
+    const controller = new AccountMfaController({ inspect, command })
+    await controller.inspect()
+    controller.conceal()
+    await controller.inspect()
+    expect(inspect).toHaveBeenLastCalledWith(undefined, flowBinding)
+    await controller.command({ action: 'start_enrollment' })
+    expect(command).toHaveBeenCalledWith(expect.objectContaining({ flowBinding }))
+  })
+  it('refuses another flow after a pending cookie switch without displaying its identity', async () => {
+    const first = { ...flow, flowBinding: crypto.randomUUID() }
+    const inspect = vi
+      .fn()
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce({
+        ...first,
+        flowBinding: crypto.randomUUID(),
+        accountLabel: 'Other account',
+      })
+    const controller = new AccountMfaController({ inspect, command: async () => enrollment })
+    await controller.inspect()
+    controller.conceal()
+    await controller.inspect()
+    expect(controller.getSnapshot()).toEqual({ phase: 'changed' })
+    expect(controller.getSecrets()).toEqual({})
+  })
   it('discards a late secret response after the view was concealed', async () => {
     const response = held<MfaBrowserResult>()
     const controller = new AccountMfaController({
@@ -98,3 +128,38 @@ describe('account MFA secret and command containment', () => {
     expect(controller.getSecrets()).toEqual({})
   })
 })
+
+it.each([429, 401, 503] as const)(
+  'classifies settings-start HTTP %s without replaying it',
+  async (status) => {
+    const settings: MfaBrowserView = {
+      kind: 'settings',
+      accountLabel: 'Fixture',
+      protected: true,
+      eligible: true,
+      remainingCodes: 10,
+    }
+    const command = vi.fn(async (): Promise<MfaBrowserResult> => {
+      throw new ApiRequestError(status, undefined, status === 429 ? 37 : undefined)
+    })
+    const resolveStart = vi.fn(async () => ({ view: settings }))
+    const inspect = vi.fn(async () => settings)
+    const controller = new AccountMfaController({ inspect, command, resolveStart })
+    await controller.inspect()
+    await controller.command({ action: 'start_code_rotation' })
+    expect(controller.getSnapshot().phase).toBe(
+      status === 429 ? 'ready' : status === 401 ? 'changed' : 'unknown'
+    )
+    if (status === 429) {
+      expect((controller.getSnapshot().error as ApiRequestError).retryAfterSeconds).toBe(37)
+      expect(controller.getRecoveryReference()).toBeUndefined()
+      await controller.inspect()
+      expect(resolveStart).not.toHaveBeenCalled()
+    } else if (status === 503) {
+      expect(controller.getRecoveryReference()?.startPurpose).toBe('rotate_codes')
+      await controller.reconcile()
+      expect(resolveStart).toHaveBeenCalledTimes(1)
+    }
+    expect(command).toHaveBeenCalledTimes(1)
+  }
+)

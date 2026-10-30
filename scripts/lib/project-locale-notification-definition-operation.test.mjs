@@ -15,6 +15,9 @@ const definitions = [
   ['account-password-changed.definition.ts', 3],
   ['account-profile-updated.definition.ts', 1],
   ['account-telegram-linked.definition.ts', 1],
+  ['account-mfa-backup-codes-changed.definition.ts', 1],
+  ['account-mfa-backup-used.definition.ts', 1],
+  ['account-mfa-factor-changed.definition.ts', 2],
 ]
 
 function source(file) {

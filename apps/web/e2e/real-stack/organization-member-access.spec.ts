@@ -9,7 +9,7 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 // Real BFF, real API, real browser: the access explanation of a member who holds the built-in ADMIN
 // role and a custom role that denies editing the name. Uses only the active managed test stand.
@@ -25,7 +25,7 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
   const t = catalogue.memberAccess
   const capabilities = catalogue.organizationRoles.capabilities
   const email = uniqueEmail('member-access')
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin: target.origins.product },
     data: { email, password: TEST_PASSWORD },
   })

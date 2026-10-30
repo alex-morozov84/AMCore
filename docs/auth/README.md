@@ -15,10 +15,11 @@ revocation, member removal and bounded operator recovery.
 
 ## What's included
 
-[Dormant MFA foundation](mfa-foundation.md) describes internal storage and
-verification primitives. It does not enable second-factor login or enrollment.
-[Browser preparation](mfa-browser.md) describes the retained account-security UI
-and its unavailable BFF boundary.
+[Account MFA architecture](mfa-foundation.md) describes storage, current session
+authority, one-time proofs and [extension to other users](mfa-foundation.md#extend-mfa-to-other-users). [Browser journeys](mfa-browser.md) cover
+setup, self-service and safe recovery. [Deployment and maintenance](mfa-deployment.md)
+cover activation, offline reset and key rotation. Activation requires separate owner
+approval; the default prepared protocol does not enable MFA or operator grants.
 
 | Topic                                                 | What it covers                                                                     |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |

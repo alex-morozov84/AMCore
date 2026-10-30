@@ -5,8 +5,6 @@ import { useTranslations } from 'next-intl'
 import type { UserResponse } from '@amcore/shared'
 import { ShieldCheckIcon } from 'lucide-react'
 
-import { ConsoleLogoutButton } from '@/features/console-logout'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { ConsoleTimeZoneProvider } from '@/shared/lib/console-time-zone'
 import {
   Sidebar,
@@ -27,6 +25,7 @@ import { ConsoleTimeZoneSwitcher } from './ConsoleTimeZoneSwitcher'
 import { ConsoleUserBadge } from './ConsoleUserBadge'
 
 interface ConsoleShellProps {
+  logoutIntent?: string
   children: ReactNode
   /** Server-resolved (`getConsoleAwareUser`) - chrome only, never an auth decision. */
   user: UserResponse | null
@@ -34,7 +33,12 @@ interface ConsoleShellProps {
   defaultSidebarOpen?: boolean
 }
 
-export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShellProps) {
+export function ConsoleShell({
+  children,
+  defaultSidebarOpen,
+  user,
+  logoutIntent,
+}: ConsoleShellProps) {
   const t = useTranslations('console')
 
   return (
@@ -81,8 +85,7 @@ export function ConsoleShell({ children, defaultSidebarOpen, user }: ConsoleShel
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               <ConsoleTimeZoneSwitcher />
               <ConsoleLocaleSwitcher />
-              <ConsoleUserBadge user={user} />
-              {ADMIN_CONSOLE_CONFIG.mode === 'host' && <ConsoleLogoutButton />}
+              <ConsoleUserBadge user={user} logoutIntent={logoutIntent} />
             </div>
           </header>
           <div className="w-full p-4 sm:p-6">{children}</div>

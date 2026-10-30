@@ -1,3 +1,4 @@
+import { prepareMfaE2E } from './mfa-e2e.mjs'
 import { admitInvocation, endInvocation } from './invocation.mjs'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -30,7 +31,10 @@ export async function test(m, lane, token, extra = [], group) {
   await save(m)
   let close
   try {
-    if (!mocked) await admitInvocation(m)
+    if (!mocked) {
+      await admitInvocation(m)
+      await prepareMfaE2E(m)
+    }
     close = await supervise(m, token)
     const config = mocked ? 'playwright.config.ts' : `playwright.${lane}.config.ts`
     const options = {

@@ -39,7 +39,7 @@ export function RecipientClient({
 }) {
   const t = useTranslations('invitationRecipient')
   const router = useRouteProgressRouter()
-  const auth = useRecipientAuthentication(initial, user)
+  const auth = useRecipientAuthentication(initial, user, placement.actionBase ?? '/auth')
   const [terminal, setTerminal] = useState<{
     descriptor: InvitationAcceptDescriptor
     organization: string

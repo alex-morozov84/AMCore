@@ -11,8 +11,28 @@ import {
   prepareOrganizationSetupSource,
 } from './organization-setup-fixture.mjs'
 import { mailCollectorProgram, setupMailCollectorService } from './setup-mail-collector.mjs'
-import { executeSetupCommand } from './setup-command.mjs'
+import { executeSetupCommand, setupFailureResult } from './setup-command.mjs'
 import { standReporters } from '../../apps/web/e2e/support/managed-target.mjs'
+
+test('setup failure diagnostics retain only allowlisted status and bounded exit', () => {
+  assert.deepEqual(
+    setupFailureResult({ status: 'SETUP_CLOSED', token: 'private-fixture-value' }, 3),
+    {
+      exit: 3,
+      status: 'SETUP_CLOSED',
+    }
+  )
+  for (const output of [
+    null,
+    { status: 'private-fixture-value' },
+    { status: { secret: 'private' } },
+  ])
+    assert.deepEqual(setupFailureResult(output, 'private-fixture-value'), {
+      exit: null,
+      status: 'fixture_unavailable',
+    })
+  assert.equal(setupFailureResult({}, 256).exit, null)
+})
 
 test('shop fixture is Docker E2E only and cannot use initial-account mutation helpers', async () => {
   assert.doesNotThrow(() =>
@@ -158,4 +178,14 @@ test('internal mailbox accepts only fake recipients, consumes once and bounds co
   })
   assert.equal((await send('/consume', { to: message.to })).status, 404)
   await assert.rejects(send('/deliver', { ...message, html: 'x'.repeat(128 * 1024) }))
+})
+
+test('all disposable Docker E2E reporters omit secret-bearing HTML steps', () => {
+  assert.deepEqual(standReporters({ purpose: 'e2e', mocked: false }, '/owned/test'), [
+    ['list', { printSteps: false }],
+  ])
+  assert.deepEqual(
+    standReporters({ purpose: 'e2e', mocked: true }, '/owned/mock').map(([name]) => name),
+    ['list', 'html']
+  )
 })

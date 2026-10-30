@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 
+import { createBrowserBindingVerifier } from '@/shared/api/bff/browser-binding.server'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
 import { createUpstreamRefresh } from '@/shared/api/bff/upstream-refresh'
@@ -20,6 +21,8 @@ export function establishmentConsoleDeps(headers: Headers): ContextExecutorDeps 
     apiBase: getBackendBaseUrl(),
     store: redisConsoleVaultStore,
     lock: redisConsoleVaultLock,
-    upstreamRefresh: createUpstreamRefresh(headers),
+    upstreamRefresh: createUpstreamRefresh(headers, undefined, 'console'),
+    expectedAudience: 'console',
+    verifyBinding: createBrowserBindingVerifier(headers, 'console'),
   }
 }

@@ -21,6 +21,7 @@ import {
   invitationVerificationReturnInputSchema,
   invitationVerificationReturnLinkSchema,
   invitationVerificationReturnResponseSchema,
+  mfaBrowserSignInPendingSchema,
 } from '@amcore/shared'
 
 import { apiClient } from '@/shared/api/http-client'
@@ -43,14 +44,30 @@ export const invitationFlowClient = {
   },
   async login(input: InvitationFlowLogin, signal: AbortSignal) {
     const parsed = invitationFlowLoginSchema.parse(input)
-    return invitationFlowAuthResponseSchema.parse(
-      await apiClient.post(path(parsed.binding.flowId, 'login'), parsed, { signal })
+    const bootstrap = await apiClient.post<{ attemptId: string }>(
+      path(parsed.binding.flowId, 'auth-context'),
+      {},
+      { signal }
+    )
+    return invitationFlowAuthResponseSchema.or(mfaBrowserSignInPendingSchema).parse(
+      await apiClient.post(path(parsed.binding.flowId, 'login'), parsed, {
+        signal,
+        headers: { 'x-amcore-login-attempt': bootstrap.attemptId },
+      })
     )
   },
   async register(input: InvitationFlowRegister, signal: AbortSignal) {
     const parsed = invitationFlowRegisterSchema.parse(input)
+    const bootstrap = await apiClient.post<{ attemptId: string }>(
+      path(parsed.binding.flowId, 'auth-context'),
+      {},
+      { signal }
+    )
     return invitationFlowAuthResponseSchema.parse(
-      await apiClient.post(path(parsed.binding.flowId, 'register'), parsed, { signal })
+      await apiClient.post(path(parsed.binding.flowId, 'register'), parsed, {
+        signal,
+        headers: { 'x-amcore-login-attempt': bootstrap.attemptId },
+      })
     )
   },
   async accept(input: InvitationFlowAccept, signal: AbortSignal) {

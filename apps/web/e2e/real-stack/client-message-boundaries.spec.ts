@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { DEFAULT_LOCALE, localePathPrefix, SUPPORTED_LOCALES } from '@amcore/shared'
 import { type APIResponse, expect, test } from '@playwright/test'
 
-import { serializedClientMessages } from '../shared/client-message-payload'
+import { ROOT_CLIENT_NAMESPACES } from '../../src/i18n/message-selection'
+import { embeddedFlight, serializedClientMessages } from '../shared/client-message-payload'
 
 import { registerViaUi, uniqueEmail } from './helpers'
 
@@ -57,3 +58,42 @@ test('sibling navigation sends new section messages without the departed section
   expect(keys).not.toHaveProperty('organizationCreation')
   expect(missing).toEqual([])
 })
+
+for (const locale of SUPPORTED_LOCALES) {
+  test(`production login excludes MFA messages from HTML and RSC (${locale})`, async ({
+    request,
+  }) => {
+    const catalogue = JSON.parse(
+      readFileSync(join(__dirname, `../../messages/${locale}.json`), 'utf8')
+    )
+    const allowed = [...ROOT_CLIENT_NAMESPACES, 'auth'].sort()
+    const url = `${localePathPrefix(locale)}/login`
+    for (const transport of ['html', 'rsc'] as const) {
+      const response = await request.get(url, {
+        headers: transport === 'rsc' ? { RSC: '1' } : {},
+      })
+      expect(response.ok()).toBe(true)
+      const body = await response.text()
+      if (transport === 'rsc')
+        expect(response.headers()['content-type']).toContain('text/x-component')
+      const boundaries = serializedClientMessages(
+        transport === 'html' ? embeddedFlight(body) : body
+      )
+      expect(boundaries.length).toBeGreaterThanOrEqual(2)
+      const messages = Object.assign({}, ...boundaries)
+      expect(Object.keys(messages).sort()).toEqual(allowed)
+      for (const key of allowed) expect(messages[key]).toEqual(catalogue[key])
+      expect(messages).not.toHaveProperty('accountMfa')
+      console.log(
+        JSON.stringify({
+          measurement: 'login-client-messages',
+          locale,
+          transport,
+          responseBytes: Buffer.byteLength(body),
+          messageBytes: Buffer.byteLength(JSON.stringify(messages)),
+          namespaces: Object.keys(messages).sort(),
+        })
+      )
+    }
+  })
+}

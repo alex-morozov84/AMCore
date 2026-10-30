@@ -41,6 +41,7 @@ export async function observeInvitationVerification(
       method: 'GET',
       expectedStatus: 200,
       accessToken: session.accessToken,
+      session,
     }
   )
   if (!profile.data.user || profile.data.user.id !== session.userSnapshot.id)
@@ -55,6 +56,7 @@ export async function observeInvitationVerification(
       method: 'POST',
       expectedStatus: 200,
       accessToken: session.accessToken,
+      session,
       credential: snapshot.flow.credential,
     }
   )

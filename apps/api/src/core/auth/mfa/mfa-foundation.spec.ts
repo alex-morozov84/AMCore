@@ -105,8 +105,18 @@ describe('Dormant MFA security primitives', () => {
 
   it('reuses fresh backup proof and independently requests only stale evidence', () => {
     const now = new Date('2026-01-01T12:00:00Z')
-    const evidence = { primaryAt: now, mfaAt: now, mfaMethod: 'recovery_code', factorVersion: 1 }
+    const evidence = {
+      primaryAt: now,
+      primaryProofId: 'password-event',
+      mfaAt: now,
+      mfaProofId: 'second-factor-event',
+      mfaMethod: 'recovery_code',
+      factorVersion: 1,
+    }
     expect(requiredMfaProofs(evidence, 1, now)).toEqual([])
+    expect(
+      requiredMfaProofs({ ...evidence, primaryProofId: null, mfaProofId: null }, 1, now)
+    ).toEqual(['password', 'second_factor'])
     expect(
       requiredMfaProofs({ ...evidence, primaryAt: new Date(now.getTime() - 600_001) }, 1, now)
     ).toEqual(['password'])
@@ -136,21 +146,34 @@ describe('Dormant MFA security primitives', () => {
   it.each([
     { protocol: null, factors: 0, accounts: 0, allowed: true },
     { protocol: { state: 'prepared', version: 1 }, factors: 0, accounts: 0, allowed: true },
-    { protocol: { state: 'active', version: 1 }, factors: 0, accounts: 0, allowed: false },
+    { protocol: { state: 'active', version: 1 }, factors: 0, accounts: 0, allowed: true },
     { protocol: null, factors: 1, accounts: 0, allowed: false },
     { protocol: null, factors: 0, accounts: 1, allowed: false },
     { protocol: { state: 'prepared', version: 2 }, factors: 0, accounts: 0, allowed: false },
-  ])('admits only prepared deployments: %j', async ({ protocol, factors, accounts, allowed }) => {
+  ])(
+    'validates local prepared or compatible active startup: %j',
+    async ({ protocol, factors, accounts, allowed }) => {
+      const db = {
+        mfaProtocol: { findUnique: jest.fn(async () => protocol) },
+        mfaFactor: { count: jest.fn(async () => factors) },
+        mfaAccount: { count: jest.fn(async () => accounts) },
+      } as unknown as PrismaService
+      const startup = new MfaFoundationService(db, encryption()).onModuleInit()
+      const result = await startup.then(
+        () => true,
+        () => false
+      )
+      expect(result).toBe(allowed)
+    }
+  )
+  it('refuses an active deployment without the configured current encryption key', async () => {
     const db = {
-      mfaProtocol: { findUnique: jest.fn(async () => protocol) },
-      mfaFactor: { count: jest.fn(async () => factors) },
-      mfaAccount: { count: jest.fn(async () => accounts) },
+      mfaProtocol: { findUnique: async () => ({ state: 'active', version: 1 }) },
+      mfaFactor: { count: async () => 1 },
+      mfaAccount: { count: async () => 1 },
     } as unknown as PrismaService
-    const startup = new MfaFoundationService(db).onModuleInit()
-    const result = await startup.then(
-      () => true,
-      () => false
-    )
-    expect(result).toBe(allowed)
+    await expect(
+      new MfaFoundationService(db, encryption('missing', {})).onModuleInit()
+    ).rejects.toThrow('MFA encryption key unavailable')
   })
 })

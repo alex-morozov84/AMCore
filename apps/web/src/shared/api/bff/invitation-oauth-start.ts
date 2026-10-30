@@ -1,5 +1,15 @@
-import { invitationFlowIdSchema, invitationOAuthCorrelationSchema } from '@amcore/shared'
+import {
+  BROWSER_AUTH_HEADERS,
+  invitationFlowIdSchema,
+  invitationOAuthCorrelationSchema,
+} from '@amcore/shared'
 
+import {
+  browserAnchorCookie,
+  privateBrowserHeaders,
+  readBrowserAnchor,
+} from './browser-binding.server'
+import { prepareBrowserAuthAttempt } from './browser-bootstrap-handler'
 import { withinContextDeadline } from './context-deadline'
 import { invitationFlowChanged } from './invitation-flow-authority'
 import { invitationOAuthFlow } from './invitation-oauth-carrier'
@@ -76,8 +86,40 @@ export async function startInvitedOAuth(
             'x-invitation-auth-attempt-id': carrier.attemptId,
             'x-invitation-handoff-key': flow.attempt.cleanupKey,
           })
+          if (!context) throw invitationFlowChanged()
+          const bootstrap = await prepareBrowserAuthAttempt(request, context, {
+            ownerHash: snapshot.ownerHash,
+            ownerEpoch: snapshot.owner.epoch,
+            flowId: carrier.flowId,
+            attemptId: carrier.attemptId,
+            fence: carrier.fence,
+            cleanupKey: flow.attempt.cleanupKey,
+          })
+          const prepared = (await bootstrap.json()) as {
+            attemptId: string
+            browser: { contextId: string; generation: number }
+          }
+          const anchor =
+            bootstrap.cookies.get(browserAnchorCookie(context.audience).name)?.value ??
+            readBrowserAnchor(request.headers, context.audience)
+          if (!anchor) throw invitationFlowChanged()
+          const binding = new Headers({
+            ...privateBrowserHeaders(context.audience),
+            [BROWSER_AUTH_HEADERS.binding]: anchor,
+            [BROWSER_AUTH_HEADERS.contextId]: prepared.browser.contextId,
+            [BROWSER_AUTH_HEADERS.generation]: String(prepared.browser.generation),
+            'x-amcore-oauth-attempt': prepared.attemptId,
+          })
+          binding.forEach((value, name) => headers.set(name, value))
           signal.throwIfAborted()
-          return send(headers, signal)
+          const upstream = await send(headers, signal)
+          const response = new Response(upstream.body, {
+            status: upstream.status,
+            headers: upstream.headers,
+          })
+          for (const cookie of bootstrap.headers.getSetCookie())
+            response.headers.append('set-cookie', cookie)
+          return response
         },
         undefined,
         context

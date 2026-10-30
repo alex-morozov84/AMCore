@@ -6,7 +6,7 @@ import { type MfaMethod, type MfaProof, mfaProofSchema, stepUpSchema } from '@am
 
 import { useLocalizedForm } from '@/shared/hooks'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form'
-import { Input } from '@/shared/ui/input'
+import { MfaCodeInput } from '@/shared/ui/mfa-code-input'
 import { PasswordInput } from '@/shared/ui/password-input'
 
 import { MfaActionButton as Button, MfaActions } from './actions'
@@ -45,13 +45,13 @@ export function MfaProofForm({
             <FormItem>
               <FormLabel>{t(method === 'totp' ? 'appCode' : 'backupCode')}</FormLabel>
               <FormControl>
-                <Input
-                  {...field}
-                  type="text"
-                  inputMode={method === 'totp' ? 'numeric' : 'text'}
-                  autoComplete={method === 'totp' ? 'one-time-code' : 'off'}
-                  spellCheck={false}
-                  autoCapitalize="off"
+                <MfaCodeInput
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  method={method}
+                  onValueChange={field.onChange}
                   disabled={pending}
                 />
               </FormControl>

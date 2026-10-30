@@ -32,6 +32,7 @@ export interface EnsureFreshSessionDeps<TRecord extends VaultRecord = VaultRecor
   store: VaultStore<TRecord>
   lock: VaultLock
   upstreamRefresh: UpstreamRefreshFn
+  verifyBinding: (entry: TRecord) => Promise<void>
   now?: () => number
 }
 
@@ -59,6 +60,7 @@ export async function ensureFreshSession<TRecord extends VaultRecord = VaultReco
   const entry = await deps.store.get(sessionId)
   if (!entry || (deps.expectedAudience && !hasSessionAudience(entry, deps.expectedAudience)))
     throw new SessionNotFoundError('unavailable')
+  await deps.verifyBinding(entry)
   if (isFresh(entry, now())) return entry
 
   return refreshUnderLock(sessionId, deps, now)
@@ -79,6 +81,7 @@ async function refreshUnderLock<TRecord extends VaultRecord>(
     const reRead = await deps.store.get(sessionId)
     if (!reRead || (deps.expectedAudience && !hasSessionAudience(reRead, deps.expectedAudience)))
       throw new SessionNotFoundError('unavailable')
+    await deps.verifyBinding(reRead)
     if (isFresh(reRead, now())) return reRead
 
     return await performRefresh(sessionId, reRead, token, deps)
@@ -106,7 +109,7 @@ async function performRefresh<TRecord extends VaultRecord>(
     // exclusivity can no longer be proven — whether or not the
     // `upstreamRefresh` implementation itself respects the abort signal.
     upstream = await Promise.race([
-      deps.upstreamRefresh(current.refreshToken, controller.signal),
+      deps.upstreamRefresh(current.refreshToken, controller.signal, current.browser),
       renewal.unsafe,
     ])
   } catch (error) {
@@ -124,6 +127,7 @@ async function performRefresh<TRecord extends VaultRecord>(
   renewal.stop()
 
   const next = { ...current, ...upstream }
+  await deps.verifyBinding(next)
   const written = await deps.store.setIfVersionMatches(sessionId, current.version, next)
   if (written) return { ...next, version: current.version + 1 }
 
@@ -131,5 +135,6 @@ async function performRefresh<TRecord extends VaultRecord>(
   // depth — the lock is not a correctness fence). Trust whatever won.
   const latest = await deps.store.get(sessionId)
   if (!latest) throw new SessionNotFoundError(sessionId)
+  await deps.verifyBinding(latest)
   return latest
 }

@@ -78,7 +78,7 @@ export async function handleSupportMail(
         body,
         cache: 'no-store',
         signal: AbortSignal.timeout(operation === 'send' ? 25_000 : 5000),
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
       }
     )
     const headers = forwardResponseHeaders(response.headers)

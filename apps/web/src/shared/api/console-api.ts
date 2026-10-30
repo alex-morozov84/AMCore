@@ -4,6 +4,8 @@ import type {
   AdminSessionsListResponse,
   AdminUserResponse,
   IntegrationsResponse,
+  MfaStepUpCommand,
+  MfaStepUpPending,
   ProbePreparation,
   ProbeReceipt,
   ScheduledJobsResponse,
@@ -176,11 +178,11 @@ export const consoleApi = {
       systemRole,
     }),
 
-  /** `POST /auth/step-up` never returns its token to this client — the BFF
-   * handler discards it and responds `204` on success (see
-   * `shared/api/console/step-up.ts`). */
-  stepUp: (password: string): Promise<void> =>
-    apiClient.post<void>(getConsolePublicApiPath('/auth/step-up'), { password }),
+  /** Browser responses contain only safe proof requirements; never API credentials. */
+  stepUp: (password: string): Promise<void | MfaStepUpPending> =>
+    apiClient.post<void | MfaStepUpPending>(getConsolePublicApiPath('/auth/step-up'), { password }),
+  stepUpProof: (command: MfaStepUpCommand): Promise<void | MfaStepUpPending> =>
+    apiClient.post<void | MfaStepUpPending>(getConsolePublicApiPath('/auth/step-up'), command),
 
   // `locale` is sent explicitly as `Accept-Language` for the same reason as
   // `authApi.getSessions` — the BFF route isn't under `[locale]`.

@@ -14,7 +14,10 @@ const request = (query = '') =>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: '<fake-access-token>' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: '<fake-access-token>',
+    bindingHeaders: {},
+  })
   upstream.mockResolvedValue(new Response('{}', { headers: { 'set-cookie': 'unexpected=1' } }))
 })
 

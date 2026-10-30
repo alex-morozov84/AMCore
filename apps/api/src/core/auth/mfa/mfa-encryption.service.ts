@@ -24,10 +24,19 @@ export class MfaEncryptionService {
     }
   }
 
+  assertKeyAvailable(id: string): void {
+    this.key(id)
+  }
+
   assertReady(): void {
     const id = this.env.get('MFA_ACTIVE_KEY_ID')
     if (!id) throw new ServiceUnavailableException('MFA encryption not configured')
     this.key(id)
+  }
+
+  activeKeyId(): string {
+    this.assertReady()
+    return this.env.get('MFA_ACTIVE_KEY_ID')!
   }
 
   encrypt(
@@ -35,8 +44,7 @@ export class MfaEncryptionService {
     factorId: string,
     secret: string
   ): { encryptedSeed: string; keyId: string } {
-    this.assertReady()
-    const keyId = this.env.get('MFA_ACTIVE_KEY_ID')!
+    const keyId = this.activeKeyId()
     const nonce = randomBytes(12)
     const cipher = createCipheriv('aes-256-gcm', this.key(keyId), nonce)
     cipher.setAAD(Buffer.from(JSON.stringify(['mfa-seed-v1', userId, factorId])))

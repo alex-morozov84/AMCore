@@ -1,20 +1,28 @@
 // @vitest-environment node
 // Captured from a real API transaction: COMMIT, then test-side acknowledgment loss.
 import { memberRolesResponseSchema, replaceMemberRolesResponseSchema } from '@amcore/shared'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 
 import { fetchBackendResponse } from '@/shared/api/backend-transport'
 import { executeContextOperation } from '@/shared/api/bff/context-executor'
 import { contextRoute } from '@/shared/api/bff/context-route'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import captured from '@/shared/api/bff/fixtures/member-ack-lost.json'
-import { FakeVaultStore, freshRefresh, makeEntry } from '@/shared/api/bff/test-fakes'
+import {
+  browserTestHeaders,
+  FakeVaultStore,
+  freshRefresh,
+  makeBrowserEntry,
+} from '@/shared/api/bff/test-fakes'
 import { SimpleLock } from '@/shared/api/bff/test-lock-fakes'
 
 import { membersClient } from '../../api/members-client'
 
 import { createOrganizationAccessController } from './controller'
 
+beforeEach(() =>
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-domain-browser-transport-key-at-least-32>')
+)
 vi.mock('server-only', () => ({}))
 vi.mock('@/shared/api/backend-transport', () => ({
   fetchBackendResponse: vi.fn(),
@@ -22,7 +30,7 @@ vi.mock('@/shared/api/backend-transport', () => ({
 }))
 vi.mock('client-only', () => ({}))
 it('replays actual committed safe503 through BFF/headless: unknown, fresh V+1, no PATCH replay', async () => {
-  const entry = makeEntry()
+  const entry = makeBrowserEntry()
   const store = new FakeVaultStore()
   store.seed('session-x', entry)
   const binding = contextSessionBinding('session-x', entry)
@@ -35,6 +43,7 @@ it('replays actual committed safe503 through BFF/headless: unknown, fresh V+1, n
   const deps = {
     store,
     lock: new SimpleLock(),
+    verifyBinding: async () => undefined,
     upstreamRefresh: vi.fn(freshRefresh),
     readSessionId: async () => 'session-x',
     apiBase: 'http://api.test',
@@ -44,7 +53,7 @@ it('replays actual committed safe503 through BFF/headless: unknown, fresh V+1, n
     organizationId: 'org',
     successStatus: 200,
   }
-  const input = { expectedSession: binding, headers: new Headers() }
+  const input = { expectedSession: binding, headers: browserTestHeaders() }
   let fresh: unknown
   const controller = createOrganizationAccessController(binding, 'org')
   controller.setAuthority(true)

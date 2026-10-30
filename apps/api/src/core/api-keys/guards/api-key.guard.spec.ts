@@ -1,5 +1,7 @@
 import type { ExecutionContext } from '@nestjs/common'
 
+import { SystemRole } from '@amcore/shared'
+
 import { ServiceUnavailableException } from '../../../common/exceptions'
 import {
   createMockContext,
@@ -7,6 +9,7 @@ import {
   mockContextToPrisma,
 } from '../../auth/auth-context.testkit'
 import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
+import { apiKeyAdmission } from '../api-key-admission'
 import { ApiKeysService } from '../api-keys.service'
 
 import { ApiKeyGuard } from './api-key.guard'
@@ -75,6 +78,21 @@ describe('ApiKeyGuard', () => {
 
   afterEach(() => {
     jest.clearAllMocks()
+  })
+
+  it('projects an operator-owned key as USER and keeps its primary role only as private evidence', async () => {
+    mockMembership({ found: true })
+    apiKeysService.verifyByShortToken.mockResolvedValueOnce({
+      ...mockApiKey,
+      user: { systemRole: SystemRole.SuperAdmin },
+    } as never)
+    const context = createMockExecutionContext(
+      `Bearer amcore_live_${SHORT_TOKEN}_${'x'.repeat(32)}`
+    )
+    expect(await guard.canActivate(context)).toBe(true)
+    const request = context.switchToHttp().getRequest()
+    expect(request.user.systemRole).toBe(SystemRole.User)
+    expect(apiKeyAdmission(request, request.user).ownerSystemRole).toBe(SystemRole.SuperAdmin)
   })
 
   it('allows request with valid api key and builds principal with org context', async () => {

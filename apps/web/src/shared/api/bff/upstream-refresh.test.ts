@@ -1,7 +1,20 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createUpstreamRefresh } from './upstream-refresh'
+import { createUpstreamRefresh as createBoundRefresh } from './upstream-refresh'
+const browser = {
+  contextId: '62dde074-27ae-42fb-a7c3-229c32566d57',
+  generation: 3,
+  familyId: 'family-1',
+  securityVersion: 2,
+  audience: 'product' as const,
+}
+function createUpstreamRefresh(source: Headers) {
+  source = new Headers(source)
+  source.set('cookie', `amcore_browser_context=${'a'.repeat(43)}`)
+  const refresh = createBoundRefresh(source)
+  return (token: string, signal: AbortSignal) => refresh(token, signal, browser)
+}
 const upstreamRefresh = createUpstreamRefresh(new Headers())
 
 // See ensure-fresh-session.basic.test.ts for why `server-only` needs mocking.
@@ -21,12 +34,40 @@ function fakeResponse(options: {
   } as unknown as Response
 }
 
+beforeEach(() => {
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
+})
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
 })
 
 describe('upstreamRefresh', () => {
+  it('refuses missing browser authority before sending any refresh', async () => {
+    const send = vi.fn()
+    vi.stubGlobal('fetch', send)
+    await expect(
+      createBoundRefresh(new Headers())('rt', new AbortController().signal)
+    ).rejects.toMatchObject({ status: 401, errorCode: 'AUTH_CONTEXT_CHANGED' })
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it.each(['AUTH_CONTEXT_CHANGED', 'SESSION_CHANGED'])(
+    'keeps %s terminal instead of retryable refresh',
+    async (errorCode) => {
+      const send = vi
+        .fn()
+        .mockResolvedValue(fakeResponse({ ok: false, status: 409, body: { errorCode } }))
+      vi.stubGlobal('fetch', send)
+      await expect(upstreamRefresh('rt', new AbortController().signal)).rejects.toMatchObject({
+        status: 401,
+        errorCode: 'AUTH_CONTEXT_CHANGED',
+      })
+      expect(send).toHaveBeenCalledOnce()
+    }
+  )
+
   it('presents the refresh token as a Cookie header and returns the rotated pair', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       fakeResponse({
@@ -44,7 +85,11 @@ describe('upstreamRefresh', () => {
     expect(result.refreshToken).toBe('rt-new')
     expect(result.accessTokenExpiresAt).toBeGreaterThan(Date.now())
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(new Headers(init.headers).get('cookie')).toBe('refresh_token=rt-old')
+    const headers = new Headers(init.headers)
+    expect(headers.get('cookie')).toBe('refresh_token=rt-old')
+    expect(headers.get('x-amcore-browser-context')).toBe(browser.contextId)
+    expect(headers.get('x-amcore-browser-generation')).toBe('3')
+    expect(headers.get('x-amcore-browser-binding')).toBe('a'.repeat(43))
   })
 
   it('snapshots the original edge source together with UA before a refresh waits for its lock', async () => {

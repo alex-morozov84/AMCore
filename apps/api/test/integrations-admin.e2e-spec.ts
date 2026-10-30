@@ -18,6 +18,7 @@ import {
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
+import { loginDomainOperator } from './operator-auth.fixture.js'
 
 const BASE = '/admin/integrations'
 const PASSWORD = 'StrongP@ss123'
@@ -57,10 +58,7 @@ describe('Admin integrations (e2e)', () => {
       where: { id: userId },
       data: { systemRole: 'SUPER_ADMIN', emailVerified: verified },
     })
-    const res = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200)
+    const res = await loginDomainOperator(context, { email, password: PASSWORD })
     return { userId, token: res.body.accessToken as string }
   }
 

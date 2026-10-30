@@ -3,8 +3,10 @@ import { JwtService } from '@nestjs/jwt'
 import { SystemRole } from '@amcore/shared'
 
 import { UnauthorizedException } from '../../../common/exceptions'
+import type { MfaAuthorityReader } from '../../../core/auth/mfa/mfa-authority-reader.service'
 import { PrivilegedAdmissionService } from '../../../core/auth/privileged-admission.service'
 import type { PrivilegedRoleService } from '../../../core/auth/privileged-role.service'
+import type { BrowserSessionContextService } from '../../../core/frontend-context/browser-session-context.service'
 
 import { BullBoardBearerAuthService } from './bull-board-bearer-auth.service'
 
@@ -13,9 +15,12 @@ const SECRET = 'bearer-auth-spec-secret-at-least-32-characters'
 describe('BullBoardBearerAuthService (admission of the Console BFF)', () => {
   const jwt = new JwtService({ secret: SECRET })
   const getCurrentSystemRole = jest.fn()
+  const readForRuntime = jest.fn()
   const service = new BullBoardBearerAuthService(
     jwt,
-    new PrivilegedAdmissionService({ getCurrentSystemRole } as unknown as PrivilegedRoleService)
+    new PrivilegedAdmissionService({ getCurrentSystemRole } as unknown as PrivilegedRoleService),
+    { readForRuntime } as unknown as MfaAuthorityReader,
+    { verify: jest.fn() } as unknown as BrowserSessionContextService
   )
 
   const sign = (
@@ -30,7 +35,10 @@ describe('BullBoardBearerAuthService (admission of the Console BFF)', () => {
       }
     )
 
-  beforeEach(() => getCurrentSystemRole.mockReset())
+  beforeEach(() => {
+    getCurrentSystemRole.mockReset()
+    readForRuntime.mockReset().mockResolvedValue({ kind: 'admitted', operator: true })
+  })
 
   it('admits a SUPER_ADMIN claim that the primary database still confirms', async () => {
     getCurrentSystemRole.mockResolvedValue(SystemRole.SuperAdmin)
@@ -39,6 +47,25 @@ describe('BullBoardBearerAuthService (admission of the Console BFF)', () => {
       userId: 'user-1',
     })
     expect(getCurrentSystemRole).toHaveBeenCalledWith('user-1')
+  })
+
+  it.each([
+    ['session_changed', 'session_changed'],
+    ['enforcement_unavailable', 'unavailable'],
+  ])('preserves signed family claims and terminal denial %s', async (reason, kind) => {
+    getCurrentSystemRole.mockResolvedValue(SystemRole.SuperAdmin)
+    readForRuntime.mockResolvedValue({ kind: 'denied', reason })
+    await expect(
+      service.verify(sign({ fid: 'F', securityVersion: 4, browserBound: true }))
+    ).resolves.toEqual({ kind })
+    expect(readForRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fid: 'F',
+        securityVersion: 4,
+        browserBound: true,
+      }),
+      null
+    )
   })
 
   it('refuses a demoted admin: the stale claim is demoted by admission, not thrown', async () => {

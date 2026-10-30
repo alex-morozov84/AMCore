@@ -16,7 +16,10 @@ const request = (signal?: AbortSignal) =>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'access-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'access-token',
+    bindingHeaders: {},
+  })
   fetchMock.mockResolvedValue(
     new Response('{"queues":[]}', {
       status: 200,

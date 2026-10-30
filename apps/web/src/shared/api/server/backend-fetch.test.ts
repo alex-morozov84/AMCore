@@ -6,14 +6,14 @@ import { z } from 'zod'
 import { SessionVaultUnavailableError } from '../bff/errors'
 import { resolveTrustedClientIp } from '../bff/trusted-client-ip'
 
-import { getBackendAccessToken } from './access-token'
+import { getBackendSessionCredential } from './access-token'
 import { fetchBackend } from './backend-fetch'
 import { generateCorrelationId } from './correlation-id'
 import { BackendAuthRequiredError, BackendRequestError } from './errors'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({ headers: vi.fn() }))
-vi.mock('./access-token', () => ({ getBackendAccessToken: vi.fn() }))
+vi.mock('./access-token', () => ({ getBackendSessionCredential: vi.fn() }))
 vi.mock('./correlation-id', () => ({ generateCorrelationId: vi.fn() }))
 vi.mock('../bff/trusted-client-ip', () => ({ resolveTrustedClientIp: vi.fn() }))
 
@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(headers).mockResolvedValue(new Headers() as never)
   vi.mocked(generateCorrelationId).mockReturnValue('corr-1')
-  vi.mocked(getBackendAccessToken).mockResolvedValue(null)
+  vi.mocked(getBackendSessionCredential).mockResolvedValue(null)
   vi.mocked(resolveTrustedClientIp).mockReturnValue(null)
 })
 
@@ -132,7 +132,10 @@ describe('fetchBackend - orchestration', () => {
 
   describe('auth modes', () => {
     it("'none' never resolves a token even if one is available", async () => {
-      vi.mocked(getBackendAccessToken).mockResolvedValue('at-1')
+      vi.mocked(getBackendSessionCredential).mockResolvedValue({
+        accessToken: 'at-1',
+        browserHeaders: {},
+      })
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
 
       await fetchBackend('/things/p1', schema, { auth: 'none' })
@@ -142,7 +145,10 @@ describe('fetchBackend - orchestration', () => {
     })
 
     it("'optional' attaches Authorization when a session exists", async () => {
-      vi.mocked(getBackendAccessToken).mockResolvedValue('at-1')
+      vi.mocked(getBackendSessionCredential).mockResolvedValue({
+        accessToken: 'at-1',
+        browserHeaders: {},
+      })
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
 
       await fetchBackend('/things/p1', schema, { auth: 'optional' })
@@ -161,7 +167,7 @@ describe('fetchBackend - orchestration', () => {
     })
 
     it("'optional' returns unavailable (never anonymous) when the vault is down, and never calls fetch", async () => {
-      vi.mocked(getBackendAccessToken).mockRejectedValue(
+      vi.mocked(getBackendSessionCredential).mockRejectedValue(
         new SessionVaultUnavailableError(new Error('Redis unreachable'))
       )
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
@@ -174,7 +180,7 @@ describe('fetchBackend - orchestration', () => {
     })
 
     it("'optional' rethrows an unknown auth-resolution error and never calls fetch", async () => {
-      vi.mocked(getBackendAccessToken).mockRejectedValue(new Error('programming defect'))
+      vi.mocked(getBackendSessionCredential).mockRejectedValue(new Error('programming defect'))
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
 
       await expect(fetchBackend('/things/p1', schema, { auth: 'optional' })).rejects.toThrow(
@@ -193,7 +199,10 @@ describe('fetchBackend - orchestration', () => {
     })
 
     it('a custom tokenResolver is used instead of the product session, with no fallback to it', async () => {
-      vi.mocked(getBackendAccessToken).mockResolvedValue('product-token')
+      vi.mocked(getBackendSessionCredential).mockResolvedValue({
+        accessToken: 'product-token',
+        browserHeaders: {},
+      })
       const customResolver = vi.fn().mockResolvedValue('console-token')
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
 
@@ -201,11 +210,14 @@ describe('fetchBackend - orchestration', () => {
 
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
       expect((init.headers as Headers).get('Authorization')).toBe('Bearer console-token')
-      expect(getBackendAccessToken).not.toHaveBeenCalled()
+      expect(getBackendSessionCredential).not.toHaveBeenCalled()
     })
 
     it("'required' with a custom tokenResolver that resolves null still throws, never falling back to the product session", async () => {
-      vi.mocked(getBackendAccessToken).mockResolvedValue('product-token')
+      vi.mocked(getBackendSessionCredential).mockResolvedValue({
+        accessToken: 'product-token',
+        browserHeaders: {},
+      })
       const customResolver = vi.fn().mockResolvedValue(null)
       const fetchMock = stubFetch(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
 
@@ -213,7 +225,7 @@ describe('fetchBackend - orchestration', () => {
         fetchBackend('/things/p1', schema, { auth: 'required', tokenResolver: customResolver })
       ).rejects.toBeInstanceOf(BackendAuthRequiredError)
       expect(fetchMock).not.toHaveBeenCalled()
-      expect(getBackendAccessToken).not.toHaveBeenCalled()
+      expect(getBackendSessionCredential).not.toHaveBeenCalled()
     })
   })
 

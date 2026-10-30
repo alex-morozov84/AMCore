@@ -106,7 +106,9 @@ OpenAPI `/docs` for exact schemas, security and responses.
 The existing DELETE member preserves its explicitly supported original-bound,
 live SUPER_ADMIN JWT membership bypass. It does NOT extend to this inventory or
 these revoke commands. Personal unbound SUPER_ADMIN JWT requires membership.
-Existing authorized API-key removal retains its exact manage:TeamAccess requirement.
+Existing API-key removal requires explicit organization TeamAccess and exact
+`manage:TeamAccess` scope. A SUPER_ADMIN owner does not supply that organization
+grant. See [API-key permissions](../auth/api-keys.md#effective-permissions).
 
 ## Custom presentation without ready UI
 

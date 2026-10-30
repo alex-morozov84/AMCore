@@ -15,6 +15,7 @@ function setup() {
   const continuation = {
     binding,
     isCurrent: () => true,
+    onMfaRequired: vi.fn(),
     onHandoff: vi.fn(),
     onConfirmed: vi.fn(),
     onFailure: vi.fn(),
@@ -50,11 +51,37 @@ describe('invitation credential handoff adapter', () => {
     confirm(response)
     const result = await pending
     expect(result).toEqual(response.data)
+    if (!('user' in result)) throw new Error('Expected confirmed authentication')
     state.adapters.login.onSuccess(result)
     expect(state.continuation.onConfirmed).toHaveBeenCalledWith(
       response.binding,
       response.data.user
     )
+  })
+
+  it('keeps MFA pending separate from confirmed login and never acknowledges before proof completion', async () => {
+    const state = setup()
+    const pending = { kind: 'mfa', flowBinding: '01900000-0000-7000-8000-000000000000' }
+    state.transport.login.mockResolvedValue(pending)
+    expect(await state.adapters.login.submit(credentials)).toEqual(pending)
+    expect(state.transport.acknowledge).not.toHaveBeenCalled()
+    expect(state.continuation.onHandoff).not.toHaveBeenCalled()
+    expect(state.continuation.onConfirmed).not.toHaveBeenCalled()
+    await state.adapters.login.onMfaRequired?.(pending.flowBinding)
+    expect(state.continuation.onMfaRequired).toHaveBeenCalledWith(pending.flowBinding)
+  })
+
+  it('does not classify an unexpected registration MFA response as created or authenticated', async () => {
+    const state = setup()
+    state.transport.register.mockResolvedValue({
+      kind: 'mfa',
+      flowBinding: '01900000-0000-7000-8000-000000000000',
+    })
+    await expect(
+      state.adapters.register.submit({ email: credentials.email, password: credentials.password })
+    ).rejects.toMatchObject({ code: 'AUTH_CONTINUATION_CHANGED' })
+    expect(state.transport.acknowledge).not.toHaveBeenCalled()
+    expect(state.continuation.onConfirmed).not.toHaveBeenCalled()
   })
 
   it('never resubmits authentication when the ACK outcome is unknown', async () => {

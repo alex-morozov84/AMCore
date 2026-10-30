@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
 
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
+import { logoutViaApi, registerViaUi, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 test('path administration shares website login/logout and preserves a localized protected destination', async ({
   page,
@@ -36,9 +36,7 @@ test('path administration shares website login/logout and preserves a localized 
   expect(cookies.some((cookie) => cookie.name === 'amcore_session')).toBe(true)
   expect(cookies.some((cookie) => cookie.name === '__Host-amcore_staff_session')).toBe(false)
   expect(
-    (
-      await context.request.post('/api/product-admin/auth/logout', { headers: { Origin: product } })
-    ).status()
+    (await logoutViaApi(context.request, product, '/api/product-admin/auth/logout')).status()
   ).toBe(200)
   expect((await context.request.get('/api/auth/me')).status()).toBe(401)
   await page.goto(`${admin(chosen, '/organizations')}?view=list`)
@@ -61,9 +59,7 @@ test('path administration shares website login/logout and preserves a localized 
   )
   expect(legacy.status()).toBe(308)
   expect(legacy.headers().location).toBe(`${admin(DEFAULT_LOCALE, '/organizations')}?view=list`)
-  expect(
-    (await context.request.post('/api/auth/logout', { headers: { Origin: product } })).status()
-  ).toBe(200)
+  expect((await logoutViaApi(context.request, product)).status()).toBe(200)
   await page.goto(admin(DEFAULT_LOCALE, '/organizations'))
   await expect(
     page.getByRole('heading', { name: baseCopy.productAdmin.loginTitle, exact: true })

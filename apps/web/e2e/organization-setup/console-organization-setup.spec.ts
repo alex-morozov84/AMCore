@@ -4,8 +4,12 @@ import { join } from 'node:path'
 import { coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
+import { probeRefusalEvidence } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
+import { completeMfaSignIn } from '../shared/mfa-login'
+import { saveContextDiagnostics } from '../support/context-read-diagnostics'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' })
@@ -14,6 +18,17 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   page,
 }) => {
   const m = activeTarget()
+  const responses: Array<{ action: string; status: number; errorCode?: string }> = []
+  page.on('response', async (response) => {
+    const path = new URL(response.url()).pathname
+    if (!path.includes('/organization-establishment/')) return
+    const body = await response.json().catch(() => ({}))
+    responses.push({
+      action: path.split('/').at(-1)!,
+      status: response.status(),
+      errorCode: body.errorCode,
+    })
+  })
   const text = (locale: string) =>
     JSON.parse(readFileSync(join(m.snapshot, `apps/web/messages/${locale}.json`), 'utf8')).console
       .organizationSetup
@@ -42,7 +57,11 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await page.goto(localizedFrontendUrl(m.origins.console, coerceSupportedLocale('en'), 'login'))
   await page.getByRole('textbox', { name: login.email, exact: true }).fill(operator)
   await page.getByLabel(login.password, { exact: true }).fill(SETUP_PASSWORD)
+  const signIn = page.waitForResponse(
+    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: login.login, exact: true }).click()
+  if ((await signIn).status() === 202) await completeMfaSignIn(page, operator)
   await page.waitForURL(
     (url) =>
       url.origin === m.origins.console &&
@@ -66,11 +85,21 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expect(setup.getByText(en.unknown, { exact: true })).toBeVisible()
   await page.unroute(preparePattern)
   await page.reload()
-  await setup.getByRole('button', { name: en.repeat, exact: true }).click()
+  const repeat = setup.getByRole('button', { name: en.repeat, exact: true })
+  try {
+    await expect(repeat).toBeVisible()
+  } catch {
+    throw new Error(
+      `Setup recovery unavailable: ${JSON.stringify({ responses, primary: await probeRefusalEvidence() })}`
+    )
+  }
+  await repeat.click()
   await expect(setup.getByText(en.unverified, { exact: true })).toBeVisible()
   await expect(setup.getByText(en.mailHelp, { exact: true })).toBeVisible()
   await expect(setup.getByRole('button', { name: en.continue, exact: true })).toHaveCount(0)
   await expect(setup.getByLabel(en.name, { exact: true })).toHaveCount(0)
+  // The mailbox-verification portion starts with an idle source budget.
+  resetBrowserProbeDomainBudget()
   const recipientPage = await page.context().newPage()
   await proveSetupMailbox(recipientPage, recipient)
   await setup.getByRole('button', { name: en.checkEmail, exact: true }).click()
@@ -84,6 +113,9 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await setup.getByRole('button', { name: en.back, exact: true }).click()
   await expect(setup.getByLabel(en.name, { exact: true })).toHaveValue('Anna shop')
 
+  // Start the independent deleted-recipient recovery case with an idle source budget.
+  // This multi-case correctness exercise is not a sustained-load test.
+  resetBrowserProbeDomainBudget()
   // Only this disposable managed fixture's recipient is deleted, never preview data.
   guardedSql("DELETE FROM core.users WHERE email = :'email';", { email: recipient })
   await page.reload()
@@ -113,6 +145,7 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expect(setup.getByLabel(ru.slug, { exact: true })).toHaveValue('anna-shop')
   await setup.getByRole('button', { name: ru.continue, exact: true }).click()
   await expect(setup.getByRole('heading', { name: ru.headings.review })).toBeVisible()
+  resetBrowserProbeDomainBudget()
   await page.reload()
   await expect(setup.getByRole('heading', { name: ru.headings.review })).toBeVisible()
   await expect(setup.getByText(recipient, { exact: true })).toBeVisible()
@@ -120,6 +153,8 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expectNoAxeViolations(page)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 
+  // A separate lost-commit-response case retains all authority/state but isolates its source budget.
+  resetBrowserProbeDomainBudget()
   const bootstrapPattern = '**/api/organization-establishment/bootstrap'
   await page.route(bootstrapPattern, async (route) => {
     await route.fetch()
@@ -147,6 +182,35 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await setup.getByRole('link', { name: ru.openOrganization, exact: true }).click()
   await expect(page.getByText('Anna shop', { exact: true })).toBeVisible()
 
+  // Recipient admission is independent of the preceding operator recovery exercise.
+  // Keep login, identity and organization reads together without further budget resets.
+  resetBrowserProbeDomainBudget()
+  const recipientProbeBefore = await probeRefusalEvidence()
+  const refusals: Array<{
+    route: string
+    status: number
+    errorCode?: string
+    retryAfter?: string
+  }> = []
+  recipientPage.on('response', async (response) => {
+    const path = new URL(response.url()).pathname
+    if (response.status() < 400 || !path.startsWith('/api/')) return
+    const body = await response.json().catch(() => ({}))
+    refusals.push({
+      route:
+        path === '/api/auth/login' || path === '/api/auth/me'
+          ? path
+          : path.startsWith('/api/product-access/')
+            ? '/api/product-access/<resource>'
+            : '/api/<other>',
+      status: response.status(),
+      errorCode: /^[A-Z_]{1,64}$/.test(body.errorCode) ? body.errorCode : undefined,
+      retryAfter: /^\d{1,6}$/.test(response.headers()['retry-after'] ?? '')
+        ? response.headers()['retry-after']
+        : undefined,
+    })
+    if (refusals.length > 10) refusals.shift()
+  })
   await recipientPage.goto(
     localizedFrontendUrl(m.origins.product, coerceSupportedLocale('en'), 'login')
   )
@@ -161,6 +225,24 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await recipientPage.goto(
     localizedFrontendUrl(m.origins.product, coerceSupportedLocale('en'), 'organizations')
   )
-  await expect(recipientPage.getByRole('heading', { name: 'Anna shop', exact: true })).toBeVisible()
+  try {
+    const identity = await recipientPage.request.get(
+      new URL('/api/auth/me', m.origins.product).href
+    )
+    expect(identity.status()).toBe(200)
+    expect((await identity.json()).user.email).toBe(recipient)
+    await expect(
+      recipientPage.getByRole('heading', { name: 'Anna shop', exact: true })
+    ).toBeVisible()
+  } catch {
+    throw new Error(
+      `Recipient journey refused: ${JSON.stringify({ before: recipientProbeBefore, after: await probeRefusalEvidence(), refusals })}`
+    )
+  } finally {
+    await saveContextDiagnostics(test.info(), 'recipient-probe-counts', {
+      before: recipientProbeBefore,
+      after: await probeRefusalEvidence(),
+    })
+  }
   await recipientPage.close()
 })

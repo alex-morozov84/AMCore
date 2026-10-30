@@ -5,6 +5,7 @@ const module = (path, tests = []) => one(path, { tests })
 
 const roots = [
   'apps/web/src/_app/console-account-security',
+  'apps/web/src/_app/console-profile',
   'apps/web/src/app/[locale]/admin',
   'apps/web/src/app/api/console',
   'apps/web/src/_pages/console',
@@ -56,6 +57,7 @@ const sharedModules = [
     'console-step-up-mutation.test.tsx',
   ]),
   module('apps/web/src/shared/ui/console-step-up-dialog.tsx'),
+  module('apps/web/src/shared/ui/console-step-up-proof.tsx'),
   module('apps/web/src/shared/lib/format-console-date-time.ts'),
   module('apps/web/src/shared/lib/require-super-admin.ts', ['require-super-admin.test.ts']),
 ]
@@ -64,9 +66,18 @@ const sharedModules = [
 // server-only and holds real credentials) live beside the product's own
 // `authApi` in `shared/api/`, not under `shared/lib/` like the modules
 // above — so their test path is derived separately below.
-const sharedApiModules = [module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts'])]
+const sharedApiModules = [
+  module('apps/web/src/shared/api/console-api.ts', ['console-api.test.ts']),
+  module('apps/web/src/shared/api/bff/console-return-entry.ts', [
+    'bff/console-return-recovery.integration.test.ts',
+  ]),
+  module('apps/web/src/shared/api/bff/console-return-claim.ts'),
+  module('apps/web/src/shared/api/bff/console-return-destination.ts'),
+]
 
 const verification = [
+  // This story exercises only the optional Console journey, even though its UI module is shared.
+  'apps/web/src/shared/ui/console-step-up-dialog.stories.tsx',
   'apps/web/e2e/real-stack/product-admin-oauth-path.spec.ts',
   'apps/web/e2e/product-admin-real-stack/product-admin-console-path.spec.ts',
   'apps/web/e2e/product-admin-real-stack/product-admin-host.spec.ts',

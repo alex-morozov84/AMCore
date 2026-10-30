@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ensureFreshSession } from './ensure-fresh-session'
 import { proxyOAuthCallback } from './oauth-provider-proxy'
 import { sessionMetadataHeaders } from './session-metadata-headers'
-import { FakeVaultStore, makeEntry } from './test-fakes'
+import { browserTestHeaders, FakeVaultStore, makeBrowserEntry } from './test-fakes'
 import { callUpstreamAuth } from './upstream-auth'
 import { createUpstreamRefresh } from './upstream-refresh'
 
@@ -13,14 +13,17 @@ vi.mock('server-only', () => ({}))
 vi.mock('./dal', () => ({ getOptionalSessionEntry: vi.fn() }))
 
 const browserHeaders = () =>
-  new Headers({
+  browserTestHeaders({
     'user-agent': 'Browser current generation',
     'x-real-ip': '8.8.8.8',
     [AMCORE_CLIENT_IP_HEADER]: '1.1.1.1',
     'x-forwarded-for': '9.9.9.9',
   })
 
-beforeEach(() => vi.stubEnv('WEB_TRUSTED_CLIENT_IP_HEADER', 'x-real-ip'))
+beforeEach(() => {
+  vi.stubEnv('WEB_TRUSTED_CLIENT_IP_HEADER', 'x-real-ip')
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', '<fake-metadata-key-at-least-32-characters>')
+})
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
@@ -103,8 +106,8 @@ describe('Session metadata transport boundary', () => {
     other.set('x-real-ip', '4.4.4.4')
     const second = createUpstreamRefresh(other)
     const signal = new AbortController().signal
-    await first('vault-refresh', signal)
-    await second('other-vault', signal)
+    await first('vault-refresh', signal, makeBrowserEntry().browser)
+    await second('other-vault', signal, makeBrowserEntry().browser)
     const init = fetchMock.mock.calls[0]![1] as RequestInit
     assertMetadata(init)
     expect(new Headers(init.headers).get('cookie')).toBe('refresh_token=vault-refresh')
@@ -132,7 +135,7 @@ describe('Session metadata transport boundary', () => {
   })
   it('the lock winner supplies metadata; a waiting request reuses the actual refreshed vault generation', async () => {
     const store = new FakeVaultStore()
-    store.seed('shared', makeEntry({ accessTokenExpiresAt: 0 }))
+    store.seed('shared', makeBrowserEntry({ accessTokenExpiresAt: 0 }))
     let finish!: (response: Response) => void, release!: () => void
     const released = new Promise<void>((resolve) => {
       release = resolve
@@ -159,6 +162,7 @@ describe('Session metadata transport boundary', () => {
     const winner = ensureFreshSession('shared', {
       store,
       lock,
+      verifyBinding: async () => undefined,
       upstreamRefresh: createUpstreamRefresh(browserHeaders()),
     })
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
@@ -167,6 +171,7 @@ describe('Session metadata transport boundary', () => {
     const waiter = ensureFreshSession('shared', {
       store,
       lock,
+      verifyBinding: async () => undefined,
       upstreamRefresh: createUpstreamRefresh(waitingHeaders),
     })
     finish(

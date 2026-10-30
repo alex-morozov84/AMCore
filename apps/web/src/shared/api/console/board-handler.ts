@@ -63,7 +63,12 @@ function boardError(request: Request, status: number, message: string): Response
   })
 }
 
-function upstreamHeaders(request: Request, token: string, context: string): Headers {
+function upstreamHeaders(
+  request: Request,
+  token: string,
+  context: string,
+  bindingHeaders: Record<string, string>
+): Headers {
   const headers = new Headers()
   for (const name of FORWARDED_REQUEST_HEADERS) {
     const value = request.headers.get(name)
@@ -71,6 +76,7 @@ function upstreamHeaders(request: Request, token: string, context: string): Head
   }
   headers.set('Authorization', `Bearer ${token}`)
   headers.set(BULL_BOARD_CONTEXT_HEADER, context)
+  for (const [name, value] of Object.entries(bindingHeaders)) headers.set(name, value)
   const clientIp = resolveTrustedClientIp(request.headers)
   if (clientIp) headers.set(AMCORE_CLIENT_IP_HEADER, clientIp)
   return headers
@@ -124,7 +130,12 @@ export async function handleConsoleBoard(
       method: request.method,
       redirect: 'manual',
       cache: 'no-store',
-      headers: upstreamHeaders(request, resolved.token, encodeBoardRenderContext(context)),
+      headers: upstreamHeaders(
+        request,
+        resolved.token,
+        encodeBoardRenderContext(context),
+        resolved.bindingHeaders
+      ),
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(TIMEOUT_MS)]),
     })
     if (upstream.status === 401 || upstream.status === 403) {

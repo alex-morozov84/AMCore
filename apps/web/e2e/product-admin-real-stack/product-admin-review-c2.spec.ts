@@ -1,6 +1,6 @@
 import { expect, type Request, test } from '@playwright/test'
 
-import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
+import { logoutViaApi, registerViaUi, uniqueEmail } from '../real-stack/helpers'
 import { activeTarget } from '../support/managed-target.mjs'
 
 import { appleBrowserFixture } from './apple-browser-fixture'
@@ -23,13 +23,7 @@ for (const surface of ['site', 'admin'] as const) {
         const page = await context.newPage()
         const email = uniqueEmail(`privacy-${surface}-${provider}`)
         await registerViaUi(page, email)
-        expect(
-          (
-            await context.request.post(`${product}/api/auth/logout`, {
-              headers: { Origin: product },
-            })
-          ).status()
-        ).toBe(200)
+        expect((await logoutViaApi(context.request, product)).status()).toBe(200)
         for (const method of ['GET', 'POST', 'PATCH', 'HEAD']) {
           const response = await context.request.fetch(
             `${origin}${callback}?code=review-invalid&state=review-invalid`,

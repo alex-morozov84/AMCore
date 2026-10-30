@@ -54,6 +54,7 @@ export function cadenceOf(definition: ScheduledJobDefinition): ScheduledJobCaden
 /** Changes whenever the schedule or freshness policy changes, so old evidence is not judged by a new rule. */
 export function configVersionOf(definition: ScheduledJobDefinition): string {
   const { id, family, schedule, graceMs, staleAfterMs } = definition
+  // Fingerprint public schedule metadata only; no credential or environment value enters it.
   return createHash('sha256')
     .update(JSON.stringify({ id, family, schedule, graceMs, staleAfterMs: staleAfterMs ?? null }))
     .digest('hex')

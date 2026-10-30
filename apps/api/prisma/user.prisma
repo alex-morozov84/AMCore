@@ -101,10 +101,13 @@ model User {
   // Relations
   mfaAccount              MfaAccount?
   mfaFactor               MfaFactor?
+  mfaRecoveryTicket       MfaRecoveryTicket?
   mfaRecoveryCodes        MfaRecoveryCode[]
   authFamilies            AuthSessionFamily[]
   mfaFlows                MfaFlow[]
   mfaBudget               MfaAttemptBudget?
+  mfaSettingsStarts       MfaSettingsStartReceipt[]
+  browserLogoutReceipts   BrowserLogoutReceipt[]
   accounts                OAuthAccount[]
   sessions                Session[]
   settings                UserSettings?

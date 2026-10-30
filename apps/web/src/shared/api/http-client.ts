@@ -35,7 +35,11 @@ async function safeJson(response: Response): Promise<ApiErrorResponse | undefine
   }
 }
 
-async function request<T>(path: string, init: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit,
+  onResponseHeaders?: (headers: Headers) => void
+): Promise<T> {
   let response: Response
   try {
     response = await fetch(`/api${path}`, init)
@@ -51,6 +55,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     )
   }
 
+  onResponseHeaders?.(response.headers)
   // Matches `/api/auth/logout`'s own contract, but written generically —
   // any future no-content BFF response is handled the same way.
   if (response.status === 204) {
@@ -88,11 +93,29 @@ function formInit(method: string, body: FormData): RequestInit {
 export const apiClient = {
   get: <T>(
     path: string,
-    options?: { headers?: Record<string, string>; signal?: AbortSignal }
+    options?: {
+      headers?: Record<string, string>
+      signal?: AbortSignal
+      onResponseHeaders?: (headers: Headers) => void
+    }
   ): Promise<T> =>
-    request<T>(path, { method: 'GET', headers: options?.headers, signal: options?.signal }),
-  post: <T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> =>
-    request<T>(path, { ...jsonInit('POST', body), signal: options?.signal }),
+    request<T>(
+      path,
+      { method: 'GET', headers: options?.headers, signal: options?.signal },
+      options?.onResponseHeaders
+    ),
+  post: <T>(
+    path: string,
+    body?: unknown,
+    options?: { signal?: AbortSignal; headers?: Record<string, string> }
+  ): Promise<T> => {
+    const init = jsonInit('POST', body)
+    return request<T>(path, {
+      ...init,
+      headers: options?.headers ? { ...init.headers, ...options.headers } : init.headers,
+      signal: options?.signal,
+    })
+  },
   patch: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PATCH', body)),
   put: <T>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit('PUT', body)),
   delete: <T>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),

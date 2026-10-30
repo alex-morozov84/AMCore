@@ -6,9 +6,10 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { TEST_PASSWORD, uniqueEmail } from './helpers'
+import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 async function expectSettledAccessibility(page: Page) {
   // A disabled→enabled opacity transition must finish before measuring contrast.
@@ -26,7 +27,7 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
   test.setTimeout(180000)
   const target = activeTarget()
   const ownerEmail = uniqueEmail('invitation-manager')
-  const registration = await context.request.post('/api/auth/register', {
+  const registration = await browserCredentialRequest(context.request, '/api/auth/register', {
     headers: { origin: target.origins.product },
     data: { email: ownerEmail, password: TEST_PASSWORD },
   })
@@ -52,6 +53,7 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
     })
   })
   for (const locale of SUPPORTED_LOCALES) {
+    resetBrowserProbeDomainBudget()
     const t = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationInvitations

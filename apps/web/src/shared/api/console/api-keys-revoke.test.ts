@@ -22,7 +22,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.stubGlobal('fetch', fetchMock)
   vi.mocked(isConsoleRequestOriginTrusted).mockReturnValue(true)
-  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({ token: 'test-token' })
+  vi.mocked(resolveConsoleAccessToken).mockResolvedValue({
+    token: 'test-token',
+    bindingHeaders: {},
+  })
 })
 describe('fixed API key mutation transport', () => {
   it('rejects origin before session or network and prevents caching', async () => {

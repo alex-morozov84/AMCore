@@ -301,7 +301,7 @@ export class OrganizationsController {
   @ApiOperation({
     summary: 'Get JWT with this organization context — must be a member',
     description:
-      'The derived token expires no later than its parent. Repeated exchanges do not renew access. Membership-checked exchange between organizations remains supported.',
+      'The derived token preserves its parent session family, account security version and browser binding, and expires no later than its parent. Repeated exchanges do not renew access. Membership-checked exchange between organizations remains supported.',
   })
   @ApiUnauthorizedResponse({
     description: 'UNAUTHORIZED: invalid credential or missing/elapsed parent expiry',
@@ -328,6 +328,9 @@ export class OrganizationsController {
         // capability (OB-06b) — without it a switched token looks legacy and
         // fails closed on @RequireFreshAuth routes.
         sid: user.sid,
+        ...(user.fid !== undefined && { fid: user.fid }),
+        ...(user.securityVersion !== undefined && { securityVersion: user.securityVersion }),
+        ...(user.browserBound !== undefined && { browserBound: user.browserBound }),
       },
       user.exp
     )

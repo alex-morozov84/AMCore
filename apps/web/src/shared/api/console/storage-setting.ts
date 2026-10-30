@@ -40,7 +40,7 @@ export async function handleConsoleStorageSetting(request: Request): Promise<Res
         method: mutation ? 'PATCH' : 'GET',
         body,
         cache: 'no-store',
-        headers: forwardRequestHeaders(request.headers, resolved.token),
+        headers: forwardRequestHeaders(request.headers, resolved.token, resolved.bindingHeaders),
         signal: AbortSignal.timeout(10_000),
       }
     )

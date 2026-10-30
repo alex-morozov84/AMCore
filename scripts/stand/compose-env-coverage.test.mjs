@@ -139,3 +139,19 @@ test('backend configuration and secrets do not spill into web or one-shot images
     }
   }
 })
+
+test('explicit MFA overlay supplies keys only to API/worker and never activates the protocol', () => {
+  const keyId = 'fixture-current'
+  const keys = JSON.stringify({ [keyId]: Buffer.alloc(32, 7).toString('base64') })
+  const config = composeEnvironment(
+    { ...sentinels, MFA_ACTIVE_KEY_ID: keyId, MFA_ENCRYPTION_KEYS: keys },
+    ['docker-compose.yml', 'docker/compose/mfa.yml']
+  )
+  for (const name of ['api', 'worker']) {
+    assert.equal(config.services[name].environment.MFA_ACTIVE_KEY_ID, keyId)
+    assert.equal(config.services[name].environment.MFA_ENCRYPTION_KEYS, keys)
+  }
+  assert.equal(config.services.web.environment.MFA_ENCRYPTION_KEYS, undefined)
+  assert.equal(config.services['system-seed'].environment.MFA_ENCRYPTION_KEYS, undefined)
+  assert.equal(config.services.api.environment.MFA_ENABLED, undefined)
+})

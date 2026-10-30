@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type * as ReactModule from 'react'
 import { cookies, headers } from 'next/headers'
-import { AMCORE_CLIENT_IP_HEADER } from '@amcore/shared'
+import { AMCORE_CLIENT_IP_HEADER, type BrowserAudience } from '@amcore/shared'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { fakeVaultEntry } from '@/shared/api/bff/dal.test-helpers'
@@ -19,9 +19,27 @@ vi.mock('./session-lock', () => ({ redisConsoleVaultLock: {} }))
 vi.mock('@/shared/api/bff/ensure-fresh-session', () => ({
   ensureFreshSession: async (
     _id: string,
-    deps: { upstreamRefresh: (token: string, signal: AbortSignal) => Promise<unknown> }
+    deps: {
+      upstreamRefresh: (
+        token: string,
+        signal: AbortSignal,
+        browser: {
+          audience: BrowserAudience
+          contextId: string
+          generation: number
+          familyId: string
+          securityVersion: number
+        }
+      ) => Promise<unknown>
+    }
   ) => {
-    await deps.upstreamRefresh('vault-credential', new AbortController().signal)
+    await deps.upstreamRefresh('vault-credential', new AbortController().signal, {
+      audience: 'console',
+      contextId: 'ctx',
+      generation: 1,
+      familyId: 'family',
+      securityVersion: 0,
+    })
     return { ...fakeVaultEntry(), audience: 'console' }
   },
 }))
@@ -31,11 +49,13 @@ afterEach(() => {
 })
 
 it('console helper refresh supplies current visitor headers with vault-derived credentials', async () => {
+  vi.stubEnv('WEB_FRONTEND_CONTEXT_KEY', 'test-key-'.repeat(8))
   vi.stubEnv('WEB_TRUSTED_CLIENT_IP_HEADER', 'x-real-ip')
   vi.mocked(cookies).mockResolvedValue({ get: () => ({ value: 'vault-id' }) } as never)
   vi.mocked(headers).mockResolvedValue(
     new Headers({
       'user-agent': 'console helper',
+      cookie: `__Host-amcore_console_context=${'a'.repeat(43)}`,
       'x-real-ip': '8.8.8.8',
       [AMCORE_CLIENT_IP_HEADER]: '1.1.1.1',
     }) as never

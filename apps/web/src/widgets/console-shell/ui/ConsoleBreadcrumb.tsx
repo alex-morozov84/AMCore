@@ -4,7 +4,10 @@ import { useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { usePathname } from '@/i18n/navigation'
-import { getConsolePublicPathname } from '@/shared/lib/console-public-href'
+import {
+  getConsoleAccountSecurityHref,
+  getConsolePublicPathname,
+} from '@/shared/lib/console-public-href'
 
 import { useConsoleNavItems } from './console-nav-items'
 
@@ -22,7 +25,10 @@ export function ConsoleBreadcrumb() {
     serverPathname
   )
   const items = useConsoleNavItems()
-  const current = items.find((item) => item.href === pathname)
+  const current =
+    pathname === getConsoleAccountSecurityHref()
+      ? { label: t('profileSettings') }
+      : items.find((item) => item.href === pathname)
 
   return (
     <div className="font-console-mono text-[11px] tracking-[0.08em] text-foreground-muted uppercase">

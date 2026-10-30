@@ -68,6 +68,8 @@ export class AbilityFactory {
       throw new Error('API key principal must carry organization context (ADR-033)')
     }
     const superAdmin =
+      principal.type === 'jwt' &&
+      authenticated.type === 'jwt' &&
       principal.systemRole === SystemRole.SuperAdmin &&
       authenticated.systemRole === SystemRole.SuperAdmin &&
       currentRole === SystemRole.SuperAdmin

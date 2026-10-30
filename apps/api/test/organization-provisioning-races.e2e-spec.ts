@@ -6,6 +6,7 @@ import { Client } from 'pg'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { SystemRole } from '@amcore/shared'
 
+import { deleteOwnedFamilies } from '../src/core/auth/session-revocation.js'
 import type { SetupOperator } from '../src/core/organizations/organization-setup-admission'
 import { ProvisioningService } from '../src/core/organizations/provisioning/provisioning.service'
 import { provisioningAdmissionDeadline } from '../src/core/organizations/provisioning/provisioning-admission-deadline'
@@ -108,13 +109,9 @@ describe('Provisioning transaction fences (e2e)', () => {
         .create({ ...fixture.input(), inviteLocale: DEFAULT_LOCALE }, operator())
         .catch((error: unknown) => error)
       await waitForDatabaseWaiter(context.prisma)
-      const claims = context.app.get(JwtService).verify(fixture.token)
-      await context.prisma.session.update({
-        where: { id: claims.sid },
-        data: { revokedAt: new Date() },
-      })
+      await deleteOwnedFamilies(context.prisma, fixture.operatorId)
       await writer.query('COMMIT')
-      expect(await operation).toMatchObject({ errorCode: 'STEP_UP_REQUIRED' })
+      expect(await operation).toMatchObject({ errorCode: 'SESSION_CHANGED' })
       expect(await context.prisma.organization.count()).toBe(0)
     } finally {
       await writer.query('ROLLBACK')

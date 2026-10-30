@@ -3,6 +3,11 @@ import { E2E_UI_SURFACES } from './project-locale-e2e-ui-surfaces.mjs'
 import { LOCALE_PURE_MOVES, LOCALE_REWRITTEN_MOVES } from './project-locale-route-paths.mjs'
 
 export const LOCALE_DISPLAY_ORDER = [
+  'apps/web/src/features/console-logout/ui/ConsoleLogoutButton.tsx',
+  'apps/web/src/_app/account-security/ui/client.tsx',
+  'apps/web/src/_app/account-security/ui/sign-in-again-client.tsx',
+  'apps/web/src/_app/console-account-security/ui/client.tsx',
+  'apps/web/src/_app/console-account-security/index.tsx',
   'apps/web/.storybook/preview.tsx',
   'apps/web/src/_pages/console/OverviewPage/OverviewFileObservations.stories.tsx',
   'apps/web/src/_pages/console/OverviewPage/OverviewProblems.stories.tsx',
@@ -100,6 +105,9 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/api/src/core/notifications/definitions/account-password-changed.definition.ts',
   'apps/api/src/core/notifications/definitions/account-profile-updated.definition.ts',
   'apps/api/src/core/notifications/definitions/account-telegram-linked.definition.ts',
+  'apps/api/src/core/notifications/definitions/account-mfa-backup-codes-changed.definition.ts',
+  'apps/api/src/core/notifications/definitions/account-mfa-backup-used.definition.ts',
+  'apps/api/src/core/notifications/definitions/account-mfa-factor-changed.definition.ts',
   'apps/api/src/core/notifications/notification-definition.registry.spec.ts',
   'apps/api/src/infrastructure/email/templates/email-verification.integration.spec.ts',
   'apps/api/src/infrastructure/email/templates/org-invite.integration.spec.ts',
@@ -142,6 +150,8 @@ export const LOCALE_DISPLAY_ORDER = [
   'apps/web/src/shared/ui/role-checklist.test.tsx',
   'apps/web/src/shared/ui/role-checklist.stories.tsx',
   'apps/web/src/shared/ui/alert.stories.tsx',
+  'apps/web/src/shared/ui/console-step-up-dialog.stories.tsx',
+  'apps/web/e2e/mocked/account-mfa-setup.spec.ts',
   'apps/web/src/features/auth-oauth/ui/OAuthErrorAlert.test.tsx',
   'apps/web/src/shared/lib/zod-error-map.test.tsx',
   'apps/web/src/shared/ui/api-error-alert.test.tsx',

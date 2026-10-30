@@ -46,7 +46,7 @@ export class AiConversationAccessAuthorizer {
       where: { id: conversationId },
       select: { ownerUserId: true },
     })
-    const isSuperAdmin = principal.systemRole === SystemRole.SuperAdmin
+    const isSuperAdmin = principal.type === 'jwt' && principal.systemRole === SystemRole.SuperAdmin
     if (!conversation || (conversation.ownerUserId !== principal.sub && !isSuperAdmin)) {
       throw new NotFoundException('Conversation', conversationId)
     }

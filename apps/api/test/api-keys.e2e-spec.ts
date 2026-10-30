@@ -771,6 +771,41 @@ describe('API Keys (e2e)', () => {
    * The api-key is bound to that same org. Only the scope differs.
    */
   describe('AK-10: scope authorization on policy-protected route', () => {
+    it('an operator-owned key keeps explicit org grants but loses access when those grants are removed', async () => {
+      const { token, userId, organizationId } = await registerWithOrg('operator-key@example.test')
+      const { key } = await createApiKey(token, organizationId, 'Operator integration', [
+        'manage:Organization',
+      ])
+      await prisma.user.update({ where: { id: userId }, data: { systemRole: 'SUPER_ADMIN' } })
+      await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .auth(key, { type: 'bearer' })
+        .send({ name: 'Explicit organization grant' })
+        .expect(200)
+      await prisma.$transaction(async (tx) => {
+        const member = await tx.orgMember.findUniqueOrThrow({
+          where: { userId_organizationId: { userId, organizationId } },
+        })
+        await tx.memberRole.deleteMany({ where: { memberId: member.id } })
+        await tx.organization.update({
+          where: { id: organizationId },
+          data: { aclVersion: { increment: 1 } },
+        })
+      })
+      await request(app.getHttpServer())
+        .patch(`/organizations/${organizationId}`)
+        .auth(key, { type: 'bearer' })
+        .send({ name: 'Must stay unchanged' })
+        .expect(403)
+      expect(
+        (await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } })).name
+      ).toBe('Explicit organization grant')
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .auth(key, { type: 'bearer' })
+        .expect(401)
+    })
+
     it('manage:Organization → 200 on PATCH /organizations/:id', async () => {
       const { token, organizationId } = await registerWithOrg('user@example.com')
       const { key } = await createApiKey(token, organizationId, 'Manager', ['manage:Organization'])

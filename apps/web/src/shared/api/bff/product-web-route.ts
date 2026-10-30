@@ -36,14 +36,16 @@ export async function productWebRoute(
       throw new ContextRequestError(403, 'AUTH_ORIGIN_REJECTED')
     return privateResponse(await work(context))
   } catch (error) {
-    if (error instanceof ContextRequestError)
-      return privateResponse(
-        apiErrorResponse(request, {
-          statusCode: error.status,
-          message: 'Request rejected',
-          errorCode: error.errorCode,
-        })
-      )
+    if (error instanceof ContextRequestError) {
+      const response = apiErrorResponse(request, {
+        statusCode: error.status,
+        message: 'Request rejected',
+        errorCode: error.errorCode,
+      })
+      if ((error.status === 429 || error.status === 503) && error.retryAfterSeconds !== undefined)
+        response.headers.set('retry-after', String(error.retryAfterSeconds))
+      return privateResponse(response)
+    }
     return privateResponse(authFailureResponse(request, error))
   }
 }

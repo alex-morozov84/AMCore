@@ -74,6 +74,8 @@ describe('OAuthService', () => {
     }
 
     prisma = {
+      mfaAccount: { findUnique: jest.fn().mockResolvedValue(null) },
+      mfaFactor: { findUnique: jest.fn().mockResolvedValue(null) },
       invitationAuthHandoff: { findUnique: jest.fn().mockResolvedValue(null) },
       oAuthAccount: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -86,7 +88,7 @@ describe('OAuthService', () => {
         update: jest.fn().mockResolvedValue(mockUser()),
       },
       $executeRaw: jest.fn(async () => 1),
-      $queryRaw: jest.fn(async () => [{ id: 'user-1' }]),
+      $queryRaw: jest.fn(async () => [{ id: 'user-1', now: new Date() }]),
       $transaction: jest
         .fn()
         .mockImplementation((ops: any) =>
@@ -204,7 +206,7 @@ describe('OAuthService', () => {
   })
 
   describe('handleCallback', () => {
-    it('should return login callback result with refresh token and access claims on success', async () => {
+    it('returns callback identity without a session or usable credentials', async () => {
       prisma.user.create.mockResolvedValue(mockUser())
 
       const result = await service.handleCallback(
@@ -215,14 +217,16 @@ describe('OAuthService', () => {
         requestInfo
       )
 
-      if (result.mode !== 'login') throw new Error('Expected login result')
-      expect(result.refreshToken).toBe('refresh-token-raw')
-      expect(result.sessionId).toBe('session-123')
-      expect(result.accessClaims).toEqual({
-        sub: 'user-1',
-        email: 'user@example.com',
+      if (result.mode !== 'login_identity') throw new Error('Expected identity result')
+      expect(result.identity).toMatchObject({
+        userId: 'user-1',
         systemRole: 'USER',
+        securityVersion: 0,
+        protectedAccount: false,
       })
+      expect(sessionService.createSession).not.toHaveBeenCalled()
+      expect(result).not.toHaveProperty('refreshToken')
+      expect(result).not.toHaveProperty('accessClaims')
       expect(result.user.email).toBe('user@example.com')
     })
 
@@ -431,17 +435,13 @@ describe('OAuthService', () => {
       )
     })
 
-    it('should update lastLoginAt when returning existing OAuth user', async () => {
+    it('does not update lastLoginAt before OAuth publication', async () => {
       const user = mockUser()
       prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: user.id, user })
 
       await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
-      expect(prisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ lastLoginAt: expect.any(Date) }),
-        })
-      )
+      expect(prisma.user.update).not.toHaveBeenCalled()
     })
 
     // Apple sends the display name only in the first-login form_post `user` field
@@ -536,9 +536,7 @@ describe('OAuthService', () => {
       await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
       expect(prisma.user.create).not.toHaveBeenCalled()
-      expect(prisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { lastLoginAt: expect.any(Date) } })
-      )
+      expect(prisma.user.update).not.toHaveBeenCalled()
       for (const call of prisma.user.update.mock.calls) {
         expect(call[0]!.data).not.toHaveProperty('locale')
       }
@@ -651,10 +649,51 @@ describe('OAuthService', () => {
       codeVerifier: 'verifier',
       mode: 'login',
       browserNonceHash: TEST_NONCE_HASH,
-      invitation: { correlation, cleanupKeyHash: 'fake-hash', expiresAt },
+      invitation: {
+        correlation,
+        cleanupKeyHash: 'a'.repeat(64),
+        expiresAt,
+        intent: {
+          attemptId: correlation.attemptId,
+          cleanupKeyHash: 'a'.repeat(64),
+          credentialHash: 'b'.repeat(64),
+          inviteId: 'invite-one',
+          organizationId: 'org-one',
+          generation: 1,
+          recipient: 'user@example.com',
+          expiresAt,
+        },
+      },
     }
     beforeEach(() => {
-      prisma.$queryRaw.mockResolvedValue([{ value: new Date(), id: 'user-1' }])
+      prisma.$queryRaw.mockImplementation(async (query: TemplateStringsArray | { sql: string }) => {
+        const sql = 'sql' in query ? query.sql : Array.from(query).join('')
+        if (sql.includes('organization_provisionings')) return []
+        if (sql.includes('FROM core.roles'))
+          return [{ id: 'role-one', name: 'Recipient', isSystem: false, organizationId: 'org-one' }]
+        if (sql.includes('FROM core.org_invites'))
+          return [
+            {
+              id: 'invite-one',
+              generation: 1,
+              emailCanonical: 'user@example.com',
+              expiresAt: new Date(expiresAt),
+            },
+          ]
+        return [{ value: new Date(), now: new Date(), id: 'user-1' }]
+      })
+      prisma.orgInviteRoleIntent = {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ requestedRoleId: 'role-one', liveRoleId: 'role-one' }]),
+      }
+      prisma.invitationContinuation = {
+        findUnique: jest.fn().mockResolvedValue({
+          inviteId: 'invite-one',
+          generation: 1,
+          expiresAt: new Date(expiresAt),
+        }),
+      }
       invitationAuthority.lockOAuthIntent.mockResolvedValue({ emailCanonical: 'user@example.com' })
       env.get.mockReturnValue(false)
     })
@@ -669,7 +708,7 @@ describe('OAuthService', () => {
       prisma.oAuthAccount.findUnique.mockResolvedValue({ userId: 'user-1', user: mockUser() })
       expect(
         (await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)).mode
-      ).toBe('login')
+      ).toBe('login_identity')
       expect(prisma.user.create).not.toHaveBeenCalled()
     })
     it('allows fixed-email invited signup and carries only server correlation to the ticket', async () => {
@@ -682,15 +721,11 @@ describe('OAuthService', () => {
         requestInfo
       )
       expect(result).toMatchObject({
-        invitation: { ...correlation, backendSessionId: 'session-123' },
+        mode: 'login_identity',
+        invitationIntent: scopedState.invitation.intent,
       })
-      expect(sessionService.createSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          handoff: { attemptId: correlation.attemptId, cleanupKeyHash: 'fake-hash' },
-        }),
-        prisma
-      )
-      expect(result).not.toHaveProperty('cleanupKeyHash')
+      expect(sessionService.createSession).not.toHaveBeenCalled()
+      expect(result).not.toHaveProperty('accessToken')
     })
     it('rejects mismatched provider email before account or session creation', async () => {
       stateService.consume.mockResolvedValue(scopedState)
@@ -800,9 +835,9 @@ describe('OAuthService', () => {
             frontend
           )
         ).mode
-      ).toBe('login')
+      ).toBe('login_identity')
       expect(prisma.user.create).not.toHaveBeenCalled()
-      expect(sessionService.createSession).toHaveBeenCalledTimes(1)
+      expect(sessionService.createSession).not.toHaveBeenCalled()
     })
     it.each([undefined, 'S256'] as const)(
       'retains the GitHub state PKCE contract %s',

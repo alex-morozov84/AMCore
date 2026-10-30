@@ -64,10 +64,12 @@ export async function invitationSwitchHandler(
                 throw invitationFlowChanged()
               try {
                 await invitationBackendNoContent('/auth/logout', {
+                  context: deps.webContext,
                   source: request.headers,
                   signal,
                   method: 'POST',
                   refreshToken: current.session.entry.refreshToken,
+                  session: current.session.entry,
                 })
               } catch (error) {
                 // Revocation can be unknown. Preserve the captured binding and require reopening/sign-in guidance.

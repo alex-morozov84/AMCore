@@ -15,6 +15,7 @@ import { AdminService } from './admin.service.js'
 import { AdminApiKeysController } from './admin-api-keys.controller.js'
 import { AdminApiKeysService } from './admin-api-keys.service.js'
 import { AdminAuditService } from './admin-audit.service.js'
+import { AdminCommandAdmission } from './admin-command-admission.js'
 import { AdminDetailService } from './admin-detail.service.js'
 import { AdminIntegrationsController } from './admin-integrations.controller.js'
 import { AdminOverviewService } from './admin-overview.service.js'
@@ -73,6 +74,7 @@ import { SupportMailDispatch } from './support-mail/support-mail-dispatch.servic
   ],
   providers: [
     AdminService,
+    AdminCommandAdmission,
     SupportMailStore,
     SupportMailService,
     SupportMailDispatch,

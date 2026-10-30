@@ -1,8 +1,9 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { setSystemRole } from '../real-stack/admin-helpers'
-import { registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
+import { logoutViaApi, registerViaUi, TEST_PASSWORD, uniqueEmail } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
+import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
@@ -11,7 +12,11 @@ async function login(page: Page, origin: string, email: string) {
   await page.goto(`${origin}/en/login`)
   await page.getByRole('textbox', { name: /email/i }).fill(email)
   await page.getByLabel(/^password$/i).fill(TEST_PASSWORD)
+  const signIn = page.waitForResponse(
+    (r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: /sign in/i }).click()
+  if ((await signIn).status() === 202) await completeMfaSignIn(page, email)
   await page.waitForURL((url) => url.origin === origin && !url.pathname.endsWith('/login'))
 }
 
@@ -30,13 +35,7 @@ test('one browser preserves product, staff and Console identities and contains c
     const operator = uniqueEmail('placement-operator')
     for (const email of [buyer, member, operator]) {
       await registerViaUi(page, email)
-      expect(
-        (
-          await context.request.post(`${product}/api/auth/logout`, {
-            headers: { Origin: product },
-          })
-        ).status()
-      ).toBe(200)
+      expect((await logoutViaApi(context.request, product)).status()).toBe(200)
     }
     setSystemRole(operator, 'SUPER_ADMIN')
     await login(page, consoleOrigin, operator)
@@ -72,19 +71,11 @@ test('one browser preserves product, staff and Console identities and contains c
         })
       ).status()
     ).toBe(403)
-    expect(
-      (
-        await context.request.post(`${product}/api/auth/logout`, { headers: { Origin: product } })
-      ).status()
-    ).toBe(200)
+    expect((await logoutViaApi(context.request, product)).status()).toBe(200)
     expect((await context.request.get(`${staff}/api/auth/me`)).status()).toBe(200)
     expect((await context.request.get(`${consoleOrigin}/api/access`)).status()).toBe(204)
     await login(page, product, member)
-    expect(
-      (
-        await context.request.post(`${product}/api/auth/logout`, { headers: { Origin: product } })
-      ).status()
-    ).toBe(200)
+    expect((await logoutViaApi(context.request, product)).status()).toBe(200)
     expect((await context.request.get(`${staff}/api/auth/me`)).status()).toBe(200)
     const current = (await context.cookies(staff)).find((c) => c.name === staffCookie.name)
     expect(current?.value === staffCookie.value).toBe(true)

@@ -6,13 +6,18 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import type { Request } from 'express'
 
 import { AuthType } from '@amcore/shared'
 
 import { BadRequestException, UnauthorizedException } from '../../../common/exceptions/index.js'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard.js'
+import { BrowserSessionContextService } from '../../frontend-context/browser-session-context.service.js'
 import { AbilityFactory } from '../casl/ability.factory.js'
 import { AUTH_TYPE_KEY } from '../decorators/auth.decorator.js'
+import { beginJwtPrimaryAdmission } from '../mfa/jwt-primary-admission.js'
+import { MfaJwtAdmissionService } from '../mfa/mfa-jwt-admission.service.js'
+import { bindMfaPrincipal } from '../mfa/mfa-principal-binding.js'
 import { contextPolicyMetadata } from '../organization-context/context-policy-metadata.js'
 import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service.js'
 import { organizationHeader } from '../organization-context/organization-selector.js'
@@ -86,10 +91,16 @@ export class AuthenticationGuard implements CanActivate {
     private readonly policiesGuard: PoliciesGuard,
     private readonly teamAccessGuard: TeamAccessGuard,
     private readonly privilegedAdmission: PrivilegedAdmissionService,
-    private readonly organizationContext: OrganizationContextResolver
+    private readonly organizationContext: OrganizationContextResolver,
+    private readonly mfaAdmission: MfaJwtAdmissionService,
+    private readonly browserContexts: BrowserSessionContextService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Normalize private browser proof before credential admission. Imported global
+    // guards do not provide an ordering guarantee relative to this auth guard.
+    const incoming = context.switchToHttp().getRequest<Request>()
+    this.browserContexts.verify(incoming, incoming.headers)
     // Default fallback is [AuthType.Bearer]; explicit API-key opt-in preserves
     // fail-safe credential admission (
     // server-side industry alignment, and the OA-01/02 lineage that
@@ -129,6 +140,7 @@ export class AuthenticationGuard implements CanActivate {
 
       if (!guard) continue
 
+      const release = type === AuthType.Bearer ? beginJwtPrimaryAdmission(incoming) : undefined
       try {
         if (await guard.canActivate(context)) {
           authenticated = true
@@ -137,6 +149,8 @@ export class AuthenticationGuard implements CanActivate {
       } catch (err) {
         if (!isDecisionError(err)) throw err
         // decision-class — try next auth type
+      } finally {
+        release?.()
       }
     }
 
@@ -149,9 +163,11 @@ export class AuthenticationGuard implements CanActivate {
     const user = request.user
 
     if (user) {
+      const evidence = await this.mfaAdmission.assert(request, user)
       const privilege = await this.privilegedAdmission.resolve(
         user,
-        this.systemRolesGuard.requiredRoles(context)
+        this.systemRolesGuard.requiredRoles(context),
+        evidence
       )
       const { admission, context: verifiedContext } = await this.organizationContext.resolve(
         context,
@@ -159,6 +175,7 @@ export class AuthenticationGuard implements CanActivate {
       )
       request.privilegedAdmission = admission
       request.user = admission.principal
+      bindMfaPrincipal(request, admission.principal)
       request.organizationContext = verifiedContext
       const authorization = await this.abilityFactory.createAuthorizationContext(
         admission,

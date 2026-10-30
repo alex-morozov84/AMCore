@@ -12,9 +12,12 @@ import {
   WORK_COMMAND_INPUT_BYTES,
 } from '@amcore/shared'
 
+import { mfaCredentialPath } from '../common/utils/mfa-credential-path.js'
+
 import { decodedBodyLimit } from './decoded-body-limit.js'
 import { configureInvitationBoundary, invitationJsonLimit } from './invitation-request-boundary.js'
 import { isMemberRoleJsonRequest } from './member-role-body-parser.js'
+import { configureMfaBoundary, MFA_CREDENTIAL_BODY_BYTES } from './mfa-request-boundary.js'
 import { decodeBody, parseNativeForm } from './native-body-values.js'
 import { parserContentType } from './parser-content-type.js'
 import { isBackgroundControlPath, REQUEST_BODY_LIMIT_BYTES } from './request-body-policy.js'
@@ -24,6 +27,7 @@ import { unmatchedBodyLimit } from './unmatched-body-limit.js'
 type BudgetRequest = { url: string; method: string; headers: Record<string, unknown> }
 
 function bodyBudget(req: BudgetRequest, prefix: string): number {
+  if (mfaCredentialPath(req.url, prefix)) return MFA_CREDENTIAL_BODY_BYTES
   const path = req.url.split('?')[0]
   if (
     req.method === 'POST' &&
@@ -47,6 +51,7 @@ export async function configureFastifyBodyParser(
   prefix = '/api/v1'
 ): Promise<void> {
   configureInvitationBoundary(app, prefix)
+  configureMfaBoundary(app, prefix)
   const adapter = app.getHttpAdapter() as FastifyAdapter<Server>
   const instance = adapter.getInstance()
   await instance.register(compress, {

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
+import { postBrowserCredentials } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
@@ -25,8 +26,9 @@ test('closed signup: compiled command, actual email proof, initial ADMIN and saf
     unavailable: { exit: 4, output: { status: 'SETUP_UNCONFIRMED', state: 'unavailable' } },
   })
   expect(setupCommand('status').state).toBe('eligible-empty')
-  const signup = await request.post(`${m.origins.product}/api/auth/register`, {
-    data: { email: 'buyer@e2e.amcore.test', password: SETUP_PASSWORD },
+  const signup = await postBrowserCredentials(request, m.origins.product, '/api/auth/register', {
+    email: 'buyer@e2e.amcore.test',
+    password: SETUP_PASSWORD,
   })
   expect(signup.status()).toBe(403)
   const prepared = setupCommand('prepare-account', { email, locale: DEFAULT_LOCALE })

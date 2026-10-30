@@ -37,6 +37,8 @@ export function outputPaths() {
   }
 }
 export function standReporters(m, dir) {
+  // Active disposable MFA can display one-use secrets; HTML steps retain fill values.
+  if (m.purpose === 'e2e' && !m.mocked) return [['list', { printSteps: false }]]
   // HTML/blob reports record built-in page.goto step URLs even when trace/video are off.
   // The rendered-mail fixture visits one-use secrets; keep only step-free console results.
   return [

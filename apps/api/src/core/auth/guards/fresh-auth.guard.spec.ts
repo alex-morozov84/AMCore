@@ -25,7 +25,7 @@ describe('FreshAuthGuard', () => {
   const principal: RequestPrincipal = {
     type: 'jwt',
     sub: 'user-1',
-    systemRole: 'SUPER_ADMIN',
+    systemRole: 'USER',
     sid: 'session-1',
   }
 
@@ -42,7 +42,27 @@ describe('FreshAuthGuard', () => {
     env = { get: jest.fn().mockReturnValue(600) }
     guard = new FreshAuthGuard(
       reflector as unknown as Reflector,
-      { session: { findUnique } } as unknown as PrismaService,
+      {
+        session: { findUnique },
+        $queryRaw: jest.fn(async () => [
+          {
+            now: new Date(),
+            user: { id: principal.sub, systemRole: 'USER', mfaAccount: null, mfaFactor: null },
+            family: null,
+            protocol: { state: 'prepared', version: 1 },
+            session: null,
+          },
+        ]),
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: principal.sub,
+            systemRole: principal.systemRole,
+            mfaAccount: null,
+            mfaFactor: null,
+          }),
+        },
+        mfaProtocol: { findUnique: jest.fn().mockResolvedValue({ state: 'prepared', version: 1 }) },
+      } as unknown as PrismaService,
       env as unknown as EnvService
     )
   })
@@ -86,7 +106,7 @@ describe('FreshAuthGuard', () => {
     await expect(guard.canActivate(ctx(principal))).resolves.toBe(true)
     expect(findUnique).toHaveBeenCalledWith({
       where: { id: 'session-1' },
-      select: { lastAuthAt: true, revokedAt: true, expiresAt: true, userId: true },
+      select: { lastAuthAt: true, revokedAt: true, expiresAt: true, userId: true, familyId: true },
     })
   })
 
