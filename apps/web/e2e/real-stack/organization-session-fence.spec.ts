@@ -8,15 +8,25 @@ import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 let phase = 'setup'
+let phaseStarted = 0
+let phaseHistory: Array<{ phase: string; ms: number }> = []
+function mark(next: string) {
+  phase = next
+  if (phaseHistory.length < 16)
+    phaseHistory.push({ phase, ms: Math.round(performance.now() - phaseStarted) })
+}
 let audit: ReturnType<typeof observeContextReads>
 test.beforeEach(async ({ page }) => {
-  phase = 'setup'
+  phaseStarted = performance.now()
+  phaseHistory = []
+  mark('setup')
   audit = observeContextReads(page, () => phase)
 })
 test.afterEach(async ({ page }, info) => {
   await saveContextDiagnostics(info, 'session-fence', {
     ...(await audit()),
     pageClosed: page.isClosed(),
+    phaseHistory,
   })
 })
 
@@ -52,24 +62,24 @@ async function settle() {
 }
 
 async function replace(page: Page, f: Awaited<ReturnType<typeof fixture>>) {
-  phase = 'credential-dispatch'
+  mark('credential-dispatch')
   const login = await browserCredentialRequest(page.request, '/api/auth/login', {
     headers: { origin: f.origin },
     data: { email: f.email, password: TEST_PASSWORD },
   })
   expect(login.status()).toBe(200)
-  phase = 'credential-published'
+  mark('credential-published')
   const identity = await page.request.get(new URL('/api/auth/me', f.origin).href)
   expect(identity.status()).toBe(200)
   expect((await identity.json()).user.id).toBe(f.actor.id)
-  phase = 'identity-verified'
+  mark('identity-verified')
 }
 
 async function terminal(page: Page, f: Awaited<ReturnType<typeof fixture>>) {
   await expect(page.getByText(f.ui.text('changedTitle'), { exact: true })).toBeVisible()
   await expect(page.getByText(f.organization.name, { exact: true })).toHaveCount(0)
   await settle()
-  phase = 'terminal-changed'
+  mark('terminal-changed')
 }
 
 test('settled session replacement makes one identity read and no old domain read', async ({
@@ -79,7 +89,7 @@ test('settled session replacement makes one identity read and no old domain read
   const baseline = (await audit()).requests.length
   await replace(page, f)
   expect((await audit()).requests.slice(baseline)).toEqual([])
-  phase = 'explicit-focus'
+  mark('explicit-focus')
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await terminal(page, f)
   const result = await audit()
@@ -113,11 +123,11 @@ test('old bootstrap delivered after replacement cannot publish old organization 
     await route.fulfill({ response })
   })
   try {
-    phase = 'old-refresh-start'
+    mark('old-refresh-start')
     await page.getByRole('button', { name: f.ui.text('refresh'), exact: true }).click()
     await expect.poll(() => oldReady).toBe(true)
     await replace(page, f)
-    phase = 'old-response-released'
+    mark('old-response-released')
     release()
     await terminal(page, f)
     const result = await audit()
@@ -132,6 +142,66 @@ test('old bootstrap delivered after replacement cannot publish old organization 
     const before = result.requests.length
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     expect((await audit()).requests).toHaveLength(before)
+  } finally {
+    release()
+  }
+})
+
+test('focus retires an already authorized old domain response before it can publish', async ({
+  page,
+}) => {
+  const f = await fixture(page)
+  const baseline = (await audit()).requests.length
+  let oldReady = false
+  let oldFinished = false
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let holdNext = true
+  await page.route(
+    `**/api/product-access/organizations/${f.organization.id}/context`,
+    async (route) => {
+      const response = await route.fetch()
+      if (holdNext) {
+        holdNext = false
+        expect(response.status()).toBe(200)
+        expect((await response.json()).data.organization.name).toBe(f.organization.name)
+        oldReady = true
+        await held
+      }
+      try {
+        await route.fulfill({ response })
+      } catch {
+        expect(route.request().failure()?.errorText).toBe('net::ERR_ABORTED')
+      } finally {
+        oldFinished = true
+      }
+    }
+  )
+  try {
+    mark('old-domain-read')
+    await page.getByRole('button', { name: f.ui.text('refresh'), exact: true }).click()
+    await expect.poll(() => oldReady).toBe(true)
+    await replace(page, f)
+    mark('focus-with-old-domain')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await terminal(page, f)
+    mark('old-domain-release-attempt')
+    release()
+    await expect.poll(() => oldFinished).toBe(true)
+    await terminal(page, f)
+    const result = await audit()
+    expect(result.truncated).toBe(0)
+    const reads = result.requests.slice(baseline)
+    expect(reads.map((r) => r.route)).toEqual([
+      '/api/product-access/bootstrap',
+      '/api/product-access/organizations/<id>/context',
+      '/api/product-access/bootstrap',
+    ])
+    expect(reads[1]?.state).toBe('failed')
+    expect(reads[1]?.events.at(-1)?.type).toBe('aborted')
+    expect(reads[2]?.status).toBe(200)
   } finally {
     release()
   }
