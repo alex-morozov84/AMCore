@@ -22,7 +22,7 @@ export function invitationOperationHandler(
       async (signal) => {
         if (new URL(request.url).search) throw new ContextRequestError(400, 'BAD_REQUEST')
         const id = invitationOperationIdSchema.parse(operationId)
-        const captured = await invitationIncomingSession(deps, request.headers)
+        const captured = await invitationIncomingSession(deps)
         if (!captured) throw new ContextRequestError(401, 'UNAUTHORIZED')
         signal.throwIfAborted()
         const session = await freshContextSession(captured, deps)

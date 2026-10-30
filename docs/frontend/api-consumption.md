@@ -135,10 +135,11 @@ sees, see [Redis memory](../operations/capacity.md#redis-memory).
 
 ## Invitation adapters
 
-After logout, the old session cookie can remain inert. Invitation admission
-treats a missing vault entry as anonymous only when a primary browser-status
-read confirms `empty` or `logged_out`. A reserved or published revision is
-never adopted; an unavailable primary fails closed.
+After logout, the old session cookie can remain inert. A missing vault entry
+supplies no identity to public invitation admission. Existing flows still match
+their original session binding. A present vault entry must pass primary
+verification; refusal or unavailability never falls back to anonymous admission.
+Every new sign-in still requires the exact primary publication protocol.
 
 Organization invitation management uses the dedicated personal, session-fenced
 `/api/product-access/organizations/{id}/invites` family. Its safe responses include

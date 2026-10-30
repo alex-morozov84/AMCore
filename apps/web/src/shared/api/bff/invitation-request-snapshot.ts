@@ -6,25 +6,22 @@ import { contextSessionBinding } from './context-session'
 import { currentInvitationFlow, invitationFlowChanged } from './invitation-flow-authority'
 import { invitationOwnerStore } from './invitation-owner-store'
 import { invitationRequestAuthority } from './invitation-request-authority'
-import { requireNeutralBrowserContext } from './neutral-browser-context'
 import type { VaultEntry } from './session-vault.types'
 
 import 'server-only'
 
 /** Snapshot the incoming session without refresh: pending handoffs must never mint child sessions. */
 export async function invitationIncomingSession(
-  deps: ContextExecutorDeps,
-  source?: Headers
+  deps: ContextExecutorDeps
 ): Promise<Awaited<ReturnType<typeof captureContextSession>> | null> {
   const sessionId = await deps.readSessionId()
   if (!sessionId) return null
   if (!/^[A-Za-z0-9_-]{43}$/.test(sessionId)) throw invitationFlowChanged()
   const entry: VaultEntry | null = await deps.store.get(sessionId)
-  if (!entry) {
-    if (!source || !deps.webContext) throw invitationFlowChanged()
-    await requireNeutralBrowserContext(source, deps.webContext.audience)
-    return null
-  }
+  // Logout leaves an inert handle. Missing storage grants no identity; public
+  // admission stays anonymous. Existing flows still enforce their original
+  // session binding, and any new login must pass the primary publication protocol.
+  if (!entry) return null
   await deps.verifyBinding(entry)
   const bindingVersion = deps.webContext?.frontend === 'admin' ? (2 as const) : (1 as const)
   return {
@@ -46,7 +43,7 @@ export async function captureInvitationRequest(
   if (!authority.ownerHash) throw invitationFlowChanged()
   const [owner, session] = await Promise.all([
     invitationOwnerStore.get(authority.ownerHash, authority.policy.origin, deps.webContext),
-    invitationIncomingSession(deps, request.headers),
+    invitationIncomingSession(deps),
   ])
   if (!owner) throw invitationFlowChanged()
   const flow = currentInvitationFlow(owner, id, session?.binding ?? null, Date.now())

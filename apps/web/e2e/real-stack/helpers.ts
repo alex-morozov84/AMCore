@@ -126,6 +126,11 @@ export async function browserCredentialRequest(
 ) {
   const origin = options.headers?.origin ?? options.headers?.Origin
   if (!origin) throw new Error('Browser credential fixture requires its same-origin header')
+  // Direct fixture setup has the same isolation as registerViaUi.
+  if (new URL(url, origin).pathname.endsWith('/register')) {
+    resetMfaDomainSourceBudgets()
+    resetBrowserProbeDomainBudget()
+  }
   const bootstrap = await request.post(new URL('/api/auth/browser-context', origin).href, {
     headers: { Origin: origin },
     data: {},

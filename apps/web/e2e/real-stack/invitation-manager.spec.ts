@@ -6,6 +6,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
@@ -52,6 +53,7 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
     })
   })
   for (const locale of SUPPORTED_LOCALES) {
+    resetBrowserProbeDomainBudget()
     const t = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationInvitations

@@ -10,8 +10,8 @@ import { registerViaUi, uniqueEmail } from './helpers'
 for (const path of ['/mfa', productAdminPath('/mfa')]) {
   test(`whole pending MFA document adds no product profile calls: ${path}`, async ({ page }) => {
     await verifyUrlOnlyLocale(page, path, {
-      en: en.accountMfa.unavailable,
-      ru: ru.accountMfa.unavailable,
+      en: en.accountMfa.sessionChanged,
+      ru: ru.accountMfa.sessionChanged,
     })
   })
 }
