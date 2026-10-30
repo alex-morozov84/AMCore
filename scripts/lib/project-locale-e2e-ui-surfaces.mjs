@@ -136,6 +136,7 @@ export const E2E_UI_PROFILES = Object.freeze({
     ["'Cancel'", "'Отмена'"],
   ],
   consoleSessions: [
+    ["'Sessions (1 total)'", "'Сессии (всего: 1)'"],
     ["'Sessions (2 total)'", "'Сессии (всего: 2)'"],
     ["'Refresh'", "'Обновить'"],
     ['/sessions \\(/i', '/сессии \\(/i'],

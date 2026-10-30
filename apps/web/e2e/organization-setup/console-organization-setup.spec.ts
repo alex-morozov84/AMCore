@@ -97,6 +97,8 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expect(setup.getByText(en.mailHelp, { exact: true })).toBeVisible()
   await expect(setup.getByRole('button', { name: en.continue, exact: true })).toHaveCount(0)
   await expect(setup.getByLabel(en.name, { exact: true })).toHaveCount(0)
+  // The mailbox-verification portion starts with an idle source budget.
+  resetBrowserProbeDomainBudget()
   const recipientPage = await page.context().newPage()
   await proveSetupMailbox(recipientPage, recipient)
   await setup.getByRole('button', { name: en.checkEmail, exact: true }).click()
@@ -142,6 +144,7 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expect(setup.getByLabel(ru.slug, { exact: true })).toHaveValue('anna-shop')
   await setup.getByRole('button', { name: ru.continue, exact: true }).click()
   await expect(setup.getByRole('heading', { name: ru.headings.review })).toBeVisible()
+  resetBrowserProbeDomainBudget()
   await page.reload()
   await expect(setup.getByRole('heading', { name: ru.headings.review })).toBeVisible()
   await expect(setup.getByText(recipient, { exact: true })).toBeVisible()

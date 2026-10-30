@@ -2,7 +2,6 @@ import {
   DEFAULT_LOCALE,
   invitationFlowAuthResponseSchema,
   invitationFlowContextResponseSchema,
-  invitationFlowPendingResponseSchema,
   localizedFrontendUrl,
 } from '@amcore/shared'
 import { expect, request, test } from '@playwright/test'
@@ -17,7 +16,7 @@ import {
 import { inviteRecipient, membershipCount } from '../real-stack/invitation-recipient.helpers'
 import { activeTarget } from '../support/managed-target.mjs'
 
-test('HTTPS: a genuinely issued pending handoff rejects ACK after another session is published', async ({
+test('HTTPS: a confirmed invitation handoff rejects replay after another browser session is published', async ({
   context,
 }) => {
   const target = activeTarget()
@@ -35,8 +34,8 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
     ).status()
   ).toBe(201)
   expect((await logoutViaApi(context.request, origin)).ok()).toBe(true)
-  // RequestContext follows the real bootstrap and stores cookies without executing
-  // page scripts, so the UI cannot automatically confirm this issued handoff.
+  // Ordinary password invitation confirmation is server-owned and precedes publication.
+  // No page script or membership consent is involved in this HTTP-only journey.
   const ingress = await context.request.get(
     localizedFrontendUrl(origin, DEFAULT_LOCALE, `invite/accept?token=${invitation.token}`)
   )
@@ -57,13 +56,16 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
   )
   expect(login.status()).toBe(200)
   const issued = invitationFlowAuthResponseSchema.parse(await login.json())
-  const pending = await context.request.get(new URL(`${root}/context`, origin).href)
-  expect(pending.status()).toBe(200)
-  expect(invitationFlowPendingResponseSchema.parse(await pending.json())).toEqual({
-    state: 'completing_signin',
-    binding: issued.binding,
-    handoff: issued.handoff,
-  })
+  expect(issued.binding.sessionBinding).not.toBeNull()
+  const confirmed = await context.request.get(new URL(`${root}/context`, origin).href)
+  expect(confirmed.status()).toBe(200)
+  expect(invitationFlowContextResponseSchema.parse(await confirmed.json()).binding).toEqual(
+    issued.binding
+  )
+  const admitted = await context.request.get(new URL('/api/auth/me', origin).href)
+  expect(admitted.status()).toBe(200)
+  expect((await admitted.json()).user.email).toBe(email)
+  expect(membershipCount(email, invitation.org.id)).toBe('0')
   const independent = await request.newContext({
     proxy: { server: target.relay },
     ignoreHTTPSErrors: true,

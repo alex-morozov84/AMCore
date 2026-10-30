@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
+import { SessionNotFoundError } from '@/shared/api/bff/errors'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { probeConsoleAccess } from './access-probe'
@@ -58,6 +59,15 @@ describe('probeConsoleAccess', () => {
     const status = await probeConsoleAccess()
 
     expect(status).toEqual({ kind: 'denied', status: 401 })
+  })
+
+  it('denies a retained logged-out cookie before any policy request', async () => {
+    mutableConfig.mode = 'host'
+    mockedConsoleAccessToken.mockRejectedValue(new SessionNotFoundError('unavailable'))
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'denied', status: 401 })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('forwards only the no-content success status', async () => {

@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
+import { SessionNotFoundError } from '../bff/errors'
 
 import { getConsoleAwareAccessToken } from './access-token'
 
@@ -27,7 +28,9 @@ export async function probeConsoleAccess(): Promise<ConsoleAccessProbe> {
         ? accessToken.browserHeaders
         : undefined
     )
-  } catch {
+  } catch (error) {
+    // Logout retains an inert cookie; a missing vault entry is a known absence of authority.
+    if (error instanceof SessionNotFoundError) return { kind: 'denied', status: 401 }
     return { kind: 'indeterminate' }
   }
 }
