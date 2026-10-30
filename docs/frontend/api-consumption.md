@@ -135,6 +135,11 @@ sees, see [Redis memory](../operations/capacity.md#redis-memory).
 
 ## Invitation adapters
 
+After logout, the old session cookie can remain inert. Invitation admission
+treats a missing vault entry as anonymous only when a primary browser-status
+read confirms `empty` or `logged_out`. A reserved or published revision is
+never adopted; an unavailable primary fails closed.
+
 Organization invitation management uses the dedicated personal, session-fenced
 `/api/product-access/organizations/{id}/invites` family. Its safe responses include
 `binding` and `data`; create/reissue return202. Direct API revoke returns an empty204,

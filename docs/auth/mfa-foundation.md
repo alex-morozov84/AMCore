@@ -140,7 +140,10 @@ for its enclosing request's selected principal. Admission consumes it once; role
 selection reuses the same decision. Standalone JWT consumers keep their existence
 check. Refresh, publication and locked sensitive checks read fresh authority.
 The BFF probe uses the same projection with its exact refresh-lineage proof.
-Its preflight and the subsequent API admission remain separate checks. A known probe
+Its preflight and the subsequent API admission remain separate checks.
+A context operation consumes its exact captured first-read check once within
+that request. Lock re-reads, refreshed records and subsequent requests still
+require a fresh primary check. A known probe
 rate refusal preserves `429 RATE_LIMIT_EXCEEDED` and the supplied `Retry-After`.
 It grants no access, preserves the vault and never starts automatic refresh. This
 reduces repeated reads; it does not remove ordinary-browser checks or establish

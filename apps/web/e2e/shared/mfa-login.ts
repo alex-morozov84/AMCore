@@ -7,6 +7,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
 import { generate } from 'otplib'
 
 import { activeTarget } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 import { redactMfaFailure } from '../support/mfa-secret-errors.mjs'
 
 const wallets = new Map<string, { codes: string[] }>()
@@ -69,6 +70,8 @@ export async function completeMfaSignIn(page: Page, email: string): Promise<void
     expect(['ready', 'completed']).toContain(result.view.kind === 'flow' && result.view.state)
     // The application reconciles publication and navigates automatically after the proof.
     await page.waitForURL((url) => !url.pathname.endsWith('/mfa'))
+    // Enrollment is fixture setup; the following domain journey gets its own source budget.
+    resetBrowserProbeDomainBudget()
   } catch (error) {
     throw redactMfaFailure(error, secrets)
   }
@@ -82,10 +85,7 @@ export async function completeMfaStepUp(page: Page, email: string): Promise<void
     readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
   ).accountMfa as Messages['accountMfa']
   try {
-    const title = JSON.parse(
-      readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
-    ).console.stepUpTitle as string
-    const dialog = page.getByRole('dialog', { name: title, exact: true })
+    const dialog = page.getByRole('dialog', { name: t.title, exact: true })
     await expect(dialog.getByLabel(t.appCode, { exact: true })).toBeVisible()
     const code = wallets.get(email)?.codes.shift()
     if (!code) throw new Error('MFA step-up requires an unused enrolled backup code')

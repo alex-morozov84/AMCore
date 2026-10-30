@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { resetMfaDomainSourceBudgets } from '../../apps/web/e2e/support/mfa-domain-fixture.mjs'
+import {
+  resetBrowserProbeDomainBudget,
+  resetMfaDomainSourceBudgets,
+} from '../../apps/web/e2e/support/mfa-domain-fixture.mjs'
 
 const owned = { purpose: 'e2e', mocked: false, runToken: 'admitted-token' }
 test('domain reset refuses preview, mocks and absent invocation before Redis access', () => {
@@ -39,4 +42,44 @@ test('unexpected keys refuse mutation and an empty scan performs no mutation', (
     assert.ok(args.includes('--scan'))
     return ''
   })
+})
+
+test('probe reset targets only the known handler and refuses foreign or malformed sources', () => {
+  const calls = []
+  resetBrowserProbeDomainBudget(
+    owned,
+    (...args) => calls.push(args),
+    () => '127.0.0.1\n::1'
+  )
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].length, 5)
+  assert.ok(calls[0].slice(3).every((key) => /^ratelimit:v1:[a-f0-9]{64}$/.test(key)))
+  for (const target of [
+    { ...owned, purpose: 'preview' },
+    { ...owned, mocked: true },
+    { ...owned, runToken: null },
+  ])
+    assert.throws(
+      () =>
+        resetBrowserProbeDomainBudget(
+          target,
+          () => assert.fail(),
+          () => assert.fail()
+        ),
+      /admitted disposable/
+    )
+  assert.throws(
+    () =>
+      resetBrowserProbeDomainBudget(
+        owned,
+        () => assert.fail(),
+        () => 'unexpected'
+      ),
+    /Unexpected/
+  )
+  resetBrowserProbeDomainBudget(
+    owned,
+    () => assert.fail(),
+    () => ''
+  )
 })

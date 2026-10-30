@@ -38,6 +38,7 @@ describe('operation inventory against the real plans', () => {
       // Post-preview profile/return ownership, re-entry route moves and strict MFA locale
       // navigation add 33 operations, 41 facts, 64 claims and 30 final operations.
       // Logout pathname adds three locale edits; Console-off absorbs one into deletion.
+      // The Console return-locale import adds two claims on the existing shared edit.
       // Grouped code/doc seams are shared/Console semantic facts on the same final edit.
       // Providers/manifests/scenarios remain unchanged. Raw inventory is independently inspected.
       { name: 'measured operations', expected: 1040, actual: inventory.operations.length },
@@ -64,7 +65,7 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic claims',
-        expected: 2310,
+        expected: 2312,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {

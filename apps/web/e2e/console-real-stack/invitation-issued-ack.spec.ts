@@ -40,6 +40,7 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
     localizedFrontendUrl(origin, DEFAULT_LOCALE, `invite/accept?token=${invitation.token}`)
   )
   expect(ingress.ok()).toBe(true)
+  expect(new URL(ingress.url()).pathname).toContain('/invite/flow/')
   const flowId = new URL(ingress.url()).pathname.split('/').at(-1)
   const root = `/api/invitation-flows/${flowId}`
   const current = await context.request.get(new URL(`${root}/context`, origin).href)

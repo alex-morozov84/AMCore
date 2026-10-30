@@ -122,6 +122,9 @@ HTTPS host tests when the Console is retained. Every Docker lane owns fresh
 Postgres, Redis, origins, volumes, lease, marker and cleanup. Keep `workers: 1`:
 Redis pauses, runtime-setting revisions and registration IP budgets are shared
 within a stand. Unique emails do not isolate those mechanisms.
+Domain fixtures reset only their known MFA source and browser-probe IP budgets
+on the leased disposable stand before an independent journey. Limiter tests do
+not use these resets. Domain success is not a production capacity measurement.
 
 Run one lane with `node scripts/e2e-ci.mjs path-standard` (also `safety`, `mocked`,
 `path-disruptive` and `host` when applicable). New ordinary specs automatically join

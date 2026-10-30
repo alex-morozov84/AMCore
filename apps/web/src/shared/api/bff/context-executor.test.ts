@@ -60,6 +60,48 @@ const operation = {
 }
 
 describe('typed context executor', () => {
+  it('checks a fresh captured entry once and repeats the primary check on the next request', async () => {
+    const { deps, expected } = fixture()
+    deps.fetch = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(Response.json({ name: 'Renamed' })))
+    deps.verifyBinding = vi.fn().mockResolvedValue(undefined)
+    const input = { expectedSession: expected, headers: boundHeaders() }
+    await executeContextOperation(operation, input, deps)
+    expect(deps.verifyBinding).toHaveBeenCalledTimes(1)
+    await executeContextOperation(operation, input, deps)
+    expect(deps.verifyBinding).toHaveBeenCalledTimes(2)
+  })
+
+  it('retains primary checks under the refresh lock and after refresh', async () => {
+    const { deps, expected } = fixture(true)
+    deps.verifyBinding = vi.fn().mockResolvedValue(undefined)
+    await executeContextOperation(
+      operation,
+      { expectedSession: expected, headers: boundHeaders() },
+      deps
+    )
+    expect(deps.verifyBinding).toHaveBeenCalledTimes(3)
+    expect(deps.upstreamRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses revocation during refresh before a resource request', async () => {
+    const { deps, expected } = fixture(true)
+    deps.verifyBinding = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Primary revoked refreshed family'))
+    await expect(
+      executeContextOperation(
+        operation,
+        { expectedSession: expected, headers: boundHeaders() },
+        deps
+      )
+    ).rejects.toThrow('Primary revoked refreshed family')
+    expect(deps.fetch).not.toHaveBeenCalled()
+  })
+
   it('enforces separate upstream and envelope byte budgets including Unicode at the exact boundary', async () => {
     const { deps, expected } = fixture()
     const apiBytes = 245760

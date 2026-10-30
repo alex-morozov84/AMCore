@@ -78,7 +78,7 @@ export async function invitationIngress(
         if (query.size !== 1 || query.getAll('token').length !== 1)
           throw new ContextRequestError(400, 'BAD_REQUEST')
         const body = invitationAdmissionSchema.parse({ token: query.get('token') })
-        const session = await invitationIncomingSession(deps)
+        const session = await invitationIncomingSession(deps, request.headers)
         const existing = authority.ownerHash
           ? await invitationOwnerStore.get(
               authority.ownerHash,
@@ -226,7 +226,7 @@ export async function invitationBootstrap(
                 authority.policy.origin,
                 deps.webContext
               ),
-              invitationIncomingSession(deps),
+              invitationIncomingSession(deps, request.headers),
             ])
             if (!owner || !pending || pending.locale !== locale) throw invitationFlowChanged()
             const admitted = admitInvitationFlow(

@@ -2,7 +2,10 @@ import { type APIRequestContext, expect, type Page } from '@playwright/test'
 
 import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
-import { resetMfaDomainSourceBudgets } from '../support/mfa-domain-fixture.mjs'
+import {
+  resetBrowserProbeDomainBudget,
+  resetMfaDomainSourceBudgets,
+} from '../support/mfa-domain-fixture.mjs'
 
 /**
  * Real-stack specs register a fresh real account through `apps/api` on
@@ -34,6 +37,7 @@ export async function registerViaUi(
   options: { name?: string } = {}
 ): Promise<void> {
   resetMfaDomainSourceBudgets()
+  resetBrowserProbeDomainBudget()
   await page.goto('/en/register')
   if (options.name) {
     await page.getByLabel(/name/i).fill(options.name)
