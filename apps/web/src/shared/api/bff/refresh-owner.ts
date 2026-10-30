@@ -89,7 +89,7 @@ export async function runRefreshOwner<TRecord extends VaultRecord>(
   sessionId: string,
   deps: OwnerDeps<TRecord>
 ): Promise<Stored<TRecord>> {
-  const { store, lock, timing, clock } = deps
+  const { lock, timing, clock } = deps
   const acquiring = clock()
   const token = await lock.acquire(sessionId, timing.leaseMs, { deadlineMs: timing.acquireMs })
   if (token && clock() - acquiring > timing.acquireMs) {
@@ -99,34 +99,7 @@ export async function runRefreshOwner<TRecord extends VaultRecord>(
   }
   if (!token) throw new SessionLockTimeoutError(sessionId)
 
-  const startedAt = clock()
-  const left = (): number => timing.ceilingMs - (clock() - startedAt)
-  const controller = new AbortController()
-  const renewal = startLockRenewal(sessionId, token, lock, controller, {
-    ttlMs: timing.leaseMs,
-    intervalMs: timing.renewEveryMs,
-    ceilingMs: timing.ceilingMs,
-    now: clock,
-  })
-  const unsafe = (): SessionRefreshUnsafeError => new SessionRefreshUnsafeError(sessionId)
-  const step: Step = async (dispatch) => {
-    if (renewal.ended || left() <= 0) throw unsafe()
-    const result = await Promise.race([dispatch(), renewal.unsafe])
-    if (renewal.ended) throw unsafe()
-    return result
-  }
-  const probe = (): VerifyBindingOptions => ({
-    deadlineMs: Math.min(PROBE_MAX_MS, left()),
-    signal: controller.signal,
-  })
-  const readOne = async (): Promise<Stored<TRecord> | null> => {
-    const entry = await step(() =>
-      store.get(sessionId, { deadlineMs: Math.min(timing.opMs, left()) })
-    )
-    return entry && (!deps.expectedAudience || hasSessionAudience(entry, deps.expectedAudience))
-      ? entry
-      : null
-  }
+  const { renewal, controller, step, probe, readOne, left } = openScope(sessionId, token, deps)
 
   let committed = false
   let dispatched = false
@@ -175,6 +148,49 @@ export async function runRefreshOwner<TRecord extends VaultRecord>(
     // Cleanup: a lost release only leaves the lease to expire and never replaces the outcome.
     await lock.release(sessionId, token).catch(() => undefined)
   }
+}
+
+/**
+ * The owner's working scope once it holds the lease: renewal from acquisition, the checked
+ * dispatch `step`, the binding-probe budget and the audience-checked vault read. Durations use the
+ * monotonic clock; the wall clock is only for token freshness.
+ */
+function openScope<TRecord extends VaultRecord>(
+  sessionId: string,
+  token: string,
+  deps: OwnerDeps<TRecord>
+) {
+  const { store, lock, timing, clock } = deps
+  const startedAt = clock()
+  const left = (): number => timing.ceilingMs - (clock() - startedAt)
+  const controller = new AbortController()
+  const renewal = startLockRenewal(sessionId, token, lock, controller, {
+    ttlMs: timing.leaseMs,
+    intervalMs: timing.renewEveryMs,
+    ceilingMs: timing.ceilingMs,
+    now: clock,
+  })
+  const unsafe = (): SessionRefreshUnsafeError => new SessionRefreshUnsafeError(sessionId)
+  const step: Step = async (dispatch) => {
+    if (renewal.ended || left() <= 0) throw unsafe()
+    const result = await Promise.race([dispatch(), renewal.unsafe])
+    if (renewal.ended) throw unsafe()
+    return result
+  }
+  const probe = (): VerifyBindingOptions => ({
+    deadlineMs: Math.min(PROBE_MAX_MS, left()),
+    signal: controller.signal,
+  })
+  const readOne = async (): Promise<Stored<TRecord> | null> => {
+    const entry = await step(() =>
+      store.get(sessionId, { deadlineMs: Math.min(timing.opMs, left()) })
+    )
+    return entry && (!deps.expectedAudience || hasSessionAudience(entry, deps.expectedAudience))
+      ? entry
+      : null
+  }
+
+  return { renewal, controller, step, probe, readOne, left }
 }
 
 /** CAS with verify-by-read. Never replays the upstream refresh. */
