@@ -36,6 +36,14 @@ export function nestedDeadlineMs(capMs: number): number {
   return Math.max(1, Math.min(capMs, Math.floor(budget.remainingMs())))
 }
 
+/**
+ * True when an enclosing stage has expired; false outside a stage. For best-effort work that
+ * started inside an admission and must stop quietly instead of throwing into a discarded promise.
+ */
+export function isStageExpired(): boolean {
+  return stageStorage.getStore()?.isExpired ?? false
+}
+
 /** Throws 503 when the enclosing stage has expired; a no-op outside a stage. */
 export function assertStageAlive(): void {
   stageStorage.getStore()?.assertAlive()
@@ -61,6 +69,10 @@ export class AuthBudget {
   /** Continuations call this before starting more work; it does not interrupt an await. */
   assertAlive(): void {
     if (this.expired || this.remainingMs() <= 0) throw unavailable()
+  }
+
+  get isExpired(): boolean {
+    return this.expired || this.remainingMs() <= 0
   }
 
   /** Terminal: an abandoned stage can never be revived. */

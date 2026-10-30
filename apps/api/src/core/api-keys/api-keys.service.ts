@@ -11,6 +11,7 @@ import { AuditActorType, AuditTargetType, Prisma } from '../../generated/prisma/
 import { BoundedRedis } from '../../infrastructure/redis/index.js'
 import { PrismaService } from '../../prisma/index.js'
 import { AuditLogService } from '../audit/index.js'
+import { isStageExpired } from '../auth/stage/auth-stage.service.js'
 
 import { apiKeyStatus, apiKeyStatusWhere } from './api-key-lifecycle.js'
 import { ApiKeyRevocationService } from './api-key-revocation.service.js'
@@ -256,6 +257,9 @@ export class ApiKeysService {
     }
 
     if (!claimed) return
+    // Started inside an admission that has since expired: the claim may have settled late, but a
+    // fresh database write must not start. Stop quietly; this promise is discarded by the caller.
+    if (isStageExpired()) return
 
     // Conditional metadata update cannot modify a terminal credential or resurrect a row.
     const now = new Date()

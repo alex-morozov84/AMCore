@@ -8,6 +8,7 @@ import {
   type MockContext,
   mockContextToPrisma,
 } from '../auth/auth-context.testkit'
+import { AUTH_STAGE_MS, AuthStageService } from '../auth/stage/auth-stage.service'
 
 import type { ApiKeyRevocationService } from './api-key-revocation.service'
 import { ApiKeysService } from './api-keys.service'
@@ -300,6 +301,64 @@ describe('ApiKeysService', () => {
       const result = await service.verifyByShortToken('abc12345', 'wrong-token')
 
       expect(result).toBeNull()
+    })
+  })
+
+  describe('touchLastUsed inside an admission stage (T082)', () => {
+    afterEach(() => jest.useRealTimers())
+
+    // The real method runs with its claim held; the stage expires; only then is the claim released.
+    const startUnderStage = async (): Promise<{
+      settleClaim: (outcome: 'ok' | 'fail') => void
+      detached: Promise<void>
+      unhandled: unknown[]
+    }> => {
+      jest.useFakeTimers()
+      let settleClaim!: (outcome: 'ok' | 'fail') => void
+      mockRedis.run.mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            settleClaim = (outcome) =>
+              outcome === 'ok' ? resolve('OK') : reject(new Error('Redis ECONNRESET'))
+          })
+      )
+      const unhandled: unknown[] = []
+      const onUnhandled = (reason: unknown): number => unhandled.push(reason)
+      process.on('unhandledRejection', onUnhandled)
+      let detached!: Promise<void>
+      const stage = new AuthStageService()
+      const outcome = stage
+        .run(async () => {
+          // Mirrors the guard: the detached promise inherits the stage context.
+          detached = service.touchLastUsed('key-1')
+          await new Promise(() => undefined)
+        })
+        .catch(() => undefined)
+      await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+      await outcome
+      process.off('unhandledRejection', onUnhandled)
+      return { settleClaim, detached, unhandled }
+    }
+
+    it.each(['ok', 'fail'] as const)(
+      'starts no database write when the claim settles (%s) after the stage expired',
+      async (outcome) => {
+        const { settleClaim, detached, unhandled } = await startUnderStage()
+        settleClaim(outcome)
+        await detached
+        await jest.advanceTimersByTimeAsync(0)
+        expect(mockCtx.prisma.apiKey.updateMany).not.toHaveBeenCalled()
+        expect(unhandled).toEqual([])
+      }
+    )
+
+    it('still writes when the claim settles inside the stage budget', async () => {
+      mockCtx.prisma.apiKey.updateMany.mockResolvedValue({ count: 1 })
+      await new AuthStageService().run(async () => {
+        await service.touchLastUsed('key-1')
+      })
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(mockCtx.prisma.apiKey.updateMany).toHaveBeenCalledTimes(1)
     })
   })
 
