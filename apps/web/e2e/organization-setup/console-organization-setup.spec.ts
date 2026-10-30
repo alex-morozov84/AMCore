@@ -8,6 +8,7 @@ import { probeRefusalEvidence } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
 import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' })
@@ -109,6 +110,9 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await setup.getByRole('button', { name: en.back, exact: true }).click()
   await expect(setup.getByLabel(en.name, { exact: true })).toHaveValue('Anna shop')
 
+  // Start the independent deleted-recipient recovery case with an idle source budget.
+  // This multi-case correctness exercise is not a sustained-load test.
+  resetBrowserProbeDomainBudget()
   // Only this disposable managed fixture's recipient is deleted, never preview data.
   guardedSql("DELETE FROM core.users WHERE email = :'email';", { email: recipient })
   await page.reload()
@@ -145,6 +149,8 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await expectNoAxeViolations(page)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 
+  // A separate lost-commit-response case retains all authority/state but isolates its source budget.
+  resetBrowserProbeDomainBudget()
   const bootstrapPattern = '**/api/organization-establishment/bootstrap'
   await page.route(bootstrapPattern, async (route) => {
     await route.fetch()
