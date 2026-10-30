@@ -166,6 +166,56 @@ describe('Primary browser-vault binding verification', () => {
       }
     )
 
+    it.each([
+      ['a fractional remainder', 2999.75, 3000],
+      ['a sub-millisecond remainder', 0.4, 1],
+    ])(
+      'rounds %s up to a whole millisecond and still dispatches',
+      async (_n, budget, expectedMs) => {
+        // The native timeout accepts only integers: a fraction used to throw before any request.
+        const timeout = vi.spyOn(AbortSignal, 'timeout')
+        const send = vi.fn().mockResolvedValue(Response.json(current()))
+        vi.stubGlobal('fetch', send)
+        await createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: budget })
+        expect(timeout).toHaveBeenCalledWith(expectedMs)
+        expect(send).toHaveBeenCalledTimes(1)
+        timeout.mockRestore()
+      }
+    )
+
+    it.each([0, -5, Number.NaN])('dispatches nothing for a spent budget (%s)', async (budget) => {
+      const send = vi.fn()
+      vi.stubGlobal('fetch', send)
+      await expect(
+        createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: budget })
+      ).rejects.toMatchObject({ status: 503 })
+      expect(send).not.toHaveBeenCalled()
+    })
+
+    it('ends a stalled reply body at the deadline instead of waiting for it', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init: RequestInit) => {
+          const signal = init.signal as AbortSignal
+          const body = new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{'))
+              signal.addEventListener('abort', () => controller.error(new Error('aborted')))
+            },
+          })
+          return new Response(body, {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        })
+      )
+      const started = performance.now()
+      await expect(
+        createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: 60 })
+      ).rejects.toMatchObject({ status: 503, errorCode: 'SERVICE_UNAVAILABLE' })
+      expect(performance.now() - started).toBeLessThan(1500)
+    })
+
     it('hands fetch one signal that also covers reading the reply', async () => {
       let seen!: AbortSignal
       vi.stubGlobal(

@@ -105,11 +105,14 @@ export function createBrowserBindingVerifier(source: Headers, expected: BrowserA
     const headers = browserSessionHeaders(incoming, expected, entry)
     const binding = browserVaultBindingSchema.parse(entry.browser)
     const waitMs = Math.min(BINDING_PROBE_MAX_MS, options.deadlineMs ?? BINDING_PROBE_MAX_MS)
-    // No budget left: dispatch nothing and refuse (never accept stale evidence).
-    if (waitMs <= 0 || options.signal?.aborted) throw unavailableBrowserContext()
+    // No budget left: dispatch nothing and refuse (never accept stale evidence). `!(x > 0)` also
+    // refuses NaN. A positive remainder is rounded UP to a whole millisecond because the native
+    // timeout accepts only integers; that never grants time when none remains.
+    if (!(waitMs > 0) || options.signal?.aborted) throw unavailableBrowserContext()
+    const timeoutMs = Math.max(1, Math.ceil(waitMs))
     const signal = options.signal
-      ? AbortSignal.any([AbortSignal.timeout(waitMs), options.signal])
-      : AbortSignal.timeout(waitMs)
+      ? AbortSignal.any([AbortSignal.timeout(timeoutMs), options.signal])
+      : AbortSignal.timeout(timeoutMs)
     let response: Response
     try {
       response = await fetchBackendResponse(

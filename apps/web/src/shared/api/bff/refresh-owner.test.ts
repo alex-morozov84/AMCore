@@ -9,6 +9,8 @@ import {
   SessionPublicationUnprovenError,
   SessionRefreshUnsafeError,
   SessionStageTimeoutError,
+  SessionVaultUnavailableError,
+  UpstreamRotationUnprovenError,
 } from './errors'
 import type { UpstreamRefreshFn, VaultEntry, VaultLock } from './session-vault.types'
 import { FakeVaultStore, freshRefresh, makeEntry } from './test-fakes'
@@ -36,21 +38,25 @@ class ControlledStore extends FakeVaultStore {
   casLandsAnyway = false
   deletes = 0
   deleteFails = false
+  deleteGate: Promise<void> | null = null
+  casThrows: Error | null = null
   override async setIfVersionMatches(
     sessionId: string,
     expectedVersion: number,
     entry: Omit<VaultEntry, 'version'>
   ): Promise<boolean> {
     if (this.casGate) await this.casGate
+    if (this.casThrows) throw this.casThrows
     if (this.casFails) {
       if (this.casLandsAnyway) await super.setIfVersionMatches(sessionId, expectedVersion, entry)
-      if (this.casFails === 'throw') throw new Error('reply lost')
+      if (this.casFails === 'throw') throw new SessionVaultUnavailableError(new Error('reply lost'))
       return false
     }
     return super.setIfVersionMatches(sessionId, expectedVersion, entry)
   }
   override async delete(sessionId: string): Promise<void> {
     this.deletes++
+    if (this.deleteGate) await this.deleteGate
     if (this.deleteFails) throw new Error('delete lost')
     await super.delete(sessionId)
   }
@@ -318,6 +324,113 @@ describe('refresh owner', () => {
         return false
       })
       await expect(call()).rejects.toBeInstanceOf(SessionNotFoundError)
+    })
+  })
+
+  describe('classified outcomes and cause preservation', () => {
+    it.each([
+      ['a TypeError', new TypeError('schema bug')],
+      [
+        'a WRONGTYPE reply error',
+        Object.assign(new Error('WRONGTYPE bad key'), { name: 'ReplyError' }),
+      ],
+    ])('%s during publication is not retried and keeps its cause', async (_n, bug) => {
+      store.casThrows = bug
+      const casSpy = vi.spyOn(store, 'setIfVersionMatches')
+      const error = await call().catch((e: unknown) => e)
+      expect(error).toBe(bug)
+      expect(casSpy).toHaveBeenCalledTimes(1)
+      // The rotation happened, so the post-rotation cleanup still applies.
+      await expect(store.get('s1')).resolves.toBeNull()
+    })
+
+    it('an unusable successful refresh reply is a rotation that was not published: terminal, cause kept', async () => {
+      const failure = new UpstreamRotationUnprovenError(new SyntaxError('bad json'))
+      const upstreamRefresh = vi.fn().mockRejectedValue(failure)
+      const error = await call({ upstreamRefresh }).catch((e: unknown) => e)
+      expect(error).toBe(failure)
+      expect((error as Error).cause).toBeInstanceOf(SyntaxError)
+      await expect(store.get('s1')).resolves.toBeNull()
+    })
+  })
+
+  describe('checked dispatch', () => {
+    it('lease loss before the backend call was sent keeps the session and sends nothing', async () => {
+      const upstreamRefresh = vi.fn(freshRefresh)
+      // The caller's check passes; the owner's own first check never settles; the lease fails at 4 s.
+      const verifyBinding = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockImplementation(() => new Promise<void>(() => undefined))
+      const result = call({ lock: new FailingRenewalLock(), verifyBinding, upstreamRefresh }).catch(
+        (e: unknown) => e
+      )
+      await vi.advanceTimersByTimeAsync(4_100)
+      await expect(result).resolves.toBeInstanceOf(SessionRefreshUnsafeError)
+      expect(upstreamRefresh).not.toHaveBeenCalled()
+      expect(store.deletes).toBe(0)
+      await expect(store.get('s1')).resolves.not.toBeNull()
+    })
+
+    it('a late lock success is released and starts no owner work', async () => {
+      let now = 0
+      const lock = new TrackingLock()
+      const acquire = vi.spyOn(lock, 'acquire').mockImplementation(async () => {
+        now += 10_000 // the answer arrives long after the acquisition deadline
+        return 'late'
+      })
+      const upstreamRefresh = vi.fn(freshRefresh)
+      await expect(
+        call({ lock, upstreamRefresh, timing: { stageMs: 60_000, clock: () => now } })
+      ).rejects.toBeInstanceOf(SessionLockTimeoutError)
+      expect(acquire).toHaveBeenCalledTimes(1)
+      expect(lock.released).toBe(1)
+      expect(upstreamRefresh).not.toHaveBeenCalled()
+    })
+
+    it('a step finishing after the ceiling is not used and no further step starts', async () => {
+      let now = 0
+      const verifyBinding = vi.fn(async () => undefined)
+      const upstreamRefresh = vi.fn(async () => {
+        now += 40_000 // the backend call returns after the 30 s ceiling
+        return freshRefresh()
+      })
+      const error = await call({
+        verifyBinding,
+        upstreamRefresh,
+        timing: { stageMs: 60_000, clock: () => now },
+      }).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(SessionRefreshUnsafeError)
+      // Caller check, owner re-read check; the check of the rotated credentials never started.
+      expect(verifyBinding).toHaveBeenCalledTimes(2)
+      await expect(store.get('s1')).resolves.toBeNull()
+    })
+  })
+
+  describe('renewal during terminal cleanup', () => {
+    it('keeps renewing a healthy lease through a held delete that crosses a renewal tick after the ceiling', async () => {
+      const gate = deferred<void>()
+      store.deleteGate = gate.promise
+      store.casGate = new Promise(() => undefined)
+      const lock = new TrackingLock()
+      const renew = vi.spyOn(lock, 'renew')
+      const result = call({
+        lock,
+        timing: { stageMs: 120_000, owner: { ceilingMs: 2_000 } },
+      }).catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(2_100) // ceiling: ordinary work ends, delete starts and is held
+      expect(store.deletes).toBe(1)
+      expect(renew).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(4_000) // a renewal tick falls inside the held delete
+      expect(renew).toHaveBeenCalled()
+      gate.resolve()
+      await vi.advanceTimersByTimeAsync(0)
+      await expect(result).resolves.toBeInstanceOf(SessionRefreshUnsafeError)
+      await expect(store.get('s1')).resolves.toBeNull()
+      // After the owner finished, renewal is over.
+      const calls = renew.mock.calls.length
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(renew.mock.calls.length).toBe(calls)
     })
   })
 })

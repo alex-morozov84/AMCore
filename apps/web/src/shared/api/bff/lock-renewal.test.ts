@@ -64,10 +64,36 @@ describe('startLockRenewal', () => {
     await expect(outcome).resolves.toBeInstanceOf(SessionRefreshUnsafeError)
   })
 
-  it('the ceiling fails closed even with successful renewals', async () => {
-    const { outcome } = start(lockWith(async () => true))
+  it('the ceiling ends ordinary work even with successful renewals', async () => {
+    const { handle, outcome } = start(lockWith(async () => true))
     await vi.advanceTimersByTimeAsync(30_100)
     await expect(outcome).resolves.toBeInstanceOf(SessionRefreshUnsafeError)
+    expect(handle.ended).toBe(true)
+  })
+
+  it('after the ceiling a still-owned lease keeps being renewed until stop (cleanup runs under it)', async () => {
+    const renew = vi.fn(async () => true)
+    const { handle, controller } = start(lockWith(renew), { ...options, ceilingMs: 5000 })
+    await vi.advanceTimersByTimeAsync(5100)
+    expect(handle.ended).toBe(true)
+    expect(controller.signal.aborted).toBe(true)
+    const atCeiling = renew.mock.calls.length
+    await vi.advanceTimersByTimeAsync(8100)
+    expect(renew.mock.calls.length).toBeGreaterThan(atCeiling)
+    handle.stop()
+    const atStop = renew.mock.calls.length
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(renew.mock.calls.length).toBe(atStop)
+  })
+
+  it('a lost lease stops renewing at once: it cannot be promised renewed during cleanup', async () => {
+    const renew = vi.fn(async () => false)
+    const { handle } = start(lockWith(renew))
+    await vi.advanceTimersByTimeAsync(4100)
+    expect(handle.ended).toBe(true)
+    const calls = renew.mock.calls.length
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(renew.mock.calls.length).toBe(calls)
   })
 
   it('is inert after stop: a late refusal neither fails nor aborts anything', async () => {

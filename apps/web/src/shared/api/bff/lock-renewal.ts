@@ -4,35 +4,42 @@ import type { VaultLock } from './session-vault.types'
 export interface LockRenewalOptions {
   ttlMs: number
   intervalMs: number
-  /** Absolute circuit breaker for pre-commit work that never settles at all. */
+  /** Ends ORDINARY work that never settles; a healthy lease keeps being renewed for cleanup. */
   ceilingMs: number
   /** Monotonic clock; injectable for tests. */
   now?: () => number
 }
 
 export interface LockRenewalHandle {
-  /** Stops the timers. Results arriving later neither fail nor abort anything. */
+  /** Stops the timers for good. Results arriving later neither fail nor abort anything. */
   stop(): void
   /**
-   * Rejects with `SessionRefreshUnsafeError` the moment a renewal is refused, fails, stays
-   * unresolved for a whole interval, or the ceiling is reached; never resolves on its own. Race it
-   * against EVERY step before the commit point so the owner always moves on, whether or not that
-   * step respects `AbortSignal`.
+   * True once ordinary pre-commit work must end: the lease was refused or lost, or the ceiling was
+   * reached. Checked before every new step so nothing starts after it.
+   */
+  readonly ended: boolean
+  /**
+   * Rejects with `SessionRefreshUnsafeError` when ordinary work must end; never resolves on its
+   * own. Race it against EVERY step before the commit point so the owner always moves on, whether
+   * or not that step respects `AbortSignal`.
    */
   unsafe: Promise<never>
 }
 
 /**
- * Periodically renews `token` for `sessionId` from lock acquisition until the owner finishes its
- * cleanup, so a merely slow (but healthy) refresh never loses exclusivity to its own lease
- * expiring (ADR-068 round 2). Ticks never overlap: a tick is skipped while the previous renewal is
- * unresolved, and a renewal unresolved for one whole interval counts as a failed renewal. If
- * renewal genuinely fails (lost exclusivity) or the ceiling is hit, the caller can no longer prove
- * the vault's refresh token was not rotated by an abandoned attempt and must treat the outcome as
- * unproven. After `stop()` the handle is inert: a late renew result is ignored.
+ * Periodically renews `token` for `sessionId` from lock acquisition until the owner calls `stop()`
+ * after its cleanup, so a merely slow (but healthy) refresh never loses exclusivity to its own
+ * lease expiring (ADR-068 round 2). Ticks never overlap: a tick is skipped while the previous
+ * renewal is unresolved, and a renewal unresolved for one whole interval counts as a failed one.
  *
- * The ceiling ends normal pre-commit work only. Bounded deletion and release may continue after
- * it; it is not a total resource lifetime.
+ * Two different endings are kept apart:
+ * - LEASE LOSS (a refused or failed renewal, or one unresolved for a whole interval): exclusivity
+ *   can no longer be proven, ordinary work ends and renewal stops, because a lost lease cannot be
+ *   promised renewed.
+ * - CEILING: ordinary work ends and the work is aborted, but a still-owned lease keeps being
+ *   renewed so a bounded terminal delete runs under it; only `stop()` ends renewal then.
+ *
+ * After `stop()` the handle is inert: a late renew result is ignored.
  */
 export function startLockRenewal(
   sessionId: string,
@@ -49,25 +56,35 @@ export function startLockRenewal(
   // Observed here so a failure that nobody is racing yet is never an unhandled rejection.
   unsafe.catch(() => undefined)
 
-  let finished = false
+  let workEnded = false
+  let stopped = false
+  let leaseLost = false
   let inFlightSince: number | null = null
-  const finish = (): void => {
-    finished = true
-    clearTimeout(ceiling)
-    clearInterval(interval)
-  }
-  const fail = (): void => {
-    if (finished) return
-    finish()
+
+  const endWork = (): void => {
+    if (workEnded) return
+    workEnded = true
     controller.abort()
     rejectUnsafe(new SessionRefreshUnsafeError(sessionId))
   }
+  const stopTimers = (): void => {
+    clearTimeout(ceiling)
+    clearInterval(interval)
+  }
+  const loseLease = (): void => {
+    if (stopped || leaseLost) return
+    leaseLost = true
+    stopTimers()
+    endWork()
+  }
 
-  const ceiling = setTimeout(fail, options.ceilingMs)
+  const ceiling = setTimeout(() => {
+    if (!stopped) endWork()
+  }, options.ceilingMs)
   const interval = setInterval(() => {
-    if (finished) return
+    if (stopped || leaseLost) return
     if (inFlightSince !== null) {
-      if (now() - inFlightSince >= options.intervalMs) fail()
+      if (now() - inFlightSince >= options.intervalMs) loseLease()
       return
     }
     inFlightSince = now()
@@ -75,18 +92,22 @@ export function startLockRenewal(
     void lock.renew(sessionId, token, options.ttlMs, { deadlineMs: options.intervalMs }).then(
       (renewed) => {
         inFlightSince = null
-        if (!finished && !renewed) fail()
+        if (!stopped && !renewed) loseLease()
       },
       () => {
         inFlightSince = null
-        fail()
+        loseLease()
       }
     )
   }, options.intervalMs)
 
   return {
     stop() {
-      finish()
+      stopped = true
+      stopTimers()
+    },
+    get ended() {
+      return workEnded
     },
     unsafe,
   }

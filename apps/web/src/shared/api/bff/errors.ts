@@ -36,6 +36,19 @@ export class SessionPublicationUnprovenError extends Error {
   }
 }
 
+/**
+ * The backend answered the refresh with success (the refresh token is rotated server-side), but the
+ * reply could not be read or understood. Unlike a request that got no response, the old token in
+ * the vault is already stale, so the owner treats the attempt as a rotation that was not
+ * published. `cause` keeps the original failure for diagnosis.
+ */
+export class UpstreamRotationUnprovenError extends Error {
+  constructor(cause: unknown) {
+    super('Upstream refresh succeeded but its reply could not be used', { cause })
+    this.name = 'UpstreamRotationUnprovenError'
+  }
+}
+
 /** No vault entry exists for this session id (logged out, expired, or never existed). */
 export class SessionNotFoundError extends Error {
   constructor(sessionId: string) {

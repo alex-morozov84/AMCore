@@ -102,16 +102,30 @@ describe('supervised vault connection against a real server', () => {
     await expect(store.get('it-stall')).resolves.toMatchObject({ refreshToken: 'rt-1' })
   }, 40_000)
 
-  it('refuses fast on a cold connection that never completes its handshake, then recovers', async () => {
+  it('refuses a cold command within its own deadline when the handshake never completes, then recovers', async () => {
     proxy.holdCommands()
     const started = performance.now()
     await expect(store.get('it-cold', { deadlineMs: 500 })).rejects.toBeInstanceOf(
       SessionVaultUnavailableError
     )
-    // The first-use wait is short; a hung handshake is not waited for indefinitely.
-    expect(performance.now() - started).toBeLessThan(2500)
+    // The first-use wait is part of the same budget: 500 ms asked, not 500 ms waiting plus 500 ms.
+    expect(performance.now() - started).toBeLessThan(800)
     proxy.release()
     await poll(reachable, HEAL_BUDGET_MS + 3000)
+  }, 40_000)
+
+  it('counts the wait for the first connection inside the command budget when readiness comes late', async () => {
+    proxy.holdCommands()
+    const started = performance.now()
+    const pending = store.get('it-budget', { deadlineMs: 600 }).catch((e: unknown) => e)
+    await sleep(350)
+    // The handshake completes near the end of the budget, and then the reply is held.
+    proxy.holdReplies()
+    proxy.release()
+    const error = await pending
+    expect(error).toBeInstanceOf(SessionVaultUnavailableError)
+    expect(performance.now() - started).toBeLessThan(600 + 300)
+    proxy.release()
   }, 40_000)
 
   it('stays bounded over repeated stall and heal cycles', async () => {

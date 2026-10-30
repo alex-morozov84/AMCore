@@ -8,6 +8,7 @@ import {
   VAULT_REDIS_DEADLINE_MS,
   VAULT_REDIS_TIMING,
   type VaultRedisClient,
+  VaultRedisError,
   type VaultRedisEvent,
 } from './vault-redis-types'
 
@@ -76,10 +77,15 @@ export async function runVaultRedis<T>(
   operation: (client: VaultRedisClient, signal: AbortSignal) => Promise<T>,
   deadlineMs: number = VAULT_REDIS_DEADLINE_MS
 ): Promise<T> {
+  const started = performance.now()
   const current = ensureSupervisor()
   if (!current.ready && Date.now() - createdAt < FIRST_USE_WINDOW_MS)
     await waitForFirstConnection(current, deadlineMs)
-  return current.run(operation, deadlineMs)
+  // The wait for the first connection is part of the same command budget: the command gets what
+  // is left, and nothing is dispatched once it is spent.
+  const remaining = deadlineMs - (performance.now() - started)
+  if (!(remaining > 0)) throw new VaultRedisError('deadline', 'not_sent')
+  return current.run(operation, remaining)
 }
 
 export function vaultRedisStats(): VaultRedisStats | undefined {
