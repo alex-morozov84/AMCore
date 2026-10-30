@@ -144,6 +144,15 @@ export class AuthRedisSupervisor {
       progressAt: this.now(),
       lastOkAt: 0,
     }
+    this.listen(generation)
+    this.generations.push(generation)
+    client.connect().catch(() => undefined)
+    return generation
+  }
+
+  /** Connection-level events are the only progress signal a not-yet-ready generation gives. */
+  private listen(generation: Generation): void {
+    const { client } = generation
     client.on('error', (error: unknown) => {
       generation.progressAt = this.now()
       this.emit({ kind: 'client-error', generation: generation.id, error })
@@ -163,9 +172,6 @@ export class AuthRedisSupervisor {
         generation.state = 'closed'
       else if (generation.state !== 'closed') generation.state = 'failed'
     })
-    this.generations.push(generation)
-    client.connect().catch(() => undefined)
-    return generation
   }
 
   private markReconnecting(generation: Generation): void {
@@ -203,34 +209,38 @@ export class AuthRedisSupervisor {
     if (generation.state === 'active' && !generation.client.isReady)
       this.markReconnecting(generation)
 
+    const verdict = this.assess(generation, t)
+    this.trackHealth(verdict.healthy, t)
+    if (verdict.replace)
+      this.replace(generation, verdict.replace.reason, verdict.replace.flapGoverned)
+  }
+
+  /** Pure decision table: is this generation healthy, and does it need replacing, and why? */
+  private assess(
+    generation: Generation,
+    t: number
+  ): { healthy: boolean; replace?: { reason: AuthRedisReplacementReason; flapGoverned: boolean } } {
     const oldest = generation.ops.size ? t - Math.min(...generation.ops.values()) : 0
     const active = generation.state === 'active'
+    const ready = active && generation.client.isReady
     const stalled = active && oldest > this.timing.stallMs
-    const noSuccess =
-      active &&
-      generation.client.isReady &&
-      !stalled &&
-      t - generation.lastOkAt > this.timing.noSuccessMs
-    const connecting = generation.state === 'connecting' || generation.state === 'reconnecting'
-    const handshakeHang = connecting && t - generation.progressAt > this.timing.notReadyMs
+    const sinceOk = t - generation.lastOkAt
+    const healthy = ready && !stalled && sinceOk <= this.timing.okFreshMs
+    if (stalled) return { healthy, replace: { reason: 'stall', flapGoverned: true } }
+    if (ready && sinceOk > this.timing.noSuccessMs)
+      return { healthy, replace: { reason: 'no-success', flapGoverned: true } }
+    const hung =
+      (generation.state === 'connecting' || generation.state === 'reconnecting') &&
+      t - generation.progressAt > this.timing.notReadyMs
+    if (hung) {
+      const reason = generation.state === 'reconnecting' ? 'reconnect-hang' : 'handshake'
+      return { healthy, replace: { reason, flapGoverned: false } }
+    }
     const ended =
       generation.state === 'failed' && t - this.lastSpawnAt >= this.timing.spawnCadenceMs
-    const healthy =
-      active &&
-      generation.client.isReady &&
-      !stalled &&
-      t - generation.lastOkAt <= this.timing.okFreshMs
-    this.trackHealth(healthy, t)
-
-    if (stalled) this.replace(generation, 'stall', true)
-    else if (noSuccess) this.replace(generation, 'no-success', true)
-    else if (handshakeHang)
-      this.replace(
-        generation,
-        generation.state === 'reconnecting' ? 'reconnect-hang' : 'handshake',
-        false
-      )
-    else if (ended) this.replace(generation, 'unplanned-end', false)
+    return ended
+      ? { healthy, replace: { reason: 'unplanned-end', flapGoverned: false } }
+      : { healthy }
   }
 
   private trackHealth(healthy: boolean, t: number): void {
