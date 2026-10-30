@@ -62,6 +62,8 @@ describe('ensureFreshSession — failure classification', () => {
         lock: new FailingRenewalLock(),
         verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(neverSettles),
+        // Keeps the caller waiting so the owner's own outcome is what is asserted here.
+        timing: { stageMs: 60_000 },
       }).catch((e: unknown) => e)
 
       // One renewal cycle (every 4s) is enough — FailingRenewalLock always refuses.
@@ -86,6 +88,8 @@ describe('ensureFreshSession — failure classification', () => {
         lock: new RejectingRenewalLock(),
         verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(neverSettles),
+        // Keeps the caller waiting so the owner's own outcome is what is asserted here.
+        timing: { stageMs: 60_000 },
       }).catch((e: unknown) => e)
 
       await vi.advanceTimersByTimeAsync(4_100)
@@ -109,6 +113,8 @@ describe('ensureFreshSession — failure classification', () => {
         lock: new SimpleLock(), // renew() always succeeds
         verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(neverSettles),
+        // Keeps the caller waiting so the owner's own outcome is what is asserted here.
+        timing: { stageMs: 60_000 },
       }).catch((e: unknown) => e)
 
       await vi.runAllTimersAsync()

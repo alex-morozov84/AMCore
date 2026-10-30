@@ -11,6 +11,31 @@ export class SessionVaultUnavailableError extends Error {
   }
 }
 
+/**
+ * The caller's own deadline for session admission passed (vault read, binding check or waiting for
+ * the refresh owner). The caller leaves with a temporary error; the refresh owner, if one is
+ * running, continues under its own budget. Not a statement about the session itself.
+ */
+export class SessionStageTimeoutError extends Error {
+  constructor(readonly step: string) {
+    super(`Session admission exceeded its deadline at ${step}`)
+    this.name = 'SessionStageTimeoutError'
+  }
+}
+
+/**
+ * A refresh rotated the backend token, but the new credentials could not be approved or published
+ * (binding check refused, unavailable or slow; publication not acknowledged). The owner ended the
+ * attempt and tried a bounded delete of the vault entry. `cause` keeps the original status and code
+ * so the response is not relabeled; a terminal result is not proof the entry was deleted.
+ */
+export class SessionPublicationUnprovenError extends Error {
+  constructor(cause: unknown) {
+    super('Refreshed session credentials could not be proven or published', { cause })
+    this.name = 'SessionPublicationUnprovenError'
+  }
+}
+
 /** No vault entry exists for this session id (logged out, expired, or never existed). */
 export class SessionNotFoundError extends Error {
   constructor(sessionId: string) {

@@ -36,10 +36,12 @@ export function authFailureResponse(request: Request, error: unknown): NextRespo
   if (isInvalidRefreshError(error)) {
     return apiErrorResponse(request, { statusCode: 401, message: 'Not authenticated' })
   }
-  // SessionVaultUnavailableError, SessionLockTimeoutError, or a transient
-  // upstreamRefresh failure — cannot prove auth right now, not "logged out."
+  // SessionVaultUnavailableError, SessionLockTimeoutError, SessionStageTimeoutError, an unproven
+  // publication, or a transient upstreamRefresh failure — cannot prove auth right now, not
+  // "logged out." No Retry-After is invented here: a hint is only relayed from an upstream 429/503.
   return apiErrorResponse(request, {
     statusCode: 503,
     message: 'Authentication temporarily unavailable',
+    errorCode: 'SERVICE_UNAVAILABLE',
   })
 }

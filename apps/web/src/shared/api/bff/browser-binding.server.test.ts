@@ -129,6 +129,91 @@ describe('Primary browser-vault binding verification', () => {
     await expect(verify(entry())).rejects.toMatchObject({ status: 503 })
   })
 
+  describe('deadline and cancellation (T082)', () => {
+    it('dispatches nothing and refuses when no budget is left', async () => {
+      const send = vi.fn()
+      vi.stubGlobal('fetch', send)
+      await expect(
+        createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: 0 })
+      ).rejects.toMatchObject({ status: 503, errorCode: 'SERVICE_UNAVAILABLE' })
+      expect(send).not.toHaveBeenCalled()
+    })
+
+    it('dispatches nothing when the owner already gave up', async () => {
+      const send = vi.fn()
+      vi.stubGlobal('fetch', send)
+      const stopped = new AbortController()
+      stopped.abort()
+      await expect(
+        createBrowserBindingVerifier(source(), 'product')(entry(), { signal: stopped.signal })
+      ).rejects.toMatchObject({ status: 503 })
+      expect(send).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['a short budget', 400, 400],
+      ['no budget named', undefined, 10_000],
+      ['a budget above the ceiling', 60_000, 10_000],
+    ])(
+      'waits at most the smaller of the budget and ten seconds: %s',
+      async (_n, budget, expectedMs) => {
+        // The native timeout signal is not driven by fake timers; its argument is the contract.
+        const timeout = vi.spyOn(AbortSignal, 'timeout')
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(current())))
+        await createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: budget })
+        expect(timeout).toHaveBeenCalledWith(expectedMs)
+        timeout.mockRestore()
+      }
+    )
+
+    it('hands fetch one signal that also covers reading the reply', async () => {
+      let seen!: AbortSignal
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init: RequestInit) => {
+          seen = init.signal as AbortSignal
+          return Response.json(current())
+        })
+      )
+      await createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: 500 })
+      expect(seen).toBeInstanceOf(AbortSignal)
+    })
+
+    it('cancels the probe when the owner signal aborts and keeps the 503 class', async () => {
+      const owner = new AbortController()
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((_resolve, reject) =>
+              (init.signal as AbortSignal).addEventListener('abort', () => reject(new Error('x')))
+            )
+        )
+      )
+      const pending = createBrowserBindingVerifier(source(), 'product')(entry(), {
+        signal: owner.signal,
+      }).catch((e: unknown) => e)
+      owner.abort()
+      await expect(pending).resolves.toMatchObject({ status: 503 })
+    })
+
+    it('keeps the probe 429 with its retry hint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue(new Response('{}', { status: 429, headers: { 'retry-after': '9' } }))
+      )
+      await expect(
+        createBrowserBindingVerifier(source(), 'product')(entry(), { deadlineMs: 2000 })
+      ).rejects.toMatchObject({
+        status: 429,
+        errorCode: 'RATE_LIMIT_EXCEEDED',
+        retryAfterSeconds: 9,
+      })
+    })
+  })
+
   it('uses a stable session cookie with separate secure host audiences', () => {
     expect(browserAnchorCookie('product').options).not.toHaveProperty('maxAge')
     expect(browserAnchorCookie('staff')).toMatchObject({

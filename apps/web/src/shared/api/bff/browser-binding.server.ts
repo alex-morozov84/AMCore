@@ -84,12 +84,32 @@ export function browserSessionHeaders(
   }
 }
 
+/** The probe never waits longer than this, whatever budget the caller has left. */
+export const BINDING_PROBE_MAX_MS = 10_000
+
+/**
+ * Bounds one verification. `deadlineMs` is what is left of the owning budget (the caller stage or
+ * the refresh owner): the probe waits at most the smaller of that and ten seconds, and the same
+ * deadline covers reading and validating the reply. A shorter wait refuses the request; it never
+ * skips or weakens the check. `signal` ends the probe when the owner gives up.
+ */
+export interface VerifyBindingOptions {
+  deadlineMs?: number
+  signal?: AbortSignal
+}
+
 /** Mandatory side-effect-free primary check before exposing a snapshot/token, including an expired access token. */
 export function createBrowserBindingVerifier(source: Headers, expected: BrowserAudience) {
   const incoming = new Headers(source)
-  return async (entry: VaultRecord): Promise<void> => {
+  return async (entry: VaultRecord, options: VerifyBindingOptions = {}): Promise<void> => {
     const headers = browserSessionHeaders(incoming, expected, entry)
     const binding = browserVaultBindingSchema.parse(entry.browser)
+    const waitMs = Math.min(BINDING_PROBE_MAX_MS, options.deadlineMs ?? BINDING_PROBE_MAX_MS)
+    // No budget left: dispatch nothing and refuse (never accept stale evidence).
+    if (waitMs <= 0 || options.signal?.aborted) throw unavailableBrowserContext()
+    const signal = options.signal
+      ? AbortSignal.any([AbortSignal.timeout(waitMs), options.signal])
+      : AbortSignal.timeout(waitMs)
     let response: Response
     try {
       response = await fetchBackendResponse(
@@ -97,7 +117,7 @@ export function createBrowserBindingVerifier(source: Headers, expected: BrowserA
         incoming,
         {
           method: 'POST',
-          signal: AbortSignal.timeout(10000),
+          signal,
           cache: 'no-store',
           headers: { ...headers, 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -118,6 +138,7 @@ export function createBrowserBindingVerifier(source: Headers, expected: BrowserA
       )
     if ([401, 403, 409].includes(response.status)) throw changedBrowserContext()
     if (!response.ok) throw unavailableBrowserContext()
+    // The body is read under the same signal, so a stalled reply cannot outlive the deadline.
     const checked = browserBindingProbeResultSchema.safeParse(
       await response.json().catch(() => null)
     )
