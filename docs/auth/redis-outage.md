@@ -120,22 +120,27 @@ that is still held keeps being renewed while a bounded delete and the lock relea
 was refused or lost is not renewed further. Several processes contend for one Redis lock; a process
 that cannot get it in 3 s answers the `503`.
 
-| Situation                                                                                                                                 | Result for the stored session                                                                                 |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| The vault is unreachable, or the lock or lease was lost before the backend call was sent                                                  | Kept; retry later                                                                                             |
-| The backend call fails without an answer (network, timeout)                                                                               | Kept; the next request tries again                                                                            |
-| The backend refuses the refresh token (invalid or reused)                                                                                 | A bounded delete is attempted; if it fails the stored state is unknown, and the backend rejects the old token |
-| The lease is lost or the ceiling is reached after the backend call was sent, or the backend answered success but the reply cannot be used | The rotation cannot be ruled out: the owner ends the attempt and tries a bounded delete                       |
-| The new credentials cannot be checked or published in time after a rotation                                                               | Same: bounded delete attempted                                                                                |
-| The vault already shows the new tokens (this owner's write, or a newer entry), then the binding check refuses                             | Not deleted; the request fails with the check's own status                                                    |
+Stored record and response are two separate outcomes. "Kept" below says the vault entry was left
+alone; it does not mean the request got a temporary error.
 
-After a rotation that could not be published the response is a temporary error now. A later request
-may continue from a fresh publication, find no session and ask for sign-in, or be rejected by the
-backend; a failed delete leaves the stored state unknown, so a terminal result does not prove the
-session was deleted. A failed binding check keeps its own status (`503`, `429` or `401`
-`AUTH_CONTEXT_CHANGED`); a dependency failure is not relabeled as a changed context. Only a
-classified Redis outage is read back and retried during publication; an unexpected programming or
-schema error is kept with its cause and is not described as an outage.
+| Situation                                                                                                              | Stored session                                                                   | Route Handler / API proxy                          | Page (data layer)                                   |
+| ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| Vault unreachable, admission budget spent, or the lock not obtained in 3 s                                             | Kept                                                                             | `503` `SERVICE_UNAVAILABLE`                        | Error boundary                                      |
+| The backend call fails without an answer (network, timeout)                                                            | Kept                                                                             | `503`                                              | Error boundary                                      |
+| Lease lost or the ceiling reached before the backend call was sent                                                     | Kept (nothing was rotated)                                                       | `401`, the same answer as any lost exclusivity     | Treated as signed out; the next request can succeed |
+| The backend refuses the refresh token (invalid or reused)                                                              | A bounded delete is attempted; if it fails the stored state is unknown           | `401`                                              | Treated as signed out                               |
+| Lease lost or the ceiling reached after the call was sent                                                              | Rotation cannot be ruled out: the attempt ends and a bounded delete is attempted | `401`                                              | Treated as signed out                               |
+| The backend answered success but the reply cannot be used, or publication cannot be proven                             | Same: bounded delete attempted                                                   | `503`                                              | Error boundary                                      |
+| The check of the rotated credentials refuses (`503`, `429`, `401` `AUTH_CONTEXT_CHANGED`)                              | Bounded delete attempted unless the new tokens are already published             | The check's own status and code                    | Follows that status                                 |
+| The vault already shows the new tokens (this owner's write, or a newer entry), then the check refuses or time runs out | Not deleted                                                                      | The check's own status, or `503` when time ran out | Follows that status                                 |
+
+A failed delete leaves the stored state unknown, so a terminal result does not prove the session was
+deleted. A later request may continue from a fresh publication, find no session and ask for sign-in,
+or be rejected by the backend. A dependency failure of the binding check is not relabeled as a
+changed context. During publication only a classified Redis outage is read back and retried; any
+other error is kept with its cause for diagnosis. In the API an unexpected programming or schema
+error stays a `500`; the web edge answers its generic sanitized `503` for failures it cannot
+classify, which is a statement about the response, not a claim that the cause was an outage.
 
 **What to watch.** The web server logs `Vault Redis client generation replaced` with the reason,
 `Vault Redis alert` and `Vault Redis client error`. It exports no metric for this connection and

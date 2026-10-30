@@ -13,6 +13,11 @@ export async function redisTransportStall(host: string, port: number) {
   let holdReplies = false
   let holdCommands = false
   let refusing = false
+  let gate: ((chunk: Buffer) => boolean) | null = null
+  let notifyMatched!: () => void
+  const matched = new Promise<void>((resolve) => {
+    notifyMatched = resolve
+  })
   const server = createServer((downstream) => {
     if (refusing) {
       downstream.destroy()
@@ -22,8 +27,17 @@ export async function redisTransportStall(host: string, port: number) {
     sockets.add(downstream)
     sockets.add(upstream)
     downstream.on('data', (chunk: Buffer) => {
-      if (holdCommands) commands.push({ socket: upstream, chunk })
-      else upstream.write(chunk)
+      if (holdCommands) {
+        commands.push({ socket: upstream, chunk })
+        return
+      }
+      // Command-aware gate: the matching command is sent, and from then on its reply is held.
+      if (gate?.(chunk)) {
+        holdReplies = true
+        gate = null
+        notifyMatched()
+      }
+      upstream.write(chunk)
     })
     upstream.on('data', (chunk: Buffer) => {
       if (holdReplies) replies.push({ socket: downstream, chunk })
@@ -52,6 +66,25 @@ export async function redisTransportStall(host: string, port: number) {
     },
     holdCommands: (): void => {
       holdCommands = true
+    },
+    /**
+     * Holds the replies from the moment a client command matching `match` is sent upstream. The
+     * command itself is delivered, so the server executes it once. `matchedCommand` settles when
+     * it was seen.
+     */
+    holdRepliesWhen: (match: (chunk: Buffer) => boolean): void => {
+      gate = match
+    },
+    matchedCommand: matched,
+    /** Delivers the held client commands only; reply holding is left as it is. */
+    releaseCommands: (): void => {
+      holdCommands = false
+      for (const pending of commands.splice(0)) pending.socket.write(pending.chunk)
+    },
+    /** Delivers the held server replies only; command holding is left as it is. */
+    releaseReplies: (): void => {
+      holdReplies = false
+      for (const pending of replies.splice(0)) pending.socket.write(pending.chunk)
     },
     release: (): void => {
       holdReplies = false

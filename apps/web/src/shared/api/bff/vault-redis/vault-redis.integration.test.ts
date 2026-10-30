@@ -114,18 +114,36 @@ describe('supervised vault connection against a real server', () => {
     await poll(reachable, HEAL_BUDGET_MS + 3000)
   }, 40_000)
 
+  it('serves the same call normally when nothing is held (healthy control)', async () => {
+    await store.create('it-control', entry())
+    const started = performance.now()
+    await expect(store.get('it-control', { deadlineMs: 600 })).resolves.toMatchObject({
+      refreshToken: 'rt-1',
+    })
+    expect(performance.now() - started).toBeLessThan(600)
+  }, 30_000)
+
   it('counts the wait for the first connection inside the command budget when readiness comes late', async () => {
+    // Only this command's reply is held, and only from the moment it is actually sent: the
+    // handshake completes first (readiness), then the application command goes out and stalls.
+    await store.create('it-budget', entry())
+    stopVaultRedis()
     proxy.holdCommands()
+    proxy.holdRepliesWhen((chunk) => chunk.includes('it-budget'))
     const started = performance.now()
     const pending = store.get('it-budget', { deadlineMs: 600 }).catch((e: unknown) => e)
     await sleep(350)
-    // The handshake completes near the end of the budget, and then the reply is held.
-    proxy.holdReplies()
-    proxy.release()
+    proxy.releaseCommands() // the handshake completes now, near the end of the budget
+    await proxy.matchedCommand // readiness was observed: the application command was dispatched
+    const dispatchedAt = performance.now() - started
     const error = await pending
+    const total = performance.now() - started
     expect(error).toBeInstanceOf(SessionVaultUnavailableError)
-    expect(performance.now() - started).toBeLessThan(600 + 300)
-    proxy.release()
+    // Dispatched with what was left of the budget, not with a fresh 600 ms.
+    expect(dispatchedAt).toBeGreaterThanOrEqual(300)
+    expect(total).toBeLessThan(600 + 300)
+    expect(total).toBeGreaterThanOrEqual(550)
+    proxy.releaseReplies()
   }, 40_000)
 
   it('stays bounded over repeated stall and heal cycles', async () => {

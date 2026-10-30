@@ -407,6 +407,82 @@ describe('refresh owner', () => {
     })
   })
 
+  describe('final steps finishing after the owner time ran out (timer deliberately not advanced)', () => {
+    it('a compare-and-set acknowledged late is published, kept and not reported as success', async () => {
+      let now = 0
+      const verifyBinding = vi.fn(async () => undefined)
+      const write = store.setIfVersionMatches.bind(store)
+      vi.spyOn(store, 'setIfVersionMatches').mockImplementation(async (...args) => {
+        const landed = await write(...args)
+        now += 40_000 // acknowledged after the 30 s ceiling; no timer callback has run
+        return landed
+      })
+      const error = await call({
+        verifyBinding,
+        timing: { stageMs: 600_000, clock: () => now },
+      }).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(SessionStageTimeoutError)
+      // The published entry survives: it is not deleted and a later request can use it.
+      await expect(store.get('s1')).resolves.toMatchObject({ refreshToken: 'rt-2', version: 2 })
+      expect(store.deletes).toBe(0)
+      // Caller check, owner re-read check, check of the rotated credentials: nothing after.
+      expect(verifyBinding).toHaveBeenCalledTimes(3)
+    })
+
+    it('a final check of a known newer entry finishing late neither deletes it nor reports success', async () => {
+      let now = 0
+      store.setIfVersionMatches = vi.fn(async () => {
+        store.seed(
+          's1',
+          makeEntry({ refreshToken: 'rt-other', accessTokenExpiresAt: 0, version: 5 })
+        )
+        return false
+      })
+      const verifyBinding = vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockImplementationOnce(async () => {
+          now += 40_000
+        })
+      const error = await call({
+        verifyBinding,
+        timing: { stageMs: 600_000, clock: () => now },
+      }).catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(SessionStageTimeoutError)
+      await expect(store.get('s1')).resolves.toMatchObject({ refreshToken: 'rt-other', version: 5 })
+      expect(store.deletes).toBe(0)
+    })
+
+    it('a read-back of this owner own write finishing late keeps the published entry', async () => {
+      let now = 0
+      store.casFails = 'throw'
+      store.casLandsAnyway = true
+      const read = store.get.bind(store)
+      let reads = 0
+      vi.spyOn(store, 'get').mockImplementation(async (...args) => {
+        const entry = await read(...args)
+        if (++reads === 3) now += 40_000 // caller read, owner read, then the read-back after the lost reply
+        return entry
+      })
+      const error = await call({ timing: { stageMs: 600_000, clock: () => now } }).catch(
+        (e: unknown) => e
+      )
+      expect(error).toBeInstanceOf(SessionStageTimeoutError)
+      await expect(store.get('s1')).resolves.toMatchObject({ refreshToken: 'rt-2' })
+      expect(store.deletes).toBe(0)
+    })
+
+    it('control: the same steps inside the budget publish and return normally', async () => {
+      const now = 0
+      await expect(call({ timing: { stageMs: 600_000, clock: () => now } })).resolves.toMatchObject(
+        { refreshToken: 'rt-2', version: 2 }
+      )
+      expect(store.deletes).toBe(0)
+    })
+  })
+
   describe('renewal during terminal cleanup', () => {
     it('keeps renewing a healthy lease through a held delete that crosses a renewal tick after the ceiling', async () => {
       const gate = deferred<void>()

@@ -5,6 +5,7 @@ import {
   SessionNotFoundError,
   SessionPublicationUnprovenError,
   SessionRefreshUnsafeError,
+  SessionStageTimeoutError,
   SessionVaultUnavailableError,
   UpstreamRotationUnprovenError,
 } from './errors'
@@ -62,7 +63,12 @@ export interface OwnerDeps<TRecord extends VaultRecord> {
 }
 
 type Stored<TRecord extends VaultRecord> = TRecord & Pick<VaultEntry, 'version'>
-type Step = <T>(dispatch: () => Promise<T>) => Promise<T>
+/**
+ * A checked dispatch. `late` runs only when the step finished after ordinary work ended: it may
+ * record what the late result proves (for example that the new tokens are already published) and
+ * may return the error to throw instead of the generic lost-exclusivity one.
+ */
+type Step = <T>(dispatch: () => Promise<T>, late?: (result: T) => Error | void) => Promise<T>
 
 /** Thrown inside the owner when publication cannot be proven; becomes a terminal outcome. */
 class PublicationUnknown extends Error {}
@@ -171,19 +177,23 @@ function openScope<TRecord extends VaultRecord>(
     now: clock,
   })
   const unsafe = (): SessionRefreshUnsafeError => new SessionRefreshUnsafeError(sessionId)
-  const step: Step = async (dispatch) => {
+  const step: Step = async (dispatch, late) => {
     if (renewal.ended || left() <= 0) throw unsafe()
     const result = await Promise.race([dispatch(), renewal.unsafe])
-    if (renewal.ended) throw unsafe()
+    // The monotonic remainder is checked here too: the ceiling timer may not have run yet.
+    if (renewal.ended || left() <= 0) throw late?.(result) ?? unsafe()
     return result
   }
   const probe = (): VerifyBindingOptions => ({
     deadlineMs: Math.min(PROBE_MAX_MS, left()),
     signal: controller.signal,
   })
-  const readOne = async (): Promise<Stored<TRecord> | null> => {
-    const entry = await step(() =>
-      store.get(sessionId, { deadlineMs: Math.min(timing.opMs, left()) })
+  const readOne = async (
+    late?: (entry: Stored<TRecord> | null) => Error | void
+  ): Promise<Stored<TRecord> | null> => {
+    const entry = await step(
+      () => store.get(sessionId, { deadlineMs: Math.min(timing.opMs, left()) }),
+      late
     )
     return entry && (!deps.expectedAudience || hasSessionAudience(entry, deps.expectedAudience))
       ? entry
@@ -201,7 +211,9 @@ async function publish<TRecord extends VaultRecord>(
   deps: OwnerDeps<TRecord>,
   steps: {
     step: Step
-    readOne: () => Promise<Stored<TRecord> | null>
+    readOne: (
+      late?: (entry: Stored<TRecord> | null) => Error | void
+    ) => Promise<Stored<TRecord> | null>
     probe: () => VerifyBindingOptions
     left: () => number
     resolved: () => void
@@ -211,10 +223,18 @@ async function publish<TRecord extends VaultRecord>(
   const { step, readOne, probe, left, resolved } = steps
   for (let attempt = 0; attempt < timing.publishAttempts; attempt++) {
     try {
-      const written = await step(() =>
-        store.setIfVersionMatches(sessionId, current.version, next, {
-          deadlineMs: Math.min(timing.opMs, left()),
-        })
+      const written = await step(
+        () =>
+          store.setIfVersionMatches(sessionId, current.version, next, {
+            deadlineMs: Math.min(timing.opMs, left()),
+          }),
+        // A write acknowledged after the owner's time ran out is published: it is not deleted
+        // and not reported as success; the next request finds the fresh entry.
+        (landed) => {
+          if (!landed) return
+          resolved()
+          return new SessionStageTimeoutError('publication')
+        }
       )
       if (written) {
         resolved()
@@ -227,7 +247,12 @@ async function publish<TRecord extends VaultRecord>(
     }
     let latest: Stored<TRecord> | null
     try {
-      latest = await readOne()
+      latest = await readOne((seen) => {
+        if (!seen || (seen.refreshToken !== next.refreshToken && seen.version === current.version))
+          return
+        resolved()
+        return new SessionStageTimeoutError('verification')
+      })
     } catch (error) {
       if (!(error instanceof SessionVaultUnavailableError)) throw error
       continue
@@ -238,7 +263,10 @@ async function publish<TRecord extends VaultRecord>(
       resolved()
       // A winner (this owner's own landed write, or another writer's) is returned only after the
       // same mandatory binding verification; a version difference alone proves nothing.
-      await step(() => deps.verifyBinding(latest, probe()))
+      await step(
+        () => deps.verifyBinding(latest, probe()),
+        () => new SessionStageTimeoutError('verification')
+      )
       return latest
     }
   }
