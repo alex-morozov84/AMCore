@@ -22,6 +22,7 @@ import { contextPolicyMetadata } from '../organization-context/context-policy-me
 import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service.js'
 import { organizationHeader } from '../organization-context/organization-selector.js'
 import { PrivilegedAdmissionService } from '../privileged-admission.service.js'
+import { type AuthBudget, AuthStageService } from '../stage/auth-stage.service.js'
 
 import { JwtAuthGuard } from './jwt-auth.guard.js'
 import { PoliciesGuard } from './policies.guard.js'
@@ -93,7 +94,8 @@ export class AuthenticationGuard implements CanActivate {
     private readonly privilegedAdmission: PrivilegedAdmissionService,
     private readonly organizationContext: OrganizationContextResolver,
     private readonly mfaAdmission: MfaJwtAdmissionService,
-    private readonly browserContexts: BrowserSessionContextService
+    private readonly browserContexts: BrowserSessionContextService,
+    private readonly stage: AuthStageService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -123,6 +125,17 @@ export class AuthenticationGuard implements CanActivate {
       return true
     }
 
+    // Steps 3-5 run under one absolute budget: at expiry the caller gets 503, the handler
+    // never runs and late work is ignored (see AuthStageService).
+    return this.stage.run((budget) => this.admit(context, authTypes, incoming, budget))
+  }
+
+  private async admit(
+    context: ExecutionContext,
+    authTypes: AuthType[],
+    incoming: Request,
+    budget: AuthBudget
+  ): Promise<boolean> {
     // 3. Authenticate — try each auth type until one succeeds.
     // Both branches use the same isDecisionError discriminator: 401/403
     // means "wrong credential, try next"; anything else propagates so the
@@ -157,6 +170,7 @@ export class AuthenticationGuard implements CanActivate {
     if (!authenticated) {
       throw new UnauthorizedException()
     }
+    budget.assertAlive()
 
     // 4. Create ability and attach to request
     const request = context.switchToHttp().getRequest()
@@ -164,15 +178,18 @@ export class AuthenticationGuard implements CanActivate {
 
     if (user) {
       const evidence = await this.mfaAdmission.assert(request, user)
+      budget.assertAlive()
       const privilege = await this.privilegedAdmission.resolve(
         user,
         this.systemRolesGuard.requiredRoles(context),
         evidence
       )
+      budget.assertAlive()
       const { admission, context: verifiedContext } = await this.organizationContext.resolve(
         context,
         privilege
       )
+      budget.assertAlive()
       request.privilegedAdmission = admission
       request.user = admission.principal
       bindMfaPrincipal(request, admission.principal)
@@ -181,6 +198,7 @@ export class AuthenticationGuard implements CanActivate {
         admission,
         verifiedContext
       )
+      budget.assertAlive()
       request.ability = authorization.ability
       request.teamAccess = authorization.teamAccess
     }
@@ -189,8 +207,11 @@ export class AuthenticationGuard implements CanActivate {
     // These now throw domain ForbiddenException on denial rather than return false,
     // so the response always carries a machine-readable errorCode.
     await this.systemRolesGuard.canActivate(context)
+    budget.assertAlive()
     await this.policiesGuard.canActivate(context)
+    budget.assertAlive()
     await this.teamAccessGuard.canActivate(context)
+    budget.assertAlive()
 
     return true
   }

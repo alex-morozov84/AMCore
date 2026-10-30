@@ -82,9 +82,9 @@ import { PermissionsCacheService } from './permissions-cache.service.js'
 import { PrivilegedAdmissionService } from './privileged-admission.service.js'
 import { PrivilegedRoleService } from './privileged-role.service.js'
 import { SessionService } from './session.service.js'
+import { AuthStageService } from './stage/auth-stage.service.js'
 import { JwtStrategy } from './strategies/jwt.strategy.js'
 import { TokenService } from './token.service.js'
-import { UserCacheService } from './user-cache.service.js'
 
 @Module({
   imports: [
@@ -167,7 +167,6 @@ import { UserCacheService } from './user-cache.service.js'
     JwtStrategy,
     OriginCheckGuard,
     RefreshTokenGuard,
-    UserCacheService,
     // RBAC
     AbilityFactory,
     OrgAclVersionService,
@@ -180,6 +179,7 @@ import { UserCacheService } from './user-cache.service.js'
     OrganizationContextResolver,
     SystemRolesGuard,
     FreshAuthGuard,
+    AuthStageService,
     AuthenticationGuard,
     // Single global guard: authenticate → current privilege → build ability → authorize
     // Registered in AuthModule so it runs AFTER RateLimitGuard (ThrottlingModule)
@@ -188,7 +188,6 @@ import { UserCacheService } from './user-cache.service.js'
   exports: [
     AuthService,
     PasswordStepUpService,
-    UserCacheService,
     AbilityFactory,
     TokenService,
     EmailIdentityService,

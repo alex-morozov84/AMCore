@@ -56,7 +56,6 @@ describe('OAuthService', () => {
   let service: OAuthService
   let prisma: jest.Mocked<any>
   let sessionService: jest.Mocked<any>
-  let userCacheService: jest.Mocked<any>
   let providerFactory: jest.Mocked<any>
   let stateService: jest.Mocked<any>
   let mockProvider: jest.Mocked<any>
@@ -103,10 +102,6 @@ describe('OAuthService', () => {
       }),
     }
 
-    userCacheService = {
-      invalidateUser: jest.fn().mockResolvedValue(undefined),
-    }
-
     providerFactory = {
       get: jest.fn().mockReturnValue(mockProvider),
       callbackUri: jest.fn(
@@ -140,7 +135,6 @@ describe('OAuthService', () => {
     service = new OAuthService(
       prisma,
       sessionService,
-      userCacheService,
       providerFactory,
       stateService,
       new EmailIdentityService(),
@@ -379,7 +373,6 @@ describe('OAuthService', () => {
         where: { emailCanonical: 'user@example.com' },
       })
       expect(prisma.$transaction).toHaveBeenCalled()
-      expect(userCacheService.invalidateUser).toHaveBeenCalledWith(user.id)
     })
 
     it('should link OAuth account when provider returns mixed-case email', async () => {
@@ -614,7 +607,6 @@ describe('OAuthService', () => {
       expect(prisma.oAuthAccount.create).not.toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ provider: 'GOOGLE' }) })
       )
-      expect(userCacheService.invalidateUser).toHaveBeenCalledWith('user-42')
     })
 
     it('should throw OAUTH_ACCOUNT_ALREADY_LINKED if provider already linked to another user', async () => {

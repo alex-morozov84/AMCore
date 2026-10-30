@@ -10,6 +10,7 @@ import type { MfaJwtAdmissionService } from '../mfa/mfa-jwt-admission.service.js
 import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
 import { PrivilegedAdmissionService } from '../privileged-admission.service'
 import type { PrivilegedRoleService } from '../privileged-role.service'
+import { AuthStageService } from '../stage/auth-stage.service.js'
 
 import { AuthenticationGuard } from './authentication.guard'
 import type { JwtAuthGuard } from './jwt-auth.guard'
@@ -82,7 +83,8 @@ it('normalizes privilege before ability and every downstream guard, outside auth
       resolve: async (_context: unknown, admission: unknown) => ({ admission }),
     } as unknown as OrganizationContextResolver,
     { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
-    { verify: () => undefined } as unknown as BrowserSessionContextService
+    { verify: () => undefined } as unknown as BrowserSessionContextService,
+    new AuthStageService()
   )
   await guard.canActivate(ctx)
   expect(order).toEqual(['auth', 'primary', 'ability', 'policy', 'team'])

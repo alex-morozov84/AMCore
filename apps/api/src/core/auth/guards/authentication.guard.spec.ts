@@ -1,5 +1,6 @@
 import { Controller, type ExecutionContext, Get, HttpException, HttpStatus } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { ClientClosedError } from '@redis/client'
 
 import { AuthErrorCode, AuthType } from '@amcore/shared'
 
@@ -14,6 +15,7 @@ import {
   RequestContextPolicy,
 } from '../organization-context/request-context-policy'
 import { PrivilegedAdmissionService } from '../privileged-admission.service'
+import { AUTH_STAGE_MS, AuthStageService } from '../stage/auth-stage.service.js'
 
 import { AuthenticationGuard } from './authentication.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
@@ -105,7 +107,8 @@ describe('AuthenticationGuard', () => {
         resolve: async (_context: unknown, admission: unknown) => ({ admission }),
       } as unknown as OrganizationContextResolver,
       { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
-      { verify: () => undefined } as unknown as BrowserSessionContextService
+      { verify: () => undefined } as unknown as BrowserSessionContextService,
+      new AuthStageService()
     )
   })
 
@@ -149,7 +152,8 @@ describe('AuthenticationGuard', () => {
         resolve: async (_context: unknown, admission: unknown) => ({ admission }),
       } as unknown as OrganizationContextResolver,
       { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
-      { verify: () => undefined } as unknown as BrowserSessionContextService
+      { verify: () => undefined } as unknown as BrowserSessionContextService,
+      new AuthStageService()
     )
     await expect(candidate.canActivate(context)).rejects.toBe(failure)
     expect(request.ability).toBeUndefined()
@@ -182,7 +186,8 @@ describe('AuthenticationGuard', () => {
           throw denied
         },
       } as unknown as MfaJwtAdmissionService,
-      { verify: () => undefined } as unknown as BrowserSessionContextService
+      { verify: () => undefined } as unknown as BrowserSessionContextService,
+      new AuthStageService()
     )
     await expect(candidate.canActivate(context)).rejects.toBe(denied)
     expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
@@ -220,11 +225,86 @@ describe('AuthenticationGuard', () => {
         resolve: async (_context: unknown, admission: unknown) => ({ admission }),
       } as unknown as OrganizationContextResolver,
       { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
-      { verify: () => undefined } as unknown as BrowserSessionContextService
+      { verify: () => undefined } as unknown as BrowserSessionContextService,
+      new AuthStageService()
     )
     await expect(candidate.canActivate(ctx)).rejects.toBe(denied)
     expect(contextFactory.createAuthorizationContext).toHaveBeenCalledTimes(1)
     expect(keyGuard.canActivate).not.toHaveBeenCalled()
+  })
+
+  describe('admission budget (T082)', () => {
+    afterEach(() => jest.useRealTimers())
+
+    const status = async (promise: Promise<unknown>): Promise<unknown> =>
+      promise.then(
+        () => 'resolved',
+        (error: unknown) =>
+          error instanceof HttpException
+            ? { status: error.getStatus(), body: error.getResponse() }
+            : error
+      )
+
+    it('answers 503 SERVICE_UNAVAILABLE when credential selection outlives the stage', async () => {
+      jest.useFakeTimers()
+      jwtAuthGuard.canActivate.mockReturnValue(new Promise<boolean>(() => undefined))
+      const outcome = status(guard.canActivate(createContext()))
+      await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+      await expect(outcome).resolves.toMatchObject({
+        status: 503,
+        body: expect.objectContaining({ errorCode: 'SERVICE_UNAVAILABLE' }),
+      })
+      expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+    })
+
+    it('maps a Redis outage during credential selection to 503, not a decision or 500', async () => {
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(new ClientClosedError())
+      await expect(status(guard.canActivate(createContext()))).resolves.toMatchObject({
+        status: 503,
+      })
+      expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+    })
+
+    it('does not run later steps or authorization guards after the stage expired', async () => {
+      jest.useFakeTimers()
+      let release!: (value: boolean) => void
+      jwtAuthGuard.canActivate.mockReturnValue(
+        new Promise<boolean>((resolve) => {
+          release = resolve
+        })
+      )
+      const systemRoles = { requiredRoles: () => [], canActivate: jest.fn() }
+      const policies = { canActivate: jest.fn() }
+      const candidate = new AuthenticationGuard(
+        reflector as unknown as Reflector,
+        jwtAuthGuard as unknown as JwtAuthGuard,
+        apiKeyGuard as unknown as ApiKeyGuard,
+        {} as unknown as AbilityFactory,
+        systemRoles as unknown as SystemRolesGuard,
+        policies as unknown as PoliciesGuard,
+        { canActivate: jest.fn() } as unknown as TeamAccessGuard,
+        {} as unknown as PrivilegedAdmissionService,
+        {} as unknown as OrganizationContextResolver,
+        { assert: async () => undefined } as unknown as MfaJwtAdmissionService,
+        { verify: () => undefined } as unknown as BrowserSessionContextService,
+        new AuthStageService()
+      )
+      const outcome = status(candidate.canActivate(createContext()))
+      await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+      await expect(outcome).resolves.toMatchObject({ status: 503 })
+      release(true)
+      await jest.advanceTimersByTimeAsync(0)
+      expect(systemRoles.canActivate).not.toHaveBeenCalled()
+      expect(policies.canActivate).not.toHaveBeenCalled()
+    })
+
+    it('keeps a genuine 401 from credential selection as a decision', async () => {
+      jwtAuthGuard.canActivate.mockRejectedValueOnce(new HttpException('expired', 401))
+      apiKeyGuard.canActivate.mockResolvedValue(false)
+      await expect(status(guard.canActivate(createContext()))).resolves.toMatchObject({
+        status: 401,
+      })
+    })
   })
 
   describe('AK-11: decision-class failures swallowed, infra propagates', () => {

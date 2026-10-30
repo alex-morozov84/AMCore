@@ -65,7 +65,6 @@ import { prepareRegistrationMail, type RegistrationMail } from './registration-m
 import { SessionService } from './session.service.js'
 import { TokenService } from './token.service.js'
 import { TokenManagerService } from './token-manager.service.js'
-import { UserCacheService } from './user-cache.service.js'
 
 /** Only the canonical-email unique index means "already registered"; other violations stay errors. */
 function rethrowEmailConflict(error: unknown): never {
@@ -118,7 +117,6 @@ export class AuthService {
     private readonly authMailLimiter: AuthMailLimiter,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
-    private readonly userCacheService: UserCacheService,
     private readonly env: EnvService,
     private readonly emailIdentity: EmailIdentityService,
     private readonly loginRateLimiter: LoginRateLimiterService,
@@ -422,7 +420,6 @@ export class AuthService {
     // current name — must not notify).
     const previous = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
     const user = await this.prisma.user.update({ where: { id: userId }, data })
-    await this.userCacheService.invalidateUser(userId)
 
     this.logger.info({ userId, fields: Object.keys(data) }, 'User profile updated')
 
@@ -534,7 +531,6 @@ export class AuthService {
     )
 
     await this.sessionService.deleteRevokedByUserId(userId)
-    await this.userCacheService.invalidateUser(userId)
 
     // Security alert via the durable notifications subsystem (ADR-052): in-app + email,
     // both mandatory (the user cannot silence a password-change alert). Emitted AFTER
@@ -573,8 +569,6 @@ export class AuthService {
       },
       { maxWait: 2000, timeout: 4000 }
     )
-
-    await this.userCacheService.invalidateUser(userId)
 
     this.logger.info({ userId }, 'Email verified successfully')
   }

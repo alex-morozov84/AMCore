@@ -7,11 +7,10 @@ import { PrismaService } from '../../prisma/index.js'
 /**
  * Privileged-role freshness reader (OB-06a / ADR-037).
  *
- * Reads the user's CURRENT `systemRole` straight from Postgres — deliberately
- * NOT via `UserCacheService`. ADR-037 §A-int requires a strict next-request
- * intersection (`JWT claim ∩ current DB role`) for privileged routes with no
- * stale-cache window: a failed cache invalidation must never keep a demoted
- * SUPER_ADMIN privileged.
+ * Reads the user's CURRENT `systemRole` straight from Postgres, never from a
+ * Redis cache. ADR-037 §A-int requires a strict next-request intersection
+ * (`JWT claim ∩ current DB role`) for privileged routes with no stale-cache
+ * window: a demoted SUPER_ADMIN must never stay privileged.
  *
  * Used by common privilege admission before ability/handler execution. Every
  * privileged JWT claim is checked, including routes without SystemRoles metadata.
