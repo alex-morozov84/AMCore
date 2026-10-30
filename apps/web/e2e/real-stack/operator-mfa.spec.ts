@@ -42,10 +42,9 @@ async function finishLogin(page: Page, result: MfaBrowserResult): Promise<void> 
     await page.getByLabel(t.password, { exact: true }).fill(TEST_PASSWORD)
     view = (await command(page, page.getByRole('button', { name: t.continue, exact: true }))).view
   }
-  if (view.kind === 'flow' && view.state === 'ready')
-    view = (await command(page, page.getByRole('button', { name: t.continue, exact: true }))).view
-  expect(view.kind === 'flow' ? view.state : view.kind).toBe('completed')
-  await page.getByRole('button', { name: t.continue, exact: true }).click()
+  expect(view.kind).toBe('flow')
+  expect(view.kind === 'flow' && ['ready', 'completed'].includes(view.state)).toBe(true)
+  // Completion/publication is automatic; no second Continue action exists.
   await page.waitForURL((url) => url.pathname === prefix || url.pathname === `${prefix}/`)
 }
 
@@ -123,7 +122,8 @@ test('real operator enrollment, backup sign-in and code rotation retain browser 
   expect(acknowledged.view.kind === 'flow' ? acknowledged.view.state : acknowledged.view.kind).toBe(
     'completed'
   )
-  await page.getByRole('button', { name: t.continue, exact: true }).click()
+  // Acknowledgement automatically returns to settings and conceals the codes.
+  await expect(page.getByText(t.enabled, { exact: true })).toBeVisible()
   await backupSignIn(page, email, replacement[0]!)
   expect((await page.request.get('/api/auth/me')).status()).toBe(200)
 })

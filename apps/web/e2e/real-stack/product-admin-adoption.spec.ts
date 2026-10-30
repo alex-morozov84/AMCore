@@ -8,6 +8,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test'
 import { expectNoAxeViolations } from '../shared/axe'
 import { closeCredentialPage } from '../shared/credential-artifacts'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
@@ -126,6 +127,7 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   await page.goto(ui.path(`/${org}`))
   await expect(page.getByRole('heading', { name: 'Adopter Beta', exact: true })).toHaveCount(0)
 
+  resetBrowserProbeDomainBudget()
   // A real separate account/organization provides the foreign target, not a random missing ID.
   const outsider = await safeApi('auth/register', {
     email: uniqueEmail('adopter-foreign'),

@@ -81,6 +81,48 @@ describe('ordinary authentication invitation lifecycle', () => {
     )
   })
 
+  it('checks publication inside the lease before any owner retirement', async () => {
+    const verifyPublication = vi.fn().mockRejectedValue(new Error('superseded publication'))
+    await expect(
+      retireFlowsForOrdinaryAuth(
+        request(),
+        {
+          sessionId: 's'.repeat(43),
+          actorId: 'example-user',
+        },
+        { onlyIfBindingChanged: true, verifyPublication }
+      )
+    ).rejects.toThrow('superseded publication')
+    expect(invitationOwnerStore.retireStaleForOrdinaryAuth).not.toHaveBeenCalled()
+    expect(invitationOwnerStore.get).not.toHaveBeenCalled()
+    expect(invitationOwnerStore.compareAndSet).not.toHaveBeenCalled()
+  })
+
+  it('replaying a settled publication leaves newer flows of that session untouched', async () => {
+    const binding = contextSessionBinding(
+      's'.repeat(43),
+      { userSnapshot: { id: 'example-user' } } as VaultEntry,
+      1
+    )
+    const owner = {
+      ...newInvitationOwner('https://app.example.test', binding, Date.now()),
+      epoch: 4,
+    }
+    vi.mocked(invitationOwnerStore.get).mockResolvedValue(owner)
+    const verifyPublication = vi.fn().mockResolvedValue(undefined)
+    await retireFlowsForOrdinaryAuth(
+      request(),
+      { sessionId: 's'.repeat(43), actorId: 'example-user' },
+      {
+        onlyIfBindingChanged: true,
+        verifyPublication,
+      }
+    )
+    expect(verifyPublication).toHaveBeenCalledTimes(1)
+    expect(invitationOwnerStore.compareAndSet).not.toHaveBeenCalled()
+    expect(owner.epoch).toBe(4)
+  })
+
   it('does not publish a replacement authority after a failed CAS', async () => {
     vi.mocked(invitationOwnerStore.compareAndSet).mockResolvedValue(false)
     await expect(retireFlowsForOrdinaryAuth(request(), null)).rejects.toThrow()

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -102,19 +102,18 @@ for (const locale of SUPPORTED_LOCALES)
       ).trim()
     ).toBe('0')
     expect(membershipCount(email, org.id)).toBe('0')
-    await context.request.post(new URL('/api/auth/logout', target.origins.product).href, {
-      headers: { origin: target.origins.product },
-    })
+    // Revoked credentials cannot clear or resume a newer session. Use deliberate re-entry.
+    await page.goto(
+      localizedFrontendUrl(target.origins.product, locale, `sign-in-again?entryId=${randomUUID()}`)
+    )
+    await page.getByRole('textbox', { name: c.auth.email, exact: true }).fill(email)
+    await page.getByLabel(c.auth.password, { exact: true }).fill(password)
+    await page.getByRole('button', { name: c.auth.login, exact: true }).click()
+    await page.waitForURL(
+      (url) =>
+        url.pathname === new URL(localizedFrontendUrl(target.origins.product, locale)).pathname
+    )
     await page.goto(original)
-    await expect(page.getByRole('heading', { name: t.signInTitle, exact: true })).toBeVisible()
-    await page
-      .getByRole('tabpanel', { name: c.auth.login, exact: true })
-      .getByLabel(c.auth.password, { exact: true })
-      .fill(password)
-    await page
-      .getByRole('tabpanel', { name: c.auth.login, exact: true })
-      .getByRole('button', { name: c.auth.login, exact: true })
-      .click()
     await expect(
       page.getByRole('heading', {
         name: t.consentTitle.replace('{organization}', org.name),

@@ -12,6 +12,7 @@ import { completeBrowserLogin, publishBrowserLogin } from './browser-login-handl
 // AMCORE_CONSOLE_RETURN_IMPORT_START
 import { confirmedConsoleReturn } from './console-return-destination'
 // AMCORE_CONSOLE_RETURN_IMPORT_END
+import { retirePublishedInvitationFlows } from './invitation-auth-lifecycle'
 import { resumeInvitedBrowserPublication } from './invited-browser-login'
 import { currentFlowView, flowView, stagedEntry } from './mfa-flow-view'
 import type { ProductWebContext } from './product-web-context.server'
@@ -86,6 +87,8 @@ export async function reconcileBrowserLogin(
     settlement = await resumeInvitedBrowserPublication(request, context, handle, record, true)
   const entry = await stagedEntry(context, record)
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
+  if (!record.invitation)
+    await retirePublishedInvitationFlows(request, context, record.vaultId, entry)
   // AMCORE_CONSOLE_RETURN_DESTINATION_START
   const consoleReturn = await confirmedConsoleReturn(request, context, record, entry)
   // AMCORE_CONSOLE_RETURN_DESTINATION_END

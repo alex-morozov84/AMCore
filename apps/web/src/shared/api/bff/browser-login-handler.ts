@@ -22,6 +22,7 @@ import {
   unavailableBrowserContext,
 } from './browser-binding.server'
 import { contextSessionBinding } from './context-session'
+import { retirePublishedInvitationFlows } from './invitation-auth-lifecycle'
 import {
   completeInvitedBrowserLogin,
   resumeInvitedBrowserPublication,
@@ -331,6 +332,7 @@ export async function publishBrowserLogin(
   if (ack.status !== 200 || !publicationAcknowledgedSchema.safeParse(ack.body).success)
     throw unavailableBrowserContext()
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
+  await retirePublishedInvitationFlows(request, context, staged.vaultId, entry)
   await updateBrowserAuthAttempt(handle, staged, { ...staged, state: 'published' }, context).catch(
     async (error) => {
       const current = await readBrowserAuthAttempt(request.headers, context)

@@ -168,12 +168,6 @@ export async function handleCredentialAuth<TInput>(
       )
       const sessionId = completed.cookies.get(context.cookieName)?.value
       if (!sessionId) throw new ContextRequestError(503, 'SERVICE_UNAVAILABLE')
-      await retireFlowsForOrdinaryAuth(
-        request,
-        { sessionId, actorId: upstream.user.id },
-        undefined,
-        context
-      )
       return new NextResponse(completed.body, {
         status: options.successStatus,
         headers: completed.headers,

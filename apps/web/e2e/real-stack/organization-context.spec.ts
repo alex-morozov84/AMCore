@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi, proveOwnedRefresh } from './credential-containment.helpers'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
@@ -117,6 +118,8 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   for (const locale of SUPPORTED_LOCALES)
     for (const dark of [false, true])
       for (const width of [1440, 375]) {
+        // Each presentation variant is independent of source-volume admission.
+        resetBrowserProbeDomainBudget()
         await page.setViewportSize({ width, height: 900 })
         await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light', reducedMotion: 'reduce' })
         await page.goto(organizationUi(locale).path(`/${second.id}`))
@@ -137,6 +140,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
         })
       }
 
+  resetBrowserProbeDomainBudget()
   const lastUi = organizationUi(SUPPORTED_LOCALES.at(-1)!)
   await page
     .getByRole('button', { name: /sidebar|меню|панел/i })
