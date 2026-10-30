@@ -151,6 +151,34 @@ describe('Authentication while Redis is stalled and when it returns', () => {
     expect(last.headers.location).toContain('mock-oauth.example.com/authorize')
   }, 120000)
 
+  it('refuses an API key request with a typed 503 through the production counter wiring, then recovers', async () => {
+    // Real DI: ApiKeyGuard -> ApiKeyAbuseLimiterService -> AbuseCounterStore -> AuthRedis.
+    const created = await request(http())
+      .post('/api-keys')
+      .auth(token, { type: 'bearer' })
+      .send({ name: 'Outage key', organizationId: orgId, scopes: ['read:User'] })
+      .expect(201)
+    const key = created.body.key as string
+    await request(http()).get('/auth/me').auth(key, { type: 'bearer' }).expect(200)
+
+    pause()
+    const started = performance.now()
+    const refused = await request(http()).get('/auth/me').auth(key, { type: 'bearer' })
+    expect(refused.status).toBe(503)
+    expect(refused.body).toMatchObject({ errorCode: 'SERVICE_UNAVAILABLE' })
+    expect(performance.now() - started).toBeLessThan(FAST_503_MS)
+
+    await sleep(3500)
+    unpause()
+    const resumed = performance.now()
+    let last = await request(http()).get('/auth/me').auth(key, { type: 'bearer' })
+    while (last.status !== 200 && performance.now() - resumed < RECOVERY_MS) {
+      await sleep(250)
+      last = await request(http()).get('/auth/me').auth(key, { type: 'bearer' })
+    }
+    expect(last.status).toBe(200)
+  }, 120000)
+
   it('refuses every request in a burst within the admission budget', async () => {
     await c.cache.flush()
     pause()
