@@ -87,15 +87,23 @@ export class AuthStageService {
    * synchronously and released only when the work settles (or throws before returning a promise).
    */
   run<T>(work: (budget: AuthBudget) => Promise<T>, requestedMs = AUTH_STAGE_MS): Promise<T> {
-    const parent = stageStorage.getStore()
-    if (parent) {
-      try {
-        parent.assertAlive()
-      } catch (error) {
-        return Promise.reject(error)
-      }
+    let started: { budget: AuthBudget; issued: Promise<T> }
+    try {
+      started = this.start(work, requestedMs)
+    } catch (error) {
+      return Promise.reject(error)
     }
-    if (this.held >= AUTH_STAGE_CAP) return Promise.reject(unavailable())
+    return this.race(started.budget, started.issued)
+  }
+
+  /** Admits, reserves the slot and starts the work; throws before any slot stays reserved. */
+  private start<T>(
+    work: (budget: AuthBudget) => Promise<T>,
+    requestedMs: number
+  ): { budget: AuthBudget; issued: Promise<T> } {
+    const parent = stageStorage.getStore()
+    parent?.assertAlive()
+    if (this.held >= AUTH_STAGE_CAP) throw unavailable()
     const totalMs = parent ? Math.max(1, Math.min(requestedMs, parent.remainingMs())) : requestedMs
     this.held++
     const budget = new AuthBudget(this.now(), totalMs, this.now)
@@ -104,13 +112,18 @@ export class AuthStageService {
       issued = stageStorage.run(budget, () => work(budget))
     } catch (error) {
       this.held--
-      return Promise.reject(error)
+      throw error
     }
     const release = (): void => {
       this.held--
     }
     issued.then(release, release)
+    return { budget, issued }
+  }
 
+  /** The caller leaves at the deadline; the slot stays held until the work really settles. */
+  private race<T>(budget: AuthBudget, issued: Promise<T>): Promise<T> {
+    const totalMs = budget.totalMs
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         budget.expire()

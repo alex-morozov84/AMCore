@@ -39,26 +39,34 @@ export function addAuthUnavailableResponses(document: OpenAPIObject): void {
           specialized.description = `${specialized.description}. ${OAUTH_503}`
         continue
       }
-      operation.responses['503'] = {
-        description: oauth ? OAUTH_503 : ADMISSION_503,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              required: ['statusCode', 'message', 'timestamp', 'path', 'method', 'errorCode'],
-              properties: {
-                statusCode: { type: 'integer', enum: [503] },
-                message: { type: 'string' },
-                timestamp: { type: 'string', format: 'date-time' },
-                path: { type: 'string' },
-                method: { type: 'string' },
-                correlationId: { type: 'string' },
-                errorCode: { type: 'string', enum: ['SERVICE_UNAVAILABLE'] },
-              },
-            },
+      operation.responses['503'] = unavailableResponse(oauth ? OAUTH_503 : ADMISSION_503)
+    }
+  }
+}
+
+type ResponseObject = NonNullable<
+  NonNullable<OpenAPIObject['paths'][string]['get']>['responses']
+>[string]
+
+function unavailableResponse(description: string): ResponseObject {
+  return {
+    description,
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          required: ['statusCode', 'message', 'timestamp', 'path', 'method', 'errorCode'],
+          properties: {
+            statusCode: { type: 'integer', enum: [503] },
+            message: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+            path: { type: 'string' },
+            method: { type: 'string' },
+            correlationId: { type: 'string' },
+            errorCode: { type: 'string', enum: ['SERVICE_UNAVAILABLE'] },
           },
         },
-      }
-    }
+      },
+    },
   }
 }
