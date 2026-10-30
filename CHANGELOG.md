@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Redis client that is replaced when it stops answering. The Redis user cache and its
   invalidation calls are removed; old `auth:user:v2:*` entries expire by themselves
   (values within 10 minutes, key sets within 24 hours), so nothing needs flushing.
+  The web server's session vault now runs on its own supervised Redis connection: a request
+  waits at most three seconds for admission and otherwise answers a temporary `503`, a single
+  refresh owner per session keeps its own budgets, and a rotation that cannot be checked or
+  published ends the attempt with a bounded delete of the stored session.
 
 ### Added
 

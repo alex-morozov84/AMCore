@@ -2,8 +2,9 @@
 
 Read this page when you operate the API, or call it, and Redis stops answering in time.
 It explains which authentication steps depend on Redis, how long a caller waits, what a
-refusal does and does not mean, and how the API recovers. It covers the API process. The web
-server's session vault is a separate Redis client and is not described here.
+refusal does and does not mean, and how the API recovers. It covers the API process and, in
+[its own section](#the-web-servers-session-vault), the web server's session vault, which uses a
+separate Redis connection.
 
 ## What a client sees
 
@@ -88,6 +89,44 @@ connection and capacity, not as guarantees:
 **Disposal.** A replaced client is counted as closed when node-redis reports it closed
 (`isOpen` is false after `destroy()`). Otherwise it stays counted as leaked and raises an alert.
 The operating system may close the socket later; this is not promised or waited for.
+
+## The web server's session vault
+
+The Next.js server keeps each browser session's backend tokens in a Redis vault (ADR-068) and
+refreshes them when a request needs a fresh access token. The vault, its refresh lock and the
+refresh itself run on a supervised connection of their own, replaced by the same triggers as the
+API's authentication client. Other web-server Redis stores (invitation, MFA and OAuth attempt
+records) stay on the shared connection.
+
+**What a request sees.** Admission waits at most 3 s in total: vault read, the browser-binding check
+and, when a refresh is needed, waiting for the refresh. The binding check waits at most the smaller
+of what is left of that time and 10 s. A shorter wait refuses the request; it never skips the check.
+A request that runs out of time or cannot reach the vault answers `503` with `errorCode`
+`SERVICE_UNAVAILABLE`. It does not end the session and the cookie stays. The response carries a
+`Retry-After` header only when the backend relayed one (for example a rate-limited binding check).
+
+**One refresh owner.** In each web-server process one owner refreshes a session, whatever the number
+of waiting requests. A request may leave at its 3 s limit while the owner continues under its own
+budget: lock wait up to 3 s, each vault command up to 1 s, a 10 s lease renewed every 4 s, and a 30 s
+ceiling for the work before the new tokens are published. Bounded deletion and the lock release may
+continue after that ceiling. Several processes contend for one Redis lock; a process that cannot get
+it in 3 s answers the `503`.
+
+| Situation                                                                                        | Result for the session                                                      |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| The vault is unreachable, or nothing was sent to the backend                                     | Kept; retry later                                                           |
+| The backend call fails without an answer (network, timeout)                                      | Kept; the next request tries again                                          |
+| The backend refuses the refresh token (invalid or reused)                                        | Stored session deleted; sign in again                                       |
+| The backend rotated the token, but the new credentials could not be checked or published in time | The owner ends the attempt and tries a bounded delete of the stored session |
+
+In the last case the response is a temporary error now. A later request may continue from a fresh
+publication, find no session and ask for sign-in, or be rejected by the backend. A failed delete
+leaves the stored state unknown; the documented result does not prove the session was deleted. A
+failed binding check after a rotation keeps its own status (`503`, `429` or `401`
+`AUTH_CONTEXT_CHANGED`); it is not relabeled.
+
+**What to watch.** The web server logs `Vault Redis client generation replaced` with the reason,
+`Vault Redis alert` and `Vault Redis client error`. It exports no metric for this connection.
 
 ## What to watch
 
