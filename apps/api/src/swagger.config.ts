@@ -10,6 +10,16 @@ import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mo
 /** The one global prefix of the API (`main.ts` applies it; the OpenAPI paths carry it). */
 export const API_GLOBAL_PREFIX = 'api/v1'
 
+const API_DESCRIPTION =
+  'AMCore API documentation.\n\n' +
+  'An authenticated request is refused with `503` and `errorCode` `SERVICE_UNAVAILABLE` ' +
+  '("Authentication temporarily unavailable") when admission cannot finish because a ' +
+  'dependency the authentication path needs (for example Redis) is slow or down; the ' +
+  'handler did not run. The OAuth sign-in steps can answer the same `503` from inside the ' +
+  'operation, after an account or provider link was already saved; start sign-in again. ' +
+  'Each operation documents its own `503`. Retry later with backoff. See ' +
+  'docs/auth/redis-outage.md.'
+
 /**
  * Shared between `main.ts` (real bootstrap) and
  * `apps/api/test/openapi.e2e-spec.ts` (CI completeness gate) so the two
@@ -23,16 +33,7 @@ export const API_GLOBAL_PREFIX = 'api/v1'
 export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
   return new DocumentBuilder()
     .setTitle('AMCore API')
-    .setDescription(
-      'AMCore API documentation.\n\n' +
-        'An authenticated request is refused with `503` and `errorCode` `SERVICE_UNAVAILABLE` ' +
-        '("Authentication temporarily unavailable") when admission cannot finish because a ' +
-        'dependency the authentication path needs (for example Redis) is slow or down; the ' +
-        'handler did not run. The OAuth sign-in steps can answer the same `503` from inside the ' +
-        'operation, after an account or provider link was already saved; start sign-in again. ' +
-        'Each operation documents its own `503`. Retry later with backoff. See ' +
-        'docs/auth/redis-outage.md.'
-    )
+    .setDescription(API_DESCRIPTION)
     .setVersion('0.0.1')
     .addBearerAuth()
     .addBearerAuth(
