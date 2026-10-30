@@ -312,6 +312,7 @@ describe('ApiKeysService', () => {
       settleClaim: (outcome: 'ok' | 'fail') => void
       detached: Promise<void>
       unhandled: unknown[]
+      stopListening: () => void
     }> => {
       jest.useFakeTimers()
       let settleClaim!: (outcome: 'ok' | 'fail') => void
@@ -336,19 +337,32 @@ describe('ApiKeysService', () => {
         .catch(() => undefined)
       await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
       await outcome
-      process.off('unhandledRejection', onUnhandled)
-      return { settleClaim, detached, unhandled }
+      // The listener stays on until the scenario ends, so a rejection raised AFTER the late
+      // claim settles is also seen.
+      return {
+        settleClaim,
+        detached,
+        unhandled,
+        stopListening: () => process.off('unhandledRejection', onUnhandled),
+      }
     }
 
     it.each(['ok', 'fail'] as const)(
       'starts no database write when the claim settles (%s) after the stage expired',
       async (outcome) => {
-        const { settleClaim, detached, unhandled } = await startUnderStage()
-        settleClaim(outcome)
-        await detached
-        await jest.advanceTimersByTimeAsync(0)
-        expect(mockCtx.prisma.apiKey.updateMany).not.toHaveBeenCalled()
-        expect(unhandled).toEqual([])
+        const { settleClaim, detached, unhandled, stopListening } = await startUnderStage()
+        try {
+          settleClaim(outcome)
+          await detached
+          await jest.advanceTimersByTimeAsync(0)
+          // Let a late unhandled-rejection event, if any, reach the listener before asserting.
+          jest.useRealTimers()
+          await new Promise((resolve) => setImmediate(resolve))
+          expect(mockCtx.prisma.apiKey.updateMany).not.toHaveBeenCalled()
+          expect(unhandled).toEqual([])
+        } finally {
+          stopListening()
+        }
       }
     )
 
