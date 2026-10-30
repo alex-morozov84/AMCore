@@ -1,6 +1,7 @@
 import { ABUSE_COUNTER_INCREMENT_SCRIPT, ABUSE_COUNTER_READ_SCRIPT } from './abuse-counter.lua'
 import { AbuseCounterError, AbuseCounterStore } from './abuse-counter.store'
-import type { BoundedRedis, BoundedRedisClient } from './bounded-redis'
+import type { AuthRedis } from './auth-redis/auth-redis.service'
+import type { BoundedRedisClient } from './bounded-redis'
 import { BoundedRedisError } from './bounded-redis'
 
 // Reply decoding and error mapping only. The Lua itself, atomicity and the refusal
@@ -16,7 +17,7 @@ describe('AbuseCounterStore', () => {
     run = jest.fn((operation: (c: BoundedRedisClient, s: AbortSignal) => Promise<unknown>) =>
       operation(client as unknown as BoundedRedisClient, new AbortController().signal)
     )
-    store = new AbuseCounterStore({ run } as unknown as BoundedRedis)
+    store = new AbuseCounterStore({ run } as unknown as AuthRedis)
   })
 
   const failure = async (promise: Promise<unknown>): Promise<AbuseCounterError> => {

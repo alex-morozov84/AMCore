@@ -22,7 +22,9 @@ describe('OAuthLoginTicketService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     }
 
-    service = new OAuthLoginTicketService(mockRedis as never)
+    service = new OAuthLoginTicketService({
+      call: (operation: (client: unknown) => unknown) => operation(mockRedis),
+    } as never)
   })
 
   describe('issue', () => {

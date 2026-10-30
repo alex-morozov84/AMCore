@@ -1,6 +1,9 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { Injectable } from '@nestjs/common'
 
 import { ServiceUnavailableException } from '../../../common/exceptions/index.js'
+import { AUTH_UNAVAILABLE_MESSAGE } from '../../../infrastructure/redis/auth-redis/auth-redis.constants.js'
 import { isRedisUnavailable } from '../../../infrastructure/redis/redis-failure-classifier.js'
 
 /** Starting values from the T082 plan; the integration measurements decide the final ones. */
@@ -12,7 +15,26 @@ export const AUTH_STAGE_MS = 1000
  */
 export const AUTH_STAGE_CAP = 256
 
-export const AUTH_UNAVAILABLE_MESSAGE = 'Authentication temporarily unavailable'
+export { AUTH_UNAVAILABLE_MESSAGE }
+
+const stageStorage = new AsyncLocalStorage<AuthBudget>()
+
+/**
+ * Deadline for one nested dependency call: its own cap, shortened to what is left of the
+ * enclosing stage. Throws 503 when the stage is already over, so abandoned work cannot start
+ * more ordinary calls. Outside a stage (public routes, tests) the cap applies unchanged.
+ */
+export function nestedDeadlineMs(capMs: number): number {
+  const budget = stageStorage.getStore()
+  if (!budget) return capMs
+  budget.assertAlive()
+  return Math.max(1, Math.min(capMs, Math.floor(budget.remainingMs())))
+}
+
+/** Throws 503 when the enclosing stage has expired; a no-op outside a stage. */
+export function assertStageAlive(): void {
+  stageStorage.getStore()?.assertAlive()
+}
 
 const unavailable = (): ServiceUnavailableException =>
   new ServiceUnavailableException(AUTH_UNAVAILABLE_MESSAGE)
@@ -58,7 +80,7 @@ export class AuthStageService {
     if (this.held >= AUTH_STAGE_CAP) return Promise.reject(unavailable())
     this.held++
     const budget = new AuthBudget(this.now(), totalMs, this.now)
-    const issued = work(budget)
+    const issued = stageStorage.run(budget, () => work(budget))
     const release = (): void => {
       this.held--
     }

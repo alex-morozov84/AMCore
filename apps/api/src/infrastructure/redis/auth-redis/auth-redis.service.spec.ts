@@ -1,5 +1,7 @@
+import { ClientClosedError } from '@redis/client'
 import type { PinoLogger } from 'nestjs-pino'
 
+import { ServiceUnavailableException } from '../../../common/exceptions/index.js'
 import type { EnvService } from '../../../env/env.service.js'
 import type { MetricsService } from '../../observability/index.js'
 import type { AppRedisClient } from '../redis-client-options.js'
@@ -82,6 +84,57 @@ describe('AuthRedis', () => {
       expect.objectContaining({ reason: 'reconnect-hang' }),
       'Auth Redis client generation replaced'
     )
+  })
+
+  describe('call', () => {
+    beforeEach(async () => {
+      const init = service.onModuleInit()
+      await jest.advanceTimersByTimeAsync(100)
+      await init
+    })
+
+    it('returns the result of a healthy operation', async () => {
+      await expect(service.call((client) => client.ping())).resolves.toBe('PONG')
+    })
+
+    it('maps an outage-class failure to the typed 503 and logs the cause', async () => {
+      const error = await service
+        .call(async () => {
+          throw new ClientClosedError()
+        })
+        .catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(ServiceUnavailableException)
+      expect(error).toMatchObject({ errorCode: 'SERVICE_UNAVAILABLE' })
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: expect.objectContaining({ reason: 'command', cause: expect.any(ClientClosedError) }),
+        }),
+        'Auth Redis operation unavailable'
+      )
+    })
+
+    it('maps a missed deadline to 503 without claiming the command did not run', async () => {
+      service.clients[0]!.hold = true
+      const outcome = service.call((client) => client.ping(), 250).catch((e: unknown) => e)
+      await jest.advanceTimersByTimeAsync(300)
+      await expect(outcome).resolves.toBeInstanceOf(ServiceUnavailableException)
+    })
+
+    it('keeps programming errors visible instead of calling them an outage', async () => {
+      const bug = new TypeError('client.nope is not a function')
+      await expect(
+        service.call(async () => {
+          throw bug
+        })
+      ).rejects.toMatchObject({ reason: 'command', cause: bug })
+    })
+
+    it('refuses fast with 503 while no generation is ready', async () => {
+      service.clients[0]!.loseReadiness(false)
+      await expect(service.call((client) => client.ping())).rejects.toBeInstanceOf(
+        ServiceUnavailableException
+      )
+    })
   })
 
   it('disposes the client on shutdown and stops creating generations', async () => {

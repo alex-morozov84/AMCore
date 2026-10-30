@@ -3,7 +3,13 @@ import { ClientClosedError, SimpleError } from '@redis/client'
 
 import { BoundedRedisError } from '../../../infrastructure/redis/bounded-redis.js'
 
-import { AUTH_STAGE_CAP, AUTH_STAGE_MS, AuthStageService } from './auth-stage.service.js'
+import {
+  assertStageAlive,
+  AUTH_STAGE_CAP,
+  AUTH_STAGE_MS,
+  AuthStageService,
+  nestedDeadlineMs,
+} from './auth-stage.service.js'
 
 const deferred = <T = void>() => {
   let resolve!: (value: T) => void
@@ -112,6 +118,44 @@ describe('AuthStageService', () => {
         throw denied
       })
     ).rejects.toBe(denied)
+  })
+
+  describe('nested deadlines', () => {
+    it('applies the cap unchanged outside a stage', () => {
+      expect(nestedDeadlineMs(250)).toBe(250)
+      expect(() => assertStageAlive()).not.toThrow()
+    })
+
+    it('keeps the cap while plenty of the stage is left and shortens it near the end', async () => {
+      const seen: number[] = []
+      await stage.run(async () => {
+        seen.push(nestedDeadlineMs(250))
+        jest.advanceTimersByTime(AUTH_STAGE_MS - 100)
+        seen.push(nestedDeadlineMs(250))
+      })
+      expect(seen[0]).toBe(250)
+      expect(seen[1]).toBeLessThanOrEqual(100)
+      expect(seen[1]).toBeGreaterThanOrEqual(1)
+    })
+
+    it('refuses to start more work once the stage expired', async () => {
+      const gate = deferred()
+      let lateAttempt: unknown
+      const outcome = stage.run(async () => {
+        await gate.promise
+        try {
+          nestedDeadlineMs(250)
+        } catch (error) {
+          lateAttempt = error
+        }
+      })
+      const status = statusOf(outcome)
+      await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+      await status
+      gate.resolve()
+      await jest.advanceTimersByTimeAsync(0)
+      expect(lateAttempt).toBeInstanceOf(HttpException)
+    })
   })
 
   it('assertAlive fails after expiry even if the clock has not moved', async () => {

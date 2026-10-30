@@ -4,6 +4,7 @@ export {
   AbuseCounterStore,
   type AbuseCounts,
 } from './abuse-counter.store.js'
+export { AuthCacheLock } from './auth-redis/auth-cache-lock.js'
 export { AuthRedis } from './auth-redis/auth-redis.service.js'
 export {
   BOUNDED_REDIS_CAPACITY,

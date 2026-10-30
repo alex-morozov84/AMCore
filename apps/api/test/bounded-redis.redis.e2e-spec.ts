@@ -8,6 +8,7 @@ import { ServiceUnavailableException } from '../src/common/exceptions'
 import { ApiKeyAbuseLimiterService } from '../src/core/api-keys/api-key-abuse-limiter.service'
 import { InviteAcceptLimiterService } from '../src/core/organizations/invite-accept-limiter.service'
 import { AbuseCounterStore } from '../src/infrastructure/redis/abuse-counter.store'
+import type { AuthRedis } from '../src/infrastructure/redis/auth-redis/auth-redis.service'
 import {
   BOUNDED_REDIS_CAPACITY,
   BOUNDED_REDIS_DEADLINE_MS,
@@ -52,7 +53,10 @@ describe('BoundedRedis against a real server with a stalled transport', () => {
     client = open(`redis://127.0.0.1:${proxy.port}`)
     client.on('error', () => undefined)
     await client.connect()
-    store = new AbuseCounterStore(new BoundedRedis(client as unknown as AppRedisClient))
+    // The store only needs the shared `run` contract, which BoundedRedis and AuthRedis both honor.
+    store = new AbuseCounterStore(
+      new BoundedRedis(client as unknown as AppRedisClient) as unknown as AuthRedis
+    )
   })
   afterEach(async () => {
     proxy.release()

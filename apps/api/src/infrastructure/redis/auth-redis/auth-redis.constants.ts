@@ -24,6 +24,9 @@ export type AuthRedisEvent =
       generation: number
     }
 
+/** Client-facing text of the 503 for an unavailable authentication dependency. */
+export const AUTH_UNAVAILABLE_MESSAGE = 'Authentication temporarily unavailable'
+
 /**
  * Timing values measured in the T082 probes (application-level fault model, loopback). The
  * recovery figures derived from them are scoped test targets, not guarantees: they assume the

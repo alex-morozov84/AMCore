@@ -19,7 +19,9 @@ describe('OAuthStateService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     }
 
-    service = new OAuthStateService(mockRedis as never)
+    service = new OAuthStateService({
+      call: (operation: (client: unknown) => unknown) => operation(mockRedis),
+    } as never)
   })
 
   describe('store', () => {

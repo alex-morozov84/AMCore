@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
 import { ABUSE_COUNTER_INCREMENT_SCRIPT, ABUSE_COUNTER_READ_SCRIPT } from './abuse-counter.lua.js'
-import { BoundedRedis, BoundedRedisError, type BoundedRedisOutcome } from './bounded-redis.js'
+import { AuthRedis } from './auth-redis/auth-redis.service.js'
+import { BoundedRedisError, type BoundedRedisOutcome } from './bounded-redis.js'
 
 export interface AbuseCounts {
   readonly ip: number
@@ -33,7 +34,7 @@ const MAX_TTL_MS = 86_400_000
  */
 @Injectable()
 export class AbuseCounterStore {
-  constructor(private readonly redis: BoundedRedis) {}
+  constructor(private readonly redis: AuthRedis) {}
 
   read(ipKey: string, subjectKey: string): Promise<AbuseCounts> {
     return this.counts(ABUSE_COUNTER_READ_SCRIPT, [ipKey, subjectKey], [])

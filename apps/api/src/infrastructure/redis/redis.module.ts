@@ -3,6 +3,7 @@ import { Global, Module } from '@nestjs/common'
 import { EnvModule } from '../../env/env.module.js'
 
 import { AbuseCounterStore } from './abuse-counter.store.js'
+import { AuthCacheLock } from './auth-redis/auth-cache-lock.js'
 import { AuthRedis } from './auth-redis/auth-redis.service.js'
 import { BoundedRedis } from './bounded-redis.js'
 import { REDIS_CLIENT } from './redis.constants.js'
@@ -21,6 +22,7 @@ import { RedisPingMetricsCollector } from './redis-ping-metrics.collector.js'
     RedisPingMetricsCollector,
     BoundedRedis,
     AuthRedis,
+    AuthCacheLock,
     AbuseCounterStore,
     {
       provide: REDIS_CLIENT,
@@ -35,6 +37,7 @@ import { RedisPingMetricsCollector } from './redis-ping-metrics.collector.js'
     RedisMutexService,
     BoundedRedis,
     AuthRedis,
+    AuthCacheLock,
     AbuseCounterStore,
   ],
 })

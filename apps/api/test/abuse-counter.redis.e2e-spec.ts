@@ -10,6 +10,7 @@ import {
   AbuseCounterError,
   AbuseCounterStore,
 } from '../src/infrastructure/redis/abuse-counter.store'
+import type { AuthRedis } from '../src/infrastructure/redis/auth-redis/auth-redis.service'
 import { BoundedRedis } from '../src/infrastructure/redis/bounded-redis'
 import type { AppRedisClient } from '../src/infrastructure/redis/redis-connection.service'
 
@@ -42,7 +43,10 @@ describe('AbuseCounterStore against Redis 7', () => {
     return client
   }
   const storeOn = (client: Client): AbuseCounterStore =>
-    new AbuseCounterStore(new BoundedRedis(client as unknown as AppRedisClient))
+    // The store only needs the shared `run` contract, which BoundedRedis and AuthRedis both honor.
+    new AbuseCounterStore(
+      new BoundedRedis(client as unknown as AppRedisClient) as unknown as AuthRedis
+    )
   const failure = async (promise: Promise<unknown>): Promise<AbuseCounterError> => {
     const error = await promise.catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AbuseCounterError)

@@ -2,12 +2,18 @@ import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common'
 import { createClient } from '@redis/client'
 import { PinoLogger } from 'nestjs-pino'
 
+import { ServiceUnavailableException } from '../../../common/exceptions/index.js'
 import { EnvService } from '../../../env/env.service.js'
 import { MetricsService } from '../../observability/index.js'
 import type { BoundedRedisClient } from '../bounded-redis.js'
 import { type AppRedisClient, redisClientOptions } from '../redis-client-options.js'
+import { isRedisUnavailable } from '../redis-failure-classifier.js'
 
-import { AUTH_REDIS_DEFAULTS, type AuthRedisEvent } from './auth-redis.constants.js'
+import {
+  AUTH_REDIS_DEFAULTS,
+  AUTH_UNAVAILABLE_MESSAGE,
+  type AuthRedisEvent,
+} from './auth-redis.constants.js'
 import { type AuthRedisStats, AuthRedisSupervisor } from './auth-redis-supervisor.js'
 
 /** Longest the module waits for the first connection before serving fast 503s. */
@@ -58,6 +64,24 @@ export class AuthRedis implements OnModuleInit, OnApplicationShutdown {
     deadlineMs?: number
   ): Promise<T> {
     return this.supervisor.run(operation, deadlineMs)
+  }
+
+  /**
+   * Like `run`, but a failure that proves Redis is unavailable becomes the typed 503.
+   * Programming and schema errors pass through unchanged so they stay visible as 500. The
+   * operation outcome is not promised: a written command may still have executed.
+   */
+  async call<T>(
+    operation: (client: BoundedRedisClient, signal: AbortSignal) => Promise<T>,
+    deadlineMs?: number
+  ): Promise<T> {
+    try {
+      return await this.supervisor.run(operation, deadlineMs)
+    } catch (error) {
+      if (!isRedisUnavailable(error)) throw error
+      this.logger.warn({ err: error }, 'Auth Redis operation unavailable')
+      throw new ServiceUnavailableException(AUTH_UNAVAILABLE_MESSAGE)
+    }
   }
 
   get ready(): boolean {
