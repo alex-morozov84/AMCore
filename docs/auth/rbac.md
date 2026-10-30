@@ -66,8 +66,8 @@ primary Postgres **before** building CASL permissions, including routes without
 `@SystemRoles`. A single request-local admission result keeps original credential
 facts separate from the effective principal passed to CASL, TeamAccess, tenant
 row-lock checks and AI control authorization. A demoted claim becomes effective
-`USER`; it cannot retain a platform permission or membership bypass through the
-user cache. Ordinary unannotated `USER` JWTs need no extra privileged-role read.
+`USER`; it cannot retain a platform permission or membership bypass through a
+stale cache. Ordinary unannotated `USER` JWTs need no extra privileged-role read.
 
 `@SystemRoles` still requires both the **original claim** and **current DB role**
 to belong to its required set. Projecting a demoted claim to `USER` does not make
@@ -542,12 +542,12 @@ Database failures propagate through the existing exception filter (`503` for
 recognized availability errors, `500` for unexpected failures). No cached
 version or JWT version is used on failure. A permission Redis read, lock or
 publication error also fails authorization; a completed database load alone is
-not an availability fallback. The shared Redis client fails an ordinary command
-without a local timeout after it waits 5 s to be written during a reconnect. It does
-not bound `MULTI` or pipeline batches, a command that is already sent, or the whole
-request, so this does not promise a bounded
-response time during every outage. No new authorization retry is introduced. See
-[the Redis client contract](../backend/architecture-and-conventions.md).
+not an availability fallback. Permission cache calls run on the supervised
+authentication Redis client and wait at most 250 ms each, or what is left of the
+1 s admission deadline. A Redis outage-class failure, a missed call deadline or an
+expired admission answers `503` `SERVICE_UNAVAILABLE` and the handler does not run;
+an unexpected programming error stays `500`. No new authorization retry is
+introduced. See [authentication when Redis is slow or unavailable](redis-outage.md).
 
 When adding an ACL mutation, call `bumpAclVersionTx(orgId, tx)` inside the same
 transaction as the write. A standalone bump is insufficient for an ACL write.

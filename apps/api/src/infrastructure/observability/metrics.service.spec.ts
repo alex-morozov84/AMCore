@@ -288,7 +288,7 @@ describe('MetricsService', () => {
   it('records bounded cache, storage, media, and email metrics', async () => {
     const service = makeService()
 
-    service.incCacheOperation('user', 'negative_hit')
+    service.incCacheOperation('permissions', 'negative_hit')
     service.observeStorageOperation('s3', 'upload', 'success', 0.25)
     service.observeMediaOperation('avatar', 'process', 'error', 0.5)
     service.observeEmailOperation(
@@ -304,7 +304,7 @@ describe('MetricsService', () => {
     service.incEmailDeadLetter('welcome', false)
 
     const output = await service.metrics()
-    expect(output).toContain('cache="user",result="negative_hit",role="web"')
+    expect(output).toContain('cache="permissions",result="negative_hit",role="web"')
     expect(output).toContain('driver="s3",operation="upload",result="success",role="web"')
     expect(output).toContain('preset="avatar",operation="process",result="error",role="web"')
     expect(output).toContain(

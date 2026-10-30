@@ -12,7 +12,8 @@ The system uses two tokens that work together. They serve completely different p
 
 Think of it as a **day pass**. It's short-lived (15 minutes), self-contained,
 and fast to verify. After signature validation, AMCore also resolves the current
-user through its Redis-backed user cache, with a database fallback on cache miss.
+user from the primary database. This is the same read that checks the session's
+authority, so a request costs one user read and no Redis call for this step.
 
 ```
 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjbTEyMyIsImVtYWlsIjoiYWxleEBleGFtcGxlLmNvbSIsInN5c3RlbVJvbGUiOiJVU0VSIn0.signature
@@ -34,7 +35,7 @@ Decoded, it looks like:
 
 The token carries the signed claims, while the user lookup rejects tokens whose
 user no longer exists. Every privileged JWT claim also requires a primary-role
-check before authorization; ordinary user-cache lookup is not privileged authority.
+check before authorization; the user lookup only proves the account exists.
 Organization `/switch` derives a token bounded by its parent's expiry and cannot
 renew access, including through repeated exchanges. See [RBAC](./rbac.md).
 
@@ -212,13 +213,14 @@ the credential itself is never stored or logged.
 - Counters need one Redis server. The two keys are not guaranteed to share a cluster slot.
 - These Redis calls wait at most a fixed deadline (`BOUNDED_REDIS_DEADLINE_MS`). The
   deadline limits how long a caller waits. It does not cancel a command that was
-  already sent, and it does not bound other users of the shared Redis client.
-- Each process holds at most `BOUNDED_REDIS_CAPACITY` unsettled calls of this kind. A
+  already sent. They run on the supervised authentication Redis client, not on the
+  shared one.
+- Each generation of that client holds at most `BOUNDED_REDIS_CAPACITY` unsettled calls. A
   call keeps its slot until its reply arrives or the connection errors or closes, even
   after the caller gave up. When all slots are held, new calls are refused at once
-  (`503`, and nothing was sent). The API sets no finite time for a connection that
-  stalls without closing to recover; it recovers when replies resume or the
-  connection errors or closes.
+  (`503`, and nothing was sent). A client that stops answering is replaced; see
+  [authentication when Redis is slow or unavailable](redis-outage.md) for the triggers
+  and the measured, scoped recovery times.
 - A clear that timed out can still run later and remove fingerprint failures
   recorded in the meantime. The source-address counter is never cleared by it.
 

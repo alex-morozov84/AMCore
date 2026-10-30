@@ -62,7 +62,7 @@ export type AiRunRealtimeStreamEvent =
 export type QueueMetricsEvent =
   'job_added' | 'redis_error' | 'redis_reconnecting' | 'worker_error' | 'dead_letter'
 export type QueueMetricsQueue = 'default' | 'email' | 'notifications' | 'ai-runs'
-export type CacheMetricsCache = 'user' | 'permissions' | 'ai_catalog'
+export type CacheMetricsCache = 'permissions' | 'ai_catalog'
 export type AiMetricsProvider =
   'anthropic' | 'openai' | 'openrouter' | 'openai_compatible' | 'yandex_ai_studio' | 'mock'
 export type AiMetricsOperation = 'text' | 'object'
