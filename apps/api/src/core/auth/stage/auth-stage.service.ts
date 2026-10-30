@@ -14,6 +14,11 @@ export const AUTH_STAGE_MS = 1000
  * caller gives up, so late database work stays counted and a burst cannot exceed the cap.
  */
 export const AUTH_STAGE_CAP = 256
+/**
+ * Root budget of one Redis phase of a public operation (OAuth state or ticket). It covers only
+ * the Redis part; the provider HTTP exchange and database commits keep their own bounds.
+ */
+export const PUBLIC_STEP_MS = 1500
 
 export { AUTH_UNAVAILABLE_MESSAGE }
 
@@ -76,11 +81,31 @@ export class AuthStageService {
   private held = 0
   private readonly now = (): number => performance.now()
 
-  run<T>(work: (budget: AuthBudget) => Promise<T>, totalMs = AUTH_STAGE_MS): Promise<T> {
+  /**
+   * Starts one stage. Inside another stage the deadline is the smaller of `totalMs` and what is
+   * left of the parent, so a nested call never gets a fresh full budget. The slot is reserved
+   * synchronously and released only when the work settles (or throws before returning a promise).
+   */
+  run<T>(work: (budget: AuthBudget) => Promise<T>, requestedMs = AUTH_STAGE_MS): Promise<T> {
+    const parent = stageStorage.getStore()
+    if (parent) {
+      try {
+        parent.assertAlive()
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    }
     if (this.held >= AUTH_STAGE_CAP) return Promise.reject(unavailable())
+    const totalMs = parent ? Math.max(1, Math.min(requestedMs, parent.remainingMs())) : requestedMs
     this.held++
     const budget = new AuthBudget(this.now(), totalMs, this.now)
-    const issued = stageStorage.run(budget, () => work(budget))
+    let issued: Promise<T>
+    try {
+      issued = stageStorage.run(budget, () => work(budget))
+    } catch (error) {
+      this.held--
+      return Promise.reject(error)
+    }
     const release = (): void => {
       this.held--
     }

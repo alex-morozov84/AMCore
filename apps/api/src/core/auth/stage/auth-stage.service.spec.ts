@@ -120,6 +120,51 @@ describe('AuthStageService', () => {
     ).rejects.toBe(denied)
   })
 
+  describe('slot accounting and nested roots', () => {
+    it('releases the reserved slot when the work throws before returning a promise', async () => {
+      const bug = new TypeError('sync failure')
+      await expect(
+        stage.run((() => {
+          throw bug
+        }) as never)
+      ).rejects.toBe(bug)
+      expect(stage.heldCount()).toBe(0)
+    })
+
+    it('gives a nested root the smaller of its request and the parent remainder', async () => {
+      const seen: number[] = []
+      await stage.run(async () => {
+        jest.advanceTimersByTime(600)
+        await stage.run(async (nested) => {
+          seen.push(Math.round(nested.totalMs))
+        }, 5000)
+        await stage.run(async (nested) => {
+          seen.push(Math.round(nested.totalMs))
+        }, 100)
+      })
+      expect(seen[0]).toBeLessThanOrEqual(400)
+      expect(seen[0]).toBeGreaterThanOrEqual(1)
+      expect(seen[1]).toBe(100)
+    })
+
+    it('refuses a nested root once the parent expired and starts none of its work', async () => {
+      const gate = deferred()
+      const nestedWork = jest.fn(async () => 'never')
+      let nestedOutcome: unknown
+      const outcome = stage.run(async () => {
+        await gate.promise
+        nestedOutcome = await stage.run(nestedWork).catch((error: unknown) => error)
+      })
+      const status = statusOf(outcome)
+      await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+      await status
+      gate.resolve()
+      await jest.advanceTimersByTimeAsync(0)
+      expect(nestedOutcome).toBeInstanceOf(HttpException)
+      expect(nestedWork).not.toHaveBeenCalled()
+    })
+  })
+
   describe('nested deadlines', () => {
     it('applies the cap unchanged outside a stage', () => {
       expect(nestedDeadlineMs(250)).toBe(250)

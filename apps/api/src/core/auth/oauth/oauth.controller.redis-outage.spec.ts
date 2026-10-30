@@ -11,8 +11,10 @@ import type { OAuthService } from './oauth.service.js'
 import type { OAuthLoginTicketService } from './oauth-login-ticket.service.js'
 import type { OAuthProviderFactory } from './providers/oauth-provider.factory.js'
 
-// These cases pin what the user and the stored state look like when Redis fails at each
-// one-time OAuth step. The real-stack outage run proves the same ordering over HTTP.
+// These cases pin, with mocked services, the call and cookie ordering when Redis fails at each
+// one-time OAuth step. They prove neither HTTP envelopes nor persisted account state; the
+// start and exchange envelopes under a stalled Redis are covered by the whole-app outage e2e,
+// the callback over HTTP is not.
 
 const outage = (): ServiceUnavailableException =>
   new ServiceUnavailableException('Authentication temporarily unavailable')

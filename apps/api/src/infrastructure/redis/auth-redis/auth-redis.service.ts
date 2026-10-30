@@ -55,8 +55,20 @@ export class AuthRedis implements OnModuleInit, OnApplicationShutdown {
       this.logger.warn('Auth Redis client not ready at startup; requests answer 503 until it is')
   }
 
+  /**
+   * Disposes every generation logically and returns at once. Generations that are still logically
+   * open after `destroy()` are reported (log and `degraded` event); the supervisor's timers are
+   * already stopped, so this is the only chance to signal it. No wait for physical closure.
+   */
   onApplicationShutdown(): void {
-    this.supervisor.stop()
+    const { logicallyOpen } = this.supervisor.stop()
+    if (logicallyOpen > 0) {
+      this.metrics.incRedisClientEvent('auth', 'degraded')
+      this.logger.error(
+        { logicallyOpen },
+        'Auth Redis shutdown left generations logically open (destroy had no effect)'
+      )
+    }
   }
 
   run<T>(

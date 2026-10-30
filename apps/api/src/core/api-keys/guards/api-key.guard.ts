@@ -4,6 +4,7 @@ import type { Request } from 'express'
 import { type RequestPrincipal, SystemRole } from '@amcore/shared'
 
 import { PrismaService } from '../../../prisma/index.js'
+import { assertStageAlive } from '../../auth/stage/auth-stage.service.js'
 import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service.js'
 import { registerApiKeyAdmission } from '../api-key-admission.js'
 import { ApiKeysService } from '../api-keys.service.js'
@@ -44,8 +45,11 @@ export class ApiKeyGuard implements CanActivate {
     // try/catch — see AK-11). Order matters: check before any DB work so
     // a saturated IP cannot keep loading the database with hot-misses.
     await this.abuseLimiter.check(ip, fingerprint)
+    // Each step below is ordinary admission work: once the stage expired, none may start.
+    assertStageAlive()
 
     const apiKey = await this.apiKeysService.verifyByShortToken(parsed.shortToken, parsed.longToken)
+    assertStageAlive()
 
     if (!apiKey) {
       await this.abuseLimiter.consume(ip, fingerprint)
@@ -68,6 +72,8 @@ export class ApiKeyGuard implements CanActivate {
       include: { organization: { select: { aclVersion: true } } },
     })
 
+    assertStageAlive()
+
     if (!membership) {
       await this.abuseLimiter.consume(ip, fingerprint)
       return false
@@ -81,7 +87,11 @@ export class ApiKeyGuard implements CanActivate {
     // request. A refused clear leaves older fingerprint debt (stricter). A clear that
     // timed out can still run later and erase failures recorded in the meantime; the
     // address counter is never cleared. The limiter logs the failure.
+    // The reset is ordinary counter work of a successful credential, not independent cleanup:
+    // it does not start after expiry. The expiry check sits outside the best-effort catch.
+    assertStageAlive()
     await this.abuseLimiter.reset(fingerprint).catch(() => undefined)
+    assertStageAlive()
 
     const principal: RequestPrincipal = {
       type: 'api_key',

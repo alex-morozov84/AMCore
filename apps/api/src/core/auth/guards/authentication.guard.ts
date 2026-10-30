@@ -152,6 +152,8 @@ export class AuthenticationGuard implements CanActivate {
             : null
 
       if (!guard) continue
+      // A delayed `false` or 401/403 from the previous credential must not start the next one.
+      budget.assertAlive()
 
       const release = type === AuthType.Bearer ? beginJwtPrimaryAdmission(incoming) : undefined
       try {

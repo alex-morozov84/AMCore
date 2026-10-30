@@ -3,6 +3,10 @@ import { setTimeout as sleep } from 'node:timers/promises'
 
 import request from 'supertest'
 
+import { OAuthProviderFactory } from '../src/core/auth/oauth/providers/oauth-provider.factory'
+import type { OAuthProvider } from '../src/core/auth/oauth/providers/oauth-provider.interface'
+import { PUBLIC_STEP_MS } from '../src/core/auth/stage/auth-stage.service'
+
 import {
   cleanDatabase,
   cleanOrgData,
@@ -104,7 +108,50 @@ describe('Authentication while Redis is stalled and when it returns', () => {
     expect(org.ms).toBeLessThan(FAST_503_MS)
   }, 90000)
 
-  it('answers every request in a burst within the budget and never runs a handler on a refusal', async () => {
+  it('refuses OAuth start and exchange with a typed 503, sets no cookie, and recovers', async () => {
+    const providers = (
+      c.app.get(OAuthProviderFactory) as unknown as { providers: Map<string, OAuthProvider> }
+    ).providers
+    providers.set('google', {
+      name: 'google',
+      getAuthorizationURL: async (state: string) =>
+        new URL(`https://mock-oauth.example.com/authorize?state=${state}`),
+      exchangeCode: async () => ({ accessToken: 'mock' }),
+      getUserProfile: async () => {
+        throw new Error('not used')
+      },
+    } as unknown as OAuthProvider)
+
+    pause()
+    const startedAt = performance.now()
+    const start = await request(http()).get('/auth/oauth/google')
+    expect(start.status).toBe(503)
+    expect(start.body).toMatchObject({ errorCode: 'SERVICE_UNAVAILABLE' })
+    // The binding cookie is set only after the one-time state was stored.
+    expect(start.headers['set-cookie']).toBeUndefined()
+    expect(performance.now() - startedAt).toBeLessThan(PUBLIC_STEP_MS + 700)
+
+    const exchange = await request(http())
+      .post('/auth/oauth/exchange')
+      .set('Cookie', 'refresh_token=binding')
+      .send({ ticket: 'ticket-1' })
+    expect(exchange.status).toBe(503)
+    expect(exchange.body).toMatchObject({ errorCode: 'SERVICE_UNAVAILABLE' })
+    expect(exchange.headers['set-cookie']).toBeUndefined()
+
+    await sleep(3500)
+    unpause()
+    const started = performance.now()
+    let last = await request(http()).get('/auth/oauth/google')
+    while (last.status !== 302 && performance.now() - started < RECOVERY_MS) {
+      await sleep(250)
+      last = await request(http()).get('/auth/oauth/google')
+    }
+    expect(last.status).toBe(302)
+    expect(last.headers.location).toContain('mock-oauth.example.com/authorize')
+  }, 120000)
+
+  it('refuses every request in a burst within the admission budget', async () => {
     await c.cache.flush()
     pause()
     const results = await Promise.all(

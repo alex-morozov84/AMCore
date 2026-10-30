@@ -8,7 +8,7 @@ import { AppException } from '../../../common/exceptions'
 import { ApiKeyGuard } from '../../api-keys/guards/api-key.guard'
 import type { BrowserSessionContextService } from '../../frontend-context/browser-session-context.service'
 import { AbilityFactory } from '../casl/ability.factory'
-import type { MfaJwtAdmissionService } from '../mfa/mfa-jwt-admission.service.js'
+import { MfaJwtAdmissionService } from '../mfa/mfa-jwt-admission.service.js'
 import { OrganizationContextResolver } from '../organization-context/organization-context-resolver.service'
 import {
   OrganizationContextBoundary,
@@ -296,6 +296,78 @@ describe('AuthenticationGuard', () => {
       await jest.advanceTimersByTimeAsync(0)
       expect(systemRoles.canActivate).not.toHaveBeenCalled()
       expect(policies.canActivate).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['false', (release: (v: unknown) => void) => release(false)],
+      [
+        'a 401',
+        (release: (v: unknown) => void) => release(Promise.reject(new HttpException('x', 401))),
+      ],
+      [
+        'a 403',
+        (release: (v: unknown) => void) => release(Promise.reject(new HttpException('x', 403))),
+      ],
+    ])(
+      'does not try the next credential after a delayed %s from the first',
+      async (_name, settle) => {
+        jest.useFakeTimers()
+        let release!: (value: unknown) => void
+        jwtAuthGuard.canActivate.mockReturnValue(
+          new Promise<boolean>((resolve) => {
+            release = resolve as (value: unknown) => void
+          })
+        )
+        apiKeyGuard.canActivate.mockResolvedValue(true)
+        const outcome = status(guard.canActivate(createContext()))
+        await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+        await expect(outcome).resolves.toMatchObject({ status: 503 })
+        settle(release)
+        await jest.advanceTimersByTimeAsync(0)
+        expect(apiKeyGuard.canActivate).not.toHaveBeenCalled()
+      }
+    )
+
+    it('starts no privilege admission when the real MFA fallback read outlives the stage', async () => {
+      jest.useFakeTimers()
+      let finish!: (value: unknown) => void
+      const authority = {
+        inspectForRuntime: jest.fn(
+          () =>
+            new Promise((resolve) => {
+              finish = resolve
+            })
+        ),
+      }
+      const privilege = { resolve: jest.fn() }
+      const principal = { type: 'jwt', sub: 'user-1', email: 'a@example.test', systemRole: 'USER' }
+      const request = { user: principal, headers: {} }
+      const context = {
+        ...createContext(),
+        switchToHttp: () => ({ getRequest: () => request }),
+      } as unknown as ExecutionContext
+      jwtAuthGuard.canActivate.mockResolvedValue(true)
+      const candidate = new AuthenticationGuard(
+        reflector as unknown as Reflector,
+        jwtAuthGuard as unknown as JwtAuthGuard,
+        apiKeyGuard as unknown as ApiKeyGuard,
+        {} as unknown as AbilityFactory,
+        { requiredRoles: () => [], canActivate: jest.fn() } as unknown as SystemRolesGuard,
+        { canActivate: jest.fn() } as unknown as PoliciesGuard,
+        { canActivate: jest.fn() } as unknown as TeamAccessGuard,
+        privilege as unknown as PrivilegedAdmissionService,
+        {} as unknown as OrganizationContextResolver,
+        new MfaJwtAdmissionService(authority as never),
+        { verify: () => undefined } as unknown as BrowserSessionContextService,
+        new AuthStageService()
+      )
+      const outcome = status(candidate.canActivate(context))
+      await jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1)
+      await expect(outcome).resolves.toMatchObject({ status: 503 })
+      finish({ admission: { kind: 'admitted' }, currentRole: 'USER' })
+      await jest.advanceTimersByTimeAsync(0)
+      expect(authority.inspectForRuntime).toHaveBeenCalledTimes(1)
+      expect(privilege.resolve).not.toHaveBeenCalled()
     })
 
     it('keeps a genuine 401 from credential selection as a decision', async () => {

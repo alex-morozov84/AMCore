@@ -8,6 +8,7 @@ import {
   type MockContext,
   mockContextToPrisma,
 } from '../../auth/auth-context.testkit'
+import { AUTH_STAGE_MS, AuthStageService } from '../../auth/stage/auth-stage.service'
 import { ApiKeyAbuseLimiterService } from '../api-key-abuse-limiter.service'
 import { apiKeyAdmission } from '../api-key-admission'
 import { ApiKeysService } from '../api-keys.service'
@@ -382,6 +383,100 @@ describe('ApiKeyGuard', () => {
       await guard.canActivate(ctx)
 
       expect(abuseLimiter.check).toHaveBeenCalledWith('unknown', FINGERPRINT)
+    })
+  })
+
+  describe('inside an admission stage (T082)', () => {
+    afterEach(() => jest.useRealTimers())
+
+    const header = `Bearer amcore_live_${SHORT_TOKEN}_${'x'.repeat(32)}`
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void
+      const promise = new Promise<T>((res) => {
+        resolve = res
+      })
+      return { promise, resolve }
+    }
+    const startStage = () => {
+      jest.useFakeTimers()
+      const stage = new AuthStageService()
+      const outcome = stage
+        .run(() => guard.canActivate(createMockExecutionContext(header)))
+        .then(
+          () => 'resolved' as const,
+          (error: unknown) => error
+        )
+      return { outcome, expire: () => jest.advanceTimersByTimeAsync(AUTH_STAGE_MS + 1) }
+    }
+    const settle = () => jest.advanceTimersByTimeAsync(0)
+    const noLateWork = () => {
+      expect(abuseLimiter.consume).not.toHaveBeenCalled()
+      expect(abuseLimiter.reset).not.toHaveBeenCalled()
+      expect(apiKeysService.touchLastUsed).not.toHaveBeenCalled()
+    }
+
+    it('completes normally and passes the live deadline to nothing it should not touch', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
+      mockMembership({ found: true })
+      const { outcome } = startStage()
+      await expect(outcome).resolves.toBe('resolved')
+      expect(abuseLimiter.reset).toHaveBeenCalledTimes(1)
+      expect(apiKeysService.touchLastUsed).toHaveBeenCalledTimes(1)
+    })
+
+    it('starts no key lookup after a delayed limiter check outlived the stage', async () => {
+      const late = deferred<void>()
+      abuseLimiter.check.mockReturnValue(late.promise)
+      const { outcome, expire } = startStage()
+      await expire()
+      await expect(outcome).resolves.toMatchObject({ status: 503 })
+      late.resolve()
+      await settle()
+      expect(apiKeysService.verifyByShortToken).not.toHaveBeenCalled()
+      noLateWork()
+    })
+
+    it.each([
+      ['no key', null],
+      ['a valid key', mockApiKey],
+    ])(
+      'starts no membership query, counter or metadata work after a delayed lookup returned %s',
+      async (_name, key) => {
+        const late = deferred<unknown>()
+        apiKeysService.verifyByShortToken.mockReturnValue(late.promise as never)
+        const { outcome, expire } = startStage()
+        await expire()
+        await expect(outcome).resolves.toMatchObject({ status: 503 })
+        late.resolve(key)
+        await settle()
+        expect(mockCtx.prisma.orgMember.findUnique).not.toHaveBeenCalled()
+        noLateWork()
+      }
+    )
+
+    it.each([
+      ['no membership', false],
+      ['a membership', true],
+    ])(
+      'starts no counter or metadata work after a delayed membership query found %s',
+      async (_name, found) => {
+        apiKeysService.verifyByShortToken.mockResolvedValue(mockApiKey as never)
+        const late = deferred<unknown>()
+        mockCtx.prisma.orgMember.findUnique.mockReturnValue(late.promise as never)
+        const { outcome, expire } = startStage()
+        await expire()
+        await expect(outcome).resolves.toMatchObject({ status: 503 })
+        late.resolve(found ? { id: 'member-1', organization: { aclVersion: 7 } } : null)
+        await settle()
+        noLateWork()
+      }
+    )
+
+    it('keeps a genuine in-budget decision: an unknown key still counts one failure', async () => {
+      apiKeysService.verifyByShortToken.mockResolvedValue(null as never)
+      const { outcome } = startStage()
+      await expect(outcome).resolves.toBe('resolved')
+      expect(abuseLimiter.consume).toHaveBeenCalledTimes(1)
     })
   })
 })

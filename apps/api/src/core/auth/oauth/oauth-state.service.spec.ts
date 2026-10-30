@@ -1,3 +1,5 @@
+import { AuthStageService, PUBLIC_STEP_MS } from '../stage/auth-stage.service'
+
 import type { OAuthStateData } from './oauth-state.service'
 import { OAuthStateService } from './oauth-state.service'
 
@@ -19,9 +21,12 @@ describe('OAuthStateService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     }
 
-    service = new OAuthStateService({
-      call: (operation: (client: unknown) => unknown) => operation(mockRedis),
-    } as never)
+    service = new OAuthStateService(
+      {
+        call: (operation: (client: unknown) => unknown) => operation(mockRedis),
+      } as never,
+      new AuthStageService()
+    )
   })
 
   describe('store', () => {
@@ -71,5 +76,26 @@ describe('OAuthStateService', () => {
 
       expect(result).toBeNull()
     })
+  })
+
+  describe('public operation root (T082)', () => {
+    afterEach(() => jest.useRealTimers())
+
+    it.each([
+      ['store', (s: OAuthStateService) => s.store(state, data)],
+      ['consume', (s: OAuthStateService) => s.consume(state)],
+    ])(
+      'answers 503 at the root budget when the Redis phase never settles: %s',
+      async (_name, act) => {
+        jest.useFakeTimers()
+        const hung = new OAuthStateService(
+          { call: () => new Promise(() => undefined) } as never,
+          new AuthStageService()
+        )
+        const outcome = act(hung).catch((error: unknown) => error)
+        await jest.advanceTimersByTimeAsync(PUBLIC_STEP_MS + 1)
+        await expect(outcome).resolves.toMatchObject({ status: 503 })
+      }
+    )
   })
 })

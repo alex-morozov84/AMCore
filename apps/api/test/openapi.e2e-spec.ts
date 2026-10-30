@@ -764,6 +764,47 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(violations).toEqual([])
   })
 
+  it('documents the dependency-unavailable 503 on protected operations and OAuth Redis steps', () => {
+    // The overview states the contract once; each affected operation also carries its own
+    // response, without replacing a specialized 503 (abuse counters, health, member keys).
+    expect(document.info.description).toContain('SERVICE_UNAVAILABLE')
+    const violations: string[] = []
+    let protectedCount = 0
+    for (const [path, item] of Object.entries(document.paths)) {
+      if (isExcluded(path)) continue
+      for (const method of HTTP_METHODS) {
+        const op = (
+          item as Record<
+            string,
+            | { security?: unknown[]; responses?: Record<string, { description?: string }> }
+            | undefined
+          >
+        )[method]
+        if (!op) continue
+        const oauthStep =
+          /\/auth\/oauth(\/|$)/.test(path) && !path.endsWith('/auth/oauth/providers')
+        const protectedOp = (op.security?.length ?? 0) > 0
+        const described = op.responses?.['503']
+        if ((oauthStep || protectedOp) && !described)
+          violations.push(`${method} ${path}: missing the 503 response`)
+        if (protectedOp) protectedCount++
+        if (
+          !oauthStep &&
+          !protectedOp &&
+          described?.description?.includes('Authentication temporarily')
+        )
+          violations.push(`${method} ${path}: claims the admission 503 but is public`)
+      }
+    }
+    expect(protectedCount).toBeGreaterThan(50)
+    expect(violations).toEqual([])
+    const exchange = document.paths['/auth/oauth/exchange'] as Record<
+      string,
+      { responses: Record<string, { description?: string }> }
+    >
+    expect(exchange['post']!.responses['503']!.description).toContain('Start sign-in again')
+  })
+
   it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {
     // Guards against a dangling security reference: every @ApiSecurity('apiKeyBearer')
     // reference below is meaningless if the scheme itself isn't registered in
@@ -960,9 +1001,12 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.responses).toHaveProperty('200')
     expect(operation?.responses).toHaveProperty('401')
     expect(operation?.responses).toHaveProperty('403')
-    // Provider bugs are 500; browser timeouts are not an API HTTP 503 response.
+    // Provider bugs are 500; browser timeouts are not an API HTTP 503 response. The only 503
+    // is the shared authentication one: admission could not finish because a dependency was slow.
     expect(operation?.responses).toHaveProperty('500')
-    expect(operation?.responses).not.toHaveProperty('503')
+    expect(
+      (operation?.responses?.['503'] as { description?: string } | undefined)?.description
+    ).toContain('Authentication temporarily unavailable')
     const response = operation?.responses?.['200'] as {
       content?: { 'application/json'?: { schema?: { $ref?: string } } }
     }

@@ -135,6 +135,8 @@ export class PermissionsCacheService {
     organizationId: string,
     aclVersion: number
   ): Promise<Permission[]> {
+    // An abandoned admission must not start the database load (the check after it stays too).
+    assertStageAlive()
     this.metrics.dbQueries++
     this.prometheus.incCacheOperation('permissions', 'db_fallback')
     const permissions = await this.loadPermissionsFromDb(userId, organizationId)

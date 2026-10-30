@@ -137,6 +137,30 @@ describe('AuthRedis', () => {
     })
   })
 
+  describe('shutdown signal', () => {
+    it('stays quiet when every generation was logically disposed', async () => {
+      const init = service.onModuleInit()
+      await jest.advanceTimersByTimeAsync(100)
+      await init
+      service.onApplicationShutdown()
+      expect(logger.error).not.toHaveBeenCalled()
+      expect(metrics.incRedisClientEvent).not.toHaveBeenCalledWith('auth', 'degraded')
+    })
+
+    it('reports a generation whose destroy had no logical effect', async () => {
+      const init = service.onModuleInit()
+      await jest.advanceTimersByTimeAsync(100)
+      await init
+      service.clients[0]!.destroyWorks = false
+      service.onApplicationShutdown()
+      expect(logger.error).toHaveBeenCalledWith(
+        { logicallyOpen: 1 },
+        expect.stringContaining('logically open')
+      )
+      expect(metrics.incRedisClientEvent).toHaveBeenCalledWith('auth', 'degraded')
+    })
+  })
+
   it('disposes the client on shutdown and stops creating generations', async () => {
     const init = service.onModuleInit()
     await jest.advanceTimersByTimeAsync(100)

@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
+import { addAuthUnavailableResponses } from './bootstrap/auth-unavailable-openapi.js'
 import { addCorrelationHeader } from './bootstrap/correlation-openapi.js'
 import { addParserResponses } from './bootstrap/parser-openapi.js'
 import { schemaOpenApiConverter } from './common/schemas/schema-openapi.js'
@@ -24,10 +25,13 @@ export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
     .setTitle('AMCore API')
     .setDescription(
       'AMCore API documentation.\n\n' +
-        'Any authenticated request, and the OAuth sign-in steps, can answer `503` with ' +
-        '`errorCode` `SERVICE_UNAVAILABLE` ("Authentication temporarily unavailable") when a ' +
-        'dependency the authentication path needs (for example Redis) is slow or down. The ' +
-        'handler did not run; retry later with backoff. See docs/auth/redis-outage.md.'
+        'An authenticated request is refused with `503` and `errorCode` `SERVICE_UNAVAILABLE` ' +
+        '("Authentication temporarily unavailable") when admission cannot finish because a ' +
+        'dependency the authentication path needs (for example Redis) is slow or down; the ' +
+        'handler did not run. The OAuth sign-in steps can answer the same `503` from inside the ' +
+        'operation, after an account or provider link was already saved; start sign-in again. ' +
+        'Each operation documents its own `503`. Retry later with backoff. See ' +
+        'docs/auth/redis-outage.md.'
     )
     .setVersion('0.0.1')
     .addBearerAuth()
@@ -105,6 +109,7 @@ export function buildApiDocument(app: INestApplication, pathPrefix: string): Ope
     standardSchemaConverter: schemaOpenApiConverter,
   })
   addParserResponses(document)
+  addAuthUnavailableResponses(document)
   addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
   addCorrelationHeader(document)
   return document

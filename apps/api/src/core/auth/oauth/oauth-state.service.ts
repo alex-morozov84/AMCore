@@ -9,6 +9,7 @@ import type {
 
 import { AuthRedis } from '../../../infrastructure/redis/index.js'
 import type { StoredInvitationIntent } from '../mfa/mfa-invitation-intent.js'
+import { AuthStageService, nestedDeadlineMs, PUBLIC_STEP_MS } from '../stage/auth-stage.service.js'
 
 import type { OAuthLinkAuthority } from './oauth-link-authority.js'
 
@@ -56,16 +57,27 @@ export interface OAuthStateData {
  */
 @Injectable()
 export class OAuthStateService {
-  constructor(private readonly redis: AuthRedis) {}
+  constructor(
+    private readonly redis: AuthRedis,
+    private readonly stage: AuthStageService
+  ) {}
 
-  /** Redis failure becomes the typed 503; nothing is retried. */
+  /**
+   * Redis failure becomes the typed 503; nothing is retried. Each Redis phase is its own public
+   * root (`PUBLIC_STEP_MS`): the provider HTTP exchange and the account commit around it keep
+   * their own bounds and are never timed out by this root.
+   */
   async store(state: string, data: OAuthStateData): Promise<void> {
-    await this.redis.call(
-      (client) =>
-        client.set(`oauth:state:${state}`, JSON.stringify(data), {
-          expiration: { type: 'PX', value: STATE_TTL_MS },
-        }),
-      CALL_DEADLINE_MS
+    await this.stage.run(
+      () =>
+        this.redis.call(
+          (client) =>
+            client.set(`oauth:state:${state}`, JSON.stringify(data), {
+              expiration: { type: 'PX', value: STATE_TTL_MS },
+            }),
+          nestedDeadlineMs(CALL_DEADLINE_MS)
+        ),
+      PUBLIC_STEP_MS
     )
   }
 
@@ -76,7 +88,10 @@ export class OAuthStateService {
    */
   async consume(state: string): Promise<OAuthStateData | null> {
     const key = `oauth:state:${state}`
-    const raw = await this.redis.call((client) => client.getDel(key), CALL_DEADLINE_MS)
+    const raw = await this.stage.run(
+      () => this.redis.call((client) => client.getDel(key), nestedDeadlineMs(CALL_DEADLINE_MS)),
+      PUBLIC_STEP_MS
+    )
     if (!raw) return null
 
     try {
