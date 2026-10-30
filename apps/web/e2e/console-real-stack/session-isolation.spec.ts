@@ -88,7 +88,11 @@ test('host session is isolated, origin-guarded, and loses admission after demoti
   await consolePage.getByRole('button').filter({ hasText: email }).click()
   await consolePage.getByRole('menuitem', { name: /sign out/i }).click()
   await expect(consolePage).toHaveURL(
-    new RegExp('^' + escapeOrigin(standTarget.origins.console) + '/en/login$')
+    (url) =>
+      url.origin === standTarget.origins.console &&
+      url.pathname === '/en/sign-in-again' &&
+      !!url.searchParams.get('entryId') &&
+      !!url.searchParams.get('returnEntryId')
   )
 
   const loggedOutAccess = await consolePage.request.get('/api/access')

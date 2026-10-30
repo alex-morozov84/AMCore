@@ -8,6 +8,7 @@ import {
 import { expect, request, test } from '@playwright/test'
 
 import {
+  browserCredentialRequest,
   logoutViaApi,
   postBrowserCredentials,
   TEST_PASSWORD,
@@ -46,10 +47,14 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
   const current = await context.request.get(new URL(`${root}/context`, origin).href)
   expect(current.status()).toBe(200)
   const { binding } = invitationFlowContextResponseSchema.parse(await current.json())
-  const login = await context.request.post(new URL(`${root}/login`, origin).href, {
-    headers,
-    data: { binding, email, password: TEST_PASSWORD },
-  })
+  const login = await browserCredentialRequest(
+    context.request,
+    new URL(`${root}/login`, origin).href,
+    {
+      headers,
+      data: { binding, email, password: TEST_PASSWORD },
+    }
+  )
   expect(login.status()).toBe(200)
   const issued = invitationFlowAuthResponseSchema.parse(await login.json())
   const pending = await context.request.get(new URL(`${root}/context`, origin).href)

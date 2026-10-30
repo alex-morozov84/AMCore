@@ -2,6 +2,7 @@ import { BULL_BOARD_CONTENT_SECURITY_POLICY } from '@amcore/shared'
 import { expect, type Locator, type Page } from '@playwright/test'
 
 import { probeRefusalEvidence } from '../real-stack/helpers'
+import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 import {
   addDefaultQueueJob,
   addFailedDefaultQueueJob,
@@ -252,9 +253,12 @@ export async function queueBoardJourney(
     await expect(board.locator('body')).not.toContainText(BOARD_CANARY)
     await expect(board.locator('body')).not.toContainText('secret.js')
 
-    // The mark survives a reload, and a bookmark (a direct load of a deep link) works.
+    // Independent reload/bookmark correctness cases start with idle source budgets.
+    // Session, generation and the board's state are unchanged; this is not a throughput test.
+    resetBrowserProbeDomainBudget()
     await board.reload()
     await expect(board.getByText('READ-ONLY').first()).toBeVisible()
+    resetBrowserProbeDomainBudget()
     await board.goto(`${new URL(board.url()).origin}${boardPath}/queue/email`)
     await expect(board.getByText('READ-ONLY').first()).toBeVisible()
     await expect(board.getByText('email').first()).toBeVisible()

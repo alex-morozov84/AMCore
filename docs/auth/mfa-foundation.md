@@ -145,7 +145,11 @@ A context operation consumes its exact captured first-read check once within
 that request. Lock re-reads, refreshed records and subsequent requests still
 require a fresh primary check. A known probe
 rate refusal preserves `429 RATE_LIMIT_EXCEEDED` and the supplied `Retry-After`.
-It grants no access, preserves the vault and never starts automatic refresh. This
+It grants no access, preserves the vault and never starts automatic refresh.
+Probes from different pages share the default per-source-IP route budget from
+[rate limiting](../backend/architecture-and-conventions.md). Functional browser fixtures
+start independent cases with idle budgets; they do not establish sustained
+headroom for a shared IP or production traffic. This
 reduces repeated reads; it does not remove ordinary-browser checks or establish
 an acceptable performance budget.
 
