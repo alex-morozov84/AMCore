@@ -169,11 +169,15 @@ reports a contrast failure the person never sees. A region that never finishes l
 message saying so. A test whose subject is the busy state itself passes `{ allowBusy: true }`. The same
 rule applies to counting requests: take the baseline only once the previous step is idle, and compare
 request lists with `expect.poll` rather than sampling once.
+For session-replacement races, use controlled response barriers for exact request counts;
+keep the assertion that old data stays hidden independent of background-event timing.
 For a deliberately scoped scan use `scanAccessibility(page, { include, rules })`
 from the same module and retain assertions on both violations and scanned nodes.
 
 Assert the intended UI state first (for example a loaded view or an open dialog).
 Visual stability does not prove hydration, completed data loading or authority.
+Metadata can stream after the visible UI. Before a document scan, assert the exact
+expected catalogue title for the selected locale; a nonempty stale title is insufficient.
 Do not scan a skeleton when the scenario is meant to prove the loaded form.
 Keep normal-motion and reduced-motion behavior checks in their own scenarios.
 Oxlint rejects direct runtime imports of axe in E2E outside the shared helper,

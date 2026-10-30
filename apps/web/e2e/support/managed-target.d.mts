@@ -13,6 +13,7 @@ export interface ManagedTarget {
   topology: string
   worktree: string
   snapshot: string
+  sourceHash: string
   ports: { web: number; api: number; redis: number; tls: number }
   origins: {
     product: string

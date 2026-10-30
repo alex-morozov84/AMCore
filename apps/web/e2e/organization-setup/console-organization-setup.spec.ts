@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test'
 import { probeRefusalEvidence } from '../real-stack/helpers'
 import { expectNoAxeViolations } from '../shared/axe'
 import { completeMfaSignIn } from '../shared/mfa-login'
+import { saveContextDiagnostics } from '../support/context-read-diagnostics'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 import { proveSetupMailbox, SETUP_PASSWORD, setupCommand } from '../support/organization-setup'
@@ -238,11 +239,9 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
       `Recipient journey refused: ${JSON.stringify({ before: recipientProbeBefore, after: await probeRefusalEvidence(), refusals })}`
     )
   } finally {
-    await test.info().attach('recipient-probe-counts', {
-      body: Buffer.from(
-        JSON.stringify({ before: recipientProbeBefore, after: await probeRefusalEvidence() })
-      ),
-      contentType: 'application/json',
+    await saveContextDiagnostics(test.info(), 'recipient-probe-counts', {
+      before: recipientProbeBefore,
+      after: await probeRefusalEvidence(),
     })
   }
   await recipientPage.close()

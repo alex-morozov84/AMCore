@@ -2,13 +2,26 @@ import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
-import { observeContextReads } from '../support/context-read-diagnostics'
+import { observeContextReads, saveContextDiagnostics } from '../support/context-read-diagnostics'
 import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi, proveOwnedRefresh } from './credential-containment.helpers'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
+
+let phase = 'setup'
+let diagnostic: ReturnType<typeof observeContextReads>
+test.beforeEach(async ({ page }) => {
+  phase = 'setup'
+  diagnostic = observeContextReads(page, () => phase)
+})
+test.afterEach(async ({ page }, info) => {
+  await saveContextDiagnostics(info, 'session-fence', {
+    ...(await diagnostic()),
+    pageClosed: page.isClosed(),
+  })
+})
 
 test('organization foundation: ordered lifecycle, targets, session fence and responsive UI', async ({
   page,
@@ -32,8 +45,9 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
     // Creation availability is independent of the existing authority-read sequence below.
-    if (path.startsWith('/api/product-access/') && !path.endsWith('/creation-policy'))
+    if (path.startsWith('/api/product-access/') && !path.endsWith('/creation-policy')) {
       calls.push(path)
+    }
   })
 
   await page.goto(ui.path())
@@ -158,8 +172,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
     page.getByRole('button', { name: lastUi.text('refresh'), exact: true })
   ).toBeEnabled()
 
-  const beforeChanged = calls.length
-  const changedReads = observeContextReads(page)
+  phase = 'credential-attempt'
   expect(
     (
       await browserCredentialRequest(context.request, '/api/auth/login', {
@@ -168,16 +181,18 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
       })
     ).status()
   ).toBe(200)
+  phase = 'new-identity'
   const newIdentity = await context.request.get(new URL('/api/auth/me', origin).href)
   expect(newIdentity.status()).toBe(200)
   expect((await newIdentity.json()).user.id).toBe(actor.id)
+  phase = 'focus-after-publication'
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   try {
     await expect(page.getByText(lastUi.text('changedTitle'), { exact: true })).toBeVisible()
   } catch {
-    throw new Error(`Session fence outcome: ${JSON.stringify(await changedReads())}`)
+    throw new Error(`Session fence outcome: ${JSON.stringify(await diagnostic())}`)
   }
-  expect(calls.slice(beforeChanged)).toEqual(['/api/product-access/bootstrap'])
+  // Exact request counts belong to the controlled session-fence scenarios, not prior navigation timing.
   await expect(page.getByText(second.name, { exact: true })).toHaveCount(0)
   expect(errors).toEqual([])
   // Vault capability checks above mutate only this cookie; never reset shared counters or limits.

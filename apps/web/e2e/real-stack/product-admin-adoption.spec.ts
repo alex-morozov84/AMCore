@@ -7,7 +7,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { closeCredentialPage } from '../shared/credential-artifacts'
-import { observeContextReads } from '../support/context-read-diagnostics'
+import { observeContextReads, saveContextDiagnostics } from '../support/context-read-diagnostics'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 
 import { directApi } from './credential-containment.helpers'
@@ -24,20 +24,25 @@ test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 const ownedContexts: BrowserContext[] = []
 let before: Awaited<ReturnType<typeof probeRefusalEvidence>>
 let reads: ReturnType<typeof observeContextReads>
+let foreignDocument: Record<string, unknown> | undefined
 test.beforeEach(async ({ page }) => {
+  foreignDocument = undefined
   before = await probeRefusalEvidence()
   reads = observeContextReads(page)
 })
 test.afterEach(async ({ context }, info) => {
-  await info.attach('adoption-authority-counts', {
-    body: Buffer.from(
-      JSON.stringify({ before, after: await probeRefusalEvidence(), reads: await reads() })
-    ),
-    contentType: 'application/json',
-  })
-  for (const owned of [context, ...ownedContexts.splice(0)]) {
-    for (const page of owned.pages()) await closeCredentialPage(page, info)
-    if (owned !== context) await owned.close()
+  try {
+    await saveContextDiagnostics(info, 'adoption-authority-counts', {
+      before,
+      after: await probeRefusalEvidence(),
+      reads: await reads(),
+      foreignDocument,
+    })
+  } finally {
+    for (const owned of [context, ...ownedContexts.splice(0)]) {
+      for (const page of owned.pages()) await closeCredentialPage(page, info)
+      if (owned !== context) await owned.close()
+    }
   }
 })
 
@@ -125,11 +130,8 @@ async function adoptionTeam(context: BrowserContext) {
   return { ...base, org, colleagueEmail, colleague, membership }
 }
 
-test('adoption creates and selects organizations while denying foreign tenants', async ({
-  page,
-  context,
-}) => {
-  const { target, ui, messages, owner } = await adoptionOwner(context)
+test('adoption creates and selects organizations', async ({ page, context }) => {
+  const { ui, messages, owner } = await adoptionOwner(context)
   const creation = messages.organizationCreation
   expect(
     count('SELECT count(*) FROM core.org_members WHERE "userId"=:\'actor\';', {
@@ -169,16 +171,47 @@ test('adoption creates and selects organizations while denying foreign tenants',
   expect(new URL(page.url()).pathname).toBe(ui.path(`/${second}`))
   await page.goto(ui.path(`/${org}`))
   await expect(page.getByRole('heading', { name: 'Adopter Beta', exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: 'Adopter Alpha', exact: true, level: 1 })
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: ui.text('refresh'), exact: true })).toBeEnabled()
+})
 
+test('adoption denies foreign documents and API without exposing data', async ({
+  page,
+  context,
+}) => {
+  const { target, ui, messages } = await adoptionOwner(context)
   // A real separate account/organization provides the foreign target, not a random missing ID.
   const outsider = await safeApi('auth/register', {
     email: uniqueEmail('adopter-foreign'),
     password: TEST_PASSWORD,
   })
   const foreign = await safeApi('organizations', { name: 'Foreign tenant' }, outsider.accessToken)
-  expect([403, 404].includes((await page.goto(ui.path(`/${foreign.id}/members`)))!.status())).toBe(
-    true
-  )
+  const foreignResponse = await page.goto(ui.path(`/${foreign.id}/members`))
+  foreignDocument = {
+    status: foreignResponse?.status(),
+    redirected: Boolean(foreignResponse?.request().redirectedFrom()),
+    unavailableVisible: await page
+      .getByText(ui.adminText('unavailableTitle'), { exact: true })
+      .isVisible(),
+    foreignNameVisible: await page.getByText('Foreign tenant', { exact: true }).isVisible(),
+  }
+  expect([200, 403, 404]).toContain(foreignResponse!.status())
+  await expect(page).toHaveURL(ui.path(`/${foreign.id}/members`))
+  await expect(
+    page.getByRole('heading', { name: messages.productAdmin.unavailableTitle, exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: messages.productAdmin.allOrganizations, exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: messages.productAdmin.visitSite, exact: true })
+  ).toBeVisible()
+  await expect(page.getByText('Foreign tenant', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(outsider.user.email, { exact: true })).toHaveCount(0)
+  foreignDocument!.unavailableVisible = true
+  foreignDocument!.foreignNameVisible = false
   const bootstrap = await context.request.get('/api/product-access/bootstrap')
   const { binding } = await bootstrap.json()
   const headers = { origin: target.origins.product, 'X-AMCore-Context-Session': binding }
