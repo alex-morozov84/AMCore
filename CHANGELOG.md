@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Authentication no longer hangs when Redis is slow or down. Organization-scoped and
-  OAuth requests that need Redis answer a fast `503` `SERVICE_UNAVAILABLE` and never
-  reach the handler; personal requests keep working because the user check reads the
-  primary database once per request. The authentication path now has its own supervised
+- Authentication no longer hangs when Redis is slow or down. Organization-scoped requests
+  whose admission needs Redis are refused with a fast `503` `SERVICE_UNAVAILABLE` before the
+  handler runs. OAuth steps can answer the same `503` from inside the operation, possibly after
+  an account or provider link was saved, so sign-in must start again. The personal user check no
+  longer needs Redis because it reads the primary database once per request. The authentication path now has its own supervised
   Redis client that is replaced when it stops answering. The Redis user cache and its
   invalidation calls are removed; old `auth:user:v2:*` entries expire by themselves
   (values within 10 minutes, key sets within 24 hours), so nothing needs flushing.
