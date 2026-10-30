@@ -62,6 +62,14 @@ test('HTTPS: a genuinely issued pending handoff rejects ACK after another sessio
   const independent = await request.newContext({
     proxy: { server: target.relay },
     ignoreHTTPSErrors: true,
+    // A competing login is another request from the same browser anchor.
+    // A different anchor would prove only cookie substitution, not supersession.
+    storageState: {
+      cookies: (await context.cookies(origin)).filter(
+        (cookie) => cookie.name === 'amcore_browser_context'
+      ),
+      origins: [],
+    },
   })
   try {
     const replacement = await postBrowserCredentials(independent, origin, '/api/auth/register', {
