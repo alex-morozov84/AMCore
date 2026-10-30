@@ -130,7 +130,8 @@ alone; it does not mean the request got a temporary error.
 | Lease lost or the ceiling reached before the backend call was sent                                                     | Kept (nothing was rotated)                                                       | `401`, the same answer as any lost exclusivity     | Treated as signed out; the next request can succeed |
 | The backend refuses the refresh token (invalid or reused)                                                              | A bounded delete is attempted; if it fails the stored state is unknown           | `401`                                              | Treated as signed out                               |
 | Lease lost or the ceiling reached after the call was sent                                                              | Rotation cannot be ruled out: the attempt ends and a bounded delete is attempted | `401`                                              | Treated as signed out                               |
-| The backend answered success but the reply cannot be used, or publication cannot be proven                             | Same: bounded delete attempted                                                   | `503`                                              | Error boundary                                      |
+| The backend answered success but its body is unreadable or has no access token, or publication cannot be proven        | Same: bounded delete attempted                                                   | `503`                                              | Error boundary                                      |
+| The backend answered success but the reply carries no rotated refresh cookie                                           | Same as an explicit refusal: a bounded delete is attempted                       | `401`                                              | Treated as signed out                               |
 | The check of the rotated credentials refuses (`503`, `429`, `401` `AUTH_CONTEXT_CHANGED`)                              | Bounded delete attempted unless the new tokens are already published             | The check's own status and code                    | Follows that status                                 |
 | The vault already shows the new tokens (this owner's write, or a newer entry), then the check refuses or time runs out | Not deleted                                                                      | The check's own status, or `503` when time ran out | Follows that status                                 |
 
@@ -168,5 +169,6 @@ dependency first. The shared client's health check and its metrics are separate.
   this mechanism.
 - The heartbeat check detects one reproduced misaligned-stream fault. It is a diagnostic, not a
   security check and not a defense against arbitrary corruption.
-- An unexpected programming or schema error stays a `500`; only Redis outage-class failures become
-  the `503`.
+- In the API an unexpected programming or schema error stays a `500`; only Redis outage-class
+  failures become the `503`. The web edge answers its generic sanitized `503` for failures it
+  cannot classify (see the web section above).
