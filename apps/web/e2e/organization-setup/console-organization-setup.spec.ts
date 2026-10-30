@@ -237,6 +237,13 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
     throw new Error(
       `Recipient journey refused: ${JSON.stringify({ before: recipientProbeBefore, after: await probeRefusalEvidence(), refusals })}`
     )
+  } finally {
+    await test.info().attach('recipient-probe-counts', {
+      body: Buffer.from(
+        JSON.stringify({ before: recipientProbeBefore, after: await probeRefusalEvidence() })
+      ),
+      contentType: 'application/json',
+    })
   }
   await recipientPage.close()
 })

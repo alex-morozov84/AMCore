@@ -2,15 +2,22 @@ import type { Page } from '@playwright/test'
 
 /** Bounded route/status diagnostics; never retain bodies, identifiers or credentials. */
 export function observeContextReads(page: Page) {
-  const reads: Array<{ route: string; status: number; errorCode?: string; retryAfter?: string }> =
-    []
+  const reads: Array<{
+    method: string
+    route: string
+    status: number
+    errorCode?: string
+    retryAfter?: string
+  }> = []
   const pending = new Set<Promise<void>>()
   page.on('response', (response) => {
     const path = new URL(response.url()).pathname
-    if (response.request().method() !== 'GET' || !path.startsWith('/api/product-access/')) return
+    const method = response.request().method()
+    if (!path.startsWith('/api/product-access/') || (method !== 'GET' && response.ok())) return
     const read = (async () => {
       const body = response.ok() ? undefined : await response.json().catch(() => undefined)
       reads.push({
+        method,
         route:
           path === '/api/product-access/bootstrap'
             ? path

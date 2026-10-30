@@ -9,7 +9,6 @@ import { expectNoAxeViolations } from '../shared/axe'
 import { closeCredentialPage } from '../shared/credential-artifacts'
 import { observeContextReads } from '../support/context-read-diagnostics'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
-import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
 import {
@@ -23,7 +22,19 @@ import { organizationUi } from './organization-context.helpers'
 // This declaration follows the spec into discovered CI, including failure/retry.
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 const ownedContexts: BrowserContext[] = []
+let before: Awaited<ReturnType<typeof probeRefusalEvidence>>
+let reads: ReturnType<typeof observeContextReads>
+test.beforeEach(async ({ page }) => {
+  before = await probeRefusalEvidence()
+  reads = observeContextReads(page)
+})
 test.afterEach(async ({ context }, info) => {
+  await info.attach('adoption-authority-counts', {
+    body: Buffer.from(
+      JSON.stringify({ before, after: await probeRefusalEvidence(), reads: await reads() })
+    ),
+    contentType: 'application/json',
+  })
   for (const owned of [context, ...ownedContexts.splice(0)]) {
     for (const page of owned.pages()) await closeCredentialPage(page, info)
     if (owned !== context) await owned.close()
@@ -68,22 +79,12 @@ async function memberAction(
   await page.getByRole('menuitem', { name: action, exact: true }).click()
 }
 
-test('ready adoption connects organization selection, roles, invitations, own keys and permanent member removal', async ({
-  page,
-  context,
-  browser,
-}) => {
-  test.setTimeout(240000)
+async function adoptionOwner(context: BrowserContext) {
   const target = activeTarget()
   const ui = organizationUi()
   const messages = JSON.parse(
     readFileSync(join(target.snapshot, `apps/web/messages/${DEFAULT_LOCALE}.json`), 'utf8')
   )
-  const creation = messages.organizationCreation
-  const members = messages.organizationMembers
-  const roles = messages.organizationRoles
-  const invitation = messages.organizationInvitations
-  const removal = messages.memberRemoval
   const email = uniqueEmail('adopter-owner')
   expect(
     (
@@ -94,6 +95,42 @@ test('ready adoption connects organization selection, roles, invitations, own ke
     ).status()
   ).toBe(201)
   const owner = await safeApi('auth/login', { email, password: TEST_PASSWORD })
+  const identity = await context.request.get(new URL('/api/auth/me', target.origins.product).href)
+  expect(identity.status()).toBe(200)
+  expect((await identity.json()).user.id).toBe(owner.user.id)
+  return { target, ui, messages, email, owner }
+}
+
+async function adoptionTeam(context: BrowserContext) {
+  const base = await adoptionOwner(context)
+  const created = await safeApi('organizations', { name: 'Adopter Alpha' }, base.owner.accessToken)
+  const org = created.id as string
+  const colleagueEmail = uniqueEmail('adopter-second-admin')
+  const colleague = await safeApi('auth/register', {
+    email: colleagueEmail,
+    password: TEST_PASSWORD,
+  })
+  const membership = `c${randomUUID().replaceAll('-', '').slice(0, 24)}`
+  guardedSql(
+    `INSERT INTO core.org_members(id,"userId","organizationId") VALUES (:'member',:'user',:'org');
+    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;
+    UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
+    {
+      member: membership,
+      user: colleague.user.id,
+      org,
+      link: `c${randomUUID().replaceAll('-', '').slice(0, 24)}`,
+    }
+  )
+  return { ...base, org, colleagueEmail, colleague, membership }
+}
+
+test('adoption creates and selects organizations while denying foreign tenants', async ({
+  page,
+  context,
+}) => {
+  const { target, ui, messages, owner } = await adoptionOwner(context)
+  const creation = messages.organizationCreation
   expect(
     count('SELECT count(*) FROM core.org_members WHERE "userId"=:\'actor\';', {
       actor: owner.user.id,
@@ -133,7 +170,6 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   await page.goto(ui.path(`/${org}`))
   await expect(page.getByRole('heading', { name: 'Adopter Beta', exact: true })).toHaveCount(0)
 
-  resetBrowserProbeDomainBudget()
   // A real separate account/organization provides the foreign target, not a random missing ID.
   const outsider = await safeApi('auth/register', {
     email: uniqueEmail('adopter-foreign'),
@@ -184,24 +220,13 @@ test('ready adoption connects organization selection, roles, invitations, own ke
       org: foreign.id,
     })
   ).toBe(beforeForeign)
+})
 
-  const colleagueEmail = uniqueEmail('adopter-second-admin')
-  const colleague = await safeApi('auth/register', {
-    email: colleagueEmail,
-    password: TEST_PASSWORD,
-  })
-  const membership = `c${randomUUID().replaceAll('-', '').slice(0, 24)}`
-  guardedSql(
-    `INSERT INTO core.org_members(id,"userId","organizationId") VALUES (:'member',:'user',:'org');
-    INSERT INTO core.member_roles(id,"memberId","roleId") SELECT :'link',:'member',id FROM core.roles WHERE name='ADMIN' AND "isSystem"=true AND "organizationId" IS NULL;
-    UPDATE core.organizations SET "aclVersion"="aclVersion"+1 WHERE id=:'org';`,
-    {
-      member: membership,
-      user: colleague.user.id,
-      org,
-      link: `c${randomUUID().replaceAll('-', '').slice(0, 24)}`,
-    }
-  )
+test('adoption assigns a custom role and records the actual actor', async ({ page, context }) => {
+  const { ui, messages, owner, org, colleagueEmail, colleague, membership } =
+    await adoptionTeam(context)
+  const members = messages.organizationMembers
+  const roles = messages.organizationRoles
   await page.goto(ui.path(`/${org}`))
   const nav = page.getByRole('navigation', { name: messages.organizationNav.sections })
   await nav.getByRole('link', { name: messages.organizationNav.roles, exact: true }).click()
@@ -256,9 +281,17 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   await memberAction(page, members, colleagueEmail, members.access)
   await expect(page.getByRole('dialog').getByRole('heading').first()).toBeVisible()
   await page.keyboard.press('Escape')
+})
 
-  const invitationProbeBefore = await probeRefusalEvidence()
-  const invitationReads = observeContextReads(page)
+test('adoption issues, reads and revokes an invitation in one journey', async ({
+  page,
+  context,
+}) => {
+  const { ui, messages, owner } = await adoptionOwner(context)
+  const created = await safeApi('organizations', { name: 'Adopter Alpha' }, owner.accessToken)
+  await page.goto(ui.path(`/${created.id}`))
+  const nav = page.getByRole('navigation', { name: messages.organizationNav.sections })
+  const invitation = messages.organizationInvitations
   await nav.getByRole('link', { name: messages.organizationNav.invitations, exact: true }).click()
   await page.getByRole('button', { name: invitation.invite, exact: true }).click()
   const recipient = uniqueEmail('adopter-invite')
@@ -275,13 +308,7 @@ test('ready adoption connects organization selection, roles, invitations, own ke
     .click()
   expect((await issued).status()).toBe(202)
   const invitationRow = page.getByRole('row').filter({ hasText: recipient })
-  try {
-    await expect(invitationRow).toBeVisible()
-  } catch {
-    throw new Error(
-      `Invitation read after issuance: ${JSON.stringify({ before: invitationProbeBefore, after: await probeRefusalEvidence(), reads: await invitationReads() })}`
-    )
-  }
+  await expect(invitationRow).toBeVisible()
   await invitationRow
     .getByRole('button', {
       name: invitation.actionFor
@@ -303,7 +330,18 @@ test('ready adoption connects organization selection, roles, invitations, own ke
     .getByRole('button', { name: invitation.revoke, exact: true })
     .click()
   await expect(invitationRow).toHaveCount(0)
+})
 
+test('adoption revokes member keys on removal and protects the last administrator', async ({
+  page,
+  context,
+  browser,
+}) => {
+  const { target, ui, messages, email, org, colleagueEmail, colleague, membership } =
+    await adoptionTeam(context)
+  const roles = messages.organizationRoles
+  const members = messages.organizationMembers
+  const removal = messages.memberRemoval
   // This context is registered for failure-DOM cleanup before its first credential-bearing step.
   const staff = await browser.newContext()
   ownedContexts.push(staff)
