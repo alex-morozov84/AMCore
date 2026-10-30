@@ -88,14 +88,15 @@ export function createOrganizationContextScheduler(
           target,
           error,
           retryAt: retryDelay > 0 ? Date.now() + retryDelay : undefined,
-          status:
-            getErrorCode(error) === 'CONTEXT_SESSION_CHANGED'
-              ? 'changed'
-              : status === 401
-                ? 'missing'
-                : status === 403 || status === 404
-                  ? 'denied'
-                  : 'error',
+          status: ['CONTEXT_SESSION_CHANGED', 'AUTH_CONTEXT_CHANGED'].includes(
+            getErrorCode(error) ?? ''
+          )
+            ? 'changed'
+            : status === 401
+              ? 'missing'
+              : status === 403 || status === 404
+                ? 'denied'
+                : 'error',
         })
         if (retryDelay > 0)
           retryTimer = setTimeout(() => {

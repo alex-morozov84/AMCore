@@ -7,11 +7,17 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
 import { closeCredentialPage } from '../shared/credential-artifacts'
+import { observeContextReads } from '../support/context-read-diagnostics'
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
 import { directApi } from './credential-containment.helpers'
-import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
+import {
+  browserCredentialRequest,
+  probeRefusalEvidence,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
 // This declaration follows the spec into discovered CI, including failure/retry.
@@ -251,6 +257,8 @@ test('ready adoption connects organization selection, roles, invitations, own ke
   await expect(page.getByRole('dialog').getByRole('heading').first()).toBeVisible()
   await page.keyboard.press('Escape')
 
+  const invitationProbeBefore = await probeRefusalEvidence()
+  const invitationReads = observeContextReads(page)
   await nav.getByRole('link', { name: messages.organizationNav.invitations, exact: true }).click()
   await page.getByRole('button', { name: invitation.invite, exact: true }).click()
   const recipient = uniqueEmail('adopter-invite')
@@ -267,7 +275,13 @@ test('ready adoption connects organization selection, roles, invitations, own ke
     .click()
   expect((await issued).status()).toBe(202)
   const invitationRow = page.getByRole('row').filter({ hasText: recipient })
-  await expect(invitationRow).toBeVisible()
+  try {
+    await expect(invitationRow).toBeVisible()
+  } catch {
+    throw new Error(
+      `Invitation read after issuance: ${JSON.stringify({ before: invitationProbeBefore, after: await probeRefusalEvidence(), reads: await invitationReads() })}`
+    )
+  }
   await invitationRow
     .getByRole('button', {
       name: invitation.actionFor

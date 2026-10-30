@@ -121,6 +121,32 @@ describe('ordered organization authority scheduler', () => {
     expect(f.publish).not.toHaveBeenCalled()
     f.scheduler.stop()
   })
+  it.each(['CONTEXT_SESSION_CHANGED', 'AUTH_CONTEXT_CHANGED'])(
+    'terminal %s hides old data and stops before authority',
+    async (errorCode) => {
+      const f = fixture()
+      f.bootstrap.mockRejectedValueOnce(new ApiRequestError(401, { errorCode } as never))
+      f.scheduler.activate()
+      await settle()
+      expect(f.scheduler.getSnapshot().status).toBe('changed')
+      expect(f.authority).not.toHaveBeenCalled()
+      expect(f.publish).not.toHaveBeenCalled()
+      f.scheduler.activate()
+      await settle()
+      expect(f.bootstrap).toHaveBeenCalledTimes(1)
+      f.scheduler.stop()
+    }
+  )
+  it('ordinary missing session remains signed out', async () => {
+    const f = fixture()
+    f.bootstrap.mockRejectedValueOnce(new ApiRequestError(401, undefined))
+    f.scheduler.activate()
+    await settle()
+    expect(f.scheduler.getSnapshot().status).toBe('missing')
+    expect(f.authority).not.toHaveBeenCalled()
+    expect(f.publish).not.toHaveBeenCalled()
+    f.scheduler.stop()
+  })
   it('bootstrap outage suspends before authority; manual retry verifies again', async () => {
     const f = fixture()
     f.bootstrap.mockRejectedValueOnce(new Error('offline'))

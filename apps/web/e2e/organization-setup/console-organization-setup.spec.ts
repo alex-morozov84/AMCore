@@ -181,6 +181,35 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await setup.getByRole('link', { name: ru.openOrganization, exact: true }).click()
   await expect(page.getByText('Anna shop', { exact: true })).toBeVisible()
 
+  // Recipient admission is independent of the preceding operator recovery exercise.
+  // Keep login, identity and organization reads together without further budget resets.
+  resetBrowserProbeDomainBudget()
+  const recipientProbeBefore = await probeRefusalEvidence()
+  const refusals: Array<{
+    route: string
+    status: number
+    errorCode?: string
+    retryAfter?: string
+  }> = []
+  recipientPage.on('response', async (response) => {
+    const path = new URL(response.url()).pathname
+    if (response.status() < 400 || !path.startsWith('/api/')) return
+    const body = await response.json().catch(() => ({}))
+    refusals.push({
+      route:
+        path === '/api/auth/login' || path === '/api/auth/me'
+          ? path
+          : path.startsWith('/api/product-access/')
+            ? '/api/product-access/<resource>'
+            : '/api/<other>',
+      status: response.status(),
+      errorCode: /^[A-Z_]{1,64}$/.test(body.errorCode) ? body.errorCode : undefined,
+      retryAfter: /^\d{1,6}$/.test(response.headers()['retry-after'] ?? '')
+        ? response.headers()['retry-after']
+        : undefined,
+    })
+    if (refusals.length > 10) refusals.shift()
+  })
   await recipientPage.goto(
     localizedFrontendUrl(m.origins.product, coerceSupportedLocale('en'), 'login')
   )
@@ -195,6 +224,19 @@ test('Console recovers a deleted recipient and lost replies without duplicating 
   await recipientPage.goto(
     localizedFrontendUrl(m.origins.product, coerceSupportedLocale('en'), 'organizations')
   )
-  await expect(recipientPage.getByRole('heading', { name: 'Anna shop', exact: true })).toBeVisible()
+  try {
+    const identity = await recipientPage.request.get(
+      new URL('/api/auth/me', m.origins.product).href
+    )
+    expect(identity.status()).toBe(200)
+    expect((await identity.json()).user.email).toBe(recipient)
+    await expect(
+      recipientPage.getByRole('heading', { name: 'Anna shop', exact: true })
+    ).toBeVisible()
+  } catch {
+    throw new Error(
+      `Recipient journey refused: ${JSON.stringify({ before: recipientProbeBefore, after: await probeRefusalEvidence(), refusals })}`
+    )
+  }
   await recipientPage.close()
 })

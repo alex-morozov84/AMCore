@@ -53,8 +53,32 @@ function invoke(script: string, input: unknown) {
       }
     )
     return JSON.parse(output)
-  } catch {
-    throw new Error('Owned organization setup fixture failed; private output discarded')
+  } catch (error) {
+    let diagnostic: { exit: number | null; status?: string } = { exit: null }
+    if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number')
+      diagnostic.exit = error.status
+    if (error && typeof error === 'object' && 'stderr' in error) {
+      try {
+        const result = JSON.parse(String(error.stderr).slice(0, 1024))
+        const statuses = [
+          'invalid_input',
+          'SETUP_CLOSED',
+          'SETUP_BUSY',
+          'SETUP_UNCONFIRMED',
+          'SETUP_NOT_READY',
+          'SETUP_ACCOUNT_UNAVAILABLE',
+          'SETUP_EMAIL_UNVERIFIED',
+          'SETUP_INTENT_MISMATCH',
+          'SETUP_STATE_CHANGED',
+          'fixture_unavailable',
+        ]
+        if (statuses.includes(result.status))
+          diagnostic = { exit: result.exit, status: result.status }
+      } catch {
+        /* Unstructured private output remains discarded. */
+      }
+    }
+    throw new Error(`Owned organization setup fixture failed: ${JSON.stringify(diagnostic)}`)
   }
 }
 

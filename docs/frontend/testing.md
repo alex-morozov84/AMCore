@@ -107,7 +107,9 @@ node scripts/e2e-ci.mjs --all
 ```
 
 This invokes the same lane commands as GitHub with `CI=true`: forbidden `.only`,
-one browser worker per stand and one retry. Locally the lanes run sequentially
+one browser worker per stand and one retry for repeatable fixtures. Initial
+organization setup has no retry on the same database: a completed bootstrap closes
+that procedure. A new attempt requires a new managed stand. Locally the lanes run sequentially
 on one machine; GitHub runs each lane on a separate Ubuntu runner. This proves
 matching commands, inventory and settings, not identical OS, hardware or cache timings.
 A nonzero, cancelled or missing lane cannot produce a successful aggregate result.

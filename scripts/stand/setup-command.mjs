@@ -6,6 +6,24 @@ import { docker, inspect } from './docker.mjs'
 import { cleanEnvironment, run } from './process.mjs'
 import { dataAdmission, owned } from './ownership.mjs'
 
+export function setupFailureResult(output, exit) {
+  const statuses = [
+    'invalid_input',
+    'SETUP_CLOSED',
+    'SETUP_BUSY',
+    'SETUP_UNCONFIRMED',
+    'SETUP_NOT_READY',
+    'SETUP_ACCOUNT_UNAVAILABLE',
+    'SETUP_EMAIL_UNVERIFIED',
+    'SETUP_INTENT_MISMATCH',
+    'SETUP_STATE_CHANGED',
+  ]
+  return {
+    exit: Number.isInteger(exit) && exit >= 0 && exit <= 255 ? exit : null,
+    status: statuses.includes(output?.status) ? output.status : 'fixture_unavailable',
+  }
+}
+
 /** Execute only admitted fixture commands against a pinned, owned runtime image. */
 export async function executeSetupCommand(m, input) {
   let previewDiagnostics = false
@@ -67,13 +85,24 @@ export async function executeSetupCommand(m, input) {
       await docker(m, ['exec', '-i', candidates[0], 'node', '-e', program], { capture: true })
     )
   }
-  const output = await docker(
-    m,
-    ['exec', '-i', candidates[0], 'node', 'dist/cli/organization-setup.js', ...args],
-    { capture: true }
-  )
+  // Capture only the existing bounded CLI JSON contract, including nonzero exits.
+  // Never forward arbitrary subprocess stderr or a failed command's full output.
+  const program = `const {spawnSync}=require('node:child_process');
+    const r=spawnSync(process.execPath,['dist/cli/organization-setup.js',...process.argv.slice(1)],
+      {encoding:'utf8',timeout:20000,maxBuffer:16384});
+    if(r.error||r.signal)throw new Error('fixture command unavailable');
+    process.stdout.write(JSON.stringify({exit:r.status,output:JSON.parse(r.stdout)}));`
+  const output = await docker(m, ['exec', '-i', candidates[0], 'node', '-e', program, ...args], {
+    capture: true,
+  })
   if (Buffer.byteLength(output) > 16384) throw new Error('Invalid command output')
-  return JSON.parse(output)
+  const result = JSON.parse(output)
+  if (result.exit !== 0) {
+    const error = new Error('Owned setup command refused')
+    error.fixtureFailure = setupFailureResult(result.output, result.exit)
+    throw error
+  }
+  return result.output
 }
 
 if (process.argv[1] === import.meta.filename) {
@@ -93,8 +122,10 @@ if (process.argv[1] === import.meta.filename) {
       if (input.length > 4096) throw new Error('oversize')
     }
     process.stdout.write(JSON.stringify(await executeSetupCommand(m, JSON.parse(input))))
-  } catch {
-    process.stderr.write('Owned setup command failed\n')
+  } catch (error) {
+    process.stderr.write(
+      JSON.stringify(error.fixtureFailure ?? setupFailureResult(null, null)) + '\n'
+    )
     process.exitCode = 1
   }
 }

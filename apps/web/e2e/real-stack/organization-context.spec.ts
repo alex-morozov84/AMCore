@@ -2,6 +2,7 @@ import { SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
+import { observeContextReads } from '../support/context-read-diagnostics'
 import { activeTarget, guardedExec, guardedSql } from '../support/managed-target.mjs'
 import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs'
 
@@ -158,6 +159,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   ).toBeEnabled()
 
   const beforeChanged = calls.length
+  const changedReads = observeContextReads(page)
   expect(
     (
       await browserCredentialRequest(context.request, '/api/auth/login', {
@@ -166,8 +168,15 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
       })
     ).status()
   ).toBe(200)
+  const newIdentity = await context.request.get(new URL('/api/auth/me', origin).href)
+  expect(newIdentity.status()).toBe(200)
+  expect((await newIdentity.json()).user.id).toBe(actor.id)
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect(page.getByText(lastUi.text('changedTitle'), { exact: true })).toBeVisible()
+  try {
+    await expect(page.getByText(lastUi.text('changedTitle'), { exact: true })).toBeVisible()
+  } catch {
+    throw new Error(`Session fence outcome: ${JSON.stringify(await changedReads())}`)
+  }
   expect(calls.slice(beforeChanged)).toEqual(['/api/product-access/bootstrap'])
   await expect(page.getByText(second.name, { exact: true })).toHaveCount(0)
   expect(errors).toEqual([])
