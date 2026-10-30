@@ -23,6 +23,7 @@ type GaugeHandle<T extends string> = Pick<Gauge<T>, 'reset' | 'set'>
 
 export type RedisMetricsClient =
   | 'shared'
+  | 'auth'
   | 'queue_producer'
   | 'queue_worker'
   | 'throttler'

@@ -54,6 +54,11 @@ export class BoundedRedis {
 
   constructor(@Inject(REDIS_CLIENT) private readonly redis: AppRedisClient) {}
 
+  /** Operations admitted through this helper that have not settled yet (diagnostics). */
+  get unsettledCount(): number {
+    return this.unsettled
+  }
+
   run<T>(
     operation: (client: BoundedRedisClient, signal: AbortSignal) => Promise<T>,
     deadlineMs = BOUNDED_REDIS_DEADLINE_MS
