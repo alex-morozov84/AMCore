@@ -79,13 +79,7 @@ export function auditCatalogue(root, choices = auditChoices(root)) {
   return { scenarios, coverage }
 }
 
-export function auditPlan(root, identity) {
-  invariant(
-    /^[a-zA-Z0-9-]+$/.test(identity.run) &&
-      /^\d+$/.test(identity.attempt) &&
-      /^[a-f0-9]{40}$/.test(identity.source),
-    'invalid-run-identity'
-  )
+export function auditScope(root) {
   const choices = auditChoices(root)
   const catalogue = auditCatalogue(root, choices)
   const lanes = ciLanes(root)
@@ -109,6 +103,17 @@ export function auditPlan(root, identity) {
     'missing-required-owner'
   )
   invariant(catalogue.scenarios.length <= 3, 'scenario-count-requires-budget-admission')
+  return { choices, catalogue, assignments }
+}
+
+export function auditPlan(root, identity) {
+  invariant(
+    /^[a-zA-Z0-9-]+$/.test(identity.run) &&
+      /^\d+$/.test(identity.attempt) &&
+      /^[a-f0-9]{40}$/.test(identity.source),
+    'invalid-run-identity'
+  )
+  const { choices, catalogue, assignments } = auditScope(root)
   const plan = {
     version: 1,
     ...identity,

@@ -22,12 +22,15 @@ export async function assertManagedStandProjection(root, scenario) {
       encoding: 'utf8',
     })
   )
-  assert.equal(matrix.lane.includes('host'), enabled)
-  assert.equal(matrix.lane.includes('setup-console'), enabled)
-  assert.ok(matrix.lane.includes('setup-cli'))
-  assert.ok(matrix.lane.includes('path-standard'))
-  assert.ok(matrix.lane.includes('safety'))
-  assert.ok(matrix.lane.includes('mocked'))
+  const lanes = matrix.include.map((row) => row.lane)
+  assert.equal(lanes.includes('host'), enabled)
+  assert.equal(lanes.includes('setup-console'), enabled)
+  assert.ok(lanes.includes('setup-cli'))
+  assert.ok(lanes.includes('path-standard'))
+  assert.ok(lanes.includes('safety'))
+  assert.ok(lanes.includes('mocked'))
+  assert.equal(new Set(lanes).size, lanes.length)
+  assert.equal(matrix.include.find((row) => row.lane === 'path-standard').timeout, 40)
   for (const file of [
     'scripts/stand/proxy-smoke.mjs',
     'scripts/stand/wrapper-cancellation.test.mjs',

@@ -2,7 +2,7 @@ import { publishPlan } from './lighthouse/ci-plan.mjs'
 import { productAdminE2ePlans } from './product-admin-e2e-plan.mjs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { auditPlan } from './lib/lighthouse-plan.mjs'
+import { auditPlan, auditScope } from './lib/lighthouse-plan.mjs'
 import { runIdentity } from './lighthouse/identity.mjs'
 import { auditEnvironment, laneEpoch } from './lib/lighthouse-command.mjs'
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
@@ -12,8 +12,7 @@ import { ciLanes } from './e2e-ci-plan.mjs'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const lanes = ciLanes(root)
 const requested = process.argv[2]
-const auditIdentity = runIdentity(root)
-const plan = auditPlan(root, auditIdentity)
+const plan = requested === '--matrix' ? auditScope(root) : auditPlan(root, runIdentity(root))
 const auditDirectory = (lane) =>
   join(root, '.amcore/lighthouse-results', plan.run, plan.attempt, lane)
 
