@@ -99,7 +99,10 @@ session vault store, the session lock factory and the refresh. The lock factory 
 invitation owner lease, so that lease runs on the supervised connection too: a held lease still
 answers "busy", an unreachable connection is a temporary failure, and acquisition waits at most 3 s.
 Every other web-server Redis record store (invitation, MFA and OAuth attempt records, Console return
-entries) stays on the shared connection.
+entries) stays on the shared connection. The 3 s admission budget does not cover them. In the
+real-stack check an invitation link opened during an 8 s stall answered after about 8.4 s and then
+opened the flow normally, with no membership created. Other pages that use these stores were not
+measured.
 
 **What a request sees.** Session admission has one absolute budget of 3 s: vault read, the
 browser-binding check and, when a refresh is needed, waiting for the refresh. Nothing starts once the
