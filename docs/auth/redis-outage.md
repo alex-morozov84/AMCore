@@ -102,8 +102,11 @@ Every other web-server Redis record store (invitation, MFA and OAuth attempt rec
 entries) stays on the shared connection. The 3 s admission budget does not cover them. In the
 real-stack check an invitation link opened during an 8 s stall answered after about 8.4 s and then
 opened the flow normally, with no membership created. A product-administration OAuth sign-in started
-during the same stall also waited and then signed in. Other pages that use these stores were not
-measured.
+during the same stall also waited and then signed in. When the stall begins after a healthy start,
+at the moment the provider returns the browser, the callback goes straight to the API: the one-time
+state step is refused fast, the browser lands on the sign-in page with a provider error, no backend
+session is created, and starting the sign-in again after recovery works. Other pages that use these
+stores were not measured.
 
 **What a request sees.** Session admission has one absolute budget of 3 s: vault read, the
 browser-binding check and, when a refresh is needed, waiting for the refresh. Nothing starts once the
