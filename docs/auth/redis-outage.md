@@ -45,8 +45,9 @@ mean Redis was untouched: a command that was already sent may still run after th
 
 **Can a client resend a write?** On a route that is not OAuth, the exact admission body above means
 the handler did not run, so resending is safe. Any other `503` message says nothing about whether
-the handler ran: send writes with an idempotency key (see
-[idempotency](../operations/idempotency.md)) or check the result before resending. Do not reload an
+the handler ran: resend only if the route supports idempotency (it is opt-in per endpoint, see
+[idempotency](../operations/idempotency.md); an unsupported header protects nothing), or check the
+result before resending. Do not reload an
 OAuth callback URL; start the sign-in again.
 
 **OAuth is different.** Its Redis steps run inside the operation. The account or provider link
@@ -64,7 +65,12 @@ load is not an availability fallback, and a stale cached version is never used.
   Work already in flight finishes in the background and its result is ignored. After expiry the
   admission starts no next credential, no further database query, no counter write and no cache
   call. A command that was already sent may still complete.
-- One cache, lock or counter call waits at most 250 ms, or what is left of the admission deadline.
+- The 1 s deadline covers every request that passes admission, including a personal JWT request
+  without an organization (its user check reads the database inside the same deadline).
+- One cache, lock or counter call made by the authentication steps above waits at most 250 ms, or
+  what is left of the admission deadline. This limit does not bound a handler: once admission
+  succeeds, the handler's own Redis use, the rate limiter and other protections keep their own
+  waits.
 - Each Redis phase of an OAuth step (store the state, consume the state, store the ticket,
   consume the ticket) has its own 1.5 s deadline. The provider HTTP exchange and the account
   commit are not bounded by it.
