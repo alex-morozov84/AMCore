@@ -1031,7 +1031,9 @@ jobs:
       - name: Prepare pinned audit browser
         if: matrix.timeout == 40
         timeout-minutes: ${{ fromJSON(steps.playwright.outputs.minutes) }}
-        run: pnpm audit:web:browser
+        run: |
+          pnpm audit:web:browser
+          node scripts/lighthouse/ci-browser.mjs
 
       - name: Require preparation reserve
         run: node scripts/lighthouse/ci-budget.mjs 20

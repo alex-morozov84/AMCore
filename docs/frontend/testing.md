@@ -201,8 +201,14 @@ needed for reuse. A live or unproved child blocks recovery and cleanup.
 The pinned browser platforms are Linux x64 and Apple Silicon macOS.
 On Linux, install system dependencies with
 `pnpm --filter web exec playwright install --with-deps chromium` before the audit.
-This may require administrator rights. A pinned binary hash alone does not prove
-that its shared libraries are available. On `browser-launch` failure, preserve the
+This may require administrator rights. Chrome also needs a working Linux sandbox.
+Ubuntu can restrict user namespaces for downloaded binaries; follow the
+[Chromium AppArmor guidance](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md)
+to admit the exact pinned executable. The disposable GitHub runner does this only
+after Chrome reports `No usable sandbox`, then checks namespace and seccomp isolation.
+It does not disable the browser sandbox or the system-wide AppArmor restriction.
+A pinned binary hash alone does not prove that these prerequisites work.
+On `browser-launch` failure, preserve the
 safe run/stand identity and ask the maintainer to diagnose the Linux prerequisites;
 do not remove a verified browser cache or assume a successful measurement.
 Other platforms stop with `browser-platform-not-admitted`; admit their binary hash
