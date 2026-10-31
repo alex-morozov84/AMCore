@@ -143,6 +143,14 @@ other error is kept with its cause for diagnosis. In the API an unexpected progr
 error stays a `500`; the web edge answers its generic sanitized `503` for failures it cannot
 classify, which is a statement about the response, not a claim that the cause was an outage.
 
+**Operations Console during a vault outage.** A Console route cannot confirm that the visitor is a
+`SUPER_ADMIN` while the vault is unavailable, so it shows the temporary "unavailable" page and
+nothing else: no navigation, no data and no operator identity. The page is not a `404`, so it
+discloses one fact. A request that carries any non-empty session cookie, even an invented one, can
+see the temporary page and learn that the Console route exists. A request without a cookie still
+gets the plain `404`, and so does every request again after recovery. The behavior is verified for
+the path-mode Console; host-mode isolation is a separate check.
+
 **What to watch.** The web server logs `Vault Redis client generation replaced` with the reason,
 `Vault Redis alert` and `Vault Redis client error`. It exports no metric for this connection and
 installs no shutdown hook for it. The heartbeat check is a diagnostic, not a defense against

@@ -138,3 +138,10 @@ export function holdRefreshInProgress(ms: number): Promise<void> {
     )
   )
 }
+
+/** Revokes the user's backend sessions the way an explicit logout does, leaving the vault entry alone. */
+export function revokeBackendSessions(userId: string): void {
+  guardedSql(
+    `UPDATE core.sessions SET "revokedAt" = now(), "revocationReason" = 'logout' WHERE "userId" = '${userId}';`
+  )
+}

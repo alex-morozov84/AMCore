@@ -7,6 +7,7 @@ import {
   holdRefreshInProgress,
   readEntry,
   refreshHoldActive,
+  revokeBackendSessions,
   rewriteEntry,
   sessionRows,
   signedIn,
@@ -104,6 +105,31 @@ test('a backend refresh that fails after its callers left keeps the session and 
     }).toPass({ timeout: 20_000, intervals: [500, 1000] })
     expect((await readEntry(cookie))?.version).toBe(before.version + 1)
     expect(sessionRows(userId)).toBe(2)
+  } finally {
+    await context.close()
+  }
+})
+
+// Explicit revocation on the backend while the vault still holds the entry: the next request is
+// refused as signed out and does not resurrect the session.
+test('a session revoked on the backend is refused on the next request, also with an aged entry', async ({
+  browser,
+  baseURL,
+}) => {
+  test.setTimeout(60_000)
+  const origin = activeTarget().origins.product
+  const context = await browser.newContext({ baseURL })
+  try {
+    const cookie = await signedIn(context, origin)
+    const userId = (await readEntry(cookie))!.userSnapshot.id
+    revokeBackendSessions(userId)
+    await rewriteEntry(cookie, ageAccessToken)
+
+    const refused = await context.request.get('/api/auth/me', { timeout: 15_000 })
+    expect(refused.status()).toBe(401)
+    expect(sessionRows(userId)).toBe(1) // no rotation happened
+    expect((await context.request.get('/api/auth/me', { timeout: 15_000 })).status()).toBe(401)
+    expect(sessionRows(userId)).toBe(1)
   } finally {
     await context.close()
   }
