@@ -5,6 +5,10 @@ import { validateDefinition } from '../notification-definition.validation.js'
 
 import { accountMfaFactorChangedDefinition as definition } from './account-mfa-factor-changed.definition.js'
 
+const safeResponse = { en: 'reset your password', ru: 'сбросьте пароль' }
+
+const recoveredResponse = { en: 'no longer work', ru: 'больше не работают' }
+
 describe('Factor-change security notification', () => {
   it('registers mandatory in-app/email delivery and a first-party security action', () => {
     expect(() => validateDefinition(definition)).not.toThrow()
@@ -30,13 +34,13 @@ describe('Factor-change security notification', () => {
     expect(definition.projectExternal!(NotificationChannel.EMAIL, payload)).toEqual(payload)
   })
 
-  it('explains factor change and a safe response in both supported languages', () => {
+  it('explains factor change and a safe response in supported languages', () => {
     const payload = { change: 'enrolled' as const, changedAt: '2026-10-26T12:00:00.000Z' }
     expect(definition.renderInApp(payload, coerceSupportedLocale('en')).body).toContain(
-      coerceSupportedLocale('en') === 'en' ? 'reset your password' : 'сбросьте пароль'
+      safeResponse[coerceSupportedLocale('en')]
     )
     expect(definition.renderInApp(payload, coerceSupportedLocale('ru')).body).toContain(
-      coerceSupportedLocale('ru') === 'en' ? 'reset your password' : 'сбросьте пароль'
+      safeResponse[coerceSupportedLocale('ru')]
     )
     expect(definition.renderExternal!.email!(payload, coerceSupportedLocale('en'))).toEqual(
       definition.renderInApp(payload, coerceSupportedLocale('en'))
@@ -46,10 +50,10 @@ describe('Factor-change security notification', () => {
   it('explains offline recovery without putting the ticket or operator reason in the notification', () => {
     const payload = { change: 'recovery_started' as const, changedAt: '2026-10-26T12:00:00.000Z' }
     expect(definition.renderInApp(payload, coerceSupportedLocale('en')).body).toContain(
-      coerceSupportedLocale('en') === 'en' ? 'no longer work' : 'больше не работают'
+      recoveredResponse[coerceSupportedLocale('en')]
     )
     expect(definition.renderInApp(payload, coerceSupportedLocale('ru')).body).toContain(
-      coerceSupportedLocale('ru') === 'en' ? 'no longer work' : 'больше не работают'
+      recoveredResponse[coerceSupportedLocale('ru')]
     )
     for (const field of ['ticket', 'reason', 'password', 'secret'])
       expect(

@@ -1057,9 +1057,9 @@ jobs:
         with:
           name: playwright-${{ matrix.lane }}
           path: |
-            .amcore/stands/**/report/
-            .amcore/stands/**/test-results/
-            .amcore/stands/**/inventory.json
+            .amcore/stands/*/report/
+            .amcore/stands/*/test-results/
+            .amcore/stands/*/inventory.json
           include-hidden-files: true
           retention-days: 7
 

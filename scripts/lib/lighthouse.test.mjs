@@ -1,5 +1,4 @@
 import { assertRequiredAudits, requiredAuditCategories } from './lighthouse-required.mjs'
-import { auditCommand } from './lighthouse-command.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, cp, readFile, writeFile, rm, symlink } from 'node:fs/promises'
@@ -102,6 +101,7 @@ test('manual and informative do not silently pass required rules; unexpected N/A
 
 // AMCORE_CONSOLE_LIGHTHOUSE_OWNER_TEST_START
 test('owner resolver keeps one exact audit assignment in all four topologies and Console-disabled output', async (t) => {
+  const { auditCommand } = await import('./lighthouse-command.mjs')
   const dir = await temporary(t)
   for (const file of [
     'PROJECT_CONTEXT.md',
@@ -120,7 +120,10 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
       await writeFile(
         join(dir, 'PROJECT_CONTEXT.md'),
         context
-          .replace('**admin_console_mode:** path', `**admin_console_mode:** ${consoleMode}`)
+          .replace(
+            /\*\*admin_console_mode:\*\* (?:path|host)/,
+            `**admin_console_mode:** ${consoleMode}`
+          )
           .replace('**admin_console_slug:** admin', '**admin_console_slug:** ops')
       )
       const p = auditPlan(dir, identity)

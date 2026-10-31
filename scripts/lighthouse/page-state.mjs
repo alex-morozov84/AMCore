@@ -1,4 +1,4 @@
-import { invariant, digest } from '../lib/lighthouse-plan.mjs'
+import { invariant } from '../lib/lighthouse-plan.mjs'
 
 export async function assertMeasuredPage(page, scenario, fixture, url) {
   invariant(page.url() === url, 'unexpected-measured-url')
@@ -15,6 +15,7 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
   // AMCORE_CONSOLE_LIGHTHOUSE_STATE_START
   if (scenario.scope === 'console') {
     if (fixture.consoleHost) {
+      const { digest } = await import('../lib/lighthouse-plan.mjs')
       const { redisEntry } = await import('../../apps/web/e2e/console-real-stack/helpers.ts')
       const cookie = (await page.context().cookies(url)).find(
         (item) => item.name === '__Host-amcore_console_session'
