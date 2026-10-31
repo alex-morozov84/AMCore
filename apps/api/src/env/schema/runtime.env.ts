@@ -10,9 +10,6 @@ export const runtimeEnv = z.object({
   // processors + cron with health-only HTTP; `all` is both (dev/single-node).
   // The bootstrap reads this raw to pick the root module; this validates it.
   PROCESS_ROLE: z.enum(['web', 'worker', 'all']).default('all'),
-  // Worker concurrency for BullMQ processors (ADR-041). Default 1 (BullMQ's
-  // default); tune from ~floor(cpu/2) for I/O-bound jobs.
-  WORKER_CONCURRENCY: z.coerce.number().int().min(1).default(1),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(5002),
   CORS_ORIGIN: z
     .string()
