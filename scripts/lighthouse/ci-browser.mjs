@@ -22,7 +22,7 @@ async function smoke() {
     invariant((await browser.version()) === `Chrome/${browserVersion}`, 'browser-version-mismatch')
     const page = await browser.newPage()
     await page.goto('chrome://sandbox')
-    const state = await page.locator('body').evaluate((body) => body.innerText)
+    const state = await page.$eval('body', (body) => body.innerText)
     invariant(/Namespace Sandbox\s+Yes/.test(state), 'namespace-sandbox-not-active')
     invariant(/Seccomp-BPF sandbox\s+Yes/.test(state), 'seccomp-sandbox-not-active')
     console.log(`Pinned Chrome ${browserVersion}: namespace and seccomp sandboxes active`)
