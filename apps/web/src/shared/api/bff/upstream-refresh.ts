@@ -4,6 +4,7 @@ import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
 
 import { browserSessionHeaders } from './browser-binding.server'
 import { ContextRequestError } from './context-errors'
+import { UpstreamRotationUnprovenError } from './errors'
 import type { ProductWebContext } from './product-web-context.server'
 import { sessionMetadataHeaders } from './session-metadata-headers'
 import type { UpstreamRefreshFn } from './session-vault.types'
@@ -67,7 +68,17 @@ export function createUpstreamRefresh(
       })
     }
 
-    const data = (await response.json()) as { accessToken: string }
+    // From here on the backend has rotated the token: a reply that cannot be read is a rotation
+    // that was not published, not a request that never produced an effect.
+    let data: { accessToken: string }
+    try {
+      const body: unknown = await response.json()
+      if (!body || typeof (body as { accessToken?: unknown }).accessToken !== 'string')
+        throw new TypeError('Upstream refresh reply has no access token')
+      data = body as { accessToken: string }
+    } catch (cause) {
+      throw new UpstreamRotationUnprovenError(cause)
+    }
     const rotatedRefreshToken = extractCookieValue(response, REFRESH_COOKIE_NAME)
     if (!rotatedRefreshToken) {
       throw Object.assign(new Error('Upstream refresh did not rotate the refresh_token cookie'), {

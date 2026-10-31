@@ -228,8 +228,9 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   `.env.example` — a CI guard (`env-example-coverage.spec.ts`) fails if the two
   drift or if a copied `.env.example` would not boot. Follow
   `docs/backend/architecture-and-conventions.md` → _Adding an environment variable_.
-- **Redis caching** for frequently-read entities (cache-aside + tag invalidation +
-  distributed lock); pattern in `apps/api/src/core/auth/user-cache.service.ts`.
+- **Redis caching** for frequently-read entities (version-keyed cache-aside + stampede
+  lock); pattern in `apps/api/src/core/auth/permissions-cache.service.ts`. Authentication
+  code uses the supervised `AuthRedis` client, not `REDIS_CLIENT`.
 - **Product administration placement:** before changing its alias, route subtree,
   hosts or session selection, read
   `docs/product-admin/placement-and-sessions.md`. Source configuration, physical

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 
 import type {
   FrontendDestination,
@@ -7,12 +7,15 @@ import type {
   SupportedLocale,
 } from '@amcore/shared'
 
-import { type AppRedisClient, REDIS_CLIENT } from '../../../infrastructure/redis/index.js'
+import { AuthRedis } from '../../../infrastructure/redis/index.js'
 import type { StoredInvitationIntent } from '../mfa/mfa-invitation-intent.js'
+import { AuthStageService, nestedDeadlineMs, PUBLIC_STEP_MS } from '../stage/auth-stage.service.js'
 
 import type { OAuthLinkAuthority } from './oauth-link-authority.js'
 
 const STATE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+/** Per-call cap; the OAuth routes sit outside the admission stage and keep this limit. */
+const CALL_DEADLINE_MS = 250
 
 export interface OAuthInvitationState {
   intent?: StoredInvitationIntent
@@ -54,18 +57,41 @@ export interface OAuthStateData {
  */
 @Injectable()
 export class OAuthStateService {
-  constructor(@Inject(REDIS_CLIENT) private readonly redis: AppRedisClient) {}
+  constructor(
+    private readonly redis: AuthRedis,
+    private readonly stage: AuthStageService
+  ) {}
 
+  /**
+   * Redis failure becomes the typed 503; nothing is retried. Each Redis phase is its own public
+   * root (`PUBLIC_STEP_MS`): the provider HTTP exchange and the account commit around it keep
+   * their own bounds and are never timed out by this root.
+   */
   async store(state: string, data: OAuthStateData): Promise<void> {
-    await this.redis.set(`oauth:state:${state}`, JSON.stringify(data), {
-      expiration: { type: 'PX', value: STATE_TTL_MS },
-    })
+    await this.stage.run(
+      () =>
+        this.redis.call(
+          (client) =>
+            client.set(`oauth:state:${state}`, JSON.stringify(data), {
+              expiration: { type: 'PX', value: STATE_TTL_MS },
+            }),
+          nestedDeadlineMs(CALL_DEADLINE_MS)
+        ),
+      PUBLIC_STEP_MS
+    )
   }
 
-  /** Atomically retrieve and delete (one-time use). Returns null if expired or not found. */
+  /**
+   * Atomically retrieve and delete (one-time use). Returns null if expired or not found.
+   * Redis failure becomes the typed 503 and is never replayed: an unknown outcome may have
+   * consumed the state, so sign-in must restart.
+   */
   async consume(state: string): Promise<OAuthStateData | null> {
     const key = `oauth:state:${state}`
-    const raw = await this.redis.getDel(key)
+    const raw = await this.stage.run(
+      () => this.redis.call((client) => client.getDel(key), nestedDeadlineMs(CALL_DEADLINE_MS)),
+      PUBLIC_STEP_MS
+    )
     if (!raw) return null
 
     try {

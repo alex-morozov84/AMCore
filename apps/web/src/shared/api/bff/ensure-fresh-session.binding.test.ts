@@ -69,7 +69,15 @@ describe('Every vault return requires current primary browser authority', () => 
   it('checks a CAS winner before returning it and cannot trust another vault version', async () => {
     const store = new FakeVaultStore()
     store.seed('cookie', makeEntry({ accessTokenExpiresAt: 0 }))
-    vi.spyOn(store, 'setIfVersionMatches').mockResolvedValue(false)
+    // Another writer's newer entry wins the compare-and-set. A different version alone proves
+    // nothing: it is returned only after the same mandatory binding verification.
+    vi.spyOn(store, 'setIfVersionMatches').mockImplementation(async () => {
+      store.seed(
+        'cookie',
+        makeEntry({ refreshToken: 'rt-other', accessTokenExpiresAt: 0, version: 2 })
+      )
+      return false
+    })
     const verifyBinding = vi
       .fn()
       .mockResolvedValueOnce(undefined)

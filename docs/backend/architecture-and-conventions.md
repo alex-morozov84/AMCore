@@ -41,7 +41,12 @@ AMCore is a **modular monolith**. The rules that keep it modular:
   fits the job: `SET … NX PX` for a claim, a token-checked lock
   ([`redis-lock.service.ts`](../../apps/api/src/infrastructure/redis/redis-lock.service.ts)),
   or an `eval` script that receives every key it touches in `KEYS`. A hot-read cache
-  follows [`user-cache.service.ts`](../../apps/api/src/core/auth/user-cache.service.ts).
+  follows [`permissions-cache.service.ts`](../../apps/api/src/core/auth/permissions-cache.service.ts).
+  - **Authentication-path Redis use goes through `AuthRedis`**, not `REDIS_CLIENT`: a
+    supervised client that is replaced when it stops answering. Call `authRedis.call(...)`
+    so an outage becomes the typed `503 SERVICE_UNAVAILABLE` and programming errors stay
+    `500`; cap each call with `nestedDeadlineMs(...)` so it respects the admission
+    deadline. See [authentication when Redis is slow or unavailable](../auth/redis-outage.md).
   - **Failure counters over an address key and a credential key** use
     [`AbuseCounterStore`](../../apps/api/src/infrastructure/redis/abuse-counter.store.ts):
     plain integers under `rate:v2:…`, one atomic script per update that validates both
@@ -388,8 +393,8 @@ Apply these only when your module needs them:
 - **Caching — opt-in for measured hot reads, not a default.** Cache an authoritative
   read only when it is actually hot; the cost is invalidation correctness. **Do not
   cache** low-traffic data, anything you can't reliably invalidate, or values that
-  must always be fresh. Pattern (cache-aside + tag invalidation + distributed lock):
-  [`core/auth/user-cache.service.ts`](../../apps/api/src/core/auth/user-cache.service.ts).
+  must always be fresh. Pattern (version-keyed cache-aside + stampede lock):
+  [`core/auth/permissions-cache.service.ts`](../../apps/api/src/core/auth/permissions-cache.service.ts).
 - **Background jobs** — use the [single registration contract](background-work.md)
   and its typed producer/worker bindings. BullMQ owns scheduling; the declared
   replay policy and business authority own retry safety and effect certainty.

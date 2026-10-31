@@ -2,6 +2,8 @@ import { createHash } from 'crypto'
 
 import { SystemRole } from '@amcore/shared'
 
+import { AuthStageService, PUBLIC_STEP_MS } from '../stage/auth-stage.service'
+
 import type { OAuthLoginTicketClaims } from './oauth-login-ticket.service'
 import { OAuthLoginTicketService } from './oauth-login-ticket.service'
 
@@ -22,7 +24,12 @@ describe('OAuthLoginTicketService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     }
 
-    service = new OAuthLoginTicketService(mockRedis as never)
+    service = new OAuthLoginTicketService(
+      {
+        call: (operation: (client: unknown) => unknown) => operation(mockRedis),
+      } as never,
+      new AuthStageService()
+    )
   })
 
   describe('issue', () => {
@@ -67,5 +74,26 @@ describe('OAuthLoginTicketService', () => {
       await expect(service.consume('raw-ticket')).resolves.toEqual(claims)
       await expect(service.consume('raw-ticket')).resolves.toBeNull()
     })
+  })
+
+  describe('public operation root (T082)', () => {
+    afterEach(() => jest.useRealTimers())
+
+    it.each([
+      ['issue', (s: OAuthLoginTicketService) => s.issue(claims)],
+      ['consume', (s: OAuthLoginTicketService) => s.consume('raw-ticket')],
+    ])(
+      'answers 503 at the root budget when the Redis phase never settles: %s',
+      async (_name, act) => {
+        jest.useFakeTimers()
+        const hung = new OAuthLoginTicketService(
+          { call: () => new Promise(() => undefined) } as never,
+          new AuthStageService()
+        )
+        const outcome = act(hung).catch((error: unknown) => error)
+        await jest.advanceTimersByTimeAsync(PUBLIC_STEP_MS + 1)
+        await expect(outcome).resolves.toMatchObject({ status: 503 })
+      }
+    )
   })
 })

@@ -61,7 +61,6 @@ describe('Protected provider linking retains its exact original family through c
     const service = new OAuthService(
       db as never,
       {} as never,
-      { invalidateUser: async () => undefined } as never,
       { get: () => provider } as never,
       {
         store: async (key: string, value: OAuthStateData) => {

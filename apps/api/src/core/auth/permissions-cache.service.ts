@@ -1,21 +1,21 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 import type { Permission } from '../../generated/prisma/client.js'
 import { Prisma } from '../../generated/prisma/client.js'
 import { MetricsService } from '../../infrastructure/observability/index.js'
-import {
-  type AppRedisClient,
-  REDIS_CLIENT,
-  RedisLockService,
-} from '../../infrastructure/redis/index.js'
+import { AuthCacheLock } from '../../infrastructure/redis/auth-redis/auth-cache-lock.js'
+import { AuthRedis } from '../../infrastructure/redis/index.js'
 import { PrismaService } from '../../prisma/index.js'
 
 import { memberPermissionSnapshot } from './member-permission-snapshot.js'
+import { assertStageAlive, nestedDeadlineMs } from './stage/auth-stage.service.js'
 
 const PERMISSIONS_CACHE_TTL_MS = 3600 * 1000
 const LOCK_TTL_MS = 5 * 1000
 const MAX_LOCK_ATTEMPTS = 5
+/** Cap of one cache call; shortened to what is left of the enclosing admission stage. */
+const CALL_DEADLINE_MS = 250
 
 /**
  * Permissions Cache Service
@@ -39,8 +39,8 @@ export class PermissionsCacheService {
   }
 
   constructor(
-    @Inject(REDIS_CLIENT) private readonly redis: AppRedisClient,
-    private readonly lock: RedisLockService,
+    private readonly redis: AuthRedis,
+    private readonly lock: AuthCacheLock,
     private readonly prisma: PrismaService,
     private readonly logger: PinoLogger,
     private readonly prometheus: MetricsService
@@ -67,7 +67,11 @@ export class PermissionsCacheService {
     const lockKey = this.getLockKey(userId, organizationId)
 
     for (let attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt++) {
-      const token = await this.lock.acquire(lockKey, LOCK_TTL_MS)
+      const token = await this.lock.acquire(
+        lockKey,
+        LOCK_TTL_MS,
+        nestedDeadlineMs(CALL_DEADLINE_MS)
+      )
 
       if (token) {
         try {
@@ -85,6 +89,7 @@ export class PermissionsCacheService {
       }
 
       await this.sleep(this.jitterMs())
+      assertStageAlive()
 
       const cachedAfterWait = await this.readPermissionsCache(cacheKey)
       if (cachedAfterWait !== null) {
@@ -130,16 +135,21 @@ export class PermissionsCacheService {
     organizationId: string,
     aclVersion: number
   ): Promise<Permission[]> {
+    // An abandoned admission must not start the database load (the check after it stays too).
+    assertStageAlive()
     this.metrics.dbQueries++
     this.prometheus.incCacheOperation('permissions', 'db_fallback')
     const permissions = await this.loadPermissionsFromDb(userId, organizationId)
 
-    await this.redis.set(
-      this.getPermissionsKey(userId, organizationId, aclVersion),
-      JSON.stringify(permissions),
-      {
-        expiration: { type: 'PX', value: PERMISSIONS_CACHE_TTL_MS },
-      }
+    assertStageAlive()
+    await this.redis.call(
+      (client) =>
+        client.set(
+          this.getPermissionsKey(userId, organizationId, aclVersion),
+          JSON.stringify(permissions),
+          { expiration: { type: 'PX', value: PERMISSIONS_CACHE_TTL_MS } }
+        ),
+      nestedDeadlineMs(CALL_DEADLINE_MS)
     )
 
     this.logger.debug(
@@ -157,7 +167,10 @@ export class PermissionsCacheService {
   }
 
   private async readPermissionsCache(cacheKey: string): Promise<Permission[] | null> {
-    const raw = await this.redis.get(cacheKey)
+    const raw = await this.redis.call(
+      (client) => client.get(cacheKey),
+      nestedDeadlineMs(CALL_DEADLINE_MS)
+    )
     if (raw === null) {
       this.prometheus.incCacheOperation('permissions', 'miss')
       return null
@@ -173,7 +186,7 @@ export class PermissionsCacheService {
       // Fall through to cache deletion below.
     }
 
-    await this.redis.del(cacheKey)
+    await this.redis.call((client) => client.del(cacheKey), nestedDeadlineMs(CALL_DEADLINE_MS))
     this.prometheus.incCacheOperation('permissions', 'corrupt')
     this.prometheus.incCacheOperation('permissions', 'miss')
     return null

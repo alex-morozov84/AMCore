@@ -43,7 +43,6 @@ import { lockMfaAccounts, mfaDatabaseClock } from '../mfa/mfa-transaction.js'
 import type { PasswordStepUpSource } from '../password-step-up-authority.js'
 import { SessionService } from '../session.service.js'
 import type { AccessTokenPayload } from '../token.service.js'
-import { UserCacheService } from '../user-cache.service.js'
 
 import { OAuthAvatarRehostService } from './oauth-avatar-rehost.service.js'
 import type { OAuthLinkAuthority } from './oauth-link-authority.js'
@@ -89,7 +88,6 @@ export class OAuthService {
   constructor(
     private readonly prisma: PrismaService,
     _sessionService: SessionService,
-    private readonly userCacheService: UserCacheService,
     private readonly providerFactory: OAuthProviderFactory,
     private readonly stateService: OAuthStateService,
     private readonly emailIdentity: EmailIdentityService,
@@ -403,7 +401,6 @@ export class OAuthService {
       { maxWait: 2000, timeout: 4000 }
     )
     const { user, accountCreated } = login
-    await this.userCacheService.invalidateUser(user.id)
 
     this.logger.info({ userId: user.id, provider: providerName }, 'oauth login')
     // Copied once, when this sign-in created the account or linked this provider for the first time.
@@ -480,7 +477,6 @@ export class OAuthService {
       { maxWait: 2000, timeout: 4000 }
     )
 
-    await this.userCacheService.invalidateUser(userId)
     return {
       user: await this.prisma.user.findUniqueOrThrow({ where: { id: userId } }),
       reauthenticationRequired,

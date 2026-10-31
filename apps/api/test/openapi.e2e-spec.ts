@@ -764,6 +764,94 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(violations).toEqual([])
   })
 
+  it('merges the dependency-unavailable 503 into every protected operation and OAuth Redis step', () => {
+    // The overview states the contract once; each affected operation also names the outcome
+    // itself. An operation's own 503 keeps its meaning and its codes; the admission or OAuth case
+    // is added to it, so the two stay distinguishable. Coverage is an explicit rule, not "a 503 exists".
+    expect(document.info.description).toContain('SERVICE_UNAVAILABLE')
+    const admission = 'admission could not finish'
+    const oauthStepMarker = 'one-time OAuth step'
+    type Response = {
+      description?: string
+      $ref?: string
+      content?: Record<string, { schema?: { properties?: { errorCode?: { enum?: string[] } } } }>
+    }
+    // The queue board authenticates in a middleware outside the admission guard and declares its own
+    // 503 ('Access could not be verified'), so the admission case does not apply to it.
+    const middlewareAuth = new Set(['get /admin/queues'])
+    const violations: string[] = []
+    let protectedCount = 0
+    let specializedCount = 0
+    for (const [path, item] of Object.entries(document.paths)) {
+      if (isExcluded(path)) continue
+      for (const method of HTTP_METHODS) {
+        const op = (
+          item as Record<
+            string,
+            { security?: unknown[]; responses?: Record<string, Response> } | undefined
+          >
+        )[method]
+        if (!op) continue
+        const oauthStep =
+          /\/auth\/oauth(\/|$)/.test(path) && !path.endsWith('/auth/oauth/providers')
+        const protectedOp = (op.security?.length ?? 0) > 0
+        const described = op.responses?.['503']
+        const key = `${method} ${path}`
+        if (!oauthStep && !protectedOp) {
+          if (described?.description?.includes(admission))
+            violations.push(`${key}: public operation claims the admission 503`)
+          continue
+        }
+        if (!described) {
+          violations.push(`${key}: missing the 503 response`)
+          continue
+        }
+        if (described.$ref) violations.push(`${key}: 503 is a reference, not merged`)
+        if (protectedOp) protectedCount++
+        if (protectedOp && !middlewareAuth.has(key) && !described.description?.includes(admission))
+          violations.push(`${key}: 503 does not document the admission case`)
+        if (oauthStep && !described.description?.includes(oauthStepMarker))
+          violations.push(`${key}: 503 does not document the OAuth Redis case`)
+        for (const media of Object.values(described.content ?? {})) {
+          const codes = media.schema?.properties?.errorCode?.enum
+          if (codes && !codes.includes('SERVICE_UNAVAILABLE'))
+            violations.push(`${key}: errorCode enum omits SERVICE_UNAVAILABLE`)
+        }
+        if (
+          /ORGANIZATION_CREATION_UNCONFIRMED|failure counters could not be checked/.test(
+            described.description ?? ''
+          )
+        )
+          specializedCount++
+      }
+    }
+    expect(protectedCount).toBeGreaterThan(50)
+    expect(violations).toEqual([])
+    expect(specializedCount).toBeGreaterThan(0)
+
+    // Specialized meanings survive next to the new case.
+    const create = (
+      document.paths['/organizations'] as Record<string, { responses: Record<string, Response> }>
+    )['post']!.responses['503']!
+    expect(create.description).toContain('ORGANIZATION_CREATION_UNCONFIRMED')
+    expect(create.description).toContain(admission)
+    const me = (
+      document.paths['/auth/me'] as Record<string, { responses: Record<string, Response> }>
+    )['get']!.responses['503']!
+    expect(me.description).toContain('API key failure counters could not be checked')
+    expect(me.description).toContain(admission)
+
+    const exchange = (
+      document.paths['/auth/oauth/exchange'] as Record<
+        string,
+        { responses: Record<string, Response> }
+      >
+    )['post']!.responses['503']!
+    expect(exchange.description).toContain('API/web placement disagreement')
+    expect(exchange.description).toContain(oauthStepMarker)
+    expect(exchange.description).toContain('Start sign-in again')
+  })
+
   it('documents the apiKeyBearer security scheme on exactly the ADR-034 allowlisted operations', () => {
     // Guards against a dangling security reference: every @ApiSecurity('apiKeyBearer')
     // reference below is meaningless if the scheme itself isn't registered in
@@ -960,9 +1048,12 @@ describe('OpenAPI success surface (e2e)', () => {
     expect(operation?.responses).toHaveProperty('200')
     expect(operation?.responses).toHaveProperty('401')
     expect(operation?.responses).toHaveProperty('403')
-    // Provider bugs are 500; browser timeouts are not an API HTTP 503 response.
+    // Provider bugs are 500; browser timeouts are not an API HTTP 503 response. The only 503
+    // is the shared authentication one: admission could not finish because a dependency was slow.
     expect(operation?.responses).toHaveProperty('500')
-    expect(operation?.responses).not.toHaveProperty('503')
+    expect(
+      (operation?.responses?.['503'] as { description?: string } | undefined)?.description
+    ).toContain('Authentication temporarily unavailable')
     const response = operation?.responses?.['200'] as {
       content?: { 'application/json'?: { schema?: { $ref?: string } } }
     }

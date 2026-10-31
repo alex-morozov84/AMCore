@@ -1,7 +1,12 @@
 import { headers } from 'next/headers'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
-import { SessionNotFoundError } from '../bff/errors'
+import {
+  SessionLockTimeoutError,
+  SessionNotFoundError,
+  SessionStageTimeoutError,
+  SessionVaultUnavailableError,
+} from '../bff/errors'
 
 import { getConsoleAwareAccessToken } from './access-token'
 
@@ -31,6 +36,14 @@ export async function probeConsoleAccess(): Promise<ConsoleAccessProbe> {
   } catch (error) {
     // Logout retains an inert cookie; a missing vault entry is a known absence of authority.
     if (error instanceof SessionNotFoundError) return { kind: 'denied', status: 401 }
+    // A session store that cannot answer in time is a temporary failure, the same class as the
+    // backend's own 503: it says nothing about the caller's authority.
+    if (
+      error instanceof SessionVaultUnavailableError ||
+      error instanceof SessionStageTimeoutError ||
+      error instanceof SessionLockTimeoutError
+    )
+      return { kind: 'upstream-unavailable' }
     return { kind: 'indeterminate' }
   }
 }

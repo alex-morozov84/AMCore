@@ -14,7 +14,12 @@ import {
 } from './helpers'
 import { invitationAcceptBody, invitationSeedRole } from './helpers/invitation-contract'
 import { aclFailureCases } from './org-acl-failures'
-import { type AclFixture, aclFixture, deferredGate } from './org-acl-freshness.fixture'
+import {
+  type AclFixture,
+  aclFixture,
+  deferredGate,
+  substituteAuthRedisClient,
+} from './org-acl-freshness.fixture'
 import { snapshotBarrier } from './org-acl-snapshot-barrier'
 
 describe('Organization ACL freshness (real Postgres/Redis)', () => {
@@ -168,17 +173,27 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
     await f.assign()
     const old = await f.version()
     const gate = deferredGate()
-    const set = f.redis.set.bind(f.redis)
     let armed = true
-    Object.assign(f.redis, {
-      set: (async (...args: Parameters<typeof set>) => {
-        if (armed && args[0] === f.key(old)) {
-          armed = false
-          await gate.pause()
-        }
-        return set(...args)
-      }) as typeof set,
-    })
+    // A longer call deadline keeps the deliberate delay from being cut short by the 250 ms cap.
+    const restore = substituteAuthRedisClient(
+      f.app,
+      (client) =>
+        new Proxy(client, {
+          get(target, prop) {
+            if (prop === 'set')
+              return async (...args: Parameters<typeof target.set>) => {
+                if (armed && args[0] === f.key(old)) {
+                  armed = false
+                  await gate.pause()
+                }
+                return Reflect.apply(target.set, target, args)
+              }
+            const value = Reflect.get(target, prop, target)
+            return typeof value === 'function' ? value.bind(target) : value
+          },
+        }),
+      10_000
+    )
     const reader = f.permissions.getPermissions(f.target.id, f.org.id, old)
     try {
       await gate.reached
@@ -188,7 +203,7 @@ describe('Organization ACL freshness (real Postgres/Redis)', () => {
       try {
         await reader
       } finally {
-        Object.assign(f.redis, { set })
+        restore()
       }
     }
     expect(await f.redis.get(f.key(old))).not.toBeNull()

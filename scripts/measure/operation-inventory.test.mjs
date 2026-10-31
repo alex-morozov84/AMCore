@@ -41,7 +41,7 @@ describe('operation inventory against the real plans', () => {
       // The Console return-locale import adds two claims on the existing shared edit.
       // Grouped code/doc seams are shared/Console semantic facts on the same final edit.
       // Providers/manifests/scenarios remain unchanged. Raw inventory is independently inspected.
-      { name: 'measured operations', expected: 1040, actual: inventory.operations.length },
+      { name: 'measured operations', expected: 1041, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -65,12 +65,12 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic claims',
-        expected: 2312,
+        expected: 2314,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 1010,
+        expected: 1011,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

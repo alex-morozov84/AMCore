@@ -7,9 +7,36 @@ import { SystemRole } from '@amcore/shared'
 import { OrgAclVersionService } from '../src/core/auth/org-acl-version.service'
 import { PermissionsCacheService } from '../src/core/auth/permissions-cache.service'
 import type { OrgMember, User } from '../src/generated/prisma/client'
-import { type AppRedisClient, REDIS_CLIENT } from '../src/infrastructure/redis'
+import { type AppRedisClient, AuthRedis, REDIS_CLIENT } from '../src/infrastructure/redis'
 
 import { type E2ETestContext, signAccessToken } from './helpers'
+
+type AuthRedisOperation = Parameters<AuthRedis['call']>[0]
+type AuthRedisClient = Parameters<AuthRedisOperation>[0]
+
+/**
+ * Test-only seam on the supervised authentication client: every operation of the permissions
+ * cache runs through `wrap(client)` instead of the real client, and may be given a longer call
+ * deadline so a deliberate delay is not cut short by the production 250 ms cap. The real
+ * `AuthRedis.call` still classifies failures, so the answer is what production would return.
+ * Returns the restore function.
+ */
+export function substituteAuthRedisClient(
+  app: E2ETestContext['app'],
+  wrap: (client: AuthRedisClient) => AuthRedisClient,
+  deadlineMs?: number
+): () => void {
+  const authRedis = app.get(AuthRedis)
+  const call = authRedis.call.bind(authRedis) as AuthRedis['call']
+  authRedis.call = ((operation: AuthRedisOperation, requested?: number) =>
+    call(
+      (client, signal) => operation(wrap(client), signal),
+      deadlineMs ?? requested
+    )) as AuthRedis['call']
+  return () => {
+    delete (authRedis as { call?: unknown }).call
+  }
+}
 
 // Keep the fixture result inferred so its service/client types stay exact.
 // oxlint-disable-next-line typescript/explicit-function-return-type

@@ -15,8 +15,6 @@ import {
 } from '../../infrastructure/storage/index.js'
 import { PrismaService } from '../../prisma/index.js'
 
-import { UserCacheService } from './user-cache.service.js'
-
 /** The validated multipart file shape the avatar upload consumes. */
 export interface AvatarUploadFile {
   buffer: Buffer
@@ -77,7 +75,6 @@ export class AvatarService {
   constructor(
     private readonly storage: StorageService,
     private readonly prisma: PrismaService,
-    private readonly userCache: UserCacheService,
     private readonly media: MediaService,
     private readonly env: EnvService,
     private readonly mutex: RedisMutexService
@@ -140,7 +137,6 @@ export class AvatarService {
         data: { avatarKey: null, avatarGeneration: generation },
       })
       if (count === 0) throw new StaleAvatarOperationError()
-      await this.userCache.invalidateUser(userId)
     })
   }
 
@@ -210,10 +206,8 @@ export class AvatarService {
       await this.cleanupVersion(userId, version).catch(() => undefined)
       throw new StaleAvatarOperationError()
     }
-    // Live now. Invalidate the cache so the new URL is served, THEN sweep older
-    // versions best-effort — a failed sweep of superseded objects must not fail
+    // Live now. Sweep older versions best-effort — a failed sweep of superseded objects must not fail
     // an upload that already published successfully.
-    await this.userCache.invalidateUser(userId)
     await this.sweep(userId, generation).catch(() => undefined)
   }
 

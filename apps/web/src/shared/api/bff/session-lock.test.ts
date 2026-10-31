@@ -2,14 +2,13 @@
 import { TimeoutError } from '@redis/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getWebRedisClient } from './redis-client'
+import { SessionVaultUnavailableError } from './errors'
 import { redisVaultLock } from './session-lock'
+import { runVaultRedis } from './vault-redis/vault-redis'
 
 // See ensure-fresh-session.test.ts for why `server-only` needs mocking here.
 vi.mock('server-only', () => ({}))
-vi.mock('./redis-client', () => ({
-  getWebRedisClient: vi.fn(),
-}))
+vi.mock('./vault-redis/vault-redis', () => ({ runVaultRedis: vi.fn() }))
 
 function makeFakeRedis() {
   return {
@@ -23,7 +22,8 @@ describe('redisVaultLock', () => {
 
   beforeEach(() => {
     fakeRedis = makeFakeRedis()
-    vi.mocked(getWebRedisClient).mockResolvedValue(fakeRedis as never)
+    vi.mocked(runVaultRedis).mockImplementation(((op: (c: unknown, s: AbortSignal) => unknown) =>
+      op(fakeRedis, new AbortController().signal)) as never)
   })
 
   it('acquire() returns a token immediately when SET NX succeeds', async () => {
@@ -56,15 +56,55 @@ describe('redisVaultLock', () => {
   })
 
   // A queue timeout is a rejection, never a silent "lock not held": acquire must not report a
-  // token it does not own, and the refresh protocol must see the failure.
+  // token it does not own, and the refresh protocol must see the failure (as the typed
+  // unavailable error, with the cause kept).
   it.each([
     ['acquire', () => redisVaultLock.acquire('s1', 5000), 'set'],
     ['renew', () => redisVaultLock.renew('s1', 'my-token', 5000), 'eval'],
-    ['release', () => redisVaultLock.release('s1', 'my-token'), 'eval'],
-  ] as const)('%s() propagates a queue timeout', async (_name, run, command) => {
-    fakeRedis[command].mockRejectedValue(new TimeoutError())
+  ] as const)(
+    '%s() reports a queue timeout as the vault unavailable error',
+    async (_name, run, command) => {
+      fakeRedis[command].mockRejectedValue(new TimeoutError())
 
-    await expect(run()).rejects.toBeInstanceOf(TimeoutError)
+      const error = await run().catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(SessionVaultUnavailableError)
+      expect((error as Error).cause).toBeInstanceOf(TimeoutError)
+    }
+  )
+
+  it('release() is cleanup: a failure never rejects and is logged', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    fakeRedis.eval.mockRejectedValue(new TimeoutError())
+
+    await expect(redisVaultLock.release('s1', 'my-token')).resolves.toBeUndefined()
+
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('an acquire attempt with an unknown answer releases its own token', async () => {
+    fakeRedis.set.mockRejectedValueOnce(new TimeoutError())
+    fakeRedis.eval.mockResolvedValue(1)
+
+    await expect(redisVaultLock.acquire('s1', 5000)).rejects.toBeInstanceOf(
+      SessionVaultUnavailableError
+    )
+    await vi.waitFor(() => expect(fakeRedis.eval).toHaveBeenCalledTimes(1))
+    const token = (fakeRedis.set.mock.calls[0] as unknown[])[1]
+    expect(fakeRedis.eval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("DEL"'),
+      expect.objectContaining({ arguments: [token] })
+    )
+  })
+
+  it('acquire() gives up once its own deadline has passed', async () => {
+    vi.useFakeTimers()
+    fakeRedis.set.mockResolvedValue(null)
+    const pending = redisVaultLock.acquire('s1', 5000, { deadlineMs: 500 })
+    await vi.advanceTimersByTimeAsync(1000)
+    await expect(pending).resolves.toBeNull()
+    vi.useRealTimers()
   })
 
   it('release() runs the token-checked DEL script', async () => {

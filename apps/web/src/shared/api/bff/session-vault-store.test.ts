@@ -4,15 +4,13 @@ import { TimeoutError } from '@redis/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SessionVaultUnavailableError } from './errors'
-import { getWebRedisClient } from './redis-client'
 import type { VaultEntry } from './session-vault.types'
 import { redisVaultStore } from './session-vault-store'
+import { runVaultRedis } from './vault-redis/vault-redis'
 
 // See ensure-fresh-session.test.ts for why `server-only` needs mocking here.
 vi.mock('server-only', () => ({}))
-vi.mock('./redis-client', () => ({
-  getWebRedisClient: vi.fn(),
-}))
+vi.mock('./vault-redis/vault-redis', () => ({ runVaultRedis: vi.fn() }))
 
 function makeFakeRedis() {
   return {
@@ -35,7 +33,8 @@ describe('redisVaultStore', () => {
 
   beforeEach(() => {
     fakeRedis = makeFakeRedis()
-    vi.mocked(getWebRedisClient).mockResolvedValue(fakeRedis as never)
+    vi.mocked(runVaultRedis).mockImplementation(((op: (c: unknown, s: AbortSignal) => unknown) =>
+      op(fakeRedis, new AbortController().signal)) as never)
   })
 
   it('get() returns null on a cache miss without touching the vault-unavailable path', async () => {
@@ -54,7 +53,9 @@ describe('redisVaultStore', () => {
   })
 
   it('get() wraps a Redis failure in SessionVaultUnavailableError (fail closed)', async () => {
-    fakeRedis.get.mockRejectedValue(new Error('ECONNREFUSED'))
+    fakeRedis.get.mockRejectedValue(
+      Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })
+    )
 
     await expect(redisVaultStore.get('s1')).rejects.toBeInstanceOf(SessionVaultUnavailableError)
   })

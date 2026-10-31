@@ -218,6 +218,11 @@ This starter's default instead:
   in both catalogues — nothing else to wire up for a query that exhausts
   its retries and surfaces the error to a component.
 
+A Route Handler or API-proxy request that cannot be admitted because the session vault is
+slow or unreachable answers `503` with `errorCode` `SERVICE_UNAVAILABLE` and keeps the session;
+this is not a 4xx and is not retried by the rule above. Details:
+[Authentication when Redis is slow or unavailable](../auth/redis-outage.md#the-web-servers-session-vault).
+
 Only `useQuery`/`useInfiniteQuery` are affected — `useMutation` never
 retries by default in TanStack Query, and this starter doesn't override
 that.

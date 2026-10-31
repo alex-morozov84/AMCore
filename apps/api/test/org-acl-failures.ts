@@ -7,7 +7,7 @@ import { MetricsService } from '../src/infrastructure/observability'
 import { PrismaService } from '../src/prisma'
 
 import { noopPinoLogger } from './helpers'
-import type { AclFixture } from './org-acl-freshness.fixture'
+import { type AclFixture, substituteAuthRedisClient } from './org-acl-freshness.fixture'
 
 export function aclFailureCases(fixture: () => AclFixture): void {
   it('rolls back both the actual role removal and version bump before commit', async () => {
@@ -136,21 +136,33 @@ export function aclFailureCases(fixture: () => AclFixture): void {
       await f.grant()
       await f.assign()
       const dead = createClient({ disableOfflineQueue: true })
-      const set = f.redis.set.bind(f.redis)
-      Object.assign(f.redis, {
-        set: ((...args: Parameters<typeof set>) => {
-          const key = args[0] as string
-          const affected =
-            stage === 'lock'
-              ? key === `auth:lock:perm:v2:${f.org.id}:${f.target.id}`
-              : key.startsWith(`auth:perm:v2:${f.org.id}:${f.target.id}:`)
-          return affected ? Reflect.apply(dead.set, dead, args) : set(...args)
-        }) as typeof set,
-      })
+      // The permissions cache runs on the supervised client; its failure is the typed 503.
+      const restore = substituteAuthRedisClient(
+        f.app,
+        (client) =>
+          new Proxy(client, {
+            get(target, prop) {
+              if (prop === 'set')
+                return (...args: Parameters<typeof dead.set>) => {
+                  const key = args[0] as string
+                  const affected =
+                    stage === 'lock'
+                      ? key === `auth:lock:perm:v2:${f.org.id}:${f.target.id}`
+                      : key.startsWith(`auth:perm:v2:${f.org.id}:${f.target.id}:`)
+                  return affected
+                    ? Reflect.apply(dead.set, dead, args)
+                    : Reflect.apply(target.set, target, args)
+                }
+              const value = Reflect.get(target, prop, target)
+              return typeof value === 'function' ? value.bind(target) : value
+            },
+          })
+      )
       try {
-        await f.read().timeout(2000).expect(500)
+        const res = await f.read().timeout(2000).expect(503)
+        expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
       } finally {
-        Object.assign(f.redis, { set })
+        restore()
       }
       await f.read().expect(200)
     }
@@ -163,13 +175,12 @@ export function aclFailureCases(fixture: () => AclFixture): void {
     await f.assign()
     await f.read().expect(200)
     const dead = createClient({ disableOfflineQueue: true })
-    const owner = f.permissions as unknown as { redis: typeof f.redis }
-    const shared = owner.redis
-    owner.redis = dead as unknown as typeof f.redis
+    const restore = substituteAuthRedisClient(f.app, () => dead as never)
     try {
-      await f.read().timeout(2000).expect(500)
+      const res = await f.read().timeout(2000).expect(503)
+      expect(res.body.errorCode).toBe('SERVICE_UNAVAILABLE')
     } finally {
-      owner.redis = shared
+      restore()
     }
     await f.read().expect(200)
   })

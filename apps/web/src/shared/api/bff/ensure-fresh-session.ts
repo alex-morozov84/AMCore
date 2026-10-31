@@ -1,14 +1,9 @@
-import {
-  isInvalidRefreshError,
-  SessionLockTimeoutError,
-  SessionNotFoundError,
-  SessionRefreshUnsafeError,
-} from './errors'
-import { startLockRenewal } from './lock-renewal'
+import type { VerifyBindingOptions } from './browser-binding.server'
+import { SessionNotFoundError, SessionStageTimeoutError } from './errors'
+import { OWNER_TIMING, type OwnerTiming, runRefreshOwner } from './refresh-owner'
 import { hasSessionAudience, type SessionAudience } from './session-audience'
 import type {
   UpstreamRefreshFn,
-  UpstreamRefreshResult,
   VaultEntry,
   VaultLock,
   VaultRecord,
@@ -19,21 +14,21 @@ import 'server-only'
 
 /** Refresh proactively before the access token actually expires. */
 const REFRESH_SAFETY_MARGIN_MS = 30 * 1000
-const LOCK_TTL_MS = 10 * 1000
-// Renew well before the lease could expire, so a merely slow (but healthy)
-// upstream call never loses exclusivity to its own TTL.
-const LOCK_RENEWAL_INTERVAL_MS = 4 * 1000
-// Last-resort circuit breaker for a refresh that never settles at all —
-// not the primary bound; renewal is (see round-2 fix in ai/models-talk.md).
-const UPSTREAM_REFRESH_CEILING_MS = 30 * 1000
+/** The caller never waits longer than this for admission, including a refresh already running. */
+export const CALLER_STAGE_MS = 3000
+/** The binding probe never waits longer than this, even with plenty of the stage left. */
+const PROBE_MAX_MS = 10_000
 
 export interface EnsureFreshSessionDeps<TRecord extends VaultRecord = VaultRecord> {
   expectedAudience?: SessionAudience
   store: VaultStore<TRecord>
   lock: VaultLock
   upstreamRefresh: UpstreamRefreshFn
-  verifyBinding: (entry: TRecord) => Promise<void>
+  verifyBinding: (entry: TRecord, options?: VerifyBindingOptions) => Promise<void>
+  /** Wall clock, for token freshness only. */
   now?: () => number
+  /** Test overrides: the caller stage, the owner budgets and the monotonic clock. */
+  timing?: { stageMs?: number; owner?: Partial<OwnerTiming>; clock?: () => number }
 }
 
 function isFresh(entry: VaultEntry, now: number): boolean {
@@ -41,100 +36,122 @@ function isFresh(entry: VaultEntry, now: number): boolean {
 }
 
 /**
- * Returns a `VaultEntry` with a currently-valid access token for
- * `sessionId`, refreshing it via the correctness-critical single-flight
- * protocol from ADR-068 if needed. Throws `SessionNotFoundError` if there is
- * no session, `SessionLockTimeoutError` on lock contention,
- * `SessionRefreshUnsafeError` (vault deleted) if lock exclusivity could not
- * be proven for the whole refresh, or rethrows whatever `upstreamRefresh`
- * threw — deleting the vault only when it was an explicit invalid/reuse
- * rejection, never for a transient failure. Any Redis-store failure
- * propagates as `SessionVaultUnavailableError` — callers must treat that as
- * "cannot authenticate," never fall back to trusting a cached value.
+ * One refresh owner per session per lock namespace per process. The lock object is the namespace:
+ * in production it is a process-wide singleton per audience, so concurrent callers share one owner;
+ * another process (or a test standing in for one) has its own object and contends for the lock.
+ */
+const owners = new WeakMap<object, Map<string, Promise<unknown>>>()
+let activeOwners = 0
+
+/** Test-only visibility: owners still running in this process (must reach 0 once they finish). */
+export function activeRefreshOwners(): number {
+  return activeOwners
+}
+
+/**
+ * Returns a `VaultEntry` with a currently-valid access token for `sessionId`, refreshing it via
+ * the single-flight protocol from ADR-068 if needed.
+ *
+ * The CALLER and the refresh OWNER are separate (T082). The caller has one absolute budget of
+ * `CALLER_STAGE_MS` for its vault read, its binding check and, if a refresh is needed, for the
+ * owner. Every step is a checked dispatch: nothing starts after the budget is spent, and a step
+ * that finishes after it is not accepted, so admission never succeeds late. The caller then leaves
+ * with `SessionStageTimeoutError` (a temporary failure) and the session is untouched by that
+ * departure; the owner continues under its own budgets (see `refresh-owner.ts`). Throws
+ * `SessionNotFoundError` if there is no session, `SessionVaultUnavailableError` when the vault
+ * store cannot be reached ("cannot authenticate", never "no session"), `SessionRefreshUnsafeError`
+ * when exclusivity or the ceiling was lost after the backend call was sent, or rethrows whatever
+ * `upstreamRefresh`/`verifyBinding` threw. The vault entry is deleted only on an explicit
+ * invalid/reuse rejection or when a rotation could not be proven or published.
  */
 export async function ensureFreshSession<TRecord extends VaultRecord = VaultRecord>(
   sessionId: string,
   deps: EnsureFreshSessionDeps<TRecord>
 ): Promise<TRecord & Pick<VaultEntry, 'version'>> {
   const now = deps.now ?? Date.now
-  const entry = await deps.store.get(sessionId)
-  if (!entry || (deps.expectedAudience && !hasSessionAudience(entry, deps.expectedAudience)))
-    throw new SessionNotFoundError('unavailable')
-  await deps.verifyBinding(entry)
-  if (isFresh(entry, now())) return entry
+  const clock = deps.timing?.clock ?? (() => performance.now())
+  const stageMs = deps.timing?.stageMs ?? CALLER_STAGE_MS
+  const started = clock()
+  const left = (): number => stageMs - (clock() - started)
+  const stage = new AbortController()
+  let spent = false
 
-  return refreshUnderLock(sessionId, deps, now)
+  const spend = (step: string): never => {
+    spent = true
+    stage.abort()
+    throw new SessionStageTimeoutError(step)
+  }
+  /** Checked dispatch: refuse before starting, race the deadline, refuse a late result. */
+  const within = async <T>(step: string, dispatch: () => Promise<T>): Promise<T> => {
+    if (spent || left() <= 0) spend(step)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => {
+          spent = true
+          stage.abort()
+          reject(new SessionStageTimeoutError(step))
+        },
+        Math.max(0, left())
+      )
+    })
+    try {
+      const result = await Promise.race([dispatch(), deadline])
+      if (spent || left() <= 0) spend(step)
+      return result
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  try {
+    const entry = await within('vault read', () =>
+      deps.store.get(sessionId, { deadlineMs: left() })
+    )
+    if (!entry || (deps.expectedAudience && !hasSessionAudience(entry, deps.expectedAudience)))
+      throw new SessionNotFoundError('unavailable')
+    await within('binding check', () =>
+      deps.verifyBinding(entry, {
+        deadlineMs: Math.min(PROBE_MAX_MS, left()),
+        signal: stage.signal,
+      })
+    )
+    if (isFresh(entry, now())) return entry
+
+    return await within('refresh owner', () => joinOwner(sessionId, deps, now, clock))
+  } finally {
+    // Releases a still-running caller-side probe; the owner has its own controller.
+    stage.abort()
+  }
 }
 
-async function refreshUnderLock<TRecord extends VaultRecord>(
+function joinOwner<TRecord extends VaultRecord>(
   sessionId: string,
   deps: EnsureFreshSessionDeps<TRecord>,
-  now: () => number
+  now: () => number,
+  clock: () => number
 ): Promise<TRecord & Pick<VaultEntry, 'version'>> {
-  const token = await deps.lock.acquire(sessionId, LOCK_TTL_MS)
-  if (!token) throw new SessionLockTimeoutError(sessionId)
-
-  try {
-    // Re-read after acquiring the lock: another request may have already
-    // refreshed while this one waited. Skipping this check is exactly the
-    // "lock only around refresh, no vault" design ADR-068 rejected.
-    const reRead = await deps.store.get(sessionId)
-    if (!reRead || (deps.expectedAudience && !hasSessionAudience(reRead, deps.expectedAudience)))
-      throw new SessionNotFoundError('unavailable')
-    await deps.verifyBinding(reRead)
-    if (isFresh(reRead, now())) return reRead
-
-    return await performRefresh(sessionId, reRead, token, deps)
-  } finally {
-    await deps.lock.release(sessionId, token)
-  }
-}
-
-async function performRefresh<TRecord extends VaultRecord>(
-  sessionId: string,
-  current: TRecord & Pick<VaultEntry, 'version'>,
-  lockToken: string,
-  deps: EnsureFreshSessionDeps<TRecord>
-): Promise<TRecord & Pick<VaultEntry, 'version'>> {
-  const controller = new AbortController()
-  const renewal = startLockRenewal(sessionId, lockToken, deps.lock, controller, {
-    ttlMs: LOCK_TTL_MS,
-    intervalMs: LOCK_RENEWAL_INTERVAL_MS,
-    ceilingMs: UPSTREAM_REFRESH_CEILING_MS,
+  const registry = owners.get(deps.lock) ?? new Map<string, Promise<unknown>>()
+  owners.set(deps.lock, registry)
+  const existing = registry.get(sessionId)
+  if (existing) return existing as Promise<TRecord & Pick<VaultEntry, 'version'>>
+  const owner = runRefreshOwner(sessionId, {
+    expectedAudience: deps.expectedAudience,
+    store: deps.store,
+    lock: deps.lock,
+    upstreamRefresh: deps.upstreamRefresh,
+    verifyBinding: deps.verifyBinding,
+    now,
+    clock,
+    timing: { ...OWNER_TIMING, ...deps.timing?.owner },
   })
-
-  let upstream: UpstreamRefreshResult
-  try {
-    // Race against `renewal.unsafe` so this always moves on once
-    // exclusivity can no longer be proven — whether or not the
-    // `upstreamRefresh` implementation itself respects the abort signal.
-    upstream = await Promise.race([
-      deps.upstreamRefresh(current.refreshToken, controller.signal, current.browser),
-      renewal.unsafe,
-    ])
-  } catch (error) {
-    renewal.stop()
-    // Only delete on an explicit backend rejection (401 / reuse-detected /
-    // invalid) or a lost-exclusivity failure — never on an ordinary
-    // transient failure (network/5xx), which would otherwise log the user
-    // out during a routine API blip.
-    if (isInvalidRefreshError(error) || error instanceof SessionRefreshUnsafeError) {
-      await deps.store.delete(sessionId)
-    }
-    throw error
+  registry.set(sessionId, owner)
+  activeOwners++
+  const remove = (): void => {
+    activeOwners--
+    if (registry.get(sessionId) === owner) registry.delete(sessionId)
   }
-
-  renewal.stop()
-
-  const next = { ...current, ...upstream }
-  await deps.verifyBinding(next)
-  const written = await deps.store.setIfVersionMatches(sessionId, current.version, next)
-  if (written) return { ...next, version: current.version + 1 }
-
-  // Lost an optimistic-concurrency race despite the lock (defense in
-  // depth — the lock is not a correctness fence). Trust whatever won.
-  const latest = await deps.store.get(sessionId)
-  if (!latest) throw new SessionNotFoundError(sessionId)
-  await deps.verifyBinding(latest)
-  return latest
+  // A departed caller must not leave the owner's failure unobserved.
+  owner.then(remove, remove)
+  return owner
 }

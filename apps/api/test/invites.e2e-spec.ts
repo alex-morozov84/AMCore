@@ -12,8 +12,8 @@ import { EmailService } from '../src/infrastructure/email'
 import {
   AbuseCounterError,
   AbuseCounterStore,
+  AuthRedis,
   BOUNDED_REDIS_CAPACITY,
-  BoundedRedis,
 } from '../src/infrastructure/redis'
 import type { PrismaService } from '../src/prisma'
 
@@ -471,7 +471,7 @@ describe('Invites (e2e — OB-02 Stage C)', () => {
       it('refuses the record at capacity after a successful check: original 400, not_sent, no effects', async () => {
         const { inviteeToken, rawToken } = await inviteeWithInvite()
         const store = app.get(AbuseCounterStore)
-        const bounded = app.get(BoundedRedis)
+        const bounded = app.get(AuthRedis)
         const warn = jest.spyOn(limiterLogger(), 'warn')
         const held: Array<() => void> = []
         const read = store.read.bind(store)

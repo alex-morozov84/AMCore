@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
-import { type JwtPayload, type RequestPrincipal, SystemRole } from '@amcore/shared'
+import { type JwtPayload, type RequestPrincipal } from '@amcore/shared'
 
 import { UnauthorizedException } from '../../../common/exceptions/index.js'
 import { EnvService } from '../../../env/env.service.js'
@@ -12,13 +12,11 @@ import {
 } from '../mfa/jwt-primary-admission.js'
 import { MfaAuthorityReader } from '../mfa/mfa-authority-reader.service.js'
 import { PrivilegedRoleService } from '../privileged-role.service.js'
-import { UserCacheService } from '../user-cache.service.js'
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     env: EnvService,
-    private readonly userCache: UserCacheService,
     private readonly privilegedRoles: PrivilegedRoleService,
     private readonly authority: MfaAuthorityReader
   ) {
@@ -33,7 +31,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   /**
    * Called after JWT signature is verified.
    * Checks user still exists (security), then returns RequestPrincipal.
-   * Signed SUPER_ADMIN claims use primary existence to avoid a Redis-cache prerequisite.
+   * Existence always comes from the primary database, never from Redis, so a cache outage
+   * cannot affect this step. Inside the global guard the one projection read that proves
+   * existence is retained and reused by MFA admission (one primary read per request).
    * Privileged admission still intersects the signed claim with the current primary role.
    */
   async validate(
@@ -42,11 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   ): Promise<RequestPrincipal> {
     const payload = signedPayload ?? (requestOrPayload as JwtPayload)
     const principal = this.principal(payload)
-    const needsPrimary =
-      payload.systemRole === SystemRole.SuperAdmin ||
-      payload.fid !== undefined ||
-      payload.browserBound !== undefined
-    if (signedPayload && needsPrimary && hasEnclosingJwtAdmission(requestOrPayload)) {
+    if (signedPayload && hasEnclosingJwtAdmission(requestOrPayload)) {
       const projection = await this.authority.readPrimaryProjection(payload)
       if (!projection) throw new UnauthorizedException('User not found')
       retainJwtPrimaryProjection(requestOrPayload, principal, projection)
@@ -55,14 +51,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   private async assertExistence(payload: JwtPayload): Promise<void> {
-    const user =
-      payload.systemRole === SystemRole.SuperAdmin ||
-      payload.fid !== undefined ||
-      payload.browserBound !== undefined
-        ? await this.privilegedRoles.getCurrentSystemRole(payload.sub)
-        : await this.userCache.getUser(payload.sub)
-
-    if (!user) {
+    const role = await this.privilegedRoles.getCurrentSystemRole(payload.sub)
+    if (!role) {
       throw new UnauthorizedException('User not found')
     }
   }

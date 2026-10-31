@@ -5,6 +5,7 @@ import {
   cleanDatabase,
   cleanOrgData,
   type E2ETestContext,
+  seedSystemRoles,
   setupE2ETest,
   teardownE2ETest,
 } from './helpers'
@@ -16,6 +17,7 @@ describe('Observability metrics (e2e)', () => {
   beforeAll(async () => {
     context = await setupE2ETest()
     app = context.app
+    await seedSystemRoles(context.prisma)
   }, 120000)
 
   afterAll(async () => {
@@ -34,16 +36,28 @@ describe('Observability metrics (e2e)', () => {
       .expect(201)
     const accessToken = registered.body.accessToken as string
 
-    // First validation falls back to DB and fills the user cache; the second is
-    // a cache hit. Registration also queues the bounded welcome template.
+    // The personal check reads the primary database and records no cache metric. An
+    // organization-scoped token reads the permissions cache: the first read falls back to
+    // the database and fills it, the next is a hit. Registration also queues the bounded
+    // welcome template.
     await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200)
-    await request(app.getHttpServer())
-      .get('/auth/me')
+    const organization = await request(app.getHttpServer())
+      .post('/organizations')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: 'Metrics org' })
+      .expect(201)
+    const scoped = await request(app.getHttpServer())
+      .post(`/organizations/${organization.body.id}/switch`)
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200)
+    for (let read = 0; read < 2; read++)
+      await request(app.getHttpServer())
+        .get(`/organizations/${organization.body.id}`)
+        .set('Authorization', `Bearer ${scoped.body.accessToken}`)
+        .expect(200)
 
     await request(app.getHttpServer()).get('/auth/me').expect(401)
 
@@ -74,8 +88,9 @@ describe('Observability metrics (e2e)', () => {
     expect(metrics.text).toContain('amcore_queue_jobs{queue="default",state="waiting"')
     expect(metrics.text).toContain('amcore_queue_jobs{queue="email",state="waiting"')
     expect(metrics.text).toContain('# HELP amcore_cache_operations_total')
-    expect(metrics.text).toContain('cache="user",result="db_fallback"')
-    expect(metrics.text).toContain('cache="user",result="hit"')
+    expect(metrics.text).toContain('cache="permissions",result="db_fallback"')
+    expect(metrics.text).toContain('cache="permissions",result="hit"')
+    expect(metrics.text).not.toContain('cache="user"')
     expect(metrics.text).toContain('# HELP amcore_storage_operations_total')
     expect(metrics.text).toContain('# HELP amcore_media_operations_total')
     expect(metrics.text).toContain('# HELP amcore_email_operations_total')

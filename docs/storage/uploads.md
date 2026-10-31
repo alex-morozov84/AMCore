@@ -59,7 +59,7 @@ The implementation:
    with `cacheControl: public, max-age=31536000, immutable`
    (safe because keys are versioned);
 3. stores the object key of `avatar-256` in `User.avatarKey` (the API computes
-   `avatarUrl` from it on every response) and invalidates the user cache;
+   `avatarUrl` from it on every response); the next request reads the new key from the database;
 4. best-effort sweeps older versions and the legacy flat `avatars/{userId}`
    object after the new version is live.
 

@@ -3,7 +3,6 @@ import { LockUnavailableError, type RedisMutexService } from '../../infrastructu
 import { PrismaService } from '../../prisma'
 
 import { AvatarService } from './avatar.service'
-import { UserCacheService } from './user-cache.service'
 
 import type { MediaService, ProcessImageResult } from '@/infrastructure/media'
 import type { StorageService } from '@/infrastructure/storage'
@@ -31,7 +30,6 @@ describe('AvatarService', () => {
   let service: AvatarService
   let storage: jest.Mocked<Pick<StorageService, 'upload' | 'list' | 'deleteMany' | 'getPublicUrl'>>
   let prisma: { user: { findUnique: jest.Mock; updateMany: jest.Mock } }
-  let userCache: jest.Mocked<Pick<UserCacheService, 'invalidateUser'>>
   let media: jest.Mocked<Pick<MediaService, 'processImageNow'>>
   let env: jest.Mocked<Pick<EnvService, 'get'>>
   let mutex: { runExclusive: jest.Mock }
@@ -49,7 +47,6 @@ describe('AvatarService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     }
-    userCache = { invalidateUser: jest.fn().mockResolvedValue(undefined) }
     media = { processImageNow: jest.fn().mockResolvedValue(PROCESS_RESULT) }
     env = { get: jest.fn().mockReturnValue('public, max-age=31536000, immutable') }
     // The critical section runs inline so the service's own CAS/sweep ordering is
@@ -58,7 +55,6 @@ describe('AvatarService', () => {
     service = new AvatarService(
       storage as unknown as StorageService,
       prisma as unknown as PrismaService,
-      userCache as unknown as UserCacheService,
       media as unknown as MediaService,
       env as unknown as EnvService,
       mutex as unknown as RedisMutexService
@@ -111,7 +107,6 @@ describe('AvatarService', () => {
       where: { id: 'u1', avatarGeneration: { lt: 1 } },
       data: { avatarKey: 'public/avatars/u1/v-1-x/avatar-256.webp', avatarGeneration: 1 },
     })
-    expect(userCache.invalidateUser).toHaveBeenCalledWith('u1')
     expect(result).toBe('https://cdn/public/avatars/u1/v-1-x/avatar-256.webp')
   })
 
@@ -147,7 +142,6 @@ describe('AvatarService', () => {
 
     expect(result).toBe('https://cdn/public/avatars/u1/v-1-x/avatar-256.webp')
     expect(prisma.user.updateMany).toHaveBeenCalled()
-    expect(userCache.invalidateUser).toHaveBeenCalledWith('u1')
   })
 
   it('rolls back the new version and does not publish on derive failure', async () => {
@@ -265,7 +259,6 @@ describe('AvatarService', () => {
       where: { id: 'u1', avatarGeneration: { lt: 1 } },
       data: { avatarKey: null, avatarGeneration: 1 },
     })
-    expect(userCache.invalidateUser).toHaveBeenCalledWith('u1')
   })
 
   it('fails closed: does not clear the row when storage cleanup fails', async () => {
@@ -286,6 +279,5 @@ describe('AvatarService', () => {
 
     expect(storage.deleteMany).not.toHaveBeenCalled()
     expect(prisma.user.updateMany).not.toHaveBeenCalled()
-    expect(userCache.invalidateUser).not.toHaveBeenCalled()
   })
 })
