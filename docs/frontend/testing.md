@@ -199,7 +199,6 @@ After a crash, first follow managed recovery without `--purge` if the build is
 needed for reuse. A live or unproved child blocks recovery and cleanup.
 
 The pinned browser platforms are Linux x64 and Apple Silicon macOS.
-Local runtime checks cover Apple Silicon; Linux hosted runtime admission remains pending.
 On Linux, install system dependencies with
 `pnpm --filter web exec playwright install --with-deps chromium` before the audit.
 This may require administrator rights. A pinned binary hash alone does not prove
