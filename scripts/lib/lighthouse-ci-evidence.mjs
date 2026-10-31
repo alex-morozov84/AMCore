@@ -1,4 +1,18 @@
 import { invariant } from './lighthouse-plan.mjs'
+import { join } from 'node:path'
+
+export function ownerBundleDirectories(root, owners, actual, identity) {
+  const names = owners.map((e) => `web-lighthouse-${identity.run}-${identity.attempt}-${e.lane}`)
+  const expected =
+    owners.length === 1
+      ? ['index.html', 'payload.json.gz', ...owners[0].expected.map((id) => `${id}.html`)]
+      : names
+  invariant(
+    actual.length === expected.length && actual.every((name) => expected.includes(name)),
+    'unexpected-owner-artifact-set'
+  )
+  return new Map(owners.map((e, i) => [e.lane, owners.length === 1 ? root : join(root, names[i])]))
+}
 
 export function validateEnvelopes(plan, envelopes, jobResults) {
   invariant(

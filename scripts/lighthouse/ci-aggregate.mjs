@@ -5,7 +5,11 @@ import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { auditPlan, auditCatalogue, invariant, digest } from '../lib/lighthouse-plan.mjs'
 import { runIdentity } from './identity.mjs'
-import { validateEnvelopes, validateOwnerBundle } from '../lib/lighthouse-ci-evidence.mjs'
+import {
+  validateEnvelopes,
+  validateOwnerBundle,
+  ownerBundleDirectories,
+} from '../lib/lighthouse-ci-evidence.mjs'
 import { unpackReports } from '../lib/lighthouse-archive.mjs'
 import { verifyView } from '../lib/lighthouse-view-export.mjs'
 import { checkCoverage } from '../lib/lighthouse-coverage.mjs'
@@ -34,11 +38,11 @@ if (process.argv.includes('--envelopes')) {
   invariant(process.env.GITHUB_OUTPUT, 'missing-ci-output')
   appendFileSync(process.env.GITHUB_OUTPUT, `ids=${owners.map((e) => e.artifactId).join(',')}\n`)
 } else {
-  const expectedNames = owners.map((e) => `web-lighthouse-${plan.run}-${plan.attempt}-${e.lane}`)
-  invariant(
-    JSON.stringify((await readdir(join(root, 'bundles'))).sort()) ===
-      JSON.stringify(expectedNames.sort()),
-    'unexpected-owner-artifact-set'
+  const locations = ownerBundleDirectories(
+    join(root, 'bundles'),
+    owners,
+    await readdir(join(root, 'bundles')),
+    plan
   )
   const catalogue = auditCatalogue(process.cwd(), plan.choices)
   const resolvers = [{ scope: 'product-admin', prefix: `/${plan.choices.productAdmin.alias}` }]
@@ -51,7 +55,7 @@ if (process.argv.includes('--envelopes')) {
     tooling: await toolingFingerprint(process.cwd()),
   }
   for (const e of owners) {
-    const location = join(root, 'bundles', `web-lighthouse-${plan.run}-${plan.attempt}-${e.lane}`)
+    const location = locations.get(e.lane)
     await mkdir(join(root, 'verified'), { recursive: true, mode: 0o700 })
     const bundle = await unpackReports(
       join(location, 'payload.json.gz'),
