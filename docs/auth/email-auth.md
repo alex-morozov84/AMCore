@@ -297,7 +297,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/verify-email \
 2. Expiry is checked (48-hour window)
 3. Under the common user mail-token lock, conditionally consume the unused,
    unexpired token and set `emailVerified` together in one transaction
-4. User cache is cleared so the next request reflects the change
+4. The next request reads the updated user from the database (there is no user cache)
 
 **Success response:** `204 No Content`
 
