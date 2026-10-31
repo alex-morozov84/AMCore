@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { auditPlan } from './lib/lighthouse-plan.mjs'
 import { runIdentity } from './lighthouse/identity.mjs'
-import { auditEnvironment } from './stand/lighthouse-phase.mjs'
+import { auditEnvironment, laneEpoch } from './lib/lighthouse-command.mjs'
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ciLanes } from './e2e-ci-plan.mjs'
@@ -13,7 +13,6 @@ const lanes = ciLanes(root)
 const requested = process.argv[2]
 const auditIdentity = runIdentity(root)
 const plan = auditPlan(root, auditIdentity)
-const epoch = process.env.AMCORE_CI_EPOCH ? Number(process.env.AMCORE_CI_EPOCH) : Date.now()
 const auditDirectory = (lane) =>
   join(root, '.amcore/lighthouse-results', plan.run, plan.attempt, lane)
 
@@ -28,7 +27,7 @@ async function closeMockedRunner(standId) {
   }
 }
 
-async function browserLane(lane) {
+async function browserLane(lane, epoch) {
   const { cancellation } = await import('./stand/cancellation.mjs')
   const { run, cleanEnvironment, stopChildren } = await import('./stand/process.mjs')
   const operation = await cancellation()
@@ -105,6 +104,7 @@ else {
   const results = []
   for (const lane of requested === '--all' ? lanes : [requested]) {
     const began = Date.now()
+    const epoch = laneEpoch(process.env.AMCORE_CI_EPOCH, began)
     const status =
       lane === 'safety'
         ? spawnSync('pnpm', ['test:stands'], {
@@ -112,7 +112,7 @@ else {
             env: { ...process.env, CI: 'true' },
             stdio: 'inherit',
           }).status
-        : await browserLane(lane)
+        : await browserLane(lane, epoch)
     if (lane === 'safety') {
       await mkdir(auditDirectory(lane), { recursive: true, mode: 0o700 })
       await writeFile(

@@ -1,3 +1,4 @@
+import { assertRequiredAudits } from './lighthouse-required.mjs'
 import defaultConfig from 'lighthouse/core/config/default-config.js'
 import { invariant } from './lighthouse-plan.mjs'
 
@@ -58,6 +59,7 @@ export function validateResult(lhr) {
 }
 
 export function evaluateResult(lhr, scenario, observation) {
+  assertRequiredAudits(scenario.requiredAudits)
   validateResult(lhr)
   invariant(
     observation.identity && observation.requiredData && observation.url === lhr.finalDisplayedUrl,
@@ -87,8 +89,13 @@ export function evaluateResult(lhr, scenario, observation) {
   }
   for (const id of scenario.requiredAudits) {
     invariant(lhr.audits[id], 'missing-required-audit')
-    if (['manual', 'informative', 'notApplicable'].includes(lhr.audits[id].scoreDisplayMode))
+    const audit = lhr.audits[id]
+    if (['manual', 'informative', 'notApplicable'].includes(audit.scoreDisplayMode))
       failed.push(`${id}:unexpected-applicability`)
+    else {
+      invariant(audit.scoreDisplayMode === 'binary', 'unsupported-required-audit-mode')
+      if (audit.score !== 1 && !failed.includes(id)) failed.push(id)
+    }
   }
   if (observation.indexable !== scenario.indexable) failed.push('indexing-expectation')
   return {

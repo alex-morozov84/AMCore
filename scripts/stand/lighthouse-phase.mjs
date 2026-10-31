@@ -13,14 +13,6 @@ import { docker, inspect } from './docker.mjs'
 import { invocationTarget } from './invocation.mjs'
 
 const invoked = new WeakSet()
-export function auditEnvironment(plan, lane, epoch, output) {
-  return {
-    AMCORE_AUDIT_PLAN: JSON.stringify(plan),
-    AMCORE_AUDIT_OWNER: lane,
-    AMCORE_AUDIT_EPOCH: String(epoch),
-    AMCORE_AUDIT_OUTPUT: output,
-  }
-}
 export async function runAuditPhase(m, token) {
   invariant(!invoked.has(m), 'duplicate-audit-phase')
   invoked.add(m)

@@ -1,3 +1,4 @@
+import { assertRequiredAudits } from './lighthouse-required.mjs'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -57,6 +58,7 @@ export function auditCatalogue(root, choices = auditChoices(root)) {
     'empty-or-duplicate-scenarios'
   )
   for (const s of scenarios) {
+    assertRequiredAudits(s.requiredAudits)
     invariant(
       /^[a-z][a-z0-9-]{0,50}$/.test(s.id) &&
         ['product', 'product-admin', ...choices.extensions.map(() => 'console')].includes(s.scope),

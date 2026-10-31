@@ -1,10 +1,9 @@
-import { auditCommand } from './lib/lighthouse-command.mjs'
+import { auditCommand, auditEnvironment } from './lib/lighthouse-command.mjs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { auditPlan, invariant } from './lib/lighthouse-plan.mjs'
 import { runIdentity } from './lighthouse/identity.mjs'
 import { run, cleanEnvironment } from './stand/process.mjs'
-import { auditEnvironment } from './stand/lighthouse-phase.mjs'
 
 const root = import.meta.dirname + '/..'
 const plan = auditPlan(root, runIdentity(root))

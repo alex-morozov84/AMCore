@@ -11,3 +11,18 @@ export function auditCommand(plan, lane, id, reuse = false) {
   if (reuse) args.push('--reuse-audit')
   return args
 }
+
+export function auditEnvironment(plan, lane, epoch, output) {
+  return {
+    AMCORE_AUDIT_PLAN: JSON.stringify(plan),
+    AMCORE_AUDIT_OWNER: lane,
+    AMCORE_AUDIT_EPOCH: String(epoch),
+    AMCORE_AUDIT_OUTPUT: output,
+  }
+}
+
+export function laneEpoch(hostedEpoch, began) {
+  const epoch = hostedEpoch === undefined ? began : Number(hostedEpoch)
+  invariant(Number.isSafeInteger(epoch) && epoch > 0 && epoch <= began, 'invalid-job-epoch')
+  return epoch
+}

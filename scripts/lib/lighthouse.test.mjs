@@ -1,3 +1,4 @@
+import { assertRequiredAudits, requiredAuditCategories } from './lighthouse-required.mjs'
 import { auditCommand } from './lighthouse-command.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -332,4 +333,44 @@ test('retrieved owner evidence rejects local-only proof, changed build sources a
       ),
     /invalid-owner-result/
   )
+})
+
+test('required HTTPS fails at zero and passes only after restoration, outside accessibility', () => {
+  const r = result(),
+    s = { requiredAudits: ['is-on-https'], indexable: false }
+  const o = { identity: true, requiredData: true, url: r.finalDisplayedUrl, indexable: false }
+  r.audits['is-on-https'].score = 0
+  assert.deepEqual(evaluateResult(r, s, o).failed, ['is-on-https'])
+  r.audits['is-on-https'].score = 1
+  assert.equal(evaluateResult(r, s, o).passed, true)
+  for (const mode of ['numeric', 'metricSavings']) {
+    r.audits['is-on-https'].scoreDisplayMode = mode
+    assert.throws(() => evaluateResult(r, s, o), /unsupported-required-audit-mode/)
+  }
+})
+
+test('mandatory registry matches pinned non-performance categories and rejects unsupported descriptors', async (t) => {
+  for (const [id, category] of Object.entries(requiredAuditCategories)) {
+    assert.ok(defaultConfig.categories[category].auditRefs.some((ref) => ref.id === id))
+    assert.ok(!defaultConfig.categories.performance.auditRefs.some((ref) => ref.id === id))
+  }
+  for (const ids of [
+    ['label', 'label'],
+    ['largest-contentful-paint'],
+    ['image-delivery-insight'],
+    ['unadmitted-rule'],
+    [null],
+  ])
+    assert.throws(() => assertRequiredAudits(ids), /unsupported-required-audits/)
+  const dir = await temporary(t)
+  const catalogue = await readFile(join(root, 'apps/web/e2e/lighthouse/catalogue.json'), 'utf8')
+  await cp(join(root, 'apps/web/e2e/lighthouse'), join(dir, 'apps/web/e2e/lighthouse'), {
+    recursive: true,
+  })
+  for (const ids of [['largest-contentful-paint'], ['unadmitted-rule']]) {
+    const bad = JSON.parse(catalogue)
+    bad.scenarios[0].requiredAudits = ids
+    await writeFile(join(dir, 'apps/web/e2e/lighthouse/catalogue.json'), JSON.stringify(bad))
+    assert.throws(() => auditCatalogue(dir, { extensions: [] }), /unsupported-required-audits/)
+  }
 })

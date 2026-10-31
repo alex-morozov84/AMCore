@@ -228,7 +228,11 @@ At most three initial scenarios and three existing owning lanes apply. Each owne
 reuses its own production build/stack and runs one audit per assigned scenario.
 Mocked, disruptive, setup and other integration lanes do not silently run audits.
 `node scripts/e2e-ci.mjs --all` retains all applicable ordinary E2E lanes and adds
-only their explicit audit assignments. Local execution stays sequential.
+only their explicit audit assignments. Local execution stays sequential. Each local
+lane starts its own preparation/audit/finalization clock when that lane begins;
+earlier lanes do not spend its budget. Hosted lanes preserve AMCORE_CI_EPOCH
+from the enclosing job, including time already spent in setup. Retries do not
+restart either clock.
 
 ### Interpret a failure and recover
 
@@ -273,7 +277,16 @@ extra default audits or throughput measurements.
 
 The generic catalogue is `apps/web/e2e/lighthouse/catalogue.json`. Each scenario
 specifies its stable ID, scope, route template, indexing expectation and required
-individual audit IDs. Keep fixture/readiness changes in the test adapter. Do not
+individual audit IDs. The admitted `requiredAudits` IDs are `label`, `button-name`,
+`image-alt` and `is-on-https`. These are binary rules: score1 passes and score0 fails,
+including HTTPS outside accessibility. Required manual/informative/N/A results fail;
+a required numeric or metric-savings result is invalid. Unknown, duplicate or
+unsupported IDs fail catalogue admission with `unsupported-required-audits`.
+Timing/image-delivery opportunities cannot become required rules. A new mandatory
+ID needs explicit admission to `scripts/lib/lighthouse-required.mjs` and matching
+policy tests; listing it only in a descriptor is insufficient. Applicable
+accessibility rules still run even when absent from `requiredAudits`.
+Keep fixture/readiness changes in the test adapter. Do not
 create product endpoints or put Node tooling in application runtime imports.
 
 The catalogue's coverage rows classify every built page family as `audited`,
