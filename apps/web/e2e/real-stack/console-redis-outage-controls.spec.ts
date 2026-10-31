@@ -41,32 +41,31 @@ test('Console route during a vault stall: no cookie, invented cookie and ordinar
     }
 
     settingsProof('pause-redis')
-    const during: Record<string, { status: number; body: string }> = {}
+    const TEMPORARY = /usually temporary|temporarily unavailable/i
+    const during: Record<string, { status: number; shown: boolean }> = {}
     for (const [name, ctx] of [
       ['anonymous', anonymous],
       ['invented', invented],
       ['user', user],
     ] as const) {
-      const response = await ctx.request.get(URL, { timeout: 10_000 })
-      during[name] = { status: response.status(), body: await response.text() }
+      // The rendered page, not the payload: the translated text also sits in unrelated bundles.
+      const page = await ctx.newPage()
+      const response = await page.goto(URL, { timeout: 15_000 })
+      during[name] = {
+        status: response!.status(),
+        shown: await page.getByText(TEMPORARY).first().isVisible(),
+      }
+      // Nothing rendered for anyone: no operator chrome, no queue data.
+      forbidden(await page.content())
+      await page.close()
     }
-    // Nothing rendered for anyone: no operator chrome, no queue data.
-    for (const { body } of Object.values(during)) forbidden(body)
     // No cookie: the vault is never asked, so the plain denial stays a 404.
-    expect(during.anonymous.status).toBe(404)
-    // Disclosure under an outage (accepted limit): a cookie, even invented, may see the
-    // temporary state instead of the 404. Recorded, not hidden.
-
-    console.log(
-      'console outage statuses',
-      JSON.stringify({
-        anonymous: during.anonymous.status,
-        invented: during.invented.status,
-        user: during.user.status,
-        inventedTemporary: /temporarily unavailable/i.test(during.invented.body),
-        userTemporary: /temporarily unavailable/i.test(during.user.body),
-      })
-    )
+    expect(during.anonymous).toEqual({ status: 404, shown: false })
+    // Disclosure under an outage (accepted limit): a cookie, even invented, sees the temporary
+    // page instead of the 404. This is the page response (200 with the temporary text), not the
+    // generic API 503. The assertions keep the accepted limit from changing unnoticed.
+    expect(during.invented).toEqual({ status: 200, shown: true })
+    expect(during.user).toEqual({ status: 200, shown: true })
 
     // After the stall the normal denial is back for all three.
     await sleep(STALL_MS + 2000)
