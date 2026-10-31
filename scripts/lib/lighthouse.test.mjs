@@ -225,11 +225,17 @@ test('expected lane evidence refuses skipped/duplicate/wrong-run owners and prio
       cleanup: 'passed',
       originalUpload: 'passed',
       audit: ids.length ? 'passed' : 'not_applicable',
+      view: ids.length ? 'passed' : 'not_applicable',
       export: ids.length ? 'passed' : 'not_applicable',
       upload: ids.length ? 'passed' : 'not_applicable',
     },
     ...(ids.length
-      ? { artifactId: '1234', manifestHash: 'b'.repeat(64), archiveHash: 'c'.repeat(64) }
+      ? {
+          artifactId: '1234',
+          manifestHash: 'b'.repeat(64),
+          archiveHash: 'c'.repeat(64),
+          viewHash: 'd'.repeat(64),
+        }
       : {}),
   }))
   const jobs = { 'web-e2e-plan': { result: 'success' }, 'web-e2e-lanes': { result: 'success' } }

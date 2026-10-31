@@ -6,7 +6,8 @@
       "scope": "console",
       "path": "/",
       "indexable": false,
-      "requiredAudits": ["button-name"]
+      "requiredAudits": ["button-name"],
+      "label": "Console Overview"
     }
   ],
   "coverage": [

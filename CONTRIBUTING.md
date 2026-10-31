@@ -158,7 +158,7 @@ Pure schema/lib contract tests for `packages/shared` live beside their source
 | `node scripts/run-deployment-version-e2e.mjs` | Isolated production A/B recovery with a custom Server Action timer; see [deployment verification](docs/frontend/testing.md#production-deployment-version-recovery) |
 | `node scripts/e2e-ci.mjs --all`               | Complete Web E2E CI lanes with matching CI settings and isolated stands; see [frontend testing](docs/frontend/testing.md#complete-ci-e2e-locally)                  |
 | `pnpm audit:web:plan`                         | Inspect Lighthouse scenarios and CI ownership                                                                                                                      |
-| `pnpm audit:web path-standard`                | Audit a new isolated production stand; [setup, reports and limits](docs/frontend/testing.md#lighthouse-audits)                                                     |
+| `pnpm audit:web path-standard`                | Audit a new isolated production stand; [setup, HTML reports and limits](docs/frontend/testing.md#lighthouse-audits)                                                |
 | `pnpm --filter web test:e2e`                  | Playwright mocked + server-mocked E2E lanes (auto-starts `next dev`)                                                                                               |
 | `pnpm --filter web test:e2e:real-stack`       | Playwright real-stack E2E lane — managed isolated startup and cleanup; see [local stands](docs/operations/local-stands.md)                                         |
 

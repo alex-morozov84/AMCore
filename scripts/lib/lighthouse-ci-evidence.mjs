@@ -41,6 +41,8 @@ export function validateEnvelopes(plan, envelopes, jobResults) {
         /^\d+$/.test(String(e.artifactId)) &&
           /^[a-f0-9]{64}$/.test(e.manifestHash) &&
           /^[a-f0-9]{64}$/.test(e.archiveHash) &&
+          /^[a-f0-9]{64}$/.test(e.viewHash) &&
+          e.outcomes.view === 'passed' &&
           e.outcomes.export === 'passed' &&
           e.outcomes.upload === 'passed',
         'missing-owner-bundle'
@@ -48,6 +50,8 @@ export function validateEnvelopes(plan, envelopes, jobResults) {
     else
       invariant(
         e.artifactId === undefined &&
+          e.outcomes.view === 'not_applicable' &&
+          e.viewHash === undefined &&
           e.outcomes.export === 'not_applicable' &&
           e.outcomes.upload === 'not_applicable',
         'unexpected-non-owner-bundle'

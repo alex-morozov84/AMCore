@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { test } from 'node:test'
-import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { auditPlan } from './lighthouse-plan.mjs'
+import { resolve, join } from 'node:path'
 import { parse } from 'yaml'
 import { ciLanes, selectedFiles, specFiles } from '../e2e-ci-plan.mjs'
 
@@ -30,6 +32,9 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
   assert.equal(gate.name, 'Web E2E')
   assert.equal(gate.if, '${{ always() }}')
   assert.deepEqual(gate.needs, ['web-e2e-plan', 'web-e2e-lanes'])
+  const temporary = mkdtempSync(join(tmpdir(), 't084-ci-gate-'))
+  const identity = { run: '123', attempt: '1', source: 'a'.repeat(40) }
+  const plan = auditPlan(root, identity)
   for (const results of [
     ['success', 'success'],
     ['success', 'failure'],
@@ -43,6 +48,11 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
       .slice(1, -1)
     const result = spawnSync(process.execPath, ['-e', script], {
       env: {
+        GITHUB_RUN_ID: identity.run,
+        GITHUB_RUN_ATTEMPT: identity.attempt,
+        GITHUB_SHA: identity.source,
+        GITHUB_STEP_SUMMARY: join(temporary, 'summary'),
+        AMCORE_EXPECTED_AUDIT_PLAN: JSON.stringify(plan),
         E2E_RESULTS: JSON.stringify(
           Object.fromEntries(
             results.map((value, index) => [
@@ -56,5 +66,6 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
     })
     assert.equal(result.status, results.every((value) => value === 'success') ? 0 : 1)
   }
+  rmSync(temporary, { recursive: true, force: true })
   assert.ok(ciLanes(root).includes('mocked'))
 })

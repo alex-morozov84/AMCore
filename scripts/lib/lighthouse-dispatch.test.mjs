@@ -33,6 +33,32 @@ test('both fresh CI planner modes run with source only and no installed packages
     assert.equal(result.error, undefined)
     assert.equal(result.status, 0, result.stderr)
   }
+  const published = dispatch(root, '--plan-ci', {
+    GITHUB_OUTPUT: join(root, 'outputs'),
+    GITHUB_STEP_SUMMARY: join(root, 'summary'),
+    AMCORE_AUDIT_RUN: '123',
+  })
+  assert.equal(published.status, 0, published.stderr)
+  const output = Object.fromEntries(
+    readFileSync(join(root, 'outputs'), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => {
+        const i = line.indexOf('=')
+        return [line.slice(0, i), JSON.parse(line.slice(i + 1))]
+      })
+  )
+  assert.equal(
+    output['audit-plan'].pages.length,
+    Object.values(output['audit-plan'].assignments).flat().length
+  )
+  const summary = readFileSync(join(root, 'summary'), 'utf8')
+  assert.match(summary, /Expected only/)
+  assert.ok(summary.includes(output['audit-plan'].digest))
+  assert.deepEqual(
+    output.matrix.include.map((row) => row.lane),
+    Object.keys(output['audit-plan'].assignments)
+  )
   const lanes = JSON.parse(matrix.stdout).include
   const assignments = JSON.parse(plan.stdout).assignments
   assert.deepEqual(
@@ -41,6 +67,13 @@ test('both fresh CI planner modes run with source only and no installed packages
   )
   assert.ok(assignments['path-standard'].includes('login'))
   assert.equal(existsSync(join(root, '.amcore')), false)
+  const catalogue = join(root, 'apps/web/e2e/lighthouse/catalogue.json')
+  const invalid = JSON.parse(readFileSync(catalogue, 'utf8'))
+  invalid.scenarios[0].id = 'index'
+  writeFileSync(catalogue, JSON.stringify(invalid))
+  const refused = dispatch(root, '--audit-plan')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /invalid-scenario/)
 })
 
 function fakeRuntime(root) {

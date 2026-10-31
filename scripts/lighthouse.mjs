@@ -1,5 +1,6 @@
 import { auditCommand, auditEnvironment } from './lib/lighthouse-command.mjs'
 import { randomUUID } from 'node:crypto'
+import { access } from 'node:fs/promises'
 import { join } from 'node:path'
 import { auditPlan, invariant } from './lib/lighthouse-plan.mjs'
 import { runIdentity } from './lighthouse/identity.mjs'
@@ -45,5 +46,13 @@ else {
   } finally {
     for (const [name, handler] of handlers) process.off(name, handler)
   }
+  const index = join(output, '../view/index.html')
+  if (
+    await access(index).then(
+      () => true,
+      () => false
+    )
+  )
+    console.log(`Open Lighthouse reports: ${index}`)
   if (!process.exitCode) console.log(`Validated local Lighthouse reports: ${output}`)
 }

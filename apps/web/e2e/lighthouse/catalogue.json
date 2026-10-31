@@ -6,14 +6,16 @@
       "scope": "product",
       "path": "/login",
       "indexable": false,
-      "requiredAudits": ["label", "button-name"]
+      "requiredAudits": ["label", "button-name"],
+      "label": "Website sign-in"
     },
     {
       "id": "members",
       "scope": "product-admin",
       "path": "/organizations/[id]/members",
       "indexable": false,
-      "requiredAudits": ["button-name"]
+      "requiredAudits": ["button-name"],
+      "label": "Organization members"
     }
   ],
   "coverage": [

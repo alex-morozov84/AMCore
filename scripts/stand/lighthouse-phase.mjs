@@ -1,3 +1,4 @@
+import { writeView } from '../lib/lighthouse-view-export.mjs'
 import { admitAuditAfterTests } from '../lib/lighthouse-admission.mjs'
 import { packReports } from '../lib/lighthouse-archive.mjs'
 import { auditAcceptance } from './lighthouse-acceptance.mjs'
@@ -143,7 +144,15 @@ export async function runAuditPhase(m, token) {
   const manifestHash = await writeManifest(output, manifest)
   await verifyBundle(output, { plan: plan.digest, lane })
   const archiveHash = await packReports(output, join(output, '../payload.json.gz'))
+  const view = await writeView(
+    join(output, '../view'),
+    plan,
+    lane,
+    output,
+    join(output, '../payload.json.gz')
+  )
   m.audit = {
+    viewHash: view.indexHash,
     archiveHash,
     lane,
     output,

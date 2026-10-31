@@ -61,11 +61,18 @@ export function auditCatalogue(root, choices = auditChoices(root)) {
     assertRequiredAudits(s.requiredAudits)
     invariant(
       /^[a-z][a-z0-9-]{0,50}$/.test(s.id) &&
+        s.id !== 'index' &&
         ['product', 'product-admin', ...choices.extensions.map(() => 'console')].includes(s.scope),
       'invalid-scenario'
     )
     invariant(
-      s.path.startsWith('/') && typeof s.indexable === 'boolean' && Array.isArray(s.requiredAudits),
+      typeof s.label === 'string' &&
+        s.label.length > 0 &&
+        s.label.length <= 120 &&
+        [...s.label].every((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127) &&
+        s.path.startsWith('/') &&
+        typeof s.indexable === 'boolean' &&
+        Array.isArray(s.requiredAudits),
       'invalid-scenario-contract'
     )
   }
@@ -109,6 +116,7 @@ export function auditPlan(root, identity) {
     descriptors: digest(catalogue),
     choices,
     assignments,
+    pages: catalogue.scenarios.map(({ id, label, path }) => ({ id, label, path })),
     exclusions: choices.exclusions,
   }
   return { ...plan, digest: digest(plan) }

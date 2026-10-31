@@ -173,9 +173,9 @@ Manual checks remain unverified. Existing axe, translation and JavaScript budget
 4. Run `pnpm audit:web path-standard` from the repository root. It creates a new
    isolated managed stand, builds once and runs the assigned audits. It does not
    replace the ordinary E2E suite. No arbitrary URL, owner preview or `.env` target is accepted.
-5. Open each HTML report under the printed `.amcore/lighthouse-results/<run>/<attempt>/<lane>/bundle`
-   directory. Read `manifest.json` for the exact source/build, validity and policy outcomes.
-   A failed or missing report never counts as a pass. Keep JSON beside HTML for hash verification.
+5. Open the printed `index.html` in your browser. Select **Open full report** for a page.
+   See [finding reports](#find-and-open-lighthouse-reports) for local and CI results.
+   Read the original bundle's `manifest.json` for exact source/build and policy outcomes.
 
 ```text
 Plan -> own build and fixtures -> actual-page identity -> Lighthouse
@@ -234,6 +234,92 @@ earlier lanes do not spend its budget. Hosted lanes preserve AMCORE_CI_EPOCH
 from the enclosing job, including time already spent in setup. Retries do not
 restart either clock.
 
+### Find and open Lighthouse reports
+
+Run the registered-page checks using the setup and owner commands above. Local
+`audit:web` checks the selected owner scope; `node scripts/e2e-ci.mjs --all`
+includes all applicable ordinary E2E lanes and their assigned audits. Audit success
+does not replace ordinary E2E success. Keep each run/attempt separate.
+
+#### Local results
+
+1. Wait for the command's report location. Open its printed `index.html` in your browser.
+2. Find the page by its name or route. Read its measurement/policy result and four category scores.
+3. Select **Open full report**. This opens the complete Lighthouse HTML, including audit details.
+
+The index describes the pages included in that command or completed local run.
+If your project assigns pages to separate owners, use `pnpm audit:web:plan` to see
+which commands apply. Do not treat a single-owner index as all-project coverage.
+The original HTML/JSON bundle remains at the printed bundle location.
+
+#### CI results
+
+You must be signed into GitHub with read access to the repository. Wait until
+the selected run finishes before deciding whether an expected result is missing:
+
+1. Open the repository's **Actions**, select **CI**, and open the required run and attempt.
+2. On **Summary**, find **Lighthouse — expected pages**, produced by the planning job. This is the full inventory for that run/attempt, including pages whose owning job produced nothing.
+3. For each expected page, find its matching **Lighthouse — results** entry for the same run/attempt and owner. Use **Download reports** when that entry offers it, then extract the complete ZIP.
+4. Open the extracted folder's `index.html`. Select **Open full report** for the desired page.
+
+```text
+Actions -> CI run / attempt -> complete expected-page inventory
+        -> matching result -> Download reports -> extract ZIP
+        -> index.html -> Open full report
+```
+
+The expected-page table is labelled **Expected only — result not confirmed here**.
+It does not prove that any audit ran or passed. After the run finishes, an expected
+page without a matching result is **Result unavailable / run incomplete**. This
+includes a job skipped, cancelled or stopped before it wrote any output. The page
+still appears in the planning job's inventory. It has no confirmed score or report;
+another page's report or an older attempt cannot replace it.
+
+If the planning job failed or no validated current inventory exists, coverage is
+unavailable. The existing **Web E2E** aggregate reports **Lighthouse — coverage
+unavailable: expected inventory was not produced** before preserving the failure.
+If that diagnostic could not run either, the absent planning inventory still means
+coverage unavailable. Inspect the failed planning job; do not infer an expected
+page list or complete coverage from the surviving reports.
+
+Several owning jobs can produce several report archives. Each result entry points
+to the archive containing that page. If a summary link is unavailable, use the run's
+**Artifacts** section and the exact `web-lighthouse-<run>-<attempt>-<owner>` name
+shown with the results. You do not need to write a program, parse JSON or unpack
+`payload.json.gz` to view a report. That file supports machine verification.
+
+Extract the complete ZIP before opening the index; links may not work inside an
+archive preview. Keep its HTML files beside `index.html`. The full Lighthouse
+reports open as local files; this requires no report server or public hosting.
+
+#### Understand incomplete or failed results
+
+**Passed** means the measurement is valid and its mandatory policy passed.
+**Audit failures** still offers a full report when the measured page was valid and
+the report passed safety checks. A green category score can coexist with a failing
+individual audit; inspect its full details before deciding what to fix.
+
+**Invalid**, **Not run** or **Incomplete** does not mean zero score or success.
+An owner-provided index explains the bounded reason and omits the report link
+when no safe full report exists. If the owner emitted nothing at all, use the
+planning inventory to identify its missing expected page; no owner index will exist.
+Failed sign-in/MFA/setup content is never offered as a report.
+Readable reports from other pages do not make that incomplete run successful.
+
+To diagnose the cause, open **Web E2E (\<owner\>)** in the same CI run/attempt
+and read its failure log. Locally, read the command's failure output.
+The index shows the measurement state; it does not reproduce the complete job log.
+
+Artifacts expire after seven days, subject to repository retention policy. If a
+link is unavailable, confirm the selected run/attempt and your repository access.
+Use the matching artifact if it still exists. If upload failed or the artifact has
+expired, preserve the incomplete result and follow the existing maintainer recovery
+path; a different attempt does not retroactively complete this one.
+
+The index and raw scores do not certify manual accessibility, unopened page states,
+stable timing or image-transfer performance. Hosted compatibility, real artifact
+transfer and cost still require the separate admission described below.
+
 ### Interpret a failure and recover
 
 The runner verifies the expected account, audience, origin, path and loaded data
@@ -276,8 +362,8 @@ extra default audits or throughput measurements.
 ### Extend downstream coverage
 
 The generic catalogue is `apps/web/e2e/lighthouse/catalogue.json`. Each scenario
-specifies its stable ID, scope, route template, indexing expectation and required
-individual audit IDs. The admitted `requiredAudits` IDs are `label`, `button-name`,
+specifies its stable ID, readable `label`, scope, route template, indexing expectation and required
+individual audit IDs. Reserve `index` for the report list; use another scenario ID. The admitted `requiredAudits` IDs are `label`, `button-name`,
 `image-alt` and `is-on-https`. These are binary rules: score1 passes and score0 fails,
 including HTTPS outside accessibility. Required manual/informative/N/A results fail;
 a required numeric or metric-savings result is invalid. Unknown, duplicate or
@@ -322,13 +408,15 @@ and owning lanes explicitly rather than extending a phase silently.
 
 The existing Web E2E aggregate requires every original lane outcome and the exact
 current-run/attempt status envelopes. Non-owners explicitly report N/A. Owners
-upload a bounded `payload.json.gz` archive, then envelopes containing returned artifact IDs and archive/manifest hashes. The
+upload a bounded viewing folder with unchanged native HTML, `index.html` and the machine
+`payload.json.gz` archive. Envelopes bind artifact IDs and archive/manifest/index hashes. The
 aggregate independently resolves ownership, retrieves those IDs and checks hashes,
 source/config/build identity, coverage and scenario outcomes. Earlier test, report,
 transfer or cleanup failures remain failures.
 
 Candidate ceilings are40 minutes per owning job,20 per non-owner and5 for the
-aggregate. Report pairs allow8MiB; bundles allow256MiB and200 files, retained seven days.
+aggregate. Report pairs allow8MiB. The complete physical upload, including payload, copied HTML
+and index, allows256MiB and200 files, retained seven days.
 Transfer and aggregate actions use absolute phase deadlines in addition to GitHub's
 minute-based fallback. No phase spends the owned termination/cleanup reserve.
 Hosted cold/warm cost and real upload/download/hash admission must pass before CI

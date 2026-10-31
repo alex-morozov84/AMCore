@@ -1,12 +1,13 @@
 import { snapshot } from '../stand/snapshot.mjs'
 import { toolingFingerprint } from './reuse.mjs'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, mkdir } from 'node:fs/promises'
 import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { auditPlan, auditCatalogue, invariant, digest } from '../lib/lighthouse-plan.mjs'
 import { runIdentity } from './identity.mjs'
 import { validateEnvelopes, validateOwnerBundle } from '../lib/lighthouse-ci-evidence.mjs'
 import { unpackReports } from '../lib/lighthouse-archive.mjs'
+import { verifyView } from '../lib/lighthouse-view-export.mjs'
 import { checkCoverage } from '../lib/lighthouse-coverage.mjs'
 
 const plan = auditPlan(process.cwd(), runIdentity(process.cwd()))
@@ -51,18 +52,19 @@ if (process.argv.includes('--envelopes')) {
   }
   for (const e of owners) {
     const location = join(root, 'bundles', `web-lighthouse-${plan.run}-${plan.attempt}-${e.lane}`)
-    invariant(
-      JSON.stringify(await readdir(location)) === JSON.stringify(['payload.json.gz']),
-      'unexpected-artifact-files'
-    )
+    await mkdir(join(root, 'verified'), { recursive: true, mode: 0o700 })
     const bundle = await unpackReports(
       join(location, 'payload.json.gz'),
-      join(location, 'verified'),
+      join(root, 'verified', e.lane),
       e.archiveHash,
       e.manifestHash
     )
     invariant(bundle.sha256 === e.manifestHash, 'wrong-retrieved-manifest')
     validateOwnerBundle(plan, e, bundle.manifest, provenance)
+    await verifyView(location, plan, e.lane, bundle.manifest, {
+      archiveHash: e.archiveHash,
+      indexHash: e.viewHash,
+    })
     const coverage = checkCoverage(bundle.manifest.coverage.pages, catalogue, resolvers)
     invariant(digest(coverage) === bundle.manifest.coverage.digest, 'unverified-coverage')
   }

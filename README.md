@@ -311,6 +311,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 ## Going to production
 
 Use [Lighthouse audits](docs/frontend/testing.md#lighthouse-audits) to inspect loaded pages and individual accessibility defects.
+[Open complete HTML reports](docs/frontend/testing.md#find-and-open-lighthouse-reports) from local indexes or CI artifacts.
 
 The Quick Start above is a development stack. For one production server, follow
 [Single-host setup](docs/operations/single-host-compose.md), including its registry

@@ -244,12 +244,24 @@
           "scripts/e2e-ci-plan.mjs",
           "scripts/product-admin-e2e-plan.mjs",
           "scripts/check-route-budgets.mjs",
-          "docs/operations/local-stands.md"
+          "docs/operations/local-stands.md",
+          "scripts/lighthouse.mjs"
         ]
       },
       "statuses": ["A", "M", "D", "R"],
       "lane": "generated-full",
       "rationale": "Managed CLI choices and mixed guide contain declared optional Console seams."
+    },
+    {
+      "id": "verification.lighthouse",
+      "graph": "generated-verification",
+      "matcher": {
+        "kind": "root",
+        "patterns": ["scripts/lighthouse"]
+      },
+      "statuses": ["A", "M", "D", "R"],
+      "lane": "generated-full",
+      "rationale": "Audit adapters, viewing exports and CI evidence must survive generated project choices."
     }
   ]
 }

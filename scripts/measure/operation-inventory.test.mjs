@@ -41,7 +41,10 @@ describe('operation inventory against the real plans', () => {
       // The Console return-locale import adds two claims on the existing shared edit.
       // Grouped code/doc seams are shared/Console semantic facts on the same final edit.
       // Providers/manifests/scenarios remain unchanged. Raw inventory is independently inspected.
-      { name: 'measured operations', expected: 1040, actual: inventory.operations.length },
+      // Lighthouse adds seven distinct code edits. Its ten code blocks and one doc
+      // block contribute 16 facts and 22 claims across shared/Console inventories.
+      // The descriptor is inside an existing closed root; provider counts stay fixed.
+      { name: 'measured operations', expected: 1047, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -60,17 +63,17 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic facts',
-        expected: 1423,
+        expected: 1439,
         actual: inventory.migrationCounts.semanticFacts,
       },
       {
         name: 'migration semantic claims',
-        expected: 2312,
+        expected: 2334,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 1010,
+        expected: 1017,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

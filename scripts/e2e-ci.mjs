@@ -1,3 +1,4 @@
+import { publishPlan } from './lighthouse/ci-plan.mjs'
 import { productAdminE2ePlans } from './product-admin-e2e-plan.mjs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -99,6 +100,7 @@ if (requested === '--matrix')
     })
   )
 else if (requested === '--audit-plan') console.log(JSON.stringify(plan))
+else if (requested === '--plan-ci') publishPlan(plan)
 else {
   if (requested !== '--all' && !lanes.includes(requested)) throw new Error('Unknown E2E CI lane')
   const results = []
@@ -131,5 +133,9 @@ else {
     if (status === 130 || status === 143) break
   }
   console.table(results)
+  if (requested === '--all' && !process.env.GITHUB_ACTIONS) {
+    const { writeLocalRunIndex } = await import('./lighthouse/local-run-view.mjs')
+    console.log(`Open Lighthouse reports: ${await writeLocalRunIndex(plan, root)}`)
+  }
   if (results.some((result) => result.status !== 0)) process.exitCode ||= 1
 }

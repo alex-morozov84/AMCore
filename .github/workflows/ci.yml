@@ -937,10 +937,7 @@ jobs:
           node-version: 24
       - name: Select all applicable E2E lanes
         id: plan
-        run: |
-          matrix="$(node scripts/e2e-ci.mjs --matrix)"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          echo "audit-plan=$(node scripts/e2e-ci.mjs --audit-plan)" >> "$GITHUB_OUTPUT"
+        run: node scripts/e2e-ci.mjs --plan-ci
 
   web-e2e-lanes:
     name: Web E2E (${{ matrix.lane }})
@@ -950,6 +947,7 @@ jobs:
     env:
       E2E_CI_LANE: ${{ matrix.lane }}
       AMCORE_AUDIT_JOB_OWNER: ${{ matrix.timeout == 40 }}
+      AMCORE_EXPECTED_AUDIT_PLAN: ${{ needs.web-e2e-plan.outputs.audit-plan }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.web-e2e-plan.outputs.matrix) }}
@@ -1065,8 +1063,16 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-      - name: Upload safe Lighthouse bundle
+      - name: Prepare safe Lighthouse viewing files
+        id: view
         if: always() && matrix.timeout == 40 && steps.transfer.outcome == 'success'
+        env:
+          NODE_OPTIONS: --import=${{ github.workspace }}/scripts/lighthouse/action-deadline.mjs
+          AMCORE_ACTION_DEADLINE: ${{ env.AMCORE_BUNDLE_TRANSFER_END }}
+        run: node scripts/lighthouse/ci-prepare-view.mjs
+
+      - name: Upload safe Lighthouse bundle
+        if: always() && matrix.timeout == 40 && steps.transfer.outcome == 'success' && steps.view.outcome == 'success'
         id: audit-upload
         env:
           NODE_OPTIONS: --import=${{ github.workspace }}/scripts/lighthouse/action-deadline.mjs
@@ -1075,7 +1081,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.lane }}
-          path: .amcore/lighthouse-results/${{ github.run_id }}/${{ github.run_attempt }}/${{ matrix.lane }}/payload.json.gz
+          path: .amcore/lighthouse-results/${{ github.run_id }}/${{ github.run_attempt }}/${{ matrix.lane }}/view/
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
@@ -1083,9 +1089,12 @@ jobs:
       - name: Write explicit lane evidence
         if: always() && steps.transfer.outcome == 'success'
         env:
+          NODE_OPTIONS: --import=${{ github.workspace }}/scripts/lighthouse/action-deadline.mjs
+          AMCORE_ACTION_DEADLINE: ${{ env.AMCORE_STATUS_TRANSFER_END }}
           ORIGINAL_UPLOAD: ${{ steps.original-upload.outcome }}
           AUDIT_UPLOAD: ${{ steps.audit-upload.outcome }}
           AUDIT_ARTIFACT_ID: ${{ steps.audit-upload.outputs.artifact-id }}
+          AUDIT_ARTIFACT_URL: ${{ steps.audit-upload.outputs.artifact-url }}
         run: node scripts/lighthouse/ci-status.mjs
 
       - name: Upload lane evidence envelope
@@ -1130,6 +1139,21 @@ jobs:
         run: |
           node -e '
             const results = JSON.parse(process.env.E2E_RESULTS);
+            let validPlan = false;
+            try {
+              const {digest, ...plan} = JSON.parse(process.env.AMCORE_EXPECTED_AUDIT_PLAN);
+              validPlan = results["web-e2e-plan"]?.result === "success" &&
+                plan.version === 1 && plan.run === process.env.GITHUB_RUN_ID &&
+                plan.attempt === process.env.GITHUB_RUN_ATTEMPT && plan.source === process.env.GITHUB_SHA &&
+                Array.isArray(plan.pages) && plan.pages.length > 0 && plan.pages.length <= 3 &&
+                require("node:crypto").createHash("sha256").update(JSON.stringify(plan)).digest("hex") === digest;
+            } catch { /* No validated inventory is available. */ }
+            if (!validPlan) {
+              require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+                "### Lighthouse — coverage unavailable\n\nExpected inventory was not produced for this run and attempt. Inspect Web E2E plan.\n");
+              console.error("Expected inventory unavailable");
+              process.exit(1);
+            }
             if (["web-e2e-plan", "web-e2e-lanes"].some(name => results[name]?.result !== "success")) {
               console.error("Every planned E2E lane must succeed", results);
               process.exit(1);
