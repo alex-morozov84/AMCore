@@ -9,3 +9,13 @@ export function browserSandboxProfile(executablePath) {
   )
   return `abi <abi/4.0>,\ninclude <tunables/global>\nprofile amcore-lighthouse "${executablePath}" flags=(unconfined) {\n  userns,\n}\n`
 }
+
+export function assertBrowserSandbox(state) {
+  for (const [key, value] of Object.entries({
+    'Layer 1 Sandbox': 'Namespace',
+    'PID namespaces': 'Yes',
+    'Network namespaces': 'Yes',
+    'Seccomp-BPF sandbox': 'Yes',
+  }))
+    invariant(state[key] === value, 'browser-sandbox-not-active')
+}
