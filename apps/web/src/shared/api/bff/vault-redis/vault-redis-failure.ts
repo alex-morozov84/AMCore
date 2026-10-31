@@ -36,7 +36,8 @@ const TRANSPORT_CODES = new Set([
   'EPIPE',
   'ETIMEDOUT',
 ])
-const OPERATIONAL_REPLY = /^(LOADING|BUSY|MASTERDOWN|TRYAGAIN|CLUSTERDOWN)\b/
+// `OOM` is a saturated Redis refusing writes: the vault is unavailable for a write.
+const OPERATIONAL_REPLY = /^(LOADING|BUSY|MASTERDOWN|TRYAGAIN|CLUSTERDOWN|OOM)\b/
 const MAX_CAUSE_DEPTH = 4
 
 /**

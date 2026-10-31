@@ -11,6 +11,8 @@ import { getWebRedisClient } from './redis-client'
 import { redisVaultStore } from './session-vault-store'
 import type * as UpstreamAuth from './upstream-auth'
 import { callUpstreamRegister } from './upstream-auth'
+import { redisTransportStall } from './vault-redis/test-redis-transport-stall'
+import { stopVaultRedis } from './vault-redis/vault-redis'
 
 // Real Redis with the production memory policy: the refusal below is Redis's own
 // `OOM command not allowed`, not a mock. The Docker image tag is recorded in REVIEW.
@@ -101,7 +103,9 @@ describe('registration under real Redis memory pressure', () => {
       .catch((error: unknown) => error)
 
     expect(failure).toBeInstanceOf(SessionVaultUnavailableError)
-    expect(String((failure as SessionVaultUnavailableError).cause)).toMatch(/OOM/)
+    // The typed vault error wraps the command failure, whose own cause is Redis's refusal.
+    const command = (failure as SessionVaultUnavailableError).cause as Error
+    expect(String(command.cause)).toMatch(/OOM/)
   })
 
   it('reports a created account, sets no cookie and keeps the vault empty under pressure', async () => {
@@ -135,17 +139,27 @@ describe('registration under real Redis memory pressure', () => {
   })
 
   it('classifies an applied write with a lost reply as created and leaves only an expiring entry', async () => {
+    // The vault runs on its own supervised connection: a TCP fixture holds the reply of the
+    // session write after Redis executed it, so the caller's deadline ends with an unknown outcome.
     const client = await redis()
-    const original = client.set.bind(client)
-    const spy = vi.spyOn(client, 'set').mockImplementationOnce((async (...args: unknown[]) => {
-      await (original as (...a: unknown[]) => Promise<unknown>)(...args)
-      throw new Error('reply lost')
-    }) as never)
+    const proxy = await redisTransportStall(container!.getHost(), container!.getMappedPort(6379))
+    const directUrl = process.env.REDIS_URL
+    process.env.REDIS_URL = `redis://127.0.0.1:${proxy.port}`
+    stopVaultRedis()
+    proxy.holdRepliesWhen((chunk) => /SET[\s\S]*web:session:v1:/i.test(chunk.toString()))
     const before = new Set(await vaultKeys())
 
-    const response = await register()
+    let response: Awaited<ReturnType<typeof register>>
+    try {
+      response = await register()
+      await proxy.matchedCommand
+    } finally {
+      proxy.release()
+      stopVaultRedis()
+      process.env.REDIS_URL = directUrl
+      await proxy.close()
+    }
 
-    expect(spy).toHaveBeenCalled()
     expect(response.status).toBe(503)
     expect(response.headers.get('set-cookie')).toBeNull()
     await expect(response.json()).resolves.toMatchObject({
