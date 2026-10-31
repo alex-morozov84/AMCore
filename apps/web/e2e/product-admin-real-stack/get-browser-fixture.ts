@@ -7,7 +7,8 @@ export async function getBrowserFixture(
   email: string,
   provider: 'google' | 'github',
   surface: 'site' | 'admin',
-  link = false
+  link = false,
+  beforeProviderReturn?: () => void
 ) {
   const base = surface === 'admin' ? '/api/product-admin/auth/oauth' : '/api/auth/oauth'
   const authorization =
@@ -49,6 +50,7 @@ export async function getBrowserFixture(
       )
         throw new Error('Unexpected selected GET provider callback or PKCE')
       seen = true
+      beforeProviderReturn?.() // the start leg is complete; the callback is the next request
       const target = new URL(redirectUri)
       target.searchParams.set('state', state)
       target.searchParams.set(

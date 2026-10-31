@@ -10,14 +10,15 @@ import { pauseRedis } from './redis-outage-support'
 
 // Characterization, not a 3 s promise: the invitation record store stays on the web server's shared
 // Redis connection (only the session vault, its lock and the refresh moved to the supervised one).
-// A link opened while Redis stalls therefore waits for the stall to end and then works; nobody is
-// admitted early and nothing is consumed. The numbers are for this fault class on this machine.
+// A link opened while Redis stalls therefore waits for the stall to end and then opens the flow.
+// Asserted: the flow opens within an upper bound and no membership exists. Not asserted: the
+// invitation's consumed state or anything during the pause. Numbers are for this fault class here.
 test.beforeEach(() => resetInvitationRegistrationIpBudget())
 
 const STALL_MS = 8000
 const MARGIN_MS = 7000
 
-test('an invitation link opened during a Redis stall waits for Redis, then opens the flow without side effects', async ({
+test('an invitation link opened during a Redis stall waits for Redis, then opens the flow with no membership', async ({
   page,
 }) => {
   test.setTimeout(120_000)
