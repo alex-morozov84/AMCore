@@ -162,6 +162,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shared table surface and a destructive-colored revoke-other-sessions control
   with confirmation.
 
+### Removed
+
+- The `WORKER_CONCURRENCY` environment variable. No code ever read it, so it never
+  changed how many jobs a worker runs: each queue processor still takes one job at a
+  time. Modules that need parallel work keep their own limits, such as the two
+  notification delivery slots per worker. An existing value is ignored and can be deleted.
+
 ### Fixed
 
 - Load-test entry removal reuses only existing Caddy resources without reconciling

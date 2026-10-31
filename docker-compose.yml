@@ -89,7 +89,6 @@ x-app-env: &app-env
   # bundled services; set COMPOSE_DATABASE_URL/COMPOSE_REDIS_URL for managed DB/Redis.
   DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://amcore:amcore@postgres:5432/amcore}
   REDIS_URL: ${COMPOSE_REDIS_URL:-redis://redis:6379}
-  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
   # Dev-only secret; production requires a real value >= 32 chars (ADR-029/040).
   AUTH_PUBLIC_SIGNUP_ENABLED: ${AUTH_PUBLIC_SIGNUP_ENABLED:-true}
   ORG_SELF_SERVICE_CREATION_ENABLED: ${ORG_SELF_SERVICE_CREATION_ENABLED:-true}
