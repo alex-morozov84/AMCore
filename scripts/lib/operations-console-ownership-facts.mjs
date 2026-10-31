@@ -118,6 +118,7 @@ const verification = [
   'apps/web/e2e/real-stack/admin-scheduled-jobs.spec.ts',
   'apps/web/e2e/real-stack/admin-integrations.spec.ts',
   'apps/web/e2e/real-stack/admin-background-work.spec.ts',
+  'apps/web/e2e/real-stack/console-redis-outage-controls.spec.ts',
   'apps/web/e2e/real-stack/storage-runtime-settings.spec.ts',
   'apps/web/e2e/shared/storage-setting-journey.ts',
   'apps/web/e2e/shared/background-work-journey.ts',

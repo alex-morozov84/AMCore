@@ -216,7 +216,7 @@ export const E2E_UI_SURFACES = Object.freeze([
   ),
   surface('apps/web/e2e/shared/background-work-journey.ts', ['backgroundWork'], 50),
   surface('apps/web/e2e/shared/background-work-intercepted-journeys.ts', ['backgroundWork'], 26),
-  surface('apps/web/e2e/real-stack/admin-background-work.spec.ts', ['backgroundWork'], 4),
+  surface('apps/web/e2e/real-stack/admin-background-work.spec.ts', ['backgroundWork'], 3),
   surface(
     'apps/web/e2e/console-real-stack/background-work.spec.ts',
     ['console', 'backgroundWork'],

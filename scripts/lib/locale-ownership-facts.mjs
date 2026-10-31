@@ -31,6 +31,7 @@ const e2eVerification = [
   'apps/web/e2e/console-real-stack/overview.spec.ts',
   'apps/web/e2e/shared/overview-summary-journey.ts',
   'apps/web/e2e/real-stack/admin-background-work.spec.ts',
+  'apps/web/e2e/real-stack/console-redis-outage-controls.spec.ts',
   'apps/web/e2e/console-real-stack/background-work.spec.ts',
   'apps/web/e2e/shared/background-work-journey.ts',
   'apps/web/e2e/shared/background-work-intercepted-journeys.ts',

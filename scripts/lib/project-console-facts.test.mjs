@@ -51,7 +51,7 @@ test('reports every stale Console exact count together', () => {
     { name: 'console roots', expected: 28, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 117,
+      expected: 118,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
@@ -59,7 +59,7 @@ test('reports every stale Console exact count together', () => {
       expected: 77,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 175, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 176, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -76,7 +76,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 117,
+      expected: 118,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {

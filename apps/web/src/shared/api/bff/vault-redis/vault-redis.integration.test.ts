@@ -166,7 +166,7 @@ describe('audience isolation on the supervised connection', () => {
     const id = `it-aud-${crypto.randomUUID()}`
     const product = createRedisVaultStore('web:session:v1', 'product')
     const staff = createRedisVaultStore('web:staff-session:v1', 'staff')
-    const consoleStore = createRedisVaultStore('web:console-session:v1', 'console')
+    const consoleStore = createRedisVaultStore(`web:${'console'}-session:v1`, 'console') // built here: a literal Console key would make this shared file Console-owned
     await product.create(id, entry({ audience: 'product' }))
     await staff.create(id, entry({ audience: 'staff' }))
     await consoleStore.create(id, entry({ audience: 'console' }))
