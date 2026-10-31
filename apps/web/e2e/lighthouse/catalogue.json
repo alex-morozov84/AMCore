@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "login",
+      "scope": "product",
+      "path": "/login",
+      "indexable": false,
+      "requiredAudits": ["label", "button-name"],
+      "label": "Website sign-in"
+    },
+    {
+      "id": "members",
+      "scope": "product-admin",
+      "path": "/organizations/[id]/members",
+      "indexable": false,
+      "requiredAudits": ["button-name"],
+      "label": "Organization members"
+    }
+  ],
+  "coverage": [
+    {
+      "route": "app:/forgot-password",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "app:/invite/flow/[flowId]",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/invite/unusable",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/login",
+      "kind": "audited",
+      "scenario": "login"
+    },
+    {
+      "route": "app:/mfa",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/register",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "app:/resend-verification",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "app:/reset-password",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/sign-in-again",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/verify-email",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/account/security",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "app:/",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "app:/settings/sessions",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/auth/linked",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/forgot-password",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/invite/flow/[flowId]",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/invite/unusable",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/login",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/mfa",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/resend-verification",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/reset-password",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/sign-in-again",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/verify-email",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/account/security",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/organizations/[id]/invites",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "product-admin:/organizations/[id]/members",
+      "kind": "audited",
+      "scenario": "members"
+    },
+    {
+      "route": "product-admin:/organizations/[id]",
+      "kind": "representative",
+      "scenario": "members",
+      "reason": "Members measures the organization shell and loaded member list; organization details and dialogs remain unverified."
+    },
+    {
+      "route": "product-admin:/organizations/[id]/roles/[roleId]",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/organizations/[id]/roles",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/organizations",
+      "kind": "representative",
+      "scenario": "members",
+      "reason": "Members measures the organization shell and loaded member list; organization details and dialogs remain unverified."
+    },
+    {
+      "route": "product-admin:/",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/settings/api-keys",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/settings/sessions",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "product-admin:/auth/callback",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/auth/callback",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "app:/_not-found",
+      "kind": "excluded",
+      "reason": "Framework error boundary is outside successful page navigation audits."
+    }
+  ]
+}

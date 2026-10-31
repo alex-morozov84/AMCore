@@ -46,7 +46,13 @@ async function inspectAndRecover(m, id, purge, options) {
       delete m.relay
       m.state = purge ? 'purged' : 'stopped'
       await save(m)
-    } else await cleanup(m, purge, options)
+    } else {
+      await cleanup(m, purge, options)
+      delete m.runToken
+      delete m.relay
+      delete m.controlSocket
+      await save(m)
+    }
   } finally {
     await held.release()
   }

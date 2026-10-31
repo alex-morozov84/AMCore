@@ -4,6 +4,8 @@ Every web page has a limit on its first-load JavaScript. CI fails a change that
 pushes a page over its limit, so bundle growth is a reviewed decision instead of
 a slow drift.
 
+[Lighthouse audits](./testing.md#lighthouse-audits) separately inspect loaded-page defects. Their route coverage does not replace these JavaScript byte limits.
+
 ## What is measured
 
 `next build` writes `apps/web/.next/diagnostics/route-bundle-stats.json`: one row

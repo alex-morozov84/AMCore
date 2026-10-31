@@ -72,7 +72,7 @@ test('Operations Console manifest lists real roots, facts, seams and aliases', (
       // Account security adds a two-file app root, two pages, two BFF route/test files,
       // one handler and one guide: eight files. The profile and re-entry contributions
       // add eleven closed-root files.
-      expected: 569,
+      expected: 570,
       actual: [...inventory.rootFiles.values()].flat().length,
     },
     {

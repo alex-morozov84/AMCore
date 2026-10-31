@@ -206,6 +206,12 @@ export const operationsConsoleSurfaceRoots = [
   'scripts/lib/product-admin-e2e-inventory.test.mjs',
   'scripts/e2e-ci-plan.mjs',
   'scripts/e2e-ci.mjs',
+  'scripts/lighthouse',
+  'scripts/lighthouse.mjs',
+  'scripts/lib/lighthouse-plan.mjs',
+  'scripts/lib/lighthouse-command.mjs',
+  'scripts/lib/lighthouse-coverage.mjs',
+  'scripts/lib/lighthouse.test.mjs',
   'scripts/product-admin-e2e-plan.mjs',
   'scripts/check-route-budgets.mjs',
 ]

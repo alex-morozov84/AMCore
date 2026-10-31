@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Production Lighthouse audit tooling with explicit scenario ownership, individual
+  accessibility/resource/indexing policy, route coverage and safe report validation.
+  Local indexes and downloadable native HTML make page results readable without code.
+  CI lists every expected page independently of owners that produce no result.
+  Hosted cost and artifact-transfer admission remain required before CI adoption.
+
 - Operator MFA with authenticator apps, one-use backup login, saved-code setup,
   source-bound code regeneration/app replacement and deployment-owner recovery.
   Browser login uses current generation checks and atomic invitation publication.

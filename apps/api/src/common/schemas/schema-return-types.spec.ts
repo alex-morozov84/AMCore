@@ -133,8 +133,30 @@ describe.each(['native', 'legacy'] as const)('%s response compiler contract', (c
           '--pretty',
           'false',
         ],
-        { encoding: 'utf8', timeout: 15000 }
+        { encoding: 'utf8', timeout: 30_000 }
       )
+      if (
+        check.error ||
+        check.signal !== null ||
+        check.status === null ||
+        !Number.isInteger(check.status)
+      ) {
+        throw new Error(
+          JSON.stringify({
+            compiler,
+            case: name,
+            error: check.error && {
+              name: check.error.name,
+              message: check.error.message,
+              code: 'code' in check.error ? check.error.code : undefined,
+            },
+            signal: check.signal,
+            status: check.status,
+            stdout: check.stdout,
+            stderr: check.stderr,
+          })
+        )
+      }
       const output = check.stdout + check.stderr
       const codes = [...output.matchAll(/error TS(\d+)/g)].map((match) => Number(match[1]))
       expect(codes).toEqual(invalid ? [1241] : [])

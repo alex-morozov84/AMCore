@@ -19,6 +19,15 @@ const block = (start, end) => ({ start, end, consumeBlankLine: true })
 export const operationsConsoleDocSeams = [
   ...operationsConsoleMfaDocSeams,
   entry(
+    'console.lighthouse-testing',
+    'docs/frontend/testing.md',
+    block(
+      '<!-- AMCORE_CONSOLE_LIGHTHOUSE_TESTING_START -->',
+      '<!-- AMCORE_CONSOLE_LIGHTHOUSE_TESTING_END -->'
+    ),
+    ['AMCORE_CONSOLE_LIGHTHOUSE_TESTING_START']
+  ),
+  entry(
     'console.route-cache-guide',
     'docs/frontend/next-route-cache-patch.md',
     block(

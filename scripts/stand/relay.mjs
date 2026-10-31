@@ -25,6 +25,8 @@ export async function relay(origins, edge) {
   const track = (socket) => {
     if (sockets.has(socket)) return socket
     sockets.add(socket)
+    // Browser cancellation can reset either side before an HTTP handler attaches.
+    socket.on('error', () => socket.destroy())
     socket.once('close', () => sockets.delete(socket))
     return socket
   }
@@ -58,6 +60,7 @@ export async function relay(origins, edge) {
       },
       (result) => {
         response.writeHead(result.statusCode, result.headers)
+        result.on('error', () => response.destroy())
         result.pipe(response)
       }
     )
@@ -66,6 +69,8 @@ export async function relay(origins, edge) {
       if (!response.headersSent) response.writeHead(502)
       response.end()
     })
+    incoming.on('error', () => upstream.destroy())
+    response.on('error', () => upstream.destroy())
     incoming.pipe(upstream)
   })
   server.on('connection', track)

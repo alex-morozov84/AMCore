@@ -21,6 +21,20 @@ of workflow self-hardening to keep the example forkable.
 | `workflow-lint.yml`          | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
 | `pr-title.yml`               | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
 
+## Lighthouse evidence admission
+
+The Web E2E workflow declares explicit Lighthouse owners and exact current-run/attempt
+evidence checks in its existing aggregate. See [the audit procedure](../frontend/testing.md#lighthouse-audits).
+The planner independently lists every expected page on the run Summary. Owners
+link downloadable native HTML; absent owner output leaves its expected pages incomplete.
+Each owning lane reuses its admitted build/stack; non-owners record N/A.
+Missing audits, wrong artifact identity, invalid hashes or earlier lane failures keep the aggregate red.
+The proposed40/20/5-minute job ceilings and15-minute audit phase require hosted cold/warm
+admission and actual artifact upload/retrieval before adoption. Configuration alone is
+not proof of cost, successful transfer or live branch protection. Seven-day safe artifacts
+exclude credentials and private fixture state. Publication, CI execution and repository
+settings retain their separate authority boundaries.
+
 ## What Each Gate Proves
 
 - **CodeQL** proves the repo is analyzed by GitHub's SAST pipeline and findings

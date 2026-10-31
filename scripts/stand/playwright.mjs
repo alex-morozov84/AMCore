@@ -1,3 +1,6 @@
+import { toolingFingerprint, compiledFingerprint } from '../lighthouse/reuse.mjs'
+import { runAuditPhase } from './lighthouse-phase.mjs'
+import { setProcessDeadline } from './process.mjs'
 import { prepareMfaE2E } from './mfa-e2e.mjs'
 import { admitInvocation, endInvocation } from './invocation.mjs'
 import { join } from 'node:path'
@@ -10,7 +13,8 @@ import { mockEnvironment } from './mock-environment.mjs'
 import { allocateControlSocket } from './control-socket.mjs'
 import { groupArguments, profileInventory } from './test-inventory.mjs'
 
-export async function test(m, lane, token, extra = [], group) {
+export async function test(m, lane, token, extra = [], group, auditOnly = false) {
+  m.auditOnly = auditOnly
   const mocked = lane === 'mocked'
   const cwd = m.snapshot
   const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
@@ -26,6 +30,11 @@ export async function test(m, lane, token, extra = [], group) {
   const proxy = await relay(Object.values(m.origins))
   m.controlSocket = await allocateControlSocket()
   m.relay = proxy.url
+  if (process.env.AMCORE_AUDIT_OWNER) {
+    m.buildSourceHash ??= m.sourceHash
+    m.auditToolsHash = await toolingFingerprint(m.snapshot)
+    m.compiledFingerprint = await compiledFingerprint(m.snapshot)
+  }
   m.runToken = token
   m.lane = lane
   await save(m)
@@ -46,18 +55,33 @@ export async function test(m, lane, token, extra = [], group) {
         AMCORE_STAND_TOKEN: token,
       }),
     }
-    if (!group) await profileInventory(m, lane, options, extra)
-    const filters = group ? await groupArguments(m, group, options) : []
-    await run(
-      'pnpm',
-      ['--filter', 'web', 'exec', 'playwright', 'test', `--config=${config}`, ...filters, ...extra],
-      options
-    )
-    m.testOutcome = 'passed'
+    if (!auditOnly && !group) await profileInventory(m, lane, options, extra)
+    const filters = !auditOnly && group ? await groupArguments(m, group, options) : []
+    if (!auditOnly)
+      await run(
+        'pnpm',
+        [
+          '--filter',
+          'web',
+          'exec',
+          'playwright',
+          'test',
+          `--config=${config}`,
+          ...filters,
+          ...extra,
+        ],
+        options
+      )
+    m.testOutcome = auditOnly ? 'not_run_local_audit' : 'passed'
+    if (process.env.AMCORE_AUDIT_OWNER) await runAuditPhase(m, token)
   } catch (error) {
-    m.testOutcome = 'failed'
+    if (!['passed', 'not_run_local_audit'].includes(m.testOutcome)) m.testOutcome = 'failed'
     throw error
   } finally {
+    if (process.env.AMCORE_AUDIT_OWNER)
+      setProcessDeadline(
+        Math.min(Date.now() + 30_000, Number(process.env.AMCORE_AUDIT_EPOCH) + 35.5 * 60_000)
+      )
     endInvocation(m)
     if (close) {
       await close()

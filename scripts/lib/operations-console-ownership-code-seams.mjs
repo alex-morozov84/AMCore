@@ -1,3 +1,4 @@
+import { operationsConsoleLighthouseSeams } from './operations-console-lighthouse-seams.mjs'
 import { operationsConsoleAuthSeams } from './operations-console-auth-seams.mjs'
 
 const seam = (id, path, seamKind, selector, detectors, extra = {}) => ({
@@ -15,6 +16,7 @@ const seam = (id, path, seamKind, selector, detectors, extra = {}) => ({
 
 export const operationsConsoleCodeSeams = [
   ...operationsConsoleAuthSeams,
+  ...operationsConsoleLighthouseSeams,
   seam(
     'console.network-exceptions',
     'apps/web/network-policy.mjs',

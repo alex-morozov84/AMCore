@@ -1,4 +1,4 @@
-import { localizedFrontendUrl } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
@@ -25,14 +25,25 @@ test('an invitation link opened during a Redis stall waits for Redis, then opens
   const target = activeTarget()
   const email = uniqueEmail('invited-stall')
   const { org, token } = await inviteRecipient(email)
-  const link = localizedFrontendUrl(target.origins.product, 'en', `invite/accept?token=${token}`)
+  const link = localizedFrontendUrl(
+    target.origins.product,
+    DEFAULT_LOCALE,
+    `invite/accept?token=${token}`
+  )
+  const prefix = SUPPORTED_LOCALES.length > 1 ? `/${DEFAULT_LOCALE}` : ''
 
   pauseRedis(STALL_MS)
   const started = performance.now()
   await page.goto(link, { timeout: STALL_MS + MARGIN_MS })
   const elapsed = performance.now() - started
   expect(elapsed).toBeLessThan(STALL_MS + MARGIN_MS)
-  await expect(page).toHaveURL(/\/en\/invite\/flow\/[A-Za-z0-9_-]{22}$/)
+  await expect(page).toHaveURL(
+    (url) =>
+      url.origin === target.origins.product &&
+      url.search === '' &&
+      url.hash === '' &&
+      new RegExp(`^${prefix}/invite/flow/[A-Za-z0-9_-]{22}$`).test(url.pathname)
+  )
   expect(page.url()).not.toContain(token)
   expect(membershipCount(email, org.id)).toBe('0')
 })

@@ -153,6 +153,7 @@ provide an operator interface for admin session management.
 - **[Search-engine indexing](frontend/seo.md)** — closed by default; the two
   run-time variables, making a page public with `buildPageMetadata`, the
   sitemap list, verification commands, the traps and recovery after a leak.
+- **[Lighthouse audits](frontend/testing.md#lighthouse-audits)** — local production audits, downloadable HTML reports, complete page inventory and safe evidence.
 - **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
   real-stack E2E, Storybook, and axe scans), the technical boundary the E2E

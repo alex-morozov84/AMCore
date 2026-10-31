@@ -242,7 +242,7 @@ Use Node 24 from `.nvmrc`, with the minimum patch version in `package.json`
 (currently 12.15.0). Check `node --version` and `pnpm --version` before installation.
 
 ```bash
-# Prerequisites: Node.js 24.15+, pnpm 12.15+, Docker (Compose v2.20.2+)
+# Prerequisites: Node.js 24.15+, pnpm 12.15.0 (exact), Docker (Compose v2.20.2+)
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
@@ -309,6 +309,9 @@ create product administration pages or choose their placement.
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 ## Going to production
+
+Use [Lighthouse audits](docs/frontend/testing.md#lighthouse-audits) to inspect loaded pages and individual accessibility defects.
+[Open complete HTML reports](docs/frontend/testing.md#find-and-open-lighthouse-reports) from local indexes or CI artifacts.
 
 The Quick Start above is a development stack. For one production server, follow
 [Single-host setup](docs/operations/single-host-compose.md), including its registry

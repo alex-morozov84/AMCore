@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "console-overview",
+      "scope": "console",
+      "path": "/",
+      "indexable": false,
+      "requiredAudits": ["button-name"],
+      "label": "Console Overview"
+    }
+  ],
+  "coverage": [
+    {
+      "route": "console:/login",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/mfa",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "console:/sign-in-again",
+      "kind": "excluded",
+      "reason": "Credential or one-use flow content is excluded from Lighthouse report capture."
+    },
+    {
+      "route": "console:/account/security",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/api-keys",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/audit",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/background-work",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/integrations",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/organizations/[id]",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/organizations",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/",
+      "kind": "audited",
+      "scenario": "console-overview"
+    },
+    {
+      "route": "console:/profile",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/scheduled-jobs",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/users/[id]",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    },
+    {
+      "route": "console:/users",
+      "kind": "excluded",
+      "reason": "Account-specific state requires a separate fixture; this initial audit does not measure this page."
+    }
+  ]
+}
