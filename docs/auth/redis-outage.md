@@ -148,8 +148,9 @@ classify, which is a statement about the response, not a claim that the cause wa
 nothing else: no navigation, no data and no operator identity. The page is not a `404`, so it
 discloses one fact. A request that carries any non-empty session cookie, even an invented one, can
 see the temporary page and learn that the Console route exists. A request without a cookie still
-gets the plain `404`, and so does every request again after recovery. The behavior is verified for
-the path-mode Console; host-mode isolation is a separate check.
+gets the plain `404`. After recovery the ordinary denial returns for absent, invented and non-operator
+sessions, and an authorized `SUPER_ADMIN` gets the Console again. The behavior is verified for the
+path-mode Console; host-mode isolation is a separate check.
 
 **What to watch.** The web server logs `Vault Redis client generation replaced` with the reason,
 `Vault Redis alert` and `Vault Redis client error`. It exports no metric for this connection and
