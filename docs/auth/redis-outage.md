@@ -4,7 +4,14 @@ Read this page when you operate the API, or call it, and Redis stops answering i
 It explains which authentication steps depend on Redis, how long a caller waits, what a
 refusal does and does not mean, and how the API recovers. It covers the API process and, in
 [its own section](#the-web-servers-session-vault), the web server's session vault, which uses a
-separate Redis connection.
+separate Redis connection. When the API and the web server use the same Redis, one outage hits both.
+
+Terms used below:
+
+- **Admission**: the checks before a handler runs (who is calling, may they, which organization).
+  A refused admission means the handler never started.
+- **Generation**: one Redis connection. A supervisor replaces a stuck one with a new generation.
+- **Owner lease**: a short Redis lock that lets one worker at a time run an invitation command.
 
 ## What a client sees
 
@@ -22,7 +29,8 @@ never lets it through "just in case".
 Only the personal user check lost its Redis dependency. A handler, the rate limiter and other
 protections that use Redis keep their own behavior.
 
-Admission and OAuth refusals use this body (standard envelope fields omitted):
+Admission and OAuth refusals use this body. "Exact" below means the same `errorCode` and `message`;
+the standard envelope fields around them are omitted here:
 
 ```json
 { "errorCode": "SERVICE_UNAVAILABLE", "message": "Authentication temporarily unavailable" }
@@ -34,6 +42,12 @@ messages.
 **What a refusal means.** A refused _admission_ means the controller did not start. It does not
 mean Redis was untouched: a command that was already sent may still run after the caller gave up
 (a counter write, a lock, a cache fill). Nothing is retried for you.
+
+**Can a client resend a write?** On a route that is not OAuth, the exact admission body above means
+the handler did not run, so resending is safe. Any other `503` message says nothing about whether
+the handler ran: send writes with an idempotency key (see
+[idempotency](../operations/idempotency.md)) or check the result before resending. Do not reload an
+OAuth callback URL; start the sign-in again.
 
 **OAuth is different.** Its Redis steps run inside the operation. The account or provider link
 can already be saved when the one-time ticket cannot be stored; start sign-in again and the
@@ -101,7 +115,9 @@ answers "busy", an unreachable connection is a temporary failure, and acquisitio
 Every other web-server Redis record store (invitation, MFA and OAuth attempt records, Console return
 entries) stays on the shared connection. The 3 s admission budget does not cover them. In the
 real-stack check an invitation link opened during an 8 s stall answered after about 8.4 s and then
-opened the flow normally, with no membership created. A product-administration OAuth sign-in started
+opened the flow normally, with no membership created. The owner lease's own 3 s limit does not
+change that: it caps only the lease step, not the page. The check looked at the membership only,
+so other records the flow creates were not examined. A product-administration OAuth sign-in started
 during the same stall also waited and then signed in. When the stall begins after a healthy start,
 at the moment the provider returns the browser, the callback goes straight to the API: the one-time
 state step is refused fast, the browser lands on the sign-in page with a provider error, no backend
@@ -153,18 +169,20 @@ classify, which is a statement about the response, not a claim that the cause wa
 **Operations Console during a vault outage.** A Console route cannot confirm that the visitor is a
 `SUPER_ADMIN` while the vault is unavailable, so it shows the temporary "unavailable" page and
 nothing else: no navigation, no data and no operator identity. The page is not a `404`, so it
-discloses one fact. A request that carries any non-empty session cookie, even an invented one, can
-see the temporary page and learn that the Console route exists. A request without a cookie still
-gets the plain `404`. After recovery the ordinary denial returns for absent, invented and non-operator
-sessions, and an authorized `SUPER_ADMIN` gets the Console again. The behavior is verified for the
-path-mode Console; host-mode isolation is a separate check.
+discloses one fact. A request that carries any non-empty value in the session cookie, even an invented
+one, can see the temporary page and learn that the Console route exists. A request without a cookie
+still gets the plain `404`. After recovery the ordinary denial returns for absent, invented and
+non-operator sessions, and an authorized `SUPER_ADMIN` gets the Console again. This was verified for
+the path-mode Console. In host mode the Console host gave the same temporary refusal to copied
+product and staff cookies and to an invented cookie, and still answered a request without a cookie
+as it does in a healthy system.
 
-**What to watch.** The web server logs `Vault Redis client generation replaced` with the reason,
-`Vault Redis alert` and `Vault Redis client error`. It exports no metric for this connection and
+**What to watch in the web server.** It logs `Vault Redis client generation replaced` with the reason,
+`Vault Redis alert` (with the same alert names as the API list below; lines that start with `Vault Redis` come from the web server, lines that start with `Auth Redis` from the API) and `Vault Redis client error`. It exports no metric for this connection and
 installs no shutdown hook for it. The heartbeat check is a diagnostic, not a defense against
 arbitrary stream corruption.
 
-## What to watch
+## What to watch in the API
 
 - Metric `redis_client_events_total{client="auth"}`: `error`, `reconnecting` and `degraded`
   (one per replacement or alert).
