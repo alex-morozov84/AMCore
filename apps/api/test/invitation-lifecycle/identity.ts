@@ -1,6 +1,5 @@
 import { createInvitationOperationId } from '@amcore/shared'
 
-import { UserCacheService } from '../../src/core/auth/user-cache.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
 import { invitationPoolQuery, trackInvitationOperation } from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
@@ -178,10 +177,9 @@ export function registerIdentityProofs(getFixture: () => InvitationProofFixture)
     }
   )
 
-  it('R09 primary identity overrides cached credential email and verification', async () => {
-    const { context, prisma, recipient, pending, accept, outcome } = getFixture()
+  it('R09 primary identity overrides the credential email and verification', async () => {
+    const { prisma, recipient, pending, accept, outcome } = getFixture()
     const { token } = await pending()
-    await context.app.get(UserCacheService).getUser(recipient.sub)
     await prisma.user.update({
       where: { id: recipient.sub },
       data: { emailCanonical: 'changed@example.test' },

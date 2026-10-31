@@ -16,7 +16,11 @@ test('isolated path groups cover every real-stack file once, including new ordin
   assert.deepEqual(combined.sort(), specFiles(root))
   assert.equal(new Set(combined).size, combined.length)
   assert.ok(standard.length)
-  for (const file of disruptive) assert.match(file, /runtime-settings|background-work/)
+  for (const file of disruptive)
+    assert.match(
+      file,
+      /runtime-settings|background-work|redis-outage|redis-stall|refresh-owner-held/
+    )
 })
 
 test('CI invokes the same fail-closed local lane runner, preserves retries and isolated workers', () => {

@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 
-import { type AppRedisClient, REDIS_CLIENT, RedisLockService } from '../../infrastructure/redis'
+import { ServiceUnavailableException } from '../../common/exceptions'
+import { type AppRedisClient, AuthCacheLock, AuthRedis } from '../../infrastructure/redis'
 
 import { PermissionsCacheService } from './permissions-cache.service'
+import { AUTH_STAGE_MS, AuthStageService } from './stage/auth-stage.service'
 
 import type { Permission } from '@/generated/prisma/client'
 import { MetricsService } from '@/infrastructure/observability'
@@ -12,7 +14,8 @@ import { PrismaService } from '@/prisma'
 describe('PermissionsCacheService', () => {
   let service: PermissionsCacheService
   let redis: jest.Mocked<Pick<AppRedisClient, 'get' | 'set' | 'del'>>
-  let lock: jest.Mocked<Pick<RedisLockService, 'acquire' | 'release'>>
+  let redisClient: { get: jest.Mock; set: jest.Mock; del: jest.Mock }
+  let lock: jest.Mocked<Pick<AuthCacheLock, 'acquire' | 'release'>>
   let prisma: PrismaService
   let mockLogger: jest.Mocked<PinoLogger>
   let prometheus: jest.Mocked<Pick<MetricsService, 'incCacheOperation'>>
@@ -80,20 +83,19 @@ describe('PermissionsCacheService', () => {
       debug: jest.fn(),
     } as unknown as jest.Mocked<PinoLogger>
     prometheus = { incCacheOperation: jest.fn() }
+    redisClient = { get: jest.fn(), set: jest.fn(), del: jest.fn() }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PermissionsCacheService,
         {
-          provide: REDIS_CLIENT,
+          provide: AuthRedis,
           useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
+            call: (operation: (client: unknown) => unknown) => operation(redisClient),
           },
         },
         {
-          provide: RedisLockService,
+          provide: AuthCacheLock,
           useValue: {
             acquire: jest.fn(),
             release: jest.fn(),
@@ -119,8 +121,8 @@ describe('PermissionsCacheService', () => {
     }).compile()
 
     service = module.get<PermissionsCacheService>(PermissionsCacheService)
-    redis = module.get(REDIS_CLIENT)
-    lock = module.get(RedisLockService)
+    redis = redisClient as typeof redis
+    lock = module.get(AuthCacheLock)
     prisma = module.get<PrismaService>(PrismaService)
     prisma.$transaction = jest.fn().mockImplementation((load) => load(prisma))
 
@@ -198,7 +200,7 @@ describe('PermissionsCacheService', () => {
       const result = await service.getPermissions('user-1', 'org-1', 5)
 
       expect(result).toEqual(mockPermissions)
-      expect(lock.acquire).toHaveBeenCalledWith('auth:lock:perm:v2:org-1:user-1', 5000)
+      expect(lock.acquire).toHaveBeenCalledWith('auth:lock:perm:v2:org-1:user-1', 5000, 250)
       expect(lock.release).toHaveBeenCalledWith('auth:lock:perm:v2:org-1:user-1', 'lock-token')
       expect(redis.set).toHaveBeenCalledWith(
         'auth:perm:v2:org-1:user-1:5',
@@ -481,6 +483,38 @@ describe('PermissionsCacheService', () => {
         )
         expect(oa05Warn).toBeUndefined()
       })
+    })
+  })
+
+  describe('dependency failure and admission stage (T082)', () => {
+    afterEach(() => jest.useRealTimers())
+
+    it('fails closed: a cache read failure propagates and the database is not consulted', async () => {
+      const outage = new ServiceUnavailableException('Authentication temporarily unavailable')
+      redis.get.mockRejectedValue(outage)
+
+      await expect(service.getPermissions('user-1', 'org-1', 5)).rejects.toBe(outage)
+
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+      expect(lock.acquire).not.toHaveBeenCalled()
+    })
+
+    it('stops the lock wait loop once the stage expired and never reads the database', async () => {
+      jest.useFakeTimers()
+      redis.get.mockResolvedValue(null)
+      lock.acquire.mockImplementation(async () => {
+        jest.advanceTimersByTime(AUTH_STAGE_MS + 1)
+        return null
+      })
+      const stage = new AuthStageService()
+      const outcome = stage
+        .run(() => service.getPermissions('user-1', 'org-1', 5))
+        .catch((error: unknown) => error)
+
+      await expect(outcome).resolves.toMatchObject({ response: expect.anything() })
+      await jest.advanceTimersByTimeAsync(0)
+      expect(lock.acquire).toHaveBeenCalledTimes(1)
+      expect(prisma.$transaction).not.toHaveBeenCalled()
     })
   })
 

@@ -2,9 +2,9 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('@/shared/api/bff/redis-client', () => ({ getWebRedisClient: vi.fn() }))
+vi.mock('@/shared/api/bff/vault-redis/vault-redis', () => ({ runVaultRedis: vi.fn() }))
 
-import { getWebRedisClient } from '@/shared/api/bff/redis-client'
+import { runVaultRedis } from '@/shared/api/bff/vault-redis/vault-redis'
 
 import type { ConsoleVaultRecord } from './session-vault.types'
 import { redisConsoleVaultStore } from './session-vault-store'
@@ -13,7 +13,8 @@ const fakeRedis = { eval: vi.fn(), set: vi.fn() }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(getWebRedisClient).mockResolvedValue(fakeRedis as never)
+  vi.mocked(runVaultRedis).mockImplementation(((op: (c: unknown, s: AbortSignal) => unknown) =>
+    op(fakeRedis, new AbortController().signal)) as never)
   fakeRedis.set.mockResolvedValue('OK')
   fakeRedis.eval.mockResolvedValue(1)
 })

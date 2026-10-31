@@ -43,6 +43,7 @@ test('reports every stale Console exact count together', () => {
   // Account MFA includes profile ownership, exact-return modules, grouped code/doc removal
   // and a separate sign-in-again move. Core account MFA remains without Console.
   // The exact network-exception seam adds one content fact/removal step, with no new root/delete.
+  // The Redis outage spec adds one delete; Lighthouse adds seven distinct retained-file edits.
   assert.equal(
     factFor(disabled.consoleFacts, 'console.network-exceptions')?.path,
     'apps/web/network-policy.mjs'
@@ -51,7 +52,7 @@ test('reports every stale Console exact count together', () => {
     { name: 'console roots', expected: 28, actual: operationsConsoleOwnership.facts.roots.length },
     {
       name: 'console disabled deletes',
-      expected: 117,
+      expected: 118,
       actual: count(disabled.consoleFacts, 'delete'),
     },
     {
@@ -59,7 +60,7 @@ test('reports every stale Console exact count together', () => {
       expected: 85,
       actual: count(disabled.consoleFacts, 'content'),
     },
-    { name: 'console disabled steps', expected: 182, actual: disabled.consoleSteps.length },
+    { name: 'console disabled steps', expected: 183, actual: disabled.consoleSteps.length },
     { name: 'console path content', expected: 4, actual: count(path.consoleFacts, 'content') },
     { name: 'console host content', expected: 4, actual: count(host.consoleFacts, 'content') },
     {
@@ -76,7 +77,7 @@ test('reports every stale Console exact count together', () => {
     },
     {
       name: 'console single-locale deletes',
-      expected: 117,
+      expected: 118,
       actual: count(singleDisabled.consoleFacts, 'delete'),
     },
     {

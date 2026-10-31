@@ -52,7 +52,7 @@ import { RolesController } from './roles.controller.js'
     PrismaModule,
     ApiKeysModule,
     InvitationAuthorityModule,
-    AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global) + UserCacheService + EmailIdentityService
+    AuthModule, // Provides TokenService (for /switch) + AuthenticationGuard (global) + EmailIdentityService
     AuditModule,
     EmailModule, // Provides EmailService for invite dispatch (OB-02 Stage D)
   ],

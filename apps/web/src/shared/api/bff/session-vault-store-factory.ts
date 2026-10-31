@@ -1,8 +1,10 @@
 import { SessionVaultUnavailableError } from './errors'
-import { getWebRedisClient } from './redis-client'
 import { hasSessionAudience, type SessionAudience } from './session-audience'
 import type { VaultEntry, VaultRecord, VaultStore } from './session-vault.types'
 import { VAULT_TTL_SECONDS } from './vault-constants'
+import { runVaultRedis } from './vault-redis/vault-redis'
+import { isVaultRedisUnavailable } from './vault-redis/vault-redis-failure'
+import type { VaultRedisClient } from './vault-redis/vault-redis-types'
 
 import 'server-only'
 
@@ -26,12 +28,21 @@ function entryKey(namespace: string, sessionId: string): string {
   return `${namespace}:${sessionId}`
 }
 
-async function withVaultErrors<T>(operation: () => Promise<T>): Promise<T> {
+/**
+ * One bounded command on the supervised vault connection. A Redis outage-class failure (deadline,
+ * capacity, a client that is not ready, transport or operational reply) is the unavailable error;
+ * a programming or schema error stays visible. Nothing is retried.
+ */
+async function vaultCall<T>(
+  operation: (client: VaultRedisClient) => Promise<T>,
+  deadlineMs?: number
+): Promise<T> {
   try {
-    return await operation()
+    return await runVaultRedis((client) => operation(client), deadlineMs)
   } catch (error) {
     if (error instanceof SessionVaultUnavailableError) throw error
-    throw new SessionVaultUnavailableError(error)
+    if (isVaultRedisUnavailable(error)) throw new SessionVaultUnavailableError(error)
+    throw error
   }
 }
 
@@ -41,59 +52,58 @@ export function createRedisVaultStore<TRecord extends VaultRecord = VaultRecord>
   expectedAudience?: SessionAudience
 ): VaultStore<TRecord> {
   return {
-    async get(sessionId) {
-      return withVaultErrors(async () => {
-        const raw = await (await getWebRedisClient()).get(entryKey(namespace, sessionId))
-        if (raw === null) return null
-        const entry = JSON.parse(raw) as TRecord & Pick<VaultEntry, 'version'>
-        return !expectedAudience || hasSessionAudience(entry, expectedAudience) ? entry : null
-      })
+    async get(sessionId, options) {
+      const raw = await vaultCall(
+        (client) => client.get(entryKey(namespace, sessionId)),
+        options?.deadlineMs
+      )
+      if (raw === null) return null
+      const entry = JSON.parse(raw) as TRecord & Pick<VaultEntry, 'version'>
+      return !expectedAudience || hasSessionAudience(entry, expectedAudience) ? entry : null
     },
 
-    async create(sessionId, entry) {
+    async create(sessionId, entry, options) {
       if (expectedAudience && entry.audience && entry.audience !== expectedAudience)
         throw new Error('Session audience mismatch')
-      return withVaultErrors(async () => {
-        const versioned = {
-          ...entry,
-          ...(expectedAudience ? { audience: expectedAudience } : {}),
-          version: 1,
-        }
-        await (
-          await getWebRedisClient()
-        ).set(entryKey(namespace, sessionId), JSON.stringify(versioned), {
-          expiration: { type: 'EX', value: VAULT_TTL_SECONDS },
-        })
-      })
+      const versioned = {
+        ...entry,
+        ...(expectedAudience ? { audience: expectedAudience } : {}),
+        version: 1,
+      }
+      await vaultCall(
+        (client) =>
+          client.set(entryKey(namespace, sessionId), JSON.stringify(versioned), {
+            expiration: { type: 'EX', value: VAULT_TTL_SECONDS },
+          }),
+        options?.deadlineMs
+      )
     },
 
-    async setIfVersionMatches(sessionId, expectedVersion, entry) {
+    async setIfVersionMatches(sessionId, expectedVersion, entry, options) {
       if (expectedAudience && !hasSessionAudience(entry, expectedAudience)) return false
-      return withVaultErrors(async () => {
-        const versioned = {
-          ...entry,
-          ...(expectedAudience ? { audience: expectedAudience } : {}),
-          version: expectedVersion + 1,
-        }
-        const reply = await (
-          await getWebRedisClient()
-        ).eval(CAS_SET_SCRIPT, {
-          keys: [entryKey(namespace, sessionId)],
-          arguments: [
-            String(expectedVersion),
-            JSON.stringify(versioned),
-            String(VAULT_TTL_SECONDS),
-            expectedAudience ?? '',
-          ],
-        })
-        return reply === 1
-      })
+      const versioned = {
+        ...entry,
+        ...(expectedAudience ? { audience: expectedAudience } : {}),
+        version: expectedVersion + 1,
+      }
+      const reply = await vaultCall(
+        (client) =>
+          client.eval(CAS_SET_SCRIPT, {
+            keys: [entryKey(namespace, sessionId)],
+            arguments: [
+              String(expectedVersion),
+              JSON.stringify(versioned),
+              String(VAULT_TTL_SECONDS),
+              expectedAudience ?? '',
+            ],
+          }),
+        options?.deadlineMs
+      )
+      return reply === 1
     },
 
-    async delete(sessionId) {
-      return withVaultErrors(async () => {
-        await (await getWebRedisClient()).del(entryKey(namespace, sessionId))
-      })
+    async delete(sessionId, options) {
+      await vaultCall((client) => client.del(entryKey(namespace, sessionId)), options?.deadlineMs)
     },
   }
 }

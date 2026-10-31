@@ -7,8 +7,8 @@ import type { Prisma } from '../src/generated/prisma/client'
 import {
   AbuseCounterError,
   AbuseCounterStore,
+  AuthRedis,
   BOUNDED_REDIS_CAPACITY,
-  BoundedRedis,
 } from '../src/infrastructure/redis'
 import type { PrismaService } from '../src/prisma'
 
@@ -520,7 +520,7 @@ describe('API Keys (e2e)', () => {
     )
 
     it('answers 503 when the counters are unreadable because the helper is at capacity', async () => {
-      const bounded = app.get(BoundedRedis)
+      const bounded = app.get(AuthRedis)
       const held: Array<() => void> = []
       for (let i = 0; i < BOUNDED_REDIS_CAPACITY; i++)
         void bounded

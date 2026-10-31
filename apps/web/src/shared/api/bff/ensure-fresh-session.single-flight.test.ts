@@ -79,17 +79,25 @@ describe('ensureFreshSession — single-flight refresh protocol', () => {
         lock,
         verifyBinding: async () => undefined,
         upstreamRefresh,
+        timing: { stageMs: 60_000 },
       })
 
       // Past the original 10s lock TTL — only still blocked if renewal
       // (every 4s) actually extended the lease.
       await vi.advanceTimersByTimeAsync(12_000)
 
+      // Another process: its own lock object over the same shared lock state.
+      const otherProcessLock = {
+        acquire: lock.acquire.bind(lock),
+        renew: lock.renew.bind(lock),
+        release: lock.release.bind(lock),
+      }
       const secondAttempt = ensureFreshSession('s1', {
         store,
-        lock,
+        lock: otherProcessLock,
         verifyBinding: async () => undefined,
         upstreamRefresh: vi.fn(freshRefresh),
+        timing: { stageMs: 60_000 },
       })
       await expect(secondAttempt).rejects.toBeInstanceOf(SessionLockTimeoutError)
 

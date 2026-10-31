@@ -44,7 +44,8 @@ it('retains the console audience when refresh writes through CAS', async () => {
   expect(store.setIfVersionMatches).toHaveBeenCalledWith(
     'session-1',
     1,
-    expect.objectContaining({ audience: 'console' })
+    expect.objectContaining({ audience: 'console' }),
+    expect.objectContaining({ deadlineMs: expect.any(Number) })
   )
   expect(refreshed).toMatchObject({ audience: 'console', version: 2 })
 })

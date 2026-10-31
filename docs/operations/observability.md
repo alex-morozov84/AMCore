@@ -186,7 +186,9 @@ existing application labels, buckets, alert rules or dashboard queries. Tests us
   [Slow query investigation](slow-query-investigation.md) for that (Postgres's
   own `pg_stat_statements`, queried directly, not scraped into Prometheus).
 - `redis_client_events_total{client,event,role}` — `client` is one of
-  `shared`, `queue_producer`, `queue_worker`, `throttler` (unchanged since
+  `shared`, `auth` (the supervised authentication client; `degraded` counts each
+  replacement and alert, see [authentication when Redis is slow or
+  unavailable](../auth/redis-outage.md)), `queue_producer`, `queue_worker`, `throttler` (unchanged since
   ADR-073 — it describes the Redis-client role, not the specific storage
   implementation behind it), `notif_subscriber`, `ai_run_subscriber`, or
   `telegram_check` (the worker's dedicated connection for the Telegram check);
@@ -239,8 +241,9 @@ unchanged. Its "Oldest queued job" is a sampled creation age and has no metric.
 
 **Cache**
 
-- `cache_operations_total{cache,result,role}` — `cache=user|permissions|
-ai_catalog`, `result=hit|negative_hit|miss|db_fallback|corrupt`.
+- `cache_operations_total{cache,result,role}` — `cache=permissions|ai_catalog`
+  (the user cache was removed; the user check reads the primary database),
+  `result=hit|negative_hit|miss|db_fallback|corrupt`.
 
 **Telegram**
 

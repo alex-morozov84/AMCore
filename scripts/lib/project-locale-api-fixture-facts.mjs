@@ -5,7 +5,6 @@ const simple = [
   'apps/api/src/core/auth/auth.controller.spec.ts',
   'apps/api/src/core/admin/admin.service.spec.ts',
   'apps/api/src/core/auth/session.service.spec.ts',
-  'apps/api/src/core/auth/user-cache.service.spec.ts',
   'apps/api/src/core/notifications/notifications.service.spec.ts',
 ]
 

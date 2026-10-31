@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
-import { SessionNotFoundError } from '@/shared/api/bff/errors'
+import {
+  SessionLockTimeoutError,
+  SessionNotFoundError,
+  SessionStageTimeoutError,
+  SessionVaultUnavailableError,
+} from '@/shared/api/bff/errors'
 import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import { probeConsoleAccess } from './access-probe'
@@ -95,6 +100,15 @@ describe('probeConsoleAccess', () => {
     const status = await probeConsoleAccess()
 
     expect(status).toEqual({ kind: 'indeterminate' })
+  })
+
+  it.each([
+    ['an unreachable session store', new SessionVaultUnavailableError(new Error('down'))],
+    ['an admission deadline', new SessionStageTimeoutError('vault read')],
+    ['a refresh lock timeout', new SessionLockTimeoutError('s1')],
+  ])('reports %s as temporarily unavailable, not as denied', async (_name, error) => {
+    mockedAccessToken.mockRejectedValue(error)
+    await expect(probeConsoleAccess()).resolves.toEqual({ kind: 'upstream-unavailable' })
   })
 
   it('does not disclose an unexpected upstream response', async () => {

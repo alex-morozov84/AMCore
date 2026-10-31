@@ -25,7 +25,6 @@ import { PasswordStepUpService } from './password-step-up.service'
 import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 import { TokenManagerService } from './token-manager.service'
-import { UserCacheService } from './user-cache.service'
 
 import { SystemRole, type User } from '@/generated/prisma/client'
 
@@ -45,7 +44,6 @@ describe('AuthService', () => {
     sendEmailVerificationEmail: jest.Mock
   }
   let mockNotifications: { notify: jest.Mock }
-  let mockUserCacheService: jest.Mocked<Pick<UserCacheService, 'invalidateUser'>>
   let mockEnvService: { get: jest.Mock }
   let mailLimiter: { reserve: jest.Mock }
   let mockLoginRateLimiter: jest.Mocked<LoginRateLimiterService>
@@ -127,10 +125,6 @@ describe('AuthService', () => {
       notify: jest.fn().mockResolvedValue({ notificationId: 'n-1', created: true, channels: [] }),
     }
 
-    mockUserCacheService = {
-      invalidateUser: jest.fn().mockResolvedValue(undefined),
-    }
-
     mockEnvService = {
       get: jest.fn((key: string) => {
         const values: Record<string, string | number | boolean> = {
@@ -170,7 +164,6 @@ describe('AuthService', () => {
       mailLimiter as never,
       mockSessionService,
       mockEmailService as never,
-      mockUserCacheService as never,
       mockEnvService as never,
       new EmailIdentityService(),
       mockLoginRateLimiter,
@@ -831,7 +824,6 @@ describe('AuthService', () => {
         where: { id: 'user-123' },
         data: { name: 'Renamed', locale: 'en' },
       })
-      expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith('user-123')
       expect(result).toMatchObject({ name: 'Renamed', locale: 'en' })
     })
 
@@ -1049,7 +1041,6 @@ describe('AuthService', () => {
         undefined
       )
       expect(mockSessionService.deleteRevokedByUserId).toHaveBeenCalledWith(mockUser.id)
-      expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
       // The reset transaction promotes emailVerified (proves mailbox control).
       expect(mockCtx.prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1086,36 +1077,26 @@ describe('AuthService', () => {
       )
     })
 
-    it.each(['sessions', 'cache'])(
-      'preserves the committed password when %s follow-up fails',
-      async (failure) => {
-        arrangeResetMocks()
-        const error = new Error('follow-up unavailable')
-        if (failure === 'sessions')
-          mockSessionService.deleteRevokedByUserId.mockRejectedValue(error)
-        else mockUserCacheService.invalidateUser.mockRejectedValue(error)
+    it('preserves the committed password when the sessions follow-up fails', async () => {
+      arrangeResetMocks()
+      const error = new Error('follow-up unavailable')
+      mockSessionService.deleteRevokedByUserId.mockRejectedValue(error)
 
-        await expect(authService.resetPassword('a'.repeat(64), 'NewPassword123')).rejects.toBe(
-          error
-        )
+      await expect(authService.resetPassword('a'.repeat(64), 'NewPassword123')).rejects.toBe(error)
 
-        expect(mockTokenManager.consumeLocked).toHaveBeenCalledTimes(1)
-        expect(mockCtx.prisma.user.update).toHaveBeenCalledWith({
-          where: { id: mockUser.id },
-          data: { passwordHash: 'new-hashed-password', emailVerified: true },
-        })
-        expect(mockCtx.prisma.$transaction).toHaveBeenCalledTimes(1)
-        expect(mockCtx.prisma.authSessionFamily.updateMany).toHaveBeenCalledWith({
-          where: { userId: mockUser.id, revokedAt: null },
-          data: { revokedAt: expect.any(Date) },
-        })
-        expect(mockCtx.prisma.mfaAccount.upsert).toHaveBeenCalledTimes(1)
-        expect(mockNotifications.notify).not.toHaveBeenCalled()
-        expect(mockUserCacheService.invalidateUser).toHaveBeenCalledTimes(
-          failure === 'sessions' ? 0 : 1
-        )
-      }
-    )
+      expect(mockTokenManager.consumeLocked).toHaveBeenCalledTimes(1)
+      expect(mockCtx.prisma.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: { passwordHash: 'new-hashed-password', emailVerified: true },
+      })
+      expect(mockCtx.prisma.$transaction).toHaveBeenCalledTimes(1)
+      expect(mockCtx.prisma.authSessionFamily.updateMany).toHaveBeenCalledWith({
+        where: { userId: mockUser.id, revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      })
+      expect(mockCtx.prisma.mfaAccount.upsert).toHaveBeenCalledTimes(1)
+      expect(mockNotifications.notify).not.toHaveBeenCalled()
+    })
 
     it('rejects a token already consumed by a racing reset (CAS matched 0 rows)', async () => {
       arrangeResetMocks(0)
@@ -1132,7 +1113,7 @@ describe('AuthService', () => {
   })
 
   describe('verifyEmail', () => {
-    it('should verify email and invalidate cache', async () => {
+    it('should verify email', async () => {
       const tokenHash = 'a'.repeat(64)
       mockTokenManager.verifyEmailVerificationToken.mockResolvedValue({
         userId: mockUser.id,
@@ -1147,7 +1128,10 @@ describe('AuthService', () => {
       await authService.verifyEmail('a'.repeat(64))
 
       expect(mockTokenManager.verifyEmailVerificationToken).toHaveBeenCalled()
-      expect(mockUserCacheService.invalidateUser).toHaveBeenCalledWith(mockUser.id)
+      expect(mockCtx.prisma.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: { emailVerified: true },
+      })
     })
   })
 

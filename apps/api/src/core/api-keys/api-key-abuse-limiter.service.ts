@@ -6,7 +6,12 @@ import { PinoLogger } from 'nestjs-pino'
 import { AuthErrorCode } from '@amcore/shared'
 
 import { AppException, ServiceUnavailableException } from '../../common/exceptions/index.js'
-import { AbuseCounterError, AbuseCounterStore } from '../../infrastructure/redis/index.js'
+import {
+  AbuseCounterError,
+  AbuseCounterStore,
+  BOUNDED_REDIS_DEADLINE_MS,
+} from '../../infrastructure/redis/index.js'
+import { nestedDeadlineMs } from '../auth/stage/auth-stage.service.js'
 
 // Defaults match the LoginRateLimiterService style (hardcoded starter
 // constants; tune by code change, not env). IP and fingerprint counters
@@ -58,7 +63,7 @@ export class ApiKeyAbuseLimiterService {
   /** Throws 429 if either counter is already at or above its limit. */
   async check(ip: string, fingerprint: string): Promise<void> {
     const counts = await this.protect('check', fingerprint, () =>
-      this.counters.read(this.ipKey(ip), this.fingerprintKey(fingerprint))
+      this.counters.read(this.ipKey(ip), this.fingerprintKey(fingerprint), this.callDeadlineMs())
     )
 
     if (counts.ip >= IP_MAX || counts.subject >= FINGERPRINT_MAX) {
@@ -74,7 +79,12 @@ export class ApiKeyAbuseLimiterService {
   /** Records one failed attempt on both counters; logs WARN with the fingerprint, not the token. */
   async consume(ip: string, fingerprint: string): Promise<void> {
     const counts = await this.protect('record', fingerprint, () =>
-      this.counters.increment(this.ipKey(ip), this.fingerprintKey(fingerprint), COUNTER_TTL_MS)
+      this.counters.increment(
+        this.ipKey(ip),
+        this.fingerprintKey(fingerprint),
+        COUNTER_TTL_MS,
+        this.callDeadlineMs()
+      )
     )
 
     this.logger.warn(
@@ -86,8 +96,13 @@ export class ApiKeyAbuseLimiterService {
   /** Clears the fingerprint counter only — IP counter must not be reset. */
   async reset(fingerprint: string): Promise<void> {
     await this.protect('reset', fingerprint, () =>
-      this.counters.clear(this.fingerprintKey(fingerprint))
+      this.counters.clear(this.fingerprintKey(fingerprint), this.callDeadlineMs())
     )
+  }
+
+  /** The counter deadline, shortened to what is left of an enclosing admission stage. */
+  private callDeadlineMs(): number {
+    return nestedDeadlineMs(BOUNDED_REDIS_DEADLINE_MS)
   }
 
   private async protect<T>(

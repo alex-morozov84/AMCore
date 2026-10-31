@@ -44,7 +44,8 @@ describe('operation inventory against the real plans', () => {
       // Lighthouse adds seven distinct code edits. Its ten code blocks and one doc
       // block contribute 16 facts and 22 claims across shared/Console inventories.
       // The descriptor is inside an existing closed root; provider counts stay fixed.
-      { name: 'measured operations', expected: 1047, actual: inventory.operations.length },
+      // The Redis outage spec adds one operation and two claims to that composed inventory.
+      { name: 'measured operations', expected: 1048, actual: inventory.operations.length },
       {
         name: 'operation scenarios',
         expected: 8,
@@ -68,12 +69,12 @@ describe('operation inventory against the real plans', () => {
       },
       {
         name: 'migration semantic claims',
-        expected: 2334,
+        expected: 2336,
         actual: inventory.migrationCounts.semanticClaims,
       },
       {
         name: 'migration final filesystem operations',
-        expected: 1017,
+        expected: 1018,
         actual: inventory.migrationCounts.finalFilesystemOperations,
       },
     ])

@@ -50,7 +50,8 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
 
       expect(counters.read).toHaveBeenCalledWith(
         'rate:v2:api_key_fail_ip:1.2.3.4',
-        'rate:v2:api_key_fail_token:fp123'
+        'rate:v2:api_key_fail_token:fp123',
+        250
       )
     })
 
@@ -127,7 +128,8 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
       expect(counters.increment).toHaveBeenCalledWith(
         'rate:v2:api_key_fail_ip:1.2.3.4',
         'rate:v2:api_key_fail_token:fp123',
-        60 * 60 * 1000
+        60 * 60 * 1000,
+        250
       )
     })
 
@@ -185,7 +187,7 @@ describe('ApiKeyAbuseLimiterService (AK-07)', () => {
       await service.reset('fp123')
 
       expect(counters.clear).toHaveBeenCalledTimes(1)
-      expect(counters.clear).toHaveBeenCalledWith('rate:v2:api_key_fail_token:fp123')
+      expect(counters.clear).toHaveBeenCalledWith('rate:v2:api_key_fail_token:fp123', 250)
     })
 
     // Critical: a valid attacker key must not wipe the per-IP failure

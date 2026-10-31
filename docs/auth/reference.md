@@ -88,8 +88,8 @@ alone:
   falling back to legacy logout. See the [session authority](mfa-foundation.md#session-admission).
 - **`POST /auth/reset-password` side effects:** the token is consumed atomically
   with the password update (single-use under concurrency), account security-version
-  change and existing family/session revocation. Physical session cleanup and
-  cache invalidation follow the commit and can fail after the change. The account email is
+  change and existing family/session revocation. Physical session cleanup
+  follows the commit and can fail after the change. The account email is
   marked **verified** (the reset proves mailbox control), and an
   `account.password_changed` security notification is emitted.
 - **Step-up (`POST /auth/step-up`)** re-verifies the current password to refresh

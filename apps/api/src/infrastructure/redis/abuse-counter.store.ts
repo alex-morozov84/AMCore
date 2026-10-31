@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
 
 import { ABUSE_COUNTER_INCREMENT_SCRIPT, ABUSE_COUNTER_READ_SCRIPT } from './abuse-counter.lua.js'
-import { BoundedRedis, BoundedRedisError, type BoundedRedisOutcome } from './bounded-redis.js'
+import { AuthRedis } from './auth-redis/auth-redis.service.js'
+import { BoundedRedisError, type BoundedRedisOutcome } from './bounded-redis.js'
 
 export interface AbuseCounts {
   readonly ip: number
@@ -33,26 +34,42 @@ const MAX_TTL_MS = 86_400_000
  */
 @Injectable()
 export class AbuseCounterStore {
-  constructor(private readonly redis: BoundedRedis) {}
+  constructor(private readonly redis: AuthRedis) {}
 
-  read(ipKey: string, subjectKey: string): Promise<AbuseCounts> {
-    return this.counts(ABUSE_COUNTER_READ_SCRIPT, [ipKey, subjectKey], [])
+  /** `deadlineMs` lets an enclosing admission stage pass what is left of its budget. */
+  read(ipKey: string, subjectKey: string, deadlineMs?: number): Promise<AbuseCounts> {
+    return this.counts(ABUSE_COUNTER_READ_SCRIPT, [ipKey, subjectKey], [], deadlineMs)
   }
 
-  increment(ipKey: string, subjectKey: string, ttlMs: number): Promise<AbuseCounts> {
+  increment(
+    ipKey: string,
+    subjectKey: string,
+    ttlMs: number,
+    deadlineMs?: number
+  ): Promise<AbuseCounts> {
     if (!Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > MAX_TTL_MS)
       throw new RangeError('Abuse counter expiry must be an integer between 1 ms and 24 h')
-    return this.counts(ABUSE_COUNTER_INCREMENT_SCRIPT, [ipKey, subjectKey], [String(ttlMs)])
+    return this.counts(
+      ABUSE_COUNTER_INCREMENT_SCRIPT,
+      [ipKey, subjectKey],
+      [String(ttlMs)],
+      deadlineMs
+    )
   }
 
   /** Deletes one key. A delayed delete can also remove increments written after it was sent. */
-  async clear(subjectKey: string): Promise<void> {
-    await this.bounded(() => this.redis.run((client) => client.del(subjectKey)))
+  async clear(subjectKey: string, deadlineMs?: number): Promise<void> {
+    await this.bounded(() => this.redis.run((client) => client.del(subjectKey), deadlineMs))
   }
 
-  private async counts(script: string, keys: string[], args: string[]): Promise<AbuseCounts> {
+  private async counts(
+    script: string,
+    keys: string[],
+    args: string[],
+    deadlineMs?: number
+  ): Promise<AbuseCounts> {
     const reply: unknown = await this.bounded(() =>
-      this.redis.run((client) => client.eval(script, { keys, arguments: args }))
+      this.redis.run((client) => client.eval(script, { keys, arguments: args }), deadlineMs)
     )
     if (!Array.isArray(reply) || reply.length !== 2 || !reply.every(Number.isSafeInteger))
       throw new AbuseCounterError('invalid_reply', 'unknown')

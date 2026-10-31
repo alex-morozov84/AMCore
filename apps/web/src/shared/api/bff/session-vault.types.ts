@@ -25,11 +25,26 @@ export interface VaultEntry extends VaultRecord {
 
 export type NewVaultEntry<TRecord extends VaultRecord = VaultRecord> = TRecord
 
+/**
+ * Per-call bound. A caller passes what is left of its own budget; an implementation never waits
+ * longer than this for one Redis command. Omitted means the implementation default.
+ */
+export interface VaultCallOptions {
+  deadlineMs?: number
+}
+
 /** Redis-backed (or fake, in tests) storage for `VaultEntry` records. */
 export interface VaultStore<TRecord extends VaultRecord = VaultRecord> {
-  get(sessionId: string): Promise<(TRecord & Pick<VaultEntry, 'version'>) | null>
+  get(
+    sessionId: string,
+    options?: VaultCallOptions
+  ): Promise<(TRecord & Pick<VaultEntry, 'version'>) | null>
   /** Initial write on login/register/OAuth exchange. Starts `version` at 1. */
-  create(sessionId: string, entry: NewVaultEntry<TRecord>): Promise<void>
+  create(
+    sessionId: string,
+    entry: NewVaultEntry<TRecord>,
+    options?: VaultCallOptions
+  ): Promise<void>
   /**
    * Conditional write: succeeds only if the stored entry's `version` still
    * equals `expectedVersion`. Returns whether the write happened.
@@ -37,17 +52,25 @@ export interface VaultStore<TRecord extends VaultRecord = VaultRecord> {
   setIfVersionMatches(
     sessionId: string,
     expectedVersion: number,
-    entry: NewVaultEntry<TRecord>
+    entry: NewVaultEntry<TRecord>,
+    options?: VaultCallOptions
   ): Promise<boolean>
-  delete(sessionId: string): Promise<void>
+  delete(sessionId: string, options?: VaultCallOptions): Promise<void>
 }
 
 /** Best-effort mutual exclusion, keyed by Next session id. Not a correctness
  * fence on its own — `VaultStore.setIfVersionMatches` is the real guard. */
 export interface VaultLock {
-  acquire(sessionId: string, ttlMs: number): Promise<string | null>
-  renew(sessionId: string, token: string, ttlMs: number): Promise<boolean>
-  release(sessionId: string, token: string): Promise<void>
+  /** Bounded: gives up with `null` once `deadlineMs` has passed; never waits for a late answer. */
+  acquire(sessionId: string, ttlMs: number, options?: VaultCallOptions): Promise<string | null>
+  renew(
+    sessionId: string,
+    token: string,
+    ttlMs: number,
+    options?: VaultCallOptions
+  ): Promise<boolean>
+  /** Cleanup: never throws; a lost release only leaves the lease to expire. */
+  release(sessionId: string, token: string, options?: VaultCallOptions): Promise<void>
 }
 
 export interface UpstreamRefreshResult {

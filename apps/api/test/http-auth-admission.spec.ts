@@ -24,7 +24,6 @@ import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import { SessionService } from '../src/core/auth/session.service'
 import { JwtStrategy } from '../src/core/auth/strategies/jwt.strategy'
 import { TokenService } from '../src/core/auth/token.service'
-import { UserCacheService } from '../src/core/auth/user-cache.service'
 import { EnvService } from '../src/env/env.service'
 
 const secret = '<http-admission-test-secret>'
@@ -65,10 +64,11 @@ class AuthProbeController {
       useValue: { get: (key: string) => (key === 'JWT_SECRET' ? secret : ['https://web.example']) },
     },
     {
-      provide: UserCacheService,
-      useValue: { getUser: async (sub: string) => (sub === 'probe' ? { id: sub } : null) },
+      provide: PrivilegedRoleService,
+      useValue: {
+        getCurrentSystemRole: async (sub: string) => (sub === 'probe' ? SystemRole.User : null),
+      },
     },
-    { provide: PrivilegedRoleService, useValue: { getCurrentSystemRole: jest.fn() } },
     { provide: SessionService, useValue: { validateRefreshToken } },
   ],
 })

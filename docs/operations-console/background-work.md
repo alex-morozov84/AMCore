@@ -512,4 +512,6 @@ notification and audit. See [backend contract](../notifications/control.md).
 
 Database-owned reads and commands do not need the wake broker. Console authentication
 still depends on its Redis session vault; a complete Redis outage does not promise
-a usable authenticated screen.
+a usable authenticated screen. During a vault outage the Console route shows only a
+temporary "unavailable" page, see
+[Operations Console during a vault outage](../auth/redis-outage.md#the-web-servers-session-vault).

@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
+import { addAuthUnavailableResponses } from './bootstrap/auth-unavailable-openapi.js'
 import { addCorrelationHeader } from './bootstrap/correlation-openapi.js'
 import { addParserResponses } from './bootstrap/parser-openapi.js'
 import { schemaOpenApiConverter } from './common/schemas/schema-openapi.js'
@@ -8,6 +9,16 @@ import { BULL_BOARD_MOUNT } from './infrastructure/queue/dashboard/bull-board-mo
 
 /** The one global prefix of the API (`main.ts` applies it; the OpenAPI paths carry it). */
 export const API_GLOBAL_PREFIX = 'api/v1'
+
+const API_DESCRIPTION =
+  'AMCore API documentation.\n\n' +
+  'An authenticated request is refused with `503` and `errorCode` `SERVICE_UNAVAILABLE` ' +
+  '("Authentication temporarily unavailable") when admission cannot finish because a ' +
+  'dependency the authentication path needs (for example Redis) is slow or down; the ' +
+  'handler did not run. The OAuth sign-in steps can answer the same `503` from inside the ' +
+  'operation, after an account or provider link was already saved; start sign-in again. ' +
+  'Each operation documents its own `503`. Retry later with backoff. See ' +
+  'docs/auth/redis-outage.md.'
 
 /**
  * Shared between `main.ts` (real bootstrap) and
@@ -22,7 +33,7 @@ export const API_GLOBAL_PREFIX = 'api/v1'
 export function buildSwaggerConfig(): Omit<OpenAPIObject, 'paths'> {
   return new DocumentBuilder()
     .setTitle('AMCore API')
-    .setDescription('AMCore API documentation')
+    .setDescription(API_DESCRIPTION)
     .setVersion('0.0.1')
     .addBearerAuth()
     .addBearerAuth(
@@ -99,6 +110,7 @@ export function buildApiDocument(app: INestApplication, pathPrefix: string): Ope
     standardSchemaConverter: schemaOpenApiConverter,
   })
   addParserResponses(document)
+  addAuthUnavailableResponses(document)
   addQueueBoardOperation(document, BULL_BOARD_MOUNT, pathPrefix)
   addCorrelationHeader(document)
   return document

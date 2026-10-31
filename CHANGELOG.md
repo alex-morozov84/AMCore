@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Authentication no longer hangs when Redis is slow or down. Organization-scoped requests
+  whose admission needs Redis are refused with a fast `503` `SERVICE_UNAVAILABLE` before the
+  handler runs. OAuth steps can answer the same `503` from inside the operation, possibly after
+  an account or provider link was saved, so sign-in must start again. The personal user check no
+  longer needs Redis because it reads the primary database once per request. The authentication path now has its own supervised
+  Redis client that is replaced when it stops answering. The Redis user cache and its
+  invalidation calls are removed; old `auth:user:v2:*` entries expire by themselves
+  (values within 10 minutes, key sets within 24 hours), so nothing needs flushing.
+  An OAuth callback that arrives while Redis stalls is refused fast with a provider error on the sign-in page, creates no session and works again after a restart of the sign-in. Session admission in the web server (vault read, browser-binding check and waiting for a refresh) now has one three-second budget and otherwise answers a temporary `503`; the session vault, its lock (also used by the invitation owner lease) and the refresh run on their own supervised Redis connection. A single refresh owner per session keeps its own budgets; when a rotation cannot be ruled out and its new tokens are not yet published, the owner ends the attempt and tries a bounded delete of the stored session (the response keeps the status of the failing step). While the vault is unavailable, a Console route shows the temporary "unavailable" page instead of `404` to a request that carries any session cookie, even an invented one, so the route's existence is visible during an outage; without a cookie the plain `404` stays, and after recovery absent, invented and non-operator sessions get the `404` again while a `SUPER_ADMIN` regains the Console.
+
 ### Added
 
 - Production Lighthouse audit tooling with explicit scenario ownership, individual

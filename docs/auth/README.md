@@ -29,6 +29,7 @@ approval; the default prepared protocol does not enable MFA or operator grants.
 | [OAuth](./oauth.md)                                   | Social login (Google, GitHub, Apple, Telegram) + account linking                   |
 | [Sessions](./sessions.md)                             | Own/admin session listing and revocation, rotation, device/IP/location metadata    |
 | [RBAC](./rbac.md)                                     | System roles, organizations, permissions, CASL — the auth-z guide                  |
+| [Redis outage behavior](./redis-outage.md)            | What authentication does when Redis is slow or down: `503`, deadlines, recovery    |
 | [Capability catalogue](./capability-catalogue.md)     | Implemented actions, permission presets and actor/record access hints              |
 | [Organization context](./organization-context.md)     | Explicit API-verified targets, typed session-fenced transport and tenant extension |
 | [Authorization upgrade](./authorization-upgrade.md)   | Audit and controlled transition to explicit defaults and TeamAccess                |
