@@ -14,11 +14,8 @@ export const metadata = noindexMetadata
 
 /**
  * Console-only "Control Room" typography. The fonts themselves load here,
- * not in `globals.css`, since that file sits outside the console's closed
- * ownership roots (`scripts/lib/operations-console-ownership-facts.mjs`):
- * a `next/font/google` call declared there has no seam covering its
- * removal when a downstream fork disables the console. `globals.css` only
- * carries a small `console.tokens`-seam-covered indirection
+ * not in `globals.css`, so the Console's font loading stays beside the Console
+ * routes. `globals.css` only carries a small indirection
  * (`--font-console-heading`/`--font-console-mono`, both `var()` references
  * to the CSS variables these fonts set below) so the rest of the console UI
  * can use ordinary `font-console-heading`/`font-console-mono` Tailwind
