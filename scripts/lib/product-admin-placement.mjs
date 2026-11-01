@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const configPath = 'packages/shared/src/config/product-admin.json'
+const localesPath = 'packages/shared/src/config/locales.json'
+const consolePath = 'packages/shared/src/config/admin-console.json'
 const terminal = /^(?:page|route)\.[cm]?[jt]sx?$/
 const metadata =
   /^(?:robots|sitemap|manifest|icon|apple-icon|opengraph-image|twitter-image|favicon)(?:\.|$)/
@@ -52,8 +54,16 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
   const alias = candidateAlias ?? config.alias
   if (!/^[a-z][a-z0-9_-]{0,31}$/.test(alias)) throw new Error('Invalid product-admin alias')
   const app = join(root, 'apps/web/src/app')
-  const localized = existsSync(join(app, '[locale]'))
-  const routeRoot = localized ? join(app, '[locale]') : app
+  // The physical `[locale]` folder is always present. Public paths carry a locale prefix only
+  // when the build serves more than one locale (one locale is rewritten onto the folder).
+  const routeRoot = join(app, '[locale]')
+  if (!existsSync(routeRoot)) throw new Error('Missing physical [locale] route folder')
+  const { enabled: locales, default: defaultLocale } = JSON.parse(
+    readFileSync(join(root, localesPath), 'utf8')
+  )
+  if (!Array.isArray(locales) || !locales.includes(defaultLocale))
+    throw new Error('Missing declared default locale')
+  const localized = locales.length > 1
   const ownedGroup = join(routeRoot, '(product-admin)')
   const physicalRoot = join(ownedGroup, config.alias)
   if (!existsSync(physicalRoot))
@@ -75,17 +85,9 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
   for (const entry of readdirSync(join(root, 'apps/web/public'), { withFileTypes: true }))
     if (entry.name === alias || entry.name.split('.')[0] === alias)
       throw new Error(`Product-admin alias collides with public asset ${entry.name}`)
-  const constants = readFileSync(join(root, 'packages/shared/src/constants/index.ts'), 'utf8')
-  const literal = constants.match(/export const SUPPORTED_LOCALES\s*=\s*\[([^\]]*)\]/)?.[1]
-  if (!literal || !/^\s*'[-a-zA-Z0-9]+'(?:\s*,\s*'[-a-zA-Z0-9]+')*\s*,?\s*$/.test(literal))
-    throw new Error('Placement requires the declared literal SUPPORTED_LOCALES source')
-  const locales = [...literal.matchAll(/'([-a-zA-Z0-9]+)'/g)].map((match) => match[1])
-  const defaultLocale = constants.match(
-    /export const DEFAULT_LOCALE[^=]*=\s*'([-a-zA-Z0-9]+)'/
-  )?.[1]
-  if (!locales.includes(defaultLocale)) throw new Error('Missing declared default locale')
   if (['_next', 'api', ...locales].includes(alias))
     throw new Error('Product-admin alias collides with a reserved root')
+  inspectConsoleAlias(root, app, alias, locales)
   for (const required of ['/login', '/organizations', '/settings/api-keys', '/settings/sessions'])
     if (!owned.some((entry) => `/${entry.segments.join('/')}` === required))
       throw new Error(`Missing product-admin physical page ${required}`)
@@ -99,4 +101,33 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
     assets: assets(join(root, 'apps/web/public')),
     routes: owned.map((entry) => entry.segments),
   }
+}
+
+/**
+ * The Console alias is the name of the physical folder `[locale]/<alias>` and, in path mode, its public
+ * segment. It must be a free first segment: not the product-admin alias, not another route or public
+ * asset, and not a reserved root or served locale. Checked in every mode, including `disabled`,
+ * because the folder stays in the build.
+ */
+function inspectConsoleAlias(root, app, productAlias, locales) {
+  const settings = JSON.parse(readFileSync(join(root, consolePath), 'utf8'))
+  const alias = settings.alias
+  if (
+    !/^[a-z][a-z0-9_-]{0,31}$/.test(alias) ||
+    ['_next', '_vercel', 'api', ...locales].includes(alias)
+  )
+    throw new Error('Console alias is invalid or reserved')
+  if (alias === productAlias) throw new Error('Console alias equals the product-admin alias')
+  const folder = join(app, '[locale]', alias)
+  if (!existsSync(folder)) throw new Error('Console alias disagrees with its physical routes')
+  for (const endpoint of inventory(app)) {
+    if (endpoint.path.startsWith(`${folder}/`)) continue
+    const segments =
+      endpoint.segments[0] === '[locale]' ? endpoint.segments.slice(1) : endpoint.segments
+    if (collides(segments[0], alias))
+      throw new Error(`Console alias collides with ${relative(root, endpoint.path)}`)
+  }
+  for (const entry of readdirSync(join(root, 'apps/web/public'), { withFileTypes: true }))
+    if (entry.name === alias || entry.name.split('.')[0] === alias)
+      throw new Error(`Console alias collides with public asset ${entry.name}`)
 }
