@@ -4,7 +4,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { render } from '@react-email/render'
 import { PinoLogger } from 'nestjs-pino'
 
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { coerceSupportedLocale } from '@amcore/shared'
 
 import { redactEmail } from '../../common/utils/index.js'
 import { EnvService } from '../../env/env.service.js'
@@ -264,7 +264,8 @@ export class EmailService {
   ): Promise<{ html: string; text: string; subject: string }> {
     const startedAt = performance.now()
     try {
-      const locale: Locale = data.locale || DEFAULT_LOCALE
+      // A queued job may carry a locale this build no longer serves; render the default then.
+      const locale: Locale = coerceSupportedLocale(data.locale)
       let element: Parameters<typeof render>[0]
       let subject: string
 

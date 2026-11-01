@@ -7,7 +7,7 @@ import { SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
  * Resolve a supported locale from the request `Accept-Language` header using
  * The same accepts parser used by Express's RFC-4647 negotiation, restricted
  * to {@link SUPPORTED_LOCALES}. Returns `undefined` when there is nothing usable
- * to negotiate, so callers fall through to the DB default rather than this
+ * to negotiate, so callers fall through to the build default locale rather than this
  * helper hard-coding it.
  *
  * A genuinely absent or blank `Accept-Language` returns `undefined` explicitly:

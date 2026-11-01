@@ -9,7 +9,7 @@ import type {
   SupportedLocale,
   UserResponse,
 } from '@amcore/shared'
-import { AuthErrorCode, parseSupportedLocale } from '@amcore/shared'
+import { AuthErrorCode, DEFAULT_LOCALE, parseSupportedLocale } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions/index.js'
 import { EnvService } from '../../../env/env.service.js'
@@ -592,8 +592,8 @@ export class OAuthService {
         emailCanonical,
         emailVerified: profile.emailVerified,
         name: profile.displayName,
-        // Seed from the negotiated locale (D2); omit to take the DB default.
-        ...(locale ? { locale } : {}),
+        // Seed from the negotiated locale (D2); otherwise the build's default, written explicitly.
+        locale: locale ?? DEFAULT_LOCALE,
         accounts: { create: { provider, providerAccountId: profile.providerId } },
       },
     })

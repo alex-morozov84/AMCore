@@ -3,7 +3,7 @@ import type { Request, Response } from 'express'
 import type { PinoLogger } from 'nestjs-pino'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, DEFAULT_LOCALE } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 import { resolveTrustedWebPeers } from '../../common/utils/trusted-web-peer'
@@ -216,6 +216,7 @@ describe('AuthService', () => {
           emailCanonical: registerInput.email,
           passwordHash: 'hashed-password',
           name: registerInput.name,
+          locale: DEFAULT_LOCALE,
           lastLoginAt: expect.any(Date),
         },
       })
@@ -330,13 +331,13 @@ describe('AuthService', () => {
         })
       })
 
-      it('omits locale entirely when neither body nor header supplies one (DB default applies)', async () => {
+      it('writes the build default locale explicitly when neither body nor header supplies one', async () => {
         setupRegisterMocks()
 
         await authService.register(registerInput, requestInfo)
 
         const createArg = mockCtx.prisma.user.create.mock.calls[0]![0]!
-        expect(createArg.data).not.toHaveProperty('locale')
+        expect(createArg.data).toHaveProperty('locale', DEFAULT_LOCALE)
       })
     })
 
