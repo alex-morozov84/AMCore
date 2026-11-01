@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { registerSchema, supportedLocaleSchema, timezoneSchema } from './auth'
+
+// These tests cover a two-locale build, whatever `locales.json` holds.
+vi.mock('../config/locales.json', () => ({
+  default: { version: 1, enabled: ['en', 'ru'], default: 'en' },
+}))
 
 describe('supportedLocaleSchema', () => {
   it('accepts supported locales and rejects others', () => {

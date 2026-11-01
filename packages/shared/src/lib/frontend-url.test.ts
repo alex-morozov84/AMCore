@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_LOCALE } from '../constants'
 
 import { localePathPrefix, localizedFrontendUrl } from './frontend-url'
+
+// These tests cover a two-locale build, whatever `locales.json` holds.
+vi.mock('../config/locales.json', () => ({
+  default: { version: 1, enabled: ['en', 'ru'], default: 'en' },
+}))
 
 describe('localizedFrontendUrl', () => {
   it('prefixes the locale, including the default one', () => {

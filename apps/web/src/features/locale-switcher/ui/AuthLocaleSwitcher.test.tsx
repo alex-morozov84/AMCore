@@ -8,6 +8,12 @@ import { AuthLocaleSwitcher } from './AuthLocaleSwitcher'
 
 const replace = vi.hoisted(() => vi.fn())
 vi.mock('client-only', () => ({}))
+vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
+  ...(await importOriginal()),
+  // This test covers a two-locale build, whatever `locales.json` holds.
+  SUPPORTED_LOCALES: ['en', 'ru'],
+  DEFAULT_LOCALE: 'en',
+}))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/mfa' }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('operation=demo&tag=a&tag=b'),

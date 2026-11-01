@@ -16,13 +16,16 @@ This page is the working guide.
 | ----------------------------------------------- | -------------------------------------------------------------------- |
 | `apps/web/messages/en.json`                     | **Source of truth.** Every key starts here                           |
 | `apps/web/messages/ru.json`                     | Full translation — same keys, no more, no fewer                      |
+| `packages/shared/src/config/locales.json`       | **Which locales this build serves** and the default one              |
 | `apps/web/src/i18n/`                            | Routing config, locale-aware navigation, request config, param guard |
 | `apps/web/src/shared/api/`                      | Error-code resolution and the `useApiError` hook                     |
 | `apps/api/src/infrastructure/email/messages.ts` | Email copy (separate catalogue — emails render server-side)          |
 
-`packages/shared` owns `SUPPORTED_LOCALES` and `DEFAULT_LOCALE`. Frontend,
-backend, and email all derive from it, so they cannot disagree about which
-locales exist.
+`packages/shared` owns `SUPPORTED_LOCALES` and `DEFAULT_LOCALE`, read from
+`locales.json`. `SUPPORTED_LOCALES` means the locales **this build serves**. The
+translated catalogues the repository contains are a separate list,
+`LOCALE_CATALOGUES`. Frontend, backend, and email all derive from the served list,
+so they cannot disagree about which locales exist.
 
 ## Recipe: add a UI string
 
@@ -226,9 +229,51 @@ correct one, and the files most likely to grow a new link are exactly the ones
 that already contain correct ones. `.ts` and `.tsx` are both scanned, since
 React Email templates live in `.tsx`.
 
+## Task: choose the served locales
+
+Use this to ship one language (for example Russian only) or to change the default.
+The repository stays English and Russian; the file selects what the build serves.
+
+1. Edit `packages/shared/src/config/locales.json`:
+
+   ```json
+   { "version": 1, "enabled": ["ru"], "default": "ru" }
+   ```
+
+   `enabled` lists served locales (at least one, no duplicates, each one a
+   catalogue locale). `default` must be in `enabled`. A wrong file fails the
+   build and names the field.
+
+2. Rebuild everything that embeds the file: `pnpm build` rebuilds shared, API,
+   worker and web. Building web or API alone against an old shared build fails with
+   "packages/shared/dist is older than its settings files"; run
+   `pnpm --filter @amcore/shared build` first.
+3. If you serve the Console on its own host, run
+   `node scripts/render-console-edge.mjs --write` (see
+   [Console configuration](../operations-console/configuration.md)). The web build
+   fails with `--check` until the edge files match.
+
+What changes with **one** served locale:
+
+| Area                                              | Behavior                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------- |
+| Public URLs                                       | Bare paths: `/login`, not `/ru/login`                         |
+| `/ru/login` for the served locale                 | Redirects (307) to `/login`, query kept                       |
+| A catalogue locale that is not served             | `/en/login` answers 404                                       |
+| Language switcher                                 | Not shown                                                     |
+| New accounts, emails, notifications               | Written and rendered in the default locale                    |
+| Accounts that stored a locale you stopped serving | Read as the default locale; the stored value is not rewritten |
+| API input                                         | Accepts only served locales                                   |
+
+With two or more served locales nothing changes: every URL carries its locale prefix.
+
+Nothing is deleted from the repository. A locale you do not serve keeps its
+catalogue file and its email copy; the tests still check them.
+
 ## Recipe: add a third locale
 
-1. Add it to `SUPPORTED_LOCALES` in `packages/shared/src/constants/index.ts`.
+1. Add it to `LOCALE_CATALOGUES` in `packages/shared/src/constants/locales.ts`, then to
+   `enabled` in `locales.json` (see above).
 2. Copy `messages/en.json` to `messages/<locale>.json` and translate it. Keep
    every key; add the CLDR plural categories that language requires.
 3. Add a message block for it in `apps/api/src/infrastructure/email/messages.ts`.
@@ -237,22 +282,33 @@ React Email templates live in `.tsx`.
    parity and coverage guards will name anything missing.
 
 No routing change is needed: routes, the switcher, and `generateStaticParams`
-all read `SUPPORTED_LOCALES`.
+all read the served list. Run `node scripts/render-console-edge.mjs --write` if the
+Console runs on its own host.
 
 Consider whether the backend should keep accepting the new locale from
 `Accept-Language` before shipping — `negotiateLocale` restricts itself to
 `SUPPORTED_LOCALES`, so it starts negotiating the new locale immediately.
 
-## Do not set `localePrefix: 'never'`
+## Why the middleware keeps `localePrefix: 'always'`
 
-It looks like the obvious way to get unprefixed URLs, and it is a trap: next-intl
-implements `'never'` by
-rewriting every request to add the locale internally, and Next's standalone
-server — what the Docker image runs — does not apply proxy rewrites
-([vercel/next.js#91844](https://github.com/vercel/next.js/issues/91844)). Every
-page would redirect to itself forever in production while working fine under
-`next dev` and `next start`. The same defect is why upstream AMCore uses
-`localePrefix: 'always'`.
+Do not set next-intl's `localePrefix` to `'never'` or `'as-needed'` in `routing.ts`.
+Both make next-intl's middleware rewrite every request to add the locale, and Next's
+standalone server — what the Docker image runs — does not apply proxy rewrites
+([vercel/next.js#91844](https://github.com/vercel/next.js/issues/91844)). Pages would
+redirect to themselves forever in production while working under `next dev` and
+`next start`.
+
+One served locale still gets bare URLs, without a proxy rewrite:
+
+1. `next.config.ts` declares a `beforeFiles` rewrite from `/<path>` to `/<locale>/<path>`,
+   and 307 redirects from `/<locale>` and `/<locale>/<path>`. Next applies config
+   rewrites on the standalone server.
+2. `src/proxy.ts` skips next-intl's middleware and answers 404 for the prefix of a
+   locale that is not served.
+3. `src/i18n/navigation.ts` builds links with `'never'`, which needs no middleware.
+
+Re-test any change here against the standalone build (`node server.js`), never only
+`next start`.
 
 ## What the guards catch
 

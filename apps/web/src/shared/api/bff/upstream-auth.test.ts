@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { DEFAULT_LOCALE } from '@amcore/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { callUpstreamAuth, callUpstreamRegister, UpstreamAuthError } from './upstream-auth'
@@ -141,7 +142,7 @@ describe('callUpstreamRegister (creation evidence)', () => {
     name: null,
     avatarUrl: null,
     phone: null,
-    locale: 'en',
+    locale: DEFAULT_LOCALE,
     timezone: 'UTC',
     createdAt: '2026-01-01T00:00:00.000Z',
     lastLoginAt: null,

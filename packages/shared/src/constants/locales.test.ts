@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 type Settings = { version: number; enabled: string[]; default: string }
@@ -23,10 +25,13 @@ const settings = (enabled: string[], fallback: string): Settings => ({
 })
 
 describe('locale settings file', () => {
-  it('serves the shipped configuration: English and Russian, English default', async () => {
+  it('serves exactly what the settings file lists', async () => {
     const shipped = await import('./locales')
-    expect([...shipped.SUPPORTED_LOCALES]).toEqual(['en', 'ru'])
-    expect(shipped.DEFAULT_LOCALE).toBe('en')
+    const file = JSON.parse(
+      readFileSync(new URL('../config/locales.json', import.meta.url), 'utf8')
+    )
+    expect([...shipped.SUPPORTED_LOCALES]).toEqual(file.enabled)
+    expect(shipped.DEFAULT_LOCALE).toBe(file.default)
   })
 
   it('serves one locale and makes it the default', async () => {

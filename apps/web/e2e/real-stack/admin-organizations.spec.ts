@@ -8,7 +8,8 @@ import {
 import { loginViaUi, registerViaUi, uniqueEmail } from './helpers'
 
 /**
- * Path mode (this checkout's configured topology - `PROJECT_CONTEXT.md`)
+ * Path mode (this checkout's configured topology -
+ * `packages/shared/src/config/admin-console.json`)
  * has no separate console login: a SUPER_ADMIN signs into the ordinary
  * product session, then opens `/admin` directly (`docs/operations-console/
  * README.md`). This proves the Organizations panel's real data path over

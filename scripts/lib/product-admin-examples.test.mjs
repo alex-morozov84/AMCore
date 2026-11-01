@@ -20,7 +20,6 @@ async function selectedSource() {
     'packages/shared/src/config/locales.json',
     'packages/shared/src/config/admin-console.json',
     'packages/shared/src/config/product-admin.json',
-    'apps/web/src/shared/lib/route-progress/route-progress-flag.ts',
     'apps/web/messages/ru.json',
     'apps/web/src/_app/organization-access/index.server.ts',
     ...['members', 'roles', 'invitations'].map(
@@ -30,21 +29,12 @@ async function selectedSource() {
   for (const path of files) {
     let contents = await read(path)
     if (path === 'PROJECT_CONTEXT.md')
-      contents = contents
-        .replace('`upstream-starter`', '`downstream-product`')
-        .replace('**i18n_mode:** multi', '**i18n_mode:** single')
-        .replace('**base_locale:** en', '**base_locale:** ru')
-        .replace('**supported_locales:** [en, ru]', '**supported_locales:** [ru]')
-        .replace('**admin_console:** enabled', '**admin_console:** disabled')
-        .replace('**frontend_storybook:** enabled', '**frontend_storybook:** disabled')
-        .replace('**frontend_route_progress:** enabled', '**frontend_route_progress:** disabled')
+      contents = contents.replace('`upstream-starter`', '`downstream-product`')
     // One served locale and no Console: the choices live in the settings files.
     if (path.endsWith('config/locales.json'))
       contents = `${JSON.stringify({ version: 1, enabled: ['ru'], default: 'ru' })}\n`
     if (path.endsWith('config/admin-console.json'))
       contents = `${JSON.stringify({ version: 1, mode: 'disabled', alias: 'admin' })}\n`
-    if (path.endsWith('route-progress-flag.ts'))
-      contents = contents.replace('ROUTE_PROGRESS_ENABLED = true', 'ROUTE_PROGRESS_ENABLED = false')
     await mkdir(dirname(join(dir, path)), { recursive: true })
     await writeFile(join(dir, path), contents)
   }

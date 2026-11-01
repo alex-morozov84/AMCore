@@ -2,6 +2,12 @@ import { NextRequest } from 'next/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
+vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
+  ...(await importOriginal()),
+  // This test covers a two-locale build, whatever `locales.json` holds.
+  SUPPORTED_LOCALES: ['en', 'ru'],
+  DEFAULT_LOCALE: 'en',
+}))
 vi.mock('next-intl/middleware', async () => {
   const { NextResponse } = await import('next/server')
   return { default: () => () => NextResponse.next() }

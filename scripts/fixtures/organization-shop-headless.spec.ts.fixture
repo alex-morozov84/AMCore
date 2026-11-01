@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { DEFAULT_LOCALE, localizedFrontendUrl } from '@amcore/shared'
@@ -55,13 +55,12 @@ test('cosmic fixed-company composition preserves tenant, command and key boundar
   const removal = catalogues.memberRemoval
   const keys = catalogues.memberApiKeys
   const org = 'ct063shopstaff00000000000'
+  // The Console is switched off by its settings file; its route folder stays in every build.
   expect(
-    readFileSync(join(target.snapshot, 'PROJECT_CONTEXT.md'), 'utf8').includes(
-      '**admin_console:** disabled'
-    )
-  ).toBe(true)
-  expect(existsSync(join(target.snapshot, 'apps/web/src/app/admin'))).toBe(false)
-  expect(existsSync(join(target.snapshot, 'apps/web/src/app/[locale]'))).toBe(false)
+    JSON.parse(
+      readFileSync(join(target.snapshot, 'packages/shared/src/config/admin-console.json'), 'utf8')
+    ).mode
+  ).toBe('disabled')
   expect(
     (
       await fetch(

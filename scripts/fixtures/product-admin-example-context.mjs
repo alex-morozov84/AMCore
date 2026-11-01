@@ -23,8 +23,6 @@ export async function exampleContext(root) {
   // Settings files own the locale and Console choices; the other fields stay in PROJECT_CONTEXT.md.
   const settings = {
     i18n_mode: single ? 'single' : 'multi',
-    base_locale: localeSettings.default,
-    supported_locales: `[${locales.join(', ')}]`,
     admin_console: adminConsole.mode === 'disabled' ? 'disabled' : 'enabled',
     admin_console_mode: adminConsole.mode === 'host' ? 'host' : 'path',
     admin_console_slug: adminConsole.alias,
@@ -37,17 +35,6 @@ export async function exampleContext(root) {
   for (const locale of locales) await read(root, `apps/web/messages/${locale}.json`)
   if (!(await exists(join(root, prefix, adminConsole.alias))))
     throw new Error('Console alias disagrees with its physical routes')
-  if (
-    (await exists(join(root, 'apps/web/.storybook'))) !==
-    (field('frontend_storybook') === 'enabled')
-  )
-    throw new Error('Project context disagrees with Storybook')
-  const progress = await read(root, 'apps/web/src/shared/lib/route-progress/route-progress-flag.ts')
-  if (
-    progress.includes('ROUTE_PROGRESS_ENABLED = true') !==
-    (field('frontend_route_progress') === 'enabled')
-  )
-    throw new Error('Project context disagrees with route progress')
   const placement = JSON.parse(await read(root, 'packages/shared/src/config/product-admin.json'))
   if (placement.mode !== 'path')
     throw new Error('Custom path examples require path placement; use the ready host recipe')
