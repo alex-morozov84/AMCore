@@ -23,19 +23,15 @@ afterEach(() => {
 })
 
 describe('proxy with the Console turned off', () => {
-  it.each([
-    '/admin',
-    '/admin/users',
-    '/en/admin',
-    '/ru/admin/audit',
-    '/api/console/access',
-    '/api/console/users/1/role',
-  ])('answers 404 for %s before any page runs', async (path) => {
-    const proxy = await proxyWith('disabled')
-    expect((await proxy(request(path))).status).toBe(404)
-  })
+  it.each(['/admin', '/admin/users', '/en/admin', '/ru/admin/audit'])(
+    'answers 404 for %s before any page runs',
+    async (path) => {
+      const proxy = await proxyWith('disabled')
+      expect((await proxy(request(path))).status).toBe(404)
+    }
+  )
 
-  it.each(['/en/login', '/api/health', '/administrators', '/en/administrators', '/api/consolex'])(
+  it.each(['/en/login', '/administrators', '/en/administrators'])(
     'leaves %s alone',
     async (path) => {
       const proxy = await proxyWith('disabled')
@@ -45,7 +41,7 @@ describe('proxy with the Console turned off', () => {
 })
 
 describe('proxy with the Console in path mode', () => {
-  it.each(['/en/admin', '/api/console/access'])('does not refuse %s', async (path) => {
+  it.each(['/en/admin', '/admin/users'])('does not refuse %s', async (path) => {
     const proxy = await proxyWith('path')
     expect((await proxy(request(path))).status).not.toBe(404)
   })

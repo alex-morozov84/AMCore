@@ -36,12 +36,13 @@ const DISABLED_LOCALES: readonly string[] = LOCALE_CATALOGUES.filter(
 /**
  * Second layer of the "Console off" refusal (the first is the guard inside every Console
  * page and route). With the Console disabled, its public pages (`/<alias>`, with or without a
- * locale prefix) and its BFF (`/api/console`) answer 404 here, before any rendering starts.
+ * locale prefix) answer 404 here, before any rendering starts. The proxy matcher excludes
+ * `/api`, so the BFF (`/api/console`) is closed only by the route guard
+ * (`withConsoleHostGuard`); the inventory test proves every route has it.
  */
 function isClosedConsolePath(segments: readonly string[]): boolean {
   if (ADMIN_CONSOLE_CONFIG.enabled) return false
   const [first = '', second = ''] = segments
-  if (first === 'api') return second === 'console'
   const page = (LOCALE_CATALOGUES as readonly string[]).includes(first) ? second : first
   return page === ADMIN_CONSOLE_CONFIG.slug
 }
