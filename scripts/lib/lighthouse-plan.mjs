@@ -14,35 +14,35 @@ export const invariant = (ok, code) => {
 }
 
 export function auditChoices(root) {
-  const text = readFileSync(join(root, 'PROJECT_CONTEXT.md'), 'utf8')
-  const field = (key) =>
-    text
-      .split('\n')
-      .find((line) => line.startsWith(`- **${key}:** `))
-      ?.split(':** ')[1]
+  // Locale and Console choices come from the settings files (PROJECT_CONTEXT.md no longer holds them).
   const productAdmin = json(root, 'packages/shared/src/config/product-admin.json')
+  const locales = json(root, 'packages/shared/src/config/locales.json')
+  const adminConsole = json(root, 'packages/shared/src/config/admin-console.json')
   const choices = {
     productAdmin,
-    locale: field('base_locale'),
-    multi: field('i18n_mode') === 'multi',
+    locale: locales.default,
+    multi: locales.enabled.length > 1,
   }
   invariant(
     ['path', 'host'].includes(productAdmin.mode) && /^[a-z0-9-]+$/.test(productAdmin.alias),
     'invalid-placement'
   )
   invariant(/^[a-z]{2}(?:-[A-Za-z0-9]+)?$/.test(choices.locale), 'invalid-locale')
-  choices.exclusions = text.split('\n').flatMap((line) => {
-    const field = line.match(/^- \*\*([a-z_]+):\*\* disabled$/)
-    return field ? [{ feature: field[1], reason: 'disabled-at-initialization' }] : []
-  })
+  choices.exclusions = []
   choices.extensions = []
-  invariant(field('admin_console') === 'enabled', 'invalid-console-choice')
-  choices.console = { mode: field('admin_console_mode'), slug: field('admin_console_slug') }
   invariant(
-    ['path', 'host'].includes(choices.console.mode) && /^[a-z0-9-]+$/.test(choices.console.slug),
+    ['disabled', 'path', 'host'].includes(adminConsole.mode) &&
+      /^[a-z0-9-]+$/.test(adminConsole.alias),
     'invalid-console-placement'
   )
-  choices.extensions.push('apps/web/e2e/console-real-stack/lighthouse/catalogue.json')
+  if (adminConsole.mode === 'disabled') {
+    // A disabled Console answers 404 everywhere, so it has nothing to audit.
+    choices.console = null
+    choices.exclusions.push({ feature: 'admin_console', reason: 'disabled-by-settings' })
+  } else {
+    choices.console = { mode: adminConsole.mode, slug: adminConsole.alias }
+    choices.extensions.push('apps/web/e2e/console-real-stack/lighthouse/catalogue.json')
+  }
   return choices
 }
 

@@ -103,13 +103,13 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
   const { auditCommand } = await import('./lighthouse-command.mjs')
   const dir = await temporary(t)
   for (const file of [
-    'PROJECT_CONTEXT.md',
     'packages/shared/src/config/product-admin.json',
+    'packages/shared/src/config/locales.json',
+    'packages/shared/src/config/admin-console.json',
     'apps/web/e2e',
     'scripts/run-console-session-e2e.mjs',
   ])
     await cp(join(root, file), join(dir, file), { recursive: true })
-  const context = await readFile(join(dir, 'PROJECT_CONTEXT.md'), 'utf8')
   for (const product of ['path', 'host'])
     for (const consoleMode of ['path', 'host']) {
       await writeFile(
@@ -117,13 +117,8 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
         JSON.stringify({ mode: product, alias: 'workspace' })
       )
       await writeFile(
-        join(dir, 'PROJECT_CONTEXT.md'),
-        context
-          .replace(
-            /\*\*admin_console_mode:\*\* (?:path|host)/,
-            `**admin_console_mode:** ${consoleMode}`
-          )
-          .replace('**admin_console_slug:** admin', '**admin_console_slug:** ops')
+        join(dir, 'packages/shared/src/config/admin-console.json'),
+        JSON.stringify({ version: 1, mode: consoleMode, alias: 'ops' })
       )
       const p = auditPlan(dir, identity)
       for (const owner of Object.keys(p.assignments).filter((lane) => p.assignments[lane].length)) {
@@ -157,7 +152,15 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
       )
       assert.equal(p.assignments['setup-cli'].length, 0)
     }
-  // Actual Console removal is tested through its registered initializer seam, not a false disabled context alone.
+  // A disabled Console is a settings value: it has nothing to audit and is recorded as an exclusion.
+  await writeFile(
+    join(dir, 'packages/shared/src/config/admin-console.json'),
+    JSON.stringify({ version: 1, mode: 'disabled', alias: 'admin' })
+  )
+  const off = auditPlan(dir, identity)
+  assert.equal(off.choices.console, null)
+  assert.deepEqual(off.exclusions, [{ feature: 'admin_console', reason: 'disabled-by-settings' }])
+  assert.deepEqual(Object.values(off.assignments).flat().sort(), ['login', 'members'])
 })
 
 test('manifest-based coverage rejects missing, stale, duplicated and empty routes', () => {

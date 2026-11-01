@@ -46,7 +46,8 @@ if (process.argv.includes('--envelopes')) {
   )
   const catalogue = auditCatalogue(process.cwd(), plan.choices)
   const resolvers = [{ scope: 'product-admin', prefix: `/${plan.choices.productAdmin.alias}` }]
-  resolvers.push({ scope: 'console', prefix: `/${plan.choices.console.slug}` })
+  if (plan.choices.console)
+    resolvers.push({ scope: 'console', prefix: `/${plan.choices.console.slug}` })
   const provenance = {
     lock: digest(await readFile('pnpm-lock.yaml')),
     content: await snapshot(process.cwd()),
