@@ -21,7 +21,8 @@
 	}
 }
 
-# AMCORE_ADMIN_CONSOLE_PROXY_START — PR5 owns this block's deletion transform.
+# AMCORE_ADMIN_CONSOLE_PROXY_START — the managed stand copies the block between these two
+# markers (scripts/stand/product-admin-source.mjs); keep both lines.
 {$ADMIN_CONSOLE_HOSTNAME} {
 	@physicalConsolePath path /admin /admin/*
 	handle @physicalConsolePath {
