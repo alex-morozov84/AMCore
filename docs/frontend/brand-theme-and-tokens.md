@@ -291,17 +291,19 @@ when you answer the corresponding prompts.
 `init:brand` finishes planning before it asks for confirmation.
 That plan includes an immutable snapshot of any supplied logo or icon, so a
 source file changed after the prompt cannot change what is applied. A confirmed
-run commits its complete filesystem plan as one recoverable transaction; a
-handled write failure restores the tree to its pre-apply state. Dry runs,
-cancelled prompts, and plans with no changes never start a transaction.
+run writes its complete filesystem plan as one transaction. When a write fails, the
+command tries to roll the tree back and its message says whether the rollback
+completed; see "Recover from a failure" below. Dry runs, cancelled prompts, and
+plans with no changes never start a transaction.
 
 `init:brand` builds desired-state facts, claims them against explicit ownership
 seams, applies narrow structural operations, and writes one composed operation plan
 in one filesystem transaction. Brand identity fields, JSON paths, TypeScript nodes,
 and the five asset destinations are claimed explicitly; missing or ambiguous
 anchors fail before mutation. There is no compatibility executor or sequential
-second mutation pass. Nothing is written until you confirm the plan (`--yes`, or the
-interactive prompt); `--dry-run` never writes.
+second mutation pass. Before it writes, the command requires a clean Git working tree and
+refuses when an `ai/` folder exists (that marks the AMCore maintainer checkout). It then
+asks you to confirm the plan (`--yes`, or the interactive prompt); `--dry-run` never writes.
 
 For a complete product-administration setup, see the
 [adoption guide](../product-admin/adoption.md). Install changed manifests and
@@ -320,19 +322,19 @@ initializer, such as `pnpm init:project`, is out of date.
 Every flag is optional, and a field you do not pass keeps its current value. In an
 interactive terminal without value flags the command asks for the values instead.
 
-| Flag                                              | What it writes                                                                                                                                                             |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--product-name`                                  | `PROJECT_CONTEXT.md` `Product` (and `Mode: downstream-product` while it still says `upstream-starter`), `manifest.ts` `name`/`short_name`, `meta.title` in both catalogues |
-| `--product-description`                           | root `package.json` `description`, `manifest.ts` `description`, `en.json` `meta.description`                                                                               |
-| `--purpose`, `--upstream-sync-policy`             | `PROJECT_CONTEXT.md` `Purpose` and `Upstream sync policy`. Write your own sentences; nothing is pre-filled.                                                                |
-| `--workflow-mode`                                 | `PROJECT_CONTEXT.md` workflow mode: `strict`, `flexible` or `custom`                                                                                                       |
-| `--theme-mode`                                    | `DEFAULT_THEME_SETTING` in `theme.ts`: `system`, `light` or `dark`                                                                                                         |
-| `--theme-persistence`                             | `PROJECT_CONTEXT.md` `theme_persistence`: `local-storage` or `cookie-ssr` (a record; it does not generate the cookie variant)                                              |
-| `--package-name`                                  | root `package.json` `name`                                                                                                                                                 |
-| `--logo-dark`, `--logo-light`                     | paths to your PNG files, copied to `public/logo-dark.png` and `public/logo-light.png`                                                                                      |
-| `--icon-192`, `--icon-512`, `--icon-512-maskable` | paths to your PNG files with the exact pixel size, copied into `public/icons/`                                                                                             |
-| `--dry-run`                                       | prints the plan and diffs without writing any file                                                                                                                         |
-| `--yes`                                           | applies the plan without the confirmation prompt                                                                                                                           |
+| Flag                                              | What it writes                                                                                                                                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--product-name`                                  | `PROJECT_CONTEXT.md` `Product` (and `Mode: downstream-product` while it still says `upstream-starter`), `manifest.ts` `name`/`short_name`, `meta.title` in both catalogues                 |
+| `--product-description`                           | root `package.json` `description`, `manifest.ts` `description`, `en.json` `meta.description`                                                                                               |
+| `--purpose`, `--upstream-sync-policy`             | `PROJECT_CONTEXT.md` `Purpose` and `Upstream sync policy`. Pass your own sentences. Without the flag the current text stays; the interactive prompt shows the current text as its default. |
+| `--workflow-mode`                                 | `PROJECT_CONTEXT.md` workflow mode: `strict`, `flexible` or `custom`                                                                                                                       |
+| `--theme-mode`                                    | `DEFAULT_THEME_SETTING` in `theme.ts`: `system`, `light` or `dark`                                                                                                                         |
+| `--theme-persistence`                             | `PROJECT_CONTEXT.md` `theme_persistence`: `local-storage` or `cookie-ssr` (a record; it does not generate the cookie variant)                                                              |
+| `--package-name`                                  | root `package.json` `name`                                                                                                                                                                 |
+| `--logo-dark`, `--logo-light`                     | paths to your PNG files, copied to `public/logo-dark.png` and `public/logo-light.png`                                                                                                      |
+| `--icon-192`, `--icon-512`, `--icon-512-maskable` | paths to your PNG files with the exact pixel size, copied into `public/icons/`                                                                                                             |
+| `--dry-run`                                       | prints the plan and diffs without writing any file                                                                                                                                         |
+| `--yes`                                           | applies the plan without the confirmation prompt                                                                                                                                           |
 
 For a real product pass at least `--product-name` and `--product-description`, plus
 `--purpose` and `--upstream-sync-policy`: a field you leave out keeps the starter's text,
@@ -353,12 +355,26 @@ section for what those fields mean. It never edits the color tokens in `globals.
 `manifest.ts` `background_color`/`theme_color`; update those by hand (checklist items 2 and 4).
 
 Run it again whenever a value must change. Pass only the flags to change, with `--dry-run`
-first. A plan with no changes writes nothing. If a write fails and the command handles
-the failure, it restores the tree to the state before the run. If the process is killed
-during the write, a `.amcore-scaffold-transaction.json` journal stays in the project root and
-blocks the next run; the error message lists the recovery steps (keep the journal, restore the
-recorded states in reverse order, check the tree, then remove the journal). Starting from a
-clean Git tree lets you compare the result with `git diff`.
+first. A plan with no changes writes nothing. Commit or stash your own work first: the
+command refuses to write into a tree with uncommitted changes.
+
+#### Recover from a failure
+
+Read the last message of the command before you do anything else. Do not assume that an error
+means nothing was written.
+
+1. **"apply failed … rollback completed and the initial filesystem snapshot was restored".** The
+   files are back as they were. Fix the cause and run the command again.
+2. **"rollback failed", or a `.amcore-scaffold-transaction.json` file remains in the project root**
+   (for example after the process was killed). Files may be partly changed. The journal blocks the
+   next run on purpose. Keep the journal and the tree as they are. The message lists the recovery
+   steps: restore the recorded states in reverse order, check the tree, and only then remove the
+   journal. Never delete the journal only to get past the block.
+3. **"filesystem committed but journal cleanup failed".** The files are already written; do not undo
+   them. Check `git diff`, then handle the remaining journal as in step 2.
+4. **"Verification failed" after "Applied N change(s)".** The files are already written; `pnpm
+typecheck` or `pnpm lint` found a problem and the command exits with code 1. Read the printed
+   output and `git diff`. Fix the problem, or undo the changes yourself with Git, before you commit.
 
 ## Inline style and contrast
 
