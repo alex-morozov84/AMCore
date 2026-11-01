@@ -63,7 +63,7 @@ test('already selected RU/no-Console source stays selected; a repeated projectio
     const context = await exampleContext(source)
     assert.equal(context.single, true)
     assert.deepEqual(context.locales, ['ru'])
-    await assert.rejects(prepareExample('roles', ['--projected'], source), /upstream demonstration/)
+    await assert.rejects(prepareExample('roles', ['--projected'], source), /Unknown example flag/)
     generated = await prepareExample('roles', [], source)
     assert.equal(generated.prefix, 'apps/web/src/app')
     assert.deepEqual(generated.locales, ['ru'])

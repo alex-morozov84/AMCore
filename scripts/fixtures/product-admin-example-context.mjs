@@ -76,51 +76,15 @@ export async function prepareExample(
   source = resolve(import.meta.dirname, '../..'),
   preflight = async () => {}
 ) {
-  if (
-    flags.some((flag) => !['--projected', ...(kind === 'shop' ? ['--preview'] : [])].includes(flag))
-  )
+  if (flags.some((flag) => !(kind === 'shop' ? ['--preview'] : []).includes(flag)))
     throw new Error('Unknown example flag')
   const context = await exampleContext(source)
   if (kind !== 'shop' && !context.mounts[kind].content.includes(`@/_pages/organization-${kind}`))
     throw new Error('This example is already installed; use the current generated copy')
-  if (
-    flags.includes('--projected') &&
-    (context.field('Mode') !== '`upstream-starter`' ||
-      context.single ||
-      context.field('admin_console') !== 'enabled' ||
-      context.field('admin_console_mode') !== 'path' ||
-      context.field('admin_console_slug') !== 'admin' ||
-      context.field('frontend_storybook') !== 'enabled' ||
-      context.field('frontend_route_progress') !== 'enabled')
-  )
-    throw new Error(
-      '--projected is only an upstream demonstration; keep selected downstream options'
-    )
   await preflight(context)
   const root = await mkdtemp(join(tmpdir(), `amcore-${kind}-headless-`))
   await snapshot(source, root)
   execFileSync('git', ['init', '--quiet'], { cwd: root })
-  if (flags.includes('--projected')) {
-    const [{ prepareProjectInit }, { parseProjectFlags }, { applyFilesystemTransaction }] =
-      await Promise.all([
-        import('../lib/project-init-plan.mjs'),
-        import('../lib/project-flags.mjs'),
-        import('../lib/filesystem-transaction.mjs'),
-      ])
-    const plan = prepareProjectInit(
-      root,
-      parseProjectFlags([
-        '--mode=single',
-        '--locale=ru',
-        '--admin-console=disabled',
-        '--storybook=disabled',
-        '--route-progress=disabled',
-      ]),
-      'panel'
-    )
-    applyFilesystemTransaction({ root, operations: plan.operationPlan.operationsForApply() })
-    plan.assertApplied()
-  }
   return exampleContext(root)
 }
 
@@ -146,9 +110,7 @@ export function exampleInstructions(context, kind, fixture = '') {
   console.log(
     `Run: pnpm stand e2e --lane real-stack ${fixture}-- organization-${kind}-headless.spec.ts`
   )
-  console.log(
-    'Run these commands inside the printed directory. A projected demonstration may require the initializer lockfile refresh first.'
-  )
+  console.log('Run these commands inside the printed directory.')
 }
 
 export async function memberTemplates(page) {
