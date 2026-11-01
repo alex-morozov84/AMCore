@@ -3,7 +3,7 @@ import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
 
 import { ClientMessages } from '@/i18n/client-message-boundary'
-import { hasCanonicalConsoleHost } from '@/shared/lib/console-host-guard'
+import { hasCanonicalConsoleHost, requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 import { noindexMetadata } from '@/shared/lib/seo/page-metadata'
 
 export const dynamic = 'force-dynamic'
@@ -40,6 +40,7 @@ const consoleMonoFont = JetBrains_Mono({
 })
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
+  requireConsoleEnabled()
   if (!(await hasCanonicalConsoleHost())) notFound()
   return (
     <div

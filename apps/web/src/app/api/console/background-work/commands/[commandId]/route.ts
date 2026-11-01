@@ -2,6 +2,8 @@ import { handleConsoleWorkCommand } from '@/shared/api/console/background-comman
 import { withConsoleHostGuard } from '@/shared/lib/console-host-guard'
 
 export async function GET(request: Request, context: { params: Promise<{ commandId: string }> }) {
-  const { commandId } = await context.params
-  return withConsoleHostGuard(request, () => handleConsoleWorkCommand(request, commandId))
+  return withConsoleHostGuard(request, async () => {
+    const { commandId } = await context.params
+    return handleConsoleWorkCommand(request, commandId)
+  })
 }

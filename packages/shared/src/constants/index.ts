@@ -149,6 +149,7 @@ export const AUTH = {
 // (`SUPPORTED_LOCALES`) and the default come from `config/locales.json`; see
 // `./locales`. The Prisma `User.locale` column default (`en`) is only an inert fallback
 // for raw inserts: application code always writes an explicit locale.
+export * from './admin-console'
 export * from './locales'
 
 // BFF -> API trusted client-IP relay (ADR-072). apps/web sets this only from

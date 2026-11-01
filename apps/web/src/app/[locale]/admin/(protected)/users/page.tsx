@@ -9,6 +9,7 @@ import {
   UsersPage,
   UsersPageSkeleton,
 } from '@/_pages/console/UsersPage'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 
 interface UsersRouteProps {
   searchParams: Promise<{
@@ -20,6 +21,7 @@ interface UsersRouteProps {
 }
 
 export default async function UsersRoute({ searchParams }: UsersRouteProps) {
+  requireConsoleEnabled()
   const {
     page: rawPage,
     search: rawSearch,

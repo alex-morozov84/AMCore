@@ -4,6 +4,7 @@ import {
   OrganizationDetailPageSkeleton,
 } from '@/_pages/console/OrganizationDetailPage'
 import { parseDetailPage, parseDetailSearch } from '@/shared/lib/console-detail-url'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 import { parseConsoleReturnHref } from '@/shared/lib/console-public-href'
 
 interface OrganizationDetailRouteProps {
@@ -19,6 +20,7 @@ export default async function OrganizationDetailRoute({
   params,
   searchParams,
 }: OrganizationDetailRouteProps) {
+  requireConsoleEnabled()
   const [{ id }, query] = await Promise.all([params, searchParams])
   return (
     <ConsolePageFrame fallback={<OrganizationDetailPageSkeleton />}>

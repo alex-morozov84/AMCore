@@ -5,6 +5,8 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ workId: string; jobId: string }> }
 ) {
-  const { workId, jobId } = await context.params
-  return withConsoleHostGuard(request, () => handleConsoleWorkJobs(request, workId, jobId))
+  return withConsoleHostGuard(request, async () => {
+    const { workId, jobId } = await context.params
+    return handleConsoleWorkJobs(request, workId, jobId)
+  })
 }

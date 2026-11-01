@@ -5,10 +5,10 @@ async function handle(
   request: Request,
   context: { params: Promise<{ id: string; segments?: string[] }> }
 ) {
-  const params = await context.params
-  return withConsoleHostGuard(request, () =>
-    administratorOrganization(request, params.id, params.segments)
-  )
+  return withConsoleHostGuard(request, async () => {
+    const params = await context.params
+    return administratorOrganization(request, params.id, params.segments)
+  })
 }
 export const GET = handle
 export const POST = handle
