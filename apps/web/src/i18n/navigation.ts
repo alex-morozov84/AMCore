@@ -1,6 +1,24 @@
 import { createNavigation } from 'next-intl/navigation'
+import { defineRouting } from 'next-intl/routing'
+import { SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { routing } from './routing'
+
+/**
+ * Routing used only to *build* links and redirects. With one served locale the public
+ * URLs carry no prefix (`next.config.ts` adds the locale internally), so the helpers
+ * must emit bare paths; `'never'` does exactly that in `createNavigation` and needs no
+ * middleware. The middleware itself keeps using `routing` (`'always'`) and is not
+ * called at all in that case (`src/proxy.ts`): next-intl's own `'never'` mode rewrites
+ * inside the middleware, which Next's standalone server does not apply (see
+ * `routing.ts`).
+ */
+const navigationRouting = defineRouting({
+  locales: routing.locales,
+  defaultLocale: routing.defaultLocale,
+  localePrefix: SUPPORTED_LOCALES.length === 1 ? 'never' : 'always',
+  alternateLinks: false,
+})
 
 /**
  * Locale-aware replacements for `next/link` and `next/navigation`.
@@ -16,4 +34,4 @@ import { routing } from './routing'
  * `useRouter`/`usePathname` for Client Components.
  */
 export const { Link, redirect, permanentRedirect, usePathname, useRouter, getPathname } =
-  createNavigation(routing)
+  createNavigation(navigationRouting)

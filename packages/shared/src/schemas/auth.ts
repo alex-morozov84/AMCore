@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
+import {
+  classifyStoredLocale,
+  DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
+  type SupportedLocale,
+} from '../constants'
 
 import { productAdminReturnSchema } from './frontend-context'
 import { invitationOAuthCorrelationSchema } from './invitation-common'
@@ -19,19 +24,24 @@ export const supportedLocaleSchema = z.enum(SUPPORTED_LOCALES)
 
 /**
  * Parse a stored locale string (e.g. the Prisma `User.locale` column) into the
- * supported set. This is the boundary where a persisted value becomes the typed
- * public contract: an out-of-contract value throws rather than being silently
- * blessed, so invalid stored data surfaces instead of disagreeing with email/UI
- * support. Upstream only ever writes supported locales, so this never throws in
- * practice; a fork that stores others must extend the contract + migrate.
+ * locales this build serves. This is the boundary where a persisted value becomes
+ * the typed public contract. A value that is not a catalogue locale at all throws, so
+ * invalid stored data surfaces instead of being silently blessed. A catalogue locale
+ * that this build does not serve (expected after a settings change) maps to
+ * {@link DEFAULT_LOCALE}: the user's stored preference stays in the database and
+ * comes back if the locale is enabled again. Input schemas (`supportedLocaleSchema`)
+ * stay strict: a new choice must be a served locale.
  */
 export function parseSupportedLocale(value: string): SupportedLocale {
-  return supportedLocaleSchema.parse(value)
+  const state = classifyStoredLocale(value)
+  if (state === 'enabled') return supportedLocaleSchema.parse(value)
+  if (state === 'disabled') return DEFAULT_LOCALE
+  throw new Error('Stored locale is not a known catalogue locale')
 }
 
 /**
  * Non-throwing counterpart of {@link parseSupportedLocale}: coerce an unknown,
- * absent, or out-of-contract locale to {@link DEFAULT_LOCALE}.
+ * absent, or not-served locale to {@link DEFAULT_LOCALE}.
  *
  * Use this on best-effort paths where a locale anomaly must not abort the work
  * — notification/email dispatch, or a recipient who has no account and

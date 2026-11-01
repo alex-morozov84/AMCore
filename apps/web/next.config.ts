@@ -9,6 +9,9 @@ import { z } from 'zod'
 import { HTML_LIMITED_BOTS } from './src/shared/lib/seo/html-limited-bots'
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
+// One served locale: public URLs carry no locale prefix (see `redirects` and `rewrites` below).
+const SINGLE_LOCALE = SUPPORTED_LOCALES.length === 1
+const ONLY_LOCALE = SUPPORTED_LOCALES[0]
 const deploymentVersion = process.env.NEXT_DEPLOYMENT_ID || randomUUID()
 const noindexHeaders = [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]
 const invitationPrivacyHeaders = [
@@ -86,6 +89,33 @@ const nextConfig: NextConfig = {
   // exclusion. CSP itself (nonce-based `script-src`, `frame-ancestors`) is
   // deliberately NOT here: it needs a fresh nonce per request, which only
   // `proxy.ts` can generate — that lands in a later PR of this track.
+  // One served locale. The physical routes keep their `[locale]` segment, so the only
+  // locale is added internally by a `beforeFiles` rewrite, and the prefixed duplicate
+  // folds back to the bare URL with a 307 (method and body are kept). Redirects run
+  // before the proxy and the rewrites, so Next's standalone server never has to apply
+  // a proxy rewrite (vercel/next.js#91844). The rewrite leaves `/api`, `/_next`,
+  // `/_vercel` and any path with a dot alone, like the proxy matcher does.
+  async redirects() {
+    if (!SINGLE_LOCALE) return []
+    return [
+      { source: `/${ONLY_LOCALE}`, destination: '/', permanent: false },
+      { source: `/${ONLY_LOCALE}/:path*`, destination: '/:path*', permanent: false },
+    ]
+  },
+  async rewrites() {
+    if (!SINGLE_LOCALE) return []
+    return {
+      beforeFiles: [
+        {
+          source: '/:path((?!api(?:/|$)|_next(?:/|$)|_vercel(?:/|$))[^.]*)?',
+          destination: `/${ONLY_LOCALE}/:path?`,
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    }
+  },
+
   async headers() {
     return [
       {

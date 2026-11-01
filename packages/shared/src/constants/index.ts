@@ -145,22 +145,11 @@ export const AUTH = {
   COOKIE_NAME: 'refresh_token',
 } as const
 
-// Supported UI/email locales — single source of truth for every locale contract
-// (registration input, profile update, user response, email rendering). Adding a
-// locale here is the only place to extend the set; downstream Zod schemas and the
-// email `Locale` type derive from it. `DEFAULT_LOCALE` mirrors the Prisma
-// `User.locale` column default — keep the two in sync.
-//
-// `en` is first and is the default: AMCore's base locale is English, and `ru`
-// ships as a fully translated second locale. Nothing should depend on the array
-// order — `negotiateLocale` deliberately refuses to negotiate an absent
-// `Accept-Language` header precisely so the result is never coupled to whichever
-// locale happens to be listed first.
-export const SUPPORTED_LOCALES = ['en', 'ru'] as const
-
-export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
-
-export const DEFAULT_LOCALE: SupportedLocale = 'en'
+// Locales: the catalogues the repository ships, the locales this build serves
+// (`SUPPORTED_LOCALES`) and the default come from `config/locales.json`; see
+// `./locales`. The Prisma `User.locale` column default (`en`) is only an inert fallback
+// for raw inserts: application code always writes an explicit locale.
+export * from './locales'
 
 // BFF -> API trusted client-IP relay (ADR-072). apps/web sets this only from
 // a value it independently resolved as trustworthy (never a browser-supplied

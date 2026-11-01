@@ -1,5 +1,6 @@
-import type { NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import createMiddleware from 'next-intl/middleware'
+import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { buildCspDirectives } from '@/shared/lib/csp/build-csp'
 import {
@@ -17,6 +18,26 @@ import { applyIndexingPolicy } from '@/shared/lib/seo/indexing'
 import { routing } from './i18n/routing'
 
 const handleI18nRouting = createMiddleware(routing)
+
+/**
+ * Locale step of the proxy. With several served locales it is next-intl's middleware.
+ * With one it is a plain pass-through: the locale is added by the `beforeFiles` rewrite
+ * in `next.config.ts`, and next-intl's own rewrite must not run (Next's standalone server
+ * does not apply a proxy rewrite, see `routing.ts`). A prefix of a catalogue locale that
+ * this build does not serve is refused here, explicitly, before any page runs. The proxy
+ * sees the public path (a rewrite later adds the locale), and the CSP, nonce and indexing
+ * work below runs for both branches.
+ */
+const DISABLED_LOCALES: readonly string[] = LOCALE_CATALOGUES.filter(
+  (locale) => !SUPPORTED_LOCALES.includes(locale)
+)
+
+function routeLocale(request: NextRequest) {
+  const firstSegment = request.nextUrl.pathname.split('/')[1] ?? ''
+  if (DISABLED_LOCALES.includes(firstSegment)) return new NextResponse(null, { status: 404 })
+  if (SUPPORTED_LOCALES.length > 1) return handleI18nRouting(request)
+  return NextResponse.next({ request: { headers: request.headers } })
+}
 
 /**
  * Track 3 PR2 (`ai/models-talk.md` FINAL PLAN §3) — generates a per-request
@@ -88,7 +109,7 @@ export default function proxy(request: NextRequest) {
   request.headers.set(NONCE_REQUEST_HEADER, nonce)
   request.headers.set(cspHeaderName, cspHeaderValue)
 
-  const response = handleI18nRouting(request)
+  const response = routeLocale(request)
 
   response.headers.set(cspHeaderName, cspHeaderValue)
   // Maps the CSP's `report-to` group name to an actual URL (must be
