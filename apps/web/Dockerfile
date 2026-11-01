@@ -44,6 +44,9 @@ COPY scripts ./scripts
 # Source-only deployment validation. These files never enter the standalone runner.
 COPY docker/caddy/product-admin.generated.caddy ./docker/caddy/product-admin.generated.caddy
 COPY docker/nginx/product-admin*.conf ./docker/nginx/
+# The web build checks that the Console edge files match admin-console.json and locales.json.
+COPY docker/caddy/Caddyfile.console-host ./docker/caddy/Caddyfile.console-host
+COPY docker/nginx/operations-console.conf ./docker/nginx/operations-console.conf
 
 RUN pnpm --filter @amcore/shared build
 
