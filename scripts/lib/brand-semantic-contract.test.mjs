@@ -4,7 +4,7 @@ import { afterEach, test } from 'node:test'
 import { brandContentDefinition } from './brand-content-operations.mjs'
 import { prepareBrandInit } from './brand-init-plan.mjs'
 import { BRAND_SEAMS } from './brand-ownership.mjs'
-import { createProjectStructuralRegistry } from './project-content-materializer.mjs'
+import { createBrandStructuralRegistry } from './brand-content-materializer.mjs'
 import { createFixtureRepo } from './test-fixture.mjs'
 
 let fixture
@@ -48,7 +48,7 @@ test('text and TypeScript operations expose narrow semantic locations', () => {
     fields: [{ label: 'Product', value: 'Acme' }],
   })
   assert.deepEqual(context, [{ location: 'markdown:field:Product', value: 'Acme' }])
-  const registry = createProjectStructuralRegistry()
+  const registry = createBrandStructuralRegistry()
   const manifest = registry
     .get('brand.set-manifest-fields')
     .deriveSemanticWrites({ name: 'Acme', short_name: 'Acme' })

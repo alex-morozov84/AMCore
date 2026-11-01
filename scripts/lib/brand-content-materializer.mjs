@@ -1,25 +1,14 @@
-import { compactConsoleReadmeTable } from './project-console-readme-format.mjs'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { brandContentDefinition } from './brand-content-operations.mjs'
+import { registerBrandStructuralOperations } from './brand-structural-operations.mjs'
 import { canonicalStringify } from './path-algebra-canonical.mjs'
 import { createOperationRegistry } from './path-algebra-operation-registry.mjs'
 import {
   applyStructuralPlan,
   planStructuralComposition,
 } from './path-algebra-structural-compose.mjs'
-import { registerProjectConfigOperations } from './project-config-operations.mjs'
-import { registerProjectLocaleOperations } from './project-locale-operations.mjs'
-import { brandContentDefinition } from './brand-content-operations.mjs'
-import { registerBrandStructuralOperations } from './brand-structural-operations.mjs'
-import {
-  projectConsoleContentDefinition,
-  registerConsoleStructuralOperations,
-} from './project-console-content.mjs'
-import { registerRouteProgressStructuralOperations } from './project-route-progress-content.mjs'
-import { projectSharedContentDefinition } from './project-shared-content-operations.mjs'
-import { projectStorybookContentDefinition } from './project-storybook-content.mjs'
-import { registerStorybookStructuralOperations } from './project-storybook-vitest-content.mjs'
 
 function conflict(pathname, location, left, right) {
   throw new Error(
@@ -28,11 +17,7 @@ function conflict(pathname, location, left, right) {
 }
 
 function claimsFor(fact) {
-  const definition =
-    projectSharedContentDefinition(fact.operationKey) ??
-    brandContentDefinition(fact.operationKey) ??
-    projectConsoleContentDefinition(fact.operationKey) ??
-    projectStorybookContentDefinition(fact.operationKey)
+  const definition = brandContentDefinition(fact.operationKey)
   if (!definition) throw new Error(`unknown shared content operation "${fact.operationKey}"`)
   if (definition.paramsSchema && definition.paramsSchema(fact.params) !== true) {
     throw new Error(`invalid operation params for "${fact.operationKey}"`)
@@ -72,53 +57,33 @@ function materializeText(root, pathname, facts) {
   const uniqueFacts = dedupeFacts(facts)
   validateClaims(pathname, uniqueFacts)
   const before = readFileSync(path.join(root, pathname), 'utf8')
-  let after = [...uniqueFacts]
+  const after = [...uniqueFacts]
     .sort((left, right) => left.operationKey.localeCompare(right.operationKey))
     .reduce((text, fact) => claimsFor(fact).definition.apply(text, fact.params), before)
-  if (
-    pathname === 'README.md' &&
-    uniqueFacts.some((fact) => fact.operationKey === 'readme-console')
-  ) {
-    after = compactConsoleReadmeTable(after)
-  }
   return { before, after }
 }
 
-export function createProjectStructuralRegistry() {
+export function createBrandStructuralRegistry() {
   const registry = createOperationRegistry()
-  registerProjectConfigOperations(registry)
   registerBrandStructuralOperations(registry)
-  registerProjectLocaleOperations(registry)
-  registerConsoleStructuralOperations(registry)
-  registerRouteProgressStructuralOperations(registry)
-  registerStorybookStructuralOperations(registry)
   return registry
 }
 
-function materializeStructural(root, pathname, facts, registry, sourcePath) {
+function materializeStructural(root, pathname, facts, registry) {
   const structural = facts.map((fact) => ({ ...fact, kind: 'structural' }))
   const [plan] = planStructuralComposition(registry, structural)
-  const before = readFileSync(path.join(root, sourcePath ?? pathname), 'utf8')
+  const before = readFileSync(path.join(root, pathname), 'utf8')
   return { before, after: applyStructuralPlan(registry, plan, before) }
 }
 
-export function materializeProjectContentPath(root, pathname, facts, options = {}) {
-  if (facts.some((fact) => fact.kind === 'delete')) {
-    if (facts.length !== 1) throw new Error(`delete/content collision on "${pathname}"`)
-    const [fact] = facts
-    const expected = `filesystem:path:${pathname}`
-    if (fact.claims?.length !== 1 || fact.claims[0].location !== expected) {
-      throw new Error(`delete fact for "${pathname}" requires its filesystem semantic claim`)
-    }
-    return { kind: 'delete', target: path.join(root, pathname), changed: true }
-  }
-  const registry = createProjectStructuralRegistry()
+export function materializeBrandContentPath(root, pathname, facts) {
+  const registry = createBrandStructuralRegistry()
   const structural = facts.filter((fact) => registry.has(fact.operationKey))
   if (structural.length && structural.length !== facts.length) {
     throw new Error(`mixed structural/text operations on "${pathname}"`)
   }
   const text = structural.length
-    ? materializeStructural(root, pathname, facts, registry, options.sourcePath)
+    ? materializeStructural(root, pathname, facts, registry)
     : materializeText(root, pathname, facts)
   return {
     kind: 'edit',

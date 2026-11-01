@@ -2,7 +2,7 @@ import path from 'node:path'
 
 import { validateOwnership } from './ownership-validate.mjs'
 import { brandOwnershipFor } from './brand-ownership.mjs'
-import { materializeProjectContentPath } from './project-content-materializer.mjs'
+import { materializeBrandContentPath } from './brand-content-materializer.mjs'
 
 function groupFacts(facts) {
   const groups = new Map()
@@ -35,7 +35,7 @@ function summary(facts) {
 
 function semanticStep(root, pathname, facts) {
   return {
-    ...materializeProjectContentPath(root, pathname, facts),
+    ...materializeBrandContentPath(root, pathname, facts),
     adapterClass: 'semantic-brand-content',
     modulePath: 'scripts/lib/brand-materializer.mjs',
     summary: summary(facts),
