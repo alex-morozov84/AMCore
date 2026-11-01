@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
-import { localeGuardSourceFiles } from './project-locale-source-files.mjs'
+import { webSourceFiles } from './web-source-files.mjs'
 
 function git(root, args) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', shell: false })
@@ -22,13 +22,13 @@ test('includes untracked sources and excludes ignored or deleted sources', async
     git(root, ['init', '--quiet'])
     git(root, ['add', '.gitignore', 'apps/web/tracked.ts'])
 
-    assert.deepEqual(localeGuardSourceFiles(root).sort(), [
+    assert.deepEqual(webSourceFiles(root).sort(), [
       'apps/web/new.tsx',
       'apps/web/tracked.ts',
     ])
 
     await rm(path.join(root, 'apps/web/tracked.ts'))
-    assert.deepEqual(localeGuardSourceFiles(root), ['apps/web/new.tsx'])
+    assert.deepEqual(webSourceFiles(root), ['apps/web/new.tsx'])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

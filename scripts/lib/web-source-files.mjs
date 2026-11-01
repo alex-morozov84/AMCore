@@ -31,6 +31,7 @@ function tracked(root) {
     .filter((file) => file && SOURCE.test(file) && existsSync(path.join(root, file)))
 }
 
-export function localeGuardSourceFiles(root) {
+/** Source files under apps/web: tracked and untracked-but-not-ignored, existing on disk. */
+export function webSourceFiles(root) {
   return tracked(root) ?? walk(root)
 }

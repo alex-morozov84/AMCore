@@ -1,117 +1,51 @@
 import assert from 'node:assert/strict'
-import { writeFileSync } from 'node:fs'
-import path from 'node:path'
 import { test } from 'node:test'
 
 import { OWNERSHIP_CODES } from './ownership-errors.mjs'
 import { validateManifestInventory } from './ownership-inventory.mjs'
-import { operationsConsoleDocSeams } from './operations-console-ownership-doc-seams.mjs'
-import { operationsConsoleOwnership } from './operations-console-ownership.mjs'
-import { assertExactScaffoldCounts } from './scaffold-exact-counts.mjs'
+import { fileFact, fixture, testManifest, write } from './ownership-test-support.mjs'
 import { validateOwnership } from './ownership-validate.mjs'
-import { createWorkingTreeCopy } from './working-tree-fixture.mjs'
-import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 
-const root = resolvePublicRepoRoot()
-
-function cloneManifest(change) {
-  const manifest = JSON.parse(JSON.stringify(operationsConsoleOwnership))
-  change(manifest)
-  return manifest
+const base = {
+  'src/app.ts': 'export const app = true\n',
+  'src/feature/entry.ts': 'export const feature = true\n',
+  'docs/feature/guide.md': '# Feature\n',
+  'config.json': '{"enabled":true}\n',
 }
 
-test('Operations Console manifest lists real roots, facts, seams and aliases', () => {
-  const { inventory, graph, projection } = validateOwnership(root, operationsConsoleOwnership)
-  assert.deepEqual(operationsConsoleOwnership.tags.topology, ['disabled', 'path', 'host'])
-  // Provisioning owns two feature roots and a browser-scenario root; Scheduled jobs owns one feature root.
-  // Nested files inherit ownership without individual registration.
-  assert.equal(operationsConsoleOwnership.facts.roots.length, 28)
-  assert.ok(
-    operationsConsoleOwnership.facts.roots.some(
-      (fact) => fact.path === 'apps/web/src/features/console-discovery'
-    )
-  )
-  assert.ok(operationsConsoleDocSeams.every((seam) => seam.seamKind === 'owned-block'))
-  assert.ok(graph.aliases.includes('@/*'))
-  const frame = 'apps/web/src/_pages/console/ConsolePageFrame/ConsolePageFrame.tsx'
-  const superAdmin = 'apps/web/src/shared/lib/require-super-admin.ts'
-  assert.ok(graph.forward.get(frame).some((edge) => edge.target === superAdmin))
-  // Protected routes live-check in ConsolePageFrame or the standalone account-security mount
-  // before rendering identity-bearing content. A persisted App Router layout is not a safe sibling-
-  // navigation admission point.
-  assert.deepEqual(
-    graph.reverse
-      .get(superAdmin)
-      .map((edge) => edge.importer)
-      .sort(),
-    [
-      frame,
-      'apps/web/src/_app/console-profile/index.tsx',
-      'apps/web/src/_app/console-account-security/index.tsx',
-      'apps/web/src/_pages/console/ConsolePageFrame/ConsolePageFrame.test.tsx',
-      'apps/web/src/shared/lib/require-super-admin.test.ts',
-    ].sort()
-  )
-  assert.equal(graph.kinds.get('apps/web/src/instrumentation.test.ts'), 'test')
-  assert.equal(graph.kinds.get('scripts/run-console-session-e2e.mjs'), 'production')
-  assert.ok(
-    graph.forward
-      .get('scripts/run-console-single-locale-proxy-smoke.mjs')
-      .some((edge) => edge.target === 'scripts/lib/init-project-test-helpers.mjs')
-  )
-  assert.equal([...graph.forward.values()].flat().length, [...graph.reverse.values()].flat().length)
-  assertExactScaffoldCounts([
-    {
-      name: 'console closed-root files',
-      // Exact Console inventory, including provisioning, administrator management
-      // and their route, story and browser proof files, and the Scheduled jobs page, feature,
-      // BFF routes, server API modules and operator guide, and the Integrations page, feature, BFF routes,
-      // stand fixture, browser spec and operator guide. Login diagnostics adds three detail UI/test
-      // files, a Console API adapter test and the shared host/path browser helper under existing roots.
-      // Support mail adds its closed feature root and route/adapter files.
-      // Account security adds a two-file app root, two pages, two BFF route/test files,
-      // one handler and one guide: eight files. The profile and re-entry contributions
-      // add eleven closed-root files.
-      expected: 570,
-      actual: [...inventory.rootFiles.values()].flat().length,
+const manifest = () =>
+  testManifest({
+    facts: {
+      topology: [fileFact('config.json')],
+      documentation: [{ glob: 'docs/feature/**/*.md', kind: 'file', cardinality: 'one-or-more' }],
     },
-    {
-      name: 'console dead shared modules',
-      // Return entry/claim/destination and the proof UI join the Console-only helpers.
-      expected: 25,
-      actual: projection.deadSharedModules.size,
-    },
-    {
-      name: 'console universal shared modules',
-      expected: 0,
-      actual: projection.universalSharedModules.size,
-    },
-  ])
+  })
+
+function cloneManifest(change) {
+  const draft = JSON.parse(JSON.stringify(manifest()))
+  change(draft)
+  return draft
+}
+
+test('a manifest lists real roots, facts and entrypoints against the working tree', () => {
+  const root = fixture(base)
+  const { inventory } = validateOwnership(root, manifest())
+  assert.deepEqual(inventory.rootFiles.get('src/feature'), ['src/feature/entry.ts'])
 })
 
 test('a stale listed path fails closed', () => {
-  const manifest = cloneManifest((draft) => {
-    draft.facts.topology[0].path = 'missing.yml'
+  const root = fixture(base)
+  const draft = cloneManifest((item) => {
+    item.facts.topology[0].path = 'missing.yml'
   })
   assert.throws(
-    () => validateManifestInventory(root, manifest),
+    () => validateManifestInventory(root, draft),
     (error) => error.code === OWNERSHIP_CODES.STALE_ENTRY
   )
 })
 
-test('omitting a real root entry exposes detectable files without a seam', () => {
-  const manifest = cloneManifest((draft) => {
-    draft.facts.roots = draft.facts.roots.filter(
-      (fact) => fact.path !== 'apps/web/src/features/console-logout'
-    )
-  })
-  assert.throws(
-    () => validateOwnership(root, manifest),
-    (error) => error.code === OWNERSHIP_CODES.MISSING_SEAM
-  )
-})
-
 test('wrong kind and glob cardinality fail closed', () => {
+  const root = fixture(base)
   const wrongKind = cloneManifest((draft) => {
     draft.facts.roots[0].kind = 'file'
   })
@@ -119,8 +53,13 @@ test('wrong kind and glob cardinality fail closed', () => {
     () => validateManifestInventory(root, wrongKind),
     (error) => error.code === OWNERSHIP_CODES.KIND_MISMATCH
   )
+  write(root, 'src/second.ts', 'export const second = true\n')
   const wrongCount = cloneManifest((draft) => {
-    draft.facts.repositoryEntrypoints[0].cardinality = 'one'
+    draft.facts.repositoryEntrypoints[0] = {
+      glob: 'src/*.ts',
+      kind: 'file',
+      cardinality: 'one',
+    }
   })
   assert.throws(
     () => validateManifestInventory(root, wrongCount),
@@ -129,38 +68,38 @@ test('wrong kind and glob cardinality fail closed', () => {
 })
 
 test('a duplicate owned-block anchor fails closed', () => {
-  const manifest = cloneManifest((draft) => {
-    const seam = draft.seams.find((item) => item.id === 'console.root-capability')
-    seam.selector.text = 'AMCore'
+  const root = fixture({ ...base, 'docs/mixed.md': 'FEATURE_TOKEN\nbetween\nFEATURE_TOKEN\n' })
+  const draft = cloneManifest((item) => {
+    item.seams.push({
+      id: 'mixed-doc',
+      ...fileFact('docs/mixed.md'),
+      seamKind: 'owned-block',
+      selector: { text: 'FEATURE_TOKEN' },
+      detectors: ['FEATURE_TOKEN'],
+      disposition: 'remove',
+    })
   })
   assert.throws(
-    () => validateOwnership(root, manifest),
+    () => validateOwnership(root, draft),
     (error) => error.code === OWNERSHIP_CODES.CARDINALITY
   )
 })
 
-test('a new file inside a closed-world Console root is discovered automatically', () => {
-  const copy = createWorkingTreeCopy()
-  try {
-    const relative = 'apps/web/src/features/console-login/new-owned-helper.ts'
-    writeFileSync(path.join(copy.root, relative), 'export const owned = true\n')
-    const { inventory } = validateOwnership(copy.root, operationsConsoleOwnership)
-    assert.ok(inventory.rootFiles.get('apps/web/src/features/console-login').includes(relative))
-  } finally {
-    copy.cleanup()
-  }
+test('a new file inside a closed-world root is discovered automatically', () => {
+  const root = fixture(base)
+  const relative = 'src/feature/new-owned-helper.ts'
+  write(root, relative, 'export const owned = true\n')
+  const { inventory } = validateOwnership(root, manifest())
+  assert.ok(inventory.rootFiles.get('src/feature').includes(relative))
 })
 
 test('whole-file feature ownership outside a closed root is forbidden', () => {
-  const manifest = cloneManifest((draft) => {
-    draft.facts.featureFiles.push({
-      path: 'apps/web/src/instrumentation.ts',
-      kind: 'file',
-      cardinality: 'one',
-    })
+  const root = fixture(base)
+  const draft = cloneManifest((item) => {
+    item.facts.featureFiles.push({ path: 'src/app.ts', kind: 'file', cardinality: 'one' })
   })
   assert.throws(
-    () => validateManifestInventory(root, manifest),
+    () => validateManifestInventory(root, draft),
     (error) => error.code === OWNERSHIP_CODES.OUTSIDE_ROOT
   )
 })

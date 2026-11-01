@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import ts from 'typescript'
 
-import { localeGuardSourceFiles } from './project-locale-source-files.mjs'
+import { webSourceFiles } from './web-source-files.mjs'
 import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 const CONSOLE_TEST =
   /^apps\/web\/src\/(?:_pages\/console\/|(?:entities|features|widgets)\/console-[^/]+\/|shared\/lib\/console-public-href\.test\.)/
@@ -136,7 +136,7 @@ export function scanConsoleTopologyAssertions(file, text) {
 }
 
 export function collectConsoleTopologyAssertionFailures(root = resolvePublicRepoRoot()) {
-  return localeGuardSourceFiles(root)
+  return webSourceFiles(root)
     .filter((file) => TEST_FILE.test(file) && CONSOLE_TEST.test(file))
     .flatMap((file) =>
       scanConsoleTopologyAssertions(file, readFileSync(path.join(root, file), 'utf8'))

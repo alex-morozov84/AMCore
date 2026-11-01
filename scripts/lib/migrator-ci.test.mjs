@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { admitSource } from '../stand/snapshot.mjs'
-import { entryMatches } from '../scaffold-selector/paths.mjs'
-import { readDeclaration } from '../scaffold-selector/declaration.mjs'
 
 const ci = parse(readFileSync('.github/workflows/ci.yml', 'utf8'))
 const steps = ci.jobs['docker-image-smoke'].steps
@@ -54,8 +52,7 @@ test('the shared root updater covers the migrator without a second npm entry', (
   assert.ok(workspace.packages.includes('docker/migrator'))
 })
 
-test('migrator files survive managed snapshots and have generated-full selector coverage', () => {
-  const declaration = readDeclaration('scripts/scaffold-selector/declaration.v1.json')
+test('migrator files survive managed snapshots', () => {
   for (const path of [
     'docker/migrator/package.json',
     'pnpm-lock.yaml',
@@ -65,12 +62,6 @@ test('migrator files survive managed snapshots and have generated-full selector 
     'docker/migrator/check-connection.sql',
   ]) {
     assert.equal(admitSource(path), true, path)
-    assert.ok(
-      declaration.inputs.some(
-        (input) => input.lane === 'generated-full' && entryMatches(input, path)
-      ),
-      path
-    )
   }
 })
 

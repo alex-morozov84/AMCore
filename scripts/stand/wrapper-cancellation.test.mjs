@@ -11,7 +11,7 @@ import { run, children, stopChildren, cleanEnvironment } from './process.mjs'
 import { discover } from './ownership.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
 import { processTable } from './process-groups.mjs'
-import { commit } from '../lib/init-project-test-helpers.mjs'
+import { commit } from '../lib/committed-copy-fixture.mjs'
 
 for (const script of [
   'run-console-session-e2e.mjs',
