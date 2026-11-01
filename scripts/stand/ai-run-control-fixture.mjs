@@ -152,7 +152,10 @@ export async function aiRunControlPreview(page, m) {
   )
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  for (const locale of m.localePrefix ? ['en', 'ru'] : [m.baseLocale]) {
+  const served = JSON.parse(
+    await readFile(join(m.worktree, 'packages/shared/src/config/locales.json'), 'utf8')
+  ).enabled
+  for (const locale of m.localePrefix ? served : [m.baseLocale]) {
     const messages = JSON.parse(
       await readFile(join(m.worktree, `apps/web/messages/${locale}.json`), 'utf8')
     )
