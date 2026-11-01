@@ -334,6 +334,15 @@ interactive terminal without value flags the command asks for the values instead
 | `--dry-run`                                       | prints the plan and diffs without writing any file                                                                                                                         |
 | `--yes`                                           | applies the plan without the confirmation prompt                                                                                                                           |
 
+For a real product pass at least `--product-name` and `--product-description`, plus
+`--purpose` and `--upstream-sync-policy`: a field you leave out keeps the starter's text,
+so `Purpose` would still describe AMCore. `--package-name` is also optional; without it the
+root package keeps the name `amcore`.
+
+After it writes, the command runs `pnpm typecheck` and `pnpm lint` as a check. They need
+installed dependencies and the generated Prisma client and shared build; the setup block in
+the [adoption guide](../product-admin/adoption.md#initialize-a-clean-product) prepares them.
+
 The first run also writes `initialized_from_amcore_version` while it still says `N/A`. The
 value is the Git tag of the current commit, or the short commit SHA when the commit has
 no tag. `Canonical upstream` stays the AMCore URL, because AMCore is the original upstream.

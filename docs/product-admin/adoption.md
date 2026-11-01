@@ -90,8 +90,9 @@ show the selector. Every selected page still checks current membership and autho
 
 The custom shop demonstration (`node scripts/fixtures/organization-shop-headless.mjs
 --preview`) needs a single-language product without the Operations Console. This build
-ships neither, so the generator refuses `--preview`. Run it without that flag to prepare
-the custom code in a disposable directory, and follow the commands it prints.
+ships neither, so the generator stops with an error when you pass `--preview`. Run it
+without that flag. It creates a disposable directory itself, prepares the custom code
+there and prints the directory and the commands to run.
 
 The fixed ID in a generated demonstration is not a production setup mechanism.
 For a real product, substitute your trusted organization ID in the server mount.

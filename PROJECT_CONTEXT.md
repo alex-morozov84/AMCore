@@ -64,7 +64,8 @@ path mode at `/admin`. The fields above record that configuration so a person or
 agent can read it without inspecting the code. They are documentation, never runtime
 configuration: editing a value here does not change the build. If you change the build
 yourself, update the matching field so the record stays true; this release provides no
-command for such changes.
+command for such changes. Write a plan that is not built yet in your product's own
+roadmap, not in these fields.
 
 - **`i18n_mode`, `base_locale`, `supported_locales`:** the routing mode and the
   locales the build serves. See `docs/frontend/i18n-and-errors.md`.

@@ -41,9 +41,12 @@ host-to-physical-path mapping in path mode.
 
 Host mode is a build-time choice. The shipped build uses `mode: 'path'` in
 `apps/web/src/shared/lib/admin-console.generated.ts`. To build host mode, change that
-value to `'host'` by hand, set `ADMIN_CONSOLE_HOSTNAME` for the web service and rebuild
-the web image; setting only the hostname variable does not switch the mode. This release
-has no command for the change. The managed stand makes the same one-line change in its
+value to `'host'` by hand and rebuild the web image (`docker compose build web` with the
+bundled Compose build; for a registry rollout, build and publish the image first). Then
+set `ADMIN_CONSOLE_HOSTNAME` as a runtime variable of the web service; it is not a build
+argument. Setting only the hostname variable does not switch the mode: a path-mode build
+ignores it, keeps the Console under `/{locale}/admin` on the product host and serves no
+Console on the console host. This release has no command for the change. The managed stand makes the same one-line change in its
 snapshot, and `pnpm test:console-session-e2e` exercises the result in an isolated lane.
 Verify your own deployment before you rely on it.
 
@@ -82,6 +85,10 @@ ADMIN_CONSOLE_HOSTNAME="console.example.com" \
 docker compose --profile edge \
   -f docker-compose.yml -f docker/compose/console-host.yml up -d
 ```
+
+In a production rollout that saves `COMPOSE_FILE`, use `docker/compose/console-host.yml`
+instead of `web.yml` and keep every other overlay; see the
+[deployment guide](../operations/deployment.md#operations-console-host-mode-reference).
 
 The base Caddy profile is API-only. Only the host override mounts the console
 Caddyfile, and missing hostnames fail validation. For nginx, adapt and include
