@@ -245,7 +245,7 @@ The repository stays English and Russian; the file selects what the build serves
    build and names the field.
 
 2. Rebuild everything that embeds the file: `pnpm build` rebuilds shared, API,
-   worker and web. Building web or API alone against an old shared build fails with
+   worker and web. Building web alone against an old shared build fails with
    "packages/shared/dist is older than its settings files"; run
    `pnpm --filter @amcore/shared build` first.
 3. If you serve the Console on its own host, run

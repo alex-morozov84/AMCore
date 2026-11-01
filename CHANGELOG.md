@@ -14,10 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by "Script contracts" (`pnpm test:scripts`, which runs the repository's tooling tests); the
   two "Scaffolding contract" required checks no longer exist. The last state with the old
   command is the Git tag `scaffolding-final`. Forks created with `init:project` before this
-  change are not supported by later AMCore updates. `PROJECT_CONTEXT.md` keeps its frontend
-  choice fields as a record of the build; no command writes them.
+  change are not supported by later AMCore updates.
+
+### Added
+
+- Build settings files replace the removed scaffolding. `packages/shared/src/config/locales.json`
+  selects the served locales and the default (for example Russian only, with bare URLs), and
+  `packages/shared/src/config/admin-console.json` sets the Operations Console mode (`disabled`,
+  `path` or `host`) and its URL segment. A disabled Console answers 404 on every page and
+  `/api/console/*` route. A host-mode Console edge (Caddy and nginx) is generated from the files
+  with `node scripts/render-console-edge.mjs --write`, and the web build fails while it is stale.
+  Builds also fail when `packages/shared/dist` is older than the files. See
+  [i18n](docs/frontend/i18n-and-errors.md) and
+  [Console configuration](docs/operations-console/configuration.md).
 
 ### Changed
+
+- `PROJECT_CONTEXT.md` no longer holds `i18n_mode`, `base_locale`, `supported_locales`,
+  `frontend_storybook`, `frontend_route_progress` and the `admin_console*` fields; the settings
+  files above are the single source. `theme_persistence` and
+  `initialized_from_amcore_version` stay. New accounts always store an explicit locale.
 
 - Authentication no longer hangs when Redis is slow or down. Organization-scoped requests
   whose admission needs Redis are refused with a fast `503` `SERVICE_UNAVAILABLE` before the

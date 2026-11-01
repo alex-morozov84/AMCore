@@ -299,10 +299,14 @@ The locale set and default come from `SUPPORTED_LOCALES` / `DEFAULT_LOCALE` in
 `Accept-Language` negotiation, and email rendering, so the frontend can never
 disagree with the backend about which locales exist.
 
-`localePrefix` is `'always'`: **every** locale is explicit, including the
+The served list is read from `packages/shared/src/config/locales.json`
+(`SUPPORTED_LOCALES` means the locales this build serves). With two or more served
+locales `localePrefix` is `'always'`: **every** locale is explicit, including the
 default — `/en/login`, `/ru/login`. A request to `/login` redirects to
 `/en/login`; an unsupported locale such as `/de/login` is a 404, never a silent
-fallback to English.
+fallback to English. With **one** served locale the URLs are bare (`/login`) and a
+prefix of a locale the build does not serve is a 404; how that works without a proxy
+rewrite is in [i18n and error localization](./i18n-and-errors.md#why-the-middleware-keeps-localeprefix-always).
 
 `'as-needed'` (default locale at bare `/login`) looks nicer and is deliberately
 **not** used. It needs the proxy to rewrite `/login` → `/en/login` internally,

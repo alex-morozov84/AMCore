@@ -47,7 +47,7 @@ if (!parsed.success) {
 
 /**
  * How this build serves the Operations Console: `disabled` (no Console pages or BFF),
- * `path` (on the product host under `/<alias>`) or `host` (on its own host). Changing the
- * file means a rebuild of shared, API, web and worker (docs/operations-console/configuration.md).
+ * `path` (on the product host under `/<alias>`) or `host` (on its own host). Only the web app
+ * reads it; changing the file means rebuilding shared and web (docs/operations-console/configuration.md).
  */
 export const ADMIN_CONSOLE_SETTINGS: Readonly<AdminConsoleSettings> = Object.freeze(parsed.data)

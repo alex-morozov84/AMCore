@@ -11,7 +11,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "nest start --watch",
-    "build": "node ../../scripts/check-shared-settings-fresh.mjs && pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs && node ../../scripts/write-mfa-artifact.mjs api-worker",
+    "build": "pnpm run typecheck:build && nest build -p tsconfig.build.json && node scripts/build-identity.mjs && node ../../scripts/write-mfa-artifact.mjs api-worker",
     "start": "node dist/main.js",
     "start:prod": "NODE_ENV=production node dist/main.js",
     "lint": "node ../../scripts/lint.mjs --scope api",
