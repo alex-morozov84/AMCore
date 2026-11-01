@@ -48,6 +48,4 @@ apply every old response does not satisfy that contract on its own.
 The Operations Console uses these primitives through its own discovery
 adapter. Its search parameter names, 255-character limit, sort allowlists,
 and page-reset rules are examples of **feature policy**, not shared defaults.
-The scaffold acceptance contract for `--admin-console=disabled` is to keep
-the shared primitives while removing that Console adapter; generated output
-must be verified before delivery.
+The shared primitives do not depend on that Console adapter.

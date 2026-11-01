@@ -12,7 +12,6 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
       .waitFor({ state: 'visible', timeout: 10_000 })
   }
   let isolatedSession = false
-  // AMCORE_CONSOLE_LIGHTHOUSE_STATE_START
   if (scenario.scope === 'console') {
     if (fixture.consoleHost) {
       const { digest } = await import('../lib/lighthouse-plan.mjs')
@@ -46,7 +45,6 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
       .first()
       .waitFor({ state: 'visible', timeout: 10_000 })
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_STATE_END
   if (scenario.id === 'login')
     await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 10_000 })
   await page.waitForFunction(

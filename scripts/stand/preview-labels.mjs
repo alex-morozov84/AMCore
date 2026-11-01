@@ -16,7 +16,6 @@ export async function previewLabels(m) {
       cancelCreation: messages.organizationCreation.cancel,
     },
   }
-  // AMCORE_CONSOLE_PREVIEW_LABELS_START
   if (m.consoleEnabled)
     labels.console = {
       email: messages.console.loginEmail,
@@ -26,6 +25,5 @@ export async function previewLabels(m) {
       setupFirstStep: messages.console.organizationSetup.headings.administrator,
       setupStates: Object.values(messages.console.organizationSetup.states),
     }
-  // AMCORE_CONSOLE_PREVIEW_LABELS_END
   return labels
 }

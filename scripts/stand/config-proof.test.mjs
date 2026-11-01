@@ -76,7 +76,6 @@ test('actual Compose rendering replaces poisoned ports/environment with owned lo
   }
 })
 
-// AMCORE_CONSOLE_SUPPORT_MAIL_CONFIG_PROOF_START
 for (const mode of ['path', 'host']) {
   test(`support-mail-${mode} renders its closed, internal-mail topology`, async () => {
     const id = `support-mail-config-${randomUUID()}`
@@ -103,9 +102,7 @@ for (const mode of ['path', 'host']) {
     }
   })
 }
-// AMCORE_CONSOLE_SUPPORT_MAIL_CONFIG_PROOF_END
 
-// AMCORE_CONSOLE_SUMMARY_CONFIG_PROOF_START
 test('console summary E2E owns its internal fault source and loopback offline Grafana', async () => {
   const id = `summary-config-${randomUUID()}`
   try {
@@ -135,4 +132,3 @@ test('console summary E2E owns its internal fault source and loopback offline Gr
     await rm(directory(id), { recursive: true, force: true })
   }
 })
-// AMCORE_CONSOLE_SUMMARY_CONFIG_PROOF_END

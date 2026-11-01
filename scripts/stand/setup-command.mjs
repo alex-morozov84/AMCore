@@ -27,13 +27,11 @@ export function setupFailureResult(output, exit) {
 /** Execute only admitted fixture commands against a pinned, owned runtime image. */
 export async function executeSetupCommand(m, input) {
   let previewDiagnostics = false
-  // AMCORE_CONSOLE_ESTABLISHMENT_DIAGNOSTICS_START
   previewDiagnostics =
     m.purpose === 'preview' &&
     m.fixtureProfile === 'organization-establishment' &&
     input.command === 'diagnostics' &&
     Object.keys(input).length === 1
-  // AMCORE_CONSOLE_ESTABLISHMENT_DIAGNOSTICS_END
   if (!previewDiagnostics && (m.purpose !== 'e2e' || !isOrganizationMailFixture(m)))
     throw new Error('Wrong setup fixture')
   if (usesResendMailFixture(m) && input.command !== 'prepare-account')

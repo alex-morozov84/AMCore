@@ -42,17 +42,13 @@ export function localizedFrontendUrl(
 }
 
 /**
- * The URL segment a locale contributes — `/en`, `/ru`, ... — or `''` once a
- * downstream fork has trimmed `SUPPORTED_LOCALES` to exactly one entry (see
- * `pnpm init:project --mode=single`, ADR-071). A single-locale `apps/web`
- * removes the `[locale]` route segment entirely
- * (`docs/frontend/i18n-and-errors.md` → "Downstream: running a single-locale
- * app"), so a link still carrying `/en/...` would 404.
+ * The URL segment a locale contributes — `/en`, `/ru`, ... — or `''` when
+ * `SUPPORTED_LOCALES` has exactly one entry: with one language there is nothing
+ * to select, so a link carries no prefix.
  *
  * `locales` defaults to the live `SUPPORTED_LOCALES` and is only a parameter
- * so this branch is independently testable: AMCore upstream's own
- * `SUPPORTED_LOCALES` never actually shrinks to one entry, so a test relying
- * on the real constant could never exercise it.
+ * so this branch is independently testable: AMCore's own `SUPPORTED_LOCALES`
+ * has two entries, so a test relying on the real constant could never exercise it.
  */
 export function localePathPrefix(
   locale: SupportedLocale,

@@ -365,8 +365,8 @@ jobs:
           API_E2E_OUTCOMES: '{"plan":"${{ needs.api-e2e-plan.result }}","shards":"${{ needs.api-e2e-shards.result }}"}'
         run: node scripts/api-e2e/aggregate.mjs api-e2e-evidence
 
-  scaffolding-contract:
-    name: Scaffolding contract (fast)
+  script-contracts:
+    name: Script contracts
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     steps:
@@ -387,190 +387,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Structural/read-only checks against the real repo (disposable copies
-      # in scripts/measure/'s own tests never run a real `pnpm install`
-      # inside them -- the top-level "Install dependencies" step above is
-      # the only real install -- no Docker): every pnpm init:project
-      # before/after fixture in scripts/lib/ still matches the real file it
-      # targets, the fixture-composition invariants (no two edit steps
-      # target the same file, every scaffold dimension composes safely with
-      # every other), and scripts/measure/'s baseline-measurement tool
-      # (BACKLOG item 14) — its own unit/inventory-contract tests and real,
-      # fast failure-path regressions (install exception, failed command,
-      # partial internal verification preserved). Does NOT cover the
-      # private-path ratchet -- that is the separate "promtool" job, display
-      # name "Observability contract (static)", already required.
-      # NOT the full pnpm test:scripts either (see the parallel
-      # "Scaffolding contract (full)" job below for that) — this is the
-      # cheap layer meant to fail fast on every PR, not gated by which paths
-      # changed: a change anywhere in the repo can drift a scaffolding
-      # fixture (this job's own introduction was prompted by exactly that —
-      # apps/web and docs changes drifting scripts/lib/*.mjs fixtures with
-      # no path filter that would have caught it). Uses the same
-      # `test:scripts:fast` script that the local aggregate `test:scripts`
-      # command also runs first. The parallel full CI job deliberately runs
-      # only `test:scripts:generated`; otherwise CI would execute this entire
-      # layer twice before reaching the generated-project matrix.
-      - name: Run scaffolding contract tests (fast layer)
-        run: pnpm test:scripts:fast
-
-  # Two parallel shards of the same six-row covering array (partition in
-  # scripts/lib/scaffold-ci-shards.mjs). The required check is the aggregate
-  # job below, not these shards; their names are deliberately different.
-  scaffolding-generated-shard:
-    name: Scaffolding generated shard (${{ matrix.shard }})
-    runs-on: ubuntu-latest
-    needs: [lint, typecheck]
-    # One shard's install plus three rows and artifact/cleanup overhead must fit the job budget.
-    timeout-minutes: 25
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - shard: a
-            tests: 'scripts/*.test.mjs'
-            non-matrix-tests: true
-          - shard: b
-            tests: 'scripts/scaffold-verification-matrix.test.mjs'
-            non-matrix-tests: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: 'pnpm'
-
-      - name: Classify scaffolding changes (shadow only)
-        shell: bash
-        env:
-          SELECTOR_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          SELECTOR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          SELECTOR_BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
-          SELECTOR_EVENT: ${{ github.event_name }}
-          SELECTOR_OUTPUT: ${{ runner.temp }}/scaffold-selector/decision.json
-        run: |
-          set -euo pipefail
-          trusted="$RUNNER_TEMP/scaffold-selector-trusted"
-          mkdir -p "$(dirname "$SELECTOR_OUTPUT")" "$trusted"
-          printf '%s\n' '{"schemaVersion":"1.0.0","selectorVersion":null,"mode":"shadow","provenance":{"event":"unknown","baseRef":null,"baseSha":null,"headSha":null,"mergeBaseSha":null,"diffRange":null,"declarationSha256":null,"trustSource":"merge-base"},"lanes":{"universalFast":{"required":true,"actualExecution":"run"},"generatedFull":{"required":true,"actualExecution":"run-shadow"},"exhaustiveBackstop":{"required":false,"actualExecution":"scheduled-or-manual"}},"reasons":[{"code":"trusted_selector_missing","paths":[],"detail":"trusted merge-base selector is unavailable"}],"matchedInputs":[],"unknownInputs":[],"diagnostics":["trusted merge-base selector is unavailable"]}' > "$SELECTOR_OUTPUT"
-          [[ "$SELECTOR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 0
-          [[ "$SELECTOR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 0
-          merge_base=$(git merge-base "$SELECTOR_BASE_SHA" "$SELECTOR_HEAD_SHA") || exit 0
-          [[ "$merge_base" =~ ^[0-9a-f]{40}$ ]] || exit 0
-          git cat-file -e "$merge_base:scripts/scaffold-selector/cli.mjs" 2>/dev/null || exit 0
-          git archive "$merge_base" scripts/scaffold-selector | tar -x -C "$trusted"
-          selector="$trusted/scripts/scaffold-selector"
-          node "$selector/fallback.mjs" --reason selector_error --output "$SELECTOR_OUTPUT" --event "$SELECTOR_EVENT" --base-ref "$SELECTOR_BASE_REF" --base "$SELECTOR_BASE_SHA" --head "$SELECTOR_HEAD_SHA"
-          node "$selector/cli.mjs" --repo "$GITHUB_WORKSPACE" --base "$SELECTOR_BASE_SHA" --head "$SELECTOR_HEAD_SHA" --event "$SELECTOR_EVENT" --base-ref "$SELECTOR_BASE_REF" --declaration "$selector/declaration.v1.json" --selector-version "$merge_base" --output "$SELECTOR_OUTPUT"
-          node "$selector/validate-output.mjs" "$SELECTOR_OUTPUT" || node "$selector/fallback.mjs" --reason output_invalid --output "$SELECTOR_OUTPUT"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # A reachable but slow Azure mirror does not trigger APT's failure fallback.
-      - name: Prefer Ubuntu archive for browser dependencies
-        run: |
-          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
-            sudo sed -i -E \
-              -e '\#^https?://azure\.archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:2/' \
-              -e '\#^https://archive\.ubuntu\.com/ubuntu/[[:space:]]#s/priority:[0-9]+/priority:1/' \
-              /etc/apt/apt-mirrors.txt
-          fi
-
-      # Six isolated generated repositories cover locale topology x Console
-      # topology plus every optional-toggle pair and both host proxy
-      # shapes. Each row installs and builds once; this shard runs three of
-      # them (shard a also runs the non-matrix scripts/*.test.mjs, exactly once).
-      # The original eight recipes remain in scaffolding-exhaustive.yml as a
-      # weekly/manual backstop. No path selector. The fast layer already runs in
-      # the parallel scaffolding-contract job; do not duplicate it here.
-      - name: Run scaffolding contract tests (generated shard)
-        id: generated_scaffolding
-        env:
-          AMCORE_SCAFFOLD_SHARD: ${{ matrix.shard }}
-          SHARD_TESTS: ${{ matrix.tests }}
-        run: node --test --test-concurrency=1 "$SHARD_TESTS"
-
-      - name: Record shard scope (this shard only)
-        if: always()
-        env:
-          SHARD: ${{ matrix.shard }}
-          NON_MATRIX_TESTS: ${{ matrix.non-matrix-tests }}
-          GENERATED_OUTCOME: ${{ steps.generated_scaffolding.outcome }}
-          SCOPE_FILE: ${{ runner.temp }}/scaffold-selector/shard-scope.json
-        run: |
-          node --input-type=module <<'SCOPE'
-            import { writeFileSync, appendFileSync } from "node:fs"
-            import { SCAFFOLD_CI_SHARDS } from "./scripts/lib/scaffold-ci-shards.mjs"
-            const e = process.env
-            const scope = { shard: e.SHARD, scenarios: SCAFFOLD_CI_SHARDS[e.SHARD], nonMatrixTests: e.NON_MATRIX_TESTS === "true", outcome: e.GENERATED_OUTCOME, scope: "shard-only", runId: e.GITHUB_RUN_ID, runAttempt: e.GITHUB_RUN_ATTEMPT }
-            writeFileSync(e.SCOPE_FILE, JSON.stringify(scope, null, 2) + "\n")
-            appendFileSync(e.GITHUB_STEP_SUMMARY, `### Shard ${scope.shard} only — not the whole matrix\n\nScenarios: ${scope.scenarios.join(", ")}\n\nShard outcome: ${scope.outcome}\n\n`)
-          SCOPE
-
-      - name: Publish scaffold selector shadow summary
-        if: always()
-        shell: bash
-        env:
-          SELECTOR_DECISION: ${{ runner.temp }}/scaffold-selector/decision.json
-          SELECTOR_ARTIFACT: ${{ runner.temp }}/scaffold-selector/shadow-result.json
-          GENERATED_OUTCOME: ${{ steps.generated_scaffolding.outcome }}
-        run: |
-          set -euo pipefail
-          reporter="$RUNNER_TEMP/scaffold-selector-trusted/scripts/scaffold-selector/report.mjs"
-          if [[ ! -f "$reporter" ]]; then reporter="scripts/scaffold-selector/report.mjs"; fi
-          node "$reporter" --decision "$SELECTOR_DECISION" --artifact "$SELECTOR_ARTIFACT" --summary "$GITHUB_STEP_SUMMARY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --outcome "$GENERATED_OUTCOME"
-
-      - name: Upload shard evidence (shard only, not a whole-matrix result)
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: scaffold-shard-evidence-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/scaffold-selector/shadow-result.json
-            ${{ runner.temp }}/scaffold-selector/shard-scope.json
-          retention-days: 30
-          if-no-files-found: error
-
-      - name: Upload shard diagnostics
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: scaffold-diagnostics-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: tmp/scaffolding-baseline/diagnostics
-          retention-days: 7
-          if-no-files-found: ignore
-
-  # The only whole-matrix verdict. Keeps the required check's display name; an
-  # explicit success comparison under always() is needed because a skipped
-  # needed job would otherwise skip this one, and a skipped required check
-  # reports success.
-  scaffolding-contract-full:
-    name: Scaffolding contract (full, real install/build/test)
-    runs-on: ubuntu-latest
-    needs: [scaffolding-generated-shard]
-    if: ${{ always() }}
-    permissions: {}
-    steps:
-      - name: Require every generated shard to succeed
-        env:
-          SHARDS_RESULT: ${{ needs.scaffolding-generated-shard.result }}
-        run: |
-          if [[ "$SHARDS_RESULT" != "success" ]]; then
-            echo "Generated shards result: $SHARDS_RESULT" >&2
-            exit 1
-          fi
+      # Unit and contract tests of the repository's own tooling: the init:brand
+      # initializer with the engine, filesystem transaction and AST core it uses, product-admin
+      # placement, lint, Lighthouse, migrator, API E2E and deployment contracts. They read the
+      # real working tree and need no Docker. This is the same command as the root
+      # `test:scripts` script (a test compares them). Does NOT cover the private-path ratchet --
+      # that is the separate "promtool" job, display name "Observability contract (static)".
+      - name: Run script contract tests
+        run: pnpm test:scripts
 
   docker-image-smoke:
     name: Docker production image smoke
@@ -1364,7 +1188,6 @@ jobs:
           docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
           docker compose -p "$OLD_VOLUME_PROJECT_NAME" down -v --remove-orphans || true
 
-  # amcore:sentinel-block start=storybook-job
   storybook:
     name: Storybook
     runs-on: ubuntu-latest
@@ -1443,4 +1266,3 @@ jobs:
       - name: Run Storybook a11y/interaction tests
         working-directory: apps/web
         run: pnpm test:storybook
-  # amcore:sentinel-block end=storybook-job

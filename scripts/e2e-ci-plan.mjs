@@ -34,9 +34,7 @@ export function selectedFiles(root, group) {
 export function ciLanes(root) {
   const lanes = ['safety', 'mocked', 'path-standard', 'setup-cli']
   if (selectedFiles(root, 'disruptive').length) lanes.push('path-disruptive')
-  // AMCORE_CONSOLE_CI_LANES_START
   if (existsSync(join(root, 'scripts/run-console-session-e2e.mjs')))
     lanes.push('host', 'setup-console')
-  // AMCORE_CONSOLE_CI_LANES_END
   return [...lanes, ...productAdminCiLanes(root)]
 }

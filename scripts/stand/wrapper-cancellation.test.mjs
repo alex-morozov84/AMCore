@@ -11,13 +11,9 @@ import { run, children, stopChildren, cleanEnvironment } from './process.mjs'
 import { discover } from './ownership.mjs'
 import { assertNoSurvivors } from './survivors.mjs'
 import { processTable } from './process-groups.mjs'
-import { commit } from '../lib/init-project-test-helpers.mjs'
+import { commit } from '../lib/committed-copy-fixture.mjs'
 
-for (const script of [
-  'run-console-session-e2e.mjs',
-  'run-console-single-locale-proxy-smoke.mjs',
-  'e2e-ci.mjs',
-])
+for (const script of ['run-console-session-e2e.mjs', 'e2e-ci.mjs'])
   for (const signal of ['SIGINT', 'SIGTERM'])
     test(`public ${script} forwards ${signal}, waits for runner cleanup and preserves foreign process`, async () => {
       const home = await mkdtemp(join(tmpdir(), 'amcore-wrapper-proof-'))
@@ -111,17 +107,14 @@ for (const script of [
             { code: 'ENOENT' }
           )
         }
-        if (script !== 'run-console-single-locale-proxy-smoke.mjs') {
-          const final = JSON.parse(
-            await readFile(`${m.worktree}/.amcore/stands/${m.id}/manifest.json`, 'utf8')
-          )
-          assert.equal(final.state, 'purged')
-          await assert.rejects(
-            () => readFile(`${m.worktree}/.amcore/stands/${m.id}/lease/owner.json`),
-            { code: 'ENOENT' }
-          )
-        } else
-          await assert.rejects(() => readFile(`${m.worktree}/package.json`), { code: 'ENOENT' })
+        const final = JSON.parse(
+          await readFile(`${m.worktree}/.amcore/stands/${m.id}/manifest.json`, 'utf8')
+        )
+        assert.equal(final.state, 'purged')
+        await assert.rejects(
+          () => readFile(`${m.worktree}/.amcore/stands/${m.id}/lease/owner.json`),
+          { code: 'ENOENT' }
+        )
         verified = true
       } finally {
         foreign.kill('SIGKILL')

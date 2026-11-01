@@ -13,7 +13,6 @@ export const productAdminE2ePlans = {
       'product-admin-denied-loss.spec.ts',
     ],
   },
-  // AMCORE_CONSOLE_STAFF_CI_START
   'staff-host': {
     lane: 'product-admin-real-stack',
     fixture: 'product-admin-three-host',
@@ -44,7 +43,6 @@ export const productAdminE2ePlans = {
     fixture: 'support-mail-host',
     files: ['console-support-mail.spec.ts'],
   },
-  // AMCORE_CONSOLE_STAFF_CI_END
 }
 
 export function productAdminCiLanes(root) {

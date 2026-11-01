@@ -14,20 +14,10 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    (`strict`, `flexible`, or `custom`). Do not guess from git remotes or names.
    If the file is missing or still says `upstream-starter` in a product fork, stop
    and ask the owner to initialize it. The supported fork-initialization path is
-   `pnpm init:brand` first, then `pnpm init:project --mode=single --locale=<code>`,
-   `pnpm init:project --storybook=disabled`, and/or
-   `pnpm init:project --route-progress=disabled`, and/or
-   `pnpm init:project --admin-console=disabled|path|host`, in any combination, only for the
-   project choices the fork actually wants; see
-   `docs/frontend/brand-theme-and-tokens.md#project-scaffolding`.
-   Check these declared choices before adding optional features. When
-   `admin_console: disabled`, do not create Console pages, frontend Route
-   Handlers/BFF, navigation, messages or admin UI scenarios without a separate
-   owner request. Console-only documentation, sections and links belong to its
-   removal seams. Backend work registration, producers, handlers and policies
-   remain usable: disabling the frontend does not remove generic backend admin
-   controllers/API, audit or workers. A frontend Route Handler is not a NestJS
-   backend controller.
+   `pnpm init:brand`, which writes the product identity, workflow and theme fields; see
+   `docs/frontend/brand-theme-and-tokens.md#fork-initialization`. The frontend choice
+   fields in `PROJECT_CONTEXT.md` describe the shipped build and are not written by a
+   command. A frontend Route Handler is not a NestJS backend controller.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
      `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo
@@ -76,19 +66,11 @@ pnpm test:background-work-contracts # isolated work registration/control/provide
 pnpm test:extension-contracts  # isolated notification/AI registration + upgrade conformance (Docker)
 pnpm --filter api organization:setup -- status # inspect trusted initial organization setup
 pnpm init:brand         # downstream fork identity/brand/theme initializer
-pnpm init:project       # downstream project choices; run with flags
 node scripts/api-e2e-ci.mjs --prepare # generate Prisma and build shared for API E2E
 pnpm --filter api test:e2e            # e2e (Jest + Testcontainers, needs Docker)
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL dev only)
 docker compose up                     # full stack (Postgres+Redis+migrate+api+web)
 ```
-
-`pnpm init:project` is intentionally flag-driven: use
-`--mode=single --locale=<code>` to remove locale routing,
-`--storybook=disabled` to remove Storybook from a fork, and/or
-`--route-progress=disabled` to turn off the top route-progress bar's
-default (non-destructive), and/or `--admin-console=disabled|path|host` for the
-one-time Operations Console topology choice (see `PROJECT_CONTEXT.md`).
 
 Production migrates with `db:migrate:prod` (`prisma migrate deploy`) as a one-shot
 step, never `db:migrate`. See `docs/operations/deployment.md`.
@@ -142,13 +124,6 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   its parent. Create an FSD slice only for a distinct domain responsibility.
   The size limits do **not** mean one component per file. Details:
   `docs/frontend/architecture-and-conventions.md#component-organization`.
-- **Optional-feature ownership is boundary-based.** A file added wholly under
-  an existing closed feature root is owned automatically and needs no scaffold
-  registration. A feature contribution to shared code, navigation, config,
-  scripts, CI, or mixed docs must use a declared ownership seam, structural
-  operation, or registered extension point. Completely novel unmarked meaning
-  cannot be inferred reliably: the author and reviewer must classify it and
-  add a marker/extension contract when it belongs to an optional dimension.
 - **Documentation writing:** before creating or changing documentation, read
   [`docs/documentation-guide.md`](docs/documentation-guide.md). Use its reader,
   scope, verification and brevity rules; do not add a new review gate for routine edits.
@@ -186,10 +161,9 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   notes inside **any git-tracked file** — `apps/*`, `packages/*`, `scripts/*`,
   or public `docs/` included — ships to every fork and contributor checkout,
   which has no `ai/` directory — the citation is dead on arrival for everyone
-  but the maintainer. This applies just as much to a scaffolding-transform
-  fixture that copies real source text verbatim (`scripts/lib/*.mjs`'s
-  before/after constants) as to hand-written prose: copying a file that
-  already carries a citation reproduces it in a second public file.
+  but the maintainer. This applies just as much to a test fixture or generated
+  file that copies real source text verbatim as to hand-written prose: copying a
+  file that already carries a citation reproduces it in a second public file.
   `pnpm test:observability-contract`'s private-path ratchet (ADR-078)
   mechanically fails a PR that adds one — it scans every git-tracked file,
   not just Markdown, and its baseline may only shrink, never grow. Put the
@@ -357,9 +331,7 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   anywhere else: metadata merges shallowly, so it can silently reopen indexing, and
   a static test fails on it. Keep the indexing hook in `proxy.ts`, the routing
   option `alternateLinks: false` and `htmlLimitedBots` as they are unless you have
-  read `docs/frontend/seo.md`. In the root `generateMetadata` do not use `locale` or
-  `params` beyond the existing `getTranslations` call (the single-locale scaffold
-  transform deletes them).
+  read `docs/frontend/seo.md`.
 - **Frontend i18n — English base, Russian second, both live.** Routes sit under
   `[locale]` with an explicit prefix (`/en/...`, `/ru/...`). Four rules an agent
   will otherwise break:

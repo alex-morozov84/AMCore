@@ -11,11 +11,9 @@ const testDir =
 export default defineConfig({
   ...outputPaths(),
   testDir,
-  // AMCORE_CONSOLE_PROVISIONING_TEST_DIR_START
   ...(activeTarget().fixtureProfile === 'organization-provisioning'
     ? { testDir: './e2e/organization-provisioning' }
     : {}),
-  // AMCORE_CONSOLE_PROVISIONING_TEST_DIR_END
   ...(activeTarget().fixtureProfile === 'organization-setup'
     ? { testMatch: '**/organization-initial-setup.spec.ts' }
     : {}),

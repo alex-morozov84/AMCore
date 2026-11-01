@@ -47,8 +47,6 @@ export async function generateMetadata({
   const locale = await resolveLocaleParam(params)
   const t = await getTranslations({ locale, namespace: 'meta' })
 
-  // Do not use `locale` or `params` anywhere else in this function: the single-locale scaffold
-  // transform deletes both here and rewrites only the `getTranslations` shorthand above.
   return {
     ...rootSeoMetadata(t('title')),
     title: { default: t('title'), template: `%s | ${t('title')}` },

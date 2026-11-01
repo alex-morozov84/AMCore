@@ -15,9 +15,7 @@ import { getSiteOrigin, isIndexingEnabled } from './site-origin'
 export const noindexMetadata = { robots: { index: false, follow: false } } satisfies Metadata
 
 /**
- * Site-wide defaults for the root layout. Takes no `locale` and no `params` on purpose: the
- * single-locale scaffold transform deletes both inside `generateMetadata`, and any other use of
- * them there would break a forked project. The root sets neither `alternates.canonical` nor
+ * Site-wide defaults for the root layout. The root sets neither `alternates.canonical` nor
  * `openGraph.url`: a page that forgot them would inherit the home page's and be folded into it.
  */
 export function rootSeoMetadata(siteName: string): Metadata {

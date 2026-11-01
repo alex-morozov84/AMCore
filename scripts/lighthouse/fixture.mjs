@@ -57,12 +57,10 @@ export async function prepareFixture(context, m, scenario, alias) {
       'negative-subject-unproved'
     )
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_FIXTURE_START
   if (scenario.scope === 'console') {
     const { setSystemRole } = await import('../../apps/web/e2e/real-stack/admin-helpers.ts')
     setSystemRole(email, 'SUPER_ADMIN')
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_FIXTURE_END
   const fixture = {
     subject,
     otherSubject,
@@ -70,12 +68,10 @@ export async function prepareFixture(context, m, scenario, alias) {
     organizationName: organization?.name,
     secrets: [TEST_PASSWORD],
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_FIXTURE_ACCESS_START
   if (scenario.scope === 'console') {
     fixture.consoleHost = m.consoleTopology === 'host'
     fixture.accessPath = fixture.consoleHost ? '/api/access' : '/api/console/access'
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_FIXTURE_ACCESS_END
   const url = scenarioUrl(scenario, m, { alias, id: organization?.id })
   // Fresh audience context proves actual password/MFA admission, without copying cookies.
   const session = await context.browser().newContext({

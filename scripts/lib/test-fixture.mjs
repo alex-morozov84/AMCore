@@ -96,76 +96,11 @@ export function createFixtureRepo() {
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
 }
 
-/**
- * A real, git-tracked-files-only copy of this repo's current `HEAD` in a
- * disposable tmpdir — for init:project tests, where a hand-written fixture
- * can't stand in for `apps/web`'s actual route tree (see
- * project-plan-web-structure.test.mjs and friends). `git archive` only
- * copies tracked files, so `ai/` (gitignored) is never present — same
- * safety property `createFixtureRepo()`'s guard tests rely on.
- *
- * `cleanup()` retries on `ENOTEMPTY` (Node's native `rmSync`
- * `maxRetries`/`retryDelay`) — observed as a real, transient failure
- * (BACKLOG item 14, PR1) when a fast scenario's cleanup runs immediately
- * after a subprocess exits, before the OS has fully released a file handle.
- */
-export function createRealRepoCopy() {
-  const root = mkdtempSync(path.join(tmpdir(), 'amcore-real-repo-copy-'))
-  const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-  }).trim()
-
-  execFileSync('sh', ['-c', `git archive HEAD | tar -x -C "${root}"`], {
-    cwd: repoRoot,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-
-  return { root, cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }) }
-}
-
 export function git(root, args) {
   return execFileSync('git', args, {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-  })
-}
-
-/**
- * Installs a {@link createRealRepoCopy} copy's dependencies — `git archive`
- * only copies tracked files, so there is no `node_modules` yet. This is
- * test-harness setup, deliberately not something `runProjectVerification`
- * does itself (see verify.mjs's header): the real `init:project`/`init:brand`
- * CLIs run against a fork the owner already has installed, and must not
- * reach the network or rewrite `node_modules` as a side effect of a
- * migration. Deliberately *not* `CI=true`: that forces pnpm's
- * `--frozen-lockfile`-like behavior, which is right for verify.mjs's
- * read-only typecheck/lint/build/test steps but wrong here — this helper
- * must also represent the ordinary `pnpm install` a real user runs after a
- * transform that changed a package.json's dependencies (e.g.
- * --storybook=disabled), which needs to update the now-stale lockfile, not
- * refuse on the mismatch.
- */
-export function installDependencies(root) {
-  // The doc comment above says "deliberately not CI=true", but until now
-  // nothing actually stripped it -- execFileSync inherits the full
-  // process.env by default, and a real GitHub Actions runner always sets
-  // both CI=true and GITHUB_ACTIONS=true globally, regardless of any
-  // workflow step. Never surfaced locally (neither var set there) until
-  // this suite first ran in real CI. Deleting CI alone is not enough: pnpm
-  // resolves "is this CI" via the ci-info package, whose vendor-detection
-  // loop independently matches GITHUB_ACTIONS and sets isCI true through
-  // that path regardless of CI. ci-info documents one explicit bypass that
-  // short-circuits its entire vendor scan: CI=false ("Bypass all checks if
-  // CI env is explicitly set to 'false'") -- more robust than trying to
-  // enumerate and strip every vendor marker (GITHUB_ACTIONS today, some
-  // other CI's marker on a future runner) by hand.
-  const env = { ...process.env, CI: 'false' }
-  execFileSync('pnpm', ['install'], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env,
   })
 }
 

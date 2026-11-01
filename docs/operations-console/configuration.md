@@ -1,42 +1,21 @@
 # Operations Console Configuration and Deployment
 
 Start with the [Operations Console user guide](README.md) for the capability and
-access boundary. This page covers downstream initialization and deployment.
+access boundary. This page covers topology and deployment.
 
-## Choose the topology once
+## Topology
 
-AMCore upstream defaults to localized path mode at `/en/admin` and `/ru/admin`.
-A downstream fork chooses once from the pristine default:
+AMCore serves the Console in localized path mode at `/en/admin` and `/ru/admin`, on
+the product host with the normal product login. The host-mode sections below
+describe the separate-host topology, its session boundary and the reference
+proxies. This release has no command that switches between the two topologies.
+`ADMIN_CONSOLE_HOSTNAME` is the deployment setting that names the public host in
+host mode; the page path segment is `admin`, and the internal BFF namespace is
+`app/api/console/**`.
 
-```bash
-pnpm init:project --admin-console=disabled
-pnpm init:project --admin-console=path --admin-console-slug=control
-pnpm init:project --admin-console=host --admin-console-slug=control
-```
-
-The optional slug is a validated page-path segment, not a hostname, and never
-changes the fixed internal BFF namespace `app/api/console/**`. The public
-hostname is the separate deployment setting `ADMIN_CONSOLE_HOSTNAME`.
-
-| Fork shape    | Path mode public page | Host mode public page                           |
-| ------------- | --------------------- | ----------------------------------------------- |
-| Multi-locale  | `/{locale}/{slug}`    | `https://<hostname>/{locale}`                   |
-| Single-locale | `/{slug}`             | `https://<hostname>/` (no public physical slug) |
-
-The choice is fail-closed and terminal in scaffold v1. Repeated,
-unchanged-default, drifted, or post-initialization topology/slug changes fail
-before writing. Inspect flags and confirmation behavior with:
-
-```bash
-pnpm init:project --help
-```
-
-`disabled` removes console-owned web routes, UI, BFF/session/login wiring,
-generated configuration, proxy overrides, tests, and this documentation. It
-keeps backend `SystemRole`, `/api/v1/admin/**`, fresh-auth, audit, health, and
-metrics foundations for automation or custom clients. The other composable
-choices are documented under [project
-scaffolding](../frontend/brand-theme-and-tokens.md#project-scaffolding).
+The Console builds on backend foundations that work without it: `SystemRole`,
+`/api/v1/admin/**`, fresh-auth, audit, health, and metrics, for automation or
+custom clients.
 
 ## Path-mode deployment and session
 
@@ -54,11 +33,22 @@ docker compose --profile edge \
   -f docker-compose.yml -f docker/compose/web.yml up -d
 ```
 
-The console is then available under the selected localized or single-locale
-slug on that host. A bring-your-own proxy serves the same application normally;
-it needs no host-to-physical-slug mapping in path mode.
+The console is then available under `/{locale}/admin` on that host. A
+bring-your-own proxy serves the same application normally; it needs no
+host-to-physical-path mapping in path mode.
 
 ## Host-mode session boundary
+
+Host mode is a build-time choice. The shipped build uses `mode: 'path'` in
+`apps/web/src/shared/lib/admin-console.generated.ts`. To build host mode, change that
+value to `'host'` by hand and rebuild the web image (`docker compose build web` with the
+bundled Compose build; for a registry rollout, build and publish the image first). Then
+set `ADMIN_CONSOLE_HOSTNAME` as a runtime variable of the web service; it is not a build
+argument. Setting only the hostname variable does not switch the mode: a path-mode build
+ignores it, keeps the Console under `/{locale}/admin` on the product host and serves no
+Console on the console host. This release has no command for the change. The managed stand makes the same one-line change in its
+snapshot, and `pnpm test:console-session-e2e` exercises the result in an isolated lane.
+Verify your own deployment before you rely on it.
 
 Host mode is a separate browser trust boundary:
 
@@ -96,6 +86,10 @@ docker compose --profile edge \
   -f docker-compose.yml -f docker/compose/console-host.yml up -d
 ```
 
+In a production rollout that saves `COMPOSE_FILE`, use `docker/compose/console-host.yml`
+instead of `web.yml` and keep every other overlay; see the
+[deployment guide](../operations/deployment.md#operations-console-host-mode-reference).
+
 The base Caddy profile is API-only. Only the host override mounts the console
 Caddyfile, and missing hostnames fail validation. For nginx, adapt and include
 `docker/nginx/operations-console.conf` with the real domains and certificates.
@@ -106,7 +100,7 @@ public `Host` authority at the edge; the Console guard matches the configured
 host and port. A different port or product host is rejected.
 
 Keep `web` private to the proxy network. Do not expose its port publicly. Both
-reference proxies reject unknown hosts and direct physical `/{slug}` paths,
+reference proxies reject unknown hosts and direct physical `/admin` paths,
 preserve assets/API/CSP paths, and map only public console pages and API paths.
 See the authoritative [proxy and TLS mapping
 tables](../operations/deployment.md#operations-console-host-mode-reference).
@@ -439,7 +433,7 @@ the Console's own server; it has no setting of its own besides the API's `ENABLE
 
 ## Troubleshooting
 
-- Startup fails in host mode: confirm the generated mode is `host` and
+- Startup fails in host mode: confirm the build's Console mode is `host` and
   `ADMIN_CONSOLE_HOSTNAME` is a lowercase FQDN.
 - Caddy is absent after `compose up`: confirm `--profile edge` was supplied.
 - A public redirect exposes the physical slug: stop relying on the deployment

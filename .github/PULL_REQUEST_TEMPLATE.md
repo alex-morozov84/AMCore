@@ -48,4 +48,3 @@ Tick each line, or write "not needed, because …". Skip the block only for a ch
 - [ ] `CHANGELOG.md` → `[Unreleased]`, when a user can see the change
 - [ ] `AGENTS.md`, when an agent could break it by not knowing it
 - [ ] OpenAPI (`@ApiTags`, responses, `apps/api/test/openapi.e2e-spec.ts`), when a route contract changed
-- [ ] Optional-feature ownership checked: closed-root addition, declared shared seam/operation, or explicitly reviewed unmarked semantics (if applicable)

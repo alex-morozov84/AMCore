@@ -288,112 +288,102 @@ It also records `PROJECT_CONTEXT.md`'s identity fields (`Mode`, `Product`,
 `Purpose`, upstream-sync policy, workflow mode, `initialized_from_amcore_version`)
 when you answer the corresponding prompts.
 
-Both initializer commands finish planning before they ask for confirmation.
+`init:brand` finishes planning before it asks for confirmation.
 That plan includes an immutable snapshot of any supplied logo or icon, so a
 source file changed after the prompt cannot change what is applied. A confirmed
-run commits its complete filesystem plan as one recoverable transaction; a
-handled write failure restores the tree to its pre-apply state. Dry runs,
-cancelled prompts, and plans with no changes never start a transaction.
+run writes its complete filesystem plan as one transaction. When a write fails, the
+command tries to roll the tree back and its message says whether the rollback
+completed; see "Recover from a failure" below. Dry runs, cancelled prompts, and
+plans with no changes never start a transaction.
 
-`init:brand` and every `init:project` dimension use the same architecture:
-desired-state facts, explicit ownership seams, narrow structural operations,
-one composed operation plan, and one filesystem transaction. Brand identity
-fields, JSON paths, TypeScript nodes, and the five asset destinations are
-claimed explicitly; missing or ambiguous anchors fail before mutation. There
-is no compatibility executor or sequential second mutation pass.
-
-The next initialization stage will combine these choices in one guided wizard
-and automatically remove downstream-only scaffolding machinery after the user
-reviews and confirms the complete result. That finalization is not part of the
-current commands yet, and it will not be exposed as a mandatory separate
-`init:finalize` step. `PROJECT_CONTEXT.md` remains the boundary that prevents
-the AMCore upstream checkout from being finalized accidentally.
+`init:brand` builds desired-state facts, claims them against explicit ownership
+seams, applies narrow structural operations, and writes one composed operation plan
+in one filesystem transaction. Brand identity fields, JSON paths, TypeScript nodes,
+and the five asset destinations are claimed explicitly; missing or ambiguous
+anchors fail before mutation. There is no compatibility executor or sequential
+second mutation pass. Before it writes, the command requires a clean Git working tree and
+refuses when an `ai/` folder exists (that marks the AMCore maintainer checkout). It then
+asks you to confirm the plan (`--yes`, or the interactive prompt); `--dry-run` never writes.
 
 For a complete product-administration setup, see the
-[adoption guide](../product-admin/adoption.md). Commit brand initialization before
-applying project choices. Install changed manifests and complete deferred checks
-before adding custom consumers. The cosmic example changes product-owned semantic
-token values while preserving theme persistence, font mapping and chart tokens.
+[adoption guide](../product-admin/adoption.md). Install changed manifests and
+complete deferred checks before adding custom consumers. The cosmic example changes
+product-owned semantic token values while preserving theme persistence, font mapping
+and chart tokens.
 
-### Project scaffolding
+### Fork initialization
 
-`pnpm init:project` is the separate, one-time sibling command for
-project choices `init:brand` deliberately never touches. It covers three
-destructive, one-time dimensions and one reversible source default, each with its own
-reinitialize guard:
-`--mode=single --locale=<code>` removes locale routing entirely, **destructively**
-(see
-[i18n & errors § Downstream: running a single-locale app](./i18n-and-errors.md#downstream-running-a-single-locale-app));
-`--storybook=disabled` removes the Storybook surface, also **destructively**
-(see
-[Storybook § Downstream: disabling Storybook](./storybook.md#downstream-disabling-storybook));
-`--route-progress=disabled` only flips the top route-progress bar's source
-flag to its disabled default and is **non-destructive** — no file is moved
-or deleted, and the choice can be reversed by hand at any later point (see
-[Top route progress bar § `pnpm init:project --route-progress=disabled`](./route-progress.md#pnpm-initproject---route-progressdisabled)).
-Any one flag alone, or any combination together, works in one invocation.
-`--admin-console=disabled|path|host` chooses the optional Operations Console:
-the pristine upstream `path/admin` default can become host mode, a custom path
-slug, or a full removal of console-owned frontend/runtime wiring. Its optional
-`--admin-console-slug=<segment>` is a URL segment, never a hostname; host mode
-continues to receive `ADMIN_CONSOLE_HOSTNAME` at deployment. A chosen console
-state is terminal for this v1 scaffold, like the other destructive dimensions.
-See `PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section for the full
-contract, and `pnpm init:project --help` for its dry-run, typed-confirmation,
-and fail-closed safety controls.
+Run `pnpm init:brand` while initializing a fresh downstream fork, before applying
+that fork's database migrations. It writes source files only; it never connects to or
+migrates a database. `pnpm init:brand` is the only initializer command. The commands
+that exist are the scripts in the root `package.json`; an older note that names another
+initializer, such as `pnpm init:project`, is out of date.
 
-Run `init:brand` and the selected `init:project` choices while initializing a
-fresh downstream fork, before applying that fork's database migrations. The
-commands project source files only; they never connect to or migrate an
-existing database.
+Every flag is optional, and a field you do not pass keeps its current value. In an
+interactive terminal without value flags the command asks for the values instead.
 
-The Operations Console transform derives removal ownership from one manifest.
-Every new file below a declared Console feature root is owned automatically;
-outside those closed roots, a Console-specific code, test, config, or docs
-contribution must declare an owned block, config field, or structural-operation
-seam. Missing declarations detectable through imports or monitored identifiers,
-plus stale, ambiguous, and duplicate declarations, fail during planning before
-the filesystem transaction starts. Shared helpers survive
-removal when an independent production consumer still reaches them; helpers
-and linked tests used only by the Console are removed together.
-The fast check follows resolved relative imports into files removed by a
-selected feature projection. A new test outside a closed root that imports a
-registered Console helper must itself be registered or use a declared seam.
-Named universal-module expectations flag newly retained shared modules for
-review.
+| Flag                                              | What it writes                                                                                                                                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--product-name`                                  | `PROJECT_CONTEXT.md` `Product` (and `Mode: downstream-product` while it still says `upstream-starter`), `manifest.ts` `name`/`short_name`, `meta.title` in both catalogues                 |
+| `--product-description`                           | root `package.json` `description`, `manifest.ts` `description`, `en.json` `meta.description`                                                                                               |
+| `--purpose`, `--upstream-sync-policy`             | `PROJECT_CONTEXT.md` `Purpose` and `Upstream sync policy`. Pass your own sentences. Without the flag the current text stays; the interactive prompt shows the current text as its default. |
+| `--workflow-mode`                                 | `PROJECT_CONTEXT.md` workflow mode: `strict`, `flexible` or `custom`                                                                                                                       |
+| `--theme-mode`                                    | `DEFAULT_THEME_SETTING` in `theme.ts`: `system`, `light` or `dark`                                                                                                                         |
+| `--theme-persistence`                             | `PROJECT_CONTEXT.md` `theme_persistence`: `local-storage` or `cookie-ssr` (a record; it does not generate the cookie variant)                                                              |
+| `--package-name`                                  | root `package.json` `name`                                                                                                                                                                 |
+| `--logo-dark`, `--logo-light`                     | paths to your PNG files, copied to `public/logo-dark.png` and `public/logo-light.png`                                                                                                      |
+| `--icon-192`, `--icon-512`, `--icon-512-maskable` | paths to your PNG files with the exact pixel size, copied into `public/icons/`                                                                                                             |
+| `--dry-run`                                       | prints the plan and diffs without writing any file                                                                                                                                         |
+| `--yes`                                           | applies the plan without the confirmation prompt                                                                                                                                           |
 
-The Storybook transform uses the same ownership contract: its closed config
-root and co-located `*.stories.tsx` verification files are discovered
-automatically, while contributions to shared code, config, workflows, and docs
-require narrow declared seams.
+For a real product pass at least `--product-name` and `--product-description`, plus
+`--purpose` and `--upstream-sync-policy`: a field you leave out keeps the starter's text,
+so `Purpose` would still describe AMCore. `--package-name` is also optional; without it the
+root package keeps the name `amcore`.
 
-#### Optional-feature extension ownership
+After it writes, the command runs `pnpm typecheck` and `pnpm lint` as a check. They need
+installed dependencies and the generated Prisma client and shared build; the setup block in
+the [adoption guide](../product-admin/adoption.md#initialize-a-clean-product) prepares them.
 
-Use the ownership boundary, not a list of every feature file:
+The first run also writes `initialized_from_amcore_version` while it still says `N/A`. The
+value is the Git tag of the current commit, or the short commit SHA when the commit has
+no tag. `Canonical upstream` stays the AMCore URL, because AMCore is the original upstream.
 
-- Adding `apps/web/src/_pages/console/activity/activity-panel.tsx` below the
-  Console's closed `_pages/console` root is automatic. Do not add a per-file
-  manifest entry.
-- Adding Console navigation to a shared sidebar, an environment/config field,
-  a script, CI workflow, or a mixed documentation page crosses a shared
-  boundary. Register an owned block, config field, structural operation, or
-  other declared extension point; a detectable forgotten contribution fails
-  with the feature, path, marker, and registration action.
-- Anchor an owned documentation block on stable prose or an explicit marker.
-  A numbered-list item's ordinal can change when another step is inserted;
-  an explicitly prefix-preserving block can retain the source list number.
-- In Console UI tests, derive topology-dependent navigation expectations from
-  `getConsole*Href()` or set a path/host fixture in the same test case. URLs
-  supplied as mock or `baseHref` inputs and backend API paths remain valid.
-- A new literal, prose statement, or config concept with no registered import,
-  identifier, or marker has no mechanically knowable feature meaning. The
-  author and reviewer must classify it and add a marker/seam when it belongs to
-  an optional feature. The tooling deliberately makes no impossible claim to
-  discover arbitrary semantics.
+The command does not change the frontend choice fields in `PROJECT_CONTEXT.md` (locales,
+Storybook, route progress, Operations Console); see that file's "Frontend Starter Choices"
+section for what those fields mean. It never edits the color tokens in `globals.css` or
+`manifest.ts` `background_color`/`theme_color`; update those by hand (checklist items 2 and 4).
 
-Adding ordinary functionality does not create a new scaffold dimension. A new
-optional dimension is a deliberate product/architecture decision with its own
-ownership, projection, verification, and documentation contract.
+Run it again whenever a value must change. Pass only the flags to change, with `--dry-run`
+first. A plan with no changes writes nothing. Commit or stash your own work first: after it
+prints the plan and before it asks for confirmation, the command refuses to write into a tree
+with uncommitted changes (the message starts with "working tree is not clean"). Untracked files
+that Git does not ignore count as changes; ignored files do not. `--dry-run` works in any tree.
+
+#### Recover from a failure
+
+Read the last message of the command before you do anything else. Do not assume that an error
+means nothing was written.
+
+1. **"apply failed … rollback completed and the initial filesystem snapshot was restored".** The
+   files are back as they were. Fix the cause and run the command again.
+2. **"rollback failed", or a `.amcore-scaffold-transaction.json` file remains in the project root**
+   (for example after the process was killed). Files may be partly changed. The journal blocks the
+   next run on purpose. Keep the journal and the tree as they are. The message lists the recovery
+   steps: restore the recorded states in reverse order, check the tree, and only then remove the
+   journal. Never delete the journal only to get past the block. The tree was clean before the
+   run and the command writes only the paths named in the flag table, so `git status` and
+   `git diff` show exactly what changed; compare them with the recorded states in the journal
+   before you restore anything. If the message does not list the steps, stop and ask the
+   maintainers of your fork; do not guess.
+3. **"filesystem committed but journal cleanup failed".** All files are already written; do not
+   undo them. Check `git diff`. The journal is then only a leftover record: remove it after that
+   check. The restore steps of item 2 do not apply.
+4. **"Verification failed" after "Applied N change(s)".** The files are already written; `pnpm
+typecheck` or `pnpm lint` found a problem and the command exits with code 1. Read the printed
+   output and `git diff`. Fix the problem before you commit, or undo the changes with
+   `git restore -- <path>` for each path that `git status` shows: the command only overwrites
+   files that already exist in the starter and creates none.
 
 ## Inline style and contrast
 

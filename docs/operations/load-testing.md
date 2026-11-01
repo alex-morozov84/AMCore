@@ -22,8 +22,8 @@ you rely on the published numbers for another host class.
   `git clone` of AMCore checked out at the same commit as the host. 2 vCPU is enough.
 - **Time:** NTP on both VMs.
 - **Topology:** path mode with the bundled Postgres, as in the single-host guide. The
-  checkout's `PROJECT_CONTEXT.md` shows `admin_console_mode: path` or no Console; host
-  mode and external databases are refused.
+  checkout's `PROJECT_CONTEXT.md` shows `admin_console_mode: path`; host mode and
+  external databases are refused.
 - **Firewall:** TCP 8443 on the host open to the generator only, in the provider firewall
   (ports Docker publishes bypass a firewall on the host itself).
 

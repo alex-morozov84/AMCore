@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { WorkCard } from './WorkCard'
 
-// Local behavior messages survive removal of a locale catalogue during scaffolding.
+// Local behavior messages stay independent of the real catalogues.
 const messages = {
   console: {
     backgroundWork: {

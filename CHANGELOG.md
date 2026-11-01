@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The `pnpm init:project` command and its generated-project test matrix, change selector
+  and CI jobs. `pnpm init:brand` stays. The CI job "Scaffolding contract (fast)" is replaced
+  by "Script contracts" (`pnpm test:scripts`, which runs the repository's tooling tests); the
+  two "Scaffolding contract" required checks no longer exist. The last state with the old
+  command is the Git tag `scaffolding-final`. Forks created with `init:project` before this
+  change are not supported by later AMCore updates. `PROJECT_CONTEXT.md` keeps its frontend
+  choice fields as a record of the build; no command writes them.
+
 ### Changed
 
 - Authentication no longer hangs when Redis is slow or down. Organization-scoped requests
@@ -34,21 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transition; the default prepared state refuses operator grants.
   Protected provider linking revokes previous sessions and requires a new sign-in.
 
-<!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_START -->
-
 - Operations Console Overview gathers recorded problems with original observation
   times, qualified missing data and links to their source and recovery guide.
   Optional Grafana dashboard links open the interval around an observation.
 
-<!-- AMCORE_CONSOLE_PROBLEM_SUMMARY_CHANGELOG_END -->
-
-<!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_START -->
-
 - Operations Console user details can send audited verification and password
   recovery mail to the saved address, with confirmation, recent authentication,
   shared recipient limits and recoverable results.
-
-<!-- AMCORE_CONSOLE_SUPPORT_MAIL_CHANGELOG_END -->
 
 - A reproducible load test for a disposable single-host deployment
   (`scripts/load-test/`, `docker/compose/load-test.yml`): a client-certificate test

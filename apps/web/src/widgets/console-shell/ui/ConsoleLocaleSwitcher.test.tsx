@@ -21,8 +21,7 @@ vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
 
 // Inline fixture of just the `locale` namespace keys this component reads -
 // deliberately not the real catalogues (`messages/en.json`/`ru.json`), which
-// are locale-scaffold-tracked source files this single-locale-agnostic unit
-// test has no reason to depend on.
+// this unit test has no reason to depend on.
 const messages = {
   locale: { label: 'Language', changeHint: 'Changes immediately', en: 'English', ru: 'Русский' },
 }

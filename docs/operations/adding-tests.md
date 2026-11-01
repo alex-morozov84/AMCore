@@ -53,14 +53,11 @@ expected consumers, natural command exit and teardown.
 See [background contracts](../backend/background-work.md#verify-a-registration) and
 [channel conformance](../notifications/channels.md#run-the-conformance-lane).
 
-## Build, CI and scaffold contracts
+## Build, CI and tooling contracts
 
-Add appropriate Node tests under `scripts/lib/*.test.mjs` or the existing
-`scripts/measure/*.test.mjs` family. Check actual fast discovery and use
-`node --test scripts/lib/<name>.test.mjs` for a focused local contract.
-Changes to generated contracts retain the six required install/build/test recipes.
-Optional features use declared ownership roots/seams; verify their retained and
-removed variants. A transform alone does not prove installation or execution.
+Add appropriate Node tests under `scripts/lib/*.test.mjs` (or `scripts/*.test.mjs` for a
+command's own entry point). The CI job **Script contracts** and `pnpm test:scripts` run both
+patterns; use `node --test scripts/lib/<name>.test.mjs` for a focused local contract.
 
 ## Compile fixtures and email tests
 

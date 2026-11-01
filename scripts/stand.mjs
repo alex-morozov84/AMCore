@@ -34,9 +34,7 @@ if (edge && (edge !== 'nginx' || action !== 'e2e' || lane !== 'product-admin-rea
 if (
   args.includes('--fixture') &&
   (![
-    // AMCORE_CONSOLE_SUMMARY_PROFILE_START
     'console-summary',
-    // AMCORE_CONSOLE_SUMMARY_PROFILE_END
     'organization-setup',
     'organization-shop',
     'organization-provisioning',
@@ -60,10 +58,8 @@ if (productAdminProfiles.includes(fixture) && lane !== 'product-admin-real-stack
   throw new Error('Staff fixture requires the staff lane')
 let topology
 if (lane === 'product-admin-real-stack') topology = 'host'
-// AMCORE_CONSOLE_LANES_START
 lanes.push('console-real-stack')
 if (lane === 'console-real-stack') topology = 'host'
-// AMCORE_CONSOLE_LANES_END
 const id = value('--id', action === 'e2e' ? `e2e-${randomUUID()}` : 'preview')
 // Explicit risk acceptance for a build whose Docker export is not proved finished;
 // recorded in the manifest as acceptance, never as proof (see local-stands guide).
@@ -182,14 +178,12 @@ async function execute() {
         await productAdminNginxSmoke(m)
         handled = true
       }
-      // AMCORE_CONSOLE_PROXY_SMOKE_START
       if (args.includes('--proxy-smoke')) {
         if (lane !== 'console-real-stack') throw new Error('Proxy smoke requires host lane')
         const { proxySmoke } = await import('./stand/proxy-smoke.mjs')
         await proxySmoke(m)
         handled = true
       }
-      // AMCORE_CONSOLE_PROXY_SMOKE_END
       if (!handled) await test(m, lane, held.token, extra, group, auditOnly)
     } else if (action === 'preview') {
       const { preview } = await import('./stand/preview.mjs')

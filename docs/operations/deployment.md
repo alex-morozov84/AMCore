@@ -765,11 +765,8 @@ The retained
 [operator API](../backend/settings.md#operator-api-and-rights) can also reset the
 override to each process's baseline.
 
-<!-- AMCORE_CONSOLE_STORAGE_SETTING_START -->
-
 A personal `SUPER_ADMIN` can change the inline interval on Console Overview and
 **Save** without restart. The Console has no reset button.
-<!-- AMCORE_CONSOLE_STORAGE_SETTING_END -->
 
 S3 checks incur PUT/GET/DELETE traffic independently of user requests. Plan the
 operation budget and detection delay using the
@@ -1375,7 +1372,9 @@ fronting only `api:5002` leaves OAuth's callback URL unreachable.
 
 ### Operations Console host-mode reference
 
-When the generated console config selects `host`, select the matching Caddy
+When the build's Console mode is `host` (see
+[Host-mode session boundary](../operations-console/configuration.md#host-mode-session-boundary)
+for how to build it), select the matching Caddy
 configuration explicitly: use `docker/compose/console-host.yml` instead of `web.yml`
 in the saved `COMPOSE_FILE`, preserving every other overlay. Set both hostnames
 in `.env`:

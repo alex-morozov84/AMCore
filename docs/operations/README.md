@@ -43,7 +43,7 @@ Already running? Reach for whichever concern below applies.
   rollout (immutable digests, restart policies, log rotation, honest
   zero/low-downtime guidance).
 - **[Operations Console](../operations-console/README.md)** — optional
-  `SUPER_ADMIN` control-plane topology, host session boundary, scaffold choice,
+  `SUPER_ADMIN` control-plane topology, host session boundary,
   proxy deployment, verification, and extension rules. The detailed nginx/Caddy
   host-mode mappings remain in [Deployment & migrations](deployment.md#operations-console-host-mode-reference).
 - **[Production deploy profile](production-deploy-profile.md)** — the

@@ -6,20 +6,18 @@ of workflow self-hardening to keep the example forkable.
 
 ## Current Gates
 
-| Workflow                     | Trigger                                 | Tooling                                                                                              | CI behavior                          |
-| ---------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `codeql.yml`                 | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                 | report-only, uploads SARIF           |
-| `dependency-review.yml`      | `pull_request`                          | GitHub Dependency Review                                                                             | blocking on `high+`                  |
-| `security-scans.yml`         | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                        | gitleaks blocks; OSV is report-only  |
-| `ci.yml`                     | `push`, `pull_request`                  | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                     | blocking                             |
-| `ci.yml`                     | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                               | Trivy report-only; boot-smoke blocks |
-| `ci.yml`                     | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job)  | blocking                             |
-| `ci.yml`                     | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                            | blocking                             |
-| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — fast (`scripts/lib/*.test.mjs`, structural/fixture checks, no nested install) | blocking                             |
-| `ci.yml`                     | `push`, `pull_request`                  | Scaffolding contract — six-row covering array in two parallel shards plus shadow selector telemetry  | blocking; full lane always runs      |
-| `scaffolding-exhaustive.yml` | weekly schedule, manual                 | Original eight real-install scaffolding recipes (`pnpm test:scripts:exhaustive`)                     | backstop, not required               |
-| `workflow-lint.yml`          | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                              | blocking                             |
-| `pr-title.yml`               | `pull_request`                          | Conventional-Commits PR-title lint                                                                   | blocking (squash title = commit msg) |
+| Workflow                | Trigger                                 | Tooling                                                                                             | CI behavior                          |
+| ----------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `codeql.yml`            | `push`, `pull_request`, weekly schedule | CodeQL (`javascript-typescript`, `build-mode: none`)                                                | report-only, uploads SARIF           |
+| `dependency-review.yml` | `pull_request`                          | GitHub Dependency Review                                                                            | blocking on `high+`                  |
+| `security-scans.yml`    | `push`, `pull_request`, weekly schedule | gitleaks CLI, OSV-Scanner CLI                                                                       | gitleaks blocks; OSV is report-only  |
+| `ci.yml`                | `push`, `pull_request`                  | Route bundle budgets after the web build (`pnpm check:route-budgets`, Build job)                    | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Trivy CLI + boot-smoke                                                                              | Trivy report-only; boot-smoke blocks |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — static (`scripts/observability-contract/`, folded into the `promtool` job) | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Observability contract — live (real Prometheus/Alertmanager/Grafana boot)                           | blocking                             |
+| `ci.yml`                | `push`, `pull_request`                  | Script contracts (`pnpm test:scripts`: tooling unit and contract tests, no Docker)                  | blocking                             |
+| `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
+| `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
 
 ## Lighthouse evidence admission
 
@@ -45,8 +43,7 @@ settings retain their separate authority boundaries.
 - **gitleaks** blocks newly introduced secrets on `push`/`pull_request`; the
   weekly full-history scan is the backstop for historical drift.
 - **Route bundle budgets** prove that no web page's first-load JavaScript grew
-  past its limit in that build, and that Next measured every page completely. The
-  generated scaffold variants run the same check after their own web build. See
+  past its limit in that build, and that Next measured every page completely. See
   [Route bundle budgets](../frontend/bundle-budget.md).
 - **OSV-Scanner** produces repository-level vulnerability SARIF on the weekly
   schedule without blocking routine development.
@@ -140,7 +137,7 @@ settings retain their separate authority boundaries.
   The 20-minute lane timeout is emergency headroom, not a runtime target or
   performance proof. Measure cold setup and runner-minutes as well as test time.
   [Local reproduction and isolation](../frontend/testing.md#complete-ci-e2e-locally).
-  In `ci.yml`, browser and generated scaffold jobs prefer the existing Ubuntu
+  In `ci.yml`, browser jobs prefer the existing Ubuntu
   archive mirror over the Azure entry in the hosted runner's APT mirror list.
   A reachable but slow mirror does not trigger APT's failure fallback. This
   preference preserves release suites, fallback mirrors and package-signature
@@ -159,107 +156,29 @@ settings retain their separate authority boundaries.
   scrape-target/rule-group/Alertmanager-discovery state, Grafana's dashboard
   APIs against the committed dashboard JSON, a real Grafana→Prometheus query
   round trip, and a from-scratch Grafana old-volume migration smoke.
-- **Scaffolding contract (fast)** — job id `scaffolding-contract`, runs
-  `pnpm test:scripts:fast` — scaffold before/after fixtures in `scripts/lib/`
-  still match their source snapshot, the fixture-composition invariants
-  (no two edit steps target the same file, every scaffold dimension composes
-  safely with every other), and
-  the `scripts/measure/` baseline-measurement tool's own unit/inventory-
-  contract tests plus real, fast failure-path regressions (an install
-  exception, a failed command, partial internal verification preserved on a
-  failed run). Read-only against the real repo — the disposable repo copies
-  a few of these tests create never run a real `pnpm install` inside them,
-  only the job's own top-level `pnpm install --frozen-lockfile` — no Docker.
-  Fast ownership and operation-inventory checks read the current public working
-  tree, including non-ignored untracked files. Mutation fixtures use an
-  isolated copy of that tree; generated-project scenarios still start from
-  committed `HEAD`.
-  A narrow fast assertion check also flags default Console page URLs expected
-  without a test-local topology input.
-  `test:scripts:fast` is also the first half of the local aggregate
-  `pnpm test:scripts` command, so local full verification cannot omit it.
-  CI does not repeat this layer inside the parallel full job. Does **not** cover the
-  public/private-path ratchet — that is the separate "Observability contract
-  (static)" job above. No path filter: a change anywhere in the repo can
-  drift a scaffolding fixture (this job exists because exactly that
-  happened — `apps/web` and `docs/` changes drifted `scripts/lib/*.mjs`
-  fixtures across several PRs with nothing in CI to catch it).
-- **Scaffolding contract (full)** — job id `scaffolding-contract-full` is a small
-  aggregate that keeps the required display name unchanged. It runs with
-  `if: always()` and is green only when the whole `scaffolding-generated-shard`
-  matrix result is `success`; failed, cancelled or skipped shards make it red.
-  It is the only whole-matrix verdict. The work runs in two parallel shards
-  (`Scaffolding generated shard (a|b)`, `fail-fast: false`, own runner, 25-minute
-  budget each) over fixed three-scenario lists in
-  `scripts/lib/scaffold-ci-shards.mjs`; a fast contract test proves the lists
-  partition the six rows exactly. Shard `a` also runs the non-matrix
-  `scripts/*.test.mjs` files once; shard `b` runs only the matrix file. Together
-  they run the generated-project half of the local `pnpm test:scripts` aggregate
-  (`AMCORE_SCAFFOLD_SHARD` selects a shard; unset runs all six, and an invalid
-  value or use with the exhaustive matrix fails before any install). Each shard
-  uploads `scaffold-diagnostics-<shard>-<run-id>-<attempt>` (best effort, none
-  after a hard job timeout). The six independent repositories cover
-  the cross-product of multi/single locale routing and Console
-  path/host/disabled topology. en/ru and both optional project toggles are
-  distributed pairwise; multi- and single-locale host rows verify the distinct
-  proxy/static-asset outputs. Every row installs and
-  builds once, with typecheck/lint/test profiles assigned to preserve the old
-  runtime obligations. There is no path selector: every PR runs all six rows.
-  The original eight recipes run unchanged through
-  `pnpm test:scripts:exhaustive` in the non-required weekly/manual
-  `scaffolding-exhaustive.yml` backstop. Both modes create a fresh worktree per
-  row and never share mutable install/build state.
+- **Script contracts** — job id `script-contracts`, runs `pnpm test:scripts`:
+  every `scripts/lib/*.test.mjs` and `scripts/*.test.mjs`. These are unit and contract
+  tests of the repository's own tooling: the `init:brand` initializer with the engine
+  core, filesystem transaction and AST core it uses, product-admin placement, lint,
+  Lighthouse, migrator, API E2E and deployment contracts, and the check that Console
+  tests do not spell the default Console address. They read the current public working
+  tree, including non-ignored untracked files, and use isolated copies for mutation
+  fixtures. No Docker; the job's own `pnpm install --frozen-lockfile` is the only
+  install. No path filter: a change anywhere in the repo can drift a contract. A test
+  keeps this job, the root `test:scripts` script and the ruleset entry consistent. It
+  does **not** cover the public/private-path ratchet — that is the separate
+  "Observability contract (static)" job above.
 
-  The job also runs a conservative change selector in **shadow mode**. Selector
-  code and its versioned data declaration are extracted from the computed Git
-  merge base, so a head change cannot authorize itself. Planning inputs and the
-  generated-repository verification closure are separate graphs; unknown/new,
-  stale, conflicting, unreadable, A/D/R, membership, workflow, selector, and
-  declaration changes fail open to `generatedFull.required: true`. The only
-  initial would-skip class is a marker-free modification to an established
-  Markdown/CHANGELOG file outside known scaffold seams.
-
-  Shadow output never controls execution: setup, install, and all six generated
-  rows remain unconditional, and the fast job remains universal. With
-  `if: always()`, each shard appends a bounded summary headed "Shard <id> only —
-  not the whole matrix" and uploads `scaffold-shard-evidence-<shard>-<run-id>-<attempt>`
-  for 30 days: the versioned selector JSON (`shadow-result.json`) plus
-  `shard-scope.json` (shard id, its three scenario names, `scope: "shard-only"`
-  and that shard's outcome). Neither file is a whole-matrix result.
-  The selector JSON records merge-base provenance, matched/unknown inputs, reasons,
-  would-run versus actually-ran state, and that shard's step outcome. The bootstrap
-  PR is expected to report `trusted_selector_missing` and choose full because
-  its merge base has no trusted selector yet. Missing or invalid output is full.
-  The job has only `contents: read`; no skip is enabled in this phase.
-
-- **Scaffolding baseline measurement** (`pnpm measure:scaffold`,
-  `scripts/measure/`) is a separate, opt-in maintainer tool — not a CI gate,
-  never runs automatically. It re-applies the required six-row covering array
-  with instrumentation (copy/install/build/test
-  counts, observed-stage wall time, disk usage, generated-tree fingerprints),
-  inventories the real plans' source/target operations and exact-copy
-  synchronization edges, and statically classifies every
-  `scripts/lib/project-plan-*.mjs` transform
-  module by its authoring shape (whole-file copy, narrow exact-text block,
-  owned/sentinel block, structured config, delete/move, or unclassified with
-  a reason). It exists to give the scaffolding engine's own future
-  simplification work a measured baseline instead of an estimate. Run it
-  locally with `pnpm measure:scaffold` (`--only=coverage-multi-path` to iterate
-  on one row) — see the header comment in
-  `scripts/measure/run-baseline.mjs` for full usage.
-
-**The observability-contract and scaffolding-contract job contexts (four in
-total: static/live, fast/full) are all listed in the tracked
-`.github/rulesets/main.json`'s `required_status_checks`** — as with every
-ruleset entry in this file, that is the _declared intent_ checked into
-version control, not live GitHub state. Applying it (making the check
-actually required to merge) is the separate owner action described in
+**The observability-contract and script-contracts job contexts ("Observability
+contract (static)", "Observability contract (live)", "Script contracts") are listed
+in the tracked `.github/rulesets/main.json`'s `required_status_checks`** — as with
+every ruleset entry in this file, that is the _declared intent_ checked into version
+control, not live GitHub state. Applying it (making the check actually required to
+merge) is the separate owner action described in
 [Strict security setup after forking](#strict-security-setup-after-forking)
-below — required-check contexts only become selectable in that flow after
-they have run at least once on the repository. A newly added job context
-(such as the scaffolding-contract pair) needs that same one-time
-re-application after its first real run on the repository, exactly like a
-brand-new observability-contract job would.
+below — required-check contexts only become selectable in that flow after they have
+run at least once on the repository. A newly added job context needs that same
+one-time re-application after its first real run on the repository.
 
 ## API E2E budget policy
 
@@ -661,7 +580,7 @@ Schedules can be delayed. It retries the `CI` workflow once when all these hold:
 
 The controller reads GitHub job metadata. It does not diagnose package ages from
 logs, so a network-related install failure may also receive this one retry.
-It repeats the whole workflow to keep API/scaffold plans and shard evidence in
+It repeats the whole workflow to keep API and web plans and shard evidence in
 the same attempt. Successful jobs therefore run again too. The installation
 checks the real policy again; no lock, age exclusion or permissions are changed.
 

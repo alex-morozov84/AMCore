@@ -368,18 +368,6 @@
       "kind": "debt"
     },
     {
-      "file": "scripts/init-project.mjs",
-      "target": "ai/decisions/adr-071-",
-      "count": 1,
-      "kind": "debt"
-    },
-    {
-      "file": "scripts/init-project.mjs",
-      "target": "ai/models-talk.md",
-      "count": 1,
-      "kind": "debt"
-    },
-    {
       "file": "scripts/lib/brand-plan-files.mjs",
       "target": "ai/models-talk.md",
       "count": 1,

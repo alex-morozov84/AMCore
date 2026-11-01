@@ -1,58 +1,53 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { test } from 'node:test'
 
 import { assertBlockOrder, ownedBlockPrefix } from './ownership-seams.mjs'
-import { storybookOwnedBlockDefinition } from './project-storybook-doc-content.mjs'
-import { storybookOwnership } from './storybook-ownership.mjs'
-import { resolvePublicRepoRoot } from './working-tree-fixture.mjs'
 
-const file = 'docs/operations-console/development.md'
-const seam = storybookOwnership.seams.find(
-  (item) => item.id === 'storybook.console-development-step'
-)
-const original = readFileSync(path.join(resolvePublicRepoRoot(), file), 'utf8')
+const file = 'docs/guide.md'
+const seam = {
+  id: 'feature.guide-step',
+  selector: {
+    start: 'Add focused unit tests',
+    end: '  browser coverage',
+    preserveStartPrefix: true,
+  },
+}
+const original = [
+  '# Guide',
+  '',
+  '7. Prepare the fixture.',
+  '8. Add focused unit tests and',
+  '   browser coverage.',
+  '9. Update the plain-language note.',
+  '',
+].join('\n')
 
 function errorHasDetails(error, startCount, endCount) {
-  assert.match(error.message, /storybook\.console-development-step/)
-  assert.match(error.message, /docs\/operations-console\/development\.md/)
+  assert.match(error.message, /feature\.guide-step/)
+  assert.match(error.message, /docs\/guide\.md/)
   assert.match(error.message, /start "Add focused unit tests/)
-  assert.match(error.message, /end " {3}browser\/real-stack coverage/)
+  assert.match(error.message, /end " {2}browser coverage/)
   assert.match(error.message, new RegExp(`start .* found ${startCount}`))
   assert.match(error.message, new RegExp(`end .* found ${endCount}`))
   return true
 }
 
-test('current block has one ordered-list prefix and retains the current projection', () => {
+test('a block with one ordered-list prefix passes and exposes that prefix', () => {
   assert.doesNotThrow(() => assertBlockOrder(original, seam, file))
   assert.equal(ownedBlockPrefix(original, seam, file), '8. ')
 })
 
-test('renumbering an earlier step carries the source ordinal into the projection', () => {
+test('renumbering an earlier step carries the source ordinal into the prefix', () => {
   const renumbered = original
-    .replace(
-      '8. Add focused unit tests',
-      '8. Document the ownership seam.\n9. Add focused unit tests'
-    )
-    .replace('9. Update the plain-language', '10. Update the plain-language')
+    .replace('7. Prepare the fixture.', '7. Prepare the fixture.\n8. Document the seam.')
+    .replace('8. Add focused unit tests', '9. Add focused unit tests')
   assert.equal(ownedBlockPrefix(renumbered, seam, file), '9. ')
-  const projected = storybookOwnedBlockDefinition('storybook.docs-console-development').apply(
-    renumbered
-  )
-  assert.match(projected, /8\. Document the ownership seam\./)
-  assert.match(projected, /9\. Add focused unit tests and browser\/real-stack coverage/)
-  assert.match(projected, /\n {3}accessibility, auth, cookies, Redis/)
 })
 
 test('missing and duplicate anchors report both searched values and counts', () => {
   const missing = original.replace('Add focused unit tests', 'Write focused unit tests')
   assert.throws(
     () => assertBlockOrder(missing, seam, file),
-    (error) => errorHasDetails(error, 0, 1)
-  )
-  assert.throws(
-    () => storybookOwnedBlockDefinition('storybook.docs-console-development').apply(missing),
     (error) => errorHasDetails(error, 0, 1)
   )
   const duplicated = `${original}\n${seam.selector.start}\n${seam.selector.end}\n`

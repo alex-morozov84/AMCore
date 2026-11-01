@@ -46,9 +46,7 @@ if (process.argv.includes('--envelopes')) {
   )
   const catalogue = auditCatalogue(process.cwd(), plan.choices)
   const resolvers = [{ scope: 'product-admin', prefix: `/${plan.choices.productAdmin.alias}` }]
-  // AMCORE_CONSOLE_LIGHTHOUSE_AGGREGATE_START
   resolvers.push({ scope: 'console', prefix: `/${plan.choices.console.slug}` })
-  // AMCORE_CONSOLE_LIGHTHOUSE_AGGREGATE_END
   const provenance = {
     lock: digest(await readFile('pnpm-lock.yaml')),
     content: await snapshot(process.cwd()),

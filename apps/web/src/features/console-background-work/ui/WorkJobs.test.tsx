@@ -8,7 +8,7 @@ import { consoleApi } from '@/shared/api/console-api'
 import { LogSearchTargetProvider } from '@/shared/lib/log-search-context'
 import { logSearchHref, type LogSearchTarget } from '@/shared/lib/log-search-link'
 
-// Local behavior fixture stays usable after locale scaffolding removes a catalogue.
+// Local behavior fixture stays independent of the real catalogues.
 const messages = {
   console: {
     backgroundWork: {

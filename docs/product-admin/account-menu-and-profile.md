@@ -62,7 +62,7 @@ JSX; it uses shared primitives and semantic tokens. To replace it, build your ow
 `node scripts/fixtures/account-avatar-headless.mjs` prepares a disposable copy of the repository,
 swaps `AccountMenu` for an inline component that uses only `useCurrentUser`, `useAvatarEditor` and
 `UserAvatar` (no menu, no dialog, no ready block), adds a real-stack browser test and prints the
-command to run it. Add `--projected` to prepare it after `init:project` choices. The test uploads
+command to run it. The test uploads
 and removes a photo through the real API and checks that the image loads and the page has no axe
 violations.
 

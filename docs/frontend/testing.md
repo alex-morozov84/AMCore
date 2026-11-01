@@ -140,10 +140,8 @@ application transport and verified identity handling, not live provider registra
 
 The separate `setup-cli` lane proves closed-registration installation with the
 compiled command and an actual captured recovery email. It always applies.
-<!-- AMCORE_CONSOLE_ESTABLISHMENT_TESTING_START -->
 
 `setup-console` adds the same initial lifecycle through the retained HTTPS Console.
-<!-- AMCORE_CONSOLE_ESTABLISHMENT_TESTING_END -->
 
 Both use fresh `organization-setup` fixtures. Ordinary registration-dependent tests
 remain in their original stands. See [initial installation proof](../operations/local-stands.md#initial-organization-installation-proof)
@@ -220,14 +218,10 @@ members in product-administration path mode. In product-administration host mode
 run `pnpm audit:web staff-oauth` for members on the staff origin. That lane uses
 real password/MFA admission; its name does not turn the audit into a provider mock.
 
-<!-- AMCORE_CONSOLE_LIGHTHOUSE_TESTING_START -->
-
 The enabled Operations Console Overview belongs to `path-standard` in path mode.
 In host mode, run `pnpm audit:web host` for its separate owning stand. Canonical
 URL helpers resolve the configured locale and slug. Removing Console removes its
 scenario catalogue and fixture contributions; it does not remove product audits.
-
-<!-- AMCORE_CONSOLE_LIGHTHOUSE_TESTING_END -->
 
 At most three initial scenarios and three existing owning lanes apply. Each owner
 reuses its own production build/stack and runs one audit per assigned scenario.
@@ -957,8 +951,6 @@ run that whole test command with retries disabled, and require a missing-handler
 Restore the handler and verify success. Repeat the signup-policy absence check. Preserve
 the negative result separately; startup errors are not missing-handler evidence.
 
-<!-- AMCORE_CONSOLE_SUPPORT_MAIL_TESTING_START -->
-
 The support-mail journey has two isolated recipient-completion profiles:
 `support-mail-path` and `support-mail-host` in the product-admin real-stack lane.
 Both run `console-support-mail.spec.ts` against actual rendered fake-recipient
@@ -966,5 +958,3 @@ mail in the internal collector. The source-copy transport retains its final
 admission callback; the original Resend SDK has a separate contract test.
 See [commands and artifact restrictions](../operations/local-stands.md#support-mail-recipient-completion).
 The mock `support-mail` preview cannot prove recipient completion.
-
-<!-- AMCORE_CONSOLE_SUPPORT_MAIL_TESTING_END -->

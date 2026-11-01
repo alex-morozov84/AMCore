@@ -41,8 +41,8 @@ The sign-in address depends on how the Console was configured:
 - **Path mode:** Sign in through the product's normal login, then open its
   Console path. In the upstream multi-locale setup, use `/en/admin` or
   `/ru/admin`.
-- **Host mode:** Open `https://<ADMIN_CONSOLE_HOSTNAME>/{locale}/login`, or
-  `/login` on a single-locale fork, and sign in with your email and password.
+- **Host mode:** Open `https://<ADMIN_CONSOLE_HOSTNAME>/{locale}/login` and sign in
+  with your email and password.
   A product login on another host does not sign you into the Console. Use
   **Sign out** in the Console to end only its session. Console OAuth sign-in
   is not supported.

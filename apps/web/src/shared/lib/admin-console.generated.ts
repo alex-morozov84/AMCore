@@ -1,6 +1,5 @@
 /**
- * Generated scaffold/runtime choice. PR5 owns the transform that rewrites
- * this file; runtime must not read PROJECT_CONTEXT.md.
+ * Console topology of this build. Runtime must not read PROJECT_CONTEXT.md.
  */
 export type AdminConsoleMode = 'disabled' | 'path' | 'host'
 

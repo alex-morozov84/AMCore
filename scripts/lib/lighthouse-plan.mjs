@@ -36,7 +36,6 @@ export function auditChoices(root) {
     return field ? [{ feature: field[1], reason: 'disabled-at-initialization' }] : []
   })
   choices.extensions = []
-  // AMCORE_CONSOLE_LIGHTHOUSE_CHOICES_START
   invariant(field('admin_console') === 'enabled', 'invalid-console-choice')
   choices.console = { mode: field('admin_console_mode'), slug: field('admin_console_slug') }
   invariant(
@@ -44,7 +43,6 @@ export function auditChoices(root) {
     'invalid-console-placement'
   )
   choices.extensions.push('apps/web/e2e/console-real-stack/lighthouse/catalogue.json')
-  // AMCORE_CONSOLE_LIGHTHOUSE_CHOICES_END
   return choices
 }
 
@@ -87,9 +85,7 @@ export function auditScope(root) {
     if (scope === 'product') return 'path-standard'
     if (scope === 'product-admin')
       return choices.productAdmin.mode === 'host' ? 'staff-oauth' : 'path-standard'
-    // AMCORE_CONSOLE_LIGHTHOUSE_OWNER_START
     if (scope === 'console') return choices.console.mode === 'host' ? 'host' : 'path-standard'
-    // AMCORE_CONSOLE_LIGHTHOUSE_OWNER_END
     throw new Error('unknown-scenario-scope')
   }
   const assignments = Object.fromEntries(
@@ -134,12 +130,10 @@ export function scenarioUrl(scenario, m, values = {}) {
     origin = m.productAdminHost ? m.origins.staff : origin
     prefix += m.productAdminHost ? '' : `/${values.alias}`
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_URL_START
   if (scenario.scope === 'console') {
     origin = m.consoleTopology === 'host' ? m.origins.console : origin
     prefix += m.consoleTopology === 'host' ? '' : `/${m.consoleSlug}`
   }
-  // AMCORE_CONSOLE_LIGHTHOUSE_URL_END
   invariant(typeof origin === 'string', 'missing-scenario-origin')
   const path = scenario.path.replace(/\[([a-zA-Z]+)\]/g, (_, key) => {
     invariant(/^[a-zA-Z0-9_-]+$/.test(values[key] ?? ''), 'missing-fixture-param')

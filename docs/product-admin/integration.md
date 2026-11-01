@@ -1,9 +1,8 @@
 # Integrate organization pages and custom UI
 
-Initialize your downstream identity with `pnpm init:brand`, then apply any chosen
-`pnpm init:project` dimensions before manual route movement. Inspect the resulting
-route tree: examples below use multi-locale `[locale]`; single-locale builds omit
-that segment. Use nonreserved same-host destinations that do not overlap API,
+Initialize your downstream identity with `pnpm init:brand` before manual route
+movement. The examples below use the multi-locale `[locale]` route tree. Use
+nonreserved same-host destinations that do not overlap API,
 authentication, assets or Operations Console routes.
 
 ## Ordinary placement
@@ -275,9 +274,7 @@ The account menu and avatar editor have the same kind of fixture:
 The executable `scripts/fixtures/organization-members-headless.mjs` includes an inline member-key panel using the same controller and explicit revoke confirmation. It creates a
 separate disposable consumer with a list and inline editor instead of the ready
 table/dialog. By default it preserves the source's selected project choices.
-Run it after identity and project initialization. On pristine upstream source only,
-`--projected` demonstrates single-Russian routing with Console, Storybook and
-route progress disabled before consumer injection. It prints the managed real-stack browser
+Run it after identity initialization. It prints the managed real-stack browser
 command; no standalone sample product route is added to the starter. See the
 [members contract](organization-members.md) for permissions, complete-set/byte
 limits, truthful self-edit warnings and safe recovery.
@@ -309,9 +306,8 @@ refresh: its failure remains in the local role error and does not fail an
 otherwise successful primary write followup. Display committed success separately from
 followup failure and offer `operation.controller.review()` to refresh current state
 without sending the original command again. Unknown results use `recover()`.
-`--projected` prepares single-Russian routing with Console and Storybook removed
-and route progress disabled. Install dependencies and run the printed browser
-command in that separate copy; preparing it alone does not verify the projection.
+Install dependencies and run the printed browser command in that separate copy;
+preparing it alone does not verify the example.
 
 This small fixture demonstrates composition, not a complete replacement manager.
 For your product, add your own search/paging, complete-set draft review and
@@ -342,18 +338,16 @@ The executable example creates a separate sanitized source fixture:
 
 ```sh
 node scripts/fixtures/organization-shop-headless.mjs
-# Optional combined projection: single Russian locale, no Console/Storybook/progress.
-node scripts/fixtures/organization-shop-headless.mjs --projected
 ```
 
-The generator preserves the source's selected project choices. Single-locale
-sources mount `/shop-team`; multi-locale sources prefix it with each selected locale.
+The generator preserves the source's project choices; `/shop-team` is prefixed with
+each locale of the source.
 The shop example independently composes the public organization-context hooks into
 a crew directory, personnel dossier and separate role, key and membership sections.
 Local CSS and product-owned semantic tokens define its appearance. See the
-[adoption guide](adoption.md) for initialization, `--preview`, safe local data and
-[your own appearance](adoption.md#your-own-appearance). It keeps the generic backend
-organization API and compiled setup command when the frontend Console is removed.
+[adoption guide](adoption.md) for initialization, safe local data and
+[your own appearance](adoption.md#your-own-appearance). It uses the generic backend
+organization API and the compiled setup command.
 Its `organization-shop` test fixture enables buyer registration and disables
 self-service organization creation; it proves that a signed-in buyer cannot create a company.
 The shop browser fixture checks backend authentication, staff role editing,

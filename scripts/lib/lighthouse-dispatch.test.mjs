@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { createCommittedCopy } from './init-project-test-helpers.mjs'
+import { createCommittedCopy } from './committed-copy-fixture.mjs'
 
 function sourceOnly(t) {
   const copies = []

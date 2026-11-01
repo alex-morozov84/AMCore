@@ -6,14 +6,14 @@ plane, never a product backoffice.
 
 ## Ownership and security boundaries
 
-| Concern             | Owned location or rule                                                                                                                                    |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Route plumbing      | Upstream: `apps/web/src/app/[locale]/admin/**`; scaffolding relocates or renames it for the selected locale mode and slug. Keep the resulting route thin. |
-| Page composition    | `apps/web/src/_pages/console/**`                                                                                                                          |
-| Shell               | `apps/web/src/widgets/console-shell/**`; reuse `shared/ui`, not the product app shell                                                                     |
-| Console BFF         | `apps/web/src/app/api/console/**`; every handler starts with `withConsoleHostGuard()`                                                                     |
-| Live page admission | `ConsolePageFrame` calls `requireSuperAdmin()` on every protected page before mounting chrome; never trust a JWT role snapshot or UI state                |
-| Public navigation   | `RouteProgressLink` and the console public-href helper                                                                                                    |
+| Concern             | Owned location or rule                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Route plumbing      | `apps/web/src/app/[locale]/admin/**`. Keep the route thin.                                                                                 |
+| Page composition    | `apps/web/src/_pages/console/**`                                                                                                           |
+| Shell               | `apps/web/src/widgets/console-shell/**`; reuse `shared/ui`, not the product app shell                                                      |
+| Console BFF         | `apps/web/src/app/api/console/**`; every handler starts with `withConsoleHostGuard()`                                                      |
+| Live page admission | `ConsolePageFrame` calls `requireSuperAdmin()` on every protected page before mounting chrome; never trust a JWT role snapshot or UI state |
+| Public navigation   | `RouteProgressLink` and the console public-href helper                                                                                     |
 
 Do not reuse console routes, BFF namespace, session audience, or `SUPER_ADMIN`
 as shortcuts for a downstream product backoffice. Every backend data endpoint
@@ -61,11 +61,11 @@ product session. Capture the intended value and revision before re-authenticatio
 for settings writes; a conflict or uncertain outcome requires an authoritative
 reread, not replay of a newly edited draft.
 
-Console files added below the closed roots listed above are scaffold-owned
-automatically. A Console contribution to shared navigation, config, scripts,
-CI, or mixed docs must declare a narrow seam or structural operation. Novel
-unmarked semantics remain an explicit author/reviewer classification boundary;
-see the [worked ownership examples](../frontend/brand-theme-and-tokens.md#optional-feature-extension-ownership).
+In Console UI tests, derive topology-dependent navigation expectations from
+`getConsole*Href()` or set a path/host fixture in the same test case. URLs
+supplied as mock or `baseHref` inputs and backend API paths remain valid. The
+`console-topology-assertions` contract test fails when a Console test spells the
+default `/admin` address.
 
 ### Overview observation contract
 
@@ -135,8 +135,8 @@ replace it with a token hash or infer authorization from the displayed device.
 
 1. Obtain a narrowly scoped plan and classify every datum as primary or
    secondary.
-2. Inspect `ADMIN_CONSOLE_CONFIG` and the actual generated route tree; do not
-   assume the upstream `[locale]/admin` path still exists.
+2. Add the route under `app/[locale]/admin/` and derive public addresses from
+   `getConsole*Href()`, not from the physical path.
 3. Add thin route plumbing and `_pages/console` composition, using the existing
    shell and semantic tokens.
 4. Add copy for every retained locale and progress-aware public navigation.
@@ -339,8 +339,8 @@ queue in the board, add a projection (see
   and real-stack layers.
 - Run `pnpm test:console-session-e2e` for the isolated HTTPS console
   cookie/Redis audience lane.
-- Run `pnpm test:scripts` when the scaffold-owned surface or generated output
-  changes; its single-locale host proxy smoke covers nginx and Caddy.
+- Run `pnpm test:scripts` when you change tooling under `scripts/` or the CI
+  workflows.
 - Run `pnpm --filter web test:storybook` for component interaction and a11y
   states.
 - Run `pnpm test:observability-contract` after tracked documentation changes.

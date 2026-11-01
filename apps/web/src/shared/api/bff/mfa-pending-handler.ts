@@ -21,9 +21,7 @@ import {
   unavailableBrowserContext,
 } from './browser-binding.server'
 import { completeBrowserLogin } from './browser-login-handler'
-// AMCORE_CONSOLE_RETURN_IMPORT_START
 import { confirmedConsoleReturn } from './console-return-destination'
-// AMCORE_CONSOLE_RETURN_IMPORT_END
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { resumeInvitedBrowserPublication } from './invited-browser-login'
@@ -105,15 +103,11 @@ export async function inspectPendingMfa(
     throw changedBrowserContext()
   const entry = await stagedEntry(context, record)
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
-  // AMCORE_CONSOLE_RETURN_DESTINATION_START
   const consoleReturn = await confirmedConsoleReturn(request, context, record, entry)
-  // AMCORE_CONSOLE_RETURN_DESTINATION_END
   const response = NextResponse.json({
     ...flowView(record, 'completed'),
     publication: 'confirmed',
-    // AMCORE_CONSOLE_RETURN_RESULT_START
     ...(consoleReturn ? { consoleReturn } : {}),
-    // AMCORE_CONSOLE_RETURN_RESULT_END
   })
   if (record.invitation) {
     const settled = await resumeInvitedBrowserPublication(

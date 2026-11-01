@@ -6,11 +6,9 @@ export const RAW_FETCH_FILES = [
   ...['creation', 'invitations', 'member-api-keys', 'member-removal', 'members', 'roles'].map(
     (name) => `src/entities/organization-context/api/${name}-client.ts`
   ),
-  // AMCORE_CONSOLE_NETWORK_EXCEPTIONS_START
   'src/shared/api/console/establishment-client.ts',
   'src/shared/api/console/identity-lookup-client.ts',
   'src/shared/api/console/provisioning-client.ts',
-  // AMCORE_CONSOLE_NETWORK_EXCEPTIONS_END
   'src/shared/lib/deployment-version/checker.ts',
 ]
 const extensions = '{ts,tsx,mts,cts,js,jsx,mjs,cjs}'

@@ -116,7 +116,7 @@ test('the repaired settings retain the documented defaults with an empty env fil
   const config = composeEnvironment()
   assert.equal(omittedBefore.length, 34)
   for (const key of omittedBefore) {
-    if (!Object.hasOwn(activeEnvironment, key)) continue // optional dimension removed by scaffolding
+    if (!Object.hasOwn(activeEnvironment, key)) continue // variable not present in this stand profile
     for (const service of ['api', 'worker']) {
       assert.equal(
         config.services[service].environment[key],

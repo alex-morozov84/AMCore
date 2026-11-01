@@ -152,7 +152,7 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
       },
       {
-        // Locale topology follows the shared locale set, including scaffolded single-locale forks.
+        // Locale topology follows the shared locale set.
         source: SUPPORTED_LOCALES.length > 1 ? '/:locale/invite/:path*' : '/invite/:path*',
         headers: invitationPrivacyHeaders,
       },
@@ -194,9 +194,8 @@ const nextConfig: NextConfig = {
       ].map((source) => ({ source, headers: invitationPrivacyHeaders })),
       // Static noindex for a surface that must never be indexed, whatever the environment. This is
       // a build-time, path-based entry; the environment/host rule is the proxy's (shared/lib/seo).
-      // `/api/*` never passes the proxy. The Console has no entry here on purpose: its slug lives in
-      // a Console-owned file that a fork without the Console deletes, so a header would need its own
-      // scaffold seam. The Console is closed by `noindexMetadata` in its layout, delivered in
+      // `/api/*` never passes the proxy. The Console has no entry here on purpose: it is
+      // closed by `noindexMetadata` in its layout, delivered in
       // `<head>` to every listed crawler (`htmlLimitedBots`), and by the proxy header on any host
       // that is not the open site host (docs/frontend/seo.md).
       { source: '/api/:path*', headers: noindexHeaders },

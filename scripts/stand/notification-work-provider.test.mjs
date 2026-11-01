@@ -6,7 +6,7 @@ import { create } from './create.mjs'
 import { configuration } from './config.mjs'
 import { directory } from './state.mjs'
 
-// Fully Console-owned profile proof; disabled scaffolding removes it with the fixture modules.
+// Fully Console-owned profile proof.
 test('notification preview provider stays on the owned internal network with persistent fake outcomes', async () => {
   const id = `notification-config-${randomUUID()}`
   try {

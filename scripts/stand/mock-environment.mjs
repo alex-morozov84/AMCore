@@ -15,10 +15,8 @@ export function mockEnvironment(m) {
     WEB_FRONTEND_CONTEXT_KEY: createHmac('sha256', m.jwtSecret)
       .update('amcore-web-context-v1')
       .digest('hex'),
-    // AMCORE_CONSOLE_MOCK_ENV_START
     ADMIN_CONSOLE_HOSTNAME: m.topology === 'host' ? m.hostnames.console : '',
     ADMIN_CONSOLE_ORIGIN:
       m.topology === 'host' ? `https://${m.hostnames.console}:${m.ports.tls}` : '',
-    // AMCORE_CONSOLE_MOCK_ENV_END
   }
 }

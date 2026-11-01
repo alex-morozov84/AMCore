@@ -9,10 +9,8 @@ export const productAdminProfiles = [
   'product-admin-console-path',
   'product-admin-closed-signup',
   'product-admin-oauth',
-  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
   'support-mail-path',
   'support-mail-host',
-  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
 ]
 
 /** Copy-only topology rehearsal; never modifies the authoring checkout or runtime policy. */
@@ -34,7 +32,6 @@ export async function prepareProductAdminSource(m) {
   if (config.mode !== 'host') throw new Error('Managed staff host requires host source placement')
   productAdminEdgeFiles(m.snapshot, true)
   let consoleBlock = ''
-  // AMCORE_CONSOLE_STAFF_EDGE_START
   if (m.consoleEnabled && m.consoleTopology === 'host') {
     const source = await readFile(join(m.snapshot, 'docker/caddy/Caddyfile.console-host'), 'utf8')
     const start = source.indexOf('# AMCORE_ADMIN_CONSOLE_PROXY_START')
@@ -42,7 +39,6 @@ export async function prepareProductAdminSource(m) {
     if (start < 0 || end < start) throw new Error('Missing managed Console edge seam')
     consoleBlock = source.slice(start, end)
   }
-  // AMCORE_CONSOLE_STAFF_EDGE_END
   const content = `{
   local_certs
   auto_https disable_redirects

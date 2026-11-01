@@ -230,14 +230,10 @@ waiting_human`) and `ai_run_due` (no labels) — the same pattern for the
   `waiting_approval`/`waiting_human` (intentionally parked for a human, not
   stuck).
 
-<!-- AMCORE_CONSOLE_BACKGROUND_WORK_START -->
-
 The Operations Console [Background work](../operations-console/background-work.md)
 screen reads the same queues but shows **Waiting** as `waiting` plus `prioritized`
 (BullMQ keeps priority jobs in a separate set); the metric meanings above are
 unchanged. Its "Oldest queued job" is a sampled creation age and has no metric.
-
-<!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->
 
 **Cache**
 

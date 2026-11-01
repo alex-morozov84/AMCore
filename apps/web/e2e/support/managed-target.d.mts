@@ -20,9 +20,7 @@ export interface ManagedTarget {
     console: string
     api: string
     staff?: string
-    // AMCORE_CONSOLE_SUMMARY_METRICS_ORIGIN_START
     metrics?: string
-    // AMCORE_CONSOLE_SUMMARY_METRICS_ORIGIN_END
   }
   hostnames: { product: string; console: string; api: string; staff?: string }
   caFile?: string

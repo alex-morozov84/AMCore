@@ -15,10 +15,9 @@ Organization details -> Administrator email -> Check details -> Create and invit
 
 ## Before you start
 
-Invitation languages follow the application's `SUPPORTED_LOCALES`. A single-language
-installation offers only that language. API examples use `en`; replace it with the
-configured language in a single-language fork. Omitted invitation language defaults
-to that installation's `DEFAULT_LOCALE`.
+Invitation languages follow the application's `SUPPORTED_LOCALES` (`en` and `ru` in
+this build). API examples use `en`. An omitted invitation language defaults to the
+installation's `DEFAULT_LOCALE`.
 
 Apply migrations and initialize the canonical system roles through the guarded
 [deployment procedure](../operations/deployment.md#seeding). Deploy matching code
@@ -52,8 +51,6 @@ not proof of delivery; a real provider can still fail after commit.
 Public signup and self-service creation both retain their default `true` values.
 They are independent of operator provisioning. Disabling Console removes its
 frontend only; the protected backend API and product invitation pages remain.
-
-<!-- AMCORE_CONSOLE_PROVISIONING_START -->
 
 ## Use Console
 
@@ -100,8 +97,6 @@ For an unfinished invitation, use **Send a new invitation** for a mail problem,
 **Change recipient** for a wrong address, or **Enter recipient** after recipient pruning.
 **Cancel administrator invitation** requires confirmation and invalidates the old link.
 After cancellation, use **Invite an administrator** for a new invitation in the same organization.
-
-<!-- AMCORE_CONSOLE_PROVISIONING_END -->
 
 ## Help the recipient obtain access
 
@@ -336,12 +331,10 @@ It is saved before sending, in the API response and in the original browser's
 recovery state. For an organization already found in inventory, its provisioning
 status also returns `creationOperationId`. The replacement operator may inspect
 the original creation result, but cannot execute creation under another creator's ID.
-<!-- AMCORE_CONSOLE_PROVISIONING_SEARCH_START -->
 
 Use the general **Search organizations** field to search name/identifier;
 **Needs attention** has its own pagination and no search field. Clear unrelated
 filters and distinguish a read error from no matches.
-<!-- AMCORE_CONSOLE_PROVISIONING_SEARCH_END -->
 
 If both the operation reference and the organization are unavailable, inventory
 absence is not proof of rollback. Do not recreate automatically or choose a new ID
@@ -407,10 +400,8 @@ The initial-setup CLI remains available; it does not create later organizations.
   remains available. Missing mail is repaired in that organization, not by opening signup.
 - **SaaS:** configure signup and self-service independently. Anna uses the PRODUCT
   **Organizations** page, not the SUPER_ADMIN Operations Console.
-  <!-- AMCORE_CONSOLE_PROVISIONING_URLS_START -->
   In the default path topology these are `/en/organizations` and
   `/en/admin/organizations` respectively. The ordinary account cannot use Console.
-  <!-- AMCORE_CONSOLE_PROVISIONING_URLS_END -->
   Users can explicitly create
   their own companies if enabled; operators can separately create one for another person.
   Each deliberate new organization uses a new request ID; uncertain retries keep the old ID.

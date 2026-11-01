@@ -4,9 +4,6 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { snapshot } from '../stand/snapshot.mjs'
-import { prepareProjectInit } from '../lib/project-init-plan.mjs'
-import { parseProjectFlags } from '../lib/project-flags.mjs'
-import { applyFilesystemTransaction } from '../lib/filesystem-transaction.mjs'
 
 const source = resolve(import.meta.dirname, '../..')
 const fixture = await mkdtemp(join(tmpdir(), 'amcore-account-headless-'))
@@ -38,21 +35,7 @@ await writeFile(
   join(fixture, 'apps/web/e2e/real-stack/account-avatar-headless.spec.ts'),
   await readFile(join(import.meta.dirname, 'account-avatar-headless.spec.ts.fixture'), 'utf8')
 )
-if (process.argv.includes('--projected')) {
-  const plan = prepareProjectInit(
-    fixture,
-    parseProjectFlags([
-      '--mode=single',
-      '--locale=ru',
-      '--admin-console=disabled',
-      '--storybook=disabled',
-    ]),
-    'panel'
-  )
-  applyFilesystemTransaction({ root: fixture, operations: plan.operationPlan.operationsForApply() })
-  plan.assertApplied()
-}
 console.log(`Prepared custom-headless account fixture: ${fixture}`)
 console.log(
-  `Install projected dependencies first: pnpm --dir ${fixture} install --ignore-scripts --no-frozen-lockfile\nRun: pnpm --dir ${fixture} stand e2e --lane real-stack -- account-avatar-headless.spec.ts`
+  `Install: pnpm --dir ${fixture} install --ignore-scripts --no-frozen-lockfile\nRun: pnpm --dir ${fixture} stand e2e --lane real-stack -- account-avatar-headless.spec.ts`
 )

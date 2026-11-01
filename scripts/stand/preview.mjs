@@ -28,12 +28,9 @@ export async function preview(m, profile = 'default') {
   ]
   if (profile === 'account-mfa-ui' && (m.purpose !== 'preview' || m.fixtureProfile !== profile))
     throw new Error('Account MFA UI needs its own managed preview profile')
-  // AMCORE_CONSOLE_NOTIFICATION_PROFILE_START
   profiles.push('notification-work')
   if (profile === 'notification-work' && m.fixtureProfile !== profile)
     throw new Error('Notification work preview needs a fresh stand created with this profile')
-  // AMCORE_CONSOLE_NOTIFICATION_PROFILE_END
-  // AMCORE_CONSOLE_AI_PROFILE_START
   profiles.push(
     'ai-run-control',
     'scheduled-jobs',
@@ -46,15 +43,12 @@ export async function preview(m, profile = 'default') {
     (!m.consoleEnabled || m.purpose !== 'preview' || m.fixtureProfile !== profile)
   )
     throw new Error('Login diagnostics needs a fresh enabled-Console stand with this profile')
-  // AMCORE_CONSOLE_AI_PROFILE_END
-  // AMCORE_CONSOLE_ESTABLISHMENT_PROFILE_START
   profiles.push('organization-establishment')
   if (
     profile === 'organization-establishment' &&
     (!m.consoleEnabled || m.fixtureProfile !== profile || m.purpose !== 'preview')
   )
     throw new Error('Initial setup preview needs a fresh enabled-Console stand with this profile')
-  // AMCORE_CONSOLE_ESTABLISHMENT_PROFILE_END
   if (!profiles.includes(profile)) throw new Error('Unknown fixture profile')
   await admitInvocation(m)
   const labels = await previewLabels(m)
@@ -84,7 +78,6 @@ export async function preview(m, profile = 'default') {
     const accounts = m.accounts.filter(
       (account) => profile !== 'account-mfa-ui' || account.role === 'USER'
     )
-    // AMCORE_CONSOLE_ESTABLISHMENT_FIXTURE_START
     if (profile === 'organization-establishment') {
       const { executeSetupCommand } = await import('./setup-command.mjs')
       const probes = await executeSetupCommand(m, { command: 'diagnostics' })
@@ -110,7 +103,6 @@ export async function preview(m, profile = 'default') {
         await save(m)
       }
     }
-    // AMCORE_CONSOLE_ESTABLISHMENT_FIXTURE_END
     if (profile === 'organization') {
       const { organizationFixture } = await import('./organization-fixture.mjs')
       await organizationFixture(m, api)
@@ -125,13 +117,10 @@ export async function preview(m, profile = 'default') {
       const { memberApiKeysFixture } = await import('./member-api-keys-fixture.mjs')
       await memberApiKeysFixture(m, api)
     }
-    // AMCORE_CONSOLE_NOTIFICATION_FIXTURE_START
     if (profile === 'notification-work') {
       const { notificationWorkFixture } = await import('./notification-work-fixture.mjs')
       await notificationWorkFixture(m)
     }
-    // AMCORE_CONSOLE_NOTIFICATION_FIXTURE_END
-    // AMCORE_CONSOLE_AI_FIXTURE_START
     if (profile === 'ai-run-control') {
       const { aiRunControlFixture } = await import('./ai-run-control-fixture.mjs')
       await aiRunControlFixture(m, api)
@@ -154,7 +143,6 @@ export async function preview(m, profile = 'default') {
       await supportMailFixture(m)
       await supportMailFeedbackFixture(m)
     }
-    // AMCORE_CONSOLE_AI_FIXTURE_END
     if (profile === 'client-ip') {
       const { clientIpPreview } = await import('./client-ip-fixture.mjs')
       const context = await browser.newContext({ baseURL: m.origins.product })
@@ -203,7 +191,6 @@ export async function preview(m, profile = 'default') {
             .getByRole('button', { name: labels.product.cancelCreation, exact: true })
             .click()
         }
-        // AMCORE_CONSOLE_PREVIEW_ACCESS_START
         if (account.role === 'SUPER_ADMIN') {
           await page.goto(
             m.origins.console
@@ -218,7 +205,6 @@ export async function preview(m, profile = 'default') {
             await page.waitForURL(`${m.origins.console}${m.localePrefix}`)
           }
           if (page.url().includes('/login')) throw new Error('Admin preview access not proved')
-          // AMCORE_CONSOLE_ESTABLISHMENT_PREVIEW_START
           if (profile === 'organization-establishment') {
             const base = m.origins.console
               ? `${m.origins.console}${m.localePrefix}`
@@ -237,7 +223,6 @@ export async function preview(m, profile = 'default') {
               .or(page.getByRole('heading', { name: new RegExp(`^(?:${states.join('|')})$`) }))
               .waitFor()
           }
-          // AMCORE_CONSOLE_ESTABLISHMENT_PREVIEW_END
           if (profile === 'notification-work') {
             const { notificationWorkPreview } = await import('./notification-work-fixture.mjs')
             await notificationWorkPreview(page, m, SUPPORTED_LOCALES)
@@ -251,7 +236,6 @@ export async function preview(m, profile = 'default') {
             await aiRunControlPreview(page, m)
           }
         }
-        // AMCORE_CONSOLE_PREVIEW_ACCESS_END
         if (profile === 'account-mfa-ui' && account.role === 'USER') {
           const { accountMfaPreview } = await import('./account-mfa-preview.mjs')
           await accountMfaPreview(page, m)
@@ -285,9 +269,7 @@ export async function preview(m, profile = 'default') {
         `Members: ${m.origins.product}${m.localePrefix}/organizations/${m.organization.id}/members`
       )
     let scenario = 'login, inspect current changes'
-    // AMCORE_CONSOLE_PREVIEW_SCENARIO_START
     if (profile !== 'account-mfa-ui') scenario += ' and Console access'
-    // AMCORE_CONSOLE_PREVIEW_SCENARIO_END
     console.log(`Scenario: ${scenario}. Stop: pnpm stand down --id ${m.id}`)
   } finally {
     endInvocation(m)

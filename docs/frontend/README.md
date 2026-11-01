@@ -61,9 +61,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
   see [Architecture & conventions § Relationship to backend/OpenAPI docs](./architecture-and-conventions.md#relationship-to-backendopenapi-docs)
 - Rebranding a downstream fork (logo, PWA icons, tokens, theme mode) →
   [Brand, theme, and design tokens § Downstream rebrand checklist](./brand-theme-and-tokens.md#downstream-rebrand-checklist)
-- Initializing a downstream fork (`pnpm init:brand`/`pnpm init:project`:
-  identity, locale/Storybook shape, route-progress default) →
-  [Brand, theme, and design tokens § Project scaffolding](./brand-theme-and-tokens.md#project-scaffolding)
+- Initializing a downstream fork (`pnpm init:brand`: identity, assets, theme) →
+  [Brand, theme, and design tokens § Fork initialization](./brand-theme-and-tokens.md#fork-initialization)
 - Adding a third-party script/style origin, or running CSP in report-only →
   [Browser security headers and CSP](./browser-security-and-csp.md)
 - Adding a page that search engines should index, or keeping the product closed →

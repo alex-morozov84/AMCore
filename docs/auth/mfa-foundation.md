@@ -223,12 +223,9 @@ Revocation of the original family invalidates every derived continuation.
 Website and product-admin account-security adapters connect source-bound code
 rotation and app replacement.
 
-<!-- AMCORE_CONSOLE_MFA_ADAPTER_START -->
-
 The Console step-up adapter connects reauthentication. Host Console selects its
 own HTTPS audience, cookie and Redis namespace; it uses the same publication and
 continuation protocol.
-<!-- AMCORE_CONSOLE_MFA_ADAPTER_END -->
 
 `GET /auth/mfa/settings` returns only the admitted account label, eligibility,
 protection state and count of unused codes. `POST /auth/mfa/rotate-codes` requires
@@ -330,12 +327,9 @@ not enter unknown-result recovery or automatically start another flow. A changed
 source requires a new sign-in. The server still owns proof freshness, one-time
 consumption, rate limits, family binding and transaction outcomes.
 
-<!-- AMCORE_CONSOLE_MFA_RECOVERY_START -->
-
 If a Console logout cannot be confirmed, offer an explicit new sign-in without
 the old return reference; successful admission then opens the overview. Never
 infer logout success from a missing receipt.
-<!-- AMCORE_CONSOLE_MFA_RECOVERY_END -->
 
 ## Extend MFA to other users
 
