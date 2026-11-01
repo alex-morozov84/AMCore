@@ -24,7 +24,7 @@ const STATS = 'apps/web/.next/diagnostics/route-bundle-stats.json'
 const MANIFEST = 'apps/web/.next/app-path-routes-manifest.json'
 const CORE = 'apps/web/route-budgets.json'
 const CONSOLE = 'apps/web/src/_pages/console/route-budgets.json'
-const CONFIG = 'apps/web/src/shared/lib/admin-console.generated.ts'
+const CONFIG = 'packages/shared/src/config/admin-console.json'
 
 test('a complete build within budget passes; redirects and _global-error need no row', () => {
   const fixture = createFixture()
@@ -115,7 +115,7 @@ failsWith('two routes normalize to one key', /both map to app:\/login/, (f) => {
   f.write(STATS, [...f.stats, { ...f.stats[1], route: '/login' }])
 })
 failsWith('route claimed by two scopes', /claimed by scopes product-admin, admin-console/, (f) =>
-  f.write(CONFIG, "  enabled: true,\n  slug: 'manage',\n")
+  f.write(CONFIG, { version: 1, mode: 'path', alias: 'manage' })
 )
 failsWith('duplicate key across budget files', /budgeted in both/, (f) =>
   f.write(CONSOLE, { routes: { 'admin-console:/': 200, 'app:/login': 200 } })
@@ -123,12 +123,23 @@ failsWith('duplicate key across budget files', /budgeted in both/, (f) =>
 failsWith('unknown scope', /unknown scope "billing"/, (f) =>
   f.write(CORE, { routes: { ...f.routes, 'billing:/': 200 } })
 )
-failsWith('Console config missing while its seam is present', /Console config is missing/, (f) =>
+failsWith('Console settings missing', /Console settings is missing/, (f) =>
   rmSync(path.join(f.root, CONFIG))
 )
-failsWith('Console config disabled while its seam is present', /needs enabled: true/, (f) =>
-  f.write(CONFIG, "  enabled: false,\n  slug: 'admin',\n")
+failsWith('Console alias invalid', /invalid Console alias/, (f) =>
+  f.write(CONFIG, { version: 1, mode: 'path', alias: 'Not Valid' })
 )
+test('a disabled Console keeps its budget scope, because its folder stays in the build', () => {
+  const fixture = createFixture()
+  try {
+    fixture.write(CONFIG, { version: 1, mode: 'disabled', alias: 'admin' })
+    const result = fixture.run()
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /ok {3}admin-console:\/ /)
+  } finally {
+    fixture.cleanup()
+  }
+})
 failsWith('page without a budget row', /app:\/register has no budget row/, (f) => {
   const { 'app:/register': _removed, ...routes } = f.routes
   f.write(CORE, { routes })

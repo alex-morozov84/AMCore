@@ -37,13 +37,13 @@ function scopeRegistry() {
   const resolvers = [{ scope: 'product-admin', prefix: `/${alias}` }]
   const mandatory = ['app:/', 'app:/login', 'app:/register', 'app:/settings/sessions']
   mandatory.push('product-admin:/organizations')
-  const consoleConfig = readText(
-    path.join(webRoot, 'src/shared/lib/admin-console.generated.ts'),
-    'Console config'
-  )
-  const slug = consoleConfig.match(/^\s*slug: '([a-z0-9-]+)',$/m)?.[1]
-  if (!/^\s*enabled: true,$/m.test(consoleConfig) || !slug)
-    throw new RouteBudgetError('Console config needs enabled: true and a valid slug')
+  // The Console folder stays in every build (a disabled Console answers 404), so its budget
+  // scope is mandatory in every mode; only the alias must be valid.
+  const slug = readJson(
+    path.join(root, 'packages/shared/src/config/admin-console.json'),
+    'Console settings'
+  ).alias
+  if (!/^[a-z0-9-]+$/.test(slug ?? '')) throw new RouteBudgetError('invalid Console alias')
   resolvers.push({ scope: 'admin-console', prefix: `/${slug}` })
   mandatory.push('admin-console:/')
   return { resolvers, mandatory, scopes: new Set(['app', ...resolvers.map((r) => r.scope)]) }
