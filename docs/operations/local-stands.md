@@ -244,7 +244,7 @@ the real API, roles are assigned only to those accounts, and browser login/acces
 is verified. Keep the stand running until acceptance or explicitly scoped cleanup.
 The [custom administration example](../product-admin/adoption.md#connect-the-chosen-interface)
 can prepare a copy-only adapter for the existing `organization` profile.
-Run its `--preview` generator only after single-locale/no-Console initialization.
+Run its `--preview` generator only when `locales.json` serves one locale and `admin-console.json` has `"mode": "disabled"`.
 The adapter records provenance before writing and preserves later owner changes.
 It does not introduce a global preview profile.
 
