@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 
@@ -31,9 +31,15 @@ test('the script contracts job is a required check and no scaffolding check rema
   )
 })
 
-test('every required check of the main ruleset names a CI job that exists', () => {
-  const names = Object.values(ci.jobs).map((job) => job.name)
-  const tracked = required.filter((context) => names.includes(context))
-  assert.ok(tracked.includes('Script contracts'))
-  assert.ok(tracked.includes('Lint'))
+test('every required check of the main ruleset names a job in a tracked workflow', () => {
+  const names = new Set()
+  for (const file of readdirSync('.github/workflows')) {
+    const workflow = parse(readFileSync(`.github/workflows/${file}`, 'utf8'))
+    for (const [id, job] of Object.entries(workflow.jobs ?? {})) names.add(job.name ?? id)
+  }
+  assert.deepEqual(
+    required.filter((context) => !names.has(context)),
+    [],
+    'a required check without a job can never pass and blocks every merge'
+  )
 })

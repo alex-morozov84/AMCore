@@ -48,9 +48,10 @@ For `downstream-product`, record at minimum:
 - whether and how upstream changes will be synchronized;
 - workflow mode: `strict`, `flexible`, or `custom`;
 - where the product roadmap, current status, and product-specific decisions live;
-- the frontend starter choices below (`i18n_mode`, `frontend_storybook`,
+- the frontend starter choice fields below (`i18n_mode`, `frontend_storybook`,
   `frontend_route_progress`, `theme_persistence`, `admin_console`,
   `admin_console_mode`, `admin_console_slug`, `initialized_from_amcore_version`).
+  They describe the build you ship; keep them true to it.
 
 Do not infer mode from directory names, package names, git remotes, or the presence
 of GitHub settings. The owner of a downstream product must declare the mode here.
@@ -61,7 +62,9 @@ of GitHub settings. The owner of a downstream product must declare the mode here
 route-progress bar, `localStorage` theme persistence and the Operations Console in
 path mode at `/admin`. The fields above record that configuration so a person or an
 agent can read it without inspecting the code. They are documentation, never runtime
-configuration: editing a value here does not change the build.
+configuration: editing a value here does not change the build. If you change the build
+yourself, update the matching field so the record stays true; this release provides no
+command for such changes.
 
 - **`i18n_mode`, `base_locale`, `supported_locales`:** the routing mode and the
   locales the build serves. See `docs/frontend/i18n-and-errors.md`.

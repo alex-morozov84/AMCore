@@ -300,8 +300,8 @@ seams, applies narrow structural operations, and writes one composed operation p
 in one filesystem transaction. Brand identity fields, JSON paths, TypeScript nodes,
 and the five asset destinations are claimed explicitly; missing or ambiguous
 anchors fail before mutation. There is no compatibility executor or sequential
-second mutation pass. `PROJECT_CONTEXT.md` remains the boundary that prevents the
-AMCore upstream checkout from being initialized accidentally.
+second mutation pass. Nothing is written until you confirm the plan (`--yes`, or the
+interactive prompt); `--dry-run` never writes.
 
 For a complete product-administration setup, see the
 [adoption guide](../product-admin/adoption.md). Install changed manifests and
@@ -311,13 +311,45 @@ and chart tokens.
 
 ### Fork initialization
 
-Run `pnpm init:brand` once while initializing a fresh downstream fork, before
-applying that fork's database migrations. It projects source files only; it never
-connects to or migrates an existing database. It does not change the frontend
-choices recorded in `PROJECT_CONTEXT.md` (locales, Storybook, route progress,
-Operations Console); see that file's "Frontend Starter Choices" section for what
-those fields mean. Add `--dry-run` to print the plan and diffs without writing any
-file; `--yes` confirms a plan without the prompt.
+Run `pnpm init:brand` while initializing a fresh downstream fork, before applying
+that fork's database migrations. It writes source files only; it never connects to or
+migrates a database. `pnpm init:brand` is the only initializer command. The commands
+that exist are the scripts in the root `package.json`; an older note that names another
+initializer, such as `pnpm init:project`, is out of date.
+
+Every flag is optional, and a field you do not pass keeps its current value. In an
+interactive terminal without value flags the command asks for the values instead.
+
+| Flag                                              | What it writes                                                                                                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--product-name`                                  | `PROJECT_CONTEXT.md` `Product` (and `Mode: downstream-product` while it still says `upstream-starter`), `manifest.ts` `name`/`short_name`, `meta.title` in both catalogues |
+| `--product-description`                           | root `package.json` `description`, `manifest.ts` `description`, `en.json` `meta.description`                                                                               |
+| `--purpose`, `--upstream-sync-policy`             | `PROJECT_CONTEXT.md` `Purpose` and `Upstream sync policy`. Write your own sentences; nothing is pre-filled.                                                                |
+| `--workflow-mode`                                 | `PROJECT_CONTEXT.md` workflow mode: `strict`, `flexible` or `custom`                                                                                                       |
+| `--theme-mode`                                    | `DEFAULT_THEME_SETTING` in `theme.ts`: `system`, `light` or `dark`                                                                                                         |
+| `--theme-persistence`                             | `PROJECT_CONTEXT.md` `theme_persistence`: `local-storage` or `cookie-ssr` (a record; it does not generate the cookie variant)                                              |
+| `--package-name`                                  | root `package.json` `name`                                                                                                                                                 |
+| `--logo-dark`, `--logo-light`                     | paths to your PNG files, copied to `public/logo-dark.png` and `public/logo-light.png`                                                                                      |
+| `--icon-192`, `--icon-512`, `--icon-512-maskable` | paths to your PNG files with the exact pixel size, copied into `public/icons/`                                                                                             |
+| `--dry-run`                                       | prints the plan and diffs without writing any file                                                                                                                         |
+| `--yes`                                           | applies the plan without the confirmation prompt                                                                                                                           |
+
+The first run also writes `initialized_from_amcore_version` while it still says `N/A`. The
+value is the Git tag of the current commit, or the short commit SHA when the commit has
+no tag. `Canonical upstream` stays the AMCore URL, because AMCore is the original upstream.
+
+The command does not change the frontend choice fields in `PROJECT_CONTEXT.md` (locales,
+Storybook, route progress, Operations Console); see that file's "Frontend Starter Choices"
+section for what those fields mean. It never edits the color tokens in `globals.css` or
+`manifest.ts` `background_color`/`theme_color`; update those by hand (checklist items 2 and 4).
+
+Run it again whenever a value must change. Pass only the flags to change, with `--dry-run`
+first. A plan with no changes writes nothing. If a write fails and the command handles
+the failure, it restores the tree to the state before the run. If the process is killed
+during the write, a `.amcore-scaffold-transaction.json` journal stays in the project root and
+blocks the next run; the error message lists the recovery steps (keep the journal, restore the
+recorded states in reverse order, check the tree, then remove the journal). Starting from a
+clean Git tree lets you compare the result with `git diff`.
 
 ## Inline style and contrast
 

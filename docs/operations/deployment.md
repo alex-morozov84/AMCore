@@ -1375,7 +1375,9 @@ fronting only `api:5002` leaves OAuth's callback URL unreachable.
 
 ### Operations Console host-mode reference
 
-When the generated console config selects `host`, select the matching Caddy
+When the build's Console mode is `host` (see
+[Host-mode session boundary](../operations-console/configuration.md#host-mode-session-boundary)
+for how to build it), select the matching Caddy
 configuration explicitly: use `docker/compose/console-host.yml` instead of `web.yml`
 in the saved `COMPOSE_FILE`, preserving every other overlay. Set both hostnames
 in `.env`:

@@ -39,6 +39,14 @@ host-to-physical-path mapping in path mode.
 
 ## Host-mode session boundary
 
+Host mode is a build-time choice. The shipped build uses `mode: 'path'` in
+`apps/web/src/shared/lib/admin-console.generated.ts`. To build host mode, change that
+value to `'host'` by hand, set `ADMIN_CONSOLE_HOSTNAME` for the web service and rebuild
+the web image; setting only the hostname variable does not switch the mode. This release
+has no command for the change. The managed stand makes the same one-line change in its
+snapshot, and `pnpm test:console-session-e2e` exercises the result in an isolated lane.
+Verify your own deployment before you rely on it.
+
 Host mode is a separate browser trust boundary:
 
 - Credential login admits only a live `SUPER_ADMIN` and sets

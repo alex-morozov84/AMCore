@@ -12,7 +12,8 @@ Business modules such as orders, inventory and CRM records belong to your produc
 Keep buyers separate from staff. For example, customers buy products while three
 employees manage the shop. Keep the immutable staff organization ID on the server
 and hide the organization selector. Choose shared website login or independent
-staff-host login. Enable the Operations Console only if platform operators need it.
+staff-host login. The Operations Console is for platform operators; it is separate
+from this staff area.
 
 ### CRM or ERP as the working application
 
