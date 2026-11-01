@@ -17,7 +17,8 @@ async function selectedSource() {
   const dir = await mkdtemp(join(tmpdir(), 'amcore-example-contract-'))
   const files = [
     'PROJECT_CONTEXT.md',
-    'packages/shared/src/constants/index.ts',
+    'packages/shared/src/config/locales.json',
+    'packages/shared/src/config/admin-console.json',
     'packages/shared/src/config/product-admin.json',
     'apps/web/src/shared/lib/route-progress/route-progress-flag.ts',
     'apps/web/messages/ru.json',
@@ -37,20 +38,25 @@ async function selectedSource() {
         .replace('**admin_console:** enabled', '**admin_console:** disabled')
         .replace('**frontend_storybook:** enabled', '**frontend_storybook:** disabled')
         .replace('**frontend_route_progress:** enabled', '**frontend_route_progress:** disabled')
-    if (path.endsWith('constants/index.ts'))
-      contents = contents
-        .replace("SUPPORTED_LOCALES = ['en', 'ru']", "SUPPORTED_LOCALES = ['ru']")
-        .replace("DEFAULT_LOCALE: SupportedLocale = 'en'", "DEFAULT_LOCALE: SupportedLocale = 'ru'")
+    // One served locale and no Console: the choices live in the settings files.
+    if (path.endsWith('config/locales.json'))
+      contents = `${JSON.stringify({ version: 1, enabled: ['ru'], default: 'ru' })}\n`
+    if (path.endsWith('config/admin-console.json'))
+      contents = `${JSON.stringify({ version: 1, mode: 'disabled', alias: 'admin' })}\n`
     if (path.endsWith('route-progress-flag.ts'))
       contents = contents.replace('ROUTE_PROGRESS_ENABLED = true', 'ROUTE_PROGRESS_ENABLED = false')
     await mkdir(dirname(join(dir, path)), { recursive: true })
     await writeFile(join(dir, path), contents)
   }
-  await mkdir(join(dir, 'apps/web/src/app/(product-admin)/manage'), { recursive: true })
-  await writeFile(
-    join(dir, 'apps/web/src/app/(product-admin)/manage/page.tsx'),
-    'export default function Page() { return null }\n'
-  )
+  // Both route folders stay in every build: a one-locale build rewrites onto [locale], a disabled
+  // Console keeps its folder and answers 404.
+  for (const folder of ['(product-admin)/manage', 'admin']) {
+    await mkdir(join(dir, 'apps/web/src/app/[locale]', folder), { recursive: true })
+    await writeFile(
+      join(dir, 'apps/web/src/app/[locale]', folder, 'page.tsx'),
+      'export default function Page() { return null }\n'
+    )
+  }
   // Git inventory is a snapshot prerequisite, not an authoring commit or stand allocation.
   execFileSync('git', ['init', '--quiet', dir])
   return dir
@@ -65,11 +71,8 @@ test('already selected RU/no-Console source stays selected; a repeated projectio
     assert.deepEqual(context.locales, ['ru'])
     await assert.rejects(prepareExample('roles', ['--projected'], source), /Unknown example flag/)
     generated = await prepareExample('roles', [], source)
-    assert.equal(generated.prefix, 'apps/web/src/app')
+    assert.equal(generated.prefix, 'apps/web/src/app/[locale]')
     assert.deepEqual(generated.locales, ['ru'])
-    await assert.rejects(readFile(join(generated.root, 'apps/web/src/app/[locale]/layout.tsx')), {
-      code: 'ENOENT',
-    })
     await assert.rejects(readFile(join(generated.root, 'apps/web/messages/en.json')), {
       code: 'ENOENT',
     })
@@ -82,8 +85,8 @@ test('already selected RU/no-Console source stays selected; a repeated projectio
 test('context mismatch and ambiguous mount anchors refuse rather than guessing', async () => {
   const source = await selectedSource()
   try {
-    await mkdir(join(source, 'apps/web/src/app/[locale]'))
-    await assert.rejects(exampleContext(source), /locale subtree/)
+    await rm(join(source, 'apps/web/src/app/[locale]/admin'), { recursive: true })
+    await assert.rejects(exampleContext(source), /Console alias/)
     assert.throws(() => replaceOnce('anchor anchor', 'anchor', 'replacement'), /anchor changed/)
   } finally {
     await rm(source, { recursive: true, force: true })
