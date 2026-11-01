@@ -199,8 +199,6 @@ The protected initial-setup API also remains when Console is removed. It require
 an existing live `SUPER_ADMIN` session. Use the CLI when that platform trust has not
 yet been established. See the API reference below.
 
-<!-- AMCORE_CONSOLE_ESTABLISHMENT_START -->
-
 ## Use Console after trusted platform access
 
 Prerequisites: the first platform `SUPER_ADMIN` already has access through the
@@ -249,7 +247,6 @@ If a selected account disappears, Console explains that it is unavailable.
 Reload keeps that original selection until you choose **Change recipient**.
 Organization details remain saved. Select the intended account and check its
 mailbox confirmation again before continuing.
-<!-- AMCORE_CONSOLE_ESTABLISHMENT_END -->
 
 ## State and recovery reference
 

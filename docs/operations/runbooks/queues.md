@@ -6,8 +6,6 @@ These alerts can be suppressed by the Redis inhibition rule in
 (see [`redis.md`](redis.md#reconnecting)) is also firing, check that first;
 these alerts being silent does not mean the backlog is fine.
 
-<!-- AMCORE_CONSOLE_BACKGROUND_WORK_START -->
-
 To see the current state of every queue (waiting, active, delayed, failed, paused,
 and a sampled age of the oldest queued job) without a metrics query, open the Operations
 Console's [Background work](../../operations-console/background-work.md) screen. It
@@ -18,8 +16,6 @@ The separate `notification-deliveries` card shows this durable backlog. Pausing 
 blocks future claims; already claimed work may drain. Retry reserves one lifetime
 attempt and retains the provider floor. Unknown sending history refuses retry and
 cleanup. See [delivery control](../../notifications/control.md).
-
-<!-- AMCORE_CONSOLE_BACKGROUND_WORK_END -->
 
 ## Backlog
 
@@ -270,12 +266,9 @@ output. Artifact input and uncertain effects refuse retry. Cleanup archives
 only never-started cancelled or expired runs after 30 days and preserves their
 identity.
 
-<!-- AMCORE_CONSOLE_AI_RUN_RUNBOOK_START -->
-
 The optional Operations Console shows this state on the `ai-run-executions`
 card in [Background work](../../operations-console/background-work.md).
 It exposes the same audited commands when the frontend is enabled.
-<!-- AMCORE_CONSOLE_AI_RUN_RUNBOOK_END -->
 
 **Do not** reset a run's status or counters directly in SQL: the retry budget, the
 attempt history and the tool records are one state machine, and a hand edit can

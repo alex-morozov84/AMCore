@@ -49,14 +49,10 @@ proxy must not cache this surface. Enabling it grants no mutation capability.
 Safe projections exclude recipients, bodies, raw payloads, provider failures and
 stack traces. Secret-bearing email must never be queued in the first place.
 
-<!-- AMCORE_CONSOLE_QUEUE_GUIDE_START -->
-
 With Operations Console enabled, registered work appears automatically in its
 native Background work panel. Use its captured confirmations and receipts for
 permitted actions; use Board only for read-only inspection. See the
 [operator guide](../../../../../docs/operations-console/background-work.md).
-
-<!-- AMCORE_CONSOLE_QUEUE_GUIDE_END -->
 
 ## Worker roles and outages
 

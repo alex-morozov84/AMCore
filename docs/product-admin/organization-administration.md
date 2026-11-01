@@ -17,8 +17,6 @@ Existing member -> Select exact member -> Confirm ADMIN assignment -> Organizati
 Cancelled initial invitation -> New invitation or member assignment -> Organization ADMIN
 ```
 
-<!-- AMCORE_CONSOLE_ADMINISTRATION_START -->
-
 ## Use Console
 
 Open **Organizations**. **Create organization** starts a new organization.
@@ -76,8 +74,6 @@ the 30-second automatic checks. These reads cover the
 current page and never execute invitation commands. After a failed read, Console
 shows an error and hides previous rows until a successful read; this is not a
 successful empty result. The timestamp remains the last successful read.
-
-<!-- AMCORE_CONSOLE_ADMINISTRATION_END -->
 
 ## Recover a problem
 

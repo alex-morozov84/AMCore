@@ -5,10 +5,8 @@ const mailFixtures = new Map([
   ['organization-setup', 'mock'],
   ['organization-provisioning', 'resend'],
   ['product-admin-closed-signup', 'mock'],
-  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
   ['support-mail-path', 'resend'],
   ['support-mail-host', 'resend'],
-  // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
 ])
 
 export const isOrganizationMailFixture = (m) => mailFixtures.has(m.fixtureProfile)

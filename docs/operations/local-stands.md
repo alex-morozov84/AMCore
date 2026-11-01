@@ -68,8 +68,6 @@ The fixed-shop example uses `--fixture organization-shop` on a fresh Docker E2E
 instead: buyer signup stays enabled and self-service organization creation is disabled.
 It has no mail collector or initial-account mutation helper access.
 
-<!-- AMCORE_CONSOLE_PROVISIONING_STAND_START -->
-
 ### Organization creation and first-administrator invitation
 
 Use a separate closed-registration fixture for operator provisioning:
@@ -94,10 +92,6 @@ The helper cannot bootstrap an organization or administer the recipient account.
 The collector, ownership checks and secret-artifact restrictions above also apply
 to this fixture. It cannot reuse a preview or send mail to ordinary addresses.
 
-<!-- AMCORE_CONSOLE_PROVISIONING_STAND_END -->
-
-<!-- AMCORE_CONSOLE_SUPPORT_MAIL_STAND_START -->
-
 ### Support-mail recipient completion
 
 Use fresh, separate website/staff/Console fixtures:
@@ -118,10 +112,6 @@ For manual inspection use a separate mock preview:
 It prepares fake targets and labelled historical examples, preserves later owner
 actions on refresh, and sends no real email. It has no collector. Do not use
 preview examples as retention, elapsed-time or recipient-completion proof.
-
-<!-- AMCORE_CONSOLE_SUPPORT_MAIL_STAND_END -->
-
-<!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_START -->
 
 Test the same lifecycle through the HTTPS Console with:
 
@@ -144,8 +134,6 @@ continue to confirmation, then select **Create organization**. The operator rece
 Refreshing this preview preserves the completed setup and does not restore removed access.
 Use the ordinary default preview on a separate ID to inspect self-service creation.
 
-<!-- AMCORE_CONSOLE_ESTABLISHMENT_STAND_END -->
-
 For self-service creation acceptance, use
 `pnpm stand preview --id organization-creation --profile organization-creation`.
 This opens and cancels the new form without creating an organization for the reviewer.
@@ -160,11 +148,8 @@ adds it to the trusted origins) and `AMCORE_STAND_WEB_SEO_INDEXING=enabled` in t
 changed environment, so run `pnpm stand down` before the next `up` with other values. See
 [Search-engine indexing](../frontend/seo.md#try-the-open-state-locally).
 
-<!-- AMCORE_CONSOLE_STAND_COMMANDS_START -->
-
 `test:e2e:console-real-stack` delegates to the HTTPS host lane;
 `pnpm test:console-session-e2e` remains its entry point.
-<!-- AMCORE_CONSOLE_STAND_COMMANDS_END -->
 
 ### CI lane reproduction
 
@@ -278,7 +263,6 @@ No integrations, Export manager (3 keys), Automation manager (25 keys) and Large
 integration set (1001 keys). Sample keys have no usable secret. This fixture uses
 managed marker-admitted SQL and never resets completed owner actions. Open the
 printed Members address to inspect empty, expiry, pagination, revoke and limit.
-<!-- AMCORE_CONSOLE_STAND_PROFILE_START -->
 
 The default also prepares SUPER_ADMIN when the Console feature is enabled.
 For notification delivery acceptance, create a fresh ID with
@@ -301,7 +285,6 @@ For the Console Scheduled jobs screen, use `pnpm stand preview --id scheduled-jo
 adds a result history to the daily jobs, which otherwise show "No runs yet" until 02:00:
 cleanup partly done and overdue, notification cleanup failed and overdue, invitation cleanup
 with no recorded end. GeoIP is turned off in a stand. Repeated preview keeps the owner's changes.
-<!-- AMCORE_CONSOLE_SUMMARY_GUIDE_START -->
 
 For isolated Overview source-failure and chart-navigation checks, run
 `pnpm stand e2e --lane real-stack --fixture console-summary -- admin-overview.spec.ts -g 'summary fixture'`.
@@ -310,7 +293,6 @@ and provides controlled source responses through an internal proxy. Its local,
 pinned Grafana has an offline dashboard with no metrics. The test proves navigation
 and time selection, not monitoring history or real provider delivery. It uses a
 fresh stand and cannot reuse an owner preview; managed cleanup owns all resources.
-<!-- AMCORE_CONSOLE_SUMMARY_GUIDE_END -->
 
 For the Console Integrations screen, use `pnpm stand preview --id integrations --profile integrations`.
 The profile marks the demo `SUPER_ADMIN` address verified (a demo-only mailbox substitute), because
@@ -367,8 +349,6 @@ Recovery checks process absence and ownership itself; a refusal is not permissio
 to remove the lease manually. See [cleanup safety](#target-and-cleanup-safety).
 After successful purge, the record remains in state `purged` and its resources
 are absent. A purged ID is not reusable; create a new ID for a fresh dataset.
-
-<!-- AMCORE_CONSOLE_STAND_PROFILE_END -->
 
 Do not put generated technical secrets, tokens or manifests in commits or shared
 reports; the deliberately public demo credentials above are a separate contract.
@@ -594,15 +574,12 @@ product origin for invitation continuation cookies. HTTPS stands leave it empty
 and use the secure prefixed cookie. This local exception is independent of
 `NODE_ENV`; an arbitrary HTTP Host or forwarded protocol cannot enable it.
 
-<!-- AMCORE_CONSOLE_STAND_ORIGIN_START -->
-
 Console host tests build a sanitized host-mode copy without changing the source
 checkout. Console host mode accepts an
 optional `ADMIN_CONSOLE_ORIGIN`: canonical HTTPS origin matching
 `ADMIN_CONSOLE_HOSTNAME`, including an optional public port. Empty retains
 `https://<hostname>`. Host routing still validates the hostname; CSRF accepts only
 the exact configured origin. Do not weaken either guard for local testing.
-<!-- AMCORE_CONSOLE_STAND_ORIGIN_END -->
 
 Automated Chromium uses a loopback HTTP/CONNECT relay plus explicit
 `--proxy-bypass-list=<-loopback>` to remove Chromium's implicit localhost bypass.

@@ -37,7 +37,6 @@ function scopeRegistry() {
   const resolvers = [{ scope: 'product-admin', prefix: `/${alias}` }]
   const mandatory = ['app:/', 'app:/login', 'app:/register', 'app:/settings/sessions']
   mandatory.push('product-admin:/organizations')
-  // AMCORE_CONSOLE_ROUTE_BUDGETS_START
   const consoleConfig = readText(
     path.join(webRoot, 'src/shared/lib/admin-console.generated.ts'),
     'Console config'
@@ -47,7 +46,6 @@ function scopeRegistry() {
     throw new RouteBudgetError('Console config needs enabled: true and a valid slug')
   resolvers.push({ scope: 'admin-console', prefix: `/${slug}` })
   mandatory.push('admin-console:/')
-  // AMCORE_CONSOLE_ROUTE_BUDGETS_END
   return { resolvers, mandatory, scopes: new Set(['app', ...resolvers.map((r) => r.scope)]) }
 }
 

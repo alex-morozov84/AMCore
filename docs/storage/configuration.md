@@ -296,12 +296,10 @@ Changing the env baseline requires process initialization or redeployment and
 does not replace a saved override. Save/reset/read never starts a canary.
 Healthy reconciliation aims for 35 seconds; a warm database-read failure retains
 the last confirmed value, while a cold unconfirmed reader uses its env baseline.
-<!-- AMCORE_CONSOLE_STORAGE_SETTING_START -->
 
 On Console Overview, change the inline interval field in **File storage** and
 choose **Save**; **Cancel** discards the draft without writing. There is no reset
 button or separate Settings page.
-<!-- AMCORE_CONSOLE_STORAGE_SETTING_END -->
 
 The following request counts assume the default applied interval.
 Normal S3 traffic is one PUT, one GET and one DELETE per check per process.

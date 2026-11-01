@@ -9,9 +9,7 @@ import {
 import { postBrowserAuth } from './browser-auth-upstream'
 import { changedBrowserContext, createBrowserBindingVerifier } from './browser-binding.server'
 import { completeBrowserLogin, publishBrowserLogin } from './browser-login-handler'
-// AMCORE_CONSOLE_RETURN_IMPORT_START
 import { confirmedConsoleReturn } from './console-return-destination'
-// AMCORE_CONSOLE_RETURN_IMPORT_END
 import { retirePublishedInvitationFlows } from './invitation-auth-lifecycle'
 import { resumeInvitedBrowserPublication } from './invited-browser-login'
 import { currentFlowView, flowView, stagedEntry } from './mfa-flow-view'
@@ -89,16 +87,12 @@ export async function reconcileBrowserLogin(
   await createBrowserBindingVerifier(request.headers, context.audience)(entry)
   if (!record.invitation)
     await retirePublishedInvitationFlows(request, context, record.vaultId, entry)
-  // AMCORE_CONSOLE_RETURN_DESTINATION_START
   const consoleReturn = await confirmedConsoleReturn(request, context, record, entry)
-  // AMCORE_CONSOLE_RETURN_DESTINATION_END
   const response = NextResponse.json({
     view: {
       ...flowView(record, 'completed'),
       publication: 'confirmed',
-      // AMCORE_CONSOLE_RETURN_RESULT_START
       ...(consoleReturn ? { consoleReturn } : {}),
-      // AMCORE_CONSOLE_RETURN_RESULT_END
     },
   })
   if (settlement) for (const cookie of settlement.cookies.getAll()) response.cookies.set(cookie)

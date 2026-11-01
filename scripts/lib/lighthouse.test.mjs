@@ -99,7 +99,6 @@ test('manual and informative do not silently pass required rules; unexpected N/A
   }
 })
 
-// AMCORE_CONSOLE_LIGHTHOUSE_OWNER_TEST_START
 test('owner resolver keeps one exact audit assignment in all four topologies and Console-disabled output', async (t) => {
   const { auditCommand } = await import('./lighthouse-command.mjs')
   const dir = await temporary(t)
@@ -160,8 +159,6 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
     }
   // Actual Console removal is tested through its registered initializer seam, not a false disabled context alone.
 })
-
-// AMCORE_CONSOLE_LIGHTHOUSE_OWNER_TEST_END
 
 test('manifest-based coverage rejects missing, stale, duplicated and empty routes', () => {
   const c = auditCatalogue(root)

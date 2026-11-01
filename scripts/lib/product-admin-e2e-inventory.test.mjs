@@ -54,9 +54,7 @@ test('actual Playwright fixture configurations select exactly their declared pro
 })
 
 const sharedSpecs = new Map()
-// AMCORE_CONSOLE_SUPPORT_MAIL_INVENTORY_START
 sharedSpecs.set('console-support-mail.spec.ts', ['support-mail-host', 'support-mail-path'])
-// AMCORE_CONSOLE_SUPPORT_MAIL_INVENTORY_END
 
 test('required staff CI plans cover every spec with only declared cross-profile reuse', () => {
   const owners = new Map()

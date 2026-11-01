@@ -18,9 +18,7 @@ export function activeTarget() {
 export function testOptions() {
   const m = activeTarget()
   let baseURL = m.lane === 'product-admin-real-stack' ? m.origins.staff : m.origins.product
-  // AMCORE_CONSOLE_TARGET_ORIGIN_START
   if (m.lane === 'console-real-stack') baseURL = m.origins.console
-  // AMCORE_CONSOLE_TARGET_ORIGIN_END
   return {
     baseURL,
     proxy: { server: m.relay },
@@ -44,10 +42,8 @@ export function standReporters(m, dir) {
   return [
     'organization-setup',
     'organization-provisioning',
-    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_START
     'support-mail-path',
     'support-mail-host',
-    // AMCORE_CONSOLE_SUPPORT_MAIL_PROFILES_END
     'product-admin-closed-signup',
     'product-admin-oauth',
     'product-admin-oauth-path',

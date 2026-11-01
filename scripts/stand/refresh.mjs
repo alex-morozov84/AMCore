@@ -3,9 +3,7 @@ import { prepareAccountMfaPreview } from './account-mfa-source.mjs'
 import { projectChoices } from './project.mjs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-// AMCORE_CONSOLE_HOST_IMPORTS_START
 import { readFile, writeFile } from 'node:fs/promises'
-// AMCORE_CONSOLE_HOST_IMPORTS_END
 import { directory, save } from './state.mjs'
 import { prepareOrganizationSetupSource } from './organization-setup-fixture.mjs'
 import { snapshot } from './snapshot.mjs'
@@ -26,7 +24,6 @@ export async function refresh(m) {
   if (hash !== m.sourceHash) delete m.images
   m.sourceHash = hash
   await prepareOrganizationSetupSource(m)
-  // AMCORE_CONSOLE_HOST_SNAPSHOT_START
   if (
     m.topology === 'host' &&
     (!m.productAdminHost || (m.consoleEnabled && m.consoleTopology === 'host'))
@@ -36,7 +33,6 @@ export async function refresh(m) {
     if (!content.includes('enabled: true')) throw new Error('Console host unavailable')
     await writeFile(file, content.replace("mode: 'path'", "mode: 'host'"))
   }
-  // AMCORE_CONSOLE_HOST_SNAPSHOT_END
   await prepareProductAdminSource(m)
   await prepareAccountMfaPreview(m)
   await save(m)

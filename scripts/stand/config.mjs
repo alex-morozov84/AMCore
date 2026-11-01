@@ -1,7 +1,5 @@
 import { mfaE2EEnvironment } from './mfa-e2e.mjs'
-// AMCORE_CONSOLE_SUMMARY_IMPORT_START
 import { consoleSummaryServices } from './console-summary-fixture.mjs'
-// AMCORE_CONSOLE_SUMMARY_IMPORT_END
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createHash, createHmac } from 'node:crypto'
@@ -36,9 +34,7 @@ export async function configuration(m) {
   assertOrganizationSetupFixture(m)
   const db = `postgresql://amcore:${m.dbPassword}@postgres:5432/amcore`
   const closedCreationProfiles = ['organization-shop']
-  // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_START
   closedCreationProfiles.push('organization-establishment')
-  // AMCORE_CONSOLE_ESTABLISHMENT_POLICY_END
   // Optional SEO scenarios (docs/frontend/seo.md): set these in the shell that runs the stand
   // command to start the web service open to search engines. Empty means the default closed site.
   // The site origin must be https and trusted, so it is added to the trusted origins below.
@@ -75,13 +71,11 @@ export async function configuration(m) {
       EMAIL_PROVIDER: 'resend',
       RESEND_API_KEY: '<fake-e2e-provider-key>',
     })
-  // AMCORE_CONSOLE_NOTIFICATION_ENV_START
   if (m.fixtureProfile === 'notification-work')
     Object.assign(app, {
       TELEGRAM_BOT_TOKEN: '<fake-preview-token>',
       TELEGRAM_API_BASE_URL: 'http://notification-provider:8099',
     })
-  // AMCORE_CONSOLE_NOTIFICATION_ENV_END
   const environments = {
     postgres: { POSTGRES_USER: 'amcore', POSTGRES_DB: 'amcore', POSTGRES_PASSWORD: m.dbPassword },
     redis: {},
@@ -106,7 +100,6 @@ export async function configuration(m) {
       WEB_INVITATION_LOCAL_HTTP_ORIGIN: m.origins.product.startsWith('http:')
         ? m.origins.product
         : '',
-      // AMCORE_CONSOLE_WEB_ENV_START
       ADMIN_CONSOLE_HOSTNAME: m.hostnames.console ?? '',
       ADMIN_CONSOLE_ORIGIN: m.origins.console ?? '',
       // External tool links for the Overview card; empty unless the CLI shell sets them.
@@ -115,14 +108,12 @@ export async function configuration(m) {
       ADMIN_CONSOLE_LOGS_URL: process.env.AMCORE_STAND_CONSOLE_LOGS_URL ?? '',
       ADMIN_CONSOLE_ALERTS_URL: process.env.AMCORE_STAND_CONSOLE_ALERTS_URL ?? '',
       ADMIN_CONSOLE_LOGS_GRAFANA_URL: process.env.AMCORE_STAND_CONSOLE_LOGS_GRAFANA_URL ?? '',
-      // AMCORE_CONSOLE_WEB_ENV_END
     },
   }
   if (m.fixtureProfile === 'client-ip' && m.clientIpPeer) {
     environments.api.TRUSTED_WEB_PEERS = m.clientIpPeer
     environments.web.WEB_TRUSTED_CLIENT_IP_HEADER = 'x-real-ip'
   }
-  // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_START
   let fixtureService
   if (m.fixtureProfile === 'notification-work') {
     if (!m.consoleEnabled) throw new Error('Notification work preview requires Console')
@@ -130,7 +121,6 @@ export async function configuration(m) {
     fixtureService = notificationProviderService(m)
     environments['notification-provider'] = {}
   }
-  // AMCORE_CONSOLE_NOTIFICATION_PROVIDER_END
   if (isOrganizationMailFixture(m))
     environments['mail-capture'] = { AMCORE_SETUP_MAIL_CAPTURE_KEY: m.mailCaptureKey }
   if (m.productAdminHost)
@@ -140,7 +130,6 @@ export async function configuration(m) {
       PRODUCT_ADMIN_HOSTNAME: m.hostnames.staff,
       CADDY_EMAIL: 'stand@example.invalid',
     }
-  // AMCORE_CONSOLE_CADDY_ENV_START
   if (m.topology === 'host' && !m.productAdminHost)
     environments.caddy = {
       CADDY_DOMAIN: m.hostnames.api,
@@ -150,7 +139,6 @@ export async function configuration(m) {
     }
   if (m.productAdminHost && m.consoleEnabled && m.consoleTopology === 'host')
     environments.caddy.ADMIN_CONSOLE_HOSTNAME = m.hostnames.console
-  // AMCORE_CONSOLE_CADDY_ENV_END
   const ports = {
     postgres: [],
     redis: [`127.0.0.1:${m.ports.redis}:6379`],
@@ -159,7 +147,6 @@ export async function configuration(m) {
     caddy: [`127.0.0.1:${m.ports.tls}:443`],
   }
   Object.assign(environments.api, await appleOAuthEnvironment(m))
-  // AMCORE_CONSOLE_SUMMARY_CONFIG_START
   const summaryServices = consoleSummaryServices(m)
   if (summaryServices) {
     for (const [name, service] of Object.entries(summaryServices))
@@ -167,7 +154,6 @@ export async function configuration(m) {
     environments.web.API_URL = 'http://summary-source:8098'
     environments.web.ADMIN_CONSOLE_METRICS_GRAFANA_URL = `${m.origins.metrics}/d/console-summary/fixture`
   }
-  // AMCORE_CONSOLE_SUMMARY_CONFIG_END
   let yaml = 'services:\n'
   for (const [service, environment] of Object.entries(environments)) {
     yaml += `  ${service}:\n    environment: ${overridden(environment)}\n    labels:\n${labelLines(m, '      ')}`
@@ -179,15 +165,12 @@ export async function configuration(m) {
         `    working_dir: /app/apps/api\n    user: node\n    init: true\n    restart: 'no'\n` +
         `    command: ['./node_modules/.bin/tsx', 'prisma/seed.ts']\n`
     if (m.images?.[service]) yaml += `    image: ${m.images[service]}\n`
-    // AMCORE_CONSOLE_NOTIFICATION_SERVICE_START
     if (service === 'notification-provider')
       yaml += stringify({ services: { [service]: fixtureService } })
         .replace(/^services:\n/, '')
         .split('\n')
         .slice(1)
         .join('\n')
-    // AMCORE_CONSOLE_NOTIFICATION_SERVICE_END
-    // AMCORE_CONSOLE_SUMMARY_SERVICE_START
     if (summaryServices?.[service]) {
       const { environment: _environment, ...definition } = summaryServices[service]
       yaml += stringify({ services: { [service]: definition } })
@@ -196,7 +179,6 @@ export async function configuration(m) {
         .slice(1)
         .join('\n')
     }
-    // AMCORE_CONSOLE_SUMMARY_SERVICE_END
     if (service === 'mail-capture')
       yaml += stringify({ services: { [service]: setupMailCollectorService(m) } })
         .replace(/^services:\n/, '')
@@ -213,9 +195,7 @@ export async function configuration(m) {
       yaml += `    volumes:\n      - ${JSON.stringify(`${m.snapshot}/docker/testing/apple-oidc.mjs:/app/fixtures/apple-oidc.mjs:ro`)}\n`
   }
   const base = parse(await readFile(join(m.snapshot, 'docker-compose.yml'), 'utf8'))
-  // AMCORE_CONSOLE_NOTIFICATION_VOLUME_START
   if (m.fixtureProfile === 'notification-work') base.volumes.notification_provider_data = {}
-  // AMCORE_CONSOLE_NOTIFICATION_VOLUME_END
   yaml += stringify({
     networks: { default: { labels: labels(m) } },
     volumes: Object.fromEntries(
@@ -229,9 +209,7 @@ export async function configuration(m) {
     'COMPOSE_PROFILES=',
     `CADDY_WEB_DOMAIN=${m.hostnames.product}`,
     ...(m.productAdminHost ? [`PRODUCT_ADMIN_HOSTNAME=${m.hostnames.staff}`] : []),
-    // AMCORE_CONSOLE_COMPOSE_ENV_START
     `ADMIN_CONSOLE_HOSTNAME=${m.topology === 'host' ? m.hostnames.console : ''}`,
-    // AMCORE_CONSOLE_COMPOSE_ENV_END
     `CADDY_DOMAIN=${m.hostnames.api}`,
     'CADDY_EMAIL=stand@example.invalid',
   ]
@@ -323,10 +301,8 @@ export function validateModel(m) {
           product: `http://${m.hostnames.product}:${m.ports.web}`,
           api: `http://127.0.0.1:${m.ports.api}`,
         }
-  // AMCORE_CONSOLE_SUMMARY_ORIGIN_CHECK_START
   if (m.fixtureProfile === 'console-summary')
     wantedOrigins.metrics = `http://127.0.0.1:${m.ports.tls}`
-  // AMCORE_CONSOLE_SUMMARY_ORIGIN_CHECK_END
   if (m.productAdminHost && (!m.consoleEnabled || m.consoleTopology !== 'host'))
     delete wantedOrigins.console
   if (JSON.stringify(m.origins) !== JSON.stringify(wantedOrigins))
@@ -396,9 +372,7 @@ export function validateModel(m) {
     if (m.model.services[name].environment.REDIS_URL !== 'redis://redis:6379')
       throw new Error('Foreign Redis target')
   const apiTargets = {
-    // AMCORE_CONSOLE_SUMMARY_API_CHECK_START
     'console-summary': 'http://summary-source:8098',
-    // AMCORE_CONSOLE_SUMMARY_API_CHECK_END
   }
   const expectedApi = apiTargets[m.fixtureProfile] ?? 'http://api:5002'
   if (m.model.services.web.environment.API_URL !== expectedApi)

@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import {
-  browserBootstrapResultSchema,
-  // AMCORE_CONSOLE_RETURN_LOCALE_START
-  DEFAULT_LOCALE,
-  // AMCORE_CONSOLE_RETURN_LOCALE_END
-  SUPPORTED_LOCALES,
-} from '@amcore/shared'
+import { browserBootstrapResultSchema, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
@@ -27,9 +21,7 @@ import {
   readBrowserCapability,
   unavailableBrowserContext,
 } from './browser-binding.server'
-// AMCORE_CONSOLE_RETURN_IMPORT_START
 import { claimConsoleReturn } from './console-return-claim'
-// AMCORE_CONSOLE_RETURN_IMPORT_END
 import { readContextJson } from './context-body-budget'
 import { ContextRequestError } from './context-errors'
 import { currentFlowView } from './mfa-flow-view'
@@ -69,19 +61,15 @@ async function bootstrap(request: Request, context: ProductWebContext): Promise<
   const input = z
     .object({
       entryId: z.string().uuid().optional(),
-      // AMCORE_CONSOLE_RETURN_INPUT_START
       returnEntryId: z.string().uuid().optional(),
       entryKind: z.literal('console').optional(),
-      // AMCORE_CONSOLE_RETURN_INPUT_END
       locale: z.enum(SUPPORTED_LOCALES).optional(),
     })
     .strict()
     .safeParse(await readContextJson(request.body, 2048))
   if (!input.success) throw new ContextRequestError(400, 'BAD_REQUEST')
-  // AMCORE_CONSOLE_RETURN_VALIDATION_START
   if (input.data.returnEntryId && !input.data.entryKind)
     throw new ContextRequestError(400, 'BAD_REQUEST')
-  // AMCORE_CONSOLE_RETURN_VALIDATION_END
   return prepareBrowserAuthAttempt(request, context, undefined, input.data)
 }
 
@@ -92,10 +80,8 @@ export async function prepareBrowserAuthAttempt(
   invitation?: InvitedBrowserAttempt,
   entry?: {
     entryId?: string
-    // AMCORE_CONSOLE_RETURN_TYPE_START
     returnEntryId?: string
     entryKind?: 'console'
-    // AMCORE_CONSOLE_RETURN_TYPE_END
     locale?: (typeof SUPPORTED_LOCALES)[number]
   }
 ): Promise<NextResponse> {
@@ -172,7 +158,6 @@ export async function prepareBrowserAuthAttempt(
   if (!actual) throw changedBrowserContext()
   let returnIdentity: { id: string; handle: string } | undefined
   let navigation: BrowserAuthAttempt['consoleEntry']
-  // AMCORE_CONSOLE_RETURN_BINDING_START
   if (entry?.entryKind === 'console') {
     const returned =
       entry.returnEntryId && !invitation
@@ -185,7 +170,6 @@ export async function prepareBrowserAuthAttempt(
       ...(returned ? { proof: returned.proof } : {}),
     }
   }
-  // AMCORE_CONSOLE_RETURN_BINDING_END
   const attempt = await createBrowserAuthAttempt(
     context,
     actual,

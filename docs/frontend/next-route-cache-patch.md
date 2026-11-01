@@ -61,25 +61,17 @@ The real-stack command builds the web/API images and isolated migrator dependenc
 then runs production browser checks. The [migration-image guide](../operations/migrator-image.md)
 also documents a direct migrator build. Keep required full checks and generated-project CI.
 
-<!-- AMCORE_LOCALE_ROUTE_CACHE_PATCH_START -->
-
 For multi-locale builds, also verify the language control and its profile policies:
 
 ```bash
 pnpm stand e2e --lane real-stack -- locale-url.spec.ts locale-persistence.spec.ts auth-locale-profile.spec.ts
 ```
 
-<!-- AMCORE_LOCALE_ROUTE_CACHE_PATCH_END -->
-
-<!-- AMCORE_CONSOLE_ROUTE_CACHE_PATCH_START -->
-
 For an enabled Operations Console in a multi-locale build, also verify its whole-page policy:
 
 ```bash
 pnpm stand e2e --lane console-real-stack -- locale-profile.spec.ts
 ```
-
-<!-- AMCORE_CONSOLE_ROUTE_CACHE_PATCH_END -->
 
 If the reviewed version is still affected, port only the reviewed cache normalization
 through [pnpm patch](https://pnpm.io/cli/patch). Replace the placeholder below with that

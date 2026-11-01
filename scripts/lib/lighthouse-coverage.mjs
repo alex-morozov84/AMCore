@@ -43,9 +43,7 @@ export function collectCoverage(root, input) {
       readJson(join(root, 'apps/web/.next/app-path-routes-manifest.json'), 'built manifest')
   )
   const resolvers = [{ scope: 'product-admin', prefix: `/${choices.productAdmin.alias}` }]
-  // AMCORE_CONSOLE_LIGHTHOUSE_COVERAGE_START
   resolvers.push({ scope: 'console', prefix: `/${choices.console.slug}` })
-  // AMCORE_CONSOLE_LIGHTHOUSE_COVERAGE_END
   const rows = checkCoverage(pages, catalogue, resolvers)
   return {
     rows,

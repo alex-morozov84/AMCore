@@ -3,9 +3,7 @@ import { prepareAccountMfaPreview } from './account-mfa-source.mjs'
 import { projectChoices } from './project.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { join } from 'node:path'
-// AMCORE_CONSOLE_HOST_IMPORTS_START
 import { readFile, writeFile } from 'node:fs/promises'
-// AMCORE_CONSOLE_HOST_IMPORTS_END
 import { root, directory, save } from './state.mjs'
 import { snapshot } from './snapshot.mjs'
 import { allocate } from './ports.mjs'
@@ -25,12 +23,10 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     !pathOAuth && (choices.productAdminHost || productAdminProfiles.includes(fixtureProfile))
   let consoleTopology =
     fixtureProfile === 'product-admin-three-host' ? 'host' : choices.consoleTopology
-  // AMCORE_CONSOLE_SUPPORT_MAIL_POLICY_START
   if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
     if (!choices.consoleEnabled) throw new Error('Support mail E2E requires enabled Console')
     consoleTopology = fixtureProfile === 'support-mail-host' ? 'host' : 'path'
   }
-  // AMCORE_CONSOLE_SUPPORT_MAIL_POLICY_END
   topology ??= pathOAuth ? 'host' : productAdminHost ? 'host' : choices.topology
   if (productAdminHost && topology !== 'host')
     throw new Error('Staff rehearsal requires HTTPS transport')
@@ -48,13 +44,11 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     hostnames.console = `console.${hostnames.product}`
     hostnames.api = `api.${hostnames.product}`
   }
-  // AMCORE_CONSOLE_SUMMARY_POLICY_START
   if (
     fixtureProfile === 'console-summary' &&
     (purpose !== 'e2e' || mocked || topology !== 'path' || !choices.consoleEnabled)
   )
     throw new Error('Console summary fixture requires isolated path E2E')
-  // AMCORE_CONSOLE_SUMMARY_POLICY_END
   const ports = await allocate(uuid)
   const origins =
     topology === 'host'
@@ -69,9 +63,7 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
         }
   if (productAdminHost && (consoleTopology !== 'host' || !choices.consoleEnabled))
     delete origins.console
-  // AMCORE_CONSOLE_SUMMARY_ORIGIN_START
   if (fixtureProfile === 'console-summary') origins.metrics = `http://127.0.0.1:${ports.tls}`
-  // AMCORE_CONSOLE_SUMMARY_ORIGIN_END
   if (mocked) {
     origins.product = `http://127.0.0.1:${ports.web}`
     delete origins.api
@@ -111,7 +103,6 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   onAllocated?.(m)
   m.sourceHash = await snapshot(root, m.snapshot)
   await prepareOrganizationSetupSource(m)
-  // AMCORE_CONSOLE_HOST_SNAPSHOT_START
   if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
     const file = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')
     const value = await readFile(file, 'utf8')
@@ -128,7 +119,6 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
       throw new Error('Console host lane unavailable in this fork')
     await writeFile(path, content.replace("mode: 'path'", "mode: 'host'"))
   }
-  // AMCORE_CONSOLE_HOST_SNAPSHOT_END
   await prepareProductAdminSource(m)
   await prepareAccountMfaPreview(m)
   await save(m)

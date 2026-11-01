@@ -32,12 +32,10 @@ const config = defineConfig({
   projects: [{ name: 'product-admin-real-stack', use: { ...devices['Desktop Chrome'] } }],
 })
 
-// AMCORE_CONSOLE_SUPPORT_MAIL_OPTIONS_START
 if (['support-mail-path', 'support-mail-host'].includes(activeTarget().fixtureProfile ?? '')) {
   config.testMatch = '**/console-support-mail.spec.ts'
   config.retries = 0
   config.use = { ...config.use, trace: 'off', screenshot: 'off', video: 'off' }
 }
-// AMCORE_CONSOLE_SUPPORT_MAIL_OPTIONS_END
 
 export default config

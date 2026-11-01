@@ -102,15 +102,11 @@ client code, which the limits of all other pages already cover. These pages must
 have a byte limit: `app:/`, `app:/login`, `app:/register`, `app:/settings/sessions`
 and `product-admin:/organizations`.
 
-<!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_START -->
-
 The Operations Console keeps its rows in
 `apps/web/src/_pages/console/route-budgets.json`. Its scope `admin-console`
 claims the pages under the slug in
 `apps/web/src/shared/lib/admin-console.generated.ts`, and `admin-console:/` must
 have a byte limit.
-
-<!-- AMCORE_CONSOLE_ROUTE_BUDGETS_DOC_END -->
 
 To set a limit, take the page's current bytes from the check output and add
 5 % of those bytes or 15 KiB (15,360 bytes), whichever is larger. Round the
