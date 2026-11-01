@@ -355,8 +355,10 @@ section for what those fields mean. It never edits the color tokens in `globals.
 `manifest.ts` `background_color`/`theme_color`; update those by hand (checklist items 2 and 4).
 
 Run it again whenever a value must change. Pass only the flags to change, with `--dry-run`
-first. A plan with no changes writes nothing. Commit or stash your own work first: the
-command refuses to write into a tree with uncommitted changes.
+first. A plan with no changes writes nothing. Commit or stash your own work first: after it
+prints the plan and before it asks for confirmation, the command refuses to write into a tree
+with uncommitted changes (the message starts with "working tree is not clean"). Untracked files
+that Git does not ignore count as changes; ignored files do not. `--dry-run` works in any tree.
 
 #### Recover from a failure
 
@@ -369,12 +371,19 @@ means nothing was written.
    (for example after the process was killed). Files may be partly changed. The journal blocks the
    next run on purpose. Keep the journal and the tree as they are. The message lists the recovery
    steps: restore the recorded states in reverse order, check the tree, and only then remove the
-   journal. Never delete the journal only to get past the block.
-3. **"filesystem committed but journal cleanup failed".** The files are already written; do not undo
-   them. Check `git diff`, then handle the remaining journal as in step 2.
+   journal. Never delete the journal only to get past the block. The tree was clean before the
+   run and the command writes only the paths named in the flag table, so `git status` and
+   `git diff` show exactly what changed; compare them with the recorded states in the journal
+   before you restore anything. If the message does not list the steps, stop and ask the
+   maintainers of your fork; do not guess.
+3. **"filesystem committed but journal cleanup failed".** All files are already written; do not
+   undo them. Check `git diff`. The journal is then only a leftover record: remove it after that
+   check. The restore steps of item 2 do not apply.
 4. **"Verification failed" after "Applied N change(s)".** The files are already written; `pnpm
 typecheck` or `pnpm lint` found a problem and the command exits with code 1. Read the printed
-   output and `git diff`. Fix the problem, or undo the changes yourself with Git, before you commit.
+   output and `git diff`. Fix the problem before you commit, or undo the changes with
+   `git restore -- <path>` for each path that `git status` shows: the command only overwrites
+   files that already exist in the starter and creates none.
 
 ## Inline style and contrast
 
