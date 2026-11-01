@@ -30,7 +30,7 @@ organization selection. Registration alone grants no staff membership.
 
 The ready composition demonstrates the shell, organization selection and management
 modules. The custom composition demonstrates a fixed company and a different visual
-style without the Console. The existing host and invitation fixtures cover independent
+style. The existing host and invitation fixtures cover independent
 sessions and recipient consent; they do not require a third example product.
 
 A hidden selector still uses the backend organization model. Use the
@@ -65,7 +65,7 @@ pnpm exec husky
 
 2. Inspect the changes. With these flags, the brand files are the paths below.
    Review any additional reported path before staging it. Commit the identity before
-   applying project choices: the next initializer requires a clean tree.
+   other changes, so later review diffs stay small.
 
    ```sh
    git add -- PROJECT_CONTEXT.md package.json apps/web/src/app/manifest.ts apps/web/messages/en.json apps/web/messages/ru.json
@@ -75,35 +75,9 @@ pnpm exec husky
    git status --short
    ```
 
-3. For the ready example, retain the shipped project choices. For the custom example,
-   select Russian-only routing, no Console, no Storybook and disabled route progress:
-
-   ```sh
-   pnpm init:project --mode=single --locale=ru --admin-console=disabled --storybook=disabled --route-progress=disabled --dry-run
-   pnpm init:project --mode=single --locale=ru --admin-console=disabled --storybook=disabled --route-progress=disabled --yes
-   pnpm install --no-frozen-lockfile
-   node scripts/api-e2e-ci.mjs --prepare
-   ```
-
-4. Storybook removal changes manifests, so the initializer defers its verification.
-   Complete the printed checks after installing. Keep normal hooks and checks active.
-
-   ```sh
-   pnpm typecheck
-   pnpm lint
-   pnpm --filter web build
-   CI=true pnpm --filter api test
-   CI=true pnpm --filter web test
-   pnpm install --frozen-lockfile
-   ```
-
-   Inspect the intentional lockfile refresh and project removals. Stage only their
-   reviewed paths and commit `chore: select product options`. Unexpected unrelated
-   changes require diagnosis. Apply selected dimensions once, before manual wiring.
-
-For other choices and prerequisites, use the
-[project scaffolding guide](../frontend/brand-theme-and-tokens.md#project-scaffolding).
-There is no additional product-admin/headless-only initializer or finalizer.
+This build ships one set of project choices, recorded in `PROJECT_CONTEXT.md`. There
+is no additional initializer for them and no product-admin/headless-only initializer
+or finalizer.
 
 ## Connect the chosen interface
 
@@ -113,38 +87,18 @@ An empty membership list permits creation only when policy allows it. One member
 opens that organization; `?view=list` retains explicit selection. Several memberships
 show the selector. Every selected page still checks current membership and authority.
 
-For the custom demonstration, run this from the initialized single-locale product:
+The custom shop demonstration (`node scripts/fixtures/organization-shop-headless.mjs
+--preview`) needs a single-language product without the Operations Console. This build
+ships neither, so the generator refuses `--preview`. Run it without that flag to prepare
+the custom code in a disposable directory, and follow the commands it prints.
 
-```sh
-node scripts/fixtures/organization-shop-headless.mjs --preview
-```
-
-The generator prints a new disposable directory. Run the following inside that
-directory; it has its own dependencies and managed data:
-
-```sh
-pnpm install --frozen-lockfile
-node scripts/api-e2e-ci.mjs --prepare
-pnpm --filter web lint
-pnpm --filter web typecheck
-pnpm stand preview --id custom-team --profile organization
-pnpm stand status --id custom-team
-```
-
-Use the actual origin and demo account printed by the managed preview. Open
-`<printed-origin>/shop-team`; ordinary login is `<printed-origin>/login`.
-The preview adapter seeds its fixed demo organization through the existing managed
-lease. Repeating the same preview command preserves completed demo edits; it refuses
-changed ownership or lost owner authority instead of restoring access.
-
-The fixed ID in this generated demonstration is not a production setup mechanism.
+The fixed ID in a generated demonstration is not a production setup mechanism.
 For a real product, substitute your trusted organization ID in the server mount.
 Keep its membership/TeamAccess check and explicit login destination.
 
 The member, role and invitation generators also preserve the source's current
 locale and feature choices. They replace current mounts in a separate copy.
-Their `--projected` option is an upstream-only demonstration; an already initialized
-fork uses the default command. Do not repeat an initializer to wire a consumer.
+Run them without extra flags.
 
 ## Your own appearance
 

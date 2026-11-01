@@ -99,8 +99,7 @@ proofs remain available for 30 days; recovery reports removed access without
 rejoining. See [API limits, security and recovery](../auth/invites.md).
 
 For a clean product setup and custom-consumer generation, follow the
-[adoption guide](adoption.md). Default generators preserve selected project choices;
-`--projected` is a pristine-upstream demonstration, not another initialization step.
+[adoption guide](adoption.md). Generators preserve the source's project choices.
 
 ## Reuse with your own design
 
@@ -135,24 +134,10 @@ see [controlled upgrade](../auth/invites.md#upgrade-an-existing-installation).
 
 ## Project choices
 
-Invitation management and recipient forms remain available when the optional
-Operations Console is disabled. A single-locale project uses prefixless routes:
-for example, `/organizations/<organization-id>/invites` and `/invite/accept`.
-Disabling Storybook removes component stories, while ready screens and headless
-controllers remain usable. Disabling route progress keeps navigation working
-without the top progress bar.
-
-For example, a Russian-only fork with these choices runs the initializer after
-brand setup:
-
-```sh
-pnpm init:project --mode=single --locale=ru --admin-console=disabled --storybook=disabled --route-progress=disabled
-```
-
-Some choices move or delete files. Follow the
-[project scaffolding guide](../frontend/brand-theme-and-tokens.md#project-scaffolding)
-before applying them to a fork. Custom presentation still uses the same
-invitation permissions, recovery and recipient consent contract.
+Invitation management and recipient forms do not depend on the optional Operations
+Console frontend. Ready screens and headless controllers do not depend on Storybook,
+and navigation works without the top route-progress bar. Custom presentation still
+uses the same invitation permissions, recovery and recipient consent contract.
 
 For the first ADMIN of an operator-created organization, use [organization provisioning](organization-provisioning.md). Its initial invitation has separate operator recovery; ordinary member invitation controls cannot change that active invitation. Recipient login, verification and consent remain the same.
 

@@ -1188,7 +1188,6 @@ jobs:
           docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
           docker compose -p "$OLD_VOLUME_PROJECT_NAME" down -v --remove-orphans || true
 
-  # amcore:sentinel-block start=storybook-job
   storybook:
     name: Storybook
     runs-on: ubuntu-latest
@@ -1267,4 +1266,3 @@ jobs:
       - name: Run Storybook a11y/interaction tests
         working-directory: apps/web
         run: pnpm test:storybook
-  # amcore:sentinel-block end=storybook-job

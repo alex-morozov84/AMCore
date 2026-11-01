@@ -7,8 +7,8 @@ vi.mock('next-intl/server', () => ({
   getTranslations: async () => (key: string) => (key === 'title' ? 'Shop' : key),
 }))
 
-// Expectations are derived from the shared locale set, never spelled out: a fork scaffolded with
-// one locale type-checks and runs this file too (a literal 'ru' or 'en' would not compile there).
+// Expectations are derived from the shared locale set, never spelled out, so the file keeps
+// working when the set changes (a literal 'ru' or 'en' would not).
 const ORIGIN = 'https://shop.example.com'
 const MULTI = SUPPORTED_LOCALES.length > 1
 const OPEN_GRAPH: Record<string, string | undefined> = { en: 'en_US', ru: 'ru_RU' }

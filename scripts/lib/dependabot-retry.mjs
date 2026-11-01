@@ -1,11 +1,6 @@
 const delay = 25 * 60 * 60 * 1000
 const rerunWindow = 30 * 24 * 60 * 60 * 1000
-const aggregates = new Set([
-  'Test',
-  'API E2E',
-  'Web E2E',
-  'Scaffolding contract (full, real install/build/test)',
-])
+const aggregates = new Set(['Test', 'API E2E', 'Web E2E'])
 
 export function matchesPull(pr, run, repository) {
   const association = run.pull_requests?.find((pull) => pull.number === pr.number)

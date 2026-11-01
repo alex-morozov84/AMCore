@@ -288,112 +288,36 @@ It also records `PROJECT_CONTEXT.md`'s identity fields (`Mode`, `Product`,
 `Purpose`, upstream-sync policy, workflow mode, `initialized_from_amcore_version`)
 when you answer the corresponding prompts.
 
-Both initializer commands finish planning before they ask for confirmation.
+`init:brand` finishes planning before it asks for confirmation.
 That plan includes an immutable snapshot of any supplied logo or icon, so a
 source file changed after the prompt cannot change what is applied. A confirmed
 run commits its complete filesystem plan as one recoverable transaction; a
 handled write failure restores the tree to its pre-apply state. Dry runs,
 cancelled prompts, and plans with no changes never start a transaction.
 
-`init:brand` and every `init:project` dimension use the same architecture:
-desired-state facts, explicit ownership seams, narrow structural operations,
-one composed operation plan, and one filesystem transaction. Brand identity
-fields, JSON paths, TypeScript nodes, and the five asset destinations are
-claimed explicitly; missing or ambiguous anchors fail before mutation. There
-is no compatibility executor or sequential second mutation pass.
-
-The next initialization stage will combine these choices in one guided wizard
-and automatically remove downstream-only scaffolding machinery after the user
-reviews and confirms the complete result. That finalization is not part of the
-current commands yet, and it will not be exposed as a mandatory separate
-`init:finalize` step. `PROJECT_CONTEXT.md` remains the boundary that prevents
-the AMCore upstream checkout from being finalized accidentally.
+`init:brand` builds desired-state facts, claims them against explicit ownership
+seams, applies narrow structural operations, and writes one composed operation plan
+in one filesystem transaction. Brand identity fields, JSON paths, TypeScript nodes,
+and the five asset destinations are claimed explicitly; missing or ambiguous
+anchors fail before mutation. There is no compatibility executor or sequential
+second mutation pass. `PROJECT_CONTEXT.md` remains the boundary that prevents the
+AMCore upstream checkout from being initialized accidentally.
 
 For a complete product-administration setup, see the
-[adoption guide](../product-admin/adoption.md). Commit brand initialization before
-applying project choices. Install changed manifests and complete deferred checks
-before adding custom consumers. The cosmic example changes product-owned semantic
-token values while preserving theme persistence, font mapping and chart tokens.
+[adoption guide](../product-admin/adoption.md). Install changed manifests and
+complete deferred checks before adding custom consumers. The cosmic example changes
+product-owned semantic token values while preserving theme persistence, font mapping
+and chart tokens.
 
-### Project scaffolding
+### Fork initialization
 
-`pnpm init:project` is the separate, one-time sibling command for
-project choices `init:brand` deliberately never touches. It covers three
-destructive, one-time dimensions and one reversible source default, each with its own
-reinitialize guard:
-`--mode=single --locale=<code>` removes locale routing entirely, **destructively**
-(see
-[i18n & errors § Downstream: running a single-locale app](./i18n-and-errors.md#downstream-running-a-single-locale-app));
-`--storybook=disabled` removes the Storybook surface, also **destructively**
-(see
-[Storybook § Downstream: disabling Storybook](./storybook.md#downstream-disabling-storybook));
-`--route-progress=disabled` only flips the top route-progress bar's source
-flag to its disabled default and is **non-destructive** — no file is moved
-or deleted, and the choice can be reversed by hand at any later point (see
-[Top route progress bar § `pnpm init:project --route-progress=disabled`](./route-progress.md#pnpm-initproject---route-progressdisabled)).
-Any one flag alone, or any combination together, works in one invocation.
-`--admin-console=disabled|path|host` chooses the optional Operations Console:
-the pristine upstream `path/admin` default can become host mode, a custom path
-slug, or a full removal of console-owned frontend/runtime wiring. Its optional
-`--admin-console-slug=<segment>` is a URL segment, never a hostname; host mode
-continues to receive `ADMIN_CONSOLE_HOSTNAME` at deployment. A chosen console
-state is terminal for this v1 scaffold, like the other destructive dimensions.
-See `PROJECT_CONTEXT.md`'s "Frontend Starter Choices" section for the full
-contract, and `pnpm init:project --help` for its dry-run, typed-confirmation,
-and fail-closed safety controls.
-
-Run `init:brand` and the selected `init:project` choices while initializing a
-fresh downstream fork, before applying that fork's database migrations. The
-commands project source files only; they never connect to or migrate an
-existing database.
-
-The Operations Console transform derives removal ownership from one manifest.
-Every new file below a declared Console feature root is owned automatically;
-outside those closed roots, a Console-specific code, test, config, or docs
-contribution must declare an owned block, config field, or structural-operation
-seam. Missing declarations detectable through imports or monitored identifiers,
-plus stale, ambiguous, and duplicate declarations, fail during planning before
-the filesystem transaction starts. Shared helpers survive
-removal when an independent production consumer still reaches them; helpers
-and linked tests used only by the Console are removed together.
-The fast check follows resolved relative imports into files removed by a
-selected feature projection. A new test outside a closed root that imports a
-registered Console helper must itself be registered or use a declared seam.
-Named universal-module expectations flag newly retained shared modules for
-review.
-
-The Storybook transform uses the same ownership contract: its closed config
-root and co-located `*.stories.tsx` verification files are discovered
-automatically, while contributions to shared code, config, workflows, and docs
-require narrow declared seams.
-
-#### Optional-feature extension ownership
-
-Use the ownership boundary, not a list of every feature file:
-
-- Adding `apps/web/src/_pages/console/activity/activity-panel.tsx` below the
-  Console's closed `_pages/console` root is automatic. Do not add a per-file
-  manifest entry.
-- Adding Console navigation to a shared sidebar, an environment/config field,
-  a script, CI workflow, or a mixed documentation page crosses a shared
-  boundary. Register an owned block, config field, structural operation, or
-  other declared extension point; a detectable forgotten contribution fails
-  with the feature, path, marker, and registration action.
-- Anchor an owned documentation block on stable prose or an explicit marker.
-  A numbered-list item's ordinal can change when another step is inserted;
-  an explicitly prefix-preserving block can retain the source list number.
-- In Console UI tests, derive topology-dependent navigation expectations from
-  `getConsole*Href()` or set a path/host fixture in the same test case. URLs
-  supplied as mock or `baseHref` inputs and backend API paths remain valid.
-- A new literal, prose statement, or config concept with no registered import,
-  identifier, or marker has no mechanically knowable feature meaning. The
-  author and reviewer must classify it and add a marker/seam when it belongs to
-  an optional feature. The tooling deliberately makes no impossible claim to
-  discover arbitrary semantics.
-
-Adding ordinary functionality does not create a new scaffold dimension. A new
-optional dimension is a deliberate product/architecture decision with its own
-ownership, projection, verification, and documentation contract.
+Run `pnpm init:brand` once while initializing a fresh downstream fork, before
+applying that fork's database migrations. It projects source files only; it never
+connects to or migrates an existing database. It does not change the frontend
+choices recorded in `PROJECT_CONTEXT.md` (locales, Storybook, route progress,
+Operations Console); see that file's "Frontend Starter Choices" section for what
+those fields mean. Add `--dry-run` to print the plan and diffs without writing any
+file; `--yes` confirms a plan without the prompt.
 
 ## Inline style and contrast
 

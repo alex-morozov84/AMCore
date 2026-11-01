@@ -45,8 +45,7 @@ vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
 }))
 
 // Inline fixture of just the keys this page and its children read -
-// deliberately not the real catalogues, which are locale-scaffold-tracked
-// source files this test has no reason to depend on.
+// deliberately not the real catalogues, which this test has no reason to depend on.
 const consoleMessages = {
   title: 'Operations Console',
   overviewEyebrow: 'Control Room',

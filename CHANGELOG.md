@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The `pnpm init:project` command and its generated-project test matrix, change selector
+  and CI jobs. `pnpm init:brand` stays. The CI job "Scaffolding contract (fast)" is replaced
+  by "Script contracts" (`pnpm test:scripts`, which runs the repository's tooling tests); the
+  two "Scaffolding contract" required checks no longer exist. The last state with the old
+  command is the Git tag `scaffolding-final`. Forks created with `init:project` before this
+  change are not supported by later AMCore updates. `PROJECT_CONTEXT.md` keeps its frontend
+  choice fields as a record of the build; no command writes them.
+
 ### Changed
 
 - Authentication no longer hangs when Redis is slow or down. Organization-scoped requests

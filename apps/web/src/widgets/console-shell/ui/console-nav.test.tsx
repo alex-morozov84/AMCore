@@ -18,7 +18,7 @@ import { ConsoleBreadcrumb } from './ConsoleBreadcrumb'
 const pathname = vi.fn<() => string>()
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => pathname() }))
 
-// Inline fixture of the keys these components read: the real catalogues are locale-scaffold files.
+// Inline fixture of the keys these components read, independent of the real catalogues.
 const messages = {
   console: {
     opsPrefix: 'OPS',

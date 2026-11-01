@@ -115,20 +115,15 @@ listener, or progress timer. Keep using `RouteProgressLink` and
 `controller.start()`. Setting the constant back to `true` and rebuilding fully
 restores the feature without regenerating files.
 
-### `pnpm init:project --route-progress=disabled`
+### Turn the bar off in a fork
 
-This is the **only** thing the scaffold flag does: it sets
-`ROUTE_PROGRESS_ENABLED`'s _initial_ value to `false` in a fresh fork and
-records `frontend_route_progress: disabled` in `PROJECT_CONTEXT.md`. Unlike
-`--mode=single` or `--storybook=disabled`, this choice is **non-destructive**
-— it never deletes the component, controller, adapter, tests, story, or
-lint guard. A developer can flip `ROUTE_PROGRESS_ENABLED` back to `true` by
-hand at any later point, without re-running the initializer or reconstructing
-any file. When changing it by hand, also set `PROJECT_CONTEXT.md`'s
-`frontend_route_progress` field to `enabled` or `disabled` accordingly.
-Omitting the scaffold flag keeps the upstream default (enabled). See
-[Brand, theme, and design tokens § Project scaffolding](./brand-theme-and-tokens.md#project-scaffolding)
-for how this composes with the other `init:project` dimensions.
+Set `ROUTE_PROGRESS_ENABLED` to `false` in
+`shared/lib/route-progress/route-progress-flag.ts` and rebuild. Nothing else changes:
+the component, controller, adapter, tests, story and lint guard stay in place, and
+setting the flag back to `true` restores the feature. Also set `PROJECT_CONTEXT.md`'s
+`frontend_route_progress` field to `enabled` or `disabled` so the file matches the
+build; the field is a record and does not change behavior. The upstream default is
+enabled.
 
 ## Testing
 
@@ -145,5 +140,4 @@ Run the focused checks after changing this feature:
 pnpm --filter web test
 pnpm --filter @amcore/shared build
 pnpm --filter web test:e2e
-pnpm test:scripts # required after source/docs that scaffolding transforms touch
 ```

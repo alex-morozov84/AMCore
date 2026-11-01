@@ -10,12 +10,9 @@ administrative controller.
 Work that runs on a timer in the worker (a nightly cleanup, a recovery poll) is not a queue
 registration: see [Scheduled jobs](scheduled-jobs.md).
 
-Read `PROJECT_CONTEXT.md` before extending a checkout. When
-`admin_console: disabled`, keep backend registrations, handlers, policies, API and
-audit integration. Do not create Console pages, frontend Route Handlers/BFF,
-navigation, messages or admin UI scenarios without an explicit owner request.
-A backend controller and a frontend BFF Route Handler have separate ownership;
-removing the optional frontend does not remove the backend control API.
+A backend controller and a frontend BFF Route Handler have separate ownership: the
+backend registrations, handlers, policies, API and audit integration do not depend on
+the Operations Console frontend.
 
 ## Choose the business authority
 

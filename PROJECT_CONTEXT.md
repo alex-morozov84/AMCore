@@ -26,9 +26,8 @@ separate product from the starter.
 - **admin_console_slug:** admin
 - **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
 
-One field per line, machine-editable by the fork initialization tooling (see
-"Frontend Starter Choices" below) — do not fold multiple fields back into a
-single prose bullet.
+One field per line, machine-editable by `pnpm init:brand` — do not fold multiple
+fields back into a single prose bullet.
 
 ## Mode Contract
 
@@ -58,79 +57,40 @@ of GitHub settings. The owner of a downstream product must declare the mode here
 
 ## Frontend Starter Choices
 
-`apps/web` ships a fork-in-place default (multi-locale, Storybook on,
-`localStorage` theme persistence). A downstream product records the choices it
-actually made instead of leaving them implicit in deleted/kept files:
+`apps/web` ships one configuration: two locales (`en`, `ru`), Storybook, the top
+route-progress bar, `localStorage` theme persistence and the Operations Console in
+path mode at `/admin`. The fields above record that configuration so a person or an
+agent can read it without inspecting the code. They are documentation, never runtime
+configuration: editing a value here does not change the build.
 
-- **`i18n_mode`:** `multi` or `single`. AMCore upstream ships `multi`. A
-  single-locale downstream product removes locale routing entirely rather
-  than configuring it away — see
-  `docs/frontend/i18n-and-errors.md` → _Downstream: running a single-locale
-  app_.
-- **`base_locale` / `supported_locales`:** the locale(s) the product actually
-  ships. For `i18n_mode: single`, `supported_locales` has exactly one entry
-  equal to `base_locale`.
-- **`frontend_storybook`:** `enabled` or `disabled`. AMCore upstream keeps
-  Storybook mandatory (CI `storybook` job, `build-storybook` +
-  `test:storybook`) as the default — see `docs/frontend/storybook.md`. A
-  `disabled` choice is a one-time removal of `.storybook/`, co-located
-  stories, Storybook scripts/dependencies, the CI job, and Storybook-specific
-  public docs, not a `SKIP_STORYBOOK` bypass that leaves the surface present
-  but unused.
-- **`frontend_route_progress`:** `enabled` or `disabled`. AMCore upstream
-  ships the top route-progress bar (`shared/ui/route-progress-bar.tsx`)
-  enabled by default — see `docs/frontend/route-progress.md`. Unlike
-  `frontend_storybook`, `disabled` is **non-destructive**: it only sets the
-  `ROUTE_PROGRESS_ENABLED` source flag's initial value to `false` in
-  `shared/lib/route-progress/route-progress-flag.ts` and records the choice
-  here — no file, test, story, or wiring is removed, so a developer can
-  flip the flag back to `true` by hand at any time without re-running
-  scaffolding.
-- **`theme_persistence`:** `local-storage` (AMCore's default) or
-  `cookie-ssr` (an advanced, opt-in downstream variant — see
-  `docs/frontend/brand-theme-and-tokens.md` → _Cookie-backed SSR theme
-  (advanced variant)_). This field records the product's choice; it does not
-  imply a second live theme implementation ships in the starter itself.
-- **`admin_console`:** `enabled` or `disabled`. AMCore upstream's default is
-  `enabled`; the Operations Console is the `SystemRole.SUPER_ADMIN`-only
-  system control plane, not a generic product backoffice. Disabling its
-  frontend removes Console pages, frontend Route Handlers/BFF, navigation,
-  messages, UI scenarios and Console-only documentation through their ownership
-  seams. Agents must not recreate them without a separate owner request.
-  Backend registration/producer/handler/policy recipes, generic backend admin
-  controllers/API, audit, workers, health and metrics remain available.
-- **`admin_console_mode`:** `path` or `host`, present only when
-  `admin_console` is `enabled`. `path` serves console pages on the product
-  host; `host` serves them on a separate host. The mode is a deployment and
+- **`i18n_mode`, `base_locale`, `supported_locales`:** the routing mode and the
+  locales the build serves. See `docs/frontend/i18n-and-errors.md`.
+- **`frontend_storybook`:** `enabled`. Storybook is part of every project (CI
+  `storybook` job, `build-storybook`, `test:storybook`); see
+  `docs/frontend/storybook.md`.
+- **`frontend_route_progress`:** `enabled`. The bar follows the
+  `ROUTE_PROGRESS_ENABLED` source flag in
+  `shared/lib/route-progress/route-progress-flag.ts`; a developer can flip the flag by
+  hand. See `docs/frontend/route-progress.md`.
+- **`theme_persistence`:** `local-storage` (AMCore's default) or `cookie-ssr` (an
+  advanced, opt-in downstream variant — see `docs/frontend/brand-theme-and-tokens.md`
+  → _Cookie-backed SSR theme (advanced variant)_). This field records the product's
+  choice; it does not imply a second live theme implementation ships in the starter.
+- **`admin_console`:** `enabled`. The Operations Console is the
+  `SystemRole.SUPER_ADMIN`-only system control plane, not a generic product
+  backoffice; see `docs/operations-console/README.md`.
+- **`admin_console_mode`:** `path` or `host`. `path` serves Console pages on the
+  product host; `host` serves them on a separate host. The mode is a deployment and
   routing choice, not an authorization role.
-- **`admin_console_slug`:** the literal URL path segment for console pages,
-  present only when `admin_console` is `enabled`; AMCore upstream's default is
-  `admin`. It is not a hostname or subdomain label, including in `host` mode.
-- **`initialized_from_amcore_version`:** the AMCore tag or commit the fork
-  was initialized from, e.g. `v0.4.0`. Lets later tooling and upstream-sync
-  decisions know the fork's starting baseline.
+- **`admin_console_slug`:** the literal URL path segment for Console pages (`admin`).
+  It is not a hostname or subdomain label, including in `host` mode.
+- **`initialized_from_amcore_version`:** the AMCore tag or commit the fork was
+  initialized from, e.g. `v0.4.0`. It gives later work and upstream-sync decisions the
+  fork's starting baseline.
 
-These fields are maintained by the fork initialization tooling: `pnpm
-init:brand` for everything above `i18n_mode`; `pnpm init:project
---mode=single --locale=<code>` for `i18n_mode`/`base_locale`/
-`supported_locales` specifically (the one-time, destructive route-topology
-transform described in `docs/frontend/i18n-and-errors.md` → "Downstream:
-running a single-locale app"); `pnpm init:project --storybook=disabled` for
-`frontend_storybook` (the one-time, destructive removal described above);
-and `pnpm init:project --route-progress=disabled` for
-`frontend_route_progress` (the one-time, non-destructive flag flip
-described above — the only one of the four that removes nothing). The four
-`init:project` dimensions are independent — any one flag alone, or
-any combination together in one invocation. A field can also be set by
-hand in a downstream fork. Their absence means "AMCore's shipped defaults
-apply," not "undecided."
-
-The Operations Console fields are maintained by `pnpm init:project
---admin-console=disabled|path|host [--admin-console-slug=<segment>]`. The
-choice is one-time: from AMCore's pristine `enabled/path/admin` default, choose
-host, a custom path slug, or disabled. The slug is a page-path segment, while
-`ADMIN_CONSOLE_HOSTNAME` remains a deployment-time host setting. These fields
-are documentation for people and scaffolding, never runtime configuration.
+`pnpm init:brand` writes the identity, workflow, theme and
+`initialized_from_amcore_version` fields. No command writes the other fields in this
+section.
 
 ## Workflow Modes
 

@@ -27,14 +27,10 @@ inline exceptions and paired presets. Run `pnpm lint:fix` for supported autofixe
 | `pnpm format:check`                                               | Check Prettier formatting                                                                                                                                                                                                                            |
 | `pnpm format`                                                     | Format code with Prettier                                                                                                                                                                                                                            |
 | `pnpm init:brand`                                                 | Initialize a downstream fork's identity, brand, assets, and theme choices                                                                                                                                                                            |
-| `pnpm init:project`                                               | Apply downstream project choices: locale mode, Storybook, route-progress default, and Operations Console topology                                                                                                                                    |
 | `docker compose --profile local-infra --profile monitoring up -d` | Optional dev-only Prometheus + Grafana + Alertmanager harness scraping this stack's real metrics — needs `METRICS_AUTH_TOKEN`/`GF_SECURITY_ADMIN_PASSWORD` set in `.env`; see [`docs/operations/observability.md`](docs/operations/observability.md) |
 | `pnpm test:observability-contract`                                | Static observability-contract checks (metric references, runbook links/anchors/panel citations, private-path ratchet, image-pin consistency) — no Docker needed                                                                                      |
 | `pnpm test:observability-contract:live`                           | Live observability-contract checks — boots the monitoring harness above and Grafana's old-volume migration smoke, then tears both down; needs Docker                                                                                                 |
-| `pnpm test:scripts`                                               | Required six-row scaffolding covering array; each generated repository is isolated and installed/built once                                                                                                                                          |
-| `pnpm test:scripts:generated`                                     | Generated-project half of `test:scripts`; used by CI after the fast contract has already run in parallel                                                                                                                                             |
-| `pnpm test:scripts:exhaustive`                                    | Original eight install-bearing scaffolding recipes; weekly/manual backstop, not a required PR check                                                                                                                                                  |
-| `pnpm measure:scaffold`                                           | Opt-in measurement of the required scaffolding array (commands, wall time, disk, fingerprints); never a CI gate, see [`docs/operations/ci-security.md`](docs/operations/ci-security.md#current-gates)                                                |
+| `pnpm test:scripts`                                               | Script contract tests (init:brand with its engine core, product-admin placement, lint, Lighthouse, migrator and deployment tooling); the CI job "Script contracts" runs this command                                                                 |
 
 `pnpm test:extension-contracts` runs notification/channel/tool/provider registration
 and migration conformance in an isolated copy with PostgreSQL/Redis Testcontainers.
@@ -75,23 +71,8 @@ parse a changed file, without blocking the commit; inspect the diff directly
 in that case. The reporter can also be rerun with
 `node scripts/code-size-report.mjs` while the change is staged.
 
-`pnpm init:project` requires at least one explicit flag, in any combination:
-`--mode=single --locale=<code>` to remove locale routing, `--storybook=disabled`
-to remove Storybook, and/or `--route-progress=disabled` to turn off the top
-route-progress bar's default (non-destructive, unlike the other two). See
-[`docs/frontend/brand-theme-and-tokens.md` → Project scaffolding](docs/frontend/brand-theme-and-tokens.md#project-scaffolding).
-
-`--admin-console=disabled|path|host` is another one-time choice. Its optional
-`--admin-console-slug=<segment>` changes the page path only; the host stays the
-deployment-time `ADMIN_CONSOLE_HOSTNAME` setting.
-
-When extending an optional feature, files wholly below one of its declared
-closed roots are discovered automatically. Contributions to shared code,
-navigation, config, scripts, CI, or mixed docs require a declared ownership
-seam, structural operation, or registered extension point. Static analysis
-cannot infer arbitrary new meaning with no import or marker, so authors and
-reviewers must explicitly classify novel shared semantics. See the worked
-examples in [Project scaffolding](docs/frontend/brand-theme-and-tokens.md#optional-feature-extension-ownership).
+`pnpm init:brand` initializes a downstream fork's identity, brand assets and theme.
+See [`docs/frontend/brand-theme-and-tokens.md` → Fork initialization](docs/frontend/brand-theme-and-tokens.md#fork-initialization).
 
 ### API-specific test commands
 
@@ -169,7 +150,7 @@ job does this explicitly; turbo does it automatically for `pnpm test`,
 isolated runtime; see [local stands](docs/operations/local-stands.md).
 
 Shared builder changes must preserve the [distribution contract](docs/backend/shared-package-build.md).
-`pnpm test:scripts:fast` checks package build/dev commands, strict dist-only consumers,
+`pnpm test:scripts` checks package build/dev commands, strict dist-only consumers,
 removed modules, source maps and build failures in disposable copies.
 
 ## Commit Messages
@@ -252,9 +233,6 @@ Use the [backend conventions](docs/backend/architecture-and-conventions.md),
    page is over its limit, reduce the cost or raise the limit in the same PR and
    explain why; see [route bundle budgets](docs/frontend/bundle-budget.md).
 9. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and ensure the checklist is satisfied.
-10. For optional-feature work, confirm that closed-root additions are automatic,
-    shared-surface contributions have a declared seam/operation, and any novel
-    unmarked semantics were explicitly classified.
 
 For product-admin placement changes, validate the physical routes and generated
 edge mapping as described in [placement and sessions](docs/product-admin/placement-and-sessions.md).

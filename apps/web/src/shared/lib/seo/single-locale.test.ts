@@ -1,12 +1,11 @@
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// A fork scaffolded with `--mode=single` has exactly one supported locale: no locale prefix in
-// URLs and no alternates anywhere. The prefix rule itself belongs to `packages/shared`
-// (`localizedFrontendUrl`, tested there against its own locale list), so this test replaces it
-// with the single-locale behaviour and checks what the SEO code does with one locale: it must
-// publish no `languages`, no `x-default` and no `alternateLocale`. The locale is taken from the
-// shared default, never spelled out, so the file also type-checks in a one-locale fork.
+// With exactly one supported locale there is no locale prefix in URLs and no alternates anywhere.
+// The prefix rule itself belongs to `packages/shared` (`localizedFrontendUrl`, tested there
+// against its own locale list), so this test replaces it with the single-locale behaviour and
+// checks what the SEO code does with one locale: it must publish no `languages`, no `x-default`
+// and no `alternateLocale`. The locale is taken from the shared default, never spelled out.
 vi.mock('@amcore/shared', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@amcore/shared')),
   SUPPORTED_LOCALES: ['single'],

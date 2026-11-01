@@ -58,7 +58,7 @@ describe('localePathPrefix', () => {
     expect(localePathPrefix('ru', ['en', 'ru'])).toBe('/ru')
   })
 
-  it('omits the prefix once exactly one locale is supported (pnpm init:project --mode=single)', () => {
+  it('omits the prefix once exactly one locale is supported', () => {
     expect(localePathPrefix('en', ['en'])).toBe('')
   })
 

@@ -8,8 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const refreshMock = vi.fn()
 
 // Inline, English-only fixture of just the keys this hook reads -
-// deliberately not the real catalogue (`messages/en.json`), which is a
-// locale-scaffold-tracked source file this single-locale-agnostic unit test
+// deliberately not the real catalogue (`messages/en.json`), which this unit test
 // has no reason to depend on.
 const messages = {
   console: {

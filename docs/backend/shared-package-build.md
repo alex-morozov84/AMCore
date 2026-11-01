@@ -45,7 +45,7 @@ passes without it on an upstream fix.
 
 ## Verification and consumers
 
-`pnpm test:scripts:fast` includes package build/dev contracts in disposable copies.
+`pnpm test:scripts` includes package build/dev contracts in disposable copies.
 Tools are linked into each build copy; dependency auto-install is disabled only
 there to prevent writes through those links. Consumers receive only package
 manifest, `dist` and Zod, without shared source or build tools.

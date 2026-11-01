@@ -53,7 +53,7 @@ find for something, that page is under-documented; please open an issue.
 | Make a page indexable by search engines, or keep the product closed to them              | [`frontend/seo.md`](frontend/seo.md)                                                                                                    |
 | Add a frontend test / pick the right layer                                               | [`frontend/testing.md`](frontend/testing.md)                                                                                            |
 | Write or review a Storybook story                                                        | [`frontend/storybook.md`](frontend/storybook.md)                                                                                        |
-| Initialize a downstream fork (rebrand, locale/Storybook/console shape, route-progress)   | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#project-scaffolding)                                          |
+| Initialize a downstream fork (rebrand, theme, icons)                                     | [`frontend/brand-theme-and-tokens.md`](frontend/brand-theme-and-tokens.md#fork-initialization)                                          |
 | Find recorded service problems and open their diagnostic source                          | [`operations-console/overview.md`](operations-console/overview.md#find-what-needs-checking)                                             |
 | Diagnose and safely control background work (or open the read-only queue board)          | [`operations-console/background-work.md`](operations-console/background-work.md), [`queue-board.md`](operations-console/queue-board.md) |
 | Check that nightly cleanups, the GeoIP update and recovery passes keep running           | [`operations-console/scheduled-jobs.md`](operations-console/scheduled-jobs.md)                                                          |
@@ -129,9 +129,8 @@ provide an operator interface for admin session management.
   each, what is deliberately not covered, and how to add a guard.
 - **[Brand, theme, and design tokens](frontend/brand-theme-and-tokens.md)** —
   token architecture, light/dark/system modes, the no-flash mechanism, the
-  downstream rebrand checklist, and initializing a fork's locale, Storybook,
-  route-progress, and Operations Console topology with `pnpm init:brand` /
-  `pnpm init:project`.
+  downstream rebrand checklist, and initializing a fork's identity, assets and
+  theme with `pnpm init:brand`.
 - **[Shared UI & shadcn](frontend/shared-ui-and-shadcn.md)** — the `shared/ui`
   reuse rule, the current primitive inventory, and the safe procedure for
   running the shadcn CLI (why a bare `shadcn add` against the live tree isn't
@@ -179,7 +178,7 @@ provide an operator interface for admin session management.
   `SUPER_ADMIN` control plane: Overview readiness, API/web identity, local
   resources and links to your monitoring tools, Background work diagnostics and policy-eligible controls, user and organization details,
   Users system-role changes, bounded Audit browsing, topology,
-  host-session boundary, downstream scaffolding, deployment, verification,
+  host-session boundary, deployment, verification,
   and safe extension rules.
 - **[Auth](auth/README.md)** — authentication and authorization: concepts,
   sessions, OAuth, [RBAC](auth/rbac.md), [capability catalogue and access

@@ -3,21 +3,14 @@
 // is expected to run separately." init:brand only ever writes JSON (always
 // syntactically valid via JSON.stringify) and known single-line TS/JS
 // literals, so `typecheck` + `lint` catch the realistic failure modes.
-// init:project's heavier structural transform adds a real `web build` and
-// the plain (infra-free) unit-test suites — `typecheck`/`lint` alone missed
-// a real class of defect here: a narrowed SUPPORTED_LOCALES can leave a spec
-// asserting runtime behavior (e.g. "'ru' is a valid locale") that no longer
-// holds, with nothing in the type system to catch it. `test:e2e` stays out
-// on purpose — it needs Docker/Testcontainers, which this verification step
-// cannot assume is available.
+// `test:e2e` stays out on purpose — it needs Docker/Testcontainers, which this
+// verification step cannot assume is available.
 //
 // Deliberately never runs `pnpm install`: this module runs as part of the
-// real `init:project`/`init:brand` CLIs against a fork the owner already
-// has installed, and a migration tool reaching out to the network and
-// rewriting node_modules on every real run is its own hazard, independent
-// of whether trimming it helps. A disposable test copy with no
-// node_modules is the test harness's own setup problem — see
-// init-project.test.mjs, which installs once before invoking the CLI.
+// real `init:brand` CLI against a fork the owner already has installed, and
+// a tool reaching out to the network and rewriting node_modules on every
+// real run is its own hazard. A disposable test copy with no node_modules
+// is the test harness's own setup problem.
 import { spawnSync } from 'node:child_process'
 
 const VERIFY_STEPS = [

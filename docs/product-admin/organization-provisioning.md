@@ -15,10 +15,9 @@ Organization details -> Administrator email -> Check details -> Create and invit
 
 ## Before you start
 
-Invitation languages follow the application's `SUPPORTED_LOCALES`. A single-language
-installation offers only that language. API examples use `en`; replace it with the
-configured language in a single-language fork. Omitted invitation language defaults
-to that installation's `DEFAULT_LOCALE`.
+Invitation languages follow the application's `SUPPORTED_LOCALES` (`en` and `ru` in
+this build). API examples use `en`. An omitted invitation language defaults to the
+installation's `DEFAULT_LOCALE`.
 
 Apply migrations and initialize the canonical system roles through the guarded
 [deployment procedure](../operations/deployment.md#seeding). Deploy matching code

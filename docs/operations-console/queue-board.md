@@ -157,10 +157,9 @@ names, tokens or free text, and add tests like those beside the shipped ones.
   markers or load entire job hashes through BullMQ's standard readers.
 - The board is a snapshot of Redis state. Its numbers can differ slightly from Background work
   taken at another moment.
-- With the Console switched off (`pnpm init:project --admin-console=disabled`) the API keeps the
-  board. Open it directly at `/api/v1/admin/queues/` in a browser that holds the API's own session
-  cookie, as a signed-in `SUPER_ADMIN`; it is the same view-only board, without the Console's
-  entry points.
+- The API serves the board without the Console frontend. Open it directly at
+  `/api/v1/admin/queues/` in a browser that holds the API's own session cookie, as a signed-in
+  `SUPER_ADMIN`; it is the same view-only board, without the Console's entry points.
 
 ## Related
 

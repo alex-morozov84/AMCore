@@ -28,8 +28,7 @@ pnpm check:route-budgets
 ```
 
 The check reads the build output and never builds. Run it right after the web
-build, in the same checkout. CI does exactly this in the **Build** job and after
-every web build of the generated scaffold variants.
+build, in the same checkout. CI does exactly this in the **Build** job.
 
 Each line shows the page key, its bytes, its limit and its gzip size:
 
