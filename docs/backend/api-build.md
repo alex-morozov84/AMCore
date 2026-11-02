@@ -138,8 +138,7 @@ ships in `dist`.
 
 Run affected unit, schema/type-negative, compiled-command and E2E contracts after
 changing module or compiler configuration. Full API E2E, all repeated extension
-contracts, generated starter install/build/test and platform checks remain
-required. Starter transforms alone do not prove a generated project builds.
+contracts and platform checks remain required.
 
 ## Choice and rollback
 

@@ -11,8 +11,9 @@ address.
 
 Console access requires a current platform `SUPER_ADMIN`. API keys cannot use this
 screen, and an organization role does not grant access. The page is at
-`/admin/integrations` in path mode and at `/integrations` on the Console host, after
-the locale prefix (for example `/en/admin/integrations`).
+`/admin/integrations` in path mode and at `/integrations` on the Console host. With several
+served languages a locale prefix comes first (for example `/en/admin/integrations`); with one
+language there is none.
 
 A link from Overview uses `?focus=<integration>` to focus the matching name.
 It does not start a test or open its confirmation. If the selection is invalid
