@@ -387,6 +387,11 @@ in the stand's own directory (`.amcore/stands/<id>/operator-factor.json`, owner-
 Git). Later runs sign in with a generated code. `pnpm stand down --purge` deletes the stand's
 data; the factor file goes with the stand record at closeout.
 
+The API counts sign-in starts per source: 20 in 10 minutes. The sign-ins that `preview` makes
+by itself count too, so several rebuilds plus scripted probes in a row end with "Too many
+attempts" on the sign-in page. This is the limit working, not a broken stand. Wait about ten
+minutes, then sign in once.
+
 **Every owner walkthrough for a Console screen must include these three steps** (sign in, run
 `pnpm stand code`, enter the code). Without them the reviewer cannot reach the screen.
 
