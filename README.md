@@ -282,8 +282,10 @@ pnpm dev
 > `upstream-starter` to `downstream-product` when you provide a product
 > name, and records the product identity, upstream-sync policy, and workflow
 > mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
-> flags. Console hostnames are deployment configuration
-> (`ADMIN_CONSOLE_HOSTNAME`). Still set by hand: where the
+> flags. Which languages the product serves and how the Operations Console is
+> served (off, a path, or its own host) are two settings files, not prompts: see
+> [`PROJECT_CONTEXT.md` → Build Settings](PROJECT_CONTEXT.md#build-settings). Console
+> hostnames are deployment configuration (`ADMIN_CONSOLE_HOSTNAME`). Still set by hand: where the
 > roadmap/status/product-specific decisions live, and anything GitHub-side
 > (branch protection, secrets, environments). Repository files _declare_ the
 > technical policy; GitHub-side enforcement is separate external state. For
