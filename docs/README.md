@@ -138,7 +138,7 @@ provide an operator interface for admin session management.
   safe).
 - **[i18n & error localization](frontend/i18n-and-errors.md)** — where copy
   lives, adding strings/locales/error codes, ICU plurals, localized form
-  validation, locale-prefixed links from the backend, and running a fork
+  validation, locale-aware links from the backend, and running a fork
   single-locale.
 - **[Frontend API consumption](frontend/api-consumption.md)** — how `apps/web`
   hooks consume the media, notifications, and AI backend surfaces through the

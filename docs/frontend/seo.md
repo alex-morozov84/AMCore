@@ -129,8 +129,9 @@ check that they match.
    (the page number of a listing) passes it separately as `query: { page: '2' }`; see
    [the online store example](#example-an-online-store). Pass the page's own title (`Pricing`): the root layout
    appends ` | <site name>` through its title template, so do not add the site name yourself. The
-   helper builds the absolute, locale-prefixed canonical URL, the language variants with
-   `x-default`, Open Graph and Twitter data, and opens the page only when indexing is effective.
+   helper builds the absolute canonical URL, Open Graph and Twitter data, and opens the page only when indexing is effective.
+   With several served locales it adds the locale prefix and language variants with `x-default`.
+   With one served locale the canonical URL has no locale prefix and there are no language alternates.
    Add the `pricing.*` message keys to every catalogue. `src/_pages/pricing/index.ts` re-exports
    `PricingPage` from `PricingPage/index.ts`, which re-exports `PricingPage/PricingPage.tsx`: the
    same shape as `src/_pages/dashboard/DashboardPage/`. An unsupported

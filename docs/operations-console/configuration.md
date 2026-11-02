@@ -16,7 +16,7 @@ The build chooses how the Console is served in
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `path` (shipped) | Console pages on the product host with the normal product login: `/en/admin` and `/ru/admin`, or `/admin` when the build serves one locale |
 | `host`           | Console pages on their own host (`ADMIN_CONSOLE_HOSTNAME`), with a separate session. See below                                             |
-| `disabled`       | No Console. Every Console page and every `/api/console/*` route answers 404 before any session, Redis or API work starts                   |
+| `disabled`       | Console pages and guarded BFF methods refuse with 404 before session, Redis or API work; unsupported HTTP methods can return 405           |
 
 `alias` is the page path segment **and** the name of the folder
 `apps/web/src/app/[locale]/<alias>`. To rename it, rename the folder and edit the file
@@ -27,21 +27,52 @@ The internal BFF namespace is `app/api/console/**`.
 
 To change the mode or alias:
 
-1. Edit the file.
-2. Run `node scripts/render-console-edge.mjs --write` after every mode, alias or
-   served-locale change, even if you do not use host mode, and commit the result. It regenerates the Console blocks in
-   `docker/caddy/Caddyfile.console-host` and `docker/nginx/operations-console.conf`.
-   The web build runs the same script with `--check` and fails while they differ.
-3. Rebuild shared and web (`pnpm build`). Only the web app reads this file.
-4. Host mode only: set `ADMIN_CONSOLE_HOSTNAME` as a runtime variable of the web service.
+1. Edit `admin-console.json`. When changing the alias, move the entire
+   `apps/web/src/app/[locale]/<old-alias>` directory to the new alias in the same change.
+   Do not leave a redirecting copy. Keep `alias` and the folder when disabling Console.
+2. Validate placement and regenerate the Console edge blocks:
 
-`ADMIN_CONSOLE_HOSTNAME` names the public host in host mode only. A build in another
-mode ignores it, so setting it never turns the Console on: the mode is decided when you
-build. Verify the result in a browser or with `curl`: in `disabled` mode `/admin` and
-`/api/console/*` must answer 404; in `path` mode the Console login page must open. In
-`disabled` mode leave `alias` as it is; the page folder stays in the build. When the product
-serves one language, `/ru/admin` redirects to `/admin` (which answers 404 in `disabled` mode)
-and `/en/admin` answers 404.
+   ```bash
+   node scripts/render-console-edge.mjs --write
+   node scripts/check-product-admin-placement.mjs
+   ```
+
+   The generator updates `docker/caddy/Caddyfile.console-host` and
+   `docker/nginx/operations-console.conf`. Run it for every mode or alias change.
+   The web build runs `--check` and refuses stale output. If locales also change,
+   follow the [locale procedure](../frontend/i18n-and-errors.md#task-choose-the-served-locales),
+   including regeneration of product-admin mappings.
+
+3. Run `pnpm build`. Review and commit the settings, any moved routes, and changed edge files.
+   Do not commit `dist` or `.next`. A Console-only change needs rebuilt shared and web artifacts;
+   a locale change also requires matching API and worker images.
+4. Deploy the matching web image and edge configuration. For host mode, set
+   `ADMIN_CONSOLE_HOSTNAME` on the web service at runtime and configure DNS/TLS as below.
+   Keep traffic closed during an inconsistent image/edge transition. Use the deployment
+   guide's [ordered rollout](../operations/deployment.md#production-rollout-via-registry-image-pull-path)
+   and retain the previous image and configuration together for rollback.
+5. Verify the chosen mode. In path mode, sign in through the **product login** as a
+   `SUPER_ADMIN`, then open the Console overview. The Console-specific login page is host-only
+   and returns 404 in path mode. In host mode use the Console host's public login page.
+   After an alias move, check navigation at the new alias and refusal at the old path.
+   In disabled mode, test the Console page and a real BFF endpoint such as
+   `GET /api/console/access`: both must refuse without session/API work.
+
+`ADMIN_CONSOLE_HOSTNAME` never enables Console by itself. Builds in path or disabled mode
+ignore it. The mode and alias come from the settings embedded during the build.
+
+Examples below use alias `admin`. With several served locales the path-mode overview is
+`/en/admin` or `/ru/admin`; with one it is `/admin`. For **Russian-only** builds,
+`/ru/admin` redirects to `/admin`, and `/en/admin` returns 404. In disabled mode the
+redirect destination also refuses access. For English-only builds exchange `en` and `ru`.
+An unsupported HTTP method may receive 405, including explicit read-only refusal methods;
+it does not reach session, Redis or backend work.
+
+```text
+Settings + physical folder -> placement check -> generated edge -> build
+                                                                    |
+Matching image + edge + runtime host -> deploy -> verify or restore previous set
+```
 
 The Console builds on backend foundations that work without it: `SystemRole`,
 `/api/v1/admin/**`, fresh-auth, audit, health, and metrics, for automation or
@@ -63,7 +94,8 @@ docker compose --profile edge \
   -f docker-compose.yml -f docker/compose/web.yml up -d
 ```
 
-The console is then available under `/{locale}/admin` on that host. A
+The Console is then available under `/{locale}/<alias>` on that host, or
+`/<alias>` with one served locale. A
 bring-your-own proxy serves the same application normally; it needs no
 host-to-physical-path mapping in path mode.
 
@@ -72,7 +104,7 @@ host-to-physical-path mapping in path mode.
 Host mode is a build-time choice made in
 `packages/shared/src/config/admin-console.json` (see [Topology](#topology)). Setting only
 `ADMIN_CONSOLE_HOSTNAME` does not switch the mode: a path-mode build ignores it, keeps
-the Console under `/{locale}/admin` on the product host and serves no Console on the
+the Console under its configured alias on the product host and serves no Console on the
 console host. The managed stand makes the same change in its snapshot, and
 `pnpm test:console-session-e2e` exercises the result in an isolated lane. Verify your
 own deployment before you rely on it.
@@ -121,13 +153,16 @@ The base Caddy profile is API-only. Only the host override mounts the console
 Caddyfile, and missing hostnames fail validation. For nginx, adapt and include
 `docker/nginx/operations-console.conf` with the real domains and certificates.
 
-For HTTPS on a non-default public port, set `ADMIN_CONSOLE_ORIGIN` to the exact
+The bundled nginx reference assumes HTTPS port 443. For a non-default port, use
+the Caddy reference or adapt and verify the nginx generator as described in
+[deployment](../operations/deployment.md#operations-console-host-mode-reference).
+Set `ADMIN_CONSOLE_ORIGIN` to the exact
 origin, for example `https://console.example.com:8443`. Preserve the complete
 public `Host` authority at the edge; the Console guard matches the configured
 host and port. A different port or product host is rejected.
 
 Keep `web` private to the proxy network. Do not expose its port publicly. Both
-reference proxies reject unknown hosts and direct physical `/admin` paths,
+reference proxies reject unknown hosts and direct physical `/<alias>` paths,
 preserve assets/API/CSP paths, and map only public console pages and API paths.
 See the authoritative [proxy and TLS mapping
 tables](../operations/deployment.md#operations-console-host-mode-reference).

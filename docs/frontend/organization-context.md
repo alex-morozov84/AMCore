@@ -104,7 +104,7 @@ Existing Card, Button(Base UI render), Empty, Skeleton, Alert, ApiErrorAlert,
 Pagination, RouteProgressLink, Sidebar/Sheet and semantic theme tokens are reused.
 Shared BackLink renders a decorative Lucide ArrowLeft and the caller's localized
 label/destination. Console owns its filtered return URL; product context owns
-the explicit list URL. The shared presentation survives Console removal.
+the explicit list URL. The shared presentation works independently of whether Console is enabled.
 Content skeletons mirror the two-column desktop/one-column mobile card structure;
 shell/navigation stays visible. Error/denied/session-change states reveal no old
 company name. Both en/ru catalogues are supported, with system/light/dark themes.

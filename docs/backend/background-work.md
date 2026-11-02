@@ -169,8 +169,8 @@ compatibility; provide labels for operator-facing registrations.
 
 The catalogue carries this metadata for both queue-owned and database-owned work;
 the generic native UI uses it automatically. Technical work IDs remain visible
-for diagnostics. Optional Console removal retains this registration recipe and
-backend metadata, without recreating frontend pages or translations.
+for diagnostics. Disabling Console retains this registration recipe and backend metadata.
+Backend work remains usable independently of the closed frontend.
 
 ## Failure reporting boundary
 

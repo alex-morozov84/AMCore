@@ -298,7 +298,7 @@ pnpm dev
 > [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 To add product management screens, start with the [product administration
-integration guide](docs/product-admin/integration.md). `--admin-console`
+integration guide](docs/product-admin/integration.md). The Console setting in `packages/shared/src/config/admin-console.json`
 configures only the separate `SUPER_ADMIN` Operations Console; it does not
 create product administration pages or choose their placement.
 

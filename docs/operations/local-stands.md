@@ -391,8 +391,9 @@ http://app-<id>.localhost:<port>` and `SUPER_ADMIN: demo.super-admin@preview.amc
    Enter the digits at once. If the page refuses them, run the command again. The owner needs no
    phone app: whoever has the checkout runs the command, either the owner in a terminal or you,
    who then pass the six digits on in the chat. A code is useless after its seconds run out, so
-   passing it on is safe.
-5. The Console opens. Go to the screen under review.
+   share it only for this disposable local demo, never for a production account.
+5. Product sign-in returns to the product home. Open the Console link or its overview
+   (`/<alias>` with one served locale, `/<locale>/<alias>` with several), then the screen under review.
 
 What goes wrong, and what to do:
 
@@ -403,8 +404,10 @@ What goes wrong, and what to do:
 | The sign-in page says "Too many attempts"            | The sign-in start limit, see below                                               | Wait about ten minutes, then sign in once                                                                                                                  |
 | The code is refused                                  | It expired while you typed                                                       | Run `pnpm stand code` again                                                                                                                                |
 
-To tell the two causes of "MFA unavailable" apart, read `mode` in `admin-console.json`: `host`
-means the host topology; `path` means the stand is older than this feature.
+Check the stand's creation options, profile and topology, as well as `mode` in
+`admin-console.json`. A command can select a host topology independently of that source file.
+These are common causes, not an exhaustive diagnosis: if a fresh eligible path-mode stand
+still fails, inspect its API logs before replacing it again.
 
 The first `preview` run enrolls the operator and keeps the factor secret and the backup codes
 in the stand's own directory (`.amcore/stands/<id>/operator-factor.json`, owner-only, ignored by

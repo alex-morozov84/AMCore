@@ -59,7 +59,7 @@ pnpm stand e2e --lane real-stack -- route-fragment.spec.ts
 
 The real-stack command builds the web/API images and isolated migrator dependency stage,
 then runs production browser checks. The [migration-image guide](../operations/migrator-image.md)
-also documents a direct migrator build. Keep required full checks and generated-project CI.
+also documents a direct migrator build. Keep the required API, browser, script-contract and production-image CI checks.
 
 For multi-locale builds, also verify the language control and its profile policies:
 

@@ -52,11 +52,11 @@ Which locales the build serves and how the Operations Console is served are **se
 files**, not fields here. They are read by the code, so editing them changes the build
 after a rebuild:
 
-| Setting                                                                  | File                                            | Guide                                          |
-| ------------------------------------------------------------------------ | ----------------------------------------------- | ---------------------------------------------- |
-| Served locales and the default locale                                    | `packages/shared/src/config/locales.json`       | `docs/frontend/i18n-and-errors.md`             |
-| Operations Console mode (`disabled`, `path`, `host`) and its URL segment | `packages/shared/src/config/admin-console.json` | `docs/operations-console/configuration.md`     |
-| Product administration placement                                         | `packages/shared/src/config/product-admin.json` | `docs/product-admin/placement-and-sessions.md` |
+| Setting                                                                  | File                                            | Guide                                                                              |
+| ------------------------------------------------------------------------ | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Served locales and the default locale                                    | `packages/shared/src/config/locales.json`       | [Locale settings](docs/frontend/i18n-and-errors.md#task-choose-the-served-locales) |
+| Operations Console mode (`disabled`, `path`, `host`) and its URL segment | `packages/shared/src/config/admin-console.json` | [Console settings](docs/operations-console/configuration.md#topology)              |
+| Product administration placement                                         | `packages/shared/src/config/product-admin.json` | [Product administration](docs/product-admin/placement-and-sessions.md)             |
 
 Storybook is part of every project, and the route-progress bar follows the
 `ROUTE_PROGRESS_ENABLED` source flag in

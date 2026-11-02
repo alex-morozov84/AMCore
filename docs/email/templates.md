@@ -9,7 +9,7 @@ render switch. Keep them in sync.
 1. Add the payload type in `apps/api/src/infrastructure/email/email.types.ts`.
 2. Add an `EmailTemplate` enum value.
 3. Add localized messages in `apps/api/src/infrastructure/email/messages.ts` for
-   every supported locale.
+   every shipped catalogue locale (`LOCALE_CATALOGUES`).
 4. Add a React Email component under
    `apps/api/src/infrastructure/email/templates/`. Import the JSX primitives
    (`Body`, `Button`, `Container`, `Head`, `Heading`, `Hr`, `Html`, `Preview`,
@@ -38,7 +38,7 @@ locale set from `@amcore/shared`. Subjects live beside each template as
 
 Rules:
 
-- Add every message key for every supported locale.
+- Add every message key for every shipped catalogue locale (`LOCALE_CATALOGUES`).
 - **Keep user-facing copy in message catalogs, not service methods** — including
   units. Pass a _number_ (`expiresInHours`) and let the catalogue phrase it;
   building `${hours} часов` in a service hardcodes one language into every
@@ -49,8 +49,8 @@ Rules:
   wrong grammar and is invisible when testing in English. `messages.spec.ts`
   enforces the required categories.
 - **Build links with `localizedFrontendUrl()`** from `@amcore/shared`, never by
-  concatenating `FRONTEND_URL`. Web routes are locale-prefixed, and an emailed
-  link cannot fall back to a browser cookie the recipient may not have. A test
+  concatenating `FRONTEND_URL`. The helper adds a locale prefix only when the build serves several locales.
+  An emailed link cannot depend on a browser cookie the recipient may not have. A test
   (`frontend-url-coverage.spec.ts`) fails any `FRONTEND_URL` read outside that
   helper. Full rules: [`docs/frontend/i18n-and-errors.md`](../frontend/i18n-and-errors.md).
 - Render HTML and plaintext from the same React Email component.

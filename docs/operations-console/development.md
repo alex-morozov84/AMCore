@@ -8,7 +8,7 @@ plane, never a product backoffice.
 
 | Concern             | Owned location or rule                                                                                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Route plumbing      | `apps/web/src/app/[locale]/admin/**`. Keep the route thin.                                                                                 |
+| Route plumbing      | `apps/web/src/app/[locale]/<alias>/**` (`admin` by default). Keep the route thin.                                                          |
 | Page composition    | `apps/web/src/_pages/console/**`                                                                                                           |
 | Shell               | `apps/web/src/widgets/console-shell/**`; reuse `shared/ui`, not the product app shell                                                      |
 | Console BFF         | `apps/web/src/app/api/console/**`; every handler starts with `withConsoleHostGuard()`                                                      |
@@ -79,9 +79,9 @@ only an unavailable sample, while an unexpected readiness failure remains HTTP 5
 
 Do not turn a resource count into a health verdict, expose arbitrary filesystem
 paths or copy full environment/health-error objects into the response. Keep web
-artifact identity local to the web build. Console UI, stories and adapters under
-closed Console roots are removed with the feature; shared schemas, backend
-sampling, deployment inputs and the generic fetch option remain reusable core.
+artifact identity local to the web build. Disabling Console closes its frontend entrypoints while retaining its UI, stories,
+adapters and route folders. Shared schemas, backend sampling, deployment inputs
+and the generic fetch option remain usable independently.
 
 ### Overview problem composition
 
@@ -135,8 +135,15 @@ replace it with a token hash or infer authorization from the displayed device.
 
 1. Obtain a narrowly scoped plan and classify every datum as primary or
    secondary.
-2. Add the route under `app/[locale]/admin/` and derive public addresses from
-   `getConsole*Href()`, not from the physical path.
+2. Add the route under `app/[locale]/<alias>/`, using the alias from `admin-console.json`.
+   Derive public addresses from `getConsole*Href()`, not from the physical path.
+   Start every page, layout and metadata function with the synchronous `requireConsoleEnabled()`
+   from `shared/lib/console-host-guard`, before creating any promise or reading a session.
+   A parent layout does not prevent its child pages from running.
+   Every BFF handler must return `withConsoleHostGuard(request, async () => …)` first;
+   await route parameters and perform session/API work only inside that callback.
+   Run `node --test scripts/lib/console-guard-inventory.test.mjs` after adding an entrypoint.
+   Keep the page folder and these guards in disabled builds too.
 3. Add thin route plumbing and `_pages/console` composition, using the existing
    shell and semantic tokens.
 4. Add copy for every retained locale and progress-aware public navigation.
@@ -387,9 +394,9 @@ and rereads ambiguous writes without automatic replay. The editor never starts
 storage I/O. No Settings route or navigation item is added.
 
 The [backend settings foundation](../backend/settings.md) owns ordinary definitions,
-persistence, atomic audit and runtime reconciliation. Console removal owns only
-this editor, its BFF/UI copy and adapters; shared contracts, backend API, migration
-and API/worker reader remain core. Organization capability catalogue/permissions
+persistence, atomic audit and runtime reconciliation. Disabling Console closes access to
+this editor and its BFF while retaining their source. Shared contracts, backend API,
+migration and API/worker reader remain usable independently. Organization capability catalogue/permissions
 remain separate from personal platform settings rights.
 
 ## Support-mail interaction and safety

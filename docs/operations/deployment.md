@@ -1402,15 +1402,23 @@ nginx reaches `web:3000` over the Compose network. Setting
 `WEB_PUBLISH_HOST=0.0.0.0` is an operator-owned exception that requires an
 independent firewall.
 
-For the console hostname, both reference proxies apply the same mapping:
+The Console blocks are generated from `locales.json` and `admin-console.json`.
+Run `node scripts/render-console-edge.mjs --write` before the image build and deploy
+changed edge files with the matching web image. Do not hand-edit generated blocks.
+For a locale change, also regenerate product-admin mappings; see
+[Choose the served locales](../frontend/i18n-and-errors.md#task-choose-the-served-locales).
 
-| Public request                      | Next upstream                                                        |
-| ----------------------------------- | -------------------------------------------------------------------- |
-| `/{locale}/.../`                    | external `308` to the same public path without `/` (query preserved) |
-| `/{locale}/...`                     | `/{locale}/admin/...`                                                |
-| `/api/...`                          | `/api/console/...` (the leading `/api/` only)                        |
-| `/api/csp-report`                   | unchanged                                                            |
-| `/_next/...` and top-level metadata | unchanged                                                            |
+For the Console hostname, both reference proxies apply these mappings (`<alias>`
+is the configured physical folder; `admin` is the default):
+
+| Public request                               | Next upstream                                                |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| `/{locale}/...`, several served locales      | `/{locale}/<alias>/...`                                      |
+| `/...`, one served locale                    | `/<alias>/...`; Next adds the physical locale internally     |
+| Page path ending in `/`                      | External `308` to the slashless public path, query preserved |
+| `/api/...`                                   | `/api/console/...` (the leading `/api/` only)                |
+| `/api/csp-report`, `/api/deployment-version` | Unchanged                                                    |
+| `/_next/...` and top-level metadata          | Unchanged                                                    |
 
 The mapping rewrites only the leading `/api/`: the queue board's own data paths
 (`/api/bull-board/api/queues`) contain a second one that must reach the application unchanged.
@@ -1421,18 +1429,19 @@ custom edge. One exception is explicit in both references: the board's root `/ap
 would otherwise redirect it to the slashless address and that redirect would name the physical
 `/api/console/` path.
 
-`docker/nginx/operations-console.conf` is the nginx reference include. Its
-default TLS vhost rejects unmatched hosts, and both vhosts forward the exact
-`Host` header, including an explicit external port. The web BFF matches this
-authority against configured trusted origins; preserve it (`$http_host` in nginx,
-`{hostport}` in Caddy) instead of stripping a non-default port or trusting
-browser-supplied forwarded headers. `docker/caddy/Caddyfile.console-host` carries the equivalent
-Caddy block and rejects unmatched HTTP hosts before proxying.
-The trailing-slash redirect runs before the internal page mapping, so an
-upstream redirect cannot expose `/{locale}/admin/...` as a public location.
-Nginx rejects encoded traversal before mapping. Both references reject direct
-physical `/admin` paths; Caddy also catches normalized traversal there. Neither
-check applies to query strings.
+`docker/nginx/operations-console.conf` is the nginx reference include. Its default
+TLS vhost rejects unmatched hosts. The bundled nginx reference forwards `$host`,
+so it assumes the standard HTTPS port. It does not preserve an explicit non-default
+port. For a non-default port use the Caddy reference, which forwards `{hostport}`,
+or adapt and verify the nginx generator and redirect authority before deployment.
+Do not edit generated locations alone: regeneration would overwrite the change.
+The BFF compares the received Host authority with its configured trusted origin.
+
+The trailing-slash redirect precedes internal page mapping. Both references reject
+bare physical `/<alias>` paths on the Console host. Nginx also rejects encoded
+traversal before mapping; Caddy catches normalized traversal. These checks do not
+inspect query strings. Keep web private behind the trusted edge.
+
 The console application checks that header only in host mode; the proxy and
 private container network are the trust boundary, not a raw client header.
 

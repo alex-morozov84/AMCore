@@ -324,6 +324,11 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   are supported for local component CSS under the same rule, with camelCase
   class names; `app/globals.css` is exempt because that is where tokens are
   declared.
+- **Operations Console entrypoints:** read `docs/operations-console/development.md`
+  before adding a page, layout, metadata function or BFF handler. Call the synchronous
+  `requireConsoleEnabled()` first in each page entrypoint. Return `withConsoleHostGuard()`
+  first in BFF handlers, and keep parameter awaits/session/API work inside its callback.
+  Resolve the physical folder from `admin-console.json`'s alias; keep it when disabled.
 - **Frontend indexing — closed by default; decide public or private before adding a
   page.** A private page needs nothing: the whole app, `/api/*` and the Console are
   `noindex`. A public page builds its metadata only with `buildPageMetadata()` from

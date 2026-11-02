@@ -18,7 +18,8 @@ values as the authoritative props. The example below assumes that `sortBy`
 and `sortOrder` already include the effective defaults chosen by the feature.
 It receives two forms of the same route: `routeHref` is locale-independent,
 such as `/catalog`, for the locale-aware navigation helpers; `formAction` is
-the browser-visible locale-prefixed path, such as `/en/catalog`, for native
+the browser-visible path, such as `/en/catalog` with several served locales
+or `/catalog` with one, for native
 GET submission and canonical identity.
 
 ## Feature adapter
@@ -134,7 +135,7 @@ export function CatalogSearch({ routeHref, formAction, view, copy }: Props) {
 
 `catalogHref()` is this feature's query builder. Pass its locale-independent
 result to `RouteProgressLink` and `useRouteProgressRouter()`; the locale-aware
-helpers add exactly one active-locale prefix. Pass the locale-prefixed
+helpers add the active-locale prefix only when the build serves several locales. Pass the browser-visible
 `formAction` to the native form and use that same browser path for expected and
 authoritative identities, so a locale change is a different canonical view.
 Search commits retain the effective sort and reset to page 1. GET submission

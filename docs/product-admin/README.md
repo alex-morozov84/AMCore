@@ -47,7 +47,7 @@ link at the bottom. The header retains the
 [account menu with profile and avatar editing](account-menu-and-profile.md).
 
 See [integration](integration.md) for custom-shell, nonhierarchical and headless
-composition. `--admin-console` affects only the Operations Console. Product admin
+composition. The setting in `packages/shared/src/config/admin-console.json` affects only the Operations Console. Product admin
 placement uses its own checked source and physical routes, with no new initializer flag.
 
 ## Authority, state and customization

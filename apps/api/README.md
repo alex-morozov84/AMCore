@@ -168,8 +168,8 @@ build. See
 
 Any link this API puts in front of a user — email CTA, notification, OAuth
 redirect — must be built with `localizedFrontendUrl()` from `@amcore/shared`,
-never concatenated from `FRONTEND_URL`: web routes are locale-prefixed and an
-emailed link cannot fall back to a browser cookie. A test enforces it per
+never concatenated from `FRONTEND_URL`: the helper adds a prefix only when the build serves several locales. An
+emailed link cannot depend on a browser cookie. A test enforces it per
 occurrence.
 
 ## Logging and Metrics

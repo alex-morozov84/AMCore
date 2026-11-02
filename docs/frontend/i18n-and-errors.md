@@ -24,8 +24,8 @@ This page is the working guide.
 `packages/shared` owns `SUPPORTED_LOCALES` and `DEFAULT_LOCALE`, read from
 `locales.json`. `SUPPORTED_LOCALES` means the locales **this build serves**. The
 translated catalogues the repository contains are a separate list,
-`LOCALE_CATALOGUES`. Frontend, backend, and email all derive from the served list,
-so they cannot disagree about which locales exist.
+`LOCALE_CATALOGUES`. Frontend, backend, and email derive their served locales from this file. Deploy matching
+builds together; an old API or worker image still carries its old settings.
 
 ## Recipe: add a UI string
 
@@ -196,8 +196,8 @@ it as the backstop with the client schema catching most issues first.
 
 ## Links the backend sends
 
-Any URL the backend puts in front of a user must carry the locale it already
-knows, via `localizedFrontendUrl()` from `@amcore/shared`. That covers email
+Any URL the backend puts in front of a user must use `localizedFrontendUrl()`
+from `@amcore/shared` with the intended locale. The helper follows the build's prefix policy. That covers email
 CTAs (verification, password reset, invites), notification links (email and
 Telegram), **and the OAuth callback and account-linking redirects**:
 
@@ -208,14 +208,15 @@ const url = localizedFrontendUrl(this.env.get('FRONTEND_URL'), userLocale, 'veri
 // → https://app.example.com/ru/verify-email?token=…
 ```
 
-An unprefixed link would be resolved by cookie or `Accept-Language`, and these
+With several served locales, an unprefixed link would be resolved by cookie or
+`Accept-Language`, and these
 links cannot rely on either. An emailed link may be opened in a browser that has
 never visited the app; an OAuth callback lands in a browser mid-sign-in that has
 no locale cookie yet. A Russian user would get an English page in both cases.
 
-When adding a test for such a link, assert the **specific** locale, not just
-that some prefix is present — a `/(en|ru)/` pattern passes against a hardcoded
-`/en`.
+With one served locale, the helper emits no prefix; the build supplies the language.
+Test the exact URL for the configured locale list: the correct prefix with several
+locales, and no prefix with one. A `/(en|ru)/` check alone misses a hardcoded `/en`.
 
 The helper lives in `packages/shared` because the prefix strategy is a contract
 both apps must agree on — if the frontend changes it, the backend follows from
@@ -244,18 +245,26 @@ The repository stays English and Russian; the file selects what the build serves
    catalogue locale). `default` must be in `enabled`. A wrong file fails the
    build and names the field.
 
-2. Run `node scripts/render-console-edge.mjs --write` (see
-   [Console configuration](../operations-console/configuration.md)). It regenerates the
-   Console host-mode proxy files from the served locales, even if you do not use host
-   mode. It reads the settings file, so it needs no build first. The web build fails with
-   "Console edge files are stale" until the files match.
-3. Run `pnpm build`. It rebuilds shared, API, worker and web in the right order. Building
-   web alone against an old shared build fails with "packages/shared/dist is older than its
-   settings files"; the message names the fix, `pnpm --filter @amcore/shared build`.
-4. Commit `locales.json` and the two regenerated proxy files
-   (`docker/caddy/Caddyfile.console-host`, `docker/nginx/operations-console.conf`). If `git status`
-   shows a proxy file unchanged, there is nothing to commit for it. Never commit build output
-   such as `dist` or `.next`.
+2. Regenerate both sets of edge files from the source settings, before building:
+
+   ```bash
+   node scripts/render-product-admin-edge.mjs --write
+   node scripts/render-console-edge.mjs --write
+   node scripts/check-product-admin-placement.mjs
+   ```
+
+   Run both generators even when the Console or product administration uses path mode.
+   Product-admin host mappings also depend on the served locales. The web build checks
+   both sets and refuses stale files. These commands read source settings, not shared `dist`.
+
+3. Run `pnpm build`. It rebuilds shared, API and web; the worker uses the API build.
+   Building web alone against old shared output fails the settings freshness check.
+   Follow its instruction to run `pnpm --filter @amcore/shared build`, then retry.
+4. Review and commit `locales.json` and every changed generated edge file:
+   `docker/caddy/Caddyfile.console-host`, `docker/nginx/operations-console.conf`,
+   `docker/caddy/product-admin.generated.caddy`, `docker/nginx/product-admin.generated.conf`
+   and `docker/nginx/product-admin-site.generated.conf`.
+   Unchanged outputs need no commit. Never commit `dist` or `.next`.
 
 To serve both shipped languages again, write
 `{ "version": 1, "enabled": ["en", "ru"], "default": "en" }` and repeat steps 2 to 4. `default`
@@ -288,9 +297,24 @@ from the same commit, in the order of
 host, or by promoting new image digests as described in
 [Registry upgrades](../operations/deployment.md#registry-upgrades). If only the web app
 is replaced, it serves one language while the API and the worker still accept and render the old
-list. In Console host mode, also apply the proxy files when they changed. After the rollout open
+list. Apply changed Console and product-admin host mappings with their matching application
+images; stop affected traffic during a mixed configuration. After the rollout open
 `/login`, check that the removed prefix answers 404, and verify the build identity as described in
 [Verify the deployed artifact](../operations/deployment.md#verify-the-deployed-artifact).
+
+For the first deployment, choose and commit these settings before building images, then use
+[Single-host deployment](../operations/single-host-compose.md) or the registry startup path
+in the deployment guide. Fork identity is a separate step:
+[initialize the brand](brand-theme-and-tokens.md#fork-initialization).
+
+**Recovery.** Before rollout, retain the previous settings, generated edge configuration and
+image digests. If verification fails, stop the rollout and follow the deployment guide's
+rollback procedure with that matching set. Do not restore only web or only the proxy.
+For a source build, restore the previous settings and generated files, rebuild all consumers,
+and repeat the ordered rollout. Changing the locale list does not rewrite stored preferences.
+Already prepared or delivered messages are not rewritten by a settings change.
+Do not retry secret mail blindly; use the appropriate verification or password-reset
+flow to request a new link.
 
 ## Recipe: add a third locale
 
@@ -304,7 +328,8 @@ list. In Console host mode, also apply the proxy files when they changed. After 
    parity and coverage guards will name anything missing.
 
 No routing change is needed: routes, the switcher, and `generateStaticParams`
-all read the served list. Run `node scripts/render-console-edge.mjs --write` (step 3 above).
+all read the served list. Repeat the edge-generation and build steps in
+[Choose the served locales](#task-choose-the-served-locales).
 
 Consider whether the backend should keep accepting the new locale from
 `Accept-Language` before shipping — `negotiateLocale` restricts itself to

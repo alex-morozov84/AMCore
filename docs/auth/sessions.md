@@ -182,8 +182,9 @@ expired refresh tokens are not listed here.
 disabled, the database has not loaded, the address is private/reserved, or
 there is no match. It never affects whether auth, listing, or revocation
 work. See [GeoIP setup](../operations/geoip-setup.md) for deployment guidance. `city` is resolved server-side in the caller's
-negotiated `Accept-Language` (falling back to English); a direct API client
-that wants a specific language sends that header explicitly.
+`Accept-Language` when its complete value is an enabled locale code. Otherwise it uses
+the build's `DEFAULT_LOCALE`. This endpoint does not negotiate a weighted language list;
+a direct API client that wants a specific language sends one enabled code.
 
 Settings keeps the existing session rows readable while refreshing its list
 after a revocation. The table exposes `aria-busy` while the request is pending;
