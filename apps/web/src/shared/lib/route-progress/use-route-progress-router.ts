@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 
-import { useRouter } from '@/i18n/navigation'
+import { useRouter, withoutLocaleWhenSingle } from '@/i18n/navigation'
 
 import { routeProgressController } from './route-progress-controller'
 import { ROUTE_PROGRESS_ENABLED } from './route-progress-flag'
@@ -33,13 +33,21 @@ export function useRouteProgressRouter() {
   return useMemo(
     () => ({
       ...router,
-      push: (...args: Parameters<typeof router.push>) => {
+      push: (
+        href: Parameters<typeof router.push>[0],
+        options?: Parameters<typeof router.push>[1]
+      ) => {
         startProgress()
-        router.push(...args)
+        if (options === undefined) router.push(href)
+        else router.push(href, withoutLocaleWhenSingle(options))
       },
-      replace: (...args: Parameters<typeof router.replace>) => {
+      replace: (
+        href: Parameters<typeof router.replace>[0],
+        options?: Parameters<typeof router.replace>[1]
+      ) => {
         startProgress()
-        router.replace(...args)
+        if (options === undefined) router.replace(href)
+        else router.replace(href, withoutLocaleWhenSingle(options))
       },
       back: () => {
         startProgress()

@@ -248,10 +248,10 @@ The repository stays English and Russian; the file selects what the build serves
    worker and web. Building web alone against an old shared build fails with
    "packages/shared/dist is older than its settings files"; run
    `pnpm --filter @amcore/shared build` first.
-3. If you serve the Console on its own host, run
-   `node scripts/render-console-edge.mjs --write` (see
-   [Console configuration](../operations-console/configuration.md)). The web build
-   fails with `--check` until the edge files match.
+3. Run `node scripts/render-console-edge.mjs --write` and commit the result (see
+   [Console configuration](../operations-console/configuration.md)). It regenerates the
+   Console host-mode proxy files from the served locales, even if you do not use host
+   mode. The web build fails with "Console edge files are stale" until they match.
 
 What changes with **one** served locale:
 
@@ -282,8 +282,7 @@ catalogue file and its email copy; the tests still check them.
    parity and coverage guards will name anything missing.
 
 No routing change is needed: routes, the switcher, and `generateStaticParams`
-all read the served list. Run `node scripts/render-console-edge.mjs --write` if the
-Console runs on its own host.
+all read the served list. Run `node scripts/render-console-edge.mjs --write` (step 3 above).
 
 Consider whether the backend should keep accepting the new locale from
 `Accept-Language` before shipping — `negotiateLocale` restricts itself to

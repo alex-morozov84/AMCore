@@ -14,6 +14,7 @@ const routeProgressFlag = vi.hoisted(() => ({ enabled: true }))
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push, replace, back, forward, refresh, prefetch }),
+  withoutLocaleWhenSingle: <T>(options: T) => options,
 }))
 vi.mock('./route-progress-flag', () => ({
   get ROUTE_PROGRESS_ENABLED() {

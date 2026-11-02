@@ -33,5 +33,27 @@ const navigationRouting = defineRouting({
  * `redirect`/`permanentRedirect` are re-exported for Server Components;
  * `useRouter`/`usePathname` for Client Components.
  */
-export const { Link, redirect, permanentRedirect, usePathname, useRouter, getPathname } =
-  createNavigation(navigationRouting)
+const navigation = createNavigation(navigationRouting)
+
+/**
+ * next-intl adds the locale prefix whenever a call names a `locale`, even in `'never'` mode,
+ * because naming one normally means "switch language". With one served locale there is nothing
+ * to switch: the prefix would only send the browser to `/<locale>/...` and back through the
+ * `next.config.ts` redirect. Callers keep naming the locale; this drops it for a one-locale build.
+ */
+export function withoutLocaleWhenSingle<T extends { locale?: unknown }>(options: T): T
+export function withoutLocaleWhenSingle<T extends { locale?: unknown }>(
+  options: T | undefined
+): T | undefined
+export function withoutLocaleWhenSingle<T extends { locale?: unknown }>(options: T | undefined) {
+  if (SUPPORTED_LOCALES.length !== 1 || !options || options.locale === undefined) return options
+  return { ...options, locale: undefined }
+}
+
+export const { Link, usePathname, useRouter, getPathname } = navigation
+
+export const redirect: typeof navigation.redirect = (args, type) =>
+  navigation.redirect(withoutLocaleWhenSingle(args), type)
+
+export const permanentRedirect: typeof navigation.permanentRedirect = (args, type) =>
+  navigation.permanentRedirect(withoutLocaleWhenSingle(args), type)

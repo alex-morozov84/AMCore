@@ -28,8 +28,8 @@ The internal BFF namespace is `app/api/console/**`.
 To change the mode or alias:
 
 1. Edit the file.
-2. For host mode, or after any alias or served-locale change, run
-   `node scripts/render-console-edge.mjs --write`. It regenerates the Console blocks in
+2. Run `node scripts/render-console-edge.mjs --write` after every mode, alias or
+   served-locale change, even if you do not use host mode, and commit the result. It regenerates the Console blocks in
    `docker/caddy/Caddyfile.console-host` and `docker/nginx/operations-console.conf`.
    The web build runs the same script with `--check` and fails while they differ.
 3. Rebuild shared and web (`pnpm build`). Only the web app reads this file.
