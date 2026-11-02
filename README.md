@@ -239,10 +239,10 @@ signup, Console-disabled installations and recovery after lost responses.
 
 Use Node 24 from `.nvmrc`, with the minimum patch version in `package.json`
 (currently 24.15.0). Use the exact pnpm version in `packageManager`
-(currently 12.15.0). Check `node --version` and `pnpm --version` before installation.
+(currently 12.17.0). Check `node --version` and `pnpm --version` before installation.
 
 ```bash
-# Prerequisites: Node.js 24.15+, pnpm 12.15.0 (exact), Docker (Compose v2.20.2+)
+# Prerequisites: Node.js 24.15+, pnpm 12.17.0 (exact), Docker (Compose v2.20.2+)
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore

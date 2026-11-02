@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refresh Node.js 24 base images, align pnpm at 12.17.0 across installation and
+  Docker preparation, and update the form resolvers to 7.0.1.
+- Isolated migrator preparation checks include the workspace's declared dependency
+  patches, matching the production Docker build context.
+
 - Dependency updates keep Nest core, common, testing and HTTP adapters in the
   Fastify group. The known incompatible `nestjs-cls` 7.0.2 update is excluded.
 - Queue-board preflight refusals retain their closed response with Nest's early

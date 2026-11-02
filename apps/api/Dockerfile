@@ -3,11 +3,11 @@
 # ===========================================
 # Debian slim (glibc), not Alpine (musl): the API depends on `sharp`/libvips for
 # media processing. Slim ships sharp's prebuilt glibc binary with bundled libvips
-# out of the box and matches the glibc CI runners. node:24 + pnpm@12.15.0 align
+# out of the box and matches the glibc CI runners. node:24 + pnpm@12.17.0 align
 # with the repo's `engines` / `packageManager`. A CI-gated smoke test
 # (.github/workflows/ci.yml) verifies a real sharp WebP encode plus module
 # resolution inside the final runner image.
-FROM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS base
+FROM node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS base
 
 # The pinned base still carries vulnerable Perl; refresh it from Debian security
 # updates in every API target until the base image includes the patched package.
@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade 
 ADD --checksum=sha256:228bd64aaef23270dbdbd2cf3d5ef5c467602ef38c4066246cef1984adab9a67 https://registry.npmjs.org/npm/-/npm-12.2.1.tgz /tmp/npm.tgz
 RUN npm install --global --ignore-scripts /tmp/npm.tgz && \
     test "$(npm --version)" = "12.2.1" && rm /tmp/npm.tgz && \
-    corepack enable && corepack prepare pnpm@12.15.0 --activate
+    corepack enable && corepack prepare pnpm@12.17.0 --activate
 
 # The pnpm content-addressed store lives in a BuildKit cache mount (see the
 # `--mount=type=cache,id=pnpm-store` steps below), not in an image layer. It
@@ -122,16 +122,16 @@ RUN find /prod/api/node_modules/.pnpm -maxdepth 1 \( \
 # ===========================================
 # The official standalone pnpm distribution includes node-gyp. Copy it whole,
 # matching the preparation stage's glibc; no package manager enters runtime.
-FROM ghcr.io/pnpm/pnpm:12.15.0@sha256:d6148daf3ad2af8fa4ecd1aa06db73da32b2e37f63088987eea2fb375ee7f320 AS migrator-pnpm
+FROM ghcr.io/pnpm/pnpm:12.17.0@sha256:172468925f0ca368313c09867081a43e298eaeb13dee8f7e4356bfad45dd8b15 AS migrator-pnpm
 
 # Share resolutions with the workspace, without running its build or hooks.
-FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS migrator-dependencies
+FROM node:24.22.1-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS migrator-dependencies
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates perl-base libatomic1 && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=migrator-pnpm /opt/pnpm /opt/pnpm
-RUN ln -sf /opt/pnpm/pnpm /usr/local/bin/pnpm && test "$(pnpm --version)" = "12.15.0"
+RUN ln -sf /opt/pnpm/pnpm /usr/local/bin/pnpm && test "$(pnpm --version)" = "12.17.0"
 ENV pnpm_config_store_dir=/pnpm/store
 ENV pnpm_config_cache_dir=/pnpm/cache
 ENV pnpm_config_frozen_lockfile=true
@@ -151,7 +151,7 @@ RUN --mount=type=cache,id=migrator-pnpm-store,target=/pnpm/store \
     HUSKY=0 pnpm --filter @amcore/migrator --fail-if-no-match deploy --prod /prod/migrator
 
 # Do not inherit build tooling, installer caches, or the API dependency graph.
-FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS migrator
+FROM node:24.22.1-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS migrator
 
 WORKDIR /app/apps/api
 ENV NODE_ENV=production
@@ -178,7 +178,7 @@ CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 # Shipping Corepack's bundled pnpm would also
 # drag its vulnerable bundled `undici` into the image (CVE-2026-12151) and bloat
 # the attack surface for no runtime benefit.
-FROM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runner
+FROM node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS runner
 
 WORKDIR /app
 

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { parse } from 'yaml'
 import { root } from '../migrator-operations/context.mjs'
 export const buildkit =
   'moby/buildkit:buildx-stable-1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea'
@@ -33,9 +34,13 @@ export function context(output) {
     'packages/eslint-config/package.json',
     'packages/typescript-config/package.json',
     'docker/migrator/package.json',
+    ...Object.values(
+      parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')).patchedDependencies ?? {}
+    ),
   ]
   const originals = {}
   for (const path of paths) {
+    assert.ok(typeof path === 'string' && !path.startsWith('/') && !path.split('/').includes('..'))
     const source = join(root, path),
       target = join(directory, path)
     mkdirSync(dirname(target), { recursive: true })
