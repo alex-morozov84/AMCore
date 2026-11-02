@@ -273,11 +273,13 @@ describe('AuthController', () => {
     })
 
     it('passes the negotiated Accept-Language locale to the service', async () => {
+      // A locale this build serves, so the test holds for every build setting.
+      const served = SUPPORTED_LOCALES[0]
       const localedRequest = {
-        headers: { 'user-agent': 'test-agent', 'accept-language': 'en-US,en;q=0.9' },
+        headers: { 'user-agent': 'test-agent', 'accept-language': `${served};q=0.9` },
         ip: '127.0.0.1',
         cookies: {},
-        acceptsLanguages: jest.fn(() => 'en'),
+        acceptsLanguages: jest.fn(() => served),
       } as unknown as Request
       authService.register.mockResolvedValue({
         user: mockUserResponse,
@@ -289,7 +291,7 @@ describe('AuthController', () => {
 
       expect(authService.register).toHaveBeenCalledWith(
         registerDto,
-        expect.objectContaining({ acceptedLocale: 'en' })
+        expect.objectContaining({ acceptedLocale: SUPPORTED_LOCALES[0] })
       )
     })
   })

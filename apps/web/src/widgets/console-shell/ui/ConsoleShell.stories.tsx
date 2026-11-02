@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, type UserResponse } from '@amcore/shared'
+import { DEFAULT_LOCALE, localePathPrefix, type UserResponse } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
@@ -75,7 +75,8 @@ export const HostMode: Story = {
     }
   },
   play: async ({ canvasElement }) => {
-    const overviewLink = canvasElement.querySelector('a[href="/en"]')
+    // The story renders as `en`; one served locale has no prefix, so the overview is `/`.
+    const overviewLink = canvasElement.querySelector(`a[href="${localePathPrefix('en') || '/'}"]`)
 
     expect(overviewLink).toBeInTheDocument()
   },

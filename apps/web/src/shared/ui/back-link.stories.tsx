@@ -1,3 +1,4 @@
+import { localePathPrefix } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, within } from 'storybook/test'
 
@@ -15,7 +16,8 @@ export const OrganizationList: Story = {
   args: { href: '/organizations?view=list', children: 'All organizations' },
   play: async ({ canvasElement }) => {
     const link = within(canvasElement).getByRole('link', { name: 'All organizations' })
-    await expect(link).toHaveAttribute('href', '/en/organizations?view=list')
+    // The story renders as `en`; the prefix exists only when the build serves several locales.
+    await expect(link).toHaveAttribute('href', `${localePathPrefix('en')}/organizations?view=list`)
     await expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   },
 }

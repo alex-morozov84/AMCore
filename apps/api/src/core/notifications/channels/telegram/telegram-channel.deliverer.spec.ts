@@ -2,6 +2,8 @@ import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 import type { PinoLogger } from 'nestjs-pino'
 import { z } from 'zod'
 
+import { coerceSupportedLocale, localePathPrefix } from '@amcore/shared'
+
 import { preparationDouble } from '../../../../../test/fixtures/extension-contracts/preparation-double'
 import type { PrismaService } from '../../../../prisma'
 import type { ClaimedDelivery } from '../../dispatch/notification-dispatch.types'
@@ -137,9 +139,10 @@ describe('TelegramChannelDeliverer', () => {
   it('appends the trusted app link when the notification has a first-party action', async () => {
     client.sendPreparedMessage.mockResolvedValue({ status: 'delivered' })
     await deliverNow(context({}, { action: { route: 'account.security' } }))
-    // Locale-prefixed; 'https://app.example' alone would match a bare URL too.
+    // Locale-prefixed when several locales are served; 'https://app.example' alone would match a
+    // bare URL too. The delivery is for `ru`; one served locale means a bare link.
     expect(JSON.parse(client.sendPreparedMessage.mock.calls[0]![0]).text).toContain(
-      'https://app.example/ru'
+      `https://app.example${localePathPrefix(coerceSupportedLocale('ru'))}`
     )
   })
 

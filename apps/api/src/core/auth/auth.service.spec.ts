@@ -3,7 +3,13 @@ import type { Request, Response } from 'express'
 import type { PinoLogger } from 'nestjs-pino'
 
 import type { LoginInput, RegisterInput } from '@amcore/shared'
-import { AuthErrorCode, DEFAULT_LOCALE } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  coerceSupportedLocale,
+  DEFAULT_LOCALE,
+  localePathPrefix,
+  SUPPORTED_LOCALES,
+} from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
 import { resolveTrustedWebPeers } from '../../common/utils/trusted-web-peer'
@@ -31,6 +37,10 @@ import { SystemRole, type User } from '@/generated/prisma/client'
 // Mock email module to prevent TSX/ESM import issues (jest.mock is hoisted automatically)
 jest.mock('../../infrastructure/email', () => ({ EmailService: jest.fn() }))
 jest.mock('argon2')
+
+// The test user prefers `ru`. Links in its emails carry `/ru` only when the build serves several
+// locales; a build that does not serve `ru` falls back to its default, and one locale means no prefix.
+const USER_PREFIX = localePathPrefix(coerceSupportedLocale('ru'))
 
 describe('AuthService', () => {
   let authService: AuthService
@@ -506,9 +516,10 @@ describe('AuthService', () => {
         expect(mockEmailService.sendEmailVerificationEmail).toHaveBeenCalledTimes(1)
         const [, payload] = mockEmailService.sendEmailVerificationEmail.mock.calls[0]!
         expect(payload.verificationUrl).toContain('token=verify-token-xyz')
-        // Locale-prefixed: a bare path would be resolved by cookie/Accept-Language,
-        // which an emailed link cannot rely on.
-        expect(payload.verificationUrl).toContain('/ru/verify-email')
+        // Locale-prefixed when several locales are served: a bare path would be resolved by
+        // cookie/Accept-Language, which an emailed link cannot rely on. The user's locale is `ru`;
+        // a build that does not serve it uses its default, and one locale means a bare link.
+        expect(payload.verificationUrl).toContain(`${USER_PREFIX}/verify-email`)
       })
 
       it('awaits token generation before returning the auth response', async () => {
@@ -816,16 +827,18 @@ describe('AuthService', () => {
     })
 
     it('writes only the supplied fields and invalidates the user cache', async () => {
-      const updated = { ...mockUser, name: 'Renamed', locale: 'en' }
+      // A new choice must be a served locale, so the test picks one the build serves.
+      const locale = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]
+      const updated = { ...mockUser, name: 'Renamed', locale }
       mockCtx.prisma.user.update.mockResolvedValue(updated)
 
-      const result = await authService.updateProfile('user-123', { name: 'Renamed', locale: 'en' })
+      const result = await authService.updateProfile('user-123', { name: 'Renamed', locale })
 
       expect(mockCtx.prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'user-123' },
-        data: { name: 'Renamed', locale: 'en' },
+        data: { name: 'Renamed', locale },
       })
-      expect(result).toMatchObject({ name: 'Renamed', locale: 'en' })
+      expect(result).toMatchObject({ name: 'Renamed', locale })
     })
 
     it('does not write fields that were not supplied', async () => {
@@ -949,9 +962,9 @@ describe('AuthService', () => {
       expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({
-          // Full prefixed path — asserting only 'reset-password?token=' would
-          // still pass if the locale prefix regressed away.
-          resetUrl: expect.stringContaining('/ru/reset-password?token='),
+          // Full prefixed path when several locales are served — asserting only
+          // 'reset-password?token=' would still pass if the locale prefix regressed away.
+          resetUrl: expect.stringContaining(`${USER_PREFIX}/reset-password?token=`),
           expiresInMinutes: 15,
         })
       )
@@ -1161,7 +1174,7 @@ describe('AuthService', () => {
       expect(mockEmailService.sendEmailVerificationEmail).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({
-          verificationUrl: expect.stringContaining('/ru/verify-email?token='),
+          verificationUrl: expect.stringContaining(`${USER_PREFIX}/verify-email?token=`),
           expiresInHours: 48,
         })
       )

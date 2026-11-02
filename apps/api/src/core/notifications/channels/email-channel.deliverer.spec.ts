@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { coerceSupportedLocale, localePathPrefix } from '@amcore/shared'
+
 import { preparationDouble } from '../../../../test/fixtures/extension-contracts/preparation-double'
 
 import type { Notification } from '@/generated/prisma/client'
@@ -186,9 +188,12 @@ describe('EmailChannelDeliverer', () => {
     })
     expect(email.renderTemplate).toHaveBeenCalledWith(
       'notification',
-      // Locale-prefixed: an email CTA cannot rely on a cookie or Accept-Language
-      // the recipient's browser may not have.
-      expect.objectContaining({ actionUrl: 'https://app.example/ru' }),
+      // Locale-prefixed when the build serves several locales: an email CTA cannot rely on a
+      // cookie or Accept-Language the recipient's browser may not have. The delivery is for `ru`;
+      // a build that does not serve it uses its default, and one locale means a bare link.
+      expect.objectContaining({
+        actionUrl: `https://app.example${localePathPrefix(coerceSupportedLocale('ru'))}`,
+      }),
       'worker'
     )
   })

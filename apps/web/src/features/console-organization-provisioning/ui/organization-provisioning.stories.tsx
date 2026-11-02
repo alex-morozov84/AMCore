@@ -1,6 +1,9 @@
+import { localePathPrefix } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
+
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 
 import messages from '../../../../messages/en.json'
 
@@ -185,7 +188,9 @@ export const CreatedResult: Story = {
     )
     expect(within(dialog).getByRole('link', { name: t.openOrganization })).toHaveAttribute(
       'href',
-      '/en/admin/organizations/north-shop'
+      // Rendered as `en`; the locale prefix exists only when several locales are served, and
+      // the folder is the Console alias from the settings file.
+      `${localePathPrefix('en')}/${ADMIN_CONSOLE_CONFIG.slug}/organizations/north-shop`
     )
     expect(canvas.queryByText(t.pendingHelp)).not.toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: t.dismissReceipt }))

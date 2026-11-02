@@ -1,5 +1,7 @@
 import { type DeepMockProxy, mockDeep } from 'jest-mock-extended'
 
+import { coerceSupportedLocale } from '@amcore/shared'
+
 import type { PrismaService } from '../../prisma'
 
 import { NotificationDefinitionRegistry } from './notification-definition.registry'
@@ -43,10 +45,12 @@ describe('NotificationFeedService', () => {
 
       expect(result.hasMore).toBe(false)
       expect(result.nextCursor).toBeNull()
+      // The stored preference is `en`; a build that does not serve it renders the default locale.
+      const titles = { en: 'Profile updated', ru: 'Профиль обновлён' }
       expect(result.data[0]).toMatchObject({
         id: 'n1',
         type: 'account.profile_updated',
-        title: 'Profile updated',
+        title: titles[coerceSupportedLocale('en')],
         readAt: null,
       })
     })
