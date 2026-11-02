@@ -243,7 +243,8 @@ The repository stays English and Russian; the file selects what the build serves
 
    `enabled` lists served locales (at least one, no duplicates, each one a
    catalogue locale). `default` must be in `enabled`. A wrong file fails the
-   build and names the field.
+   build and names the field. The edge generators in step 2 check the file with the same
+   rules first and write nothing when it is wrong.
 
 2. Regenerate both sets of edge files from the source settings, before building:
 
@@ -283,6 +284,7 @@ What changes with **one** served locale:
 | New accounts, emails, notifications                       | Written and rendered in the default locale                                                                                      |
 | Accounts created while one locale is served               | Store that locale and keep it when you serve more locales again                                                                 |
 | Accounts that stored a locale you stopped serving         | Read as the default locale; the stored value is not rewritten                                                                   |
+| Queued mail and saved drafts written under other settings | Still read: any shipped catalogue locale is accepted, then mapped to the default; a message is never half in one language       |
 | API input                                                 | Accepts only served locales; any other value is refused by input validation                                                     |
 
 With two or more served locales nothing changes: every URL carries its locale prefix.

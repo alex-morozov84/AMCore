@@ -24,9 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `path` or `host`) and its URL segment. A disabled Console answers 404 on every page and
   `/api/console/*` route. A host-mode Console edge (Caddy and nginx) is generated from the files
   with `node scripts/render-console-edge.mjs --write`, and the web build fails while it is stale.
-  Builds also fail when `packages/shared/dist` is older than the files. See
-  [i18n](docs/frontend/i18n-and-errors.md) and
+  Builds also fail when `packages/shared/dist` is older than the files, and the edge generators
+  refuse a wrong settings file before they write anything. Data written under other settings
+  keeps working: queued mail, pending AI approvals and saved organization drafts accept any shipped
+  locale and read it as the build's default, and links that were already sent keep their old
+  prefix. See [i18n](docs/frontend/i18n-and-errors.md) and
   [Console configuration](docs/operations-console/configuration.md).
+- A preview stand with the Console in path mode prepares sign-in for the demo operator in its own
+  disposable database; `pnpm stand code --id <id>` prints the current code. Operator multi-factor
+  checking stays on. See [local stands](docs/operations/local-stands.md#operator-sign-in-on-a-preview).
 
 ### Changed
 

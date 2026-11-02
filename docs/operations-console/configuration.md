@@ -37,7 +37,8 @@ To change the mode or alias:
    node scripts/check-product-admin-placement.mjs
    ```
 
-   The generator updates `docker/caddy/Caddyfile.console-host` and
+   The generator checks both settings files with the same rules as the build first and writes
+   nothing when one is wrong. It updates `docker/caddy/Caddyfile.console-host` and
    `docker/nginx/operations-console.conf`. Run it for every mode or alias change.
    The web build runs `--check` and refuses stale output. If locales also change,
    follow the [locale procedure](../frontend/i18n-and-errors.md#task-choose-the-served-locales),

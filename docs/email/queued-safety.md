@@ -17,6 +17,13 @@ Missing or expired content refuses sending; an admitted request is never re-rend
 Changing the sender, credentials or template cannot replace a frozen request.
 PG stores safety metadata and digests, not recipients, bodies or credentials.
 
+**Language after a settings change.** A queued job stores the recipient's locale. The worker
+accepts any shipped catalogue locale there, so a job written before a build stopped serving that
+locale is not failed. If the job has not been rendered yet, the worker renders the whole message
+(subject, HTML and plain text) in the default locale of the build. A request that is already
+frozen is sent as it was, in its original language and with its original links. Changing the
+served locales never re-renders it and never rewrites links in mail that was already sent.
+
 Eligible terminal cleanup removes only the matching private body and reservation.
 It does not delete independent uncertainty or refund an execution grant.
 A new BullMQ incarnation does not prove that an earlier business email failed.
