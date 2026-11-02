@@ -11,9 +11,13 @@ their existing guides. Swagger remains development-only and absent on workers.
 same helpers through `createHttpTestApp`. Startup order is intentional:
 
 ```text
-role/module selection -> Fastify adapter -> board early refusal
-  -> body parsers/cookies/security headers -> CORS -> routes -> listen
+role/module selection -> Fastify instance + board early refusal
+  -> Nest adapter + early CORS hook -> body parsers/cookies/security headers
+  -> routes -> listen
 ```
+
+The board refusal hook is installed on the Fastify instance before constructing
+the Nest adapter. This keeps board preflights ahead of Nest’s early CORS hook.
 
 - `@fastify/cookie` supplies request cookies and response cookie methods.
 - `@fastify/helmet` supplies API security headers after parser admission. The

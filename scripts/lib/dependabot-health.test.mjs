@@ -66,7 +66,8 @@ test('other jobs, unfinished runs and old runs are ignored', () => {
   assert.equal(rootJobHealth(runs, NOW).state, 'unknown')
 })
 
-test('the report warns on a failing job and on a large backlog', () => {
+test('the report warns on a failing job and on a large backlog', (t) => {
+  t.mock.method(Date, 'now', () => NOW)
   const runs = { rows: [root('2026-10-19T06:00:00Z', 'cancelled', 55)] }
   const text = renderDependabotHealth({ runs, backlog: { count: BACKLOG_WARN } }).join('\n')
   assert.match(text, /^## Dependabot health/)
