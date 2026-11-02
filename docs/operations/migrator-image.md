@@ -312,8 +312,8 @@ the checkout; its parent must exist. Do not use a directory containing previous 
 node scripts/verify-migrator-preparation.mjs /absolute/new/preparation-output
 ```
 
-The command copies only root/workspace manifests, the root lock and workspace
-policy into a disposable context. It derives the preparation stage and exact
+The command copies root/workspace manifests, the root lock, workspace policy
+and its declared dependency patches into a disposable context. It derives the preparation stage and exact
 install/deploy commands from `apps/api/Dockerfile`. It replaces authoring hooks
 only in copied workspace manifests with failing sentinels. It does not change
 Prisma package files, production source or root build/release-age policy.
