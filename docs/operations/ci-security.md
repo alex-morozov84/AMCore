@@ -477,6 +477,13 @@ Dependabot updates:
 - `npm` dependencies;
 - `uses:` action pins in the `github-actions` ecosystem.
 
+The `fastify-stack` group also updates Nest common/core, testing and both HTTP
+adapters together. These packages share framework contracts and must be reviewed
+as one update. The configuration excludes `nestjs-cls` 7.0.2: closing one Nest
+application clears the shared CLS hooks host and breaks another application in
+the same process. A later version needs the existing multi-application API E2E
+checks before admission.
+
 Dependabot does **not** update versions for binaries downloaded via `curl`, so
 these require manual bumps:
 

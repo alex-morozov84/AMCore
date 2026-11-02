@@ -4,11 +4,14 @@ import { types } from 'node:util'
 import { HttpException } from '@nestjs/common'
 import { FastifyAdapter as NestFastifyAdapter } from '@nestjs/platform-fastify'
 import type { Response } from 'express'
+import fastify from 'fastify'
 
 import { PayloadTooLargeException } from '../common/exceptions/domain/index.js'
 import { configureFastifyIdempotency } from '../infrastructure/idempotency/fastify-idempotency-response.js'
 import { applyBoardHeaders } from '../infrastructure/queue/dashboard/bull-board-boundary.middleware.js'
 import { safeErrorResult } from '../infrastructure/queue/dashboard/bull-board-errors.js'
+
+import { configureBoardEdge } from './configure-board-edge.js'
 
 // The class is deliberately named `FastifyAdapter`: nestjs-cls picks the middleware mount point
 // by `constructor.name === 'FastifyAdapter'`. Any other name makes it treat the adapter as
@@ -35,7 +38,7 @@ export function createHttpAdapter(
   trustProxy: boolean | number | string = false,
   boardMounted = false
 ): NestFastifyAdapter<Server> {
-  const adapter = new FastifyAdapter({
+  const instance = fastify({
     trustProxy:
       typeof trustProxy === 'number'
         ? (_address: string, hop: number) => hop < trustProxy
@@ -79,6 +82,8 @@ export function createHttpAdapter(
       },
     },
   })
+  if (boardMounted) configureBoardEdge(instance, mount)
+  const adapter = new FastifyAdapter(instance)
   configureFastifyIdempotency(adapter.getInstance())
   return adapter
 }

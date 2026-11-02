@@ -20,14 +20,19 @@ updates:
     # the rest. A red PR stays open until the set is compatible again.
     groups:
       # @nestjs/platform-fastify pins an exact fastify version; bumping fastify
-      # alone installs two copies and breaks the plugin types. Merge when Nest
-      # ships a release that requires the new fastify.
+      # alone installs two copies and breaks the plugin types. Nest core, common,
+      # testing and both adapters also move together to preserve framework contracts.
+      # Merge when Nest ships a release that requires the new fastify.
       fastify-stack:
         applies-to: version-updates
         patterns:
           - 'fastify'
           - '@fastify/*'
           - '@nestjs/platform-fastify'
+          - '@nestjs/platform-express'
+          - '@nestjs/common'
+          - '@nestjs/core'
+          - '@nestjs/testing'
         update-types:
           - 'patch'
           - 'minor'
@@ -69,6 +74,11 @@ updates:
       # (#148), but the repo's been inactive since 2026-04-20 with no ETA.
       # Remove this entry once a clean version is confirmed and re-pinned.
       - dependency-name: 'jest-mock-extended'
+      # 7.0.2 clears its process-wide CLS hooks host when the newest Nest app
+      # closes, breaking requests in another still-running app in the same process.
+      # Keep 7.0.1 until a release preserves concurrent application lifecycles.
+      - dependency-name: 'nestjs-cls'
+        versions: ['7.0.2']
     commit-message:
       prefix: 'chore(deps)'
       include: 'scope'

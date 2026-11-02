@@ -21,6 +21,7 @@ import {
   isRoleDefinitionFormRequest,
   isRoleDefinitionJsonRequest,
 } from '../../src/bootstrap/role-definition-body-parser'
+import { PayloadTooLargeException } from '../../src/common/exceptions/domain/index.js'
 
 /**
  * Register explicit JSON and urlencoded body-parser limits on the application.
@@ -113,6 +114,9 @@ export function configureBodyParser(app: NestExpressApplication, prefix = '/api/
       .map((key) => `ERR_${key.slice('BROTLI_DECODER'.length)}`)
   )
   const parserErrors: ErrorRequestHandler = (error, req, _res, next) => {
+    // Normalize before Nest maps http-errors into a generic HttpException.
+    if (types.isNativeError(error) && (error as { type?: string }).type === 'entity.too.large')
+      return next(new PayloadTooLargeException())
     if (
       types.isNativeError(error) &&
       (error as { status?: number }).status === 400 &&
