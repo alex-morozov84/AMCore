@@ -470,6 +470,11 @@ workspace.
    `.github/workflows/workflow-lint.yml` — that workflow is the source of
    truth, so no version is duplicated here.
 
+The Lint job runs a small API unit suite after installation, before downstream
+build and test jobs start. This checks the installed Jest/SWC runtime without
+building shared packages or starting Docker. Missing test-runner dependencies
+therefore stop the dependent jobs early.
+
 ### CLI Tool Versions
 
 Dependabot updates:
