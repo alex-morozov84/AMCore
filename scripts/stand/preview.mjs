@@ -8,6 +8,7 @@ import { sql } from './ownership.mjs'
 import { relay } from './relay.mjs'
 import { save } from './state.mjs'
 import { fixtureAccounts } from './fixture-accounts.mjs'
+import { operatorSignIn, prepareOperatorMfa } from './operator-mfa.mjs'
 import {
   organizationRolesAddresses,
   organizationRolesFixture,
@@ -73,6 +74,8 @@ export async function preview(m, profile = 'default') {
       env: cleanEnvironment({ TMPDIR: tmp }),
       args: ['--proxy-bypass-list=<-loopback>'],
     })
+    // The disposable database gets the operator MFA protocol before any account signs in.
+    await prepareOperatorMfa(m)
     // UI simulation needs only USER; prepared protocol must refuse operator login.
     await fixtureAccounts(m, api, profile === 'account-mfa-ui' ? 'user' : profile)
     const accounts = m.accounts.filter(
@@ -166,17 +169,21 @@ export async function preview(m, profile = 'default') {
       })
       try {
         const page = await context.newPage()
-        await page.goto(`${m.localePrefix}/login`)
-        await page.getByLabel(labels.product.email, { exact: true }).fill(account.email)
-        await page.getByLabel(labels.product.password, { exact: true }).fill(account.password)
-        await page.getByRole('button', { name: labels.product.submit, exact: true }).click()
-        await page.waitForURL(
-          (url) =>
-            url.origin === m.origins.product &&
-            (m.localePrefix
-              ? SUPPORTED_LOCALES.some((locale) => url.pathname === `/${locale}`)
-              : url.pathname === '/')
-        )
+        if (m.operatorMfa && account.role === 'SUPER_ADMIN')
+          await operatorSignIn(page, m, account, labels)
+        else {
+          await page.goto(`${m.localePrefix}/login`)
+          await page.getByLabel(labels.product.email, { exact: true }).fill(account.email)
+          await page.getByLabel(labels.product.password, { exact: true }).fill(account.password)
+          await page.getByRole('button', { name: labels.product.submit, exact: true }).click()
+          await page.waitForURL(
+            (url) =>
+              url.origin === m.origins.product &&
+              (m.localePrefix
+                ? SUPPORTED_LOCALES.some((locale) => url.pathname === `/${locale}`)
+                : url.pathname === '/')
+          )
+        }
         if (profile === 'organization-creation' && account.role === 'USER') {
           await page.goto(`${m.localePrefix}/organizations?view=list`)
           await page

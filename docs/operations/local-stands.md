@@ -29,6 +29,7 @@ concurrent scenarios within a test retain their own process and stand orchestrat
 | Full product/browser stack           | `pnpm stand e2e --lane real-stack`           | Fresh disposable database                               |
 | HTTPS Console host stack             | `pnpm stand e2e --lane console-real-stack`   | Fresh disposable host-mode database                     |
 | Inspect selected preview             | `pnpm stand status`                          | Read-only                                               |
+| Current operator sign-in code        | `pnpm stand code --id <stand-id>`            | Read-only; prints one code, never the secret            |
 | List records and labelled resources  | `pnpm stand list`                            | Read-only, includes missing-source orphans              |
 | Stop preview                         | `pnpm stand down`                            | Retains named volumes                                   |
 | Delete preview data explicitly       | `pnpm stand down --purge`                    | Deletes only proved-owned resources, built images too   |
@@ -361,6 +362,38 @@ required public build input with an ordinary file rather than dereferencing
 private/foreign files. Refresh rebuilds from
 current source while retaining preview data. Unexpected account/role state fails
 instead of silently resetting the reviewer's scenario.
+
+### Operator sign-in on a preview
+
+An operator (`SUPER_ADMIN`) must pass a second factor. A new preview stand whose Console
+runs in path mode therefore prepares it in the stand's own disposable database only: an
+encryption key for that stand, the active MFA protocol (the same seed the `e2e` stands use),
+and the demo operator's enrollment through the real enrollment screen. Enforcement stays on.
+No application code and no deployment setting changes, and nothing here is activation
+evidence for a deployment.
+
+To review the Console as the demo operator:
+
+1. Create a fresh preview stand with the Console enabled, for example
+   `pnpm stand preview --id console-review`. A stand created before this feature has no
+   operator MFA; create a new one.
+2. Open the printed product URL and sign in as `demo.super-admin@preview.amcore.test` with the
+   public demo password. The page asks for a code from an app.
+3. Run `pnpm stand code --id console-review`. It prints the six-digit code and how long it stays
+   valid (30-second steps). Enter it. The Console opens.
+
+The first `preview` run enrolls the operator and keeps the factor secret and the backup codes
+in the stand's own directory (`.amcore/stands/<id>/operator-factor.json`, owner-only, ignored by
+Git). Later runs sign in with a generated code. `pnpm stand down --purge` deletes the stand's
+data; the factor file goes with the stand record at closeout.
+
+**Every owner walkthrough for a Console screen must include these three steps** (sign in, run
+`pnpm stand code`, enter the code). Without them the reviewer cannot reach the screen.
+
+Limits: a stand with the Console on its own host (host topology) and the `account-mfa-ui`
+profile (which keeps the protocol only prepared) do not get this; the `user` profile has no
+operator. A bare `next start` or `pnpm dev` without the managed stand has no database
+protocol either, so operator sign-in is unavailable there.
 
 ## Target and cleanup safety
 
@@ -717,8 +750,9 @@ or capturing secret steps. Do not treat simulation as backend security evidence.
 Docker E2E stands receive their own generated MFA encryption key. After the runner
 validates its lease, database marker and owned resources, it seeds protocol version1
 as active in that disposable database. This is test setup, not deployment preflight
-or activation evidence. Preview stands and ordinary Compose deployments do not receive
-this test configuration.
+or activation evidence. Ordinary Compose deployments never receive this test configuration.
+A preview stand gets a separate per-stand variant only for operator sign-in; see
+[Operator sign-in on a preview](#operator-sign-in-on-a-preview).
 
 Run the real enrollment, backup sign-in and code-rotation journey with:
 

@@ -105,6 +105,11 @@ async function execute() {
     )
     return
   }
+  if (action === 'code') {
+    const { printOperatorCode } = await import('./stand/operator-code.mjs')
+    await printOperatorCode(await load(id))
+    return
+  }
   if (action === 'closeout') {
     const { closeout } = await import('./stand/closeout.mjs')
     await closeout()

@@ -1,5 +1,6 @@
 import { prepareProductAdminSource, productAdminProfiles } from './product-admin-source.mjs'
 import { setConsoleMode } from './console-mode.mjs'
+import { operatorMfaWanted } from './operator-mfa.mjs'
 import { prepareAccountMfaPreview } from './account-mfa-source.mjs'
 import { projectChoices } from './project.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
@@ -76,6 +77,13 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     consoleTopology,
     fixtureVersion: 2,
     fixtureProfile,
+    operatorMfa: operatorMfaWanted({
+      purpose,
+      mocked,
+      consoleEnabled: choices.consoleEnabled,
+      consoleTopology,
+      fixtureProfile,
+    }),
     ...(isOrganizationMailFixture({ fixtureProfile })
       ? { mailCaptureKey: randomBytes(32).toString('hex') }
       : {}),
