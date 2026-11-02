@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `frontend_storybook`, `frontend_route_progress` and the `admin_console*` fields; the settings
   files above are the single source. `theme_persistence` and
   `initialized_from_amcore_version` stay. New accounts always store an explicit locale.
+- Dependency updates keep Nest core, common, testing and HTTP adapters in the
+  Fastify group. The known incompatible `nestjs-cls` 7.0.2 update is excluded.
+- Queue-board preflight refusals retain their closed response with Nest's early
+  CORS hook. Express parser comparison fixtures preserve body-size error codes.
 
 - Authentication no longer hangs when Redis is slow or down. Organization-scoped requests
   whose admission needs Redis are refused with a fast `503` `SERVICE_UNAVAILABLE` before the

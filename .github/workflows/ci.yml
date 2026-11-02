@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check installed Jest runtime
+        run: pnpm --filter api test --runInBand --runTestsByPath src/common/utils/anonymize-ip.spec.ts
+
       - name: Run ESLint
         run: |
           node scripts/migrator-contract.mjs
