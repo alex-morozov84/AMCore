@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES } from '@amcore/shared'
 
 import { QUEUEABLE_EMAIL_TEMPLATES } from '../../email/email.types.js'
 import { QueueName } from '../constants/queues.constant.js'
@@ -25,7 +25,8 @@ const emailCandidate = z.object({
   template: z
     .string()
     .refine((value) => (QUEUEABLE_EMAIL_TEMPLATES as ReadonlySet<string>).has(value)),
-  locale: z.enum(SUPPORTED_LOCALES).optional(),
+  // Stored job data may name a locale this build no longer serves; it is still a known catalogue.
+  locale: z.enum(LOCALE_CATALOGUES).optional(),
   userId: identifier.optional(),
 })
 

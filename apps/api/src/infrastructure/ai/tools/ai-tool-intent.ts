@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { aiApprovalPreviewSchema, SUPPORTED_LOCALES } from '@amcore/shared'
+import { aiApprovalPreviewSchema, LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { canonicalJsonEqual, canonicalJsonHash } from '../../../common/utils/canonical-json.js'
 import { strictJson } from '../../../common/utils/strict-json.js'
@@ -37,7 +37,9 @@ const intentSchema = z
       })
       .strict()
       .nullable(),
-    preview: z.record(z.enum(SUPPORTED_LOCALES), aiApprovalPreviewSchema).nullable(),
+    // Stored data: a pending approval keeps the previews written under the settings of an earlier
+    // build. Read any shipped catalogue, none required; the reader picks the viewer's served locale.
+    preview: z.partialRecord(z.enum(LOCALE_CATALOGUES), aiApprovalPreviewSchema).nullable(),
   })
   .strict()
 
@@ -87,6 +89,13 @@ export async function prepareToolIntent(
   const normalized = tool.normalizedSchema.parse(prepared.args)
   if (!canonicalJsonEqual(normalized, prepared.args))
     throw new Error('tool_normalized_args_changed')
+  // A new intent carries one preview for exactly the locales this build serves. Reading a stored
+  // intent is looser (see `intentSchema`), because it may have been written under other settings.
+  if (prepared.preview) {
+    const written = Object.keys(prepared.preview).sort().join(',')
+    if (written !== [...SUPPORTED_LOCALES].sort().join(','))
+      throw new Error('tool_preview_locales_incomplete')
+  }
   const value = {
     ...prepared,
     formatVersion: 1 as const,

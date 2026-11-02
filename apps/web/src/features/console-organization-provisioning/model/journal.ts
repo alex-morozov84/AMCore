@@ -1,4 +1,5 @@
 import {
+  coerceSupportedLocale,
   contextSessionBindingSchema,
   DEFAULT_LOCALE,
   invitationOperationIdSchema,
@@ -54,7 +55,8 @@ export function readProvisioningJournal(
   try {
     const raw = localStorage.getItem(key(scope))
     if (!raw) return
-    const parsed = raw.length <= 8192 ? schema.safeParse(JSON.parse(raw)) : undefined
+    const parsed =
+      raw.length <= 8192 ? schema.safeParse(withServedLocales(JSON.parse(raw))) : undefined
     if (!parsed?.success || parsed.data.actorId !== actorId) {
       localStorage.removeItem(key(scope))
       return
@@ -72,6 +74,25 @@ export function readProvisioningJournal(
   } catch {
     return
   }
+}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/**
+ * A saved draft can outlive a deployment that changed the served languages. Map its invitation
+ * locale to the default instead of discarding the draft and the recovery identity of an
+ * unresolved creation. Every other field is left for the strict schema to judge.
+ */
+function withServedLocales(value: unknown): unknown {
+  if (!isRecord(value)) return value
+  const served = (input: unknown): unknown =>
+    isRecord(input) && typeof input.inviteLocale === 'string'
+      ? { ...input, inviteLocale: coerceSupportedLocale(input.inviteLocale) }
+      : input
+  const pending = isRecord(value.pending)
+    ? { ...value.pending, input: served(value.pending.input) }
+    : value.pending
+  return { ...value, draft: served(value.draft), pending }
 }
 export function writeProvisioningJournal(row: ProvisioningJournal, scope: string): boolean {
   try {
