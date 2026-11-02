@@ -49,6 +49,25 @@ export function consoleEntrypoints(root) {
   }
 }
 
+// The guards live in one module. A file that declares its own function of the same name, or
+// imports it from elsewhere, would pass a name-only check without refusing anything.
+const GUARD_MODULE = '@/shared/lib/console-host-guard'
+
+function isFunctionNode(node) {
+  return ts.isArrowFunction(node) || ts.isFunctionExpression(node)
+}
+
+// Page form: `requireConsoleEnabled()` with no argument. Route form: `withConsoleHostGuard(request,
+// <function>)`: the request is a plain identifier and the work is a callback that runs only after
+// the guard, so no argument can start anything before the refusal.
+function hasGuardShape(call, returned) {
+  if (!returned) return call.arguments.length === 0
+  const [request, work] = call.arguments
+  return (
+    call.arguments.length === 2 && ts.isIdentifier(request) && Boolean(work && isFunctionNode(work))
+  )
+}
+
 function isCall(statement, name, { returned }) {
   let expression
   if (returned) {
@@ -62,8 +81,38 @@ function isCall(statement, name, { returned }) {
   return (
     ts.isCallExpression(expression) &&
     ts.isIdentifier(expression.expression) &&
-    expression.expression.text === name
+    expression.expression.text === name &&
+    hasGuardShape(expression, returned)
   )
+}
+
+function importsGuard(source, name) {
+  return source.statements.some(
+    (statement) =>
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text === GUARD_MODULE &&
+      !statement.importClause?.isTypeOnly &&
+      statement.importClause?.namedBindings !== undefined &&
+      ts.isNamedImports(statement.importClause.namedBindings) &&
+      statement.importClause.namedBindings.elements.some(
+        (element) =>
+          !element.isTypeOnly &&
+          element.name.text === name &&
+          (element.propertyName === undefined || element.propertyName.text === name)
+      )
+  )
+}
+
+function declaresLocally(source, name) {
+  return source.statements.some((statement) => {
+    if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement))
+      return statement.name?.text === name
+    if (!ts.isVariableStatement(statement)) return false
+    return statement.declarationList.declarations.some(
+      (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name
+    )
+  })
 }
 
 function asBody(body) {
@@ -92,16 +141,45 @@ function localBodies(source) {
   return locals
 }
 
-// A refusal stub: `new Response(null, { status: 405, ... })` and nothing else. It starts no work, so
-// it needs no guard; the proxy answers 404 for the whole Console path earlier when it is off.
+const isLiteral = (node) =>
+  ts.isStringLiteral(node) ||
+  ts.isNoSubstitutionTemplateLiteral(node) ||
+  ts.isNumericLiteral(node) ||
+  node.kind === ts.SyntaxKind.TrueKeyword ||
+  node.kind === ts.SyntaxKind.FalseKeyword ||
+  node.kind === ts.SyntaxKind.NullKeyword
+
+// An object made only of literal values: no call, identifier or spread can compute anything.
+function isLiteralObject(node) {
+  return (
+    ts.isObjectLiteralExpression(node) &&
+    node.properties.every(
+      (property) =>
+        ts.isPropertyAssignment(property) &&
+        (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
+        (isLiteral(property.initializer) || isLiteralObject(property.initializer))
+    )
+  )
+}
+
+// A refusal stub: `new Response(null, { status: 405, headers: { ...literals } })` and nothing else.
+// Every part is a literal, so it starts no work and needs no guard; the proxy answers 404 for the
+// whole Console path earlier when it is off. An explicit method that is not a literal stub is
+// guarded like any other handler.
 function isMethodRefusal(body) {
   const only = body?.statements?.length === 1 ? body.statements[0] : undefined
   const expression = only && ts.isReturnStatement(only) ? only.expression : undefined
-  return Boolean(
-    expression &&
-    ts.isNewExpression(expression) &&
-    expression.expression.getText() === 'Response' &&
-    /status:\s*405/.test(expression.getText())
+  if (!expression || !ts.isNewExpression(expression)) return false
+  if (!ts.isIdentifier(expression.expression) || expression.expression.text !== 'Response')
+    return false
+  const [payload, init, ...rest] = expression.arguments ?? []
+  if (rest.length > 0 || !payload || payload.kind !== ts.SyntaxKind.NullKeyword) return false
+  if (!init || !isLiteralObject(init)) return false
+  return init.properties.some(
+    (property) =>
+      property.name.text === 'status' &&
+      ts.isNumericLiteral(property.initializer) &&
+      property.initializer.text === '405'
   )
 }
 
@@ -149,6 +227,7 @@ export function inspectGuardFile(file, text, kind) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const problems = []
   const guard = kind === 'page' ? 'requireConsoleEnabled' : 'withConsoleHostGuard'
+  let guarded = 0
   for (const entry of exportedFunctions(source)) {
     const relevant =
       kind === 'page'
@@ -157,9 +236,16 @@ export function inspectGuardFile(file, text, kind) {
     if (!relevant) continue
     const first = entry.body?.statements[0]
     if (kind === 'route' && isMethodRefusal(entry.body)) continue
+    guarded += 1
     if (!first || !isCall(first, guard, { returned: kind !== 'page' })) {
-      problems.push(`${file}: export "${entry.name}" must start with ${guard}(…)`)
+      const form = kind === 'page' ? `${guard}()` : `${guard}(request, <function>)`
+      problems.push(`${file}: export "${entry.name}" must start with ${form}`)
     }
+  }
+  if (guarded > 0 && declaresLocally(source, guard)) {
+    problems.push(`${file}: ${guard} is declared in this file; import it from ${GUARD_MODULE}`)
+  } else if (guarded > 0 && !importsGuard(source, guard)) {
+    problems.push(`${file}: ${guard} must be imported from ${GUARD_MODULE}`)
   }
   if (
     kind === 'route' &&
