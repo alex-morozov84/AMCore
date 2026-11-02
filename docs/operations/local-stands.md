@@ -366,39 +366,61 @@ instead of silently resetting the reviewer's scenario.
 ### Operator sign-in on a preview
 
 An operator (`SUPER_ADMIN`) must pass a second factor. A new preview stand whose Console
-runs in path mode therefore prepares it in the stand's own disposable database only: an
+runs in **path mode** (the Console is served under the product address, for example `/admin`)
+therefore prepares it in the stand's own disposable database only: an
 encryption key for that stand, the active MFA protocol (the same seed the `e2e` stands use),
 and the demo operator's enrollment through the real enrollment screen. Enforcement stays on.
 No application code and no deployment setting changes, and nothing here is activation
-evidence for a deployment.
+evidence for a deployment. Never switch the check off for a preview; create a new stand instead.
 
 To review the Console as the demo operator:
 
-1. Create a fresh preview stand with the Console enabled, for example
-   `pnpm stand preview --id console-review`. A stand created before this feature has no
-   operator MFA; create a new one.
-2. Open the printed product URL and sign in as `demo.super-admin@preview.amcore.test` with the
+1. Check that the Console is on: `mode` in `packages/shared/src/config/admin-console.json` is
+   `path`. In `disabled` mode `/admin` answers 404.
+2. Create a fresh preview stand, for example `pnpm stand preview --id console-review`. The
+   default profile is enough for screens that need only accounts; add `--profile <name>` only
+   when the screen needs the data of a profile described in this guide. The command prints the
+   product URL, the demo accounts and the stop command.
+3. Open the printed product URL and sign in as `demo.super-admin@preview.amcore.test` with the
    public demo password. The page asks for a code from an app.
-3. Run `pnpm stand code --id console-review`. It prints the six-digit code and how long it stays
-   valid (30-second steps). Enter it. The Console opens.
+4. Run `pnpm stand code --id console-review`. It prints one line, for example
+   `Operator demo.super-admin@preview.amcore.test: code 123456 (valid for about 21 s)`.
+   Enter the digits at once. If the page refuses them, run the command again. The owner needs no
+   phone app: whoever has the checkout runs the command, either the owner in a terminal or you,
+   who then pass the six digits on in the chat. A code is useless after its seconds run out, so
+   passing it on is safe.
+5. The Console opens. Go to the screen under review.
+
+What goes wrong, and what to do:
+
+| What you see                                         | Cause                                                                            | What to do                                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in answers "MFA unavailable"                    | The stand was created before this feature, or it has the Console on its own host | Create a new stand with a new ID; a repeated `preview` cannot add it. Remove the old one with `pnpm stand down --id <old-id> --purge` when nobody needs it |
+| `pnpm stand code` says the stand has no operator MFA | Same as above                                                                    | Same as above                                                                                                                                              |
+| The sign-in page says "Too many attempts"            | The sign-in start limit, see below                                               | Wait about ten minutes, then sign in once                                                                                                                  |
+| The code is refused                                  | It expired while you typed                                                       | Run `pnpm stand code` again                                                                                                                                |
 
 The first `preview` run enrolls the operator and keeps the factor secret and the backup codes
 in the stand's own directory (`.amcore/stands/<id>/operator-factor.json`, owner-only, ignored by
-Git). Later runs sign in with a generated code. `pnpm stand down --purge` deletes the stand's
-data; the factor file goes with the stand record at closeout.
+Git). Never print the file or the backup codes in a chat or a report; the review needs only the
+current six-digit code. You never use the backup codes. Later runs sign in with a generated code.
+`pnpm stand down --purge` deletes the stand's database, so the saved secret opens nothing any
+more; the file stays in the ignored stand directory with the stand record.
 
-The API counts sign-in starts per source: 20 in 10 minutes. The sign-ins that `preview` makes
-by itself count too, so several rebuilds plus scripted probes in a row end with "Too many
-attempts" on the sign-in page. This is the limit working, not a broken stand. Wait about ten
-minutes, then sign in once.
+The API counts sign-in starts per source: 20 in 10 minutes. The count is kept in the stand's own
+Redis: a refresh keeps it, a new stand starts at zero. The sign-ins that `preview` makes by itself
+count too, so several rebuilds plus scripted probes in a row end with "Too many attempts". This
+is the limit working, not a broken stand.
 
-**Every owner walkthrough for a Console screen must include these three steps** (sign in, run
+**Every owner walkthrough for a Console screen must include these steps** (sign in, run
 `pnpm stand code`, enter the code). Without them the reviewer cannot reach the screen.
 
-Limits: a stand with the Console on its own host (host topology) and the `account-mfa-ui`
-profile (which keeps the protocol only prepared) do not get this; the `user` profile has no
-operator. A bare `next start` or `pnpm dev` without the managed stand has no database
-protocol either, so operator sign-in is unavailable there.
+Limits: a stand with the Console on its own host (**host topology**: the Console has an address
+separate from the product) and the `account-mfa-ui` profile (which keeps the protocol only
+prepared) do not get this; the `user` profile has no operator. Review a Console screen in path
+mode unless the change is about the host itself; host behavior has its own `e2e` lanes. A bare
+`next start` or `pnpm dev` without the managed stand has no database protocol either, so operator
+sign-in is unavailable there.
 
 ## Target and cleanup safety
 

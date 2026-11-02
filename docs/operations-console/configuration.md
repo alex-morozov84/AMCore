@@ -36,8 +36,11 @@ To change the mode or alias:
 4. Host mode only: set `ADMIN_CONSOLE_HOSTNAME` as a runtime variable of the web service.
 
 `ADMIN_CONSOLE_HOSTNAME` names the public host in host mode only. A build in another
-mode ignores it. Verify the result in a browser or with `curl`: in `disabled` mode
-`/admin` must answer 404; in `path` mode the Console login page must open.
+mode ignores it, so setting it never turns the Console on: the mode is decided when you
+build. Verify the result in a browser or with `curl`: in `disabled` mode `/admin` and
+`/api/console/*` must answer 404; in `path` mode the Console login page must open. In
+`disabled` mode leave `alias` as it is; the page folder stays in the build. When the product
+serves one language, `/ru/admin` redirects to `/admin` and `/en/admin` answers 404.
 
 The Console builds on backend foundations that work without it: `SystemRole`,
 `/api/v1/admin/**`, fresh-auth, audit, health, and metrics, for automation or

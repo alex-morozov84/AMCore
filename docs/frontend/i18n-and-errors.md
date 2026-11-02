@@ -244,31 +244,48 @@ The repository stays English and Russian; the file selects what the build serves
    catalogue locale). `default` must be in `enabled`. A wrong file fails the
    build and names the field.
 
-2. Rebuild everything that embeds the file: `pnpm build` rebuilds shared, API,
-   worker and web. Building web alone against an old shared build fails with
-   "packages/shared/dist is older than its settings files"; run
-   `pnpm --filter @amcore/shared build` first.
-3. Run `node scripts/render-console-edge.mjs --write` and commit the result (see
+2. Run `node scripts/render-console-edge.mjs --write` (see
    [Console configuration](../operations-console/configuration.md)). It regenerates the
    Console host-mode proxy files from the served locales, even if you do not use host
-   mode. The web build fails with "Console edge files are stale" until they match.
+   mode. It reads the settings file, so it needs no build first. The web build fails with
+   "Console edge files are stale" until the files match.
+3. Run `pnpm build`. It rebuilds shared, API, worker and web in the right order. Building
+   web alone against an old shared build fails with "packages/shared/dist is older than its
+   settings files"; the message names the fix, `pnpm --filter @amcore/shared build`.
+4. Commit `locales.json` and the two regenerated proxy files
+   (`docker/caddy/Caddyfile.console-host`, `docker/nginx/operations-console.conf`). Never commit
+   build output such as `dist` or `.next`.
+
+To serve both shipped languages again, write
+`{ "version": 1, "enabled": ["en", "ru"], "default": "en" }` and repeat steps 2 to 4. `default`
+is your product choice; `en` is the shipped one.
 
 What changes with **one** served locale:
 
-| Area                                              | Behavior                                                      |
-| ------------------------------------------------- | ------------------------------------------------------------- |
-| Public URLs                                       | Bare paths: `/login`, not `/ru/login`                         |
-| `/ru/login` for the served locale                 | Redirects (307) to `/login`, query kept                       |
-| A catalogue locale that is not served             | `/en/login` answers 404                                       |
-| Language switcher                                 | Not shown                                                     |
-| New accounts, emails, notifications               | Written and rendered in the default locale                    |
-| Accounts that stored a locale you stopped serving | Read as the default locale; the stored value is not rewritten |
-| API input                                         | Accepts only served locales                                   |
+| Area                                                      | Behavior                                                                                       |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Public URLs                                               | Bare paths: `/login`, not `/ru/login`                                                          |
+| `/ru/login` for the served locale                         | Redirects (307) to `/login`, query kept                                                        |
+| A catalogue locale that is not served                     | `/en/login` answers 404                                                                        |
+| Links sent or saved before the change with the old prefix | Answer 404 when the prefix is no longer served, for example `/en/verify-email?...` in an email |
+| Language switcher                                         | Not shown                                                                                      |
+| New accounts, emails, notifications                       | Written and rendered in the default locale                                                     |
+| Accounts created while one locale is served               | Store that locale and keep it when you serve more locales again                                |
+| Accounts that stored a locale you stopped serving         | Read as the default locale; the stored value is not rewritten                                  |
+| API input                                                 | Accepts only served locales; any other value is refused by input validation                    |
 
 With two or more served locales nothing changes: every URL carries its locale prefix.
 
 Nothing is deleted from the repository. A locale you do not serve keeps its
 catalogue file and its email copy; the tests still check them.
+
+**Roll out the change to a running product.** The file is embedded in the shared package, so the
+API, the worker and the web app each carry their own copy. Replace all of them with images built
+from the same commit, in the order of
+[Upgrades](../operations/deployment.md#upgrades-new-migrations-in-a-release). If only the web app
+is replaced, it serves one language while the API and the worker still accept and render the old
+list. In Console host mode, also apply the proxy files when they changed. After the rollout open
+`/login` and `/api/deployment-version`, and check that the removed prefix answers 404.
 
 ## Recipe: add a third locale
 
