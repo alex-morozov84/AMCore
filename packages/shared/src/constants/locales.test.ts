@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
-
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import shippedFile from '../config/locales.json'
 
 type Settings = { version: number; enabled: string[]; default: string }
 
@@ -27,9 +27,7 @@ const settings = (enabled: string[], fallback: string): Settings => ({
 describe('locale settings file', () => {
   it('serves exactly what the settings file lists', async () => {
     const shipped = await import('./locales')
-    const file = JSON.parse(
-      readFileSync(new URL('../config/locales.json', import.meta.url), 'utf8')
-    )
+    const file = shippedFile
     expect([...shipped.SUPPORTED_LOCALES]).toEqual(file.enabled)
     expect(shipped.DEFAULT_LOCALE).toBe(file.default)
   })
