@@ -5998,6 +5998,10 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  co@4.6.0:
+    resolution: {integrity: sha512-QVb0dM5HvG+uaxitm8wONl7jltx8dqhfU33DcqtOZcLSVIKSDDLDi7+0LbAKiyI8hD9u42m2YxXSkMGWThaecQ==}
+    engines: {iojs: '>= 1.0.0', node: '>= 0.12.0'}
+
   code-block-writer@13.0.3:
     resolution: {integrity: sha512-Oofo0pq3IKnsFtuHqSF7TqBfr71aeyZDVJ0HpmqB7FBM2qEigL0iPONSCZSO9pE9dZTAxANe5XHG9Uy0YMv8cg==}
 
@@ -7368,6 +7372,10 @@ packages:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
     engines: {node: '>=8'}
 
+  is-generator-fn@2.1.0:
+    resolution: {integrity: sha512-cTIB4yPYL/Grw0EaSzASzg6bBy9gqCofvWN8okThAYIxKJZC+udlRAmGbM0XLeniEJSs8uEgHPGuHSe1XsOLSQ==}
+    engines: {node: '>=6'}
+
   is-glob@4.0.3:
     resolution: {integrity: sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==}
     engines: {node: '>=0.10.0'}
@@ -7541,6 +7549,10 @@ packages:
 
   jest-docblock@30.5.0:
     resolution: {integrity: sha512-NwDqcxtoZi33RhuW+zJS/RVA3rmheQ8BnwpYZuc/Eruaz6seQb7+aoCeDZu/3X7W2XmD8DbSo9Pn72DbKsBFYw==}
+    engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
+
+  jest-each@30.5.2:
+    resolution: {integrity: sha512-GRrW+7fmmgmkvyfEBqc1QFdWnF1Ex5yG6Y6AWL4TTxnkWlKIT98dsKh3P3UuWm6v4XsQwVE6DEzXIPMzWJ3ZbA==}
     engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
 
   jest-environment-node@30.5.2:
@@ -8874,6 +8886,9 @@ packages:
 
   pure-rand@6.1.0:
     resolution: {integrity: sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA==}
+
+  pure-rand@7.0.1:
+    resolution: {integrity: sha512-oTUZM/NAZS8p7ANR3SHh30kXB+zK2r2BPcEn/awJIbOvq82WoMN4p62AWWp3Hhw50G0xMsw1mhIBLqHw64EcNQ==}
 
   qified@0.10.1:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
@@ -15420,6 +15435,8 @@ snapshots:
 
   cn@0.2.6: {}
 
+  co@4.6.0: {}
+
   code-block-writer@13.0.3: {}
 
   collect-v8-coverage@1.0.3: {}
@@ -16834,6 +16851,8 @@ snapshots:
 
   is-fullwidth-code-point@3.0.0: {}
 
+  is-generator-fn@2.1.0: {}
+
   is-glob@4.0.3:
     dependencies:
       is-extglob: 2.1.1
@@ -16941,7 +16960,31 @@ snapshots:
       jest-util: 30.5.1
       p-limit: 3.1.0
 
-  jest-circus@30.5.2: {}
+  jest-circus@30.5.2(supports-color@10.2.2):
+    dependencies:
+      '@jest/environment': 30.5.2
+      '@jest/expect': 30.5.2(supports-color@10.2.2)
+      '@jest/test-result': 30.5.2
+      '@jest/types': 30.5.1
+      '@types/node': 26.6.6
+      chalk: 4.1.2
+      co: 4.6.0
+      dedent: 1.7.2
+      is-generator-fn: 2.1.0
+      jest-each: 30.5.2
+      jest-matcher-utils: 30.5.2
+      jest-message-util: 30.5.1
+      jest-runtime: 30.5.2(supports-color@10.2.2)
+      jest-snapshot: 30.5.2(supports-color@10.2.2)
+      jest-util: 30.5.1
+      p-limit: 3.1.0
+      pretty-format: 30.5.1
+      pure-rand: 7.0.1
+      slash: 3.0.0
+      stack-utils: 2.0.6
+    transitivePeerDependencies:
+      - babel-plugin-macros
+      - supports-color
 
   jest-cli@30.5.2(@types/node@26.6.6)(supports-color@10.2.2):
     dependencies:
@@ -16974,7 +17017,7 @@ snapshots:
       deepmerge: 4.3.1
       glob: 13.0.6
       graceful-fs: 4.2.11
-      jest-circus: 30.5.2
+      jest-circus: 30.5.2(supports-color@10.2.2)
       jest-docblock: 30.5.0
       jest-environment-node: 30.5.2
       jest-regex-util: 30.5.0
@@ -17009,7 +17052,24 @@ snapshots:
     dependencies:
       detect-newline: 3.1.0
 
-  jest-environment-node@30.5.2: {}
+  jest-each@30.5.2:
+    dependencies:
+      '@jest/get-type': 30.5.0
+      '@jest/types': 30.5.1
+      chalk: 4.1.2
+      jest-regex-util: 30.5.0
+      jest-util: 30.5.1
+      pretty-format: 30.5.1
+
+  jest-environment-node@30.5.2:
+    dependencies:
+      '@jest/environment': 30.5.2
+      '@jest/fake-timers': 30.5.2
+      '@jest/types': 30.5.1
+      '@types/node': 26.6.6
+      jest-mock: 30.5.2
+      jest-util: 30.5.1
+      jest-validate: 30.5.1
 
   jest-haste-map@30.5.1:
     dependencies:
@@ -18551,6 +18611,8 @@ snapshots:
       - yauzl
 
   pure-rand@6.1.0: {}
+
+  pure-rand@7.0.1: {}
 
   qified@0.10.1:
     dependencies:
