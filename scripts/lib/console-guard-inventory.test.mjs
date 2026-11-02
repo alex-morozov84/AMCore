@@ -106,7 +106,7 @@ test('negative: a 405 stub with a computed status or header value is not a stub'
   assert.equal(route('export const POST = () => new Response(null, { status: code() })').length, 1)
   assert.equal(
     route(
-      "export const POST = () => new Response(null, { status: 405, headers: { Allow: allow() } })"
+      'export const POST = () => new Response(null, { status: 405, headers: { Allow: allow() } })'
     ).length,
     1
   )
@@ -128,7 +128,8 @@ test('negative: the guard callback argument is evaluated before the guard', () =
 })
 
 test('negative: the guard request argument must be a plain identifier', () => {
-  const text = 'export const GET = (r: Request) => withConsoleHostGuard(await prepare(r), () => x())'
+  const text =
+    'export const GET = (r: Request) => withConsoleHostGuard(await prepare(r), () => x())'
   assert.equal(route(text).length, 1)
   assert.equal(
     route('export const GET = (r: Request) => withConsoleHostGuard(r, () => x(), extra())').length,

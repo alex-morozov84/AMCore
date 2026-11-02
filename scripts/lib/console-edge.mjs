@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { readAdminConsoleSettings, readLocaleSettings } from './settings-files.mjs'
+
 // Console host-mode edge blocks (Caddy and nginx) generated from the two settings files:
 // `admin-console.json` (alias) and `locales.json` (served locales). With several locales the
 // public path starts with the locale; with one it does not, and the edge maps a public page onto
@@ -12,11 +14,11 @@ const END = '# AMCORE_ADMIN_CONSOLE_PROXY_END'
 const NGINX_START = '    # AMCORE_ADMIN_CONSOLE_LOCATIONS_START'
 const NGINX_END = '    # AMCORE_ADMIN_CONSOLE_LOCATIONS_END'
 
+// Both files are validated with the same rules as the shared schemas before anything is
+// generated, so a wrong file stops here and never reaches the proxy files.
 export function readConsoleEdgeSettings(root) {
-  const read = (name) =>
-    JSON.parse(readFileSync(join(root, `packages/shared/src/config/${name}.json`), 'utf8'))
-  const locales = read('locales').enabled
-  const { alias, mode } = read('admin-console')
+  const locales = readLocaleSettings(root).enabled
+  const { alias, mode } = readAdminConsoleSettings(root)
   return { alias, mode, locales }
 }
 

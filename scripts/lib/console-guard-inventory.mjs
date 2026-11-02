@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import ts from 'typescript'
 
+import { readAdminConsoleSettings } from './settings-files.mjs'
+
 // Static proof that every Operations Console entrypoint refuses before it starts any work.
 // Pages, layouts and metadata functions call `requireConsoleEnabled()` as their first
 // statement; Route Handlers return `withConsoleHostGuard(...)` as their first statement. Both
@@ -20,10 +22,7 @@ const PAGE_FILES = new Set([
 const METADATA_EXPORTS = new Set(['generateMetadata', 'generateViewport', 'generateStaticParams'])
 
 export function consoleAlias(root) {
-  const settings = JSON.parse(
-    readFileSync(path.join(root, 'packages/shared/src/config/admin-console.json'), 'utf8')
-  )
-  return settings.alias
+  return readAdminConsoleSettings(root).alias
 }
 
 function walk(directory) {

@@ -123,10 +123,10 @@ failsWith('duplicate key across budget files', /budgeted in both/, (f) =>
 failsWith('unknown scope', /unknown scope "billing"/, (f) =>
   f.write(CORE, { routes: { ...f.routes, 'billing:/': 200 } })
 )
-failsWith('Console settings missing', /Console settings is missing/, (f) =>
+failsWith('Console settings missing', /admin-console\.json is missing/, (f) =>
   rmSync(path.join(f.root, CONFIG))
 )
-failsWith('Console alias invalid', /invalid Console alias/, (f) =>
+failsWith('Console alias invalid', /admin-console\.json: alias \(invalid_format\)/, (f) =>
   f.write(CONFIG, { version: 1, mode: 'path', alias: 'Not Valid' })
 )
 test('a disabled Console keeps its budget scope, because its folder stays in the build', () => {

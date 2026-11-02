@@ -1,20 +1,26 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+import { readAdminConsoleSettings, readLocaleSettings } from './settings-files.mjs'
 
 // The settings files are bundled into `packages/shared/dist`. A web or API build that runs against
 // a `dist` built from older settings would serve the old locales or Console mode. This check loads
 // the built package and compares it with the two JSON files; it fails with the command to run.
-const readJson = (root, name) =>
-  JSON.parse(readFileSync(join(root, `packages/shared/src/config/${name}.json`), 'utf8'))
+// A settings file that the shared schema would refuse is reported by name instead.
 
 /** Returns a list of mismatches; empty means `dist` matches the settings files. */
 export async function sharedSettingsProblems(root) {
   const entry = join(root, 'packages/shared/dist/index.js')
   if (!existsSync(entry)) return ['packages/shared/dist is missing']
   const built = await import(`${pathToFileURL(entry).href}?fresh=${Date.now()}`)
-  const locales = readJson(root, 'locales')
-  const adminConsole = readJson(root, 'admin-console')
+  let locales, adminConsole
+  try {
+    locales = readLocaleSettings(root)
+    adminConsole = readAdminConsoleSettings(root)
+  } catch (error) {
+    return [error.message]
+  }
   const problems = []
   if (JSON.stringify(built.SUPPORTED_LOCALES) !== JSON.stringify(locales.enabled))
     problems.push(

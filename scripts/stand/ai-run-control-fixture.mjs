@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { readLocaleSettings } from '../lib/settings-files.mjs'
 import { sql } from './ownership.mjs'
 import { save } from './state.mjs'
 
@@ -152,9 +153,7 @@ export async function aiRunControlPreview(page, m) {
   )
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  const served = JSON.parse(
-    await readFile(join(m.worktree, 'packages/shared/src/config/locales.json'), 'utf8')
-  ).enabled
+  const served = readLocaleSettings(m.worktree).enabled
   for (const locale of m.localePrefix ? served : [m.baseLocale]) {
     const messages = JSON.parse(
       await readFile(join(m.worktree, `apps/web/messages/${locale}.json`), 'utf8')

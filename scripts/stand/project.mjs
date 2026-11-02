@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readAdminConsoleSettings, readLocaleSettings } from '../lib/settings-files.mjs'
 import { run } from './process.mjs'
 
 export async function projectChoices(root) {
@@ -7,12 +8,8 @@ export async function projectChoices(root) {
     await readFile(join(root, 'packages/shared/src/config/product-admin.json'), 'utf8')
   )
   // Locale and Console choices come from the settings files, not from PROJECT_CONTEXT.md.
-  const locales = JSON.parse(
-    await readFile(join(root, 'packages/shared/src/config/locales.json'), 'utf8')
-  )
-  const adminConsole = JSON.parse(
-    await readFile(join(root, 'packages/shared/src/config/admin-console.json'), 'utf8')
-  )
+  const locales = readLocaleSettings(root)
+  const adminConsole = readAdminConsoleSettings(root)
   return {
     productAdminHost: placement.mode === 'host',
     consoleTopology: adminConsole.mode === 'host' ? 'host' : 'path',

@@ -1,9 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
+import {
+  RESERVED_ROOT_SEGMENTS,
+  aliasProblems,
+  readAdminConsoleSettings,
+  readLocaleSettings,
+} from './settings-files.mjs'
+
 const configPath = 'packages/shared/src/config/product-admin.json'
-const localesPath = 'packages/shared/src/config/locales.json'
-const consolePath = 'packages/shared/src/config/admin-console.json'
 const terminal = /^(?:page|route)\.[cm]?[jt]sx?$/
 const metadata =
   /^(?:robots|sitemap|manifest|icon|apple-icon|opengraph-image|twitter-image|favicon)(?:\.|$)/
@@ -58,11 +63,8 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
   // when the build serves more than one locale (one locale is rewritten onto the folder).
   const routeRoot = join(app, '[locale]')
   if (!existsSync(routeRoot)) throw new Error('Missing physical [locale] route folder')
-  const { enabled: locales, default: defaultLocale } = JSON.parse(
-    readFileSync(join(root, localesPath), 'utf8')
-  )
-  if (!Array.isArray(locales) || !locales.includes(defaultLocale))
-    throw new Error('Missing declared default locale')
+  // Validated with the shared schema's rules: a wrong locales file stops here, not later.
+  const { enabled: locales, default: defaultLocale } = readLocaleSettings(root)
   const localized = locales.length > 1
   const ownedGroup = join(routeRoot, '(product-admin)')
   const physicalRoot = join(ownedGroup, config.alias)
@@ -85,9 +87,11 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
   for (const entry of readdirSync(join(root, 'apps/web/public'), { withFileTypes: true }))
     if (entry.name === alias || entry.name.split('.')[0] === alias)
       throw new Error(`Product-admin alias collides with public asset ${entry.name}`)
-  if (['_next', 'api', ...locales].includes(alias))
+  // Reserved roots include every catalogue locale, served or not: a locale you stop serving can
+  // come back, and its first path segment must stay free.
+  if (RESERVED_ROOT_SEGMENTS.includes(alias))
     throw new Error('Product-admin alias collides with a reserved root')
-  inspectConsoleAlias(root, app, alias, locales)
+  inspectConsoleAlias(root, app, alias)
   for (const required of ['/login', '/organizations', '/settings/api-keys', '/settings/sessions'])
     if (!owned.some((entry) => `/${entry.segments.join('/')}` === required))
       throw new Error(`Missing product-admin physical page ${required}`)
@@ -106,17 +110,12 @@ export function inspectProductAdminPlacement(root, candidateAlias) {
 /**
  * The Console alias is the name of the physical folder `[locale]/<alias>` and, in path mode, its public
  * segment. It must be a free first segment: not the product-admin alias, not another route or public
- * asset, and not a reserved root or served locale. Checked in every mode, including `disabled`,
+ * asset, and not a reserved root or catalogue locale. Checked in every mode, including `disabled`,
  * because the folder stays in the build.
  */
-function inspectConsoleAlias(root, app, productAlias, locales) {
-  const settings = JSON.parse(readFileSync(join(root, consolePath), 'utf8'))
-  const alias = settings.alias
-  if (
-    !/^[a-z][a-z0-9_-]{0,31}$/.test(alias) ||
-    ['_next', '_vercel', 'api', ...locales].includes(alias)
-  )
-    throw new Error('Console alias is invalid or reserved')
+function inspectConsoleAlias(root, app, productAlias) {
+  const { alias } = readAdminConsoleSettings(root)
+  if (aliasProblems(alias).length > 0) throw new Error('Console alias is invalid or reserved')
   if (alias === productAlias) throw new Error('Console alias equals the product-admin alias')
   const folder = join(app, '[locale]', alias)
   if (!existsSync(folder)) throw new Error('Console alias disagrees with its physical routes')

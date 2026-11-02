@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
+import { readAdminConsoleSettings, readLocaleSettings } from '../lib/settings-files.mjs'
 import { snapshot } from '../stand/snapshot.mjs'
 
 const exists = async (path) => Boolean(await stat(path).catch(() => undefined))
@@ -16,9 +17,8 @@ export function replaceOnce(source, before, after) {
 
 export async function exampleContext(root) {
   const text = await read(root, 'PROJECT_CONTEXT.md')
-  const localeSettings = JSON.parse(await read(root, 'packages/shared/src/config/locales.json'))
-  const adminConsole = JSON.parse(await read(root, 'packages/shared/src/config/admin-console.json'))
-  const locales = localeSettings.enabled
+  const adminConsole = readAdminConsoleSettings(root)
+  const locales = readLocaleSettings(root).enabled
   const single = locales.length === 1
   // Settings files own the locale and Console choices; the other fields stay in PROJECT_CONTEXT.md.
   const settings = {

@@ -71,6 +71,33 @@ test('a changed alias or locale list makes --check fail until regenerated', (t) 
   )
 })
 
+// A wrong settings file must stop the generator before it writes: the shared build refuses the
+// same files later, but by then a broken proxy block could already sit in the working tree.
+for (const [name, file, content] of [
+  [
+    'an alias that breaks a proxy pattern',
+    'admin-console',
+    { version: 1, mode: 'path', alias: 'a|b)' },
+  ],
+  ['a reserved alias', 'admin-console', { version: 1, mode: 'path', alias: 'ru' }],
+  ['an unknown mode', 'admin-console', { version: 1, mode: 'off', alias: 'admin' }],
+  ['a locale with no catalogue', 'locales', { version: 1, enabled: ['en', 'de'], default: 'en' }],
+  ['a default that is not enabled', 'locales', { version: 1, enabled: ['ru'], default: 'en' }],
+  ['a duplicate locale', 'locales', { version: 1, enabled: ['en', 'en'], default: 'en' }],
+]) {
+  test(`--write refuses ${name} and changes no file`, (t) => {
+    const dir = copy(t)
+    writeFileSync(join(dir, `packages/shared/src/config/${file}.json`), JSON.stringify(content))
+    const files = ['docker/caddy/Caddyfile.console-host', 'docker/nginx/operations-console.conf']
+    const before = files.map((item) => readFileSync(join(dir, item), 'utf8'))
+    assert.throws(() => consoleEdgeFiles(dir, true), /Invalid packages\/shared\/src\/config/)
+    assert.deepEqual(
+      files.map((item) => readFileSync(join(dir, item), 'utf8')),
+      before
+    )
+  })
+}
+
 test('missing markers are an error, not a silent no-op', (t) => {
   const dir = copy(t)
   const file = join(dir, 'docker/nginx/operations-console.conf')

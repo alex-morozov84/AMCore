@@ -18,6 +18,7 @@ import {
   statsRows,
 } from './lib/route-budget-inputs.mjs'
 import { evaluate, keyRoutes, mergeBudgets } from './lib/route-budget-policy.mjs'
+import { readAdminConsoleSettings } from './lib/settings-files.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const webRoot = path.join(root, 'apps/web')
@@ -39,11 +40,12 @@ function scopeRegistry() {
   mandatory.push('product-admin:/organizations')
   // The Console folder stays in every build (a disabled Console answers 404), so its budget
   // scope is mandatory in every mode; only the alias must be valid.
-  const slug = readJson(
-    path.join(root, 'packages/shared/src/config/admin-console.json'),
-    'Console settings'
-  ).alias
-  if (!/^[a-z0-9-]+$/.test(slug ?? '')) throw new RouteBudgetError('invalid Console alias')
+  let slug
+  try {
+    slug = readAdminConsoleSettings(root).alias
+  } catch (error) {
+    throw new RouteBudgetError(error.message)
+  }
   resolvers.push({ scope: 'admin-console', prefix: `/${slug}` })
   mandatory.push('admin-console:/')
   return { resolvers, mandatory, scopes: new Set(['app', ...resolvers.map((r) => r.scope)]) }

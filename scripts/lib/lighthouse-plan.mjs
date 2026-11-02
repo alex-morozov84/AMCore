@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ciLanes } from '../e2e-ci-plan.mjs'
+import { readAdminConsoleSettings, readLocaleSettings } from './settings-files.mjs'
 
 export const digest = (value) =>
   createHash('sha256')
@@ -16,8 +17,8 @@ export const invariant = (ok, code) => {
 export function auditChoices(root) {
   // Locale and Console choices come from the settings files (PROJECT_CONTEXT.md no longer holds them).
   const productAdmin = json(root, 'packages/shared/src/config/product-admin.json')
-  const locales = json(root, 'packages/shared/src/config/locales.json')
-  const adminConsole = json(root, 'packages/shared/src/config/admin-console.json')
+  const locales = readLocaleSettings(root)
+  const adminConsole = readAdminConsoleSettings(root)
   const choices = {
     productAdmin,
     locale: locales.default,
