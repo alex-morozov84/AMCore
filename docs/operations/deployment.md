@@ -74,6 +74,12 @@ a backport is actually needed.
 - Docker Compose **v2.20.2+** (`depends_on: { required: false }` and
   `service_completed_successfully`). Use `docker compose` (v2), not the legacy
   `docker-compose` binary.
+- Build settings chosen and committed before the first image build: served languages
+  (`packages/shared/src/config/locales.json`) and Operations Console mode
+  (`packages/shared/src/config/admin-console.json`). They are embedded in the images, so a
+  later change needs a new build and a rollout of the API, worker and web app together; see
+  [Build Settings](../../PROJECT_CONTEXT.md#build-settings) and
+  [the rollout steps](../frontend/i18n-and-errors.md#task-choose-the-served-locales).
 
 ## Reference stack: `docker-compose.yml`
 

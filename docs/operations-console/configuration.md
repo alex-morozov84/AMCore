@@ -40,7 +40,8 @@ mode ignores it, so setting it never turns the Console on: the mode is decided w
 build. Verify the result in a browser or with `curl`: in `disabled` mode `/admin` and
 `/api/console/*` must answer 404; in `path` mode the Console login page must open. In
 `disabled` mode leave `alias` as it is; the page folder stays in the build. When the product
-serves one language, `/ru/admin` redirects to `/admin` and `/en/admin` answers 404.
+serves one language, `/ru/admin` redirects to `/admin` (which answers 404 in `disabled` mode)
+and `/en/admin` answers 404.
 
 The Console builds on backend foundations that work without it: `SystemRole`,
 `/api/v1/admin/**`, fresh-auth, audit, health, and metrics, for automation or

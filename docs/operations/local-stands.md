@@ -365,7 +365,8 @@ instead of silently resetting the reviewer's scenario.
 
 ### Operator sign-in on a preview
 
-An operator (`SUPER_ADMIN`) must pass a second factor. A new preview stand whose Console
+An operator (the `SUPER_ADMIN` role, the person who uses the Operations Console, called the
+Console below) must pass a second factor. A new preview stand whose Console
 runs in **path mode** (the Console is served under the product address, for example `/admin`)
 therefore prepares it in the stand's own disposable database only: an
 encryption key for that stand, the active MFA protocol (the same seed the `e2e` stands use),
@@ -380,7 +381,9 @@ To review the Console as the demo operator:
 2. Create a fresh preview stand, for example `pnpm stand preview --id console-review`. The
    default profile is enough for screens that need only accounts; add `--profile <name>` only
    when the screen needs the data of a profile described in this guide. The command prints the
-   product URL, the demo accounts and the stop command.
+   product URL, the demo accounts and the stop command, for example `URL:
+http://app-<id>.localhost:<port>` and `SUPER_ADMIN: demo.super-admin@preview.amcore.test`.
+   The `localhost` address opens only on the machine that runs the stand.
 3. Open the printed product URL and sign in as `demo.super-admin@preview.amcore.test` with the
    public demo password. The page asks for a code from an app.
 4. Run `pnpm stand code --id console-review`. It prints one line, for example
@@ -400,6 +403,9 @@ What goes wrong, and what to do:
 | The sign-in page says "Too many attempts"            | The sign-in start limit, see below                                               | Wait about ten minutes, then sign in once                                                                                                                  |
 | The code is refused                                  | It expired while you typed                                                       | Run `pnpm stand code` again                                                                                                                                |
 
+To tell the two causes of "MFA unavailable" apart, read `mode` in `admin-console.json`: `host`
+means the host topology; `path` means the stand is older than this feature.
+
 The first `preview` run enrolls the operator and keeps the factor secret and the backup codes
 in the stand's own directory (`.amcore/stands/<id>/operator-factor.json`, owner-only, ignored by
 Git). Never print the file or the backup codes in a chat or a report; the review needs only the
@@ -410,7 +416,8 @@ more; the file stays in the ignored stand directory with the stand record.
 The API counts sign-in starts per source: 20 in 10 minutes. The count is kept in the stand's own
 Redis: a refresh keeps it, a new stand starts at zero. The sign-ins that `preview` makes by itself
 count too, so several rebuilds plus scripted probes in a row end with "Too many attempts". This
-is the limit working, not a broken stand.
+is the limit working, not a broken stand. A new stand starts at zero, so creating one is also a
+valid way to continue at once.
 
 **Every owner walkthrough for a Console screen must include these steps** (sign in, run
 `pnpm stand code`, enter the code). Without them the reviewer cannot reach the screen.

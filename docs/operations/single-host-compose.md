@@ -11,6 +11,12 @@ Use [Deployment & migrations](deployment.md) for rollback and other topologies, 
 
 ## Before you start
 
+- Your build settings, chosen and committed **before the first image build**: which languages
+  the product serves (`packages/shared/src/config/locales.json`) and how the Operations
+  Console is served (`packages/shared/src/config/admin-console.json`: `disabled`, `path` or
+  `host`). They are part of the images, not of the environment file. See
+  [Build Settings](../../PROJECT_CONTEXT.md#build-settings). Changing them later means a new
+  build and a rollout of every service.
 - A Linux host with Docker Engine and Docker Compose v2.20.2 or later. Your user can
   run `docker` without `sudo` (`sudo usermod -aG docker "$USER"`, then log in again). Read
   [Capacity](capacity.md) for CPU and memory: building the images needs more memory
