@@ -3,7 +3,7 @@ import {
   BULL_BOARD_CONTENT_SECURITY_POLICY,
   BULL_BOARD_CONTEXT_HEADER,
   DEFAULT_LOCALE,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,9 +21,9 @@ import { handleConsoleBoard } from './board-handler'
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
-const VISITOR_LOCALE = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]!
+const VISITOR_LOCALE = SERVED_LOCALES[SERVED_LOCALES.length - 1]!
 const expectedReturnHref = (locale: string) =>
-  `${SUPPORTED_LOCALES.length > 1 ? `/${locale}` : ''}${getConsoleBackgroundWorkHref()}`
+  `${SERVED_LOCALES.length > 1 ? `/${locale}` : ''}${getConsoleBackgroundWorkHref()}`
 
 const PAGE = new Request('https://app.example.test/api/console/bull-board/', {
   headers: {

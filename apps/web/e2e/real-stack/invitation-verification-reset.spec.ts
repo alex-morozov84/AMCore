@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { activeTarget, guardedSql } from '../support/managed-target.mjs'
@@ -13,7 +13,7 @@ import { resetInvitationRegistrationIpBudget } from './invitation-registration-b
 
 test.beforeEach(() => resetInvitationRegistrationIpBudget())
 
-for (const locale of SUPPORTED_LOCALES)
+for (const locale of SERVED_LOCALES)
   test(`recipient ${locale}: real verification API, explicit return and reset/reopen`, async ({
     page,
     context,

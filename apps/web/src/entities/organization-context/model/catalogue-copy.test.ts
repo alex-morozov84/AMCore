@@ -1,4 +1,4 @@
-import { CAPABILITY_CATALOGUE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { CAPABILITY_CATALOGUE, SERVED_LOCALES } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
  * capability a product registers appears in both with the copy declared here. Without it a screen
  * would fall back to a raw id, so a missing key is caught where the capability is registered.
  */
-describe.each([...SUPPORTED_LOCALES])('catalogue copy (%s)', (locale) => {
+describe.each([...SERVED_LOCALES])('catalogue copy (%s)', (locale) => {
   it('names every capability, its area and the levels it offers', async () => {
     const messages = (await import(`../../../../messages/${locale}.json`)).default
     const roles = messages.organizationRoles as {

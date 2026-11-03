@@ -1,7 +1,7 @@
 import { adminAuditQuerySchema } from '@amcore/shared'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 import {
   getConsoleAccountSecurityHref,
   getConsoleAuditHref,
@@ -21,20 +21,20 @@ import {
 
 const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {
   mode: 'disabled' | 'path' | 'host'
-  slug: string
+  alias: string
 }
 const originalMode = ADMIN_CONSOLE_CONFIG.mode
-const originalSlug = ADMIN_CONSOLE_CONFIG.slug
+const originalAlias = ADMIN_CONSOLE_CONFIG.alias
 
 afterEach(() => {
   mutableConfig.mode = originalMode
-  mutableConfig.slug = originalSlug
+  mutableConfig.alias = originalAlias
 })
 
 describe('detail return addresses', () => {
   it('opens identity activity for the full 31-day Audit interval', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
     const now = Date.parse('2026-09-25T12:00:00.000Z')
     const href = getConsoleDetailAuditHref({ actorId: 'user1' }, now)
     const url = new URL(href, 'http://console.invalid')
@@ -48,7 +48,7 @@ describe('detail return addresses', () => {
   })
   it('preserves exact inventory and audit query state in path mode', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
     const audit = '/operations/audit?cursor=next&actorId=user1'
     expect(parseConsoleReturnHref(audit)).toBe(audit)
     expect(parseConsoleReturnHref('/operations/users?page=10&search=alex')).toBe(
@@ -61,7 +61,7 @@ describe('detail return addresses', () => {
 
   it('rejects external, encoded, malformed and wrong-route sources', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
     for (const value of [
       '//evil.test/operations/users',
       'https://evil.test/operations/users',
@@ -85,9 +85,9 @@ describe('detail return addresses', () => {
 })
 
 describe('getConsoleOverviewHref', () => {
-  it('uses the generated slug in path mode', () => {
+  it('uses the configured alias in path mode', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
 
     expect(getConsoleOverviewHref()).toBe('/operations')
   })
@@ -100,9 +100,9 @@ describe('getConsoleOverviewHref', () => {
 })
 
 describe('getConsoleOrganizationsHref', () => {
-  it('nests under the generated slug in path mode', () => {
+  it('nests under the configured alias in path mode', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
 
     expect(getConsoleOrganizationsHref()).toBe('/operations/organizations')
   })
@@ -115,9 +115,9 @@ describe('getConsoleOrganizationsHref', () => {
 })
 
 describe('getConsoleUsersHref', () => {
-  it('nests under the generated slug in path mode', () => {
+  it('nests under the configured alias in path mode', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
 
     expect(getConsoleUsersHref()).toBe('/operations/users')
   })
@@ -130,9 +130,9 @@ describe('getConsoleUsersHref', () => {
 })
 
 describe('getConsoleAuditHref', () => {
-  it('uses the generated slug in path mode and the root in host mode', () => {
+  it('uses the configured alias in path mode and the root in host mode', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
     expect(getConsoleAuditHref()).toBe('/operations/audit')
     mutableConfig.mode = 'host'
     expect(getConsoleAuditHref()).toBe('/audit')
@@ -142,7 +142,7 @@ describe('getConsoleAuditHref', () => {
 describe('getConsoleBackgroundWorkHref', () => {
   it('follows the topology rule in every mode', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
     expect(getConsoleBackgroundWorkHref()).toBe('/operations/background-work')
     mutableConfig.mode = 'host'
     expect(getConsoleBackgroundWorkHref()).toBe('/background-work')
@@ -152,7 +152,7 @@ describe('getConsoleBackgroundWorkHref', () => {
 describe('getConsoleScheduledJobsHref', () => {
   it('follows the topology rule in every mode, next to Background work', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'operations'
+    mutableConfig.alias = 'operations'
     expect(getConsoleScheduledJobsHref()).toBe('/operations/scheduled-jobs')
     mutableConfig.mode = 'host'
     expect(getConsoleScheduledJobsHref()).toBe('/scheduled-jobs')
@@ -160,10 +160,10 @@ describe('getConsoleScheduledJobsHref', () => {
 })
 
 describe('queue board address', () => {
-  it('is the Console BFF route under the product host in path mode, whatever the slug', () => {
+  it('is the Console BFF route under the product host in path mode, whatever the alias', () => {
     mutableConfig.mode = 'path'
-    for (const slug of ['admin', 'operations']) {
-      mutableConfig.slug = slug
+    for (const alias of ['admin', 'operations']) {
+      mutableConfig.alias = alias
       expect(getConsoleQueueBoardBasePath()).toBe('/api/console/bull-board')
       expect(getConsoleQueueBoardHref()).toBe('/api/console/bull-board')
     }
@@ -181,7 +181,7 @@ describe('recorded security views', () => {
     'binds exact actions and identity to the same 31-day interval in %s mode',
     (mode) => {
       mutableConfig.mode = mode
-      mutableConfig.slug = 'operations'
+      mutableConfig.alias = 'operations'
       const now = Date.parse('2026-10-23T12:00:00.000Z')
       const hrefs = getConsoleUserSecurityHrefs('user1', now)
       const parse = (href: string) => {
@@ -218,7 +218,7 @@ describe('recorded security views', () => {
 
 it('keeps account security inside the selected Console topology', () => {
   mutableConfig.mode = 'path'
-  mutableConfig.slug = 'operations'
+  mutableConfig.alias = 'operations'
   expect(getConsoleAccountSecurityHref()).toBe('/operations/profile')
   mutableConfig.mode = 'host'
   expect(getConsoleAccountSecurityHref()).toBe('/profile')
@@ -226,7 +226,7 @@ it('keeps account security inside the selected Console topology', () => {
 
 it('normalizes only the selected physical host prefix for display', () => {
   mutableConfig.mode = 'host'
-  mutableConfig.slug = 'control'
+  mutableConfig.alias = 'control'
   for (const [source, expected] of [
     ['/control', '/'],
     ['/control/account/security', '/account/security'],

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../constants'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '../constants'
 
 import { invitationOperationIdSchema } from './invitation-operations'
 import { createOrganizationSchema } from './organization'
@@ -11,7 +11,7 @@ export const provisioningCreateSchema = z.strictObject({
   name: createOrganizationSchema.shape.name.trim(),
   slug: createOrganizationSchema.shape.slug,
   firstAdminEmail: z.email().max(254),
-  inviteLocale: z.enum(SUPPORTED_LOCALES).default(DEFAULT_LOCALE),
+  inviteLocale: z.enum(SERVED_LOCALES).default(DEFAULT_LOCALE),
 })
 export const provisioningCancelSchema = z.strictObject({
   operationId: invitationOperationIdSchema,
@@ -23,7 +23,7 @@ export const provisioningReissueSchema = provisioningCancelSchema.extend({
 })
 export const provisioningReplaceSchema = provisioningCancelSchema.extend({
   firstAdminEmail: z.email().max(254),
-  inviteLocale: z.enum(SUPPORTED_LOCALES).default(DEFAULT_LOCALE),
+  inviteLocale: z.enum(SERVED_LOCALES).default(DEFAULT_LOCALE),
 })
 export const provisioningReceiptSchema = z.strictObject({
   operationId: invitationOperationIdSchema,

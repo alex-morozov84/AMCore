@@ -1,4 +1,4 @@
-import type { SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale } from '@amcore/shared'
 
 import { handleBrowserBootstrap } from '@/shared/api/bff/browser-bootstrap-handler'
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
@@ -72,11 +72,11 @@ export const invitationHandlers = {
     productWebRoute(request, 'product-data', () =>
       invitationOperationHandler(request, operationId, productContextDeps(request.headers))
     ),
-  ingress: (request: Request, locale: SupportedLocale) =>
+  ingress: (request: Request, locale: CatalogueLocale) =>
     productWebRoute(request, 'legacy-invite', () =>
       invitationIngress(request, locale, productContextDeps(request.headers, 'legacy-invite'))
     ),
-  bootstrap: (request: Request, locale: SupportedLocale, pendingId: string) =>
+  bootstrap: (request: Request, locale: CatalogueLocale, pendingId: string) =>
     productWebRoute(request, 'legacy-invite', () =>
       invitationBootstrap(
         request,
@@ -85,11 +85,11 @@ export const invitationHandlers = {
         productContextDeps(request.headers, 'legacy-invite')
       )
     ),
-  adminIngress: (request: Request, locale: SupportedLocale) =>
+  adminIngress: (request: Request, locale: CatalogueLocale) =>
     productWebRoute(request, 'admin-invite', () =>
       invitationIngress(request, locale, productContextDeps(request.headers, 'admin-invite'))
     ),
-  adminBootstrap: (request: Request, locale: SupportedLocale, pendingId: string) =>
+  adminBootstrap: (request: Request, locale: CatalogueLocale, pendingId: string) =>
     productWebRoute(request, 'admin-invite', () =>
       invitationBootstrap(
         request,

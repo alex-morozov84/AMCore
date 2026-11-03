@@ -5,12 +5,12 @@ import * as argon2 from 'argon2'
 import { PinoLogger } from 'nestjs-pino'
 
 import type {
+  CatalogueLocale,
   InvitedRegisterInput,
   LoginPublication,
   RegisterInput,
   RequestPrincipal,
   StepUpResponse,
-  SupportedLocale,
   UpdateProfileInput,
   UserResponse,
 } from '@amcore/shared'
@@ -105,7 +105,7 @@ export interface RequestInfo {
    * resolves it via `negotiateLocale` and the accepts parser). Used at registration only as a
    * fallback when the body carries no explicit `locale`.
    */
-  acceptedLocale?: SupportedLocale
+  acceptedLocale?: CatalogueLocale
 }
 
 @Injectable()
@@ -410,7 +410,7 @@ export class AuthService {
    * canonical profile response.
    */
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<UserResponse> {
-    const data: { name?: string; locale?: SupportedLocale; timezone?: string } = {}
+    const data: { name?: string; locale?: CatalogueLocale; timezone?: string } = {}
     if (input.name !== undefined) data.name = input.name
     if (input.locale !== undefined) data.locale = input.locale
     if (input.timezone !== undefined) data.timezone = input.timezone

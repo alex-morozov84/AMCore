@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { localePathPrefix, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localePathPrefix, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { ROOT_CLIENT_NAMESPACES } from '../../src/i18n/message-selection'
 import { embeddedFlight, serializedClientMessages } from '../shared/client-message-payload'
 
-for (const locale of SUPPORTED_LOCALES) {
+for (const locale of SERVED_LOCALES) {
   test(`login serializes only core and auth messages (${locale})`, async ({ request }) => {
     const catalogue = JSON.parse(
       readFileSync(path.join(__dirname, `../../messages/${locale}.json`), 'utf8')

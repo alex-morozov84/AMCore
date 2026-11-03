@@ -4,7 +4,7 @@ import { createBrowserBindingVerifier } from '@/shared/api/bff/browser-binding.s
 import type { ContextExecutorDeps } from '@/shared/api/bff/context-executor'
 import { productContextDeps } from '@/shared/api/bff/product-context-deps'
 import { createUpstreamRefresh } from '@/shared/api/bff/upstream-refresh'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { getBackendBaseUrl } from '../backend-transport'
 

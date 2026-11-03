@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildPageMetadata, noindexMetadata, rootSeoMetadata } from './page-metadata'
@@ -10,7 +10,7 @@ vi.mock('next-intl/server', () => ({
 // Expectations are derived from the shared locale set, never spelled out, so the file keeps
 // working when the set changes (a literal 'ru' or 'en' would not).
 const ORIGIN = 'https://shop.example.com'
-const MULTI = SUPPORTED_LOCALES.length > 1
+const MULTI = SERVED_LOCALES.length > 1
 const OPEN_GRAPH: Record<string, string | undefined> = { en: 'en_US', ru: 'ru_RU' }
 
 type Query = Record<string, string>
@@ -18,7 +18,7 @@ const url = (path: string, query?: Query, locale: string = DEFAULT_LOCALE) =>
   localizedFrontendUrl(ORIGIN, locale as typeof DEFAULT_LOCALE, path, query)
 const languages = (path: string, query?: Query) =>
   Object.fromEntries([
-    ...SUPPORTED_LOCALES.map((locale) => [locale, url(path, query, locale)]),
+    ...SERVED_LOCALES.map((locale) => [locale, url(path, query, locale)]),
     ['x-default', url(path, query)],
   ])
 const input = { locale: DEFAULT_LOCALE, path: '/pricing', title: 'Pricing', description: 'Plans' }
@@ -76,7 +76,7 @@ describe('buildPageMetadata', () => {
   it('lists the other supported locales as alternate Open Graph locales, and none for one locale', async () => {
     stubSite(true)
     const metadata = await buildPageMetadata(input)
-    const others = SUPPORTED_LOCALES.filter((locale) => locale !== DEFAULT_LOCALE)
+    const others = SERVED_LOCALES.filter((locale) => locale !== DEFAULT_LOCALE)
       .map((locale) => OPEN_GRAPH[locale])
       .filter(Boolean)
     if (others.length > 0) expect(metadata.openGraph).toMatchObject({ alternateLocale: others })

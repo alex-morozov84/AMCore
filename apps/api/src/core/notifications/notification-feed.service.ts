@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
 
 import {
+  type CatalogueLocale,
   coerceSupportedLocale,
   type NotificationAction,
   type NotificationFeedItem,
   type NotificationFeedResponse,
-  type SupportedLocale,
 } from '@amcore/shared'
 
 import type { Notification } from '../../generated/prisma/client.js'
@@ -101,7 +101,7 @@ export class NotificationFeedService {
     if (count > 0) void this.realtime.publish(userId, 'archived', notificationId)
   }
 
-  private async recipientLocale(userId: string): Promise<SupportedLocale> {
+  private async recipientLocale(userId: string): Promise<CatalogueLocale> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { locale: true },
@@ -109,7 +109,7 @@ export class NotificationFeedService {
     return coerceSupportedLocale(user?.locale)
   }
 
-  private toFeedItem(row: Notification, locale: SupportedLocale): NotificationFeedItem {
+  private toFeedItem(row: Notification, locale: CatalogueLocale): NotificationFeedItem {
     // Version-aware, fail-closed per row: unknown type, an unsupported schemaVersion,
     // an invalid historical payload, or a throwing renderer fall back to a neutral
     // item — never failing the whole feed page (ADR-052).

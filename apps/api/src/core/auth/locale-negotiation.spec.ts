@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 
-import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SERVED_LOCALES } from '@amcore/shared'
 
 import { negotiateLocale } from './locale-negotiation'
 
@@ -36,13 +36,13 @@ describe('negotiateLocale', () => {
 
   it('returns the negotiated supported locale for a matching header', () => {
     // Any served locale works; the first one keeps the test valid for every build setting.
-    const served = SUPPORTED_LOCALES[0]
+    const served = SERVED_LOCALES[0]
     const req = makeReq(`${served};q=0.9`, served)
     expect(negotiateLocale(req)).toBe(served)
   })
 
   it('does not select a shipped locale that this build does not serve', () => {
-    const unserved = LOCALE_CATALOGUES.find((locale) => !SUPPORTED_LOCALES.includes(locale))
+    const unserved = LOCALE_CATALOGUES.find((locale) => !SERVED_LOCALES.includes(locale))
     if (!unserved) return // every shipped locale is served in this build
     const req = { headers: { 'accept-language': `${unserved};q=1` } } as Request
     expect(negotiateLocale(req)).toBeUndefined()
@@ -56,7 +56,7 @@ describe('negotiateLocale', () => {
   ])('uses the actual parser for %s without an Express request', (header, expected) => {
     const req = { headers: { 'accept-language': header } } as Request
     // These headers offer both locales (or a wildcard); a single-locale fork selects its only locale.
-    const locales: readonly string[] = SUPPORTED_LOCALES
+    const locales: readonly string[] = SERVED_LOCALES
     const supported = expected && locales.length === 1 ? locales[0] : expected
     expect(negotiateLocale(req)).toBe(supported)
   })

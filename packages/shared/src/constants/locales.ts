@@ -11,7 +11,7 @@ import localeConfig from '../config/locales.json'
  */
 export const LOCALE_CATALOGUES = ['en', 'ru'] as const
 
-export type SupportedLocale = (typeof LOCALE_CATALOGUES)[number]
+export type CatalogueLocale = (typeof LOCALE_CATALOGUES)[number]
 
 const catalogueSchema = z.enum(LOCALE_CATALOGUES)
 
@@ -42,7 +42,7 @@ export const localeSettingsSchema = z
 
 export type LocaleSettings = z.infer<typeof localeSettingsSchema>
 
-type NonEmptyLocales = readonly [SupportedLocale, ...SupportedLocale[]]
+type NonEmptyLocales = readonly [CatalogueLocale, ...CatalogueLocale[]]
 
 const parsed = localeSettingsSchema.safeParse(localeConfig)
 if (!parsed.success) {
@@ -64,10 +64,10 @@ if (!parsed.success) {
  * `negotiateLocale` deliberately refuses to negotiate an absent `Accept-Language`
  * header so the result is never coupled to the first entry.
  */
-export const SUPPORTED_LOCALES: NonEmptyLocales = parsed.data.enabled as unknown as NonEmptyLocales
+export const SERVED_LOCALES: NonEmptyLocales = parsed.data.enabled as unknown as NonEmptyLocales
 
-/** The locale used when nothing else decides. It is always one of `SUPPORTED_LOCALES`. */
-export const DEFAULT_LOCALE: SupportedLocale = parsed.data.default
+/** The locale used when nothing else decides. It is always one of `SERVED_LOCALES`. */
+export const DEFAULT_LOCALE: CatalogueLocale = parsed.data.default
 
 /** Why a stored locale string was or was not used as is (see {@link classifyStoredLocale}). */
 export type StoredLocaleState = 'enabled' | 'disabled' | 'absent' | 'unknown'
@@ -83,5 +83,5 @@ export function classifyStoredLocale(value: string | null | undefined): StoredLo
   if (value === null || value === undefined || value === '') return 'absent'
   const known = catalogueSchema.safeParse(value)
   if (!known.success) return 'unknown'
-  return (SUPPORTED_LOCALES as readonly string[]).includes(known.data) ? 'enabled' : 'disabled'
+  return (SERVED_LOCALES as readonly string[]).includes(known.data) ? 'enabled' : 'disabled'
 }

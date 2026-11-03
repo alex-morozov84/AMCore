@@ -1,12 +1,12 @@
 import { createTranslator } from 'next-intl'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-// Typed as a plain string: a project that keeps only one locale narrows `SUPPORTED_LOCALES` and the
+// Typed as a plain string: a project that keeps only one locale narrows `SERVED_LOCALES` and the
 // locale type to that one, and this test must still compile there (it is skipped at run time).
 const locale: string = 'ru'
 
-const kept = (SUPPORTED_LOCALES as readonly string[]).includes(locale)
+const kept = (SERVED_LOCALES as readonly string[]).includes(locale)
 
 // Russian needs four plural forms; a wrong form reads as a mistake in the product's own words.
 // Skipped in a project that does not keep Russian.

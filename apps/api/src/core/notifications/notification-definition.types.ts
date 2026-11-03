@@ -1,6 +1,6 @@
 import type { ZodType } from 'zod'
 
-import type { NotificationAction, SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale, NotificationAction } from '@amcore/shared'
 
 import type {
   NotificationCategory,
@@ -63,12 +63,12 @@ export interface NotificationDefinition<TPayload = unknown> {
   /** Safe public projection of the payload for the recipient's own in-app feed. */
   safePayload(payload: TPayload): Record<string, unknown>
   /** In-app feed render in the recipient's locale. */
-  renderInApp(payload: TPayload, locale: SupportedLocale): RenderedNotificationContent
+  renderInApp(payload: TPayload, locale: CatalogueLocale): RenderedNotificationContent
   /** Detailed renderers receive only the channel-specific allowlisted projection. */
   readonly renderExternal?: Partial<
     Record<
       NotificationChannel,
-      (projection: Record<string, unknown>, locale: SupportedLocale) => RenderedNotificationContent
+      (projection: Record<string, unknown>, locale: CatalogueLocale) => RenderedNotificationContent
     >
   >
   /** Optional safe first-party action descriptor (never an arbitrary URL). */

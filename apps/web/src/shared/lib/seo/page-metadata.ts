@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import { type PageQuery, pageUrl } from './page-url'
 import { getSiteOrigin, isIndexingEnabled } from './site-origin'
@@ -32,7 +32,7 @@ export function rootSeoMetadata(siteName: string): Metadata {
 const OPEN_GRAPH_LOCALES: Partial<Record<string, string>> = { en: 'en_US', ru: 'ru_RU' }
 
 export interface PageMetadataInput {
-  locale: SupportedLocale
+  locale: CatalogueLocale
   /** Path without the locale prefix: `/pricing`, or `''` for the home page. No query or hash. */
   path: string
   /**
@@ -48,7 +48,7 @@ export interface PageMetadataInput {
   type?: 'website' | 'article'
 }
 
-type UrlFor = (target: SupportedLocale) => string
+type UrlFor = (target: CatalogueLocale) => string
 
 /** The absolute URL of this page in each locale, or `null` when there is no usable site origin. */
 function urlBuilder(origin: string | null, path: string, query?: PageQuery): UrlFor | null {
@@ -56,21 +56,21 @@ function urlBuilder(origin: string | null, path: string, query?: PageQuery): Url
 }
 
 /** Canonical plus every language variant and `x-default`; a single-locale fork gets no variants. */
-function alternatesFor(locale: SupportedLocale, urlFor: UrlFor | null): Metadata['alternates'] {
+function alternatesFor(locale: CatalogueLocale, urlFor: UrlFor | null): Metadata['alternates'] {
   if (!urlFor) return undefined
   const canonical = urlFor(locale)
-  if (SUPPORTED_LOCALES.length < 2) return { canonical }
+  if (SERVED_LOCALES.length < 2) return { canonical }
   return {
     canonical,
     languages: {
-      ...Object.fromEntries(SUPPORTED_LOCALES.map((other) => [other, urlFor(other)])),
+      ...Object.fromEntries(SERVED_LOCALES.map((other) => [other, urlFor(other)])),
       'x-default': urlFor(DEFAULT_LOCALE),
     },
   }
 }
 
-function otherOpenGraphLocales(locale: SupportedLocale): string[] {
-  return SUPPORTED_LOCALES.filter((other) => other !== locale)
+function otherOpenGraphLocales(locale: CatalogueLocale): string[] {
+  return SERVED_LOCALES.filter((other) => other !== locale)
     .map((other) => OPEN_GRAPH_LOCALES[other])
     .filter((value): value is string => Boolean(value))
 }

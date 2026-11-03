@@ -28,14 +28,17 @@ describe('locale settings file', () => {
   it('serves exactly what the settings file lists', async () => {
     const shipped = await import('./locales')
     const file = shippedFile
-    expect([...shipped.SUPPORTED_LOCALES]).toEqual(file.enabled)
+    expect([...shipped.SERVED_LOCALES]).toEqual(file.enabled)
     expect(shipped.DEFAULT_LOCALE).toBe(file.default)
   })
 
-  it('serves one locale and makes it the default', async () => {
-    const { SUPPORTED_LOCALES, DEFAULT_LOCALE } = await withSettings(settings(['ru'], 'ru'))
-    expect([...SUPPORTED_LOCALES]).toEqual(['ru'])
-    expect(DEFAULT_LOCALE).toBe('ru')
+  it.each(['en', 'ru'])('serves only %s and makes it the default', async (locale) => {
+    const { SERVED_LOCALES, DEFAULT_LOCALE, LOCALE_CATALOGUES } = await withSettings(
+      settings([locale], locale)
+    )
+    expect([...SERVED_LOCALES]).toEqual([locale])
+    expect(DEFAULT_LOCALE).toBe(locale)
+    expect([...LOCALE_CATALOGUES]).toEqual(['en', 'ru'])
   })
 
   it.each([
@@ -61,23 +64,28 @@ describe('stored locale handling when this build serves one locale', () => {
     expect(classifyStoredLocale('de')).toBe('unknown')
   })
 
-  it('reads a not-served catalogue locale as the default and keeps rejecting anomalies', async () => {
+  it.each(['en', 'ru'])('reads stored values with %s as the only served locale', async (locale) => {
     const { parseSupportedLocale, coerceSupportedLocale } = await withSettings(
-      settings(['ru'], 'ru')
+      settings([locale], locale)
     )
-    expect(parseSupportedLocale('ru')).toBe('ru')
-    expect(parseSupportedLocale('en')).toBe('ru')
+    expect(parseSupportedLocale('ru')).toBe(locale)
+    expect(parseSupportedLocale('en')).toBe(locale)
     expect(() => parseSupportedLocale('de')).toThrow()
-    expect(coerceSupportedLocale('en')).toBe('ru')
-    expect(coerceSupportedLocale('de')).toBe('ru')
-    expect(coerceSupportedLocale(null)).toBe('ru')
+    expect(coerceSupportedLocale('en')).toBe(locale)
+    expect(coerceSupportedLocale('ru')).toBe(locale)
+    expect(coerceSupportedLocale('de')).toBe(locale)
+    expect(coerceSupportedLocale(null)).toBe(locale)
   })
 
-  it('accepts a new choice only when this build serves it', async () => {
-    const { supportedLocaleSchema } = await withSettings(settings(['ru'], 'ru'))
-    expect(supportedLocaleSchema.safeParse('ru').success).toBe(true)
-    expect(supportedLocaleSchema.safeParse('en').success).toBe(false)
-  })
+  it.each([['en', 'ru'], ['en'], ['ru']])(
+    'accepts choices only from the served set %j',
+    async (...enabled) => {
+      const { supportedLocaleSchema } = await withSettings(settings(enabled, enabled[0]!))
+      for (const locale of ['en', 'ru']) {
+        expect(supportedLocaleSchema.safeParse(locale).success).toBe(enabled.includes(locale))
+      }
+    }
+  )
 
   it('keeps the shared link prefix rule: no prefix with one locale', async () => {
     vi.resetModules()

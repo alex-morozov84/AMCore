@@ -15,7 +15,7 @@ Organization details -> Administrator email -> Check details -> Create and invit
 
 ## Before you start
 
-Invitation languages follow the application's `SUPPORTED_LOCALES`: the languages your build
+Invitation languages follow the application's `SERVED_LOCALES`: the languages your build
 serves (`en` and `ru` in the shipped default). API examples use `en`; in a one-language build
 use that language. An omitted invitation language defaults to the installation's
 `DEFAULT_LOCALE`.

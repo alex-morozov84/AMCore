@@ -21,10 +21,11 @@ This page is the working guide.
 | `apps/web/src/shared/api/`                      | Error-code resolution and the `useApiError` hook                     |
 | `apps/api/src/infrastructure/email/messages.ts` | Email copy (separate catalogue — emails render server-side)          |
 
-`packages/shared` owns `SUPPORTED_LOCALES` and `DEFAULT_LOCALE`, read from
-`locales.json`. `SUPPORTED_LOCALES` means the locales **this build serves**. The
+`packages/shared` owns `SERVED_LOCALES` and `DEFAULT_LOCALE`, read from
+`locales.json`. `SERVED_LOCALES` means the locales **this build serves**. The
 translated catalogues the repository contains are a separate list,
-`LOCALE_CATALOGUES`. Frontend, backend, and email derive their served locales from this file. Deploy matching
+`LOCALE_CATALOGUES`; `CatalogueLocale` is the union of all these catalogue codes, including disabled ones.
+Runtime input schemas accept only `SERVED_LOCALES`. Frontend, backend, and email derive their served locales from this file. Deploy matching
 builds together; an old API or worker image still carries its old settings.
 
 ## Recipe: add a UI string
@@ -341,7 +342,7 @@ all read the served list. Repeat the edge-generation and build steps in
 
 Consider whether the backend should keep accepting the new locale from
 `Accept-Language` before shipping — `negotiateLocale` restricts itself to
-`SUPPORTED_LOCALES`, so it starts negotiating the new locale immediately.
+`SERVED_LOCALES`, so it starts negotiating the new locale immediately.
 
 ## Why the middleware keeps `localePrefix: 'always'`
 

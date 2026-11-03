@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 import {
   getConsoleHostname,
   getConsoleOrigin,
   validateAdminConsoleStartup,
 } from './admin-console-config'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 
 const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {
   mode: 'disabled' | 'path' | 'host'

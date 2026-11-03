@@ -3,7 +3,7 @@ import { setRequestLocale } from 'next-intl/server'
 
 import { ConsoleLoginPage } from '@/_pages/console'
 import { resolveLocaleParam } from '@/i18n/params'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 
 export const dynamic = 'force-dynamic'

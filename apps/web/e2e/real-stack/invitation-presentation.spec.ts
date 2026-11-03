@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -17,7 +17,7 @@ test('manager presentation: themes, reduced motion, CSS zoom and keyboard dismis
 }) => {
   const target = activeTarget()
   const c = JSON.parse(
-    readFileSync(join(target.snapshot, `apps/web/messages/${SUPPORTED_LOCALES[0]}.json`), 'utf8')
+    readFileSync(join(target.snapshot, `apps/web/messages/${SERVED_LOCALES[0]}.json`), 'utf8')
   )
   const t = c.organizationInvitations
   const email = uniqueEmail('presentation-owner')
@@ -37,7 +37,7 @@ test('manager presentation: themes, reduced motion, CSS zoom and keyboard dismis
     await page.goto(
       localizedFrontendUrl(
         target.origins.product,
-        SUPPORTED_LOCALES[0],
+        SERVED_LOCALES[0],
         `organizations/${org.id}/invites`
       )
     )

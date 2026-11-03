@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shared locale exports now distinguish `CatalogueLocale` (all shipped catalogues; formerly
+  `SupportedLocale`) from `SERVED_LOCALES` (languages enabled for this build; formerly
+  `SUPPORTED_LOCALES`). Update downstream imports when upgrading. The handwritten web Console
+  adapter is now `admin-console-topology.ts`, with `alias` replacing its `slug` property.
+  Locale parsing, fallback and Console routing behavior stay the same.
+
 - A weekly lockfile refresh opens one PR for compatible dependency resolutions,
   preserving existing pins and holds and relying on the required PR checks.
 - `PROJECT_CONTEXT.md` no longer holds `i18n_mode`, `base_locale`, `supported_locales`,
@@ -1041,7 +1047,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   message catalogue, removes the other catalogue from the generated graph,
   and synchronizes Russian email-template default expectations with the
   selected catalogue. It also rewrites the two typed frontend-URL test
-  fixtures to the selected Russian locale after `SupportedLocale` narrows to
+  fixtures to the selected Russian locale after `CatalogueLocale` narrows to
   `"ru"`, removes impossible English notification branches, and keeps the
   shared, Prisma, and fresh-fork SQL locale defaults aligned. Prefixless OAuth
   and web browser fixtures now match the generated topology, while RU browser
@@ -1607,7 +1613,7 @@ PRIVILEGES FOR ROLE` also fails for a non-member admin connection
   `docs/frontend/i18n-and-errors.md` → "Downstream: running a single-locale
   app". Moves `app/[locale]/*` up, deletes `proxy.ts`/`routing.ts`/
   `navigation.ts`/`params.ts` and the `LocaleSwitcher` feature, rewrites
-  every affected import/call site, trims `SUPPORTED_LOCALES`/
+  every affected import/call site, trims `SERVED_LOCALES`/
   `DEFAULT_LOCALE` (and the `emailMessages`/`telegramGenericMessages`
   catalogues) to the chosen locale, and updates `PROJECT_CONTEXT.md`'s
   `i18n_mode`/`base_locale`/`supported_locales`. Unlike `init:brand`, not
@@ -1969,7 +1975,7 @@ This release changes default behavior and import paths that a fork built on
 - **Breaking for new installs:** AMCore's base locale is now English. The
   `User.locale` column default changed from `ru` to `en`, `User.timezone` from
   `Europe/Moscow` to `UTC`, and `DEFAULT_LOCALE` in `@amcore/shared` from `ru`
-  to `en`. Russian remains a fully supported locale — `SUPPORTED_LOCALES` is
+  to `en`. Russian remains a fully supported locale — `SERVED_LOCALES` is
   unchanged apart from ordering, and a user who registers with
   `Accept-Language: ru` or an explicit `locale: "ru"` still gets Russian, as do
   all their emails and notifications.
@@ -1986,9 +1992,9 @@ This release changes default behavior and import paths that a fork built on
   `invite.service.ts`, two verbatim copies of a `toLocale()` helper in the
   notification deliverers, and four inline `as 'ru' | 'en'` casts in
   `auth.service.ts`), so changing the default in one place silently left the
-  others behind. All now derive from `SUPPORTED_LOCALES`/`DEFAULT_LOCALE`
+  others behind. All now derive from `SERVED_LOCALES`/`DEFAULT_LOCALE`
   via a new exported `coerceSupportedLocale()` helper, which also replaces an
-  unchecked `as SupportedLocale` cast in the notification feed.
+  unchecked `as CatalogueLocale` cast in the notification feed.
 - An organization invite sent to an email with no AMCore account is now
   rendered in the base locale rather than always in Russian.
 

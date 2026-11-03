@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -20,8 +20,7 @@ test('operator steps, lost reply and actual recipient consent produce a working 
   const copy = (locale: string) =>
     JSON.parse(readFileSync(join(m.snapshot, `apps/web/messages/${locale}.json`), 'utf8'))
   const en = copy(DEFAULT_LOCALE)
-  const alternateLocale =
-    SUPPORTED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
+  const alternateLocale = SERVED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
   const ru = copy(alternateLocale)
   const operatorEmail = 'operator@e2e.amcore.test'
   const recipientEmail = 'first-admin@e2e.amcore.test'
@@ -173,7 +172,7 @@ test('operator steps, lost reply and actual recipient consent produce a working 
       { org: southId }
     ).trim()
   ).toBe('2')
-  for (const [locale, messages] of SUPPORTED_LOCALES.map(
+  for (const [locale, messages] of SERVED_LOCALES.map(
     (locale) => [locale, copy(locale)] as const
   )) {
     await page.goto(localizedFrontendUrl(consoleOrigin, locale, `organizations/${southId}`))

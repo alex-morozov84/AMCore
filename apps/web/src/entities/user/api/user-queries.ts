@@ -1,5 +1,5 @@
 import { useLocale } from 'next-intl'
-import type { SessionsListResponse, SupportedLocale, UserResponse } from '@amcore/shared'
+import type { CatalogueLocale, SessionsListResponse, UserResponse } from '@amcore/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { authApi } from '@/shared/api'
@@ -11,7 +11,7 @@ export const userKeys = {
   // this to `invalidateQueries` after a revoke to match every locale/page/
   // limit variant at once without also invalidating `me()`.
   sessionsAll: () => [...userKeys.all, 'sessions'] as const,
-  sessions: (locale: SupportedLocale, page: number, limit: number) =>
+  sessions: (locale: CatalogueLocale, page: number, limit: number) =>
     [...userKeys.sessionsAll(), locale, page, limit] as const,
 }
 
@@ -45,7 +45,7 @@ export function useCurrentUser() {
  * change, so switching locale falls through to the ordinary loading state.
  */
 export function useSessions(page: number, limit: number) {
-  const locale = useLocale() as SupportedLocale
+  const locale = useLocale() as CatalogueLocale
 
   return useQuery({
     queryKey: userKeys.sessions(locale, page, limit),

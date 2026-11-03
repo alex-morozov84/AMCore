@@ -22,7 +22,7 @@ display metadata, risk class, idempotency class, input `parameters`, stored
 prepare(input, context, tx): Promise<{
   args: NormalizedArguments
   target: { kind: string; id: string; revision: number } | null
-  preview: Partial<Record<SupportedLocale, AiApprovalPreview>> | null
+  preview: Partial<Record<CatalogueLocale, AiApprovalPreview>> | null
 }>
 execute(intent, context): Promise<{ output: string }>
 ```

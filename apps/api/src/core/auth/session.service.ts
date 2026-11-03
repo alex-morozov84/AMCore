@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 import { PinoLogger } from 'nestjs-pino'
 
-import { AuthErrorCode, type SessionsListResponse, type SupportedLocale } from '@amcore/shared'
+import { AuthErrorCode, type CatalogueLocale, type SessionsListResponse } from '@amcore/shared'
 
 import { AppException, NotFoundException } from '../../common/exceptions/index.js'
 import type { Prisma, Session, User } from '../../generated/prisma/client.js'
@@ -422,7 +422,7 @@ export class SessionService {
     currentTokenHash: string | undefined,
     page: number,
     limit: number,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): Promise<SessionsListResponse> {
     const where = { userId, revokedAt: null, expiresAt: { gt: new Date() } }
     const skip = (page - 1) * limit

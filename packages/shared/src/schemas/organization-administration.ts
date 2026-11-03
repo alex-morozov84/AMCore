@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../constants'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '../constants'
 
 import { invitationOperationIdSchema } from './invitation-operations'
 import { utf8Bytes } from './organization-members-budget'
@@ -21,7 +21,7 @@ const operation = z.strictObject({
 })
 export const administratorInvitationCreateSchema = operation.extend({
   email: z.email().max(254),
-  inviteLocale: z.enum(SUPPORTED_LOCALES).default(DEFAULT_LOCALE),
+  inviteLocale: z.enum(SERVED_LOCALES).default(DEFAULT_LOCALE),
   supersedesInvite: z.strictObject({ id, generation: z.number().int().positive() }).optional(),
 })
 export const administratorInvitationCancelSchema = operation.extend({
@@ -33,7 +33,7 @@ export const administratorInvitationReissueSchema = administratorInvitationCance
 })
 export const administratorInvitationReplaceSchema = administratorInvitationCancelSchema.extend({
   email: z.email().max(254),
-  inviteLocale: z.enum(SUPPORTED_LOCALES).default(DEFAULT_LOCALE),
+  inviteLocale: z.enum(SERVED_LOCALES).default(DEFAULT_LOCALE),
 })
 export const administratorAssignmentSchema = operation.extend({
   userId: id,

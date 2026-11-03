@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale } from '@amcore/shared'
 
 import {
   NotificationCategory,
@@ -19,7 +19,7 @@ const payloadSchema = z
   })
   .strict()
 type Payload = z.infer<typeof payloadSchema>
-function content(payload: Payload, locale: SupportedLocale): RenderedNotificationContent {
+function content(payload: Payload, locale: CatalogueLocale): RenderedNotificationContent {
   if (payload.change === 'recovery_started')
     return locale === 'en'
       ? {

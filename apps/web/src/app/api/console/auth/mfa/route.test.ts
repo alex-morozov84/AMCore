@@ -5,7 +5,7 @@ vi.mock('server-only', () => ({}))
 vi.mock('@/shared/api/bff/account-mfa-handler', () => ({
   handleAccountMfa: vi.fn(async () => Response.json({ kind: 'unavailable' }, { status: 503 })),
 }))
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { GET, POST } from './route'
 

@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
 import { test } from '../shared/auth-test'
@@ -85,7 +85,7 @@ test('register form rejects a weak password without calling the BFF', async ({ p
 })
 
 test('registration hint is localized in Russian', async ({ page }) => {
-  test.skip(!new Set<string>(SUPPORTED_LOCALES).has('ru'), 'Russian locale is not enabled')
+  test.skip(!new Set<string>(SERVED_LOCALES).has('ru'), 'Russian locale is not enabled')
   await page.goto('/ru/register')
   await expectPasswordHint(page, 'ru')
 })
@@ -110,7 +110,7 @@ test('reset form explains the password rule and rejects a weak password locally'
 })
 
 test('reset hint is localized in Russian and absent without a token', async ({ page }) => {
-  test.skip(!new Set<string>(SUPPORTED_LOCALES).has('ru'), 'Russian locale is not enabled')
+  test.skip(!new Set<string>(SERVED_LOCALES).has('ru'), 'Russian locale is not enabled')
   await page.goto(`/ru/reset-password?token=${'a'.repeat(64)}`)
   await expectPasswordHint(page, 'ru')
 

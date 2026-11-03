@@ -1,4 +1,4 @@
-import { CAPABILITY_CATALOGUE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { CAPABILITY_CATALOGUE, SERVED_LOCALES } from '@amcore/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 type Roles = {
@@ -9,7 +9,7 @@ type Roles = {
 }
 
 // Catalogues are loaded by locale code, so the test follows whichever locales a project keeps.
-describe.each([...SUPPORTED_LOCALES])('catalogue wording (%s)', (locale) => {
+describe.each([...SERVED_LOCALES])('catalogue wording (%s)', (locale) => {
   let roles: Roles
   beforeAll(async () => {
     roles = (await import(`../../../../messages/${locale}.json`)).default.organizationRoles

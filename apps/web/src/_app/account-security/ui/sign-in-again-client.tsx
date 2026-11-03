@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import type { SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale } from '@amcore/shared'
 
 import { LoginForm } from '@/features/auth-login'
 import { type AuthActionBase, authActions, PendingBrowserFlowError } from '@/shared/api/auth-api'
@@ -27,7 +27,7 @@ export function SignInAgainClient({
   placement: SignInAgainPlacement
   entryId: string
   returnEntryId?: string
-  locale: SupportedLocale
+  locale: CatalogueLocale
 }) {
   const router = useRouteProgressRouter()
   const t = useTranslations('auth')

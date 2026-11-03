@@ -12,7 +12,7 @@ import {
 // The next build serves Russian only; the journal was written while English was served too.
 vi.mock('@amcore/shared', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  SUPPORTED_LOCALES: ['ru'] as const,
+  SERVED_LOCALES: ['ru'] as const,
   DEFAULT_LOCALE: 'ru' as const,
   coerceSupportedLocale: () => 'ru' as const,
 }))

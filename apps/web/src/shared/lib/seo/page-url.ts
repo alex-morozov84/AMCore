@@ -1,4 +1,4 @@
-import { localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, localizedFrontendUrl } from '@amcore/shared'
 
 /**
  * Query parameters that belong to a page's own identity, such as the page number of a listing
@@ -14,7 +14,7 @@ export type PageQuery = Readonly<Record<string, string>>
  */
 export function pageUrl(
   origin: string,
-  locale: SupportedLocale,
+  locale: CatalogueLocale,
   path: string,
   query?: PageQuery
 ): string {

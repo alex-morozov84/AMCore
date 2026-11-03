@@ -1,10 +1,10 @@
 import {
+  type CatalogueLocale,
   invitationFlowExpectedSchema,
   invitationVerificationReturnInputSchema,
   invitationVerificationReturnLinkSchema,
   invitationVerificationReturnResponseSchema,
   localizedFrontendUrl,
-  type SupportedLocale,
 } from '@amcore/shared'
 
 import { readContextJson } from './context-body-budget'
@@ -32,7 +32,7 @@ import 'server-only'
 
 function pathname(origin: string, locale: string, path: string, context?: ProductWebContext) {
   const url = new URL(
-    localizedFrontendUrl(origin, locale as SupportedLocale, invitationPagePath(path, context))
+    localizedFrontendUrl(origin, locale as CatalogueLocale, invitationPagePath(path, context))
   )
   return url.pathname + url.search
 }

@@ -33,7 +33,7 @@ test('production code has no second hand-written list of locale codes', () => {
   assert.deepEqual(
     offenders,
     [],
-    'derive the list from SUPPORTED_LOCALES or LOCALE_CATALOGUES in @amcore/shared'
+    'derive the list from SERVED_LOCALES or LOCALE_CATALOGUES in @amcore/shared'
   )
 })
 

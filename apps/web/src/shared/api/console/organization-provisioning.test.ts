@@ -3,7 +3,7 @@ import { createInvitationOperationId, DEFAULT_LOCALE } from '@amcore/shared'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
-vi.mock('@/shared/lib/admin-console.generated', () => ({ ADMIN_CONSOLE_CONFIG: { mode: 'host' } }))
+vi.mock('@/shared/lib/admin-console-topology', () => ({ ADMIN_CONSOLE_CONFIG: { mode: 'host' } }))
 vi.mock('./authenticated-proxy', () => ({ isConsoleRequestOriginTrusted: () => true }))
 vi.mock('./establishment-deps', () => ({ establishmentConsoleDeps: () => ({}) }))
 vi.mock('@/shared/lib/admin-console-config', () => ({

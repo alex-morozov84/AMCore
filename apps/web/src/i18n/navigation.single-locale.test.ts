@@ -18,7 +18,7 @@ vi.mock('./routing', () => ({ routing: { locales: ['ru'], defaultLocale: 'ru' } 
 
 async function navigationFor(locales: string[]) {
   vi.resetModules()
-  vi.doMock('@amcore/shared', () => ({ SUPPORTED_LOCALES: locales }))
+  vi.doMock('@amcore/shared', () => ({ SERVED_LOCALES: locales }))
   return import('./navigation')
 }
 

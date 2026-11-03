@@ -5,7 +5,7 @@ vi.mock('server-only', () => ({}))
 vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
   ...(await importOriginal()),
   // This test covers a two-locale build, whatever `locales.json` holds.
-  SUPPORTED_LOCALES: ['en', 'ru'],
+  SERVED_LOCALES: ['en', 'ru'],
   DEFAULT_LOCALE: 'en',
 }))
 vi.mock('next-intl/middleware', async () => {
@@ -15,8 +15,8 @@ vi.mock('next-intl/middleware', async () => {
 
 async function proxyWith(mode: 'disabled' | 'path') {
   vi.resetModules()
-  vi.doMock('@/shared/lib/admin-console.generated', () => ({
-    ADMIN_CONSOLE_CONFIG: { enabled: mode !== 'disabled', mode, slug: 'admin' },
+  vi.doMock('@/shared/lib/admin-console-topology', () => ({
+    ADMIN_CONSOLE_CONFIG: { enabled: mode !== 'disabled', mode, alias: 'admin' },
   }))
   return (await import('./proxy')).default
 }
@@ -24,7 +24,7 @@ async function proxyWith(mode: 'disabled' | 'path') {
 const request = (path: string) => new NextRequest(`https://app.example.com${path}`)
 
 afterEach(() => {
-  vi.doUnmock('@/shared/lib/admin-console.generated')
+  vi.doUnmock('@/shared/lib/admin-console-topology')
   vi.resetModules()
 })
 

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { aiApprovalPreviewSchema, LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
+import { aiApprovalPreviewSchema, LOCALE_CATALOGUES, SERVED_LOCALES } from '@amcore/shared'
 
 import { canonicalJsonEqual, canonicalJsonHash } from '../../../common/utils/canonical-json.js'
 import { strictJson } from '../../../common/utils/strict-json.js'
@@ -93,7 +93,7 @@ export async function prepareToolIntent(
   // intent is looser (see `intentSchema`), because it may have been written under other settings.
   if (prepared.preview) {
     const written = Object.keys(prepared.preview).sort().join(',')
-    if (written !== [...SUPPORTED_LOCALES].sort().join(','))
+    if (written !== [...SERVED_LOCALES].sort().join(','))
       throw new Error('tool_preview_locales_incomplete')
   }
   const value = {

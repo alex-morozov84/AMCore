@@ -1,12 +1,12 @@
 import accepts from 'accepts'
 import type { Request } from 'express'
 
-import { SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, SERVED_LOCALES } from '@amcore/shared'
 
 /**
  * Resolve a supported locale from the request `Accept-Language` header using
  * The same accepts parser used by Express's RFC-4647 negotiation, restricted
- * to {@link SUPPORTED_LOCALES}. Returns `undefined` when there is nothing usable
+ * to {@link SERVED_LOCALES}. Returns `undefined` when there is nothing usable
  * to negotiate, so callers fall through to the build default locale rather than this
  * helper hard-coding it.
  *
@@ -19,10 +19,10 @@ import { SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
  * Used as a creation-time hint only (registration, first OAuth login). An
  * explicitly stored preference always wins thereafter.
  */
-export function negotiateLocale(req: Request): SupportedLocale | undefined {
+export function negotiateLocale(req: Request): CatalogueLocale | undefined {
   const header = req.headers['accept-language']
   if (!header || header.trim() === '') return undefined
 
-  const match = accepts(req).languages(...SUPPORTED_LOCALES)
-  return match ? (match as SupportedLocale) : undefined
+  const match = accepts(req).languages(...SERVED_LOCALES)
+  return match ? (match as CatalogueLocale) : undefined
 }

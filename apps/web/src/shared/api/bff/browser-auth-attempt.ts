@@ -8,7 +8,7 @@ import {
   type MfaFactorBindingResult,
   type MfaRecoveryTicketResult,
   passwordLoginPendingSchema,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 import { z } from 'zod'
 
@@ -38,7 +38,7 @@ const base = z
     expiresAt: z.number().int().positive(),
     cancelled: z.boolean().optional(),
     consoleEntry: z
-      .object({ locale: z.enum(SUPPORTED_LOCALES), proof: browserReturnProofSchema.optional() })
+      .object({ locale: z.enum(SERVED_LOCALES), proof: browserReturnProofSchema.optional() })
       .strict()
       .optional(),
   })

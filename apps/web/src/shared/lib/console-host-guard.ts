@@ -1,8 +1,8 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 import { getConsoleOrigin } from './admin-console-config'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 import { productAdminOrigins } from './product-admin-config.server'
 import { hostMatchesOrigin } from './seo/host-matches-origin'
 

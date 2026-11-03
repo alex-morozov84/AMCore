@@ -53,7 +53,7 @@ describe('localizedFrontendUrl', () => {
 })
 
 describe('localePathPrefix', () => {
-  // AMCore upstream's own SUPPORTED_LOCALES never shrinks to one entry, so
+  // AMCore upstream's own SERVED_LOCALES never shrinks to one entry, so
   // these pass an explicit `locales` array rather than relying on the real
   // constant — otherwise the single-locale branch could never be exercised
   // and this test would pass vacuously forever. See the doc comment on
@@ -67,7 +67,7 @@ describe('localePathPrefix', () => {
     expect(localePathPrefix('en', ['en'])).toBe('')
   })
 
-  it('defaults to the real SUPPORTED_LOCALES, which is multi-locale on AMCore upstream today', () => {
+  it('defaults to the real SERVED_LOCALES, which is multi-locale on AMCore upstream today', () => {
     expect(localePathPrefix('en')).toBe('/en')
   })
 })

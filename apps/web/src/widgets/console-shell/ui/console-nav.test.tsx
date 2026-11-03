@@ -5,7 +5,7 @@ import { DEFAULT_LOCALE } from '@amcore/shared'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import {
   getConsoleBackgroundWorkHref,
   getConsoleIntegrationsHref,
@@ -87,12 +87,12 @@ describe('Console navigation', () => {
   })
 })
 
-const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as { mode: string; slug: string }
+const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as { mode: string; alias: string }
 const originalConfig = { ...mutableConfig }
 afterEach(() => Object.assign(mutableConfig, originalConfig))
 it('hydrates rewritten host navigation with stable fallback before selecting the browser page', async () => {
   mutableConfig.mode = 'host'
-  mutableConfig.slug = 'control'
+  mutableConfig.alias = 'control'
   pathname.mockReturnValue('/control')
   const tree = () => (
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>

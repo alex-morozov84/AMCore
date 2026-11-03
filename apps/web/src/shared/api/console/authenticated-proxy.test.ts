@@ -10,7 +10,7 @@ vi.mock('@/shared/api/bff/origin-guard', () => ({ isTrustedOrigin: vi.fn() }))
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { SessionNotFoundError, SessionVaultUnavailableError } from '@/shared/api/bff/errors'
 import { isTrustedOrigin } from '@/shared/api/bff/origin-guard'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { isConsoleRequestOriginTrusted, resolveConsoleAccessToken } from './authenticated-proxy'
 import { isTrustedConsoleOrigin } from './origin-guard'

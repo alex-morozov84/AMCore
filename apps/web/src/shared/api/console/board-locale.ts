@@ -1,16 +1,16 @@
-import { DEFAULT_LOCALE, localePathPrefix, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localePathPrefix, SERVED_LOCALES } from '@amcore/shared'
 
 import { getConsoleBackgroundWorkHref } from '@/shared/lib/console-public-href'
 
 import 'server-only'
 
-export type BoardLocale = (typeof SUPPORTED_LOCALES)[number]
+export type BoardLocale = (typeof SERVED_LOCALES)[number]
 
 /** The visitor's language from the `NEXT_LOCALE` cookie, or the default when it is absent or unknown. */
 export function readBoardLocale(request: Request): BoardLocale {
   const cookie = request.headers.get('cookie') ?? ''
   const value = /(?:^|;\s*)NEXT_LOCALE=([^;]*)/.exec(cookie)?.[1]
-  return SUPPORTED_LOCALES.find((locale) => locale === value) ?? DEFAULT_LOCALE
+  return SERVED_LOCALES.find((locale) => locale === value) ?? DEFAULT_LOCALE
 }
 
 /**

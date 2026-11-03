@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { NotificationAction, SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale, NotificationAction } from '@amcore/shared'
 
 import {
   NotificationCategory,
@@ -24,7 +24,7 @@ const payloadSchema = z.object({ changedAt: z.iso.datetime() })
 
 type Payload = z.infer<typeof payloadSchema>
 
-function formatChangedAt(changedAt: string, locale: SupportedLocale): string {
+function formatChangedAt(changedAt: string, locale: CatalogueLocale): string {
   return new Date(changedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ru-RU', {
     dateStyle: 'long',
     timeStyle: 'short',

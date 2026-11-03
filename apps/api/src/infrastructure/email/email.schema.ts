@@ -27,7 +27,7 @@ import { EmailTemplate } from './email.types.js'
 // A queued job is stored data: it was written under the settings of an earlier build and may
 // name a locale this build no longer serves. Accept every shipped catalogue here; the email
 // service maps a not-served locale to the default before it renders anything. Request input
-// is different and is checked against the served list (`SUPPORTED_LOCALES`).
+// is different and is checked against the served list (`SERVED_LOCALES`).
 const localeSchema = z.enum(LOCALE_CATALOGUES)
 
 export const welcomeEmailDataSchema = z.object({

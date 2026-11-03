@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import createMiddleware from 'next-intl/middleware'
-import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SERVED_LOCALES } from '@amcore/shared'
 
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { buildCspDirectives } from '@/shared/lib/csp/build-csp'
 import {
   CSP_ENFORCE_HEADER,
@@ -30,7 +30,7 @@ const handleI18nRouting = createMiddleware(routing)
  * work below runs for both branches.
  */
 const DISABLED_LOCALES: readonly string[] = LOCALE_CATALOGUES.filter(
-  (locale) => !SUPPORTED_LOCALES.includes(locale)
+  (locale) => !SERVED_LOCALES.includes(locale)
 )
 
 /**
@@ -44,7 +44,7 @@ function isClosedConsolePath(segments: readonly string[]): boolean {
   if (ADMIN_CONSOLE_CONFIG.enabled) return false
   const [first = '', second = ''] = segments
   const page = (LOCALE_CATALOGUES as readonly string[]).includes(first) ? second : first
-  return page === ADMIN_CONSOLE_CONFIG.slug
+  return page === ADMIN_CONSOLE_CONFIG.alias
 }
 
 function routeLocale(request: NextRequest) {
@@ -53,7 +53,7 @@ function routeLocale(request: NextRequest) {
   if (DISABLED_LOCALES.includes(firstSegment) || isClosedConsolePath(segments)) {
     return new NextResponse(null, { status: 404 })
   }
-  if (SUPPORTED_LOCALES.length > 1) return handleI18nRouting(request)
+  if (SERVED_LOCALES.length > 1) return handleI18nRouting(request)
   return NextResponse.next({ request: { headers: request.headers } })
 }
 

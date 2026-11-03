@@ -10,7 +10,7 @@ vi.mock('./personal-mutation-route', () => ({ consolePersonalMutation: vi.fn() }
 import { logoutConsoleReturnEntry } from '@/shared/api/bff/console-return-entry'
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import { handleLogout } from '@/shared/api/bff/logout-handler'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { consoleBrowserContext } from './browser-context'
 import { handleConsoleLogout } from './logout-handler'

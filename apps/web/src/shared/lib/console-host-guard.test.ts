@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 import { isConsoleHost, withConsoleHostGuard } from './console-host-guard'
 
 const mutableConfig = ADMIN_CONSOLE_CONFIG as unknown as {

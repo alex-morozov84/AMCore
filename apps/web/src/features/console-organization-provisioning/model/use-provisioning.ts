@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AuthErrorCode,
+  type CatalogueLocale,
   createInvitationOperationId,
   DEFAULT_LOCALE,
   type ProductAccessBootstrap,
   provisioningCreateSchema,
-  type SupportedLocale,
 } from '@amcore/shared'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -269,7 +269,7 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
     save({ ...current.current, draft, step, at: Date.now(), open: true })
     setError(undefined)
   }
-  function start(locale: SupportedLocale = DEFAULT_LOCALE) {
+  function start(locale: CatalogueLocale = DEFAULT_LOCALE) {
     if ((current.current?.pending || current.current?.expiredOperationId) && !hasExpiredProof())
       return
     save({

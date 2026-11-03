@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import type { PinoLogger } from 'nestjs-pino'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import type { EnvService } from '../../env/env.service'
 
@@ -37,7 +37,7 @@ it('independent readers recover from missing boot, detect atomic generations and
       city: { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
       countryCode: 'GB',
     })
-    for (const locale of SUPPORTED_LOCALES) {
+    for (const locale of SERVED_LOCALES) {
       expect(api.resolve('::ffff:81.2.69.142', locale)).toEqual({
         city: { en: 'London', ru: 'Лондон' }[locale],
         countryCode: 'GB',

@@ -18,13 +18,6 @@ const VERIFY_STEPS = [
   { label: 'lint', args: ['lint'] },
 ]
 
-const PROJECT_VERIFY_STEPS = [
-  ...VERIFY_STEPS,
-  { label: 'web build', args: ['--filter', 'web', 'build'] },
-  { label: 'api test', args: ['--filter', 'api', 'test'] },
-  { label: 'web test', args: ['--filter', 'web', 'test'] },
-]
-
 function runSteps(cwd, steps) {
   return steps.map(({ label, args }) => {
     const result = spawnSync('pnpm', args, {
@@ -44,8 +37,4 @@ function runSteps(cwd, steps) {
 
 export function runVerification(cwd) {
   return runSteps(cwd, VERIFY_STEPS)
-}
-
-export function runProjectVerification(cwd) {
-  return runSteps(cwd, PROJECT_VERIFY_STEPS)
 }

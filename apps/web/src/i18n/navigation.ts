@@ -1,6 +1,6 @@
 import { createNavigation } from 'next-intl/navigation'
 import { defineRouting } from 'next-intl/routing'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 
 import { routing } from './routing'
 
@@ -16,7 +16,7 @@ import { routing } from './routing'
 const navigationRouting = defineRouting({
   locales: routing.locales,
   defaultLocale: routing.defaultLocale,
-  localePrefix: SUPPORTED_LOCALES.length === 1 ? 'never' : 'always',
+  localePrefix: SERVED_LOCALES.length === 1 ? 'never' : 'always',
   alternateLinks: false,
 })
 
@@ -46,7 +46,7 @@ export function withoutLocaleWhenSingle<T extends { locale?: unknown }>(
   options: T | undefined
 ): T | undefined
 export function withoutLocaleWhenSingle<T extends { locale?: unknown }>(options: T | undefined) {
-  if (SUPPORTED_LOCALES.length !== 1 || !options || options.locale === undefined) return options
+  if (SERVED_LOCALES.length !== 1 || !options || options.locale === undefined) return options
   return { ...options, locale: undefined }
 }
 

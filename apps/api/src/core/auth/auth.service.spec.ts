@@ -8,7 +8,7 @@ import {
   coerceSupportedLocale,
   DEFAULT_LOCALE,
   localePathPrefix,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 
 import { AppException } from '../../common/exceptions'
@@ -828,7 +828,7 @@ describe('AuthService', () => {
 
     it('writes only the supplied fields and invalidates the user cache', async () => {
       // A new choice must be a served locale, so the test picks one the build serves.
-      const locale = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+      const locale = SERVED_LOCALES.at(-1) ?? DEFAULT_LOCALE
       const updated = { ...mockUser, name: 'Renamed', locale }
       mockCtx.prisma.user.update.mockResolvedValue(updated)
 

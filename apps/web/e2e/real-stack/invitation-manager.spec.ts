@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -52,7 +52,7 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
       contentType: 'application/json',
     })
   })
-  for (const locale of SUPPORTED_LOCALES) {
+  for (const locale of SERVED_LOCALES) {
     resetBrowserProbeDomainBudget()
     const t = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')

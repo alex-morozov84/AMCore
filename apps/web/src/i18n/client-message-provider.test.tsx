@@ -7,7 +7,7 @@ import {
   useTimeZone,
   useTranslations,
 } from 'next-intl'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -23,7 +23,7 @@ function Content() {
   )
 }
 
-function Fixture({ locale }: { locale: (typeof SUPPORTED_LOCALES)[number] }) {
+function Fixture({ locale }: { locale: (typeof SERVED_LOCALES)[number] }) {
   return (
     <NextIntlClientProvider
       locale={locale}
@@ -39,7 +39,7 @@ function Fixture({ locale }: { locale: (typeof SUPPORTED_LOCALES)[number] }) {
 
 describe('real nested message provider', () => {
   it('hydrates the actual server-rendered provider tree without mismatched messages', () => {
-    const locale = SUPPORTED_LOCALES[0]
+    const locale = SERVED_LOCALES[0]
     const container = document.createElement('div')
     container.innerHTML = renderToString(<Fixture locale={locale} />)
     document.body.append(container)
@@ -54,7 +54,7 @@ describe('real nested message provider', () => {
   })
 
   it('inherits formats, time zone and clock independently from message additions', () => {
-    const locale = SUPPORTED_LOCALES[0]
+    const locale = SERVED_LOCALES[0]
     const now = new Date('2026-01-02T03:04:05.000Z')
     const options = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
     function Probe() {
@@ -83,15 +83,15 @@ describe('real nested message provider', () => {
     )
   })
 
-  it.each(SUPPORTED_LOCALES)('keeps the parent locale during %s server rendering', (locale) => {
+  it.each(SERVED_LOCALES)('keeps the parent locale during %s server rendering', (locale) => {
     expect(renderToString(<Fixture locale={locale} />).replaceAll('<!-- -->', '')).toContain(
       `${locale}:shared:selected`
     )
   })
 
   it('uses the new parent locale without replacing the adapter boundary', () => {
-    const first = SUPPORTED_LOCALES[0]
-    const next = SUPPORTED_LOCALES.at(-1)!
+    const first = SERVED_LOCALES[0]
+    const next = SERVED_LOCALES.at(-1)!
     const { rerender } = render(<Fixture locale={first} />)
     expect(screen.getByText(`${first}:shared:selected`)).toBeVisible()
     rerender(<Fixture locale={next} />)
@@ -110,7 +110,7 @@ describe('real nested message provider', () => {
 
   it('preserves MISSING_MESSAGE diagnostics until a section selects its namespace', () => {
     const onError = vi.fn()
-    const locale = SUPPORTED_LOCALES.at(-1)!
+    const locale = SERVED_LOCALES.at(-1)!
     function Section({ selected }: { selected: boolean }) {
       return (
         <NextIntlClientProvider

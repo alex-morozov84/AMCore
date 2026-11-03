@@ -3,6 +3,7 @@ import type {
   AdminQueuesResponse,
   AdminSessionsListResponse,
   AdminUserResponse,
+  CatalogueLocale,
   IntegrationsResponse,
   MfaStepUpCommand,
   MfaStepUpPending,
@@ -12,7 +13,6 @@ import type {
   ScheduledRunsResponse,
   StorageProbeSettingResponse,
   StorageProbeSettingUpdate,
-  SupportedLocale,
   SystemRole,
   WorkCommand,
   WorkJob,
@@ -190,7 +190,7 @@ export const consoleApi = {
     userId: string,
     page: number,
     limit: number,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): Promise<AdminSessionsListResponse> =>
     apiClient.get<AdminSessionsListResponse>(
       getConsolePublicApiPath(`/users/${userId}/sessions?page=${page}&limit=${limit}`),

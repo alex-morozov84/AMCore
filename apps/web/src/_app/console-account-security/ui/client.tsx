@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { AccountMfaController, AccountMfaJourney } from '@/features/account-mfa'
 import { apiClient } from '@/shared/api/http-client'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { getConsolePublicApiPath } from '@/shared/lib/console-public-api-path'
 import { getConsoleOverviewHref, getConsoleSignInAgainHref } from '@/shared/lib/console-public-href'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'

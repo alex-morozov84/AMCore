@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localePathPrefix, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localePathPrefix, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 const messages = JSON.parse(
@@ -27,7 +27,7 @@ test('production auth messages and validation match the selected project topolog
   await page.goto(`${localePathPrefix(DEFAULT_LOCALE)}/login`)
   await expect(
     page.getByRole('combobox', { name: messages.locale.label, exact: true })
-  ).toHaveCount(SUPPORTED_LOCALES.length > 1 ? 1 : 0)
+  ).toHaveCount(SERVED_LOCALES.length > 1 ? 1 : 0)
   await page.getByRole('button', { name: messages.auth.login, exact: true }).click()
   await expect(page.getByText(messages.validation.email, { exact: true })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', DEFAULT_LOCALE)
