@@ -142,7 +142,7 @@ replace it with a token hash or infer authorization from the displayed device.
    A parent layout does not prevent its child pages from running.
    Every BFF handler must return `withConsoleHostGuard(request, async () => …)` first;
    await route parameters and perform session/API work only inside that callback.
-   Run `node --test scripts/lib/console-guard-inventory.test.mjs` after adding an entrypoint.
+   Run `node --test scripts/lib/console-guard-inventory.test.mjs` after adding an entrypoint; CI runs it inside `pnpm test:scripts`.
    Keep the page folder and these guards in disabled builds too.
 3. Add thin route plumbing and `_pages/console` composition, using the existing
    shell and semantic tokens.

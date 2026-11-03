@@ -300,7 +300,9 @@ host, or by promoting new image digests as described in
 [Registry upgrades](../operations/deployment.md#registry-upgrades). If only the web app
 is replaced, it serves one language while the API and the worker still accept and render the old
 list. Apply changed Console and product-admin host mappings with their matching application
-images; stop affected traffic during a mixed configuration. After the rollout open
+images; stop affected traffic during a mixed configuration. (The deployment guide's
+"keep the existing Caddy running" covers an unchanged proxy file; a changed edge file is applied
+together with the images.) After the rollout open
 `/login`, check that the removed prefix answers 404, and verify the build identity as described in
 [Verify the deployed artifact](../operations/deployment.md#verify-the-deployed-artifact).
 
@@ -312,9 +314,12 @@ in the deployment guide. Fork identity is a separate step:
 **Recovery.** Before rollout, retain the previous settings, generated edge configuration and
 image digests. If verification fails, stop the rollout and follow the deployment guide's
 rollback procedure with that matching set. Do not restore only web or only the proxy.
-For a source build, restore the previous settings and generated files, rebuild all consumers,
+With registry images, promote the previous digests together with the previous edge files
+([Registry upgrades](../operations/deployment.md#registry-upgrades)). For a source build, check
+out the previous commit (settings and generated files), rebuild all consumers,
 and repeat the ordered rollout. Changing the locale list does not rewrite stored preferences.
-Already prepared or delivered messages are not rewritten by a settings change.
+Already prepared or delivered messages are not rewritten by a settings change: a link already
+written into one keeps its old prefix and answers 404 when that prefix is no longer served.
 Do not retry secret mail blindly; use the appropriate verification or password-reset
 flow to request a new link.
 

@@ -55,7 +55,8 @@ To change the mode or alias:
 5. Verify the chosen mode. In path mode, sign in through the **product login** as a
    `SUPER_ADMIN`, then open the Console overview. The Console-specific login page is host-only
    and returns 404 in path mode. In host mode use the Console host's public login page.
-   After an alias move, check navigation at the new alias and refusal at the old path.
+   After an alias move, check navigation at the new alias and a 404 at the old path (the
+   folder no longer exists; in host mode the edge also answers 404 for the physical alias).
    In disabled mode, test the Console page and a real BFF endpoint such as
    `GET /api/console/access`: both must refuse without session/API work.
 
@@ -154,8 +155,9 @@ The base Caddy profile is API-only. Only the host override mounts the console
 Caddyfile, and missing hostnames fail validation. For nginx, adapt and include
 `docker/nginx/operations-console.conf` with the real domains and certificates.
 
-Set `ADMIN_CONSOLE_ORIGIN` to the exact
-origin, for example `https://console.example.com:8443`. Both references forward the
+`ADMIN_CONSOLE_ORIGIN` is optional on port 443 (empty means `https://<ADMIN_CONSOLE_HOSTNAME>`).
+Set it to the exact origin when the public port differs, for example
+`https://console.example.com:8443`. Both references forward the
 complete public `Host` authority, port included (nginx `$http_host`, Caddy `{hostport}`).
 The Console guard matches the configured host and port. A different port or product host
 is rejected. If you write your own edge, keep that header; `$host` in nginx drops the port.

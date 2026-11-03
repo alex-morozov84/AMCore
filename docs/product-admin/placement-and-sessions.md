@@ -13,6 +13,9 @@ The checked-in source is `packages/shared/src/config/product-admin.json`:
 { "version": 1, "mode": "path", "alias": "manage" }
 ```
 
+For a separate administration host, set `"mode": "host"` and keep the alias. The file holds no
+hostname: the host comes from `PRODUCT_ADMIN_ORIGIN` at runtime (step 3 below).
+
 With website `https://shop.example.com`, the default Russian addresses are:
 
 | Journey          | Path mode                      | Host mode, `https://manage.shop.example.com` |

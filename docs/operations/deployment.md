@@ -76,7 +76,9 @@ a backport is actually needed.
   `docker-compose` binary.
 - Build settings chosen and committed before the first image build: served languages
   (`packages/shared/src/config/locales.json`) and Operations Console mode
-  (`packages/shared/src/config/admin-console.json`). They are embedded in the images, so a
+  (`packages/shared/src/config/admin-console.json`), plus product administration placement
+  (`product-admin.json`; a separate host needs its generated edge files and
+  `PRODUCT_ADMIN_ORIGIN`). They are embedded in the images, so a
   later change needs a new build and a rollout of the API, worker and web app together; see
   [Build Settings](../../PROJECT_CONTEXT.md#build-settings) and
   [the rollout steps](../frontend/i18n-and-errors.md#task-choose-the-served-locales).
