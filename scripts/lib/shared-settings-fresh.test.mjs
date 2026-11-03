@@ -1,19 +1,33 @@
 import assert from 'node:assert/strict'
-import { cpSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { test } from 'node:test'
+import { after, before, test } from 'node:test'
 
 import { sharedSettingsProblems } from './shared-settings-fresh.mjs'
+import { build, copyShared, root } from './shared-package-fixture.mjs'
 
-const root = join(import.meta.dirname, '../..')
+// The check reads a built `packages/shared/dist`. A clean checkout has none, so the tests build
+// the package once in their own temporary copy instead of relying on the working tree.
+let base
+
+before(() => {
+  base = mkdtempSync(join(tmpdir(), 'amcore-shared-built-'))
+  const shared = join(base, 'packages/shared')
+  mkdirSync(shared, { recursive: true })
+  copyShared(shared)
+  build(shared)
+})
+after(() => rmSync(base, { recursive: true, force: true }))
 
 function copy(t) {
   const dir = mkdtempSync(join(tmpdir(), 'amcore-shared-fresh-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
-  cpSync(join(root, 'packages/shared/dist'), join(dir, 'packages/shared/dist'), { recursive: true })
-  cpSync(join(root, 'packages/shared/package.json'), join(dir, 'packages/shared/package.json'))
-  cpSync(join(root, 'packages/shared/src/config'), join(dir, 'packages/shared/src/config'), {
+  cpSync(join(base, 'packages/shared/dist'), join(dir, 'packages/shared/dist'), {
+    recursive: true,
+  })
+  cpSync(join(base, 'packages/shared/package.json'), join(dir, 'packages/shared/package.json'))
+  cpSync(join(base, 'packages/shared/src/config'), join(dir, 'packages/shared/src/config'), {
     recursive: true,
   })
   // The built package imports zod; resolve it from the real install.
@@ -22,7 +36,7 @@ function copy(t) {
 }
 
 test('the built package matches the settings files', async () => {
-  assert.deepEqual(await sharedSettingsProblems(root), [])
+  assert.deepEqual(await sharedSettingsProblems(base), [])
 })
 
 test('a changed locale list, default or Console mode is reported', async (t) => {
