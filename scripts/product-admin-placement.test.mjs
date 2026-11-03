@@ -60,7 +60,8 @@ test('the Console alias must be free, physical and distinct from the product-adm
   f.write(`${f.routeRoot}/(other)/console/extra/page.tsx`)
   assert.throws(() => inspectProductAdminPlacement(f.root), /Console alias collides/)
   setAlias('en')
-  assert.throws(() => inspectProductAdminPlacement(f.root), /invalid or reserved/)
+  // A locale name is refused by the shared settings rules (the code ALIAS_RESERVED), before any route check.
+  assert.throws(() => inspectProductAdminPlacement(f.root), /ALIAS_RESERVED/)
 })
 
 test('a public asset cannot take the Console alias', (t) => {
