@@ -1430,12 +1430,10 @@ would otherwise redirect it to the slashless address and that redirect would nam
 `/api/console/` path.
 
 `docker/nginx/operations-console.conf` is the nginx reference include. Its default
-TLS vhost rejects unmatched hosts. The bundled nginx reference forwards `$host`,
-so it assumes the standard HTTPS port. It does not preserve an explicit non-default
-port. For a non-default port use the Caddy reference, which forwards `{hostport}`,
-or adapt and verify the nginx generator and redirect authority before deployment.
+TLS vhost rejects unmatched hosts. The nginx reference forwards `$http_host` and redirects
+with it, and the Caddy reference forwards `{hostport}`, so both keep the port the client used.
+The BFF compares the received Host authority (host and port) with its configured trusted origin.
 Do not edit generated locations alone: regeneration would overwrite the change.
-The BFF compares the received Host authority with its configured trusted origin.
 
 The trailing-slash redirect precedes internal page mapping. Both references reject
 bare physical `/<alias>` paths on the Console host. Nginx also rejects encoded

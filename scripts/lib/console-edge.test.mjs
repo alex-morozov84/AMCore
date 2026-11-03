@@ -56,19 +56,39 @@ test('one locale: public pages carry no prefix and still map onto the alias fold
   assert.doesNotMatch(nginx, /\(en\|ru\)|\(ru\)/)
 })
 
+// The web app compares the whole Host authority, port included, with its configured origin. nginx
+// `$host` drops the port, so the Console behind a non-default TLS port would look like the wrong host.
+for (const locales of [['en', 'ru'], ['ru']]) {
+  test(`nginx keeps the client's port in the Host header and in redirects (${locales.length} locale)`, () => {
+    const nginx = renderConsoleNginxLocations({ alias: 'admin', locales })
+    assert.doesNotMatch(nginx, /\$host\b/)
+    assert.match(nginx, /proxy_set_header Host \$http_host;/)
+    assert.match(nginx, /return 308 \$scheme:\/\/\$http_host/)
+  })
+}
+
+test('the committed nginx reference also forwards the client authority', () => {
+  const file = readFileSync(join(root, 'docker/nginx/operations-console.conf'), 'utf8')
+  assert.doesNotMatch(file, /\$host\b/)
+})
+
 test('a changed alias or locale list makes --check fail until regenerated', (t) => {
   const dir = copy(t)
+  // Switch to the other topology than the one the real settings have, so the test holds for any fork.
+  const served = JSON.parse(
+    readFileSync(join(dir, 'packages/shared/src/config/locales.json'), 'utf8')
+  ).enabled
+  const next = served.length > 1 ? ['en'] : ['en', 'ru']
   writeFileSync(
     join(dir, 'packages/shared/src/config/locales.json'),
-    '{"version":1,"enabled":["en"],"default":"en"}\n'
+    `${JSON.stringify({ version: 1, enabled: next, default: 'en' })}\n`
   )
   assert.throws(() => consoleEdgeFiles(dir, false), /stale/)
   consoleEdgeFiles(dir, true)
   assert.doesNotThrow(() => consoleEdgeFiles(dir, false))
-  assert.doesNotMatch(
-    readFileSync(join(dir, 'docker/caddy/Caddyfile.console-host'), 'utf8'),
-    /\(en\|ru\)/
-  )
+  const caddy = readFileSync(join(dir, 'docker/caddy/Caddyfile.console-host'), 'utf8')
+  if (next.length > 1) assert.match(caddy, /\(en\|ru\)/)
+  else assert.doesNotMatch(caddy, /\(en\|ru\)/)
 })
 
 // A wrong settings file must stop the generator before it writes: the shared build refuses the

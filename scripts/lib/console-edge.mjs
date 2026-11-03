@@ -116,8 +116,11 @@ ${proxy}
 `
 }
 
+// `$http_host` keeps the port the client used. The web app compares the whole Host authority
+// (host and port) with its configured origin, as Caddy's `{hostport}` does; `$host` would drop
+// a non-default port and the Console would look like the wrong host.
 const nginxProxy = `        proxy_pass http://web:3000;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-Proto $scheme;`
 
 export function renderConsoleNginxLocations(settings) {
@@ -154,7 +157,7 @@ ${nginxProxy}
     }
 
     location ~ ${trailing} {
-        return 308 $scheme://$host$1$is_args$args;
+        return 308 $scheme://$http_host$1$is_args$args;
     }
 
     location = /api/csp-report {
