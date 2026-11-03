@@ -958,3 +958,19 @@ mail in the internal collector. The source-copy transport retains its final
 admission callback; the original Resend SDK has a separate contract test.
 See [commands and artifact restrictions](../operations/local-stands.md#support-mail-recipient-completion).
 The mock `support-mail` preview cannot prove recipient completion.
+
+### Interpreting CI failures and retries
+
+A browser job can fail during stack preparation before any browser test runs.
+Check its phase and safe startup/resource summary first. An unhealthy API and a
+nearly full disk are separate observations until the health failure is diagnosed.
+
+CI browser summaries identify the static source location and retry number without
+persisting credentials, raw bodies or HTML steps. A failed first try followed by a
+successful retry is a flaky result, even when the job finishes green. Unknown free
+text is withheld; use the known assertion category and bounded context-read phases.
+Artifact names include run/attempt/lane so recovery preserves the first failure.
+
+Use the [CI recovery procedure](../operations/ci-security.md#recovering-a-failed-ci-run).
+Do not retry only a leaf job when its evidence depends on a planner. Do not change
+an assertion, add a sleep or increase a timeout merely to make a retry pass.

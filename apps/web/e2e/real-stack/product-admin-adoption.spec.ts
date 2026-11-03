@@ -25,10 +25,14 @@ const ownedContexts: BrowserContext[] = []
 let before: Awaited<ReturnType<typeof probeRefusalEvidence>>
 let reads: ReturnType<typeof observeContextReads>
 let foreignDocument: Record<string, unknown> | undefined
+let journeyPhase = 'journey'
+let returnDocument: { status: number | null; redirected: boolean } | undefined
 test.beforeEach(async ({ page }) => {
+  journeyPhase = 'journey'
+  returnDocument = undefined
   foreignDocument = undefined
   before = await probeRefusalEvidence()
-  reads = observeContextReads(page)
+  reads = observeContextReads(page, () => journeyPhase)
 })
 test.afterEach(async ({ context }, info) => {
   try {
@@ -37,6 +41,7 @@ test.afterEach(async ({ context }, info) => {
       after: await probeRefusalEvidence(),
       reads: await reads(),
       foreignDocument,
+      returnDocument,
     })
   } finally {
     for (const owned of [context, ...ownedContexts.splice(0)]) {
@@ -154,22 +159,30 @@ test('adoption creates and selects organizations', async ({ page, context }) => 
     await expect(page.getByRole('heading', { name, exact: true, level: 1 })).toBeVisible()
     return result.data.id as string
   }
+  journeyPhase = 'create-alpha'
   const org = await createOrganization('Adopter Alpha')
   await page.goto(ui.path())
   await expect(page).toHaveURL(new RegExp(`${ui.path(`/${org}`)}$`))
   await page.getByRole('link', { name: ui.text('all'), exact: true }).click()
   await expect(page).toHaveURL(/view=list/)
   await expect(page.getByRole('link', { name: ui.open('Adopter Alpha') })).toBeVisible()
+  journeyPhase = 'create-beta'
   const second = await createOrganization('Adopter Beta')
   await page.goto(ui.path())
   await expect(page.getByRole('link', { name: ui.open('Adopter Alpha') })).toBeVisible()
   await expect(page.getByRole('link', { name: ui.open('Adopter Beta') })).toBeVisible()
+  journeyPhase = 'select-beta'
   await page.getByRole('link', { name: ui.open('Adopter Beta') }).click()
   await expect(
     page.getByRole('heading', { name: 'Adopter Beta', exact: true, level: 1 })
   ).toBeVisible()
   expect(new URL(page.url()).pathname).toBe(ui.path(`/${second}`))
-  await page.goto(ui.path(`/${org}`))
+  journeyPhase = 'return-alpha'
+  const returned = await page.goto(ui.path(`/${org}`))
+  returnDocument = {
+    status: returned?.status() ?? null,
+    redirected: Boolean(returned?.request().redirectedFrom()),
+  }
   await expect(page.getByRole('heading', { name: 'Adopter Beta', exact: true })).toHaveCount(0)
   await expect(
     page.getByRole('heading', { name: 'Adopter Alpha', exact: true, level: 1 })

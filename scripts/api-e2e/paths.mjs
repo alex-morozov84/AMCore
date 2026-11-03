@@ -43,6 +43,7 @@ export function executionHash() {
     ...files(resolve(api, 'src')),
     ...files(resolve(root, 'scripts/api-e2e')),
     resolve(root, 'scripts/api-e2e-ci.mjs'),
+    resolve(root, 'scripts/ci-diagnostic.cjs'),
   ].filter((path) => !path.includes('/src/generated/'))
   for (const path of paths) hash.update(path.slice(root.length)).update(readFileSync(path))
   return hash.digest('hex')

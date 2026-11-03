@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
+import diagnostics from '../ci-diagnostic.cjs'
 
 export function readRows(path, live = false) {
   if (!existsSync(path)) return []
@@ -86,7 +87,7 @@ export async function supervise(command, args, options) {
           if (rows.some((row) => /cleanup-fail/.test(row.event))) result.lifecycleFailure = true
         } catch (error) {
           result.lifecycleFailure = true
-          result.diagnostic ??= error.message
+          result.diagnostic ??= diagnostics.failure(error)
           force()
         }
         if (

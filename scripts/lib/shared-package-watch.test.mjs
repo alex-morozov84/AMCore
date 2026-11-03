@@ -27,6 +27,19 @@ function hasMarker(directory, marker, expected) {
   })
 }
 
+function outputState(directory, marker) {
+  return Object.fromEntries(
+    ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts'].map((name) => {
+      try {
+        const content = readFileSync(join(directory, 'dist', name), 'utf8')
+        return [name, { bytes: content.length, marker: content.includes(marker) }]
+      } catch (error) {
+        return [name, { error: error.code }]
+      }
+    })
+  )
+}
+
 function groupAbsent(pid) {
   try {
     process.kill(-pid, 0)
@@ -46,14 +59,27 @@ test(
     let output = ''
     let stopped = false
     let buildStart = 0
+    let childExit
     const completed = () => {
       const recent = output.slice(buildStart)
       return ['es', 'cjs'].every((format) => recent.includes(`SHARED_BUILD_DONE:${format}`))
     }
     const waitForBuild = (marker, expected) =>
       waitFor(
-        () => completed() && hasMarker(directory, marker, expected),
-        () => output
+        () => {
+          if (childExit)
+            throw new Error(`Shared watch exited before ${marker}: ${JSON.stringify(childExit)}`)
+          return completed() && hasMarker(directory, marker, expected)
+        },
+        () =>
+          JSON.stringify({
+            marker,
+            expected,
+            completed: completed(),
+            childExit,
+            outputs: outputState(directory, marker),
+            compilerTail: output.slice(-2048),
+          })
       )
     try {
       copyShared(directory)
@@ -66,7 +92,10 @@ test(
       })
       const exited = new Promise((resolve, reject) => {
         child.once('error', reject)
-        child.once('exit', (code, signal) => resolve({ code, signal }))
+        child.once('exit', (code, signal) => {
+          childExit = { code, signal }
+          resolve(childExit)
+        })
       })
       child.stdout.on('data', (data) => {
         output += data

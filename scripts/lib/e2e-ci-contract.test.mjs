@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, globSync } from 'node:fs'
+import {
+  readFileSync,
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  globSync,
+  chmodSync,
+} from 'node:fs'
 import { test } from 'node:test'
 import { tmpdir } from 'node:os'
 import { auditPlan } from './lighthouse-plan.mjs'
@@ -10,13 +18,18 @@ import { ciLanes, selectedFiles, specFiles } from '../e2e-ci-plan.mjs'
 import { standReporters } from '../../apps/web/e2e/support/managed-target.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
-test('CI report upload selects actual stand outputs without traversing copied dependencies', (t) => {
+test('CI upload selects safe diagnostics/inventory and excludes raw reports and copied dependencies', (t) => {
   const temporary = mkdtempSync(join(tmpdir(), 'ci-report-scope-'))
   t.after(() => rmSync(temporary, { recursive: true, force: true }))
   const directory = join(temporary, '.amcore/stands/owned-stand')
   const reporters = standReporters({ purpose: 'e2e', mocked: true }, directory)
   const html = reporters.find((row) => Array.isArray(row) && row[0] === 'html')[1].outputFolder
-  const expected = [html, join(directory, 'test-results'), join(directory, 'inventory.json')]
+  const safe = ['ci-diagnostics', 'ci-resources'].map((name) => join(temporary, '.amcore', name))
+  const expected = [...safe, join(directory, 'inventory.json')]
+  for (const path of safe) {
+    mkdirSync(path, { recursive: true })
+    writeFileSync(join(path, 'safe.json'), '{}')
+  }
   for (const path of [html, join(directory, 'test-results')]) {
     mkdirSync(path, { recursive: true })
     writeFileSync(join(path, 'index.html'), 'owned result')
@@ -61,10 +74,36 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
   const job = jobs['web-e2e-lanes']
   assert.equal(job.strategy['fail-fast'], false)
   assert.match(job.strategy.matrix, /fromJSON\(needs.web-e2e-plan.outputs.matrix\)/)
-  assert.equal(
-    job.steps.find((step) => step.name === 'Run isolated E2E lane').run,
-    'node scripts/e2e-ci.mjs "$E2E_CI_LANE"'
-  )
+  const runnerFixture = mkdtempSync(join(tmpdir(), 'ci-lane-dispatch-'))
+  try {
+    const binary = join(runnerFixture, 'node'),
+      log = join(runnerFixture, 'invocation')
+    writeFileSync(binary, '#!/bin/sh\nprintf "%s\\n" "$*" > "$CI_INVOCATION_LOG"\n')
+    chmodSync(binary, 0o755)
+    for (const lane of ['safety', 'mocked', 'staff-path-oauth']) {
+      const result = spawnSync(
+        'bash',
+        ['-c', job.steps.find((step) => step.name === 'Run isolated E2E lane').run],
+        {
+          env: {
+            PATH: `${runnerFixture}:${process.env.PATH}`,
+            CI_INVOCATION_LOG: log,
+            E2E_CI_LANE: lane,
+          },
+          encoding: 'utf8',
+        }
+      )
+      assert.equal(result.status, 0, result.stderr)
+      assert.equal(
+        readFileSync(log, 'utf8').trim(),
+        ['safety', 'mocked'].includes(lane)
+          ? `scripts/e2e-ci.mjs ${lane}`
+          : `scripts/ci-disk.mjs -- node scripts/e2e-ci.mjs ${lane}`
+      )
+    }
+  } finally {
+    rmSync(runnerFixture, { recursive: true, force: true })
+  }
   const gate = jobs['web-e2e']
   assert.equal(gate.name, 'Web E2E')
   assert.equal(gate.if, '${{ always() }}')

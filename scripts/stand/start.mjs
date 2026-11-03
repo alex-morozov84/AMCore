@@ -6,8 +6,18 @@ import { configuration, builtServices } from './config.mjs'
 import { dataAdmission, cleanup } from './ownership.mjs'
 import { runBuild } from './build-intent.mjs'
 import { save } from './state.mjs'
+import { startupDiagnostic } from './startup-diagnostic.mjs'
 
 export async function start(m) {
+  try {
+    await startServices(m)
+  } catch (error) {
+    await startupDiagnostic(m)
+    throw error
+  }
+}
+
+async function startServices(m) {
   // A changed source rebuild must not admit previous application image IDs.
   // Preserve only the already-owned volumes, then recreate the local services.
   if (!m.images && m.resources?.container?.length) await cleanup(m, false)

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CI detects stale planner attempts before expensive E2E preparation, preserves
+  safe failure diagnostics per attempt, and guards hosted browser jobs against disk
+  exhaustion. Invitation replay proofs ignore unrelated database transactions while
+  still detecting a second transaction of the observed operation.
+
 - Weekly lockfile refresh keeps the reviewed Bull Board group together instead of
   updating its API packages independently of the pinned Fastify adapter.
 
