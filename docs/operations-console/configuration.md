@@ -154,13 +154,12 @@ The base Caddy profile is API-only. Only the host override mounts the console
 Caddyfile, and missing hostnames fail validation. For nginx, adapt and include
 `docker/nginx/operations-console.conf` with the real domains and certificates.
 
-The bundled nginx reference assumes HTTPS port 443. For a non-default port, use
-the Caddy reference or adapt and verify the nginx generator as described in
-[deployment](../operations/deployment.md#operations-console-host-mode-reference).
 Set `ADMIN_CONSOLE_ORIGIN` to the exact
-origin, for example `https://console.example.com:8443`. Preserve the complete
-public `Host` authority at the edge; the Console guard matches the configured
-host and port. A different port or product host is rejected.
+origin, for example `https://console.example.com:8443`. Both references forward the
+complete public `Host` authority, port included (nginx `$http_host`, Caddy `{hostport}`).
+The Console guard matches the configured host and port. A different port or product host
+is rejected. If you write your own edge, keep that header; `$host` in nginx drops the port.
+See [deployment](../operations/deployment.md#operations-console-host-mode-reference).
 
 Keep `web` private to the proxy network. Do not expose its port publicly. Both
 reference proxies reject unknown hosts and direct physical `/<alias>` paths,
