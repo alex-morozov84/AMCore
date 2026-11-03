@@ -29,8 +29,11 @@ if (auditOnly && (!auditOwner || process.env.CI === 'true'))
   throw new Error('Audit-only requires explicit local audit dispatcher')
 if (auditOwner) setProcessDeadline(Number(process.env.AMCORE_AUDIT_EPOCH) + 20 * 60_000)
 const edge = value('--edge')
-if (edge && (edge !== 'nginx' || action !== 'e2e' || lane !== 'product-admin-real-stack'))
-  throw new Error('--edge nginx requires product-admin-real-stack E2E')
+if (
+  edge &&
+  (!['nginx', 'caddy'].includes(edge) || action !== 'e2e' || lane !== 'product-admin-real-stack')
+)
+  throw new Error('--edge nginx|caddy requires product-admin-real-stack E2E')
 if (
   args.includes('--fixture') &&
   (![
@@ -181,6 +184,12 @@ async function execute() {
           throw new Error('Nginx wire smoke accepts only its dedicated edge scenario')
         const { productAdminNginxSmoke } = await import('./stand/product-admin-nginx-smoke.mjs')
         await productAdminNginxSmoke(m)
+        handled = true
+      }
+      if (edge === 'caddy') {
+        if (extra.length) throw new Error('Caddy wire smoke takes no test arguments')
+        const { productAdminCaddySmoke } = await import('./stand/product-admin-caddy-smoke.mjs')
+        await productAdminCaddySmoke(m)
         handled = true
       }
       if (args.includes('--proxy-smoke')) {

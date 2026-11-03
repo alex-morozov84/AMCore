@@ -634,6 +634,10 @@ an owned nginx container with generated snippets, checks nginx configuration,
 and uses loopback TLS requests with the configured public Host. It does not
 replace browser auth or deployment on your own proxy.
 
+`--edge caddy` (no test argument) asks the stand's own Caddy the same questions, with no extra
+container. Use either flag when the build serves one language: the browser suites open
+language-prefixed addresses and only prove the default two-language build.
+
 ### Browser trust
 
 Each Docker stand has unique `.localhost` hostnames: cookies do not isolate by
