@@ -1,7 +1,5 @@
 const process = require('node:process')
-const console = require('node:console')
 const { appendFileSync, writeFileSync } = require('node:fs')
-const { failure } = require('../ci-diagnostic.cjs')
 class Reporter {
   record(row) {
     appendFileSync(
@@ -20,33 +18,14 @@ class Reporter {
     const assertions = result.testResults.map(({ status, invocations, retryReasons }) => ({
       status,
       invocations,
-      retryReasons: Array.isArray(retryReasons)
-        ? retryReasons.map(() => 'detail-withheld')
-        : retryReasons,
+      retryReasons,
     }))
-    const failures = result.testResults.flatMap((test, index) =>
-      test.status === 'failed'
-        ? [
-            {
-              assertion: index + 1,
-              ...failure(test.failureDetails?.[0], {
-                file: result.testFilePath,
-                ...test.location,
-              }),
-            },
-          ]
-        : []
-    )
-    if (result.testExecError)
-      failures.push({ ...failure(result.testExecError, { file: test.path }), phase: 'runtime' })
-    if (failures.length) console.error('API E2E failure:', JSON.stringify(failures).slice(0, 8192))
     this.record({
       event: 'suite-end',
       path: test.path,
       assertions,
       runtimeError: Boolean(result.testExecError),
-      firstError: failures[0] ?? (result.failureMessage ? { category: 'suite-failure' } : null),
-      failures: failures.slice(0, 8),
+      firstError: result.testExecError?.message || result.failureMessage || null,
       failure: Boolean(result.failureMessage),
       heap: process.memoryUsage().heapUsed,
       rss: process.memoryUsage().rss,

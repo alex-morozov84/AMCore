@@ -51,7 +51,6 @@ export async function runShard(
       'jest-e2e.config.js',
       '--ci',
       '--runInBand',
-      '--testLocationInResults',
       '--reporters',
       resolve(root, 'scripts/api-e2e/reporter.cjs'),
       '--runTestsByPath',

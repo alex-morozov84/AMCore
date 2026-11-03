@@ -38,14 +38,10 @@ test('F4 parent retains first execution diagnostic and records later cleanup err
   })
   assert.equal(spawned.length, 1)
   assert.equal(report.success, false)
-  const attempt = report.attempts[0]
-  assert.deepEqual(attempt.diagnostic, attempt.diagnostics[0])
-  assert.equal(attempt.diagnostic.phase, 'execution')
-  assert.equal(attempt.diagnostic.category, 'detail-withheld')
-  assert.equal(attempt.diagnostics[1].phase, 'cleanup')
-  assert.equal(attempt.diagnostics[1].category, 'detail-withheld')
-  assert.ok(!JSON.stringify(report).includes('first execution fault'))
-  assert.ok(!JSON.stringify(report).includes('later inspection fault'))
+  assert.equal(report.attempts[0].diagnostic, 'first execution fault')
+  assert.ok(
+    report.attempts[0].diagnostics.some((item) => item.message === 'later inspection fault')
+  )
 })
 test('F5 only complete ordinary failure permits next child; incomplete metadata never does', async () => {
   const complete = await exerciseRun()

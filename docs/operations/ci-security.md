@@ -29,7 +29,7 @@ Each owning lane reuses its admitted build/stack; non-owners record N/A.
 Missing audits, wrong artifact identity, invalid hashes or earlier lane failures keep the aggregate red.
 The proposed40/20/5-minute job ceilings and15-minute audit phase require hosted cold/warm
 admission and actual artifact upload/retrieval before adoption. Configuration alone is
-not proof of cost, successful transfer or live branch protection. API and browser proof artifacts retain fourteen days where repository policy permits; safe artifacts
+not proof of cost, successful transfer or live branch protection. Seven-day safe artifacts
 exclude credentials and private fixture state. Publication, CI execution and repository
 settings retain their separate authority boundaries.
 
@@ -94,7 +94,7 @@ settings retain their separate authority boundaries.
   actual suite paths across fresh workspace roots and binds them to assignments. Missing, cancelled,
   skipped or forced attempts fail. Artifact names include the workflow attempt;
   the aggregate downloads only that attempt and rejects unexpected artifact directories.
-  API reports retain fourteen days where repository policy permits.
+  Reports remain available for seven days.
   The tracked main ruleset requires the stable **API E2E** aggregate from GitHub
   Actions. Individual shard contexts are not required. Applying the declaration
   to live GitHub protection remains a separate owner-authorized repository action.
@@ -132,7 +132,7 @@ settings retain their separate authority boundaries.
   Every lane invokes `node scripts/e2e-ci.mjs <lane>` with CI settings. Matrix
   failure, cancellation or skipping fails the aggregate; the plan must also succeed.
   Grouped runs verify actual Playwright inventory before browser execution.
-  All lanes retain sanitized browser summaries and test inventories for fourteen days where repository policy permits. Raw real-stack reports and attachments are not uploaded.
+  All lanes retain browser reports/test results/inventories for seven days.
   Parallelism changes wall time, not coverage or within-stand concurrency.
   The 20-minute lane timeout is emergency headroom, not a runtime target or
   performance proof. Measure cold setup and runner-minutes as well as test time.
@@ -180,63 +180,11 @@ below — required-check contexts only become selectable in that flow after they
 run at least once on the repository. A newly added job context needs that same
 one-time re-application after its first real run on the repository.
 
-## Recovering a failed CI run
-
-Inspect the first failed job before retrying. Record its source SHA, run, attempt,
-phase and safe diagnostic artifact ID. A green retry does not erase the first failure.
-For an assertion failure, diagnose the behavior first. A source fix needs a new push
-and complete CI on that source; retrying an old run does not test new code.
-
-For a diagnosed environment failure on unchanged source, rerun the relevant planner
-**with all dependent jobs**, instead of selecting only the failed job:
-
-1. Open **API E2E plan** or **Web E2E plan** in the completed run.
-2. Select the job's rerun-with-dependent-jobs action. With the CLI use
-   `gh run rerun --repo OWNER/REPO --job PLANNER_JOB_ID`.
-3. Verify the new attempt includes the planner, every assigned shard or lane, and
-   its aggregates. All evidence within that family must belong to that attempt.
-
-This recovery path requires hosted admission of matrix propagation and artifact
-retrieval. Until that is established for the deployed workflow, use **Re-run all
-jobs**. If propagation is incomplete, keep the failure and use the full-run fallback;
-do not remove attempt checks. Leaf-only retries refuse stale planner identity before
-installation and tell you which planner to rerun.
-
-Independent successful families can retain their latest result for the same source.
-The latest executed family attempt must be complete and successful. A later failure,
-cancellation, skip or missing artifact blocks acceptance; never select an earlier
-green artifact. API shards and Web lanes/owners cannot mix attempts. Every other
-required check must also pass on the current PR head. Keep recovery labelled as
-recovery, not first-attempt success.
-
-If a plan is absent, artifacts expired or source/inputs changed, recover the complete
-planner family or require a new full run. Runs older than GitHub's rerun window need
-a new event. Do not repeat an unexplained failure until green. Preserve the failed
-attempt summary and investigate recurrence.
-
-### Resource failures and safe evidence
-
-Real-Docker browser jobs on ephemeral GitHub-hosted Linux measure free bytes and
-inodes. Before preparation they inspect and remove only unused Android/.NET SDKs
-at `/usr/local/lib/android` and `/usr/share/dotnet`; unexpected paths, symlinks or
-mounts refuse deletion. Local stands and self-hosted machines receive no SDK cleanup.
-The command monitor records sampled reserve through startup, test and cleanup.
-A reserve below 2 GiB or 5% free inodes fails resource admission. Sampling does not
-prove the instantaneous peak; retain ENOSPC errors as independent evidence.
-
-Inspect `disk.jsonl` and the safe startup service states when a container becomes
-unhealthy. Startup states alone do not establish why its health check failed.
-Diagnostics omit environment, cookies, authorization, tokens, response bodies and
-arbitrary error text. Reports retain source location, known assertion category,
-numeric facts and bounded context-read route templates. Unknown details are withheld.
-Real-stack traces, screenshots and video remain disabled.
-
-Browser artifact names include run, attempt and lane. Summaries retain first failure
-and retry outcomes separately. API artifacts already include attempt identity.
-The configured retention is fourteen days, subject to repository policy. Record
-artifact IDs/digests before recovery and preserve the bounded safe summary before
-expiry. Hard cancellation can prevent final upload; earlier phase checkpoints remain
-useful. Do not upload raw logs to compensate for missing diagnostics.
+The `staff-path-oauth` and `staff-invitation` browser jobs log workspace free space
+and inodes with `df` before preparation and after the lane, including failures.
+These snapshots do not measure the minimum reserve during execution or separate
+Docker storage. A missing final snapshot leaves the experiment incomplete.
+They perform no cleanup and do not establish that disk exhaustion is fixed.
 
 ## API E2E budget policy
 

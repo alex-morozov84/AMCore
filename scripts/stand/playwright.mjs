@@ -53,11 +53,6 @@ export async function test(m, lane, token, extra = [], group, auditOnly = false)
         TMPDIR: tmp,
         AMCORE_STAND_MANIFEST: join(directory(m.id), 'manifest.json'),
         AMCORE_STAND_TOKEN: token,
-        ...(process.env.CI === 'true'
-          ? {
-              AMCORE_CI_DIAGNOSTICS: join(m.worktree, '.amcore/ci-diagnostics', `${m.id}.jsonl`),
-            }
-          : {}),
       }),
     }
     if (!auditOnly && !group) await profileInventory(m, lane, options, extra)
@@ -72,9 +67,6 @@ export async function test(m, lane, token, extra = [], group, auditOnly = false)
           'playwright',
           'test',
           `--config=${config}`,
-          ...(process.env.CI === 'true'
-            ? [`--reporter=${join(m.snapshot, 'scripts/ci-browser-reporter.cjs')}`]
-            : []),
           ...filters,
           ...extra,
         ],
