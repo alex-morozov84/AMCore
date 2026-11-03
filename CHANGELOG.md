@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A weekly lockfile refresh opens one PR for compatible dependency resolutions,
+  preserving existing pins and holds and relying on the required PR checks.
 - `PROJECT_CONTEXT.md` no longer holds `i18n_mode`, `base_locale`, `supported_locales`,
   `frontend_storybook`, `frontend_route_progress` and the `admin_console*` fields; the settings
   files above are the single source. `theme_persistence` and

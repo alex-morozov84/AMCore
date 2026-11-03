@@ -537,7 +537,9 @@ future dependency update; a package's minimum supported version can be vulnerabl
 
 Dependabot handles patch/minor npm + action bumps and (per repo, see
 [_Strict security setup_](#strict-security-setup-after-forking)) opens security
-PRs — but it does not surface **semver-major** npm updates (ignored in
+PRs when its dependency graph supports the lockfile. GitHub currently
+[does not detect dependencies in pnpm 12's two-document lockfile for security alerts/updates](https://github.blog/changelog/2026-10-20-dependabot-now-supports-npm-12-pnpm-11-and-12-and-bun-1-4/).
+Dependabot also does not surface **semver-major** npm updates (ignored in
 `dependabot.yml`), Docker base-image **digest drift**, or newer **curl-pinned CLI
 tool** releases. It also does not bump the root `packageManager` pnpm pin or the
 Node.js major selectors; the report has a **Toolchain** section for both (pnpm
@@ -557,6 +559,30 @@ checks, and the combined rollback remains coherent. Preserve all required CI
 coverage and installation policies. Record intentional deferrals in the
 product's own backlog or issue tracker. Dependabot's major-version ignore and
 automatic update groups remain unchanged.
+
+### Weekly lockfile refresh
+
+`lockfile-refresh.yml` runs on Tuesday at 07:00 UTC, or manually through
+**Actions → Lockfile refresh → Run workflow**, selecting `main`. It refreshes direct
+and transitive versions within existing manifest ranges and opens or updates one
+PR from `chore/lockfile-refresh`. Only `pnpm-lock.yaml` enters the PR. Exact pins,
+the root release-age policy and the `nestjs-cls`/`jest-mock-extended` holds remain.
+Next.js also stays at its current resolution because it has a version-specific
+patch. Keep these exclusions aligned with the holds and patch lifecycle.
+
+A repository administrator must enable **Settings → Actions → General → Workflow
+permissions → Allow GitHub Actions to create and approve pull requests**. Keep the
+default token read-only; this job requests `contents: write` and `pull-requests: write`.
+No extra secret is required. If the bot PR shows **Approve workflows to run**, approve
+that CI run. Merge only after reviewing the diff and every required check on its
+current head. A green refresh job alone does not prove compatibility.
+
+No diff means no PR. For a red update or CI run, inspect the failure and fix it
+manually; keep age restrictions and required checks intact. The ready-made
+`peter-evans/create-pull-request` action manages the bot branch and PR. Keep manual
+fixes in separate PRs to `main`, then rerun the refresh. This updates compatible
+resolutions, including non-security updates; packages without a compatible fix
+remain for manual review. It never merges automatically.
 
 The root workspace explicitly sets `minimumReleaseAge: 1440` and
 `minimumReleaseAgeStrict: true`. It also sets

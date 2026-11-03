@@ -1,0 +1,52 @@
+name: Lockfile refresh
+
+on:
+  schedule:
+    - cron: '0 7 * * 2' # Tuesday, after Monday's Dependabot updates
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lockfile-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Refresh compatible resolutions
+        # Preserve Dependabot holds and the version-specific Next.js patch.
+        run: |
+          pnpm --recursive --include-workspace-root update \
+            --depth Infinity --lockfile-only --no-save --ignore-scripts --ignore-pnpmfile \
+            '!nestjs-cls' '!jest-mock-extended' '!next'
+      - name: Create or update refresh PR
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          add-paths: pnpm-lock.yaml
+          branch: chore/lockfile-refresh
+          base: main
+          commit-message: 'chore(deps): refresh dependency lockfile'
+          title: 'chore(deps): refresh dependency lockfile'
+          body: |
+            Refresh direct and transitive resolutions within the existing manifest ranges.
+            Preserve exact pins, held packages and the root release-age policy.
+            Review the diff and all required PR checks before merging.
