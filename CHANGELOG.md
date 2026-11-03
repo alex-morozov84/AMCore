@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Weekly lockfile refresh keeps the reviewed Bull Board group together instead of
+  updating its API packages independently of the pinned Fastify adapter.
+
 ### Removed
 
 - The `pnpm init:project` command and its generated-project test matrix, change selector

@@ -568,7 +568,10 @@ and transitive versions within existing manifest ranges and opens or updates one
 PR from `chore/lockfile-refresh`. Only `pnpm-lock.yaml` enters the PR. Exact pins,
 the root release-age policy and the `nestjs-cls`/`jest-mock-extended` holds remain.
 Next.js also stays at its current resolution because it has a version-specific
-patch. Keep these exclusions aligned with the holds and patch lifecycle.
+patch. The entire `@bull-board/*` group is excluded: its Fastify adapter is pinned,
+and its UI assets require hash and disclosure checks. Review Bull Board upgrades
+through the separate Dependabot group. Keep these exclusions aligned with the
+holds, patch lifecycle and reviewed board boundary.
 
 A repository administrator must enable **Settings → Actions → General → Workflow
 permissions → Allow GitHub Actions to create and approve pull requests**. Keep the
