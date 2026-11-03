@@ -14,16 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by "Script contracts" (`pnpm test:scripts`, which runs the repository's tooling tests); the
   two "Scaffolding contract" required checks no longer exist. The last state with the old
   command is the Git tag `scaffolding-final`. Forks created with `init:project` before this
-  change are not supported by later AMCore updates. `PROJECT_CONTEXT.md` keeps its frontend
-  choice fields as a record of the build; no command writes them.
+  change are not supported by later AMCore updates.
+
+### Added
+
+- Build settings files replace the removed scaffolding. `packages/shared/src/config/locales.json`
+  selects the served locales and the default (for example Russian only, with bare URLs), and
+  `packages/shared/src/config/admin-console.json` sets the Operations Console mode (`disabled`,
+  `path` or `host`) and its URL segment. A disabled Console answers 404 on every page and
+  `/api/console/*` route that handles the request (a method the route does not export can get 405). A host-mode Console edge (Caddy and nginx) is generated from the files
+  with `node scripts/render-console-edge.mjs --write`, and the web build fails while it is stale.
+  Builds also fail when `packages/shared/dist` is older than the files, and the edge generators
+  refuse a wrong settings file before they write anything. Data written under other settings
+  keeps working: queued mail, pending AI approvals and saved organization drafts accept any shipped
+  locale and read it as the build's default (a Console organization request already submitted is
+  never rewritten; it is looked up by its operation ID instead of being sent again, and stays
+  saved until its absence is proven), and links
+  already written into sent mail keep their old prefix and answer 404 once that prefix is no longer
+  served. See [i18n](docs/frontend/i18n-and-errors.md) and
+  [Console configuration](docs/operations-console/configuration.md).
+- A preview stand with the Console in path mode prepares sign-in for the demo operator in its own
+  disposable database; `pnpm stand code --id <id>` prints the current code. Operator multi-factor
+  checking stays on. See [local stands](docs/operations/local-stands.md#operator-sign-in-on-a-preview).
 
 ### Changed
 
+- `PROJECT_CONTEXT.md` no longer holds `i18n_mode`, `base_locale`, `supported_locales`,
+  `frontend_storybook`, `frontend_route_progress` and the `admin_console*` fields; the settings
+  files above are the single source. `theme_persistence` and
+  `initialized_from_amcore_version` stay. New accounts always store an explicit locale.
 - Refresh Node.js 24 base images, align pnpm at 12.17.0 across installation and
   Docker preparation, and update the form resolvers to 7.0.1.
 - Isolated migrator preparation checks include the workspace's declared dependency
   patches, matching the production Docker build context.
-
 - Dependency updates keep Nest core, common, testing and HTTP adapters in the
   Fastify group. The known incompatible `nestjs-cls` 7.0.2 update is excluded.
 - Queue-board preflight refusals retain their closed response with Nest's early

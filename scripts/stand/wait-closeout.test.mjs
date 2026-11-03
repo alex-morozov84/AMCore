@@ -12,18 +12,29 @@ for (const completes of [true, false])
     const id = `closeout-proof-${randomUUID()}`
     const attempt = randomUUID()
     const manifest = {
-      version: 1, id, uuid: randomUUID(), attempt, worktree: root,
-      purpose: 'e2e', topology: 'path', mocked: true, state: 'allocated',
+      version: 1,
+      id,
+      uuid: randomUUID(),
+      attempt,
+      worktree: root,
+      purpose: 'e2e',
+      topology: 'path',
+      mocked: true,
+      state: 'allocated',
       snapshot: `${directory(id)}/source-${attempt}`,
     }
     await mkdir(manifest.snapshot, { recursive: true })
     const held = await lease(id, 'closeout-proof')
     await save(manifest)
-    const child = spawn(process.execPath, ['-e', completes
-      ? 'setTimeout(() => process.exit(0), 800)'
-      : 'setInterval(() => {}, 1000)'], {
-      cwd: manifest.snapshot, detached: true, stdio: 'ignore',
-    })
+    const child = spawn(
+      process.execPath,
+      ['-e', completes ? 'setTimeout(() => process.exit(0), 800)' : 'setInterval(() => {}, 1000)'],
+      {
+        cwd: manifest.snapshot,
+        detached: true,
+        stdio: 'ignore',
+      }
+    )
     const closed = once(child, 'close')
     await once(child, 'spawn')
     try {

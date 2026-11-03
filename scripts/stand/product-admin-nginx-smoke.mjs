@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 
-import { inspectProductAdminPlacement } from '../lib/product-admin-placement.mjs'
-
 import { labels } from './config.mjs'
 import { composeArguments, docker, inspect } from './docker.mjs'
 import { owned } from './ownership.mjs'
 import { allocate } from './ports.mjs'
+import { checkProductAdminWire } from './product-admin-wire-checks.mjs'
 import { run } from './process.mjs'
 import { save } from './state.mjs'
 
@@ -14,7 +13,6 @@ import { save } from './state.mjs'
 export async function productAdminNginxSmoke(m) {
   assert.equal(m.purpose, 'e2e')
   assert.equal(m.productAdminHost, true)
-  const { alias } = inspectProductAdminPlacement(m.snapshot)
   const directory = `${m.snapshot}/docker/nginx/product-admin-smoke`
   await mkdir(directory, { recursive: true, mode: 0o700 })
   await run(
@@ -75,40 +73,6 @@ server { listen 443 ssl; server_name ${m.hostnames.staff}; ${tls}\n${staff}\n}\n
   const id = (await docker(m, [...command, 'ps', '-q', 'nginx'], { capture: true })).trim()
   owned(m, await inspect(m, 'container', id), 'container')
   await docker(m, ['exec', id, 'nginx', '-t'])
-  const prefix = m.localePrefix
-  for (const [host, path, expected] of [
-    [m.hostnames.staff, `${prefix}/login`, 200],
-    [m.hostnames.staff, `${prefix}/${alias}/organizations`, 404],
-    [m.hostnames.product, `${prefix}/${alias}/organizations`, 404],
-    [m.hostnames.staff, `${prefix}/unknown-staff-page`, 404],
-    [m.hostnames.staff, '/api/auth/login', 404],
-    [m.hostnames.product, '/api/product-admin/auth/login', 404],
-    [m.hostnames.staff, '/api/auth/me', 401],
-    [m.hostnames.staff, '/favicon.ico', 200],
-  ]) {
-    const body = `${directory}/response.html`
-    const status = await run(
-      'curl',
-      [
-        '--silent',
-        '--show-error',
-        '--insecure',
-        '--noproxy',
-        '*',
-        '--resolve',
-        `${host}:${port}:127.0.0.1`,
-        '--header',
-        `Host: ${host}:${m.ports.tls}`,
-        '--output',
-        body,
-        '--write-out',
-        '%{http_code}',
-        `https://${host}:${port}${path}`,
-      ],
-      { capture: true }
-    )
-    assert.equal(Number(status), expected, `nginx ${path}`)
-    if (path === `${prefix}/login`) assert.match(await readFile(body, 'utf8'), /Sign in|Вход/)
-  }
+  await checkProductAdminWire(m, { edge: 'nginx', port, directory })
   console.log('Product admin nginx TLS wire smoke: passed')
 }

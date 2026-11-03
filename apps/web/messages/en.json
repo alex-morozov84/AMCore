@@ -1675,6 +1675,8 @@
       "emailBlocked": "Email delivery is not configured for this application. Ask the person responsible to configure it before inviting an administrator. Saved organizations remain available.",
       "refreshReadiness": "Check email configuration again",
       "notManaged": "This organization does not use the initial administrator invitation process.",
+      "createLanguageChanged": "The saved request used an invitation language this site no longer serves, so it cannot be sent again. It stays saved so that it cannot be created twice. Use “Check request result”; once it is shown that nothing was created, you can start a new request.",
+      "requestLanguageChanged": "The saved request used an invitation language this site no longer serves, so it was not sent again. Check the current state, review the details and send a new request if it is still needed.",
       "newOrganization": "Create another organization",
       "mail": {
         "unconfirmed": "We could not confirm that the email service accepted the invitation. An email may still arrive. The organization is saved. Check with the recipient before sending another invitation.",

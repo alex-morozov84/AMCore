@@ -62,9 +62,8 @@ those inputs. A stale preparation receipt must fail preflight; regenerate it wit
 real preparation. Both extension fixtures build shared through its package command
 before preserving their original type and E2E checks.
 
-API deployment, web standalone/Storybook and generated starter variants consume
-this package. Full API E2E and the generated install/build/test matrix remain CI
-requirements. Local transformation alone does not prove those variants build.
+API deployment and web standalone/Storybook consume this package. Full API E2E remains
+a CI requirement.
 
 ## Performance and rollback
 

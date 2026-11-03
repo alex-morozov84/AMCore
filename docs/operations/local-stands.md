@@ -29,6 +29,7 @@ concurrent scenarios within a test retain their own process and stand orchestrat
 | Full product/browser stack           | `pnpm stand e2e --lane real-stack`           | Fresh disposable database                               |
 | HTTPS Console host stack             | `pnpm stand e2e --lane console-real-stack`   | Fresh disposable host-mode database                     |
 | Inspect selected preview             | `pnpm stand status`                          | Read-only                                               |
+| Current operator sign-in code        | `pnpm stand code --id <stand-id>`            | Read-only; prints one code, never the secret            |
 | List records and labelled resources  | `pnpm stand list`                            | Read-only, includes missing-source orphans              |
 | Stop preview                         | `pnpm stand down`                            | Retains named volumes                                   |
 | Delete preview data explicitly       | `pnpm stand down --purge`                    | Deletes only proved-owned resources, built images too   |
@@ -244,7 +245,7 @@ the real API, roles are assigned only to those accounts, and browser login/acces
 is verified. Keep the stand running until acceptance or explicitly scoped cleanup.
 The [custom administration example](../product-admin/adoption.md#connect-the-chosen-interface)
 can prepare a copy-only adapter for the existing `organization` profile.
-Run its `--preview` generator only after single-locale/no-Console initialization.
+Run its `--preview` generator only when `locales.json` serves one locale and `admin-console.json` has `"mode": "disabled"`.
 The adapter records provenance before writing and preserves later owner changes.
 It does not introduce a global preview profile.
 
@@ -361,6 +362,75 @@ required public build input with an ordinary file rather than dereferencing
 private/foreign files. Refresh rebuilds from
 current source while retaining preview data. Unexpected account/role state fails
 instead of silently resetting the reviewer's scenario.
+
+### Operator sign-in on a preview
+
+An operator (the `SUPER_ADMIN` role, the person who uses the Operations Console, called the
+Console below) must pass a second factor. A new preview stand whose Console
+runs in **path mode** (the Console is served under the product address, for example `/admin`)
+therefore prepares it in the stand's own disposable database only: an
+encryption key for that stand, the active MFA protocol (the same seed the `e2e` stands use),
+and the demo operator's enrollment through the real enrollment screen. Enforcement stays on.
+No application code and no deployment setting changes, and nothing here is activation
+evidence for a deployment. Never switch the check off for a preview; create a new stand instead.
+
+To review the Console as the demo operator:
+
+1. Check that the Console is on: `mode` in `packages/shared/src/config/admin-console.json` is
+   `path`. In `disabled` mode `/admin` answers 404.
+2. Create a fresh preview stand, for example `pnpm stand preview --id console-review`. The
+   default profile is enough for screens that need only accounts; add `--profile <name>` only
+   when the screen needs the data of a profile described in this guide. The command prints the
+   product URL, the demo accounts and the stop command, for example `URL:
+http://app-<id>.localhost:<port>` and `SUPER_ADMIN: demo.super-admin@preview.amcore.test`.
+   The `localhost` address opens only on the machine that runs the stand.
+3. Open the printed product URL and sign in as `demo.super-admin@preview.amcore.test` with the
+   public demo password. The page asks for a code from an app.
+4. Run `pnpm stand code --id console-review`. It prints one line, for example
+   `Operator demo.super-admin@preview.amcore.test: code 123456 (valid for about 21 s)`.
+   Enter the digits at once. If the page refuses them, run the command again. The owner needs no
+   phone app: whoever has the checkout runs the command, either the owner in a terminal or you,
+   who then pass the six digits on in the chat. A code is useless after its seconds run out, so
+   share it only for this disposable local demo, never for a production account.
+5. Product sign-in returns to the product home. Open the Console link or its overview
+   (`/<alias>` with one served locale, `/<locale>/<alias>` with several), then the screen under review.
+
+What goes wrong, and what to do:
+
+| What you see                                         | Cause                                                                            | What to do                                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in answers "MFA unavailable"                    | The stand was created before this feature, or it has the Console on its own host | Create a new stand with a new ID; a repeated `preview` cannot add it. Remove the old one with `pnpm stand down --id <old-id> --purge` when nobody needs it |
+| `pnpm stand code` says the stand has no operator MFA | Same as above                                                                    | Same as above                                                                                                                                              |
+| The sign-in page says "Too many attempts"            | The sign-in start limit, see below                                               | Wait about ten minutes, then sign in once                                                                                                                  |
+| The code is refused                                  | It expired while you typed                                                       | Run `pnpm stand code` again                                                                                                                                |
+
+Check the stand's creation options, profile and topology, as well as `mode` in
+`admin-console.json`. A command can select a host topology independently of that source file.
+These are common causes, not an exhaustive diagnosis: if a fresh eligible path-mode stand
+still fails, inspect its API logs before replacing it again.
+
+The first `preview` run enrolls the operator and keeps the factor secret and the backup codes
+in the stand's own directory (`.amcore/stands/<id>/operator-factor.json`, owner-only, ignored by
+Git). Never print the file or the backup codes in a chat or a report; the review needs only the
+current six-digit code. You never use the backup codes. Later runs sign in with a generated code.
+`pnpm stand down --purge` deletes the stand's database, so the saved secret opens nothing any
+more; the file stays in the ignored stand directory with the stand record.
+
+The API counts sign-in starts per source: 20 in 10 minutes. The count is kept in the stand's own
+Redis: a refresh keeps it, a new stand starts at zero. The sign-ins that `preview` makes by itself
+count too, so several rebuilds plus scripted probes in a row end with "Too many attempts". This
+is the limit working, not a broken stand. A new stand starts at zero, so creating one is also a
+valid way to continue at once.
+
+**Every owner walkthrough for a Console screen must include these steps** (sign in, run
+`pnpm stand code`, enter the code). Without them the reviewer cannot reach the screen.
+
+Limits: a stand with the Console on its own host (**host topology**: the Console has an address
+separate from the product) and the `account-mfa-ui` profile (which keeps the protocol only
+prepared) do not get this; the `user` profile has no operator. Review a Console screen in path
+mode unless the change is about the host itself; host behavior has its own `e2e` lanes. A bare
+`next start` or `pnpm dev` without the managed stand has no database protocol either, so operator
+sign-in is unavailable there.
 
 ## Target and cleanup safety
 
@@ -564,6 +634,10 @@ an owned nginx container with generated snippets, checks nginx configuration,
 and uses loopback TLS requests with the configured public Host. It does not
 replace browser auth or deployment on your own proxy.
 
+`--edge caddy` (no test argument) asks the stand's own Caddy the same questions, with no extra
+container. Use either flag when the build serves one language: the browser suites open
+language-prefixed addresses and only prove the default two-language build.
+
 ### Browser trust
 
 Each Docker stand has unique `.localhost` hostnames: cookies do not isolate by
@@ -698,7 +772,7 @@ pnpm stand preview --id account-security-review --profile account-mfa-ui
 ```
 
 Open its printed product URL followed by `/mfa`, with the locale prefix when
-locales are enabled. The demonstration needs no login. Its managed check verifies only the demo USER
+the build serves several languages. The demonstration needs no login. Its managed check verifies only the demo USER
 account; it does not attempt password-only operator access. Existing operator
 records stay unchanged when refreshing this preview. Use a made-up password.
 Scan its public test QR with an authenticator app and enter the current code.
@@ -717,8 +791,9 @@ or capturing secret steps. Do not treat simulation as backend security evidence.
 Docker E2E stands receive their own generated MFA encryption key. After the runner
 validates its lease, database marker and owned resources, it seeds protocol version1
 as active in that disposable database. This is test setup, not deployment preflight
-or activation evidence. Preview stands and ordinary Compose deployments do not receive
-this test configuration.
+or activation evidence. Ordinary Compose deployments never receive this test configuration.
+A preview stand gets a separate per-stand variant only for operator sign-in; see
+[Operator sign-in on a preview](#operator-sign-in-on-a-preview).
 
 Run the real enrollment, backup sign-in and code-rotation journey with:
 

@@ -1,25 +1,23 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readAdminConsoleSettings, readLocaleSettings } from '../lib/settings-files.mjs'
 import { run } from './process.mjs'
 
 export async function projectChoices(root) {
-  const context = await readFile(join(root, 'PROJECT_CONTEXT.md'), 'utf8')
-  const field = (name) =>
-    context
-      .split('\n')
-      .find((line) => line.startsWith(`- **${name}:** `))
-      ?.slice(`- **${name}:** `.length)
   const placement = JSON.parse(
     await readFile(join(root, 'packages/shared/src/config/product-admin.json'), 'utf8')
   )
+  // Locale and Console choices come from the settings files, not from PROJECT_CONTEXT.md.
+  const locales = readLocaleSettings(root)
+  const adminConsole = readAdminConsoleSettings(root)
   return {
     productAdminHost: placement.mode === 'host',
-    consoleTopology: field('admin_console_mode') === 'host' ? 'host' : 'path',
-    consoleEnabled: field('admin_console') === 'enabled',
-    consoleSlug: field('admin_console_slug') ?? 'admin',
-    baseLocale: field('base_locale') ?? 'en',
-    localePrefix: field('i18n_mode') === 'single' ? '' : `/${field('base_locale') ?? 'en'}`,
-    topology: placement.mode === 'host' || field('admin_console_mode') === 'host' ? 'host' : 'path',
+    consoleTopology: adminConsole.mode === 'host' ? 'host' : 'path',
+    consoleEnabled: adminConsole.mode !== 'disabled',
+    consoleSlug: adminConsole.alias,
+    baseLocale: locales.default,
+    localePrefix: locales.enabled.length === 1 ? '' : `/${locales.default}`,
+    topology: placement.mode === 'host' || adminConsole.mode === 'host' ? 'host' : 'path',
     branch:
       (await run('git', ['branch', '--show-current'], { cwd: root, capture: true })).trim() ||
       'detached',

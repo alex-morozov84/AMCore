@@ -1,9 +1,9 @@
 import { prepareProductAdminSource } from './product-admin-source.mjs'
+import { setConsoleMode } from './console-mode.mjs'
 import { prepareAccountMfaPreview } from './account-mfa-source.mjs'
 import { projectChoices } from './project.mjs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { readFile, writeFile } from 'node:fs/promises'
 import { directory, save } from './state.mjs'
 import { prepareOrganizationSetupSource } from './organization-setup-fixture.mjs'
 import { snapshot } from './snapshot.mjs'
@@ -28,10 +28,7 @@ export async function refresh(m) {
     m.topology === 'host' &&
     (!m.productAdminHost || (m.consoleEnabled && m.consoleTopology === 'host'))
   ) {
-    const file = join(destination, 'apps/web/src/shared/lib/admin-console.generated.ts')
-    const content = await readFile(file, 'utf8')
-    if (!content.includes('enabled: true')) throw new Error('Console host unavailable')
-    await writeFile(file, content.replace("mode: 'path'", "mode: 'host'"))
+    await setConsoleMode(destination, 'host', 'Console host unavailable')
   }
   await prepareProductAdminSource(m)
   await prepareAccountMfaPreview(m)

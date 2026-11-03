@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
 import { SignInAgainMount } from '@/_app/account-security'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 import { getConsoleOverviewHref, getConsoleSignInAgainHref } from '@/shared/lib/console-public-href'
 
 export default async function SignInAgain({
@@ -8,6 +9,7 @@ export default async function SignInAgain({
 }: {
   searchParams: Promise<{ entryId?: string | string[]; returnEntryId?: string | string[] }>
 }) {
+  requireConsoleEnabled()
   const t = await getTranslations('console')
   return (
     <SignInAgainMount

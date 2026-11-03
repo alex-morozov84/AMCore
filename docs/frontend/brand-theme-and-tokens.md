@@ -49,7 +49,8 @@ oversight.
 `--font-sans`/`--font-mono` in `@theme inline` cover the whole app. A feature
 that needs its **own** font — the Operations Console does, loading IBM Plex
 Sans/JetBrains Mono only inside
-`apps/web/src/app/[locale]/admin/layout.tsx` so a downstream fork that
+`apps/web/src/app/[locale]/<console alias>/layout.tsx` (`admin` unless you changed the alias in
+`admin-console.json`) so a downstream fork that
 disables the console never ships a dangling font import — still gets a real
 Tailwind utility, not a repeated arbitrary-value class at every call site:
 
@@ -316,8 +317,7 @@ and chart tokens.
 Run `pnpm init:brand` while initializing a fresh downstream fork, before applying
 that fork's database migrations. It writes source files only; it never connects to or
 migrates a database. `pnpm init:brand` is the only initializer command. The commands
-that exist are the scripts in the root `package.json`; an older note that names another
-initializer, such as `pnpm init:project`, is out of date.
+that exist are the scripts in the root `package.json`.
 
 Every flag is optional, and a field you do not pass keeps its current value. In an
 interactive terminal without value flags the command asks for the values instead.
@@ -349,9 +349,8 @@ The first run also writes `initialized_from_amcore_version` while it still says 
 value is the Git tag of the current commit, or the short commit SHA when the commit has
 no tag. `Canonical upstream` stays the AMCore URL, because AMCore is the original upstream.
 
-The command does not change the frontend choice fields in `PROJECT_CONTEXT.md` (locales,
-Storybook, route progress, Operations Console); see that file's "Frontend Starter Choices"
-section for what those fields mean. It never edits the color tokens in `globals.css` or
+The command does not choose the served locales or the Operations Console mode: those are
+settings files, listed in `PROJECT_CONTEXT.md` → "Build Settings". It never edits the color tokens in `globals.css` or
 `manifest.ts` `background_color`/`theme_color`; update those by hand (checklist items 2 and 4).
 
 Run it again whenever a value must change. Pass only the flags to change, with `--dry-run`

@@ -38,14 +38,21 @@ export function createFixture() {
     path.join(scripts, 'check-route-budgets.mjs'),
     path.join(root, 'scripts/check-route-budgets.mjs')
   )
-  for (const lib of ['route-budget-inputs.mjs', 'route-budget-policy.mjs'])
+  for (const lib of ['route-budget-inputs.mjs', 'route-budget-policy.mjs', 'settings-files.mjs'])
     cpSync(path.join(scripts, 'lib', lib), path.join(root, 'scripts/lib', lib))
+  // The settings reader takes the catalogue list from the shared source next to it.
+  mkdirSync(path.join(root, 'packages/shared/src/constants'), { recursive: true })
+  cpSync(
+    path.join(scripts, '../packages/shared/src/constants/locales.ts'),
+    path.join(root, 'packages/shared/src/constants/locales.ts')
+  )
   write('apps/web/node_modules/next/package.json', { version: '16.4.2' })
   write('packages/shared/src/config/product-admin.json', { alias: 'manage' })
-  write(
-    'apps/web/src/shared/lib/admin-console.generated.ts',
-    "export const ADMIN_CONSOLE_CONFIG = {\n  enabled: true,\n  mode: 'path',\n  slug: 'admin',\n}\n"
-  )
+  write('packages/shared/src/config/admin-console.json', {
+    version: 1,
+    mode: 'path',
+    alias: 'admin',
+  })
   for (const name of ['a', 'b', 'c']) write(`apps/web/.next/static/chunks/${name}.js`, CHUNK)
   write('apps/web/.next/BUILD_ID', 'fixture-build')
   const manifest = Object.fromEntries(PAGES.map(([key, route]) => [key, route]))

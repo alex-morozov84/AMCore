@@ -6,7 +6,10 @@ vi.mock('next/font/google', () => ({
   IBM_Plex_Sans: () => ({ variable: 'console-heading' }),
   JetBrains_Mono: () => ({ variable: 'console-mono' }),
 }))
-vi.mock('@/shared/lib/console-host-guard', () => ({ hasCanonicalConsoleHost: async () => true }))
+vi.mock('@/shared/lib/console-host-guard', () => ({
+  hasCanonicalConsoleHost: async () => true,
+  requireConsoleEnabled: () => {},
+}))
 
 import { ClientMessages } from '@/i18n/client-message-boundary'
 

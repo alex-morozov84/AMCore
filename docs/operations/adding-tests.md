@@ -76,4 +76,4 @@ An ordinary discovered test needs no change to Test's dependencies. A genuinely
 new family requires a deliberate runner/group, preparation, inventory, docs and
 aggregate update. Update guards to reject a missing group and review projection
 behavior. Test accepts only its declared groups with successful results.
-Keep full API E2E, generated-project, platform and browser obligations intact.
+Keep full API E2E, script-contract, platform and browser obligations intact.

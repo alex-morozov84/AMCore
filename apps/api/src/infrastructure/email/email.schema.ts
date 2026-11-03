@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES } from '@amcore/shared'
 
 import type { WelcomeEmailData } from './email.types.js'
 import { EmailTemplate } from './email.types.js'
@@ -24,9 +24,11 @@ import { EmailTemplate } from './email.types.js'
  * contract, not a frontend wire contract.
  */
 
-// Derived from the single shared locale source rather than re-listing the
-// locales — a third hardcoded copy would silently drift when a locale is added.
-const localeSchema = z.enum(SUPPORTED_LOCALES)
+// A queued job is stored data: it was written under the settings of an earlier build and may
+// name a locale this build no longer serves. Accept every shipped catalogue here; the email
+// service maps a not-served locale to the default before it renders anything. Request input
+// is different and is checked against the served list (`SUPPORTED_LOCALES`).
+const localeSchema = z.enum(LOCALE_CATALOGUES)
 
 export const welcomeEmailDataSchema = z.object({
   name: z.string(),

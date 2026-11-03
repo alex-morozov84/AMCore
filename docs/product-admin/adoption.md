@@ -76,9 +76,12 @@ pnpm exec husky
    git status --short
    ```
 
-This build ships one set of project choices, recorded in `PROJECT_CONTEXT.md`. There
-is no additional initializer for them and no product-admin/headless-only initializer
-or finalizer.
+Served locales and the Operations Console mode are build settings in
+`packages/shared/src/config/locales.json` and `admin-console.json` (see
+[i18n](../frontend/i18n-and-errors.md#task-choose-the-served-locales) and
+[Console configuration](../operations-console/configuration.md#topology)). There is no
+additional initializer for them and no product-admin/headless-only initializer or
+finalizer.
 
 ## Connect the chosen interface
 
@@ -89,8 +92,9 @@ opens that organization; `?view=list` retains explicit selection. Several member
 show the selector. Every selected page still checks current membership and authority.
 
 The custom shop demonstration (`node scripts/fixtures/organization-shop-headless.mjs
---preview`) needs a single-language product without the Operations Console. This build
-ships neither, so the generator stops with an error when you pass `--preview`. Run it
+--preview`) needs a single-language product without the Operations Console: one locale in
+`locales.json` and `"mode": "disabled"` in `admin-console.json`. The generator stops with
+an error when you pass `--preview` and the build is configured otherwise. Run it
 without that flag. It creates a disposable directory itself, prepares the custom code
 there and prints the directory and the commands to run.
 

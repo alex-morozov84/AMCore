@@ -1,5 +1,4 @@
 import { createTranslator, NextIntlClientProvider, useLocale, useTranslations } from 'next-intl'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, within } from 'storybook/test'
 
@@ -51,11 +50,10 @@ async function checkTimes(canvasElement: HTMLElement) {
   const card = canvasElement.querySelector('[data-slot="card"]')!
   await expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth)
 }
-const catalogues: Record<string, typeof en> = { en, ru }
-const baseMessages = catalogues[DEFAULT_LOCALE]
+// The Storybook provider renders every story in English, whatever locales the build serves.
 const baseCopy = createTranslator({
-  locale: DEFAULT_LOCALE,
-  messages: baseMessages,
+  locale: 'en',
+  messages: en,
   namespace: 'console.problems',
 })
 export const HealthyOverviewOldFailure: Story = {
@@ -97,16 +95,14 @@ export const FailedOverviewOldSuccess: Story = {
     await checkTimes(canvasElement)
   },
 }
-const russianLocale =
-  SUPPORTED_LOCALES.find((locale: string): boolean => locale === 'ru') ?? DEFAULT_LOCALE
 const ruCopy = createTranslator({
-  locale: russianLocale,
+  locale: 'ru',
   messages: ru,
   namespace: 'console.problems',
 })
 const russian: NonNullable<Story['decorators']> = [
   (Story) => (
-    <NextIntlClientProvider locale={russianLocale} messages={ru} timeZone="UTC">
+    <NextIntlClientProvider locale="ru" messages={ru} timeZone="UTC">
       <Story />
     </NextIntlClientProvider>
   ),

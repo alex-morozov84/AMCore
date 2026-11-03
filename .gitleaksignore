@@ -1,2 +1,5 @@
 # Historical false positive: resolve() path src/generated/prisma, not an API credential.
 4fa079074f37c3217748ebe0256a911039b24ea2:scripts/api-e2e/paths.mjs:generic-api-key:47
+# False positive in an earlier commit of this branch: the public RFC 6238 test vector (the base32 of
+# "12345678901234567890") in a TOTP unit test. The current file builds it from two short halves.
+da9d2579edb1718c860f83f6377b7f03643cb094:scripts/stand/operator-totp.test.mjs:generic-api-key:7

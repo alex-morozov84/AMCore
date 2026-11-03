@@ -12,7 +12,8 @@ whether the maintenance job behind it still works. Queues and commands are on
 Console access requires a current platform `SUPER_ADMIN`. API keys cannot read
 this screen, and an organization role does not grant access. The page is at
 `/admin/scheduled-jobs` in path mode and at `/scheduled-jobs` on the Console host,
-after the locale prefix (for example `/en/admin/scheduled-jobs`). The screen only
+With several served languages a locale prefix comes first (for example
+`/en/admin/scheduled-jobs`); with one language there is none. The screen only
 reads: it has no button that starts, stops or edits a job.
 
 A link from Overview uses `?focus=<job>` to focus the matching job name. It does

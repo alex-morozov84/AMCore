@@ -1,7 +1,9 @@
 import {
+  coerceSupportedLocale,
   contextSessionBindingSchema,
   DEFAULT_LOCALE,
   invitationOperationIdSchema,
+  LOCALE_CATALOGUES,
   provisioningCancelSchema,
   provisioningCreateSchema,
   provisioningReissueSchema,
@@ -18,10 +20,20 @@ export const provisioningDraftSchema = z.strictObject({
   firstAdminEmail: z.string().max(254),
   inviteLocale: z.enum(SUPPORTED_LOCALES),
 })
+// A frozen command is exactly what was sent (or may have been sent) and its operation ID is bound
+// to that content. It may name a locale the build no longer serves, so it is read against the
+// shipped catalogues and is never rewritten; `isReplayable` says whether this build may send it.
+const frozenLocale = z.enum(LOCALE_CATALOGUES)
 const pending = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('create'), input: provisioningCreateSchema }),
+  z.strictObject({
+    kind: z.literal('create'),
+    input: provisioningCreateSchema.extend({ inviteLocale: frozenLocale }),
+  }),
   z.strictObject({ kind: z.literal('reissue'), input: provisioningReissueSchema }),
-  z.strictObject({ kind: z.literal('replace-recipient'), input: provisioningReplaceSchema }),
+  z.strictObject({
+    kind: z.literal('replace-recipient'),
+    input: provisioningReplaceSchema.extend({ inviteLocale: frozenLocale }),
+  }),
   z.strictObject({ kind: z.literal('cancel'), input: provisioningCancelSchema }),
 ])
 const schema = z.strictObject({
@@ -54,7 +66,8 @@ export function readProvisioningJournal(
   try {
     const raw = localStorage.getItem(key(scope))
     if (!raw) return
-    const parsed = raw.length <= 8192 ? schema.safeParse(JSON.parse(raw)) : undefined
+    const parsed =
+      raw.length <= 8192 ? schema.safeParse(withServedLocales(JSON.parse(raw))) : undefined
     if (!parsed?.success || parsed.data.actorId !== actorId) {
       localStorage.removeItem(key(scope))
       return
@@ -72,6 +85,34 @@ export function readProvisioningJournal(
   } catch {
     return
   }
+}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/**
+ * A saved draft can outlive a deployment that changed the served languages. Map its invitation
+ * locale to the default instead of discarding the draft. Only the editable draft is changed: a
+ * frozen command keeps its content and operation ID (see `isReplayable`). Every other field is
+ * left for the strict schema to judge.
+ */
+function withServedLocales(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.draft)) return value
+  const draft =
+    typeof value.draft.inviteLocale === 'string'
+      ? { ...value.draft, inviteLocale: coerceSupportedLocale(value.draft.inviteLocale) }
+      : value.draft
+  return { ...value, draft }
+}
+
+/**
+ * Whether this build may send the frozen command again. The API accepts request input in a served
+ * locale only, so a command written under other settings would be refused and its operation ID
+ * could not be replayed; the caller then looks the result up instead of sending it.
+ */
+export function isReplayable(command: PendingProvisioning): boolean {
+  return (
+    !('inviteLocale' in command.input) || SUPPORTED_LOCALES.includes(command.input.inviteLocale)
+  )
 }
 export function writeProvisioningJournal(row: ProvisioningJournal, scope: string): boolean {
   try {

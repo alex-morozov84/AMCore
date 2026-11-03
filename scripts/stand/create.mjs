@@ -1,9 +1,10 @@
 import { prepareProductAdminSource, productAdminProfiles } from './product-admin-source.mjs'
+import { setConsoleMode } from './console-mode.mjs'
+import { operatorMfaWanted } from './operator-mfa.mjs'
 import { prepareAccountMfaPreview } from './account-mfa-source.mjs'
 import { projectChoices } from './project.mjs'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { readFile, writeFile } from 'node:fs/promises'
 import { root, directory, save } from './state.mjs'
 import { snapshot } from './snapshot.mjs'
 import { allocate } from './ports.mjs'
@@ -76,6 +77,13 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
     consoleTopology,
     fixtureVersion: 2,
     fixtureProfile,
+    operatorMfa: operatorMfaWanted({
+      purpose,
+      mocked,
+      consoleEnabled: choices.consoleEnabled,
+      consoleTopology,
+      fixtureProfile,
+    }),
     ...(isOrganizationMailFixture({ fixtureProfile })
       ? { mailCaptureKey: randomBytes(32).toString('hex') }
       : {}),
@@ -104,20 +112,13 @@ export async function create(id, purpose, topology, mocked = false, fixtureProfi
   m.sourceHash = await snapshot(root, m.snapshot)
   await prepareOrganizationSetupSource(m)
   if (['support-mail-path', 'support-mail-host'].includes(fixtureProfile)) {
-    const file = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')
-    const value = await readFile(file, 'utf8')
-    if (!value.includes('enabled: true')) throw new Error('Support mail Console disabled')
-    await writeFile(file, value.replace(/mode: '(?:path|host)'/, `mode: '${consoleTopology}'`))
+    await setConsoleMode(m.snapshot, consoleTopology, 'Support mail Console disabled')
   }
   if (
     topology === 'host' &&
     (!productAdminHost || (choices.consoleEnabled && consoleTopology === 'host'))
   ) {
-    const path = join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts')
-    const content = await readFile(path, 'utf8')
-    if (!content.includes('enabled: true'))
-      throw new Error('Console host lane unavailable in this fork')
-    await writeFile(path, content.replace("mode: 'path'", "mode: 'host'"))
+    await setConsoleMode(m.snapshot, 'host', 'Console host lane unavailable in this fork')
   }
   await prepareProductAdminSource(m)
   await prepareAccountMfaPreview(m)

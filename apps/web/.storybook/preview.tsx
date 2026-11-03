@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
-import { DEFAULT_LOCALE } from '@amcore/shared'
 import { withThemeByClassName } from '@storybook/addon-themes'
 import type { Preview } from '@storybook/nextjs-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -53,9 +52,11 @@ const preview: Preview = {
       themes: { light: '', dark: 'dark' },
       defaultTheme: 'light',
     }),
+    // The stories are written against the English catalogue (`messages/en.json`), so they render
+    // as `en` whatever locales the build serves: the locale must match the messages it formats.
     (Story, context) => (
       <NextIntlClientProvider
-        locale={DEFAULT_LOCALE}
+        locale="en"
         messages={context.parameters.messages ?? defaultMessages}
         timeZone="UTC"
       >

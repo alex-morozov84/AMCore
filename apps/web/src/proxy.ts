@@ -1,6 +1,8 @@
-import type { NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import createMiddleware from 'next-intl/middleware'
+import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
 
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { buildCspDirectives } from '@/shared/lib/csp/build-csp'
 import {
   CSP_ENFORCE_HEADER,
@@ -17,6 +19,43 @@ import { applyIndexingPolicy } from '@/shared/lib/seo/indexing'
 import { routing } from './i18n/routing'
 
 const handleI18nRouting = createMiddleware(routing)
+
+/**
+ * Locale step of the proxy. With several served locales it is next-intl's middleware.
+ * With one it is a plain pass-through: the locale is added by the `beforeFiles` rewrite
+ * in `next.config.ts`, and next-intl's own rewrite must not run (Next's standalone server
+ * does not apply a proxy rewrite, see `routing.ts`). A prefix of a catalogue locale that
+ * this build does not serve is refused here, explicitly, before any page runs. The proxy
+ * sees the public path (a rewrite later adds the locale), and the CSP, nonce and indexing
+ * work below runs for both branches.
+ */
+const DISABLED_LOCALES: readonly string[] = LOCALE_CATALOGUES.filter(
+  (locale) => !SUPPORTED_LOCALES.includes(locale)
+)
+
+/**
+ * Second layer of the "Console off" refusal (the first is the guard inside every Console
+ * page and route). With the Console disabled, its public pages (`/<alias>`, with or without a
+ * locale prefix) answer 404 here, before any rendering starts. The proxy matcher excludes
+ * `/api`, so the BFF (`/api/console`) is closed only by the route guard
+ * (`withConsoleHostGuard`); the inventory test proves every route has it.
+ */
+function isClosedConsolePath(segments: readonly string[]): boolean {
+  if (ADMIN_CONSOLE_CONFIG.enabled) return false
+  const [first = '', second = ''] = segments
+  const page = (LOCALE_CATALOGUES as readonly string[]).includes(first) ? second : first
+  return page === ADMIN_CONSOLE_CONFIG.slug
+}
+
+function routeLocale(request: NextRequest) {
+  const segments = request.nextUrl.pathname.split('/').slice(1)
+  const firstSegment = segments[0] ?? ''
+  if (DISABLED_LOCALES.includes(firstSegment) || isClosedConsolePath(segments)) {
+    return new NextResponse(null, { status: 404 })
+  }
+  if (SUPPORTED_LOCALES.length > 1) return handleI18nRouting(request)
+  return NextResponse.next({ request: { headers: request.headers } })
+}
 
 /**
  * Track 3 PR2 (`ai/models-talk.md` FINAL PLAN §3) — generates a per-request
@@ -88,7 +127,7 @@ export default function proxy(request: NextRequest) {
   request.headers.set(NONCE_REQUEST_HEADER, nonce)
   request.headers.set(cspHeaderName, cspHeaderValue)
 
-  const response = handleI18nRouting(request)
+  const response = routeLocale(request)
 
   response.headers.set(cspHeaderName, cspHeaderValue)
   // Maps the CSP's `report-to` group name to an actual URL (must be

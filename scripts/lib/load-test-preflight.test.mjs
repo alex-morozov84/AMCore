@@ -21,13 +21,16 @@ function checkout({ context = {}, env = {} } = {}) {
   mkdirSync(join(d, 'bin'))
   writeFileSync(join(d, 'ca/ca.crt'), 'test ca\n')
   writeFileSync(join(d, 'secrets/fixture-password'), 'x'.repeat(24))
-  const ctx = { i18n_mode: 'multi', base_locale: 'en', admin_console_mode: 'path', ...context }
+  // The check reads the two settings files; `context` overrides what they hold.
+  const ctx = { locales: ['en', 'ru'], default: 'en', mode: 'path', ...context }
+  mkdirSync(join(d, 'packages/shared/src/config'), { recursive: true })
   writeFileSync(
-    join(d, 'PROJECT_CONTEXT.md'),
-    Object.entries(ctx)
-      .filter(([, v]) => v !== null)
-      .map(([k, v]) => `- **${k}:** ${v}`)
-      .join('\n')
+    join(d, 'packages/shared/src/config/locales.json'),
+    JSON.stringify({ version: 1, enabled: ctx.locales, default: ctx.default }, null, 2)
+  )
+  writeFileSync(
+    join(d, 'packages/shared/src/config/admin-console.json'),
+    JSON.stringify({ version: 1, mode: ctx.mode, alias: 'admin' }, null, 2)
   )
   if (env.COMPOSE_FILE) env.COMPOSE_FILE += `:${join(d, 'migration-cli.override.yml')}`
   const values = {
@@ -89,8 +92,8 @@ const mutating = (calls) =>
 test('plan accepts the supported path topologies and never mutates', () => {
   for (const [label, context, prefix] of [
     ['multi-locale path Console', {}, "'/en'"],
-    ['single locale', { i18n_mode: 'single' }, "''"],
-    ['Console disabled', { admin_console_mode: null }, "'/en'"],
+    ['single locale', { locales: ['en'] }, "''"],
+    ['Console disabled', { mode: 'disabled' }, "'/en'"],
   ]) {
     const r = preflight(checkout({ context }))
     assert.equal(r.status, 0, `${label}: ${r.stderr}`)
@@ -106,7 +109,7 @@ test('plan accepts the supported path topologies and never mutates', () => {
 
 test('plan refuses unsupported topology and inputs before any docker call', () => {
   for (const [label, opts, message] of [
-    ['host-mode Console', { context: { admin_console_mode: 'host' } }, /host is not supported/],
+    ['host-mode Console', { context: { mode: 'host' } }, /host is not supported/],
     [
       'missing overlay',
       { env: { COMPOSE_FILE: FILES.replace(':docker/compose/load-test.yml', '') } },

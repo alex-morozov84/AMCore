@@ -14,7 +14,7 @@ import type {
   UpdateProfileInput,
   UserResponse,
 } from '@amcore/shared'
-import { frontendAuthPath } from '@amcore/shared'
+import { DEFAULT_LOCALE, frontendAuthPath } from '@amcore/shared'
 import {
   AuthErrorCode,
   coerceSupportedLocale,
@@ -163,10 +163,10 @@ export class AuthService {
     // Hash password
     const passwordHash = await argon2.hash(input.password)
 
-    // Locale precedence: explicit body choice → negotiated `Accept-Language` →
-    // omit so the Prisma `User.locale` default applies. An explicit user choice
+    // Locale precedence: explicit body choice → negotiated `Accept-Language` → the
+    // build's default locale, always written explicitly. An explicit user choice
     // must never be overridden by the header (MDN Accept-Language guidance).
-    const locale = input.locale ?? requestInfo.acceptedLocale
+    const locale = input.locale ?? requestInfo.acceptedLocale ?? DEFAULT_LOCALE
 
     const registrationUserId = randomUUID()
     // User, session and verification token commit together; if the transaction fails, its writes
@@ -187,7 +187,7 @@ export class AuthService {
               emailCanonical,
               passwordHash,
               name: input.name,
-              ...(locale ? { locale } : {}),
+              locale,
               lastLoginAt: requestInfo.registrationBrowser ? null : new Date(),
             },
           })
@@ -297,7 +297,7 @@ export class AuthService {
           })
           if (existing)
             throw new AppException('Email already exists', 409, AuthErrorCode.EMAIL_ALREADY_EXISTS)
-          const locale = input.locale ?? requestInfo.acceptedLocale
+          const locale = input.locale ?? requestInfo.acceptedLocale ?? DEFAULT_LOCALE
           const user = await tx.user.create({
             data: {
               ...(requestInfo.registrationBrowser ? { id: registrationUserId } : {}),
@@ -305,7 +305,7 @@ export class AuthService {
               emailCanonical: invite.emailCanonical,
               passwordHash,
               name: input.name,
-              ...(locale ? { locale } : {}),
+              locale,
               lastLoginAt: requestInfo.registrationBrowser ? null : new Date(),
             },
           })

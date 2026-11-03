@@ -1,6 +1,7 @@
 import { ConsolePageFrame } from '@/_pages/console'
 import { UserDetailPage, UserDetailPageSkeleton } from '@/_pages/console/UserDetailPage'
 import { parseDetailPage, parseDetailSearch } from '@/shared/lib/console-detail-url'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 import { parseConsoleReturnHref } from '@/shared/lib/console-public-href'
 
 interface UserDetailRouteProps {
@@ -13,6 +14,7 @@ interface UserDetailRouteProps {
 }
 
 export default async function UserDetailRoute({ params, searchParams }: UserDetailRouteProps) {
+  requireConsoleEnabled()
   const [{ id }, query] = await Promise.all([params, searchParams])
   return (
     <ConsolePageFrame fallback={<UserDetailPageSkeleton />}>

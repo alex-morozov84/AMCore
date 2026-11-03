@@ -1,0 +1,129 @@
+import assert from 'node:assert/strict'
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { test } from 'node:test'
+
+import {
+  consoleEdgeFiles,
+  renderConsoleCaddy,
+  renderConsoleNginxLocations,
+} from './console-edge.mjs'
+
+const root = join(import.meta.dirname, '../..')
+
+function copy(t) {
+  const dir = mkdtempSync(join(tmpdir(), 'amcore-console-edge-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  for (const file of [
+    'docker/caddy/Caddyfile.console-host',
+    'docker/nginx/operations-console.conf',
+    'packages/shared/src/config/locales.json',
+    'packages/shared/src/config/admin-console.json',
+  ])
+    cpSync(join(root, file), join(dir, file), { recursive: true })
+  return dir
+}
+
+test('the committed Console edge files match the settings files', () => {
+  assert.doesNotThrow(() => consoleEdgeFiles(root, false))
+})
+
+test('several locales: pages keep the locale prefix and map onto the alias folder', () => {
+  const settings = { alias: 'admin', locales: ['en', 'ru'] }
+  assert.match(renderConsoleCaddy(settings), /\^\/\(en\|ru\)\(\/\.\*\)\?\$/)
+  assert.match(
+    renderConsoleCaddy(settings),
+    /rewrite \* \/\{re\.consolePage\.1\}\/admin\{re\.consolePage\.2\}/
+  )
+  assert.match(
+    renderConsoleNginxLocations(settings),
+    /rewrite \^\/\(en\|ru\)\(\/\.\*\)\?\$ \/\$1\/admin\$2 break;/
+  )
+})
+
+test('one locale: public pages carry no prefix and still map onto the alias folder', () => {
+  const settings = { alias: 'ops', locales: ['ru'] }
+  const caddy = renderConsoleCaddy(settings)
+  assert.match(caddy, /path \/ops \/ops\/\*/)
+  assert.match(caddy, /rewrite \* \/ops\{re\.consolePage\.1\}/)
+  assert.match(caddy, /@consoleNextAssets path \/_next\/\*/)
+  assert.doesNotMatch(caddy, /\(en\|ru\)|\(ru\)/)
+  const nginx = renderConsoleNginxLocations(settings)
+  assert.match(nginx, /location = \/ops \{\s+return 404;/)
+  assert.match(nginx, /rewrite \^\(\.\*\)\$ \/ops\$1 break;/)
+  assert.match(nginx, /location \^~ \/_next\//)
+  assert.doesNotMatch(nginx, /\(en\|ru\)|\(ru\)/)
+})
+
+// The web app compares the whole Host authority, port included, with its configured origin. nginx
+// `$host` drops the port, so the Console behind a non-default TLS port would look like the wrong host.
+for (const locales of [['en', 'ru'], ['ru']]) {
+  test(`nginx keeps the client's port in the Host header and in redirects (${locales.length} locale)`, () => {
+    const nginx = renderConsoleNginxLocations({ alias: 'admin', locales })
+    assert.doesNotMatch(nginx, /\$host\b/)
+    assert.match(nginx, /proxy_set_header Host \$http_host;/)
+    assert.match(nginx, /return 308 \$scheme:\/\/\$http_host/)
+  })
+}
+
+test('the committed nginx reference also forwards the client authority', () => {
+  const file = readFileSync(join(root, 'docker/nginx/operations-console.conf'), 'utf8')
+  assert.doesNotMatch(file, /\$host\b/)
+})
+
+test('a changed alias or locale list makes --check fail until regenerated', (t) => {
+  const dir = copy(t)
+  // Switch to the other topology than the one the real settings have, so the test holds for any fork.
+  const served = JSON.parse(
+    readFileSync(join(dir, 'packages/shared/src/config/locales.json'), 'utf8')
+  ).enabled
+  const next = served.length > 1 ? ['en'] : ['en', 'ru']
+  writeFileSync(
+    join(dir, 'packages/shared/src/config/locales.json'),
+    `${JSON.stringify({ version: 1, enabled: next, default: 'en' })}\n`
+  )
+  assert.throws(() => consoleEdgeFiles(dir, false), /stale/)
+  consoleEdgeFiles(dir, true)
+  assert.doesNotThrow(() => consoleEdgeFiles(dir, false))
+  const caddy = readFileSync(join(dir, 'docker/caddy/Caddyfile.console-host'), 'utf8')
+  if (next.length > 1) assert.match(caddy, /\(en\|ru\)/)
+  else assert.doesNotMatch(caddy, /\(en\|ru\)/)
+})
+
+// A wrong settings file must stop the generator before it writes: the shared build refuses the
+// same files later, but by then a broken proxy block could already sit in the working tree.
+for (const [name, file, content] of [
+  [
+    'an alias that breaks a proxy pattern',
+    'admin-console',
+    { version: 1, mode: 'path', alias: 'a|b)' },
+  ],
+  ['a reserved alias', 'admin-console', { version: 1, mode: 'path', alias: 'ru' }],
+  ['an unknown mode', 'admin-console', { version: 1, mode: 'off', alias: 'admin' }],
+  ['a locale with no catalogue', 'locales', { version: 1, enabled: ['en', 'de'], default: 'en' }],
+  ['a default that is not enabled', 'locales', { version: 1, enabled: ['ru'], default: 'en' }],
+  ['a duplicate locale', 'locales', { version: 1, enabled: ['en', 'en'], default: 'en' }],
+]) {
+  test(`--write refuses ${name} and changes no file`, (t) => {
+    const dir = copy(t)
+    writeFileSync(join(dir, `packages/shared/src/config/${file}.json`), JSON.stringify(content))
+    const files = ['docker/caddy/Caddyfile.console-host', 'docker/nginx/operations-console.conf']
+    const before = files.map((item) => readFileSync(join(dir, item), 'utf8'))
+    assert.throws(() => consoleEdgeFiles(dir, true), /Invalid packages\/shared\/src\/config/)
+    assert.deepEqual(
+      files.map((item) => readFileSync(join(dir, item), 'utf8')),
+      before
+    )
+  })
+}
+
+test('missing markers are an error, not a silent no-op', (t) => {
+  const dir = copy(t)
+  const file = join(dir, 'docker/nginx/operations-console.conf')
+  writeFileSync(
+    file,
+    readFileSync(file, 'utf8').replace('AMCORE_ADMIN_CONSOLE_LOCATIONS_START', 'x')
+  )
+  assert.throws(() => consoleEdgeFiles(dir, false), /markers/)
+})

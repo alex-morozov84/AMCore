@@ -1,4 +1,5 @@
 import { mfaE2EEnvironment } from './mfa-e2e.mjs'
+import { operatorMfaEnvironment } from './operator-mfa.mjs'
 import { consoleSummaryServices } from './console-summary-fixture.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -43,6 +44,7 @@ export async function configuration(m) {
   const app = {
     NODE_ENV: 'development',
     ...mfaE2EEnvironment(m),
+    ...operatorMfaEnvironment(m),
     API_PORT: '5002',
     DATABASE_URL: db,
     REDIS_URL: 'redis://redis:6379',

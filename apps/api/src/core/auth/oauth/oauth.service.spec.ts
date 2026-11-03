@@ -4,7 +4,7 @@ jest.mock('./oauth-client.service', () => ({ OAuthClientService: jest.fn() }))
 import { HttpStatus } from '@nestjs/common'
 import type { PinoLogger } from 'nestjs-pino'
 
-import { AuthErrorCode } from '@amcore/shared'
+import { AuthErrorCode, DEFAULT_LOCALE } from '@amcore/shared'
 
 import { AppException } from '../../../common/exceptions'
 import { EmailIdentityService } from '../email-identity.service'
@@ -503,14 +503,14 @@ describe('OAuthService', () => {
       )
     })
 
-    it('omits locale on create when the state carries none (DB default applies)', async () => {
+    it('writes the build default locale on create when the state carries none', async () => {
       prisma.oAuthAccount.findUnique.mockResolvedValue(null)
       prisma.user.findUnique.mockResolvedValue(null)
 
       await service.handleCallback('google', 'code', 'state', TEST_NONCE, requestInfo)
 
       const createArg = prisma.user.create.mock.calls[0]![0]!
-      expect(createArg.data).not.toHaveProperty('locale')
+      expect(createArg.data).toHaveProperty('locale', DEFAULT_LOCALE)
     })
 
     // D2: an already-linked OAuth account keeps its stored preference — the

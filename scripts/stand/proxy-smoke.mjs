@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { allocate } from './ports.mjs'
-import { docker, inspect } from './docker.mjs'
+import { composeArguments, docker, inspect } from './docker.mjs'
 import { labels } from './config.mjs'
 import { save } from './state.mjs'
 import { run } from './process.mjs'
@@ -37,7 +36,13 @@ async function assertProxy(m, port, label) {
       { capture: true }
     )
     assert.equal(Number(status), expected, `${label}: ${path}`)
-    if (path === '/login') assert.match(await readFile(body, 'utf8'), /Console sign in/)
+    if (path === '/login') {
+      // The smoke runs with one served locale, so the page is in the build's default locale.
+      const catalogue = JSON.parse(
+        await readFile(`${m.worktree}/apps/web/messages/${m.baseLocale}.json`, 'utf8')
+      )
+      assert.ok((await readFile(body, 'utf8')).includes(catalogue.console.loginTitle))
+    }
     if (path === '/') assert.doesNotMatch(await readFile(body, 'utf8'), /nginx/i)
   }
 }
@@ -71,36 +76,32 @@ export async function proxySmoke(m) {
     ],
     { capture: true }
   )
-  const port = (await allocate(`${m.uuid}-nginx`)).tls
+  // The web app compares the whole Host authority with its configured origin, port included, and
+  // that origin names the stand's TLS port. nginx must therefore answer on that same port, so
+  // Caddy (already checked above) is stopped and nginx takes its place.
+  await docker(m, [...composeArguments(m), 'stop', 'caddy'])
+  const port = m.ports.tls
   m.services.push('nginx')
   await save(m)
-  const tags = {
-    ...labels(m),
-    'com.docker.compose.project': m.project,
-    'com.docker.compose.service': 'nginx',
-  }
-  const id = (
-    await docker(
-      m,
-      [
-        'run',
-        '-d',
-        '--name',
-        `${m.project}-nginx`,
-        '--network',
-        `${m.project}_default`,
-        ...Object.entries(tags).flatMap(([key, value]) => ['--label', `${key}=${value}`]),
-        '-p',
-        `127.0.0.1:${port}:443`,
-        '-v',
-        `${config}:/etc/nginx/conf.d/default.conf:ro`,
-        '-v',
-        `${tls}:/etc/nginx/tls:ro`,
-        'nginx:1.27-alpine',
-      ],
-      { capture: true }
-    )
-  ).trim()
+  // A Compose service, as in the product-administration nginx check: the stand's cleanup only
+  // removes containers that carry Compose creation evidence and the stand's ownership labels.
+  const overlay = `${m.snapshot}/docker/nginx/console-smoke-compose.json`
+  await writeFile(
+    overlay,
+    JSON.stringify({
+      services: {
+        nginx: {
+          image: 'nginx:1.27-alpine',
+          labels: labels(m),
+          ports: [`127.0.0.1:${port}:443`],
+          volumes: [`${config}:/etc/nginx/conf.d/default.conf:ro`, `${tls}:/etc/nginx/tls:ro`],
+        },
+      },
+    })
+  )
+  const command = [...composeArguments(m), '-f', overlay]
+  await docker(m, [...command, 'up', '-d', '--no-deps', 'nginx'])
+  const id = (await docker(m, [...command, 'ps', '-q', 'nginx'], { capture: true })).trim()
   const container = await inspect(m, 'container', id)
   assert.equal(container.Config.Labels['org.amcore.stand'], m.uuid)
   await docker(m, ['exec', id, 'nginx', '-t'])

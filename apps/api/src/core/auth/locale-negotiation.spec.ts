@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import { negotiateLocale } from './locale-negotiation'
 
@@ -35,8 +35,17 @@ describe('negotiateLocale', () => {
   })
 
   it('returns the negotiated supported locale for a matching header', () => {
-    const req = makeReq('en-US,en;q=0.9', 'en')
-    expect(negotiateLocale(req)).toBe('en')
+    // Any served locale works; the first one keeps the test valid for every build setting.
+    const served = SUPPORTED_LOCALES[0]
+    const req = makeReq(`${served};q=0.9`, served)
+    expect(negotiateLocale(req)).toBe(served)
+  })
+
+  it('does not select a shipped locale that this build does not serve', () => {
+    const unserved = LOCALE_CATALOGUES.find((locale) => !SUPPORTED_LOCALES.includes(locale))
+    if (!unserved) return // every shipped locale is served in this build
+    const req = { headers: { 'accept-language': `${unserved};q=1` } } as Request
+    expect(negotiateLocale(req)).toBeUndefined()
   })
 
   it.each([

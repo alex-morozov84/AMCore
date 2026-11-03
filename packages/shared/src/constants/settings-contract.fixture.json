@@ -1,0 +1,105 @@
+{
+  "locales": {
+    "valid": [
+      {
+        "name": "both locales, English first",
+        "file": { "version": 1, "enabled": ["en", "ru"], "default": "en" }
+      },
+      {
+        "name": "both locales, Russian first and default",
+        "file": { "version": 1, "enabled": ["ru", "en"], "default": "ru" }
+      },
+      { "name": "Russian only", "file": { "version": 1, "enabled": ["ru"], "default": "ru" } },
+      { "name": "English only", "file": { "version": 1, "enabled": ["en"], "default": "en" } }
+    ],
+    "invalid": [
+      { "name": "unknown version", "file": { "version": 2, "enabled": ["en"], "default": "en" } },
+      { "name": "missing version", "file": { "enabled": ["en"], "default": "en" } },
+      {
+        "name": "extra key",
+        "file": { "version": 1, "enabled": ["en"], "default": "en", "extra": true }
+      },
+      { "name": "enabled is empty", "file": { "version": 1, "enabled": [], "default": "en" } },
+      {
+        "name": "enabled has a duplicate",
+        "file": { "version": 1, "enabled": ["en", "en"], "default": "en" }
+      },
+      {
+        "name": "enabled names a locale with no catalogue",
+        "file": { "version": 1, "enabled": ["en", "de"], "default": "en" }
+      },
+      {
+        "name": "enabled is not a list",
+        "file": { "version": 1, "enabled": "en", "default": "en" }
+      },
+      {
+        "name": "default is not enabled",
+        "file": { "version": 1, "enabled": ["ru"], "default": "en" }
+      },
+      {
+        "name": "default has no catalogue",
+        "file": { "version": 1, "enabled": ["en"], "default": "de" }
+      },
+      { "name": "default is missing", "file": { "version": 1, "enabled": ["en"] } },
+      { "name": "not an object", "file": ["en"] }
+    ]
+  },
+  "adminConsole": {
+    "valid": [
+      {
+        "name": "path mode with the default alias",
+        "file": { "version": 1, "mode": "path", "alias": "admin" }
+      },
+      {
+        "name": "disabled mode keeps its alias",
+        "file": { "version": 1, "mode": "disabled", "alias": "admin" }
+      },
+      {
+        "name": "host mode with another alias",
+        "file": { "version": 1, "mode": "host", "alias": "ops" }
+      },
+      { "name": "moved alias", "file": { "version": 1, "mode": "path", "alias": "office" } },
+      {
+        "name": "alias with hyphen and underscore",
+        "file": { "version": 1, "mode": "path", "alias": "back-office_2" }
+      },
+      {
+        "name": "alias of the longest allowed length",
+        "file": { "version": 1, "mode": "path", "alias": "a1234567890123456789012345678901" }
+      }
+    ],
+    "invalid": [
+      { "name": "unknown mode", "file": { "version": 1, "mode": "off", "alias": "admin" } },
+      { "name": "unknown version", "file": { "version": 2, "mode": "path", "alias": "admin" } },
+      {
+        "name": "extra key",
+        "file": { "version": 1, "mode": "path", "alias": "admin", "hostname": "x" }
+      },
+      { "name": "missing alias", "file": { "version": 1, "mode": "path" } },
+      { "name": "empty alias", "file": { "version": 1, "mode": "path", "alias": "" } },
+      { "name": "uppercase alias", "file": { "version": 1, "mode": "path", "alias": "Admin" } },
+      {
+        "name": "alias starts with a digit",
+        "file": { "version": 1, "mode": "path", "alias": "1admin" }
+      },
+      { "name": "alias is a path", "file": { "version": 1, "mode": "path", "alias": "a/b" } },
+      {
+        "name": "alias one character too long",
+        "file": { "version": 1, "mode": "path", "alias": "a12345678901234567890123456789012" }
+      },
+      { "name": "alias is the API root", "file": { "version": 1, "mode": "path", "alias": "api" } },
+      {
+        "name": "alias is a framework root",
+        "file": { "version": 1, "mode": "disabled", "alias": "_next" }
+      },
+      {
+        "name": "alias is a served locale",
+        "file": { "version": 1, "mode": "path", "alias": "en" }
+      },
+      {
+        "name": "alias is a catalogue locale even when it is not served",
+        "file": { "version": 1, "mode": "disabled", "alias": "ru" }
+      }
+    ]
+  }
+}

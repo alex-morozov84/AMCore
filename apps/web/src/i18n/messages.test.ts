@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
 import en from '../../messages/en.json'
@@ -48,13 +48,13 @@ const REQUIRED_PLURAL_CATEGORIES: Record<string, string[]> = {
 }
 
 describe('message catalogues', () => {
-  it('has a catalogue for every supported locale', () => {
-    for (const locale of SUPPORTED_LOCALES) {
+  it('has a catalogue for every catalogue locale', () => {
+    for (const locale of LOCALE_CATALOGUES) {
       expect(Object.keys(catalogues)).toContain(locale)
     }
     // Guards the reverse direction too: an orphaned catalogue for a locale the
-    // backend does not support would render but never be reachable.
-    expect(Object.keys(catalogues).sort()).toEqual([...SUPPORTED_LOCALES].sort())
+    // shared contract does not know would render but never be reachable.
+    expect(Object.keys(catalogues).sort()).toEqual([...LOCALE_CATALOGUES].sort())
   })
 
   it('routing is derived from the shared locale contract', () => {
@@ -64,7 +64,7 @@ describe('message catalogues', () => {
 
   const basePaths = leafPaths(en).sort()
 
-  it.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))(
+  it.each(LOCALE_CATALOGUES.filter((locale) => locale !== 'en'))(
     '%s has exactly the same keys as the en source catalogue',
     (locale) => {
       const paths = leafPaths(catalogues[locale]).sort()
@@ -78,7 +78,7 @@ describe('message catalogues', () => {
     }
   )
 
-  it.each(SUPPORTED_LOCALES)('%s has no empty message values', (locale) => {
+  it.each(LOCALE_CATALOGUES)('%s has no empty message values', (locale) => {
     const empty = leafEntries(catalogues[locale])
       .filter(([, value]) => typeof value !== 'string' || value.trim() === '')
       .map(([path]) => path)
@@ -88,7 +88,7 @@ describe('message catalogues', () => {
 
   // next-intl reads "." in a key as nesting and reports INVALID_KEY on every render.
   // Data codes such as audit actions use "_" in their keys instead.
-  it.each(SUPPORTED_LOCALES)('%s has no "." inside a message key', (locale) => {
+  it.each(LOCALE_CATALOGUES)('%s has no "." inside a message key', (locale) => {
     const dotted: string[] = []
     const walk = (value: unknown, prefix: string) => {
       if (value === null || typeof value !== 'object' || Array.isArray(value)) return
@@ -101,7 +101,7 @@ describe('message catalogues', () => {
     expect(dotted).toEqual([])
   })
 
-  it.each(SUPPORTED_LOCALES)('%s supplies every required plural category', (locale) => {
+  it.each(LOCALE_CATALOGUES)('%s supplies every required plural category', (locale) => {
     const required = REQUIRED_PLURAL_CATEGORIES[locale]
     expect(required, `no plural categories declared for ${locale}`).toBeDefined()
 

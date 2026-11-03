@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_LOCALE } from '../constants'
+
 import { BULL_BOARD_CONTENT_SECURITY_POLICY, parseBoardRenderContext } from './bull-board'
 
 const valid = {
   basePath: '/api/console/bull-board',
-  locale: 'en',
+  locale: DEFAULT_LOCALE,
   returnHref: '/en/admin/background-work',
 } as const
 

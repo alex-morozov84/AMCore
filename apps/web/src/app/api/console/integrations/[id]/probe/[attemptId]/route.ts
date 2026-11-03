@@ -5,8 +5,8 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string; attemptId: string }> }
 ): Promise<Response> {
-  const { id, attemptId } = await context.params
-  return withConsoleHostGuard(request, () =>
-    handleConsoleIntegrations(request, { kind: 'receipt', id, attemptId })
-  )
+  return withConsoleHostGuard(request, async () => {
+    const { id, attemptId } = await context.params
+    return handleConsoleIntegrations(request, { kind: 'receipt', id, attemptId })
+  })
 }

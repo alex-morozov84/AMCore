@@ -15,15 +15,7 @@ separate product from the starter.
 - **Workflow mode:** `strict` (protected `main`, PR-only, squash-only, required CI).
 - **Public workflow:** See `AGENTS.md` and `CONTRIBUTING.md`.
 - **Current maintainer status:** If `ai/` exists, read `ai/STATUS.md`.
-- **i18n_mode:** multi
-- **base_locale:** en
-- **supported_locales:** [en, ru]
-- **frontend_storybook:** enabled
-- **frontend_route_progress:** enabled
 - **theme_persistence:** local-storage
-- **admin_console:** enabled
-- **admin_console_mode:** path
-- **admin_console_slug:** admin
 - **initialized_from_amcore_version:** N/A — this checkout is AMCore itself.
 
 One field per line, machine-editable by `pnpm init:brand` — do not fold multiple
@@ -48,53 +40,41 @@ For `downstream-product`, record at minimum:
 - whether and how upstream changes will be synchronized;
 - workflow mode: `strict`, `flexible`, or `custom`;
 - where the product roadmap, current status, and product-specific decisions live;
-- the frontend starter choice fields below (`i18n_mode`, `frontend_storybook`,
-  `frontend_route_progress`, `theme_persistence`, `admin_console`,
-  `admin_console_mode`, `admin_console_slug`, `initialized_from_amcore_version`).
-  They describe the build you ship; keep them true to it.
+- the build fields below (`theme_persistence`, `initialized_from_amcore_version`).
+  `theme_persistence` describes the build you ship; keep it true to it.
 
 Do not infer mode from directory names, package names, git remotes, or the presence
 of GitHub settings. The owner of a downstream product must declare the mode here.
 
-## Frontend Starter Choices
+## Build Settings
 
-`apps/web` ships one configuration: two locales (`en`, `ru`), Storybook, the top
-route-progress bar, `localStorage` theme persistence and the Operations Console in
-path mode at `/admin`. The fields above record that configuration so a person or an
-agent can read it without inspecting the code. They are documentation, never runtime
-configuration: editing a value here does not change the build. If you change the build
-yourself, update the matching field so the record stays true; this release provides no
-command for such changes. Write a plan that is not built yet in your product's own
-roadmap, not in these fields.
+Which locales the build serves and how the Operations Console is served are **settings
+files**, not fields here. They are read by the code, so editing them changes the build
+after a rebuild:
 
-- **`i18n_mode`, `base_locale`, `supported_locales`:** the routing mode and the
-  locales the build serves. See `docs/frontend/i18n-and-errors.md`.
-- **`frontend_storybook`:** `enabled`. Storybook is part of every project (CI
-  `storybook` job, `build-storybook`, `test:storybook`); see
-  `docs/frontend/storybook.md`.
-- **`frontend_route_progress`:** `enabled`. The bar follows the
-  `ROUTE_PROGRESS_ENABLED` source flag in
-  `shared/lib/route-progress/route-progress-flag.ts`; a developer can flip the flag by
-  hand. See `docs/frontend/route-progress.md`.
+| Setting                                                                  | File                                            | Guide                                                                              |
+| ------------------------------------------------------------------------ | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Served locales and the default locale                                    | `packages/shared/src/config/locales.json`       | [Locale settings](docs/frontend/i18n-and-errors.md#task-choose-the-served-locales) |
+| Operations Console mode (`disabled`, `path`, `host`) and its URL segment | `packages/shared/src/config/admin-console.json` | [Console settings](docs/operations-console/configuration.md#topology)              |
+| Product administration placement                                         | `packages/shared/src/config/product-admin.json` | [Product administration](docs/product-admin/placement-and-sessions.md)             |
+
+Storybook is part of every project, and the route-progress bar follows the
+`ROUTE_PROGRESS_ENABLED` source flag in
+`apps/web/src/shared/lib/route-progress/route-progress-flag.ts` (see
+`docs/frontend/route-progress.md`).
+
+Two fields in this file describe the product's choices:
+
 - **`theme_persistence`:** `local-storage` (AMCore's default) or `cookie-ssr` (an
   advanced, opt-in downstream variant — see `docs/frontend/brand-theme-and-tokens.md`
   → _Cookie-backed SSR theme (advanced variant)_). This field records the product's
   choice; it does not imply a second live theme implementation ships in the starter.
-- **`admin_console`:** `enabled`. The Operations Console is the
-  `SystemRole.SUPER_ADMIN`-only system control plane, not a generic product
-  backoffice; see `docs/operations-console/README.md`.
-- **`admin_console_mode`:** `path` or `host`. `path` serves Console pages on the
-  product host; `host` serves them on a separate host. The mode is a deployment and
-  routing choice, not an authorization role.
-- **`admin_console_slug`:** the literal URL path segment for Console pages (`admin`).
-  It is not a hostname or subdomain label, including in `host` mode.
 - **`initialized_from_amcore_version`:** the AMCore tag or commit the fork was
   initialized from, e.g. `v0.4.0`. It gives later work and upstream-sync decisions the
   fork's starting baseline.
 
 `pnpm init:brand` writes the identity, workflow, theme and
-`initialized_from_amcore_version` fields. No command writes the other fields in this
-section.
+`initialized_from_amcore_version` fields. No command edits the settings files.
 
 ## Workflow Modes
 

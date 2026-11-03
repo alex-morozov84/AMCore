@@ -5,8 +5,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-  const { id } = await context.params
-  return withConsoleHostGuard(request, () =>
-    handleConsoleIntegrations(request, { kind: 'prepare', id })
-  )
+  return withConsoleHostGuard(request, async () => {
+    const { id } = await context.params
+    return handleConsoleIntegrations(request, { kind: 'prepare', id })
+  })
 }

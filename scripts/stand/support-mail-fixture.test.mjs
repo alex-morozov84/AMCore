@@ -131,10 +131,10 @@ test('ordinary host rehearsal projects the Console login independently of the ch
   try {
     const m = await create(id, 'e2e', 'host', false, 'organization-setup')
     const source = await readFile(
-      join(m.snapshot, 'apps/web/src/shared/lib/admin-console.generated.ts'),
+      join(m.snapshot, 'packages/shared/src/config/admin-console.json'),
       'utf8'
     )
-    assert.match(source, /mode: 'host'/)
+    assert.equal(JSON.parse(source).mode, 'host')
     await configuration(m)
     assert.equal(m.model.services.web.environment.ADMIN_CONSOLE_ORIGIN, m.origins.console)
   } finally {

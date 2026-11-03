@@ -3,12 +3,14 @@ import { adminApiKeyQuerySchema } from '@amcore/shared'
 
 import { ConsolePageFrame } from '@/_pages/console'
 import { ApiKeysPage, ApiKeysPageSkeleton } from '@/_pages/console/ApiKeysPage'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 
 export default async function ApiKeysRoute({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  requireConsoleEnabled()
   const raw = await searchParams
   const cleaned = Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== ''))
   const query = adminApiKeyQuerySchema.safeParse(cleaned)

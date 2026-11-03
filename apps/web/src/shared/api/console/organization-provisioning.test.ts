@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createInvitationOperationId } from '@amcore/shared'
+import { createInvitationOperationId, DEFAULT_LOCALE } from '@amcore/shared'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -48,7 +48,7 @@ it('preserves the create status and session binding at the fixed upstream route'
     timeoutMs: 15000,
   })
   expect(input.expectedSession).toBe(binding)
-  expect(operation.body).toMatchObject({ ...body, inviteLocale: 'en' })
+  expect(operation.body).toMatchObject({ ...body, inviteLocale: DEFAULT_LOCALE })
 })
 
 it.each(['', 'https://foreign.example.test'])(

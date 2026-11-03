@@ -120,10 +120,7 @@ restores the feature without regenerating files.
 Set `ROUTE_PROGRESS_ENABLED` to `false` in
 `shared/lib/route-progress/route-progress-flag.ts` and rebuild. Nothing else changes:
 the component, controller, adapter, tests, story and lint guard stay in place, and
-setting the flag back to `true` restores the feature. Also set `PROJECT_CONTEXT.md`'s
-`frontend_route_progress` field to `enabled` or `disabled` so the file matches the
-build; the field is a record and does not change behavior. The upstream default is
-enabled.
+setting the flag back to `true` restores the feature. The upstream default is enabled.
 
 ## Testing
 

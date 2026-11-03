@@ -13,6 +13,9 @@ The checked-in source is `packages/shared/src/config/product-admin.json`:
 { "version": 1, "mode": "path", "alias": "manage" }
 ```
 
+For a separate administration host, set `"mode": "host"` and keep the alias. The file holds no
+hostname: the host comes from `PRODUCT_ADMIN_ORIGIN` at runtime (step 3 below).
+
 With website `https://shop.example.com`, the default Russian addresses are:
 
 | Journey          | Path mode                      | Host mode, `https://manage.shop.example.com` |
@@ -64,8 +67,11 @@ Host mode requires different normalized hostnames for website, admin and any
 separate Console host, regardless of port. `https://shop.example.com:443` and
 `https://shop.example.com:9443` cannot isolate cookies and are rejected as separate
 frontends. Origins include scheme and effective port; extra ports are not aliases.
-The Operations Console `--admin-console` initializer choice remains independent.
-There is no new product-admin initializer flag.
+Operations Console settings live separately in `packages/shared/src/config/admin-console.json`.
+See [Console configuration](../operations-console/configuration.md) for its mode and alias.
+Both areas share the served-locale list in `locales.json`. After changing that list,
+regenerate both areas' edge files before rebuilding, as described in
+[Choose the served locales](../frontend/i18n-and-errors.md#task-choose-the-served-locales).
 
 ## Session and account behavior
 

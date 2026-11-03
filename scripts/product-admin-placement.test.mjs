@@ -6,38 +6,71 @@ import { test } from 'node:test'
 
 import { inspectProductAdminPlacement } from './lib/product-admin-placement.mjs'
 
-function fixture(t, localized = true) {
+function fixture(t, multi = true) {
   const root = mkdtempSync(join(tmpdir(), 'amcore-placement-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const write = (path, text = '') => {
     mkdirSync(dirname(join(root, path)), { recursive: true })
     writeFileSync(join(root, path), text)
   }
-  const routeRoot = `apps/web/src/app${localized ? '/[locale]' : ''}`
+  // The physical [locale] folder exists in every build; `multi` decides the public prefix.
+  const routeRoot = 'apps/web/src/app/[locale]'
   const own = `${routeRoot}/(product-admin)/manage`
   write(
     'packages/shared/src/config/product-admin.json',
     JSON.stringify({ version: 1, mode: 'path', alias: 'manage' })
   )
   write(
-    'packages/shared/src/constants/index.ts',
-    "export const SUPPORTED_LOCALES = ['en', 'ru'] as const\nexport const DEFAULT_LOCALE = 'en'\n"
+    'packages/shared/src/config/locales.json',
+    JSON.stringify({ version: 1, enabled: multi ? ['en', 'ru'] : ['en'], default: 'en' })
   )
+  write(
+    'packages/shared/src/config/admin-console.json',
+    JSON.stringify({ version: 1, mode: 'path', alias: 'admin' })
+  )
+  write(`${routeRoot}/admin/page.tsx`)
   write('apps/web/public/favicon.ico')
   for (const page of ['login', 'organizations', 'settings/api-keys', 'settings/sessions'])
     write(`${own}/(ready)/${page}/page.tsx`)
   return { root, write, routeRoot, own }
 }
 
-test('grouped routes work with explicit locales and without a locale segment', (t) => {
-  for (const localized of [true, false]) {
-    const f = fixture(t, localized)
+test('grouped routes work with several locales and with one locale', (t) => {
+  for (const multi of [true, false]) {
+    const f = fixture(t, multi)
     const result = inspectProductAdminPlacement(f.root)
-    assert.equal(result.localized, localized)
+    assert.equal(result.localized, multi)
     assert.equal(result.routes.length, 4)
-    assert.deepEqual(result.locales, ['en', 'ru'])
+    assert.deepEqual(result.locales, multi ? ['en', 'ru'] : ['en'])
     assert.equal(result.defaultLocale, 'en')
   }
+})
+
+test('the Console alias must be free, physical and distinct from the product-admin alias', (t) => {
+  const f = fixture(t)
+  const consoleConfig = 'packages/shared/src/config/admin-console.json'
+  const setAlias = (alias) =>
+    f.write(consoleConfig, JSON.stringify({ version: 1, mode: 'disabled', alias }))
+  setAlias('manage')
+  assert.throws(() => inspectProductAdminPlacement(f.root), /equals the product-admin alias/)
+  setAlias('console')
+  assert.throws(() => inspectProductAdminPlacement(f.root), /physical routes/)
+  f.write(`${f.routeRoot}/console/page.tsx`)
+  assert.doesNotThrow(() => inspectProductAdminPlacement(f.root))
+  f.write(`${f.routeRoot}/(other)/console/extra/page.tsx`)
+  assert.throws(() => inspectProductAdminPlacement(f.root), /Console alias collides/)
+  setAlias('en')
+  // A locale name is refused by the shared settings rules (the code ALIAS_RESERVED), before any route check.
+  assert.throws(() => inspectProductAdminPlacement(f.root), /ALIAS_RESERVED/)
+})
+
+test('a public asset cannot take the Console alias', (t) => {
+  const f = fixture(t)
+  f.write('apps/web/public/admin.svg')
+  assert.throws(
+    () => inspectProductAdminPlacement(f.root),
+    /Console alias collides with public asset/
+  )
 })
 
 test('candidate alias preflight does not move physical routes or alter source config', (t) => {

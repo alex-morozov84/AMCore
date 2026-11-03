@@ -15,9 +15,10 @@ Claude Code reads it via the `@AGENTS.md` import in `CLAUDE.md`.
    If the file is missing or still says `upstream-starter` in a product fork, stop
    and ask the owner to initialize it. The supported fork-initialization path is
    `pnpm init:brand`, which writes the product identity, workflow and theme fields; see
-   `docs/frontend/brand-theme-and-tokens.md#fork-initialization`. The frontend choice
-   fields in `PROJECT_CONTEXT.md` describe the shipped build and are not written by a
-   command. A frontend Route Handler is not a NestJS backend controller.
+   `docs/frontend/brand-theme-and-tokens.md#fork-initialization`. Served locales and the
+   Console mode are build settings in `packages/shared/src/config/*.json`, not fields
+   there (see `PROJECT_CONTEXT.md` → _Build Settings_). A frontend Route Handler is not
+   a NestJS backend controller.
 2. Detect the working-context overlay:
    - **`ai/` directory present** → maintainer copy of the product named in
      `PROJECT_CONTEXT.md`. ALSO read, in order: `ai/README.md` (private-repo
@@ -323,6 +324,11 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   are supported for local component CSS under the same rule, with camelCase
   class names; `app/globals.css` is exempt because that is where tokens are
   declared.
+- **Operations Console entrypoints:** read `docs/operations-console/development.md`
+  before adding a page, layout, metadata function or BFF handler. Call the synchronous
+  `requireConsoleEnabled()` first in each page entrypoint. Return `withConsoleHostGuard()`
+  first in BFF handlers, and keep parameter awaits/session/API work inside its callback.
+  Resolve the physical folder from `admin-console.json`'s alias; keep it when disabled.
 - **Frontend indexing — closed by default; decide public or private before adding a
   page.** A private page needs nothing: the whole app, `/api/*` and the Console are
   `noindex`. A public page builds its metadata only with `buildPageMetadata()` from
@@ -332,9 +338,12 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   a static test fails on it. Keep the indexing hook in `proxy.ts`, the routing
   option `alternateLinks: false` and `htmlLimitedBots` as they are unless you have
   read `docs/frontend/seo.md`.
-- **Frontend i18n — English base, Russian second, both live.** Routes sit under
-  `[locale]` with an explicit prefix (`/en/...`, `/ru/...`). Four rules an agent
-  will otherwise break:
+- **Frontend i18n — English base, Russian second, both live by default.** Which
+  locales a build serves is set in `packages/shared/src/config/locales.json`
+  (`SUPPORTED_LOCALES` means the served list; `LOCALE_CATALOGUES` lists the catalogues
+  the repository ships). Routes sit under `[locale]`; with several served locales every
+  URL has an explicit prefix (`/en/...`, `/ru/...`), with one the URLs are bare. Never
+  write a second hand-made locale list. Four rules an agent will otherwise break:
   1. **Never inline user-facing text.** Add the key to `messages/en.json` (the
      source of truth) and to **every** other catalogue. Keys are type-checked;
      a catalogue mismatch fails a test.

@@ -50,12 +50,12 @@ Registration passwords need at least 8 characters, one uppercase Latin letter
 requirements below the password field before submission. The same rule and
 hint apply when setting a new password through the reset flow below.
 
-`locale` is optional (`en` or `ru`). It sets the new user's interface/email
+`locale` is optional and must be in `locales.json`'s enabled list (`en` and `ru` in the shipped build). It sets the new user's interface/email
 language with this precedence:
 
 1. an explicit `locale` in the body, else
 2. the best supported match negotiated from the `Accept-Language` header, else
-3. the column default (`en`).
+3. the configured `DEFAULT_LOCALE` from `locales.json`, written explicitly to the account.
 
 An unsupported `Accept-Language` (e.g. `de`) falls through to the default; an
 unsupported body `locale` is a `400` validation error.
@@ -195,9 +195,10 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
    request renews its one-hour expiry; refusals do not renew it)
 2. If the email exists, a reset token is generated (32 random bytes, encoded as
    64 hexadecimal characters, then SHA-256 hashed for storage)
-3. An email is sent with a link: `https://amcore.dev/{locale}/reset-password?token={raw_token}`
-   — the locale prefix comes from the recipient's stored `User.locale`, since an
-   emailed link cannot rely on a browser cookie
+3. An email is sent with a link built by `localizedFrontendUrl()`. With several served locales,
+   it is `https://amcore.dev/{locale}/reset-password?token={raw_token}`. With one, it is
+   `https://amcore.dev/reset-password?token={raw_token}`. A stored locale no longer served
+   falls back to the configured default; the link does not depend on a browser cookie
 4. Token expires in **15 minutes**
 
 SHA-256 stores a lookup key for the 256-bit random token, not a human password.
@@ -388,7 +389,7 @@ wins over `Accept-Language`.
 | Field      | Rules                                    |
 | ---------- | ---------------------------------------- |
 | `name`     | ≥ 2 characters                           |
-| `locale`   | `en` or `ru`                             |
+| `locale`   | A locale enabled in `locales.json`       |
 | `timezone` | a valid IANA zone (e.g. `Europe/Moscow`) |
 
 **Success response** `200 OK`: the full updated profile in the same `{ user }`

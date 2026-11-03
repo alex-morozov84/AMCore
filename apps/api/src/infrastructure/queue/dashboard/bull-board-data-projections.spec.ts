@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
 
 import {
   BOARD_DATA_PROJECTIONS,
@@ -45,6 +45,14 @@ describe('email job projection', () => {
         data: { name: 'A', email: 'a@b.co' },
       })
     ).toEqual({ template: 'welcome' })
+  })
+
+  it('shows the locale of a stored job for every shipped catalogue, served or not', () => {
+    for (const locale of LOCALE_CATALOGUES) {
+      expect(
+        projectEmailJobData({ ...REAL_EMAIL_JOB, data: { ...REAL_EMAIL_JOB.data, locale } })
+      ).toMatchObject({ locale })
+    }
   })
 
   it.each([

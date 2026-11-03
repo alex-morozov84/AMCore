@@ -67,6 +67,7 @@ find for something, that page is under-documented; please open an issue.
 | Learn how the shared Redis client is configured and what its timeouts do not bound       | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                                    |
 | Add an external service / infra dependency                                               | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md#adding-an-external-service--infra-dependency)       |
 | Add UI copy, a locale, or an error message                                               | [`frontend/i18n-and-errors.md`](frontend/i18n-and-errors.md)                                                                            |
+| Choose which languages your product serves, or turn the Console off or move it           | [`PROJECT_CONTEXT.md` → Build Settings](../PROJECT_CONTEXT.md#build-settings)                                                           |
 | Configure auth, OAuth, sessions                                                          | [`auth/`](auth/README.md)                                                                                                               |
 | Deploy, recover and maintain operator MFA                                                | [`auth/mfa-deployment.md`](auth/mfa-deployment.md)                                                                                      |
 | Set up RBAC / authorization                                                              | [`auth/rbac.md`](auth/rbac.md)                                                                                                          |
@@ -137,7 +138,7 @@ provide an operator interface for admin session management.
   safe).
 - **[i18n & error localization](frontend/i18n-and-errors.md)** — where copy
   lives, adding strings/locales/error codes, ICU plurals, localized form
-  validation, locale-prefixed links from the backend, and running a fork
+  validation, locale-aware links from the backend, and running a fork
   single-locale.
 - **[Frontend API consumption](frontend/api-consumption.md)** — how `apps/web`
   hooks consume the media, notifications, and AI backend surfaces through the

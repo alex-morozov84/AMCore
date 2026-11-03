@@ -4,7 +4,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { render } from '@react-email/render'
 import { PinoLogger } from 'nestjs-pino'
 
-import { DEFAULT_LOCALE } from '@amcore/shared'
+import { coerceSupportedLocale } from '@amcore/shared'
 
 import { redactEmail } from '../../common/utils/index.js'
 import { EnvService } from '../../env/env.service.js'
@@ -264,35 +264,39 @@ export class EmailService {
   ): Promise<{ html: string; text: string; subject: string }> {
     const startedAt = performance.now()
     try {
-      const locale: Locale = data.locale || DEFAULT_LOCALE
+      // A queued job may carry a locale this build no longer serves. Map it to the default once
+      // and give the same value to the subject and to the body, so one message never mixes two
+      // languages.
+      const locale: Locale = coerceSupportedLocale(data.locale)
+      const content = { ...data, locale } as RenderableEmailData
       let element: Parameters<typeof render>[0]
       let subject: string
 
       switch (template) {
         case EmailTemplate.WELCOME:
-          element = WelcomeEmail(data as WelcomeEmailData)
+          element = WelcomeEmail(content as WelcomeEmailData)
           subject = getWelcomeSubject(locale)
           break
 
         case EmailTemplate.PASSWORD_RESET:
-          element = PasswordResetEmail(data as PasswordResetEmailData)
+          element = PasswordResetEmail(content as PasswordResetEmailData)
           subject = getPasswordResetSubject(locale)
           break
 
         case EmailTemplate.EMAIL_VERIFICATION:
-          element = EmailVerificationEmail(data as EmailVerificationData)
+          element = EmailVerificationEmail(content as EmailVerificationData)
           subject = getEmailVerificationSubject(locale)
           break
 
         case EmailTemplate.ORG_INVITE: {
-          const inviteData = data as OrgInviteEmailData
+          const inviteData = content as OrgInviteEmailData
           element = OrgInviteEmail(inviteData)
           subject = getOrgInviteSubject(inviteData.orgName, locale)
           break
         }
 
         case EmailTemplate.NOTIFICATION: {
-          const notificationData = data as NotificationEmailData
+          const notificationData = content as NotificationEmailData
           element = NotificationEmail(notificationData)
           // The dispatcher already applied the content policy to the title, so it is a
           // safe subject for both detailed and neutral/generic notifications.

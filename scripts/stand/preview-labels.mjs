@@ -16,6 +16,19 @@ export async function previewLabels(m) {
       cancelCreation: messages.organizationCreation.cancel,
     },
   }
+  if (m.operatorMfa) {
+    const t = messages.accountMfa
+    labels.mfa = {
+      connectApp: t.connectApp,
+      qrLabel: t.qrLabel,
+      appCode: t.appCode,
+      continue: t.continue,
+      codesDescription: t.codesDescription,
+      backupCodesTitle: t.backupCodesTitle,
+      savedCheckbox: t.savedCheckbox,
+      finishSetup: t.finishSetup,
+    }
+  }
   if (m.consoleEnabled)
     labels.console = {
       email: messages.console.loginEmail,

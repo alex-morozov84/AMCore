@@ -17,6 +17,11 @@ separate activation approval. The mechanism is account-owned; see
 
 [Create an organization for another person](docs/product-admin/organization-provisioning.md) through Console or the protected API, with invitation recovery.
 
+**Building your own product from a fork of this starter?** Read the note “Building a product from
+this starter?” at the end of [Quick Start](#quick-start) first: fork identity, then the build
+settings (served languages, Operations Console, product administration), then the first deploy.
+The rest of Quick Start runs the starter itself.
+
 AMCore is a production-oriented application starter for building secure, modular
 SaaS products, internal tools, and AI-enabled systems. The reusable surface is
 backend-first: a NestJS API foundation with strong application and security
@@ -282,8 +287,10 @@ pnpm dev
 > `upstream-starter` to `downstream-product` when you provide a product
 > name, and records the product identity, upstream-sync policy, and workflow
 > mode (`strict`, `flexible`, or `custom`) from the corresponding prompts or
-> flags. Console hostnames are deployment configuration
-> (`ADMIN_CONSOLE_HOSTNAME`). Still set by hand: where the
+> flags. Which languages the product serves and how the Operations Console is
+> served (off, a path, or its own host) are two settings files, not prompts: see
+> [`PROJECT_CONTEXT.md` → Build Settings](PROJECT_CONTEXT.md#build-settings). Console
+> hostnames are deployment configuration (`ADMIN_CONSOLE_HOSTNAME`). Still set by hand: where the
 > roadmap/status/product-specific decisions live, and anything GitHub-side
 > (branch protection, secrets, environments). Repository files _declare_ the
 > technical policy; GitHub-side enforcement is separate external state. For
@@ -296,7 +303,7 @@ pnpm dev
 > [`docs/operations/ci-security.md` → What a fork inherits](docs/operations/ci-security.md#what-a-fork-inherits-and-what-it-doesnt).
 
 To add product management screens, start with the [product administration
-integration guide](docs/product-admin/integration.md). `--admin-console`
+integration guide](docs/product-admin/integration.md). The Console setting in `packages/shared/src/config/admin-console.json`
 configures only the separate `SUPER_ADMIN` Operations Console; it does not
 create product administration pages or choose their placement.
 

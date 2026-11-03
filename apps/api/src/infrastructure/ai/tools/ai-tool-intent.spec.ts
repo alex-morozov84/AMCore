@@ -108,6 +108,38 @@ describe('AI immutable intent contract', () => {
     }
   })
 
+  it('reads a stored intent whose previews were written under other locale settings', async () => {
+    const tool = {
+      ...currentTimeTool,
+      ...fixtureToolContract(currentTimeTool.parameters),
+      riskClass: 'SENSITIVE' as const,
+      idempotency: 'idempotent' as const,
+    }
+    const registry = new AiToolContractRegistry([tool], [authority()])
+    const { intent } = await prepareToolIntent(tool, {}, ctx, tx, 1, registry)
+    const [first] = Object.values(intent.preview!)
+    // Earlier build served both shipped locales; a later build serves one (or the reverse).
+    for (const keys of [['en', 'ru'], ['en'], ['ru']] as const) {
+      const preview = Object.fromEntries(keys.map((locale) => [locale, first]))
+      const stored = { ...intent, preview }
+      expect(readToolIntent(stored, canonicalJsonHash(stored)).preview).toEqual(preview)
+    }
+  })
+
+  it('still refuses a stored preview keyed by a locale that is not a shipped catalogue', async () => {
+    const tool = {
+      ...currentTimeTool,
+      ...fixtureToolContract(currentTimeTool.parameters),
+      riskClass: 'SENSITIVE' as const,
+      idempotency: 'idempotent' as const,
+    }
+    const registry = new AiToolContractRegistry([tool], [authority()])
+    const { intent } = await prepareToolIntent(tool, {}, ctx, tx, 1, registry)
+    const [first] = Object.values(intent.preview!)
+    const stored = { ...intent, preview: { xx: first } }
+    expect(() => readToolIntent(stored, canonicalJsonHash(stored))).toThrow()
+  })
+
   it('rejects non-JSON arguments even with a self-consistent hash', async () => {
     const registry = new AiToolContractRegistry([currentTimeTool], [authority()])
     const prepared = await prepareToolIntent(currentTimeTool, {}, ctx, tx, 1, registry)

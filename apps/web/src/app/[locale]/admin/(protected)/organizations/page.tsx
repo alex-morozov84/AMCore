@@ -9,6 +9,7 @@ import {
   parseSortBy,
   parseSortOrder,
 } from '@/_pages/console/OrganizationsPage'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 
 interface OrganizationsRouteProps {
   searchParams: Promise<{
@@ -20,6 +21,7 @@ interface OrganizationsRouteProps {
 }
 
 export default async function OrganizationsRoute({ searchParams }: OrganizationsRouteProps) {
+  requireConsoleEnabled()
   const {
     page: rawPage,
     search: rawSearch,

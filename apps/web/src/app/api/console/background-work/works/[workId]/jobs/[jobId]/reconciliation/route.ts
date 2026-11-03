@@ -5,8 +5,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ workId: string; jobId: string }> }
 ) {
-  const { workId, jobId } = await context.params
-  return withConsoleHostGuard(request, () =>
-    handleConsoleEvidenceReconciliation(request, workId, jobId)
-  )
+  return withConsoleHostGuard(request, async () => {
+    const { workId, jobId } = await context.params
+    return handleConsoleEvidenceReconciliation(request, workId, jobId)
+  })
 }

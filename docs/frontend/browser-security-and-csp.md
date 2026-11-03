@@ -218,19 +218,19 @@ group today — but the supported pattern for a fork that does is:
 
 1. **Do not narrow `src/proxy.ts`'s `matcher` to exclude the new public
    route group.** This looks like the obvious fix and is wrong: the
-   matcher governs `next-intl`'s locale routing too, not just the CSP
-   logic riding alongside it — every route lives under a `[locale]`
-   segment (see [Locale routing](./architecture-and-conventions.md#locale-routing)),
-   so excluding a route from the matcher breaks its locale
-   detection/redirects entirely, not just its CSP. Verified live: narrowing
+   matcher also governs locale handling and the disabled-Console refusal. With several
+   served locales it runs `next-intl`; with one, the proxy rejects disabled locale
+   prefixes and `next.config.ts` supplies the physical `[locale]` rewrite.
+   Excluding a route can bypass these checks as well as CSP. See
+   [Locale routing](./architecture-and-conventions.md#locale-routing). Verified live: narrowing
    the matcher for a test path made that path 404/misroute, not "get a
    relaxed policy."
 2. **Instead, branch inside `proxy()` itself.** Keep the matcher as-is (so
-   `next-intl` still runs for every route), but skip the
+   the locale and Console checks still run), but skip the
    `response.headers.set(cspHeaderName, cspHeaderValue)` call — and the
    nonce/`x-nonce` request-header logic — for the new public route group's
-   paths. `next-intl`'s own routing still applies to them; only AMCore's
-   CSP response header is conditionally skipped.
+   paths. Keep the existing locale branch for both one- and multi-locale builds;
+   only AMCore's CSP handling is conditionally skipped.
 3. **Only then does a separate `next.config.ts` `headers()` entry, scoped
    to that route's `source` pattern, actually take effect** (static
    hash-based or a documented `'unsafe-inline'` baseline, labeled honestly
@@ -365,6 +365,6 @@ invite and provider callback responses use private/no-referrer/noindex. The fina
 OAuth completion GET document alone uses strict-origin: a native same-origin form
 retains exact Origin but Referer carries no ticket/path. Completion POST responses
 and redirects retain no-referrer. Preserve the path-scoped next.config.ts override,
-including alias/single-locale projections, and verify the public wire policy.
+including non-default aliases and one-locale builds, and verify the public wire policy.
 Nonce CSP/form-action self remains unchanged. API/web frontend proof headers are server-to-server data; never expose their key in client props or
 NEXT_PUBLIC variables. See [placement and sessions](../product-admin/placement-and-sessions.md).

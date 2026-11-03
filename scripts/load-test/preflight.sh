@@ -6,9 +6,14 @@
 set -eu
 . "$(dirname "$0")/lib.sh"
 MODE=${1:-}
-[ -f .env ] && [ -f PROJECT_CONTEXT.md ] || die "run from the deployment checkout (needs .env and PROJECT_CONTEXT.md)"
+LOCALES=packages/shared/src/config/locales.json
+CONSOLE=packages/shared/src/config/admin-console.json
+[ -f .env ] && [ -f "$LOCALES" ] && [ -f "$CONSOLE" ] || die "run from the deployment checkout (needs .env and the settings files under packages/shared/src/config)"
 
-ctx() { sed -n "s/^- \*\*$1:\*\* *//p" PROJECT_CONTEXT.md | head -n 1; }
+# The settings files are JSON; read them without jq or node so the check works on a bare host.
+flat() { tr -d ' \n\t\r' < "$1"; }
+jsonstr() { flat "$2" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
+jsonlist() { flat "$2" | sed -n "s/.*\"$1\":\[\([^]]*\)\].*/\1/p"; }
 RUN=$(envval LOAD_TEST_RUN_ID)
 GEN=$(envval LOAD_TEST_GENERATOR_IP)
 PROJECT=$(envval COMPOSE_PROJECT_NAME)
@@ -17,10 +22,12 @@ SECRETS=$(envval LOAD_TEST_SECRETS_DIR)
 WEB_IP=$(envval COMPOSE_WEB_IPV4)
 
 # Topology: path-mode product web edge, the TLS database and the exact web peer only.
-[ "$(ctx admin_console_mode)" != host ] || die "admin_console_mode: host is not supported by the reference load test"
-I18N=$(ctx i18n_mode)
-BASE=$(ctx base_locale)
-case "$I18N" in multi) PREFIX="/$BASE" ;; single) PREFIX= ;; *) die "unknown i18n_mode '$I18N'" ;; esac
+[ "$(jsonstr mode "$CONSOLE")" != host ] || die "Console mode host is not supported by the reference load test"
+BASE=$(jsonstr default "$LOCALES")
+SERVED=$(jsonlist enabled "$LOCALES")
+[ -n "$BASE" ] && [ -n "$SERVED" ] || die "cannot read the served locales from $LOCALES"
+# With several served locales the public path starts with the default locale; with one it does not.
+case "$SERVED" in *,*) PREFIX="/$BASE" ;; *) PREFIX= ;; esac
 FILES=$(envval COMPOSE_FILE)
 for f in docker-compose.yml docker/compose/postgres-tls.yml docker/compose/web.yml docker/compose/bff-relay.yml docker/compose/load-test.yml; do
   echo ":$FILES:" | grep -q ":$f:" || die "COMPOSE_FILE must include $f"

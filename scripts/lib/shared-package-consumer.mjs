@@ -4,6 +4,9 @@ import { basename, dirname, join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 
+// Settings files bundled as JSON modules; the bundler emits their source without content.
+const SETTINGS_JSON = ['product-admin', 'locales', 'admin-console']
+
 export function verifyConsumer(root, packageRoot, consumer, expectedValues) {
   const installed = join(consumer, 'node_modules/@amcore/shared')
   mkdirSync(installed, { recursive: true })
@@ -116,8 +119,11 @@ export function verifyMaps(packageRoot) {
           // Rolldown's JSON loader emits this source without embedded content.
           // Keep the exception exact; every TypeScript source still needs content.
           (source === '' &&
-            name.startsWith('config/product-admin.') &&
-            map.sources[index] === '../../src/config/product-admin.json')
+            SETTINGS_JSON.some(
+              (setting) =>
+                name.startsWith(`config/${setting}.`) &&
+                map.sources[index] === `../../src/config/${setting}.json`
+            ))
       ),
       true
     )

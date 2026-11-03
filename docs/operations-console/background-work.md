@@ -17,7 +17,8 @@ Jobs that run on a schedule, such as nightly cleanups, are on
 Console access requires a current platform `SUPER_ADMIN`. API keys cannot read
 this screen, and an organization role does not grant access. The page is at
 `/admin/background-work` in path mode and at `/background-work` on the Console
-host, after the locale prefix (for example `/en/admin/background-work`).
+host. With several served languages a locale prefix comes first (for example
+`/en/admin/background-work`); with one language there is none.
 
 ## Arrive from Overview
 

@@ -7,12 +7,14 @@ import {
   parseAuditParams,
   type RawAuditParams,
 } from '@/_pages/console/AuditPage'
+import { requireConsoleEnabled } from '@/shared/lib/console-host-guard'
 
 interface AuditRouteProps {
   searchParams: Promise<RawAuditParams>
 }
 
 export default async function AuditRoute({ searchParams }: AuditRouteProps) {
+  requireConsoleEnabled()
   const query = parseAuditParams(await searchParams)
   const loading = (await getMessages()).console.audit.loading
   return (

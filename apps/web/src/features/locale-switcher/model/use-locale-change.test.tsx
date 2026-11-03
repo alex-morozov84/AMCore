@@ -8,6 +8,12 @@ import { useLocaleChange } from './use-locale-change'
 
 const state = vi.hoisted(() => ({ replace: vi.fn() }))
 vi.mock('client-only', () => ({}))
+vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
+  ...(await importOriginal()),
+  // This test covers a two-locale build, whatever `locales.json` holds.
+  SUPPORTED_LOCALES: ['en', 'ru'],
+  DEFAULT_LOCALE: 'en',
+}))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/login' }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('tag=a&tag=b') }))
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({

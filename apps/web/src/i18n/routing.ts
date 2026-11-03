@@ -5,9 +5,9 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
  * Locale routing contract for the web app.
  *
  * The locale set and the default are **not** declared here — they come from
- * `@amcore/shared`, the same source the API uses for `User.locale`,
- * `Accept-Language` negotiation, and email rendering. Adding a locale is a
- * single edit in `SUPPORTED_LOCALES` plus a message catalogue; the frontend
+ * `@amcore/shared` (read from `config/locales.json`), the same source the API uses
+ * for `User.locale`, `Accept-Language` negotiation, and email rendering. Serving a
+ * locale is an edit to that file; a new locale also needs a catalogue; the frontend
  * must never disagree with the backend about which locales exist.
  *
  * `localePrefix: 'always'` — every locale is explicit (`/en/login`,

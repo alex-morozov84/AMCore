@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
+import { readAdminConsoleSettings, readLocaleSettings } from '../lib/settings-files.mjs'
 import { snapshot } from '../stand/snapshot.mjs'
 
 const exists = async (path) => Boolean(await stat(path).catch(() => undefined))
@@ -16,39 +17,24 @@ export function replaceOnce(source, before, after) {
 
 export async function exampleContext(root) {
   const text = await read(root, 'PROJECT_CONTEXT.md')
-  const field = (name) => text.match(new RegExp(`^- \\*\\*${name}:\\*\\* (.+)$`, 'm'))?.[1]
-  const single = field('i18n_mode') === 'single'
-  if (!['single', 'multi'].includes(field('i18n_mode'))) throw new Error('Declare i18n_mode first')
-  const prefix = `apps/web/src/app${single ? '' : '/[locale]'}`
-  if ((await exists(join(root, 'apps/web/src/app/[locale]'))) === single)
-    throw new Error('Project context disagrees with the locale subtree')
-  const constants = await read(root, 'packages/shared/src/constants/index.ts')
-  const locales = [
-    ...(constants.match(/SUPPORTED_LOCALES = \[([^\]]+)\]/)?.[1] ?? '').matchAll(/'([^']+)'/g),
-  ].map((m) => m[1])
-  const base = constants.match(/DEFAULT_LOCALE[^=]*= '([^']+)'/)?.[1]
-  if (
-    !locales.length ||
-    base !== field('base_locale') ||
-    field('supported_locales') !== `[${locales.join(', ')}]` ||
-    (single && locales.length !== 1)
-  )
-    throw new Error('Project context disagrees with supported/default locales')
+  const adminConsole = readAdminConsoleSettings(root)
+  const locales = readLocaleSettings(root).enabled
+  const single = locales.length === 1
+  // Settings files own the locale and Console choices; the other fields stay in PROJECT_CONTEXT.md.
+  const settings = {
+    i18n_mode: single ? 'single' : 'multi',
+    admin_console: adminConsole.mode === 'disabled' ? 'disabled' : 'enabled',
+    admin_console_mode: adminConsole.mode === 'host' ? 'host' : 'path',
+    admin_console_slug: adminConsole.alias,
+  }
+  const field = (name) =>
+    settings[name] ?? text.match(new RegExp(`^- \\*\\*${name}:\\*\\*\\s+(.+)$`, 'm'))?.[1]
+  // The physical locale folder is always present: a one-locale build rewrites onto it.
+  const prefix = 'apps/web/src/app/[locale]'
+  if (!(await exists(join(root, prefix)))) throw new Error('The locale route folder is missing')
   for (const locale of locales) await read(root, `apps/web/messages/${locale}.json`)
-  const consoleEnabled = field('admin_console') === 'enabled'
-  if ((await exists(join(root, prefix, field('admin_console_slug') ?? 'admin'))) !== consoleEnabled)
-    throw new Error('Project context disagrees with Console routes')
-  if (
-    (await exists(join(root, 'apps/web/.storybook'))) !==
-    (field('frontend_storybook') === 'enabled')
-  )
-    throw new Error('Project context disagrees with Storybook')
-  const progress = await read(root, 'apps/web/src/shared/lib/route-progress/route-progress-flag.ts')
-  if (
-    progress.includes('ROUTE_PROGRESS_ENABLED = true') !==
-    (field('frontend_route_progress') === 'enabled')
-  )
-    throw new Error('Project context disagrees with route progress')
+  if (!(await exists(join(root, prefix, adminConsole.alias))))
+    throw new Error('Console alias disagrees with its physical routes')
   const placement = JSON.parse(await read(root, 'packages/shared/src/config/product-admin.json'))
   if (placement.mode !== 'path')
     throw new Error('Custom path examples require path placement; use the ready host recipe')

@@ -161,7 +161,7 @@ be enqueued at all.
 - Classify the email: notification, queueable, direct, or secret-bearing.
 - Keep secret-bearing templates on `sendNow()` and out of queue schemas.
 - Add queue schema/tests for queueable templates.
-- Add subjects/messages for every supported locale.
+- Add subjects/messages for every shipped catalogue locale (`LOCALE_CATALOGUES`), including locales not enabled in this build.
 - Add HTML and plaintext render tests.
 - Verify provider/logging paths do not expose rendered bodies or payload values.
 

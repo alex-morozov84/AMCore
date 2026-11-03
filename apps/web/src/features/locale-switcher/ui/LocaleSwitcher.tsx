@@ -17,6 +17,8 @@ export function LocaleSwitcher({ className }: { className?: string }) {
   const { value, pending, change } = useLocaleChange((locale) => {
     if (data?.user) persistLocale(locale)
   })
+  // A build that serves one locale has nothing to choose; hooks above stay unconditional.
+  if (SUPPORTED_LOCALES.length < 2) return null
   return (
     <div className={className}>
       <LocaleSelector

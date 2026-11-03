@@ -214,7 +214,7 @@ Initial layout admission requires three complete, mutually comparable warm sampl
 Compare exact source/configuration/inventory/assignments, measured runner class,
 software and resolved container images. Require actual cache hits in the plan and
 every shard, exact-once coverage, natural clean exits and matching run/attempt artifacts.
-Current normal CI, including Web, generated projects and security, must also pass.
+Current normal CI, including Web and security, must also pass.
 
 Ordinary feature PRs use the current complete CI gates; they do not repeat layout
 admission automatically. Documentation-only changes do not justify another full

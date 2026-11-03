@@ -15,9 +15,10 @@ Organization details -> Administrator email -> Check details -> Create and invit
 
 ## Before you start
 
-Invitation languages follow the application's `SUPPORTED_LOCALES` (`en` and `ru` in
-this build). API examples use `en`. An omitted invitation language defaults to the
-installation's `DEFAULT_LOCALE`.
+Invitation languages follow the application's `SUPPORTED_LOCALES`: the languages your build
+serves (`en` and `ru` in the shipped default). API examples use `en`; in a one-language build
+use that language. An omitted invitation language defaults to the installation's
+`DEFAULT_LOCALE`.
 
 Apply migrations and initialize the canonical system roles through the guarded
 [deployment procedure](../operations/deployment.md#seeding). Deploy matching code
@@ -76,7 +77,10 @@ Open **Organizations** and choose **Create organization**. This path can create 
 error. **Clear entered details** asks before clearing an unsent draft. It never deletes
 an organization or invitation and is unavailable for an unknown request. A busy identifier produces a readable error; choose another identifier.
 An unknown result keeps the original request frozen. Use **Check request result** or
-**Repeat the same request** before starting another organization.
+**Repeat the same request** before starting another organization. If the request names an
+invitation language the build no longer serves, it cannot be repeated: **Repeat the same request**
+only looks the result up again (see
+[the language-change rule](#when-the-served-languages-change)).
 
 Choose the invitation path by default, including for the first organization of a
 shop. Use **Use an already verified account** in **First organization** only for
@@ -147,17 +151,17 @@ For direct API actions, use the [creation and recovery requests](#save-and-send-
 After cancellation or completion, use the separate
 [administrator commands](organization-administration.md#use-the-backend-without-console).
 
-| What happened                                 | What to do                                                                                  | Expected result                                                                              |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| No confirmed email send                       | Check the recipient address, inbox/spam and provider configuration, then explicitly reissue | Same organization; a new invitation invalidates old links                                    |
-| Wrong address                                 | Explicitly replace the recipient with the correct address                                   | Same organization; old invitation revoked; new recipient must accept                         |
-| Invitation expired                            | Send a new invitation while its retained details are available                              | New validity period; old links stop working                                                  |
-| Awaiting process; old recipient removed       | Explicitly choose the recipient again for the awaiting process                              | New invitation for this same awaiting process                                                |
-| Cancelled process, including pruned recipient | Create a new administrator invitation with email, language and reason                       | NEW intent in the same organization; never resume the cancelled one                          |
-| Lost response or reload                       | Check the original request reference; repeat the same frozen request if needed              | Original result; no duplicate organization or automatic resend                               |
-| Another operator takes over                   | Read the current organization and invitation state using their saved IDs                    | Current state and permitted recovery; their explicit action uses a new request ID            |
-| Process completed, then access removed        | Review the exact member and make a new explicit administrator assignment or invitation      | The original first-administrator process stays closed and does not restore the removed grant |
-| Original organization deleted                 | Read the original result                                                                    | Unavailable organization; old request never recreates it                                     |
+| What happened                                 | What to do                                                                                                                 | Expected result                                                                              |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| No confirmed email send                       | Check the recipient address, inbox/spam and provider configuration, then explicitly reissue                                | Same organization; a new invitation invalidates old links                                    |
+| Wrong address                                 | Explicitly replace the recipient with the correct address                                                                  | Same organization; old invitation revoked; new recipient must accept                         |
+| Invitation expired                            | Send a new invitation while its retained details are available                                                             | New validity period; old links stop working                                                  |
+| Awaiting process; old recipient removed       | Explicitly choose the recipient again for the awaiting process                                                             | New invitation for this same awaiting process                                                |
+| Cancelled process, including pruned recipient | Create a new administrator invitation with email, language and reason                                                      | NEW intent in the same organization; never resume the cancelled one                          |
+| Lost response or reload                       | Check the original request reference; repeat the same frozen request if needed (not when its language is no longer served) | Original result; no duplicate organization or automatic resend                               |
+| Another operator takes over                   | Read the current organization and invitation state using their saved IDs                                                   | Current state and permitted recovery; their explicit action uses a new request ID            |
+| Process completed, then access removed        | Review the exact member and make a new explicit administrator assignment or invitation                                     | The original first-administrator process stays closed and does not restore the removed grant |
+| Original organization deleted                 | Read the original result                                                                                                   | Unavailable organization; old request never recreates it                                     |
 
 A provider acknowledgment means that the email service accepted the message. It
 never proves inbox delivery. Timeout or error can occur after the service took
@@ -300,12 +304,12 @@ it is not the accept/write endpoint.
 
 Creation lookup and administrator-command lookup have different response schemas:
 
-| Creation lookup response                                                                                                                       | Meaning and next step                                                                                   |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `{"state":"committed","receipt":{"operationId":"<saved-UUIDv7>","organizationId":"<organization-id>","createdAt":"2026-10-17T12:00:00.000Z"}}` | Creation saved; open current organization state                                                         |
-| `{"state":"unrecorded","sameIdAdmissible":true}`                                                                                               | No saved result observed; preserve and retry the same ID/input, not a new creation                      |
-| `{"state":"unrecorded","sameIdAdmissible":false}`                                                                                              | ID is more than 5 minutes in the future; investigate the clock and keep the original attempt unresolved |
-| `{"state":"expired_unrecorded"}`                                                                                                               | Absent ID is older than 24 hours, checked under its lock; it can no longer start                        |
+| Creation lookup response                                                                                                                       | Meaning and next step                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{"state":"committed","receipt":{"operationId":"<saved-UUIDv7>","organizationId":"<organization-id>","createdAt":"2026-10-17T12:00:00.000Z"}}` | Creation saved; open current organization state                                                                                                                   |
+| `{"state":"unrecorded","sameIdAdmissible":true}`                                                                                               | No saved result observed; preserve and retry the same ID/input, not a new creation (if its invitation language is no longer served, keep it and look it up again) |
+| `{"state":"unrecorded","sameIdAdmissible":false}`                                                                                              | ID is more than 5 minutes in the future; investigate the clock and keep the original attempt unresolved                                                           |
+| `{"state":"expired_unrecorded"}`                                                                                                               | Absent ID is older than 24 hours, checked under its lock; it can no longer start                                                                                  |
 
 `unrecorded` does not prove rollback while another request may still commit.
 Do not start a different create automatically. Only `expired_unrecorded` permits
@@ -429,6 +433,27 @@ and an expired unresolved creation retains only its operation reference. An acco
 change clears the former journal from the next admitted UI. The same actor can recover
 their input after fresh login, but old callbacks retire and every action uses current
 server authority and the new session binding. Reload never submits automatically.
+
+### When the served languages change
+
+If the served languages changed while a request was unresolved, the saved request is never
+rewritten: its operation ID is bound to its content, and the API accepts a served invitation
+language only, so an unchanged repeat is impossible. The Console does not send it. It looks the
+creation up by its original operation ID:
+
+- `committed`: the creation is recovered as usual.
+- `unrecorded`: the request stays saved and a notice explains why. This is the same rule as
+  above, because `unrecorded` does not prove that nothing can still commit. Do not create the
+  organization by a different request yet.
+- `expired_unrecorded` (the 24-hour window passed): the absence is proven. The Console then
+  offers a new request; the draft is kept and its invitation language moves to the default.
+
+A saved replace-recipient request is released at once and the organization status is refreshed:
+it carries the revision it expects, so a later replacement cannot apply twice. An API client
+that holds a creation whose language is no longer served follows the table above: look up the
+operation ID and start a new request only after `expired_unrecorded`.
+
+### Invitation links and placement
 
 New invitation emails target the configured product administration area. Existing
 root links retain their site flow. See [placement and sessions](placement-and-sessions.md)

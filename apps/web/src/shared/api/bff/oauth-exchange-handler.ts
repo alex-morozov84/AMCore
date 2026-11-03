@@ -6,6 +6,7 @@ import { productAdminReturnPath } from '@amcore/shared'
 import {
   AuthErrorCode,
   coerceSupportedLocale,
+  localePathPrefix,
   localizedFrontendUrl,
   type OAuthExchangeResponse,
 } from '@amcore/shared'
@@ -230,7 +231,7 @@ export async function handleOAuthExchange(
         exchange.returnTo?.locale ?? coerceSupportedLocale(locale),
         exchange.returnTo ? productAdminReturnPath(exchange.returnTo) : context.entryPath
       )
-    : new URL(`/${locale}`, request.url)
+    : new URL(localePathPrefix(coerceSupportedLocale(locale)) || '/', request.url)
   const response = NextResponse.redirect(target, 303)
   response.cookies.set(
     context?.cookieName ?? SESSION_COOKIE_NAME,

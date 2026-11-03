@@ -5,8 +5,10 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ userId: string }> }
 ): Promise<Response> {
-  const userId = (await context.params).userId
-  return withConsoleHostGuard(request, () => establishmentConsoleHandlers.account(request, userId))
+  return withConsoleHostGuard(request, async () => {
+    const userId = (await context.params).userId
+    return establishmentConsoleHandlers.account(request, userId)
+  })
 }
 const denied = () => new Response(null, { status: 405, headers: { Allow: 'GET' } })
 export const HEAD = denied

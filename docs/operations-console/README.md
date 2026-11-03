@@ -53,6 +53,10 @@ unavailable state instead. A `SUPER_ADMIN` demotion takes effect on the next
 protected request. See [configuration and deployment](configuration.md) for the
 session and routing details.
 
+Choose `disabled`, `path` or `host`, or rename the Console alias, through
+[Console configuration](configuration.md#topology). Disabling closes frontend entrypoints;
+it keeps source files and does not disable the generic backend admin API.
+
 ## Display time zone
 
 The header's **Time** selector controls how Console dates are displayed. Choose

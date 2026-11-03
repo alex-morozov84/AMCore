@@ -11,6 +11,17 @@ Use [Deployment & migrations](deployment.md) for rollback and other topologies, 
 
 ## Before you start
 
+- Your build settings, chosen and committed **before the first image build**: which languages
+  the product serves (`packages/shared/src/config/locales.json`) and how the Operations
+  Console is served (`packages/shared/src/config/admin-console.json`: `disabled`, `path` or
+  `host`). A third file, `product-admin.json`, places product administration; for a separate
+  host also generate its edge files and set `PRODUCT_ADMIN_ORIGIN`
+  ([placement](../product-admin/placement-and-sessions.md#configure-or-move-the-administration-area)).
+  The reference stack's bundled Caddy does not serve that host: include the generated snippets
+  in your own proxy.
+  They are part of the images, not of the environment file. See
+  [Build Settings](../../PROJECT_CONTEXT.md#build-settings). Changing them later means a new
+  build and a rollout of every service.
 - A Linux host with Docker Engine and Docker Compose v2.20.2 or later. Your user can
   run `docker` without `sudo` (`sudo usermod -aG docker "$USER"`, then log in again). Read
   [Capacity](capacity.md) for CPU and memory: building the images needs more memory
