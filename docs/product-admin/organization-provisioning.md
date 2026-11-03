@@ -432,11 +432,20 @@ server authority and the new session binding. Reload never submits automatically
 
 If the served languages changed while a request was unresolved, the saved request is never
 rewritten: its operation ID is bound to its content, and the API accepts a served invitation
-language only. The next retry therefore does not send it. The Console looks the creation up
-by its original operation ID: a committed creation is recovered as usual. Otherwise the
-request is released with a notice, the draft stays (its invitation language moves to the
-default), and the next request is a new one with a new operation ID. A saved
-replace-recipient request is released the same way and the organization status is refreshed.
+language only, so an unchanged repeat is impossible. The Console does not send it. It looks the
+creation up by its original operation ID:
+
+- `committed`: the creation is recovered as usual.
+- `unrecorded`: the request stays saved and a notice explains why. This is the same rule as
+  above, because `unrecorded` does not prove that nothing can still commit. Do not create the
+  organization by a different request yet.
+- `expired_unrecorded` (the 24-hour window passed): the absence is proven. The Console then
+  offers a new request; the draft is kept and its invitation language moves to the default.
+
+A saved replace-recipient request is released at once and the organization status is refreshed:
+it carries the revision it expects, so a later replacement cannot apply twice. An API client
+that holds a creation whose language is no longer served follows the table above: look up the
+operation ID and start a new request only after `expired_unrecorded`.
 
 New invitation emails target the configured product administration area. Existing
 root links retain their site flow. See [placement and sessions](placement-and-sessions.md)

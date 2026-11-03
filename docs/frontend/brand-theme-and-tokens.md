@@ -49,7 +49,8 @@ oversight.
 `--font-sans`/`--font-mono` in `@theme inline` cover the whole app. A feature
 that needs its **own** font — the Operations Console does, loading IBM Plex
 Sans/JetBrains Mono only inside
-`apps/web/src/app/[locale]/admin/layout.tsx` so a downstream fork that
+`apps/web/src/app/[locale]/<console alias>/layout.tsx` (`admin` unless you changed the alias in
+`admin-console.json`) so a downstream fork that
 disables the console never ships a dangling font import — still gets a real
 Tailwind utility, not a repeated arbitrary-value class at every call site:
 

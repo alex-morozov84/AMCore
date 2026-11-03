@@ -1438,7 +1438,7 @@ The BFF compares the received Host authority (host and port) with its configured
 Do not edit generated locations alone: regeneration would overwrite the change.
 
 The trailing-slash redirect precedes internal page mapping. Both references reject
-bare physical `/<alias>` paths on the Console host. Nginx also rejects encoded
+bare physical `/<alias>` paths on the Console host with 404. Nginx also rejects encoded
 traversal before mapping; Caddy catches normalized traversal. These checks do not
 inspect query strings. Keep web private behind the trusted edge.
 

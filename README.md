@@ -17,9 +17,10 @@ separate activation approval. The mechanism is account-owned; see
 
 [Create an organization for another person](docs/product-admin/organization-provisioning.md) through Console or the protected API, with invitation recovery.
 
-**Building your own product from this starter?** Start with
-[Building a product from this starter](#quick-start) below: fork identity first, then the build
+**Building your own product from a fork of this starter?** Read the note “Building a product from
+this starter?” at the end of [Quick Start](#quick-start) first: fork identity, then the build
 settings (served languages, Operations Console, product administration), then the first deploy.
+The rest of Quick Start runs the starter itself.
 
 AMCore is a production-oriented application starter for building secure, modular
 SaaS products, internal tools, and AI-enabled systems. The reusable surface is

@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse a wrong settings file before they write anything. Data written under other settings
   keeps working: queued mail, pending AI approvals and saved organization drafts accept any shipped
   locale and read it as the build's default (a Console organization request already submitted is
-  never rewritten; it is looked up by its operation ID instead of being sent again), and links
+  never rewritten; it is looked up by its operation ID instead of being sent again, and stays
+  saved until its absence is proven), and links
   already written into sent mail keep their old prefix and answer 404 once that prefix is no longer
   served. See [i18n](docs/frontend/i18n-and-errors.md) and
   [Console configuration](docs/operations-console/configuration.md).

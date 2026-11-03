@@ -17,6 +17,8 @@ Use [Deployment & migrations](deployment.md) for rollback and other topologies, 
   `host`). A third file, `product-admin.json`, places product administration; for a separate
   host also generate its edge files and set `PRODUCT_ADMIN_ORIGIN`
   ([placement](../product-admin/placement-and-sessions.md#configure-or-move-the-administration-area)).
+  The reference stack's bundled Caddy does not serve that host: include the generated snippets
+  in your own proxy.
   They are part of the images, not of the environment file. See
   [Build Settings](../../PROJECT_CONTEXT.md#build-settings). Changing them later means a new
   build and a rollout of every service.
