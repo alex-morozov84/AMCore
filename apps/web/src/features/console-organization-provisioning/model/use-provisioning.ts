@@ -17,6 +17,7 @@ import { useStepUpMutation } from '@/shared/lib/console-step-up-mutation'
 
 import {
   emptyProvisioningDraft,
+  isReplayable,
   type PendingProvisioning,
   type ProvisioningDraft,
   type ProvisioningJournal,
@@ -32,6 +33,7 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
   const [createdId, setCreatedId] = useState<string>()
   const [retired, setRetired] = useState(false)
   const [error, setError] = useState<unknown>()
+  const [notice, setNotice] = useState<'requestLanguageChanged'>()
   const [storageAvailable, setStorageAvailable] = useState(true)
   const [retryAt, setRetryAt] = useState<number>()
   const [expiredProof, setExpiredProof] = useState<{
@@ -133,6 +135,27 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
     void cache.invalidateQueries({ queryKey: ['initial-organization-state'] })
     void cache.invalidateQueries({ queryKey: ['organization-administration'] })
   }
+  /**
+   * The saved command names a language this build no longer serves, so the API would refuse it and
+   * its operation ID cannot be replayed. Never rewrite it. Look the result up first: a committed
+   * creation is recovered as usual. Otherwise nothing can commit it any more, so release it, keep
+   * the draft and say so; the next request is a new one with a new operation ID.
+   */
+  async function settleUnreplayable(
+    row: ProvisioningJournal,
+    life: AbortController,
+    applies: () => boolean
+  ) {
+    const command = row.pending!
+    if (command.kind === 'create') {
+      const result = await api.lookup(admission.binding, command.input.operationId, life.signal)
+      await identity(life)
+      if (!applies()) return
+      if (result.state === 'committed') return committed(row, result.receipt.organizationId)
+    } else if (row.organizationId) void statusQuery.refetch()
+    save({ ...row, pending: undefined })
+    setNotice('requestLanguageChanged')
+  }
   const mutation = useStepUpMutation({
     mutationFn: async () => {
       const captured = target.current
@@ -148,6 +171,10 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
         await identity(life)
         if (!applies()) return
         const command = row.pending
+        if (!isReplayable(command)) {
+          await settleUnreplayable(row, life, applies)
+          return
+        }
         const sending =
           command.kind === 'create'
             ? api.create(admission.binding, command.input, life.signal)
@@ -248,6 +275,7 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
       at: Date.now(),
     })
     setError(undefined)
+    setNotice(undefined)
     setExpiredProof(undefined)
   }
   function reset() {
@@ -293,6 +321,7 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
       })
     }
     setError(undefined)
+    setNotice(undefined)
     await confirm()
   }
   return {
@@ -301,6 +330,7 @@ export function useProvisioning(admission: ProductAccessBootstrap, orgId?: strin
     dismissCreated: () => setCreatedId(undefined),
     reset,
     clearError: () => setError(undefined),
+    notice,
     error: error ?? statusQuery.error ?? policy.error,
     storageAvailable,
     retired,

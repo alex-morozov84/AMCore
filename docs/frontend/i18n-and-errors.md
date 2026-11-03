@@ -273,19 +273,20 @@ is your product choice; `en` is the shipped one.
 
 What changes with **one** served locale:
 
-| Area                                                      | Behavior                                                                                                                        |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Public URLs                                               | Bare paths: `/login` answers 200, not `/ru/login`                                                                               |
-| `/ru/login` for the served locale                         | Redirects (307) to `/login`, query kept                                                                                         |
-| A catalogue locale that is not served                     | `/en/login` answers 404                                                                                                         |
-| Links sent or saved before the change with the old prefix | Answer 404 when the prefix is no longer served, for example `/en/verify-email?...` in an email; the person requests a new email |
-| Links the backend puts in new emails                      | Built without a prefix (`localizedFrontendUrl`)                                                                                 |
-| Language switcher                                         | Not shown                                                                                                                       |
-| New accounts, emails, notifications                       | Written and rendered in the default locale                                                                                      |
-| Accounts created while one locale is served               | Store that locale and keep it when you serve more locales again                                                                 |
-| Accounts that stored a locale you stopped serving         | Read as the default locale; the stored value is not rewritten                                                                   |
-| Queued mail and saved drafts written under other settings | Still read: any shipped catalogue locale is accepted, then mapped to the default; a message is never half in one language       |
-| API input                                                 | Accepts only served locales; any other value is refused by input validation                                                     |
+| Area                                                            | Behavior                                                                                                                                                                                                    |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public URLs                                                     | Bare paths: `/login` answers 200, not `/ru/login`                                                                                                                                                           |
+| `/ru/login` for the served locale                               | Redirects (307) to `/login`, query kept                                                                                                                                                                     |
+| A catalogue locale that is not served                           | `/en/login` answers 404                                                                                                                                                                                     |
+| Links sent or saved before the change with the old prefix       | Answer 404 when the prefix is no longer served, for example `/en/verify-email?...` in an email; the person requests a new email                                                                             |
+| Links the backend puts in new emails                            | Built without a prefix (`localizedFrontendUrl`)                                                                                                                                                             |
+| Language switcher                                               | Not shown                                                                                                                                                                                                   |
+| New accounts, emails, notifications                             | Written and rendered in the default locale                                                                                                                                                                  |
+| Accounts created while one locale is served                     | Store that locale and keep it when you serve more locales again                                                                                                                                             |
+| Accounts that stored a locale you stopped serving               | Read as the default locale; the stored value is not rewritten                                                                                                                                               |
+| Queued mail and saved drafts written under other settings       | Still read: any shipped catalogue locale is accepted, then mapped to the default; a message is never half in one language                                                                                   |
+| A saved Console organization request that was already submitted | Never rewritten (its operation ID is bound to its content). If its language is no longer served it is not sent again: the Console looks the creation up by its operation ID, then releases it with a notice |
+| API input                                                       | Accepts only served locales; any other value is refused by input validation                                                                                                                                 |
 
 With two or more served locales nothing changes: every URL carries its locale prefix.
 

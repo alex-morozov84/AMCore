@@ -63,6 +63,7 @@ function BoundProvisioning({
           {!orgId && <p>{t('description')}</p>}
           {!flow.storageAvailable && <p role="alert">{t('storageUnavailable')}</p>}
           {notManaged ? <p>{t('notManaged')}</p> : <ApiErrorAlert error={flow.error} />}
+          {flow.notice && <p role="status">{t(flow.notice)}</p>}
           {flow.policy.data && !flow.policy.data.createAllowed && (
             <div className="space-y-2">
               <p role="alert">{t('emailBlocked')}</p>

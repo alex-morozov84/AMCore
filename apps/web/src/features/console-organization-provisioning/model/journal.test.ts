@@ -72,13 +72,12 @@ describe('provisioning recovery journal', () => {
   })
   it('keeps a saved draft whose invitation locale is not served and uses the default', () => {
     const input = row()
+    delete input.pending
     const stored = JSON.parse(JSON.stringify(input))
     stored.draft.inviteLocale = 'de'
-    stored.pending.input.inviteLocale = 'de'
     localStorage.setItem(key, JSON.stringify(stored))
     const restored = readProvisioningJournal(input.binding, input.actorId, 'create')
     expect(restored?.draft.inviteLocale).toBe(DEFAULT_LOCALE)
-    expect(restored?.pending).toEqual(input.pending)
   })
   it('rejects malformed and oversized storage', () => {
     localStorage.setItem(key, 'x'.repeat(8193))

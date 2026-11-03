@@ -430,6 +430,14 @@ change clears the former journal from the next admitted UI. The same actor can r
 their input after fresh login, but old callbacks retire and every action uses current
 server authority and the new session binding. Reload never submits automatically.
 
+If the served languages changed while a request was unresolved, the saved request is never
+rewritten: its operation ID is bound to its content, and the API accepts a served invitation
+language only. The next retry therefore does not send it. The Console looks the creation up
+by its original operation ID: a committed creation is recovered as usual. Otherwise the
+request is released with a notice, the draft stays (its invitation language moves to the
+default), and the next request is a new one with a new operation ID. A saved
+replace-recipient request is released the same way and the organization status is refreshed.
+
 New invitation emails target the configured product administration area. Existing
 root links retain their site flow. See [placement and sessions](placement-and-sessions.md)
 for addresses, host isolation and recovery; this does not change membership policy.
