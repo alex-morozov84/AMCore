@@ -5,11 +5,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { context } from '../migrator-preparation/context.mjs'
+import { root } from '../migrator-operations/context.mjs'
+import { parse } from 'yaml'
 
 test('positive hook control rejects missing trace and parses real newline-delimited evidence', () => {
   const directory = mkdtempSync(join(tmpdir(), 'migrator-preparation-reader-'))
   try {
     const fixture = context(directory)
+    const policy = parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
+    for (const patch of Object.values(policy.patchedDependencies ?? {})) {
+      assert.deepEqual(readFileSync(join(fixture, patch)), readFileSync(join(root, patch)))
+    }
     const checker = readFileSync(join(fixture, 'verification/check-control.cjs'), 'utf8')
     const execute = (trace) =>
       runInNewContext(checker, {
