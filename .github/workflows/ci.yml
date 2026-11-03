@@ -768,7 +768,7 @@ jobs:
 
   web-e2e-lanes:
     name: Web E2E (${{ matrix.lane }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [web-e2e-plan]
     timeout-minutes: ${{ matrix.timeout }}
     env:
@@ -989,14 +989,17 @@ jobs:
             }
           '
 
+      # Checkout also has a post action. A phase preload would expire before that
+      # cleanup runs and turn a fully validated job red. Enforce admission below.
       - name: Checkout exact evidence policy
-        env:
-          NODE_OPTIONS: --import=${{ runner.temp }}/amcore-action-deadline.mjs
-          AMCORE_ACTION_DEADLINE: ${{ env.AMCORE_AGG_ADMISSION_END }}
         timeout-minutes: 1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Require checkout within admission phase
+        env:
+          AMCORE_ACTION_DEADLINE: ${{ env.AMCORE_AGG_ADMISSION_END }}
+        run: node --import "$RUNNER_TEMP/amcore-action-deadline.mjs" -e ""
       - name: Retrieve all expected lane envelopes
         env:
           NODE_OPTIONS: --import=${{ github.workspace }}/scripts/lighthouse/action-deadline.mjs
