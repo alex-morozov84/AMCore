@@ -180,6 +180,10 @@ below — required-check contexts only become selectable in that flow after they
 run at least once on the repository. A newly added job context needs that same
 one-time re-application after its first real run on the repository.
 
+Browser E2E lanes use `ubuntu-24.04` to keep the operating-system major version
+stable while `ubuntu-latest` migrates. Image updates within Ubuntu 24.04 still apply.
+Changing this label requires verifying the Docker/browser lanes on the target image.
+
 ## API E2E budget policy
 
 The accepted layout uses three built-in shards on measured Linux x64 runners with
