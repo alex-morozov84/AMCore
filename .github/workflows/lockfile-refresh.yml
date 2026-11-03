@@ -33,11 +33,11 @@ jobs:
         with:
           node-version: 24
       - name: Refresh compatible resolutions
-        # Preserve Dependabot holds and the version-specific Next.js patch.
+        # Preserve holds, the Next.js patch and the reviewed Bull Board boundary.
         run: |
           pnpm --recursive --include-workspace-root update \
             --depth Infinity --lockfile-only --no-save --ignore-scripts --ignore-pnpmfile \
-            '!nestjs-cls' '!jest-mock-extended' '!next'
+            '!nestjs-cls' '!jest-mock-extended' '!next' '!@bull-board/*'
       - name: Create or update refresh PR
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
