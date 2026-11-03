@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { jest } from '@jest/globals'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import request from 'supertest'
 
 import { BROWSER_AUTH_HEADERS } from '@amcore/shared'
@@ -10,7 +11,9 @@ import { MfaEncryptionService } from '../src/core/auth/mfa/mfa-encryption.servic
 import { mfaCredential } from '../src/core/auth/mfa/mfa-secrets.js'
 import { mfaDatabaseClock } from '../src/core/auth/mfa/mfa-transaction.js'
 import { TokenService } from '../src/core/auth/token.service.js'
+import { InvitationAuthHandoffService } from '../src/core/invitations/invitation-auth-handoff.service.js'
 import { EnvService } from '../src/env/env.service.js'
+import { INVITATION_HANDOFF_JOB } from '../src/infrastructure/schedule/scheduled-jobs.catalogue.js'
 
 import { cleanDatabase, type E2ETestContext, setupE2ETest, teardownE2ETest } from './helpers.js'
 import { pendingPublication } from './mfa-publication.fixture.js'
@@ -21,6 +24,7 @@ describe('Actual private browser credential HTTP routes with dormant MFA', () =>
   let context: E2ETestContext
   beforeAll(async () => {
     context = await setupE2ETest()
+    await context.app.get(SchedulerRegistry).getCronJob(INVITATION_HANDOFF_JOB.id).stop()
     const env = context.app.get(EnvService)
     const get = env.get.bind(env)
     jest
@@ -123,6 +127,20 @@ describe('Actual private browser credential HTTP routes with dormant MFA', () =>
     ).toMatchObject({ publicationState: 'published' })
     expect(await context.prisma.orgMember.count({ where: { userId: f.user.id } })).toBe(0)
     expect(await context.prisma.session.count({ where: { userId: f.user.id } })).toBe(1)
+  })
+
+  it('aborts an expired handoff when the cleanup sweep runs explicitly', async () => {
+    const { body } = await invitationCandidate()
+    await context.prisma.invitationAuthHandoff.update({
+      where: { attemptId: body.handoff.attemptId },
+      data: { deadline: new Date(0) },
+    })
+    await context.app.get(InvitationAuthHandoffService).sweep()
+    expect(
+      await context.prisma.invitationAuthHandoff.findUnique({
+        where: { attemptId: body.handoff.attemptId },
+      })
+    ).toMatchObject({ status: 'aborted' })
   })
 
   it.each(['sid', 'fid', 'generation', 'key', 'expiry'] as const)(

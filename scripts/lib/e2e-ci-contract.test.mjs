@@ -106,19 +106,3 @@ test('CI invokes the same fail-closed local lane runner, preserves retries and i
   rmSync(temporary, { recursive: true, force: true })
   assert.ok(ciLanes(root).includes('mocked'))
 })
-
-// These snapshots measure two known ENOSPC lanes; the original runner owns execution.
-test('disk experiment only measures the two selected lanes without wrapping execution', () => {
-  const steps = parse(readFileSync(`${root}/.github/workflows/ci.yml`, 'utf8')).jobs[
-    'web-e2e-lanes'
-  ].steps
-  const snapshots = steps.filter((step) => step.name.startsWith('Disk space '))
-  assert.equal(snapshots.length, 2)
-  assert.equal(
-    snapshots[0].if,
-    "matrix.lane == 'staff-path-oauth' || matrix.lane == 'staff-invitation'"
-  )
-  assert.equal(snapshots[1].if, `always() && (${snapshots[0].if})`)
-  for (const step of snapshots)
-    assert.equal(step.run.trim(), 'df -Pk "$GITHUB_WORKSPACE"\ndf -Pi "$GITHUB_WORKSPACE"')
-})

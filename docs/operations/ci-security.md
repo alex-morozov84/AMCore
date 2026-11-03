@@ -180,11 +180,9 @@ below — required-check contexts only become selectable in that flow after they
 run at least once on the repository. A newly added job context needs that same
 one-time re-application after its first real run on the repository.
 
-The `staff-path-oauth` and `staff-invitation` browser jobs log workspace free space
-and inodes with `df` before preparation and after the lane, including failures.
-These snapshots do not measure the minimum reserve during execution or separate
-Docker storage. A missing final snapshot leaves the experiment incomplete.
-They perform no cleanup and do not establish that disk exhaustion is fixed.
+Browser E2E lanes use `ubuntu-24.04` to keep the operating-system major version
+stable while `ubuntu-latest` migrates. Image updates within Ubuntu 24.04 still apply.
+Changing this label requires verifying the Docker/browser lanes on the target image.
 
 ## API E2E budget policy
 
