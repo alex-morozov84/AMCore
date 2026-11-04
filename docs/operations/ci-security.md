@@ -33,6 +33,25 @@ not proof of cost, successful transfer or live branch protection. Seven-day safe
 exclude credentials and private fixture state. Publication, CI execution and repository
 settings retain their separate authority boundaries.
 
+## Docker Hub mirror
+
+Every CI job that builds or runs containers starts with the step `Docker Hub mirror`
+(`scripts/docker-registry-mirror.sh`). It sets `mirror.gcr.io` as a registry mirror of
+the runner's Docker daemon, so one setting covers `docker build`, `docker run`,
+`docker compose` and Testcontainers. The daemon falls back to Docker Hub when the
+mirror cannot answer. The mirror is an optimization: if the setup fails, the script
+restores the original daemon config and the job continues on plain Docker Hub with a
+warning annotation `Docker Hub mirror: NOT configured`. It fails the step only when
+Docker itself does not come back. A green job alone does not prove the mirror is
+active; check the run summary line `Docker Hub mirror: active`. The cause was a Docker Hub
+`502 Bad Gateway` that failed whole jobs after a few minutes, in places with no retry.
+
+Add the same step, right after checkout, to any new job that pulls images. Digest-pinned
+references are served through the mirror unchanged. The mirror helps only with
+Docker Hub images; images from other registries (for example `ghcr.io`) are pulled as before.
+The stand also retries its own `postgres` and `redis` pulls on registry 5xx and timeouts
+(`scripts/stand/registry-pull.mjs`); that protects local use, where this step is absent.
+
 ## Docker E2E disk preparation
 
 Docker-backed Web E2E lanes remove the preinstalled Android SDK
