@@ -24,11 +24,13 @@ test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 const ownedContexts: BrowserContext[] = []
 let before: Awaited<ReturnType<typeof probeRefusalEvidence>>
 let reads: ReturnType<typeof observeContextReads>
+let phase = 'journey'
 let foreignDocument: Record<string, unknown> | undefined
 test.beforeEach(async ({ page }) => {
   foreignDocument = undefined
   before = await probeRefusalEvidence()
-  reads = observeContextReads(page)
+  phase = 'journey'
+  reads = observeContextReads(page, () => phase)
 })
 test.afterEach(async ({ context }, info) => {
   try {
@@ -169,6 +171,7 @@ test('adoption creates and selects organizations', async ({ page, context }) => 
     page.getByRole('heading', { name: 'Adopter Beta', exact: true, level: 1 })
   ).toBeVisible()
   expect(new URL(page.url()).pathname).toBe(ui.path(`/${second}`))
+  phase = 'return-to-alpha'
   await page.goto(ui.path(`/${org}`))
   await expect(page.getByRole('heading', { name: 'Adopter Beta', exact: true })).toHaveCount(0)
   await expect(
