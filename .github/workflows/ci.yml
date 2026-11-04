@@ -812,7 +812,7 @@ jobs:
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Free unused SDK disk space for Docker lanes
-        if: matrix.lane != 'safety' && matrix.lane != 'mocked'
+        if: matrix.lane != 'mocked'
         timeout-minutes: 10
         run: |
           df -B1 / "$GITHUB_WORKSPACE" "$RUNNER_TEMP"

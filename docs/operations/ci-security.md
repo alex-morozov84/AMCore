@@ -57,8 +57,11 @@ The stand also retries its own `postgres` and `redis` pulls on registry 5xx and 
 Docker-backed Web E2E lanes remove the preinstalled Android SDK
 (`/usr/local/lib/android`) and system .NET SDK (`/usr/share/dotnet`) after checkout,
 before dependency installation and cache restoration. These lanes use neither SDK.
-The runner's own bundled runtime remains intact. The `safety` and `mocked` lanes
-skip this step. The step records free bytes and inode availability before and after
+The runner's own bundled runtime remains intact. Only the `mocked` lane skips this
+step, because it uses no Docker. The `safety` lane runs it: its stand tests build the
+application images, and the API readiness check fails when disk use passes 90%
+(`HEALTH_DISK_THRESHOLD_PERCENT`), so a nearly full runner shows up as an unhealthy
+`api` container. The step records free bytes and inode availability before and after
 removal; a successful removal alone does not prove sufficient build capacity.
 Do not rely on the extra disk observed on some hosted machines. Reassess runner
 capacity when measured build consumption no longer leaves adequate headroom.
