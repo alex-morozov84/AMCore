@@ -52,9 +52,9 @@ const redis = () => getWebRedisClient()
 
 async function fillMemory() {
   const client = await redis()
-  const used = Number(/used_memory:(\d+)/.exec(await client.info('memory'))![1])
   await client.configSet('maxmemory-policy', 'noeviction')
-  await client.configSet('maxmemory', String(used))
+  // A fixed limit below Redis overhead keeps every write refused until releaseMemory().
+  await client.configSet('maxmemory', '1')
 }
 const releaseMemory = async () => (await redis()).configSet('maxmemory', '0')
 
