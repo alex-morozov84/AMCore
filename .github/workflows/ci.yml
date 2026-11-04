@@ -788,6 +788,16 @@ jobs:
 
         timeout-minutes: 1
 
+      - name: Free unused SDK disk space for Docker lanes
+        if: matrix.lane != 'safety' && matrix.lane != 'mocked'
+        timeout-minutes: 10
+        run: |
+          df -B1 / "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+          df -i / "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+          sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet
+          df -B1 / "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+          df -i / "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+
       - name: Preparation budget
         id: preparation
         run: node scripts/lighthouse/ci-budget.mjs 20
@@ -884,7 +894,7 @@ jobs:
         timeout-minutes: 1
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-${{ matrix.lane }}
+          name: playwright-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.lane }}
           path: |
             .amcore/stands/*/report/
             .amcore/stands/*/test-results/

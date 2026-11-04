@@ -33,6 +33,17 @@ not proof of cost, successful transfer or live branch protection. Seven-day safe
 exclude credentials and private fixture state. Publication, CI execution and repository
 settings retain their separate authority boundaries.
 
+## Docker E2E disk preparation
+
+Docker-backed Web E2E lanes remove the preinstalled Android SDK
+(`/usr/local/lib/android`) and system .NET SDK (`/usr/share/dotnet`) after checkout,
+before dependency installation and cache restoration. These lanes use neither SDK.
+The runner's own bundled runtime remains intact. The `safety` and `mocked` lanes
+skip this step. The step records free bytes and inode availability before and after
+removal; a successful removal alone does not prove sufficient build capacity.
+Do not rely on the extra disk observed on some hosted machines. Reassess runner
+capacity when measured build consumption no longer leaves adequate headroom.
+
 ## What Each Gate Proves
 
 - **CodeQL** proves the repo is analyzed by GitHub's SAST pipeline and findings
