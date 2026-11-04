@@ -115,7 +115,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
@@ -146,7 +145,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
@@ -175,7 +173,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
@@ -204,7 +201,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
@@ -316,7 +312,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -398,7 +393,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
@@ -445,7 +439,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup Node.js for report validation
@@ -813,7 +806,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
         timeout-minutes: 1
@@ -1087,7 +1079,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
@@ -1205,7 +1196,6 @@ jobs:
           persist-credentials: false
 
       - name: Docker Hub mirror
-        continue-on-error: true
         run: bash scripts/docker-registry-mirror.sh
 
       - name: Setup pnpm
