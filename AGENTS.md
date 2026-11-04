@@ -286,6 +286,10 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   never background/log redirection; in a sandbox, `pnpm --filter web build`
   always uses the user-approved elevated path. Details:
   `docs/frontend/testing.md#observable-long-running-checks`.
+- **Red CI on a test you did not touch:** do not rerun and do not delete the test.
+  Reproduce it under parallel load and find the cause; a test that fails now and
+  then usually points at a real defect. Steps:
+  `docs/operations/ci-security.md#handling-a-red-ci-job-on-a-test-you-did-not-touch`.
 - **Browser accessibility scans:** use `expectNoAxeViolations()` from
   `apps/web/e2e/shared/axe.ts`; it waits for fonts and finite visual transitions.
   Assert the intended loaded/open state first; the helper also waits for

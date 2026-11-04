@@ -286,6 +286,39 @@ of the following hold, and remove it the moment any one stops holding:
    understand and re-verify the exception, since that's the part every fork
    actually gets.
 
+## Handling a red CI job on a test you did not touch
+
+A full CI run takes up to half an hour. A plain rerun costs that time again and
+proves nothing about the cause, so **do not rerun and do not delete the test first**.
+A test that fails now and then usually points at a real defect: the shared watch
+test, for example, exposed a `dist` file deleted by a parallel rebuild.
+
+1. **Find the failing job.** The aggregate `Test` job only mirrors the five jobs it
+   checks, so it fails within seconds when any of them is red. Open the job that
+   ran the test. Read its log with
+   `gh api repos/<owner>/<repo>/actions/jobs/<job-id>/logs`, which also works
+   while the run is still going. Search for the failing test name, not the whole log.
+2. **Check whether your change can cause it.** Compare the diff and the lockfile diff
+   with the failing area. Look at whether the same job passed on `main` with the
+   same lockfile. If your change cannot reach it, say so in the PR.
+3. **Reproduce it locally.** Run 8 to 16 copies of the one test file in parallel,
+   for three or four rounds, with a few busy processes occupying the CPUs. Keep
+   each run's output in a separate file. A race that appears once in 30 CI runs
+   often appears in 5 of 32 local runs under load.
+4. **Tell slowness from a defect.** Raise the wait (for example from 20 s to 90 s)
+   in a throwaway copy of the test. If the state still never converges, the code
+   is wrong and a longer timeout would only hide it. Fix the code, not the timeout.
+5. **If you cannot reproduce it, do not guess.** A guessed fix adds a workaround
+   and leaves the cause. Open a small test-only change that adds the missing state to
+   the failure message (the wave, counts, open sockets, retained leases). Merge it,
+   then rerun the failed job. The next failure explains itself.
+6. **Keep the test unless it proves nothing.** Delete or weaken a test only when it
+   checks something the product no longer promises, and say so in the PR.
+
+Local pitfalls: on macOS, `sed -i` needs a suffix argument (use `perl -pi -e`), and
+`kill(-pgid, 0)` can return `EPERM` while a process group still holds exited,
+unreaped members. Treat that as "still present", not as an error.
+
 ## What a fork inherits (and what it doesn't)
 
 A clone or fork receives the repository **files** that _declare_ the intended policy — but
