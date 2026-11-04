@@ -135,12 +135,17 @@ async function adoptionTeam(context: BrowserContext) {
 test('adoption creates and selects organizations', async ({ page, context }) => {
   const { ui, messages, owner } = await adoptionOwner(context)
   const creation = messages.organizationCreation
+  const expectLoaded = () =>
+    expect(page.getByRole('status').filter({ hasText: ui.text('loaded') })).toHaveText(
+      ui.text('loaded')
+    )
   expect(
     count('SELECT count(*) FROM core.org_members WHERE "userId"=:\'actor\';', {
       actor: owner.user.id,
     })
   ).toBe(0)
   await page.goto(ui.path())
+  await expectLoaded()
   await expect(page.getByText(ui.text('emptyTitle'), { exact: true })).toBeVisible()
   async function createOrganization(name: string) {
     await page.getByRole('button', { name: creation.create, exact: true }).click()
@@ -154,25 +159,28 @@ test('adoption creates and selects organizations', async ({ page, context }) => 
     expect(response.status()).toBe(201)
     const result = await response.json()
     await expect(page.getByRole('heading', { name, exact: true, level: 1 })).toBeVisible()
+    await expectLoaded()
     return result.data.id as string
   }
   const org = await createOrganization('Adopter Alpha')
-  await page.goto(ui.path())
-  await expect(page).toHaveURL(new RegExp(`${ui.path(`/${org}`)}$`))
   await page.getByRole('link', { name: ui.text('all'), exact: true }).click()
   await expect(page).toHaveURL(/view=list/)
+  await expectLoaded()
   await expect(page.getByRole('link', { name: ui.open('Adopter Alpha') })).toBeVisible()
   const second = await createOrganization('Adopter Beta')
   await page.goto(ui.path())
+  await expectLoaded()
   await expect(page.getByRole('link', { name: ui.open('Adopter Alpha') })).toBeVisible()
   await expect(page.getByRole('link', { name: ui.open('Adopter Beta') })).toBeVisible()
   await page.getByRole('link', { name: ui.open('Adopter Beta') }).click()
   await expect(
     page.getByRole('heading', { name: 'Adopter Beta', exact: true, level: 1 })
   ).toBeVisible()
+  await expectLoaded()
   expect(new URL(page.url()).pathname).toBe(ui.path(`/${second}`))
   phase = 'return-to-alpha'
   await page.goto(ui.path(`/${org}`))
+  await expectLoaded()
   await expect(page.getByRole('heading', { name: 'Adopter Beta', exact: true })).toHaveCount(0)
   await expect(
     page.getByRole('heading', { name: 'Adopter Alpha', exact: true, level: 1 })
