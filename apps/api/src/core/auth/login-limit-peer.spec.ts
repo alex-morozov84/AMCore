@@ -57,13 +57,19 @@ const realTimeout = setTimeout
 const realClearTimeout = clearTimeout
 const wallNow = performance.now.bind(performance)
 
-async function waitForPeer(predicate: () => boolean): Promise<void> {
+// `describe` runs only on timeout, so a failure reports what the peer actually saw.
+async function waitForPeer(predicate: () => boolean, describe?: () => string): Promise<void> {
   const deadline = wallNow() + 3000
   while (!predicate()) {
-    if (wallNow() >= deadline) throw new Error('Redis peer did not receive the wave')
+    if (wallNow() >= deadline) {
+      throw new Error(`Redis peer did not receive the wave${describe ? ` (${describe()})` : ''}`)
+    }
     await nextTurn()
   }
 }
+
+const evalCount = (commands: string[][]) =>
+  commands.filter((c) => c[0]?.toLowerCase() === 'eval').length
 
 async function withinWatchdog<T>(operation: () => Promise<T>): Promise<T> {
   let timer!: ReturnType<typeof setTimeout>
@@ -194,7 +200,10 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
           const results = Promise.allSettled(batch)
           expect(() => LoginLimitConnection.acquire()).toThrow('capacity')
           await waitForPeer(
-            () => p.commands.filter((c) => c[0]?.toLowerCase() === 'eval').length >= (wave + 1) * 32
+            () => evalCount(p.commands) >= (wave + 1) * 32,
+            () =>
+              `wave ${wave}: ${evalCount(p.commands)}/${(wave + 1) * 32} EVAL, ` +
+              `${p.commands.length} commands, ${p.sockets.size} open sockets`
           )
           await jest.advanceTimersByTimeAsync(250)
           return results
@@ -203,7 +212,7 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
       }
       healthy = true
       await expect(withinWatchdog(() => run(p.url))).resolves.toEqual([1, 0])
-      expect(p.commands.filter((c) => c[0]?.toLowerCase() === 'eval')).toHaveLength(65)
+      expect(evalCount(p.commands)).toBe(65)
     } finally {
       await p.close()
     }
