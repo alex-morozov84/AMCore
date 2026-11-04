@@ -13,6 +13,13 @@ Run `pnpm --filter @amcore/shared dev` to rebuild on source changes.
 Each build cleans `dist` before emitting dual ES2022 Node formats. The build is
 unbundled: `dist` mirrors `src` module by module.
 
+`dev` does not clean on rebuilds (`--no-clean`). The ESM and CommonJS builds run in
+parallel, and a per-rebuild clean could delete a file the other build had just written:
+`dist` then lacked `index.d.cts` until the next edit. The cost is that `dev` keeps the
+output of a deleted source module. Nothing reaches it, because the package exports only
+the root entry. Run `build` to clear `dist`. `scripts/lib/shared-package-watch.test.mjs`
+covers this behavior.
+
 - ESM: `dist/index.js`, `dist/index.d.ts` and one `.js`/`.d.ts` per source module.
 - CommonJS: `dist/index.cjs`, `dist/index.d.cts` and one `.cjs`/`.d.cts` per module.
 - JavaScript source maps embed their source content. The entry files only re-export,
