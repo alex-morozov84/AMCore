@@ -39,11 +39,11 @@ Every CI job that builds or runs containers starts with the step `Docker Hub mir
 (`scripts/docker-registry-mirror.sh`). It sets `mirror.gcr.io` as a registry mirror of
 the runner's Docker daemon, so one setting covers `docker build`, `docker run`,
 `docker compose` and Testcontainers. The daemon falls back to Docker Hub when the
-mirror cannot answer. The script never fails the job: the mirror is an optimization, and
-a failure leaves the job on plain Docker Hub. A green job alone does not prove the
-mirror is active. Check the run summary line `Docker Hub mirror: active`, or the
-`Registry mirrors:` line in the step log. A failed setup shows a yellow warning
-annotation `Docker Hub mirror: NOT configured`. The cause was a Docker Hub
+mirror cannot answer. The mirror is an optimization: if the setup fails, the script
+restores the original daemon config and the job continues on plain Docker Hub with a
+warning annotation `Docker Hub mirror: NOT configured`. It fails the step only when
+Docker itself does not come back. A green job alone does not prove the mirror is
+active; check the run summary line `Docker Hub mirror: active`. The cause was a Docker Hub
 `502 Bad Gateway` that failed whole jobs after a few minutes, in places with no retry.
 
 Add the same step, right after checkout, to any new job that pulls images. Digest-pinned
