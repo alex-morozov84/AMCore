@@ -31,6 +31,8 @@ for (const [state, signal] of [
           if (error.code !== 'ENOENT') throw error
         })
         if (m?.state === state) break
+        // A failed start purges itself and never reaches a later phase: stop waiting.
+        if (m?.state === 'purged') break
         await new Promise((resolve) => setTimeout(resolve, 10))
       }
       assert.equal(m?.state, state, 'startup never reached requested interruption phase')
