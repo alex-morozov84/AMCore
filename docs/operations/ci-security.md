@@ -54,14 +54,19 @@ The stand also retries its own `postgres` and `redis` pulls on registry 5xx and 
 
 ## Docker E2E disk preparation
 
-Docker-backed Web E2E lanes remove the preinstalled Android SDK
-(`/usr/local/lib/android`) and system .NET SDK (`/usr/share/dotnet`) after checkout,
-before dependency installation and cache restoration. These lanes use neither SDK.
-The runner's own bundled runtime remains intact. Only the `mocked` lane skips this
-step, because it uses no Docker. The `safety` lane runs it: its stand tests build the
-application images, and the API readiness check fails when disk use passes 90%
+Hosted Linux runners guarantee only about 14 GB of free disk, and some machines have
+less than others. Every job that builds application images runs
+`scripts/free-runner-disk.sh` after checkout: the Docker-backed Web E2E lanes (all but
+`mocked`, which uses no Docker, and including `safety`, whose stand tests build the
+images), `docker-image-smoke` and `observability-contract-live`. **Add the same step
+to any new job that builds images.** Jobs that only pull small images (Redis,
+Postgres) do not need it; the removal takes about a minute.
+
+The script removes the preinstalled Android SDK (`/usr/local/lib/android`) and system
+.NET SDK (`/usr/share/dotnet`); no job uses either. The runner's own bundled runtime
+remains intact. The API readiness check fails when disk use passes 90%
 (`HEALTH_DISK_THRESHOLD_PERCENT`), so a nearly full runner shows up as an unhealthy
-`api` container. The step records free bytes and inode availability before and after
+`api` container. The script prints free bytes and inode availability before and after
 removal; a successful removal alone does not prove sufficient build capacity.
 Do not rely on the extra disk observed on some hosted machines. Reassess runner
 capacity when measured build consumption no longer leaves adequate headroom.
