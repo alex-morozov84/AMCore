@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Invitation transaction proofs ignore unrelated operations while detecting a true
+  repeat. CI checkout cleanup no longer inherits an expired admission deadline.
+  Browser publication HTTP tests isolate scheduled handoff cleanup, and browser
+  E2E jobs use Ubuntu 24.04 instead of the moving `ubuntu-latest` label.
+
+- Weekly lockfile refresh keeps the reviewed Bull Board group together instead of
+  updating its API packages independently of the pinned Fastify adapter.
+
 ### Removed
 
 - The `pnpm init:project` command and its generated-project test matrix, change selector

@@ -44,10 +44,12 @@ test('Test accepts only the exact nonempty successful dependency set', () => {
 })
 
 test('independent leaves preserve commands and frozen preparation without aggregate cycles', () => {
+  // The mirror step is first; its script never fails the job (a warning instead).
+  const mirror = 'bash scripts/docker-registry-mirror.sh'
   const commands = {
-    'test-unit-redis': ['pnpm test', 'pnpm --filter web test:integration'],
-    'test-capability': ['pnpm test:capability-extension'],
-    'test-notification-ai': ['pnpm test:extension-contracts'],
+    'test-unit-redis': [mirror, 'pnpm test', 'pnpm --filter web test:integration'],
+    'test-capability': [mirror, 'pnpm test:capability-extension'],
+    'test-notification-ai': [mirror, 'pnpm test:extension-contracts'],
   }
   for (const [key, runs] of Object.entries(commands)) {
     const job = jobs[key]

@@ -6,8 +6,9 @@ import type { Prisma } from '../../src/generated/prisma/client'
 import type { PrismaService } from '../../src/prisma'
 const jest = import.meta.jest
 
-const operations = new AsyncLocalStorage<{ capture: (pid: number) => void }>()
+const operations = new AsyncLocalStorage<{ capture: (pid: number) => void; transactions: number }>()
 const backends = new WeakMap<Promise<unknown>, Promise<number>>()
+const counts = new WeakMap<Promise<unknown>, { transactions: number }>()
 
 /** Bind the exact invoked service operation to its real transaction connection. */
 export function trackInvitationOperation<T>(work: () => Promise<T>): Promise<T> {
@@ -15,9 +16,17 @@ export function trackInvitationOperation<T>(work: () => Promise<T>): Promise<T> 
   const pid = new Promise<number>((resolve) => {
     capture = resolve
   })
-  const result = operations.run({ capture }, work)
+  const state = { capture, transactions: 0 }
+  const result = operations.run(state, work)
   backends.set(result, pid)
+  counts.set(result, state)
   return result
+}
+
+export function invitationTransactionCount(operation: Promise<unknown>): number {
+  const state = counts.get(operation)
+  if (!state) throw new Error('Invitation operation was not tracked')
+  return state.transactions
 }
 
 export function carryInvitationBackend<T>(
@@ -55,6 +64,7 @@ export function observeInvitationTransactions(prisma: PrismaService): () => void
     options?: object
   ) => {
     const operation = operations.getStore()
+    if (operation) operation.transactions++
     if (!operation || typeof work !== 'function') return original(work, options)
     return original(async (tx) => {
       const rows = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`

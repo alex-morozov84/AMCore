@@ -7,7 +7,11 @@ import { InviteAcceptService } from '../../src/core/organizations/invite-accept.
 import { InviteAcceptLimiterService } from '../../src/core/organizations/invite-accept-limiter.service'
 import { OrganizationsService } from '../../src/core/organizations/organizations.service'
 import { EmailService } from '../../src/infrastructure/email/email.service'
-import { boundedFailure } from '../helpers/invitation-operation'
+import {
+  boundedFailure,
+  invitationTransactionCount,
+  trackInvitationOperation,
+} from '../helpers/invitation-operation'
 import type { InvitationProofFixture } from '../helpers/invitation-proof'
 import { invitationFence } from '../helpers/invitation-race'
 const jest = import.meta.jest
@@ -135,25 +139,34 @@ export function registerDurabilityProofs(getFixture: () => InvitationProofFixtur
     const stalled = new Promise<void>((_, no) => {
       reject = no
     })
+    // This background transaction runs outside the acceptance operation's async context.
+    // A global Prisma spy incorrectly counts it as a replay of the invitation commit.
+    let releaseBackground!: () => void
+    const background = new Promise<void>((resolve) => {
+      releaseBackground = resolve
+    }).then(() => prisma.$transaction(async () => null))
     const reset = jest
       .spyOn(context.app.get(InviteAcceptLimiterService), 'reset')
-      .mockReturnValueOnce(stalled)
+      .mockImplementationOnce(async () => {
+        releaseBackground()
+        await background
+        return stalled
+      })
     const service = context.app.get(InviteAcceptService)
     const logger = (service as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger
     const warning = jest.spyOn(logger, 'warn')
-    const transaction = jest.spyOn(prisma, '$transaction')
-    transaction.mockClear()
     const unhandled: unknown[] = []
     const record = (error: unknown): void => {
       unhandled.push(error)
     }
     process.on('unhandledRejection', record)
+    const acceptance = trackInvitationOperation(() => accept(token))
     try {
       expect(
-        await Promise.race([outcome(accept(token)), boundedFailure('Acknowledged response')])
+        await Promise.race([outcome(acceptance), boundedFailure('Acknowledged response')])
       ).toBe(200)
       expect(reset).toHaveBeenCalledTimes(1)
-      expect(transaction).toHaveBeenCalledTimes(1)
+      expect(invitationTransactionCount(acceptance)).toBe(1)
       const after = await truth(invite.id)
       expect(after.members).toHaveLength(1)
       expect(after.members[0]!.roles.map((r) => r.roleId)).toEqual([
@@ -174,16 +187,27 @@ export function registerDurabilityProofs(getFixture: () => InvitationProofFixtur
       expect(unhandled).toEqual([])
       expect(inspect(warning.mock.calls, { depth: 10 })).not.toContain(token)
       expect(await truth(invite.id)).toEqual(after)
-      expect(transaction).toHaveBeenCalledTimes(1)
+      expect(invitationTransactionCount(acceptance)).toBe(1)
       expect(await outcome(accept(token))).toBe(400)
       expect(await truth(invite.id)).toEqual(after)
     } finally {
       reject(new Error('safe teardown'))
+      releaseBackground()
+      await background
       process.off('unhandledRejection', record)
       reset.mockRestore()
       warning.mockRestore()
-      transaction.mockRestore()
     }
+  })
+
+  it('F1/R15 observer retains a genuine second transaction of the same operation', async () => {
+    const { prisma } = getFixture()
+    const replay = trackInvitationOperation(async () => {
+      await prisma.$transaction(async () => null)
+      await prisma.$transaction(async () => null)
+    })
+    await replay
+    expect(invitationTransactionCount(replay)).toBe(2)
   })
 
   it('R15 acknowledged commit survives cache invalidation/reset failure', async () => {

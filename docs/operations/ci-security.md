@@ -33,6 +33,46 @@ not proof of cost, successful transfer or live branch protection. Seven-day safe
 exclude credentials and private fixture state. Publication, CI execution and repository
 settings retain their separate authority boundaries.
 
+## Docker Hub mirror
+
+Every CI job that builds or runs containers starts with the step `Docker Hub mirror`
+(`scripts/docker-registry-mirror.sh`). It sets `mirror.gcr.io` as a registry mirror of
+the runner's Docker daemon, so one setting covers `docker build`, `docker run`,
+`docker compose` and Testcontainers. The daemon falls back to Docker Hub when the
+mirror cannot answer. The mirror is an optimization: if the setup fails, the script
+restores the original daemon config and the job continues on plain Docker Hub with a
+warning annotation `Docker Hub mirror: NOT configured`. It fails the step only when
+Docker itself does not come back. A green job alone does not prove the mirror is
+active; check the run summary line `Docker Hub mirror: active`. The cause was a Docker Hub
+`502 Bad Gateway` that failed whole jobs after a few minutes, in places with no retry.
+
+Add the same step, right after checkout, to any new job that pulls images. Digest-pinned
+references are served through the mirror unchanged. The mirror helps only with
+Docker Hub images; images from other registries (for example `ghcr.io`) are pulled as before.
+The stand also retries its own `postgres` and `redis` pulls on registry 5xx and timeouts
+(`scripts/stand/registry-pull.mjs`); that protects local use, where this step is absent.
+
+## Docker E2E disk preparation
+
+Hosted Linux runners guarantee only about 14 GB of free disk, and some machines have
+less than others. Every job that builds application images runs
+`scripts/free-runner-disk.sh` after checkout: the Docker-backed Web E2E lanes (all but
+`mocked`, which uses no Docker, and including `safety`, whose stand tests build the
+images), `docker-image-smoke` and `observability-contract-live`. **Add the same step
+to any new job that builds images.** Jobs that only pull small images (Redis,
+Postgres) do not need it; the removal takes one to two minutes.
+
+The script removes the preinstalled Android SDK (`/usr/local/lib/android`) and system
+.NET SDK (`/usr/share/dotnet`); no job uses either. The runner's own bundled runtime
+remains intact. The API readiness check fails when disk use passes
+`HEALTH_DISK_THRESHOLD_PERCENT` (90% by default), so a nearly full runner shows up as
+an unhealthy `api` container. The script prints free bytes and inode availability
+before and after removal. On an Azure runner it freed about 17 GiB; that is an
+observation, not a promise, and a successful removal alone does not prove sufficient
+build capacity. If a job still fails on disk, read those `df` lines first.
+Do not rely on the extra disk observed on some hosted machines. Reassess runner
+capacity when measured build consumption no longer leaves adequate headroom.
+
 ## What Each Gate Proves
 
 - **CodeQL** proves the repo is analyzed by GitHub's SAST pipeline and findings
@@ -179,6 +219,10 @@ merge) is the separate owner action described in
 below — required-check contexts only become selectable in that flow after they have
 run at least once on the repository. A newly added job context needs that same
 one-time re-application after its first real run on the repository.
+
+Browser E2E lanes use `ubuntu-24.04` to keep the operating-system major version
+stable while `ubuntu-latest` migrates. Image updates within Ubuntu 24.04 still apply.
+Changing this label requires verifying the Docker/browser lanes on the target image.
 
 ## API E2E budget policy
 
@@ -568,7 +612,10 @@ and transitive versions within existing manifest ranges and opens or updates one
 PR from `chore/lockfile-refresh`. Only `pnpm-lock.yaml` enters the PR. Exact pins,
 the root release-age policy and the `nestjs-cls`/`jest-mock-extended` holds remain.
 Next.js also stays at its current resolution because it has a version-specific
-patch. Keep these exclusions aligned with the holds and patch lifecycle.
+patch. The entire `@bull-board/*` group is excluded: its Fastify adapter is pinned,
+and its UI assets require hash and disclosure checks. Review Bull Board upgrades
+through the separate Dependabot group. Keep these exclusions aligned with the
+holds, patch lifecycle and reviewed board boundary.
 
 A repository administrator must enable **Settings → Actions → General → Workflow
 permissions → Allow GitHub Actions to create and approve pull requests**. Keep the
