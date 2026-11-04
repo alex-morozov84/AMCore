@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "dev": "tsdown --watch",
+    "dev": "tsdown --watch --no-clean",
     "lint": "node ../../scripts/lint.mjs --scope shared",
     "typecheck": "node ../../scripts/typecheck-native.mjs --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",

@@ -33,6 +33,8 @@ function groupAbsent(pid) {
     return false
   } catch (error) {
     if (error.code === 'ESRCH') return true
+    // macOS reports EPERM while a group still holds exited, not yet reaped members.
+    if (error.code === 'EPERM') return false
     throw error
   }
 }
