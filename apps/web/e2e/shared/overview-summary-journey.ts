@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
@@ -14,7 +14,7 @@ const catalogue = (locale: string) =>
 const t = catalogue(DEFAULT_LOCALE).console
 const common = catalogue(DEFAULT_LOCALE).common
 const secondary = catalogue(
-  new Set<string>(SUPPORTED_LOCALES).has('ru') ? 'ru' : DEFAULT_LOCALE
+  new Set<string>(SERVED_LOCALES).has('ru') ? 'ru' : DEFAULT_LOCALE
 ).console
 type Mode = (value: string) => unknown
 const card = (page: Page) => page.locator('[aria-labelledby="overview-attention-title"]')

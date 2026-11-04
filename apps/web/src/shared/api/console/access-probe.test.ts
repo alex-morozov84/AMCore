@@ -10,7 +10,7 @@ import {
   SessionStageTimeoutError,
   SessionVaultUnavailableError,
 } from '@/shared/api/bff/errors'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { probeConsoleAccess } from './access-probe'
 import { getConsoleSessionEntry } from './session'

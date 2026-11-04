@@ -2,7 +2,7 @@ import type { ExecutionContext } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import type { Request, Response } from 'express'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import {
   AuthErrorCode,
   BROWSER_AUTH_HEADERS,
@@ -274,7 +274,7 @@ describe('AuthController', () => {
 
     it('passes the negotiated Accept-Language locale to the service', async () => {
       // A locale this build serves, so the test holds for every build setting.
-      const served = SUPPORTED_LOCALES[0]
+      const served = SERVED_LOCALES[0]
       const localedRequest = {
         headers: { 'user-agent': 'test-agent', 'accept-language': `${served};q=0.9` },
         ip: '127.0.0.1',
@@ -291,7 +291,7 @@ describe('AuthController', () => {
 
       expect(authService.register).toHaveBeenCalledWith(
         registerDto,
-        expect.objectContaining({ acceptedLocale: SUPPORTED_LOCALES[0] })
+        expect.objectContaining({ acceptedLocale: SERVED_LOCALES[0] })
       )
     })
   })
@@ -637,7 +637,7 @@ describe('AuthController', () => {
     it('negotiates a supported Accept-Language header into the session locale', async () => {
       sessionService.getUserSessions.mockResolvedValue(mockEnvelope)
 
-      const locale = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+      const locale = SERVED_LOCALES.at(-1) ?? DEFAULT_LOCALE
       await controller.sessions(mockUser.id, mockRequest, defaultPagination, locale)
 
       expect(sessionService.getUserSessions).toHaveBeenCalledWith(

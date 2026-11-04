@@ -22,9 +22,9 @@ export async function sharedSettingsProblems(root) {
     return [error.message]
   }
   const problems = []
-  if (JSON.stringify(built.SUPPORTED_LOCALES) !== JSON.stringify(locales.enabled))
+  if (JSON.stringify(built.SERVED_LOCALES) !== JSON.stringify(locales.enabled))
     problems.push(
-      `served locales: built ${JSON.stringify(built.SUPPORTED_LOCALES)}, settings ${JSON.stringify(locales.enabled)}`
+      `served locales: built ${JSON.stringify(built.SERVED_LOCALES)}, settings ${JSON.stringify(locales.enabled)}`
     )
   if (built.DEFAULT_LOCALE !== locales.default)
     problems.push(`default locale: built ${built.DEFAULT_LOCALE}, settings ${locales.default}`)

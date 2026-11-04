@@ -340,7 +340,7 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   read `docs/frontend/seo.md`.
 - **Frontend i18n — English base, Russian second, both live by default.** Which
   locales a build serves is set in `packages/shared/src/config/locales.json`
-  (`SUPPORTED_LOCALES` means the served list; `LOCALE_CATALOGUES` lists the catalogues
+  (`SERVED_LOCALES` means the served list; `LOCALE_CATALOGUES` lists the catalogues
   the repository ships). Routes sit under `[locale]`; with several served locales every
   URL has an explicit prefix (`/en/...`, `/ru/...`), with one the URLs are bare. Never
   write a second hand-made locale list. Four rules an agent will otherwise break:

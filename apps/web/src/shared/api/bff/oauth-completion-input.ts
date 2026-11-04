@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 export const oauthTicketSchema = z
@@ -8,7 +8,7 @@ export const oauthTicketSchema = z
   .regex(/^[A-Za-z0-9_-]+$/)
 export const oauthCompletionSchema = z.strictObject({
   ticket: oauthTicketSchema,
-  locale: z.enum(SUPPORTED_LOCALES),
+  locale: z.enum(SERVED_LOCALES),
 })
 
 export type OAuthCompletionInput = z.infer<typeof oauthCompletionSchema>

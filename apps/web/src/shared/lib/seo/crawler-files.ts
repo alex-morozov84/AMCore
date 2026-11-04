@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import { type PageQuery, pageUrl } from './page-url'
 
@@ -54,16 +54,16 @@ function xmlText(value: string): string {
  */
 export function buildSitemap(origin: string, pages: readonly PublicPage[]): MetadataRoute.Sitemap {
   return pages.flatMap((page) => {
-    const urlFor = (locale: SupportedLocale) =>
+    const urlFor = (locale: CatalogueLocale) =>
       xmlText(pageUrl(origin, locale, page.path, page.query))
     const languages =
-      SUPPORTED_LOCALES.length > 1
+      SERVED_LOCALES.length > 1
         ? {
-            ...Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, urlFor(locale)])),
+            ...Object.fromEntries(SERVED_LOCALES.map((locale) => [locale, urlFor(locale)])),
             'x-default': urlFor(DEFAULT_LOCALE),
           }
         : undefined
-    return SUPPORTED_LOCALES.map((locale) => ({
+    return SERVED_LOCALES.map((locale) => ({
       url: urlFor(locale),
       ...(page.lastModified !== undefined && { lastModified: page.lastModified }),
       ...(page.changeFrequency && { changeFrequency: page.changeFrequency }),

@@ -1,5 +1,6 @@
 import type {
   AvatarResponse,
+  CatalogueLocale,
   ForgotPasswordInput,
   LoginInput,
   MfaBrowserSignInPending,
@@ -7,7 +8,6 @@ import type {
   ResendVerificationInput,
   ResetPasswordInput,
   SessionsListResponse,
-  SupportedLocale,
   UpdateProfileInput,
   UserResponse,
   VerifyEmailInput,
@@ -48,7 +48,7 @@ async function passwordSignIn(
     entryId: string
     returnEntryId?: string
     entryKind?: 'console'
-    locale: SupportedLocale
+    locale: CatalogueLocale
   }
 ): Promise<BrowserLoginResponse> {
   const bootstrap = await apiClient.post<
@@ -66,7 +66,7 @@ export function authActions(
     entryId: string
     returnEntryId?: string
     entryKind?: 'console'
-    locale: SupportedLocale
+    locale: CatalogueLocale
   }
 ) {
   return {
@@ -144,7 +144,7 @@ export const authApi = {
   getSessions: (
     page: number,
     limit: number,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): Promise<SessionsListResponse> =>
     apiClient.get<SessionsListResponse>(`/auth/sessions?page=${page}&limit=${limit}`, {
       headers: { 'Accept-Language': locale },

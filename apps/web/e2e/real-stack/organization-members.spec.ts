@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -47,7 +47,7 @@ test('members: real BFF, complete draft, Enter filtering, self-warning, responsi
   )
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(error.name))
-  for (const locale of SUPPORTED_LOCALES) {
+  for (const locale of SERVED_LOCALES) {
     const t = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     ).organizationMembers

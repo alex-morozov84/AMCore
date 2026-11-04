@@ -2,10 +2,10 @@ import { randomBytes } from 'node:crypto'
 
 import { NextResponse } from 'next/server'
 import {
+  type CatalogueLocale,
   invitationAdmissionResponseSchema,
   invitationAdmissionSchema,
   localizedFrontendUrl,
-  type SupportedLocale,
 } from '@amcore/shared'
 
 import { withinContextDeadline } from './context-deadline'
@@ -36,7 +36,7 @@ import 'server-only'
 
 function redirect(
   request: Request,
-  locale: SupportedLocale,
+  locale: CatalogueLocale,
   path: string,
   context?: ProductWebContext
 ) {
@@ -57,7 +57,7 @@ function redirect(
 /** Raw email tokens never enter rendered props, flow URLs or Redis records. GET never joins. */
 export async function invitationIngress(
   request: Request,
-  locale: SupportedLocale,
+  locale: CatalogueLocale,
   deps: ContextExecutorDeps
 ) {
   let destination: string | undefined
@@ -198,7 +198,7 @@ export async function invitationIngress(
 /** Confirm against the CURRENT browser proof, not the cookie candidate from the first response. */
 export async function invitationBootstrap(
   request: Request,
-  locale: SupportedLocale,
+  locale: CatalogueLocale,
   pendingId: string,
   deps: ContextExecutorDeps
 ) {

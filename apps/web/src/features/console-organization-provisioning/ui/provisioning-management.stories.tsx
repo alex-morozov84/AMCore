@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
@@ -9,7 +9,7 @@ import russian from '../../../../messages/ru.json'
 import { OrganizationProvisioning } from './organization-provisioning'
 
 const invitationLanguage =
-  SUPPORTED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
+  SERVED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
 const t = messages.console.organizationProvisioning
 const binding = 'a'.repeat(64)
 const root = '/api/console/organization-provisionings'

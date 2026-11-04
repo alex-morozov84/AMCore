@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 
 import { NextResponse } from 'next/server'
-import { browserLogoutReceiptResultSchema, SUPPORTED_LOCALES } from '@amcore/shared'
+import { browserLogoutReceiptResultSchema, SERVED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { getConsoleOverviewHref, getConsolePublicPathname } from '@/shared/lib/console-public-href'
@@ -45,7 +45,7 @@ export const returnEntrySchema = z
     userId: z.string(),
     browser: browserSchema,
     destination: z.string(),
-    locale: z.enum(SUPPORTED_LOCALES),
+    locale: z.enum(SERVED_LOCALES),
     expiresAt: z.number(),
     phase: z.enum(['prepared', 'logout_dispatched', 'logout_confirmed', 'claimed', 'superseded']),
     outcome: browserLogoutReceiptResultSchema.optional(),
@@ -153,7 +153,7 @@ export async function callLogoutReceipt(
 
 export async function createConsoleReturnEntry(request: Request, context: ProductWebContext) {
   const input = z
-    .object({ destination: z.string().max(1024), locale: z.enum(SUPPORTED_LOCALES) })
+    .object({ destination: z.string().max(1024), locale: z.enum(SERVED_LOCALES) })
     .strict()
     .parse(await readContextJson(request.body, 2048))
   const source = await settingsSource(request, context)

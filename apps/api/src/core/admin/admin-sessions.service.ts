@@ -6,8 +6,8 @@ import {
   type AdminSessionsListResponse,
   type AdminSessionsQuery,
   type AdminSessionsRevokeResult,
+  type CatalogueLocale,
   type RequestPrincipal,
-  type SupportedLocale,
 } from '@amcore/shared'
 
 import { BusinessRuleViolationException, NotFoundException } from '../../common/exceptions/index.js'
@@ -47,7 +47,7 @@ export class AdminSessionsService {
   async list(
     targetUserId: string,
     query: AdminSessionsQuery,
-    locale: SupportedLocale,
+    locale: CatalogueLocale,
     actor: RequestPrincipal
   ): Promise<AdminSessionsListResponse> {
     const user = await this.prisma.user.findUnique({
@@ -204,7 +204,7 @@ export class AdminSessionsService {
     }
   }
 
-  private toAdminSession(row: SessionListRow, locale: SupportedLocale): AdminSession {
+  private toAdminSession(row: SessionListRow, locale: CatalogueLocale): AdminSession {
     return {
       sessionId: row.familyId,
       userAgent: row.userAgent,

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale } from '@amcore/shared'
 
 import {
   NotificationCategory,
@@ -14,7 +14,7 @@ import type {
 
 const payloadSchema = z.object({ changedAt: z.iso.datetime() }).strict()
 type Payload = z.infer<typeof payloadSchema>
-function content(locale: SupportedLocale): RenderedNotificationContent {
+function content(locale: CatalogueLocale): RenderedNotificationContent {
   return locale === 'en'
     ? {
         title: 'New backup codes generated',

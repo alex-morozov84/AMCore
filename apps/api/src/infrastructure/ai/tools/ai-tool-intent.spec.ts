@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 
 import { fixtureToolContract } from '../../../../test/fixtures/extension-contracts/tool-registration'
 
@@ -91,8 +91,8 @@ describe('AI immutable intent contract', () => {
     }
     const registry = new AiToolContractRegistry([tool], [authority()])
     const prepared = await prepareToolIntent(tool, {}, ctx, tx, 1, registry)
-    expect(Object.keys(prepared.intent.preview!).sort()).toEqual([...SUPPORTED_LOCALES].sort())
-    for (const locale of SUPPORTED_LOCALES) {
+    expect(Object.keys(prepared.intent.preview!).sort()).toEqual([...SERVED_LOCALES].sort())
+    for (const locale of SERVED_LOCALES) {
       const guard = authority()
       const incomplete = {
         ...tool,

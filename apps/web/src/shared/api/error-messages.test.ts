@@ -13,7 +13,7 @@ import {
   PermissionErrorCode,
   ResourceErrorCode,
   RoleDefinitionErrorCode,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
   SupportMailErrorCode,
   WORK_REASONS,
 } from '@amcore/shared'
@@ -66,21 +66,21 @@ describe('API error message coverage', () => {
     expect(overlap).toEqual([])
   })
 
-  it.each(SUPPORTED_LOCALES)('%s translates every backend error code', (locale) => {
+  it.each(SERVED_LOCALES)('%s translates every backend error code', (locale) => {
     const messages = catalogues[locale]!.errors
     const missing = backendCodes.filter((code) => !(code in messages))
 
     expect(missing).toEqual([])
   })
 
-  it.each(SUPPORTED_LOCALES)('%s translates every client error code', (locale) => {
+  it.each(SERVED_LOCALES)('%s translates every client error code', (locale) => {
     const messages = catalogues[locale]!.errors
     const missing = clientCodes.filter((code) => !(code in messages))
 
     expect(missing).toEqual([])
   })
 
-  it.each(SUPPORTED_LOCALES)('%s has no orphaned error message', (locale) => {
+  it.each(SERVED_LOCALES)('%s has no orphaned error message', (locale) => {
     const known = new Set<string>([...backendCodes, ...clientCodes, 'correlationHint'])
     const orphaned = Object.keys(catalogues[locale]!.errors).filter((key) => !known.has(key))
 
@@ -89,7 +89,7 @@ describe('API error message coverage', () => {
     expect(orphaned).toEqual([])
   })
 
-  it.each(SUPPORTED_LOCALES)('%s never leaves an error message blank', (locale) => {
+  it.each(SERVED_LOCALES)('%s never leaves an error message blank', (locale) => {
     const blank = Object.entries(catalogues[locale]!.errors)
       .filter(([, value]) => typeof value !== 'string' || value.trim() === '')
       .map(([key]) => key)

@@ -23,8 +23,8 @@ import {
   contextRouteInput,
 } from '@/shared/api/bff/context-route-input'
 import { captureContextSession } from '@/shared/api/bff/context-session'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { getConsoleOrigin } from '@/shared/lib/admin-console-config'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { isConsoleRequestOriginTrusted } from './authenticated-proxy'
 import { establishmentConsoleDeps } from './establishment-deps'

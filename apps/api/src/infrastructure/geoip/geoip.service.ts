@@ -4,7 +4,7 @@ import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/com
 import { type CityResponse, open, type Reader } from 'maxmind'
 import { PinoLogger } from 'nestjs-pino'
 
-import { type SessionLocation, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, type SessionLocation } from '@amcore/shared'
 
 import { EnvService } from '../../env/env.service.js'
 
@@ -108,7 +108,7 @@ export class GeoIpService implements OnModuleInit, OnModuleDestroy {
    * locale's name is absent from the database; `countryCode` is a narrow
    * ISO code the caller localizes itself.
    */
-  resolve(ipAddress: string | null, locale: SupportedLocale): SessionLocation | null {
+  resolve(ipAddress: string | null, locale: CatalogueLocale): SessionLocation | null {
     if (!this.reader) return null
     const normalized = normalizeIpForGeoLookup(ipAddress)
     if (!normalized) return null

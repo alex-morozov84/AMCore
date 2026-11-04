@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest'
 vi.mock('client-only', () => ({}))
 vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
   ...(await importOriginal()),
-  SUPPORTED_LOCALES: ['en'],
+  SERVED_LOCALES: ['en'],
 }))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/login' }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))

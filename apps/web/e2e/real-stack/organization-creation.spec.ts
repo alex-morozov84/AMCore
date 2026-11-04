@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -10,7 +10,7 @@ import { activeTarget, guardedSql } from '../support/managed-target.mjs'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 import { organizationUi } from './organization-context.helpers'
 
-for (const locale of SUPPORTED_LOCALES) {
+for (const locale of SERVED_LOCALES) {
   test(`creation ${locale}: occupied identifier is explained and cancel clears its error`, async ({
     page,
     context,

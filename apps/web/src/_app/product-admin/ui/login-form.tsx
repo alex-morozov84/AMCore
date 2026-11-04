@@ -1,6 +1,6 @@
 'use client'
 
-import { productAdminPath, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, productAdminPath } from '@amcore/shared'
 
 import { LoginForm } from '@/features/auth-login'
 import { authActions } from '@/shared/api/auth-api'
@@ -14,7 +14,7 @@ export function ProductAdminLoginForm({
   targetLocale,
 }: {
   destination: string
-  targetLocale?: SupportedLocale
+  targetLocale?: CatalogueLocale
 }) {
   const router = useRouteProgressRouter()
   return (

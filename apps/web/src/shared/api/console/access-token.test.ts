@@ -7,7 +7,7 @@ import type { UserResponse } from '@amcore/shared'
 
 import { getOptionalSession } from '@/shared/api/bff/dal'
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { getConsoleAwareAccessToken, getConsoleAwareUser } from './access-token'
 import { getConsoleSessionEntry } from './session'

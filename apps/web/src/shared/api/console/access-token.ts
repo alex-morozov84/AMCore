@@ -6,7 +6,7 @@ import { browserSessionHeaders } from '@/shared/api/bff/browser-binding.server'
 import { contextSessionBinding } from '@/shared/api/bff/context-session'
 import { getOptionalSession, getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import type { TokenResolver } from '@/shared/api/server'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { getConsoleSessionEntry } from './session'
 import { CONSOLE_SESSION_COOKIE_NAME } from './session-cookie'

@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES, type SupportedLocale } from '../constants'
+import { type CatalogueLocale, SERVED_LOCALES } from '../constants'
 
 const SLASH = '/'.charCodeAt(0)
 
@@ -19,12 +19,12 @@ const SLASH = '/'.charCodeAt(0)
  * {@link localePathPrefix}.
  *
  * Lives in `packages/shared` deliberately: the prefix strategy is a contract
- * both apps must agree on, like `SUPPORTED_LOCALES` itself. If the frontend
+ * both apps must agree on, like `SERVED_LOCALES` itself. If the frontend
  * ever changes it, this is the one place the backend follows.
  */
 export function localizedFrontendUrl(
   baseUrl: string,
-  locale: SupportedLocale,
+  locale: CatalogueLocale,
   path = '',
   query?: Record<string, string>
 ): string {
@@ -43,16 +43,16 @@ export function localizedFrontendUrl(
 
 /**
  * The URL segment a locale contributes — `/en`, `/ru`, ... — or `''` when
- * `SUPPORTED_LOCALES` has exactly one entry: with one language there is nothing
+ * `SERVED_LOCALES` has exactly one entry: with one language there is nothing
  * to select, so a link carries no prefix.
  *
- * `locales` defaults to the live `SUPPORTED_LOCALES` and is only a parameter
- * so this branch is independently testable: AMCore's own `SUPPORTED_LOCALES`
+ * `locales` defaults to the live `SERVED_LOCALES` and is only a parameter
+ * so this branch is independently testable: AMCore's own `SERVED_LOCALES`
  * has two entries, so a test relying on the real constant could never exercise it.
  */
 export function localePathPrefix(
-  locale: SupportedLocale,
-  locales: readonly string[] = SUPPORTED_LOCALES
+  locale: CatalogueLocale,
+  locales: readonly string[] = SERVED_LOCALES
 ): string {
   return locales.length > 1 ? `/${locale}` : ''
 }

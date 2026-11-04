@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
 import {
+  type CatalogueLocale,
   classifyStoredLocale,
   DEFAULT_LOCALE,
-  SUPPORTED_LOCALES,
-  type SupportedLocale,
+  SERVED_LOCALES,
 } from '../constants'
 
 import { productAdminReturnSchema } from './frontend-context'
@@ -14,13 +14,13 @@ import { paginatedResponseSchema } from './pagination'
 export const emailInputSchema = z.string().trim().pipe(z.email())
 
 /**
- * Supported locale — derived from the single `SUPPORTED_LOCALES` source so
+ * Supported locale — derived from the single `SERVED_LOCALES` source so
  * registration, profile update, the user response, and email rendering all
  * validate against the same set. No hardcoded messages: a schema-level message
  * outranks the frontend's per-parse error map and would force English into a
  * localized UI.
  */
-export const supportedLocaleSchema = z.enum(SUPPORTED_LOCALES)
+export const supportedLocaleSchema = z.enum(SERVED_LOCALES)
 
 /**
  * Parse a stored locale string (e.g. the Prisma `User.locale` column) into the
@@ -32,7 +32,7 @@ export const supportedLocaleSchema = z.enum(SUPPORTED_LOCALES)
  * comes back if the locale is enabled again. Input schemas (`supportedLocaleSchema`)
  * stay strict: a new choice must be a served locale.
  */
-export function parseSupportedLocale(value: string): SupportedLocale {
+export function parseSupportedLocale(value: string): CatalogueLocale {
   const state = classifyStoredLocale(value)
   if (state === 'enabled') return supportedLocaleSchema.parse(value)
   if (state === 'disabled') return DEFAULT_LOCALE
@@ -48,7 +48,7 @@ export function parseSupportedLocale(value: string): SupportedLocale {
  * therefore no stored preference. Prefer `parseSupportedLocale` anywhere a bad
  * stored value should surface as an error instead of being silently defaulted.
  */
-export function coerceSupportedLocale(value: string | null | undefined): SupportedLocale {
+export function coerceSupportedLocale(value: string | null | undefined): CatalogueLocale {
   const parsed = supportedLocaleSchema.safeParse(value)
   return parsed.success ? parsed.data : DEFAULT_LOCALE
 }

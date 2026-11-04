@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { getLocale, getTranslations } from 'next-intl/server'
-import type { SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale } from '@amcore/shared'
 import { z } from 'zod'
 
 import { LoginPage } from '@/_pages/auth'
@@ -22,7 +22,7 @@ export async function SignInAgainMount({
   standalone?: boolean
 }) {
   const t = await getTranslations('auth')
-  const locale = (await getLocale()) as SupportedLocale
+  const locale = (await getLocale()) as CatalogueLocale
   const entryId = z.string().uuid().safeParse(query.entryId)
   const returnEntryId = z.string().uuid().safeParse(query.returnEntryId)
   const id = entryId.success ? entryId.data : randomUUID()

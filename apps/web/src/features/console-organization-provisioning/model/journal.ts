@@ -8,7 +8,7 @@ import {
   provisioningCreateSchema,
   provisioningReissueSchema,
   provisioningReplaceSchema,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 import { z } from 'zod'
 
@@ -18,7 +18,7 @@ export const provisioningDraftSchema = z.strictObject({
   name: z.string().max(100),
   slug: z.string().max(50),
   firstAdminEmail: z.string().max(254),
-  inviteLocale: z.enum(SUPPORTED_LOCALES),
+  inviteLocale: z.enum(SERVED_LOCALES),
 })
 // A frozen command is exactly what was sent (or may have been sent) and its operation ID is bound
 // to that content. It may name a locale the build no longer serves, so it is read against the
@@ -110,9 +110,7 @@ function withServedLocales(value: unknown): unknown {
  * could not be replayed; the caller then looks the result up instead of sending it.
  */
 export function isReplayable(command: PendingProvisioning): boolean {
-  return (
-    !('inviteLocale' in command.input) || SUPPORTED_LOCALES.includes(command.input.inviteLocale)
-  )
+  return !('inviteLocale' in command.input) || SERVED_LOCALES.includes(command.input.inviteLocale)
 }
 export function writeProvisioningJournal(row: ProvisioningJournal, scope: string): boolean {
   try {

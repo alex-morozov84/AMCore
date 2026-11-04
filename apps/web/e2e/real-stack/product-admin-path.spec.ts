@@ -5,7 +5,7 @@ import {
   DEFAULT_LOCALE,
   localizedFrontendUrl,
   productAdminPath,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
@@ -19,7 +19,7 @@ test('path administration shares website login/logout and preserves a localized 
 }) => {
   const target = activeTarget()
   const { product } = target.origins
-  const chosen = SUPPORTED_LOCALES.find((locale: string) => locale === 'ru') ?? DEFAULT_LOCALE
+  const chosen = SERVED_LOCALES.find((locale: string) => locale === 'ru') ?? DEFAULT_LOCALE
   const catalogue = (locale: string) =>
     JSON.parse(readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8'))
   const baseCopy = catalogue(DEFAULT_LOCALE)

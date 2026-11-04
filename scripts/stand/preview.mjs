@@ -55,7 +55,7 @@ export async function preview(m, profile = 'default') {
   const labels = await previewLabels(m)
   const require = createRequire(join(m.worktree, 'apps/web/package.json'))
   const { chromium, request } = require('@playwright/test')
-  const { SUPPORTED_LOCALES } = require('@amcore/shared')
+  const { SERVED_LOCALES } = require('@amcore/shared')
   const tmp = `${m.worktree}/.amcore/stands/${m.id}/tmp`
   await mkdir(tmp, { recursive: true, mode: 0o700 })
   const proxy = await relay(
@@ -180,7 +180,7 @@ export async function preview(m, profile = 'default') {
             (url) =>
               url.origin === m.origins.product &&
               (m.localePrefix
-                ? SUPPORTED_LOCALES.some((locale) => url.pathname === `/${locale}`)
+                ? SERVED_LOCALES.some((locale) => url.pathname === `/${locale}`)
                 : url.pathname === '/')
           )
         }
@@ -232,11 +232,11 @@ export async function preview(m, profile = 'default') {
           }
           if (profile === 'notification-work') {
             const { notificationWorkPreview } = await import('./notification-work-fixture.mjs')
-            await notificationWorkPreview(page, m, SUPPORTED_LOCALES)
+            await notificationWorkPreview(page, m, SERVED_LOCALES)
           }
           if (profile === 'support-mail') {
             const { supportMailPreview } = await import('./support-mail-preview.mjs')
-            await supportMailPreview(page, m, SUPPORTED_LOCALES)
+            await supportMailPreview(page, m, SERVED_LOCALES)
           }
           if (profile === 'ai-run-control') {
             const { aiRunControlPreview } = await import('./ai-run-control-fixture.mjs')

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '../constants'
+import { SERVED_LOCALES } from '../constants'
 
 import { createOrganizationSchema } from './organization'
 
@@ -39,7 +39,7 @@ export const organizationSetupStatusSchema = z.strictObject({
 })
 export const organizationPrepareAccountSchema = z.strictObject({
   email: z.email().max(254),
-  locale: z.enum(SUPPORTED_LOCALES).optional(),
+  locale: z.enum(SERVED_LOCALES).optional(),
 })
 export const organizationPreparedAccountSchema = z.strictObject({
   status: z.enum(['created', 'existing']),

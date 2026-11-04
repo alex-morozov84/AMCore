@@ -1,11 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import {
-  createInvitationOperationId,
-  localizedFrontendUrl,
-  SUPPORTED_LOCALES,
-} from '@amcore/shared'
+import { createInvitationOperationId, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Route, test } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
@@ -14,7 +10,7 @@ import { resetBrowserProbeDomainBudget } from '../support/mfa-domain-fixture.mjs
 import { directApi } from './credential-containment.helpers'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
-for (const locale of SUPPORTED_LOCALES)
+for (const locale of SERVED_LOCALES)
   test(`manager ${locale}: primary faults, dirty generation, unknown recovery and late retirement`, async ({
     page,
     context,

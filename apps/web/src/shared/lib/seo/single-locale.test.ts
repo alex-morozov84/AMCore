@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // and no `alternateLocale`. The locale is taken from the shared default, never spelled out.
 vi.mock('@amcore/shared', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@amcore/shared')),
-  SUPPORTED_LOCALES: ['single'],
+  SERVED_LOCALES: ['single'],
   localizedFrontendUrl: (
     base: string,
     _locale: string,

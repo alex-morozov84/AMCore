@@ -6,10 +6,10 @@ import { parseArgs } from 'node:util'
 import * as clack from '@clack/prompts'
 import { assertCleanGitTree, assertNotMaintainerCheckout, SafetyError } from './safety.mjs'
 import { unifiedDiff } from './diff.mjs'
-import { runVerification, runProjectVerification } from './verify.mjs'
+import { runVerification } from './verify.mjs'
 import { applyFilesystemTransaction } from './filesystem-transaction.mjs'
 
-export { SafetyError, clack, runVerification, runProjectVerification }
+export { SafetyError, clack, runVerification }
 
 export function parseCommonFlags(argv, extraOptions = {}) {
   const { values } = parseArgs({

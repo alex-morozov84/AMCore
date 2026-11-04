@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '../constants'
+import { SERVED_LOCALES } from '../constants'
 
 /**
  * Contract between the Console BFF and the API for the read-only queue board (Bull Board).
@@ -45,7 +45,7 @@ export const boardRenderContextSchema = z
   .object({
     /** Where the browser reaches the board; becomes the page's `<base>`. Ends without a slash. */
     basePath: relativePath(200),
-    locale: z.enum(SUPPORTED_LOCALES),
+    locale: z.enum(SERVED_LOCALES),
     /** Console page the "back" link points to (no query, no host). */
     returnHref: relativePath(300),
   })

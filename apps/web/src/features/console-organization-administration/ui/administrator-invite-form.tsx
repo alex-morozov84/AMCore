@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { administratorReasonSchema, coerceSupportedLocale, SUPPORTED_LOCALES } from '@amcore/shared'
+import { administratorReasonSchema, coerceSupportedLocale, SERVED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { useLocalizedForm } from '@/shared/hooks'
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const schema = z.strictObject({
   email: z.email().max(254),
-  inviteLocale: z.enum(SUPPORTED_LOCALES),
+  inviteLocale: z.enum(SERVED_LOCALES),
   reason: administratorReasonSchema,
 })
 export type AdministratorFormValue = z.infer<typeof schema>
@@ -67,7 +67,7 @@ export function AdministratorInviteForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {SUPPORTED_LOCALES.map((language) => (
+                  {SERVED_LOCALES.map((language) => (
                     <SelectItem key={language} value={language}>
                       {t(String(language) === 'ru' ? 'russian' : 'english')}
                     </SelectItem>

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 
 import type {
+  CatalogueLocale,
   FrontendDestination,
   InvitationOAuthCorrelation,
   ProductAdminReturn,
-  SupportedLocale,
 } from '@amcore/shared'
 
 import { AuthRedis } from '../../../infrastructure/redis/index.js'
@@ -41,7 +41,7 @@ export interface OAuthStateData {
    * Seeds a newly created OAuth user's locale; never overwrites an existing
    * user. Absent for link flows (the user already exists).
    */
-  locale?: SupportedLocale
+  locale?: CatalogueLocale
   /**
    * SHA-256 of the browser-binding nonce (set as a `SameSite=Lax` cookie on the
    * initiating browser). Required so the callback can prove it runs in the same

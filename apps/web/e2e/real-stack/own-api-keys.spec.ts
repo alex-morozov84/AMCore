@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -14,7 +14,7 @@ import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 // Never retain one-time credentials in browser artifacts, including a failed assertion.
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 test.afterEach(({ page }, info) => closeCredentialPage(page, info))
-for (const locale of SUPPORTED_LOCALES) {
+for (const locale of SERVED_LOCALES) {
   test(`own keys ${locale}: create, conceal, explicit loss, unknown result and permanent revocation`, async ({
     page,
     context,

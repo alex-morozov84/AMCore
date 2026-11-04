@@ -75,7 +75,7 @@ function recordInput(node, state) {
     if (ts.isPropertyAccessExpression(node.left)) {
       const owner = node.left.expression.getText()
       const field = node.left.name.text
-      if (/config/i.test(owner) && ['mode', 'slug'].includes(field)) state.explicitTopology = true
+      if (/config/i.test(owner) && ['mode', 'alias'].includes(field)) state.explicitTopology = true
     }
   }
   if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {

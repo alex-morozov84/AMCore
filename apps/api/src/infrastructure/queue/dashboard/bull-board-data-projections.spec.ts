@@ -1,4 +1,4 @@
-import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SERVED_LOCALES } from '@amcore/shared'
 
 import {
   BOARD_DATA_PROJECTIONS,
@@ -8,7 +8,7 @@ import {
 } from './bull-board-data-projections'
 
 // A supported locale, not a spelled-out one: a fork that keeps a single locale supports only that.
-const LOCALE = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]
+const LOCALE = SERVED_LOCALES[SERVED_LOCALES.length - 1]
 
 const REAL_EMAIL_JOB = {
   template: 'welcome',

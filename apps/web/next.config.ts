@@ -3,15 +3,15 @@ import path from 'node:path'
 
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
-import { PRODUCT_ADMIN_CONFIG, SUPPORTED_LOCALES } from '@amcore/shared'
+import { PRODUCT_ADMIN_CONFIG, SERVED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { HTML_LIMITED_BOTS } from './src/shared/lib/seo/html-limited-bots'
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 // One served locale: public URLs carry no locale prefix (see `redirects` and `rewrites` below).
-const SINGLE_LOCALE = SUPPORTED_LOCALES.length === 1
-const ONLY_LOCALE = SUPPORTED_LOCALES[0]
+const SINGLE_LOCALE = SERVED_LOCALES.length === 1
+const ONLY_LOCALE = SERVED_LOCALES[0]
 const deploymentVersion = process.env.NEXT_DEPLOYMENT_ID || randomUUID()
 const noindexHeaders = [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]
 const invitationPrivacyHeaders = [
@@ -183,24 +183,24 @@ const nextConfig: NextConfig = {
       },
       {
         // Locale topology follows the shared locale set.
-        source: SUPPORTED_LOCALES.length > 1 ? '/:locale/invite/:path*' : '/invite/:path*',
+        source: SERVED_LOCALES.length > 1 ? '/:locale/invite/:path*' : '/invite/:path*',
         headers: invitationPrivacyHeaders,
       },
       {
-        source: SUPPORTED_LOCALES.length > 1 ? '/:locale/verify-email' : '/verify-email',
+        source: SERVED_LOCALES.length > 1 ? '/:locale/verify-email' : '/verify-email',
         headers: invitationPrivacyHeaders,
       },
       ...['/reset-password'].map((suffix) => ({
-        source: `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}${suffix}`,
+        source: `${SERVED_LOCALES.length > 1 ? '/:locale' : ''}${suffix}`,
         headers: invitationPrivacyHeaders,
       })),
       ...['/invite/:path*', '/verify-email', '/reset-password'].map((suffix) => ({
-        source: `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}/${PRODUCT_ADMIN_CONFIG.alias}${suffix}`,
+        source: `${SERVED_LOCALES.length > 1 ? '/:locale' : ''}/${PRODUCT_ADMIN_CONFIG.alias}${suffix}`,
         headers: invitationPrivacyHeaders,
       })),
       // Native completion forms need exact Origin; expose only origin in Referer.
       ...['/auth/callback', `/${PRODUCT_ADMIN_CONFIG.alias}/auth/callback`].map((suffix) => ({
-        source: `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}${suffix}`,
+        source: `${SERVED_LOCALES.length > 1 ? '/:locale' : ''}${suffix}`,
         headers: invitationPrivacyHeaders.map((header) =>
           header.key === 'Referrer-Policy' ? { ...header, value: 'strict-origin' } : header
         ),
@@ -209,8 +209,8 @@ const nextConfig: NextConfig = {
       ...[
         '/api/auth/oauth/:provider/callback',
         '/api/product-admin/auth/oauth/:provider/callback',
-        `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}/organizations/:path*`,
-        `${SUPPORTED_LOCALES.length > 1 ? '/:locale' : ''}/settings/api-keys`,
+        `${SERVED_LOCALES.length > 1 ? '/:locale' : ''}/organizations/:path*`,
+        `${SERVED_LOCALES.length > 1 ? '/:locale' : ''}/settings/api-keys`,
         '/api/auth/oauth/complete',
         '/api/product-admin/auth/oauth/complete',
       ].map((source) => ({

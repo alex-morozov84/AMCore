@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { activeTarget } from '../support/managed-target.mjs'
@@ -30,7 +30,7 @@ test('an invitation link opened during a Redis stall waits for Redis, then opens
     DEFAULT_LOCALE,
     `invite/accept?token=${token}`
   )
-  const prefix = SUPPORTED_LOCALES.length > 1 ? `/${DEFAULT_LOCALE}` : ''
+  const prefix = SERVED_LOCALES.length > 1 ? `/${DEFAULT_LOCALE}` : ''
 
   pauseRedis(STALL_MS)
   const started = performance.now()

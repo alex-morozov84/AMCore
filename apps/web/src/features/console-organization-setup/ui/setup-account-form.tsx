@@ -5,7 +5,7 @@ import {
   coerceSupportedLocale,
   type OrganizationPrepareAccount,
   organizationPrepareAccountSchema,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 
 import { useLocalizedForm } from '@/shared/hooks'
@@ -69,7 +69,7 @@ export function SetupAccountForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {SUPPORTED_LOCALES.map((code) => (
+                  {SERVED_LOCALES.map((code) => (
                     <SelectItem key={code} value={code}>
                       {t(`languages.${code}`)}
                     </SelectItem>

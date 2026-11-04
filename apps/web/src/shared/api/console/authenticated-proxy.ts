@@ -8,7 +8,7 @@ import {
 } from '@/shared/api/bff/browser-binding.server'
 import { getOptionalSessionEntry } from '@/shared/api/bff/dal'
 import { isTrustedOrigin } from '@/shared/api/bff/origin-guard'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { isConsoleHost } from '@/shared/lib/console-host-guard'
 
 import { isTrustedConsoleOrigin } from './origin-guard'

@@ -146,7 +146,7 @@ export const AUTH = {
 } as const
 
 // Locales: the catalogues the repository ships, the locales this build serves
-// (`SUPPORTED_LOCALES`) and the default come from `config/locales.json`; see
+// (`SERVED_LOCALES`) and the default come from `config/locales.json`; see
 // `./locales`. The Prisma `User.locale` column default (`en`) is only an inert fallback
 // for raw inserts: application code always writes an explicit locale.
 export * from './admin-console'

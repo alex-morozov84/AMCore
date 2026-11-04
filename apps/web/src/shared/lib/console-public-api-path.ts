@@ -1,4 +1,4 @@
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 
 /**
  * Maps a physical console BFF suffix (always `app/api/console/**`,

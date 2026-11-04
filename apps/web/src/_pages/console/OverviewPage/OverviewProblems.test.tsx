@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { createTranslator, NextIntlClientProvider } from 'next-intl'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -110,7 +110,7 @@ describe('problem summary presentation', () => {
 
 describe('C1 visible private-file observations', () => {
   it.each(
-    SUPPORTED_LOCALES.flatMap((locale) =>
+    SERVED_LOCALES.flatMap((locale) =>
       [false, true].map((primaryFailed) => ({ locale, primaryFailed }))
     )
   )(

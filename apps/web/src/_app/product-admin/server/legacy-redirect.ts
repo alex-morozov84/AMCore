@@ -6,7 +6,7 @@ import {
   localizedFrontendUrl,
   ownKeyQuerySchema,
   productAdminPath,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
@@ -33,7 +33,7 @@ export function legacyAdminRedirect(
     if (error instanceof ContextRequestError) return new Response(null, { status: error.status })
     throw error
   }
-  if (!SUPPORTED_LOCALES.some((locale) => locale === params.locale))
+  if (!SERVED_LOCALES.some((locale) => locale === params.locale))
     return new Response(null, { status: 404 })
   if (request.method !== 'GET' && request.method !== 'HEAD')
     return new Response(null, { status: 405 })

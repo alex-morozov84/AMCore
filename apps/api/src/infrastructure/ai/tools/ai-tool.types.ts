@@ -1,7 +1,7 @@
 import type { DynamicModule, InjectionToken, Type } from '@nestjs/common'
 import type { ZodType } from 'zod'
 
-import type { AiApprovalPreview, SupportedLocale } from '@amcore/shared'
+import type { AiApprovalPreview, CatalogueLocale } from '@amcore/shared'
 
 import type { Prisma } from '../../../generated/prisma/client.js'
 import type { AiToolRiskClass } from '../../../generated/prisma/client.js'
@@ -72,7 +72,7 @@ export interface AiToolContract<TInput = unknown, TArgs = TInput> {
 export interface AiToolPreparation<TParams = unknown> {
   args: TParams
   target: { kind: string; id: string; revision: number } | null
-  preview: Partial<Record<SupportedLocale, AiApprovalPreview>> | null
+  preview: Partial<Record<CatalogueLocale, AiApprovalPreview>> | null
 }
 
 export interface AiToolIntent<TParams = unknown> extends AiToolPreparation<TParams> {

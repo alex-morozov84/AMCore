@@ -5,7 +5,7 @@ import {
   type ProductWebContext,
 } from '@/shared/api/bff/product-web-context.server'
 import { productWebRoute } from '@/shared/api/bff/product-web-route'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { consoleBrowserContext } from './browser-context'
 import { isTrustedConsoleOrigin } from './origin-guard'

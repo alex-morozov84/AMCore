@@ -1,5 +1,5 @@
 import type { AdministratorSummary } from '@amcore/shared'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { http, HttpResponse, type HttpResponseResolver } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
@@ -12,7 +12,7 @@ import { OrganizationAdministration } from './organization-administration'
 import { OrganizationAttention } from './organization-attention'
 
 const invitationLanguage =
-  SUPPORTED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
+  SERVED_LOCALES.find((locale) => String(locale) === 'ru') ?? DEFAULT_LOCALE
 const t = messages.console.organizationAdministration
 const binding = 'a'.repeat(64)
 const orgId = '11111111-1111-4111-8111-111111111111'

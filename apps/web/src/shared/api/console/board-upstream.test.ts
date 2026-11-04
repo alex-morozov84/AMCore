@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
@@ -78,10 +78,10 @@ describe('board render context', () => {
       headers: cookie ? { cookie } : {},
     })
 
-  it.each(SUPPORTED_LOCALES)(
+  it.each(SERVED_LOCALES)(
     'uses the public path, the cookie locale (%s) and the Background work page',
     (locale) => {
-      const prefix = SUPPORTED_LOCALES.length > 1 ? `/${locale}` : ''
+      const prefix = SERVED_LOCALES.length > 1 ? `/${locale}` : ''
       expect(buildBoardRenderContext(request(`NEXT_LOCALE=${locale}`))).toEqual({
         basePath: getConsoleQueueBoardBasePath(),
         locale,

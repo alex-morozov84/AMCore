@@ -1,7 +1,7 @@
 import { type DynamicModule, Injectable, Module, type Type } from '@nestjs/common'
 import { z } from 'zod'
 
-import { Action, Subject, SUPPORTED_LOCALES } from '@amcore/shared'
+import { Action, SERVED_LOCALES, Subject } from '@amcore/shared'
 
 import { ForbiddenException } from '../../../src/common/exceptions'
 import { DomainAuthorizationModule } from '../../../src/core/auth/domain-authorization.module'
@@ -120,7 +120,7 @@ export class FixtureOrganizationTool implements AiTool<
       args: { organizationId: row.id, name },
       target: { kind: 'Organization', id: row.id, revision: row.aclVersion },
       preview: Object.fromEntries(
-        SUPPORTED_LOCALES.map((locale) => [
+        SERVED_LOCALES.map((locale) => [
           locale,
           {
             title: 'Rename organization',

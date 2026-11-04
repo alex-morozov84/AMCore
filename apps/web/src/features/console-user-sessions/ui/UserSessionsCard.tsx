@@ -5,7 +5,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import type { AdminSession } from '@amcore/shared'
 import { RefreshCw } from 'lucide-react'
 
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'

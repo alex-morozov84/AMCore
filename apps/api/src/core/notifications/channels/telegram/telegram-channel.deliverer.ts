@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
 
 import { canonicalJsonHash } from '../../../../common/utils/canonical-json.js'
 import { EnvService } from '../../../../env/env.service.js'
@@ -176,7 +176,7 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
   private composeText(
     content: RenderedNotificationContent,
     hasAction: boolean,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): string {
     const base = `${content.title}\n\n${content.body}`
     // Locale-prefixed: the recipient may open this from a client that has never
@@ -226,7 +226,7 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
     type: string,
     schemaVersion: number,
     payload: unknown,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): RenderedNotificationContent | 'forbidden' | 'payload_invalid' | 'version_unavailable' {
     let definition
     try {
@@ -248,7 +248,7 @@ export class TelegramChannelDeliverer implements ChannelDeliverer {
     return this.genericContent(locale)
   }
 
-  private genericContent(locale: SupportedLocale): RenderedNotificationContent {
+  private genericContent(locale: CatalogueLocale): RenderedNotificationContent {
     return telegramGenericMessages[locale]
   }
 }

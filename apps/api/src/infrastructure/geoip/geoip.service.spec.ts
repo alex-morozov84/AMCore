@@ -1,6 +1,6 @@
 import type { PinoLogger } from 'nestjs-pino'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import type { EnvService } from '../../env/env.service'
 
@@ -126,7 +126,7 @@ describe('GeoIpService', () => {
       )
       await service.reload()
 
-      for (const locale of SUPPORTED_LOCALES) {
+      for (const locale of SERVED_LOCALES) {
         expect(service.resolve('203.0.0.1', locale)).toEqual({
           city: { en: 'Berlin', ru: 'Берлин' }[locale],
           countryCode: 'DE',
@@ -141,7 +141,7 @@ describe('GeoIpService', () => {
       )
       await service.reload()
 
-      for (const locale of SUPPORTED_LOCALES) {
+      for (const locale of SERVED_LOCALES) {
         expect(service.resolve('203.0.0.1', locale)).toEqual({
           city: 'Berlin',
           countryCode: 'DE',

@@ -1,4 +1,4 @@
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 
 const FQDN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
 type ConsoleEnvironment = {

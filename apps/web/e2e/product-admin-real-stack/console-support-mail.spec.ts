@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -29,7 +29,7 @@ test('operator recovery and verification use real localized website mail with sa
   const copy = (locale: string) =>
     JSON.parse(readFileSync(join(m.snapshot, `apps/web/messages/${locale}.json`), 'utf8'))
   const baseLocale = DEFAULT_LOCALE
-  const recipientLocale = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+  const recipientLocale = SERVED_LOCALES.at(-1) ?? DEFAULT_LOCALE
   const operatorLocale = m.consoleTopology === 'host' ? baseLocale : recipientLocale
   const loginCopy = copy(baseLocale)
   const operatorCopy = copy(operatorLocale)

@@ -45,7 +45,7 @@ test('pure URL-builder input and explicit path/host config are allowed', () => {
   })`
   const topology = `it('route', () => {
     mutableConfig.mode = 'path'
-    mutableConfig.slug = 'admin'
+    mutableConfig.alias = 'admin'
     expect(getConsoleUsersHref()).toBe('/admin/users')
   })`
   assert.deepEqual(scan(builder), [])

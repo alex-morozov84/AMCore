@@ -1,5 +1,5 @@
 import { defineRouting } from 'next-intl/routing'
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 /**
  * Locale routing contract for the web app.
@@ -39,7 +39,7 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
  * user who follows a `/ru/...` link would be bounced back and forth.
  */
 export const routing = defineRouting({
-  locales: SUPPORTED_LOCALES,
+  locales: SERVED_LOCALES,
   defaultLocale: DEFAULT_LOCALE,
   localePrefix: 'always',
   // next-intl's default sends hreflang as a `Link` header built from the request's own

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '../constants'
+import { SERVED_LOCALES } from '../constants'
 import { ORGANIZATION_CONTEXT_ID_PATTERN } from '../constants/organization-context'
 
 export const frontendDestinationSchema = z.enum(['site', 'admin'])
@@ -45,7 +45,7 @@ export const productAdminReturnSchema = z
     ]),
     orgId: contextId.optional(),
     roleId: contextId.optional(),
-    locale: z.enum(SUPPORTED_LOCALES).optional(),
+    locale: z.enum(SERVED_LOCALES).optional(),
     query: returnQuerySchema.optional(),
   })
   .refine((value) => {

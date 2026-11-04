@@ -7,7 +7,7 @@ import {
   localizedFrontendUrl,
   type OrganizationBootstrap,
   type OrganizationPrepareAccount,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
 } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
@@ -102,7 +102,7 @@ export async function proveSetupMailbox(page: Page, email: string) {
     const url = new URL(candidate)
     if (url.origin !== target.origins.product || url.searchParams.size !== 1)
       throw new Error('foreign')
-    const locale = SUPPORTED_LOCALES.find(
+    const locale = SERVED_LOCALES.find(
       (code) =>
         new URL(localizedFrontendUrl(target.origins.product, code, 'reset-password')).pathname ===
         url.pathname

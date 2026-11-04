@@ -2,7 +2,7 @@ import { handleAccountMfa } from '@/shared/api/bff/account-mfa-handler'
 import { apiErrorResponse } from '@/shared/api/bff/api-error-response'
 import { authFailureResponse } from '@/shared/api/bff/auth-failure-response'
 import { productWebRoute } from '@/shared/api/bff/product-web-route'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { consoleBrowserContext } from './browser-context'
 import { isTrustedConsoleOrigin } from './origin-guard'

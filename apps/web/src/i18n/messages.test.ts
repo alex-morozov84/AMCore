@@ -1,4 +1,4 @@
-import { LOCALE_CATALOGUES, SUPPORTED_LOCALES } from '@amcore/shared'
+import { LOCALE_CATALOGUES, SERVED_LOCALES } from '@amcore/shared'
 import { describe, expect, it } from 'vitest'
 
 import en from '../../messages/en.json'
@@ -58,8 +58,8 @@ describe('message catalogues', () => {
   })
 
   it('routing is derived from the shared locale contract', () => {
-    expect([...routing.locales].sort()).toEqual([...SUPPORTED_LOCALES].sort())
-    expect(SUPPORTED_LOCALES).toContain(routing.defaultLocale)
+    expect([...routing.locales].sort()).toEqual([...SERVED_LOCALES].sort())
+    expect(SERVED_LOCALES).toContain(routing.defaultLocale)
   })
 
   const basePaths = leafPaths(en).sort()

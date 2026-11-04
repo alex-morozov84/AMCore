@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { AuthErrorCode, type SupportedLocale } from '@amcore/shared'
+import { AuthErrorCode, type CatalogueLocale } from '@amcore/shared'
 
 import { OAuthCompletionPage } from '@/_pages/auth'
 import { ClientMessages } from '@/i18n/client-message-boundary'
@@ -18,7 +18,7 @@ export async function OAuthCompletionMount({
   kind,
 }: {
   query: Record<string, string | string[] | undefined>
-  locale: SupportedLocale
+  locale: CatalogueLocale
   kind: 'site-auth' | 'admin-auth'
 }) {
   let context

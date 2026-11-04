@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { coerceSupportedLocale, localizedFrontendUrl, type SupportedLocale } from '@amcore/shared'
+import { type CatalogueLocale, coerceSupportedLocale, localizedFrontendUrl } from '@amcore/shared'
 
 import { EnvService } from '../../../env/env.service.js'
 import { EmailService, EmailTemplate } from '../../../infrastructure/email/index.js'
@@ -154,7 +154,7 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
     type: string,
     schemaVersion: number,
     payload: unknown,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): RenderedNotificationContent | 'forbidden' | 'payload_invalid' | 'version_unavailable' {
     let definition
     try {
@@ -177,7 +177,7 @@ export class EmailChannelDeliverer implements ChannelDeliverer {
     return this.genericContent(locale)
   }
 
-  private genericContent(locale: SupportedLocale): RenderedNotificationContent {
+  private genericContent(locale: CatalogueLocale): RenderedNotificationContent {
     // These strings have no ICU interpolation, so index the message catalog directly —
     // avoids pulling the ESM `@formatjs/intl` into this worker service.
     const messages = emailMessages[locale]

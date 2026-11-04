@@ -49,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shared locale exports now distinguish `CatalogueLocale` (all shipped catalogues; formerly
+  `SupportedLocale`) from `SERVED_LOCALES` (languages enabled for this build; formerly
+  `SUPPORTED_LOCALES`). Update downstream imports when upgrading. The handwritten web Console
+  adapter is now `admin-console-topology.ts`, with `alias` replacing its `slug` property.
+  Locale parsing, fallback and Console routing behavior stay the same.
+
 - A weekly lockfile refresh opens one PR for compatible dependency resolutions,
   preserving existing pins and holds and relying on the required PR checks.
 - `PROJECT_CONTEXT.md` no longer holds `i18n_mode`, `base_locale`, `supported_locales`,

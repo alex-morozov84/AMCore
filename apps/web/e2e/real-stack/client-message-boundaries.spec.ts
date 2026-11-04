@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { DEFAULT_LOCALE, localePathPrefix, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localePathPrefix, SERVED_LOCALES } from '@amcore/shared'
 import { type APIResponse, expect, test } from '@playwright/test'
 
 import { ROOT_CLIENT_NAMESPACES } from '../../src/i18n/message-selection'
@@ -59,7 +59,7 @@ test('sibling navigation sends new section messages without the departed section
   expect(missing).toEqual([])
 })
 
-for (const locale of SUPPORTED_LOCALES) {
+for (const locale of SERVED_LOCALES) {
   test(`production login excludes MFA messages from HTML and RSC (${locale})`, async ({
     request,
   }) => {

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -20,7 +20,7 @@ import { resetInvitationRegistrationIpBudget } from './invitation-registration-b
 
 test.beforeEach(() => resetInvitationRegistrationIpBudget())
 
-for (const locale of SUPPORTED_LOCALES) {
+for (const locale of SERVED_LOCALES) {
   for (const loseResponse of [false, true]) {
     test(`recipient ${locale} (${loseResponse ? 'lost acceptance response' : 'acknowledged acceptance'}): registration, verification and consent`, async ({
       page,
@@ -152,7 +152,7 @@ for (const locale of SUPPORTED_LOCALES) {
   }
 }
 
-for (const locale of SUPPORTED_LOCALES) {
+for (const locale of SERVED_LOCALES) {
   test(`recipient ${locale}: account created but session publication refused, notice then explicit sign-in`, async ({
     page,
     context,

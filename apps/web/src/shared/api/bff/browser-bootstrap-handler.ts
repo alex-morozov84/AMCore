@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { browserBootstrapResultSchema, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { browserBootstrapResultSchema, DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 import { z } from 'zod'
 
 import { fetchBackendResponse, getBackendBaseUrl } from '../backend-transport'
@@ -63,7 +63,7 @@ async function bootstrap(request: Request, context: ProductWebContext): Promise<
       entryId: z.string().uuid().optional(),
       returnEntryId: z.string().uuid().optional(),
       entryKind: z.literal('console').optional(),
-      locale: z.enum(SUPPORTED_LOCALES).optional(),
+      locale: z.enum(SERVED_LOCALES).optional(),
     })
     .strict()
     .safeParse(await readContextJson(request.body, 2048))
@@ -82,7 +82,7 @@ export async function prepareBrowserAuthAttempt(
     entryId?: string
     returnEntryId?: string
     entryKind?: 'console'
-    locale?: (typeof SUPPORTED_LOCALES)[number]
+    locale?: (typeof SERVED_LOCALES)[number]
   }
 ): Promise<NextResponse> {
   const anchor = readBrowserAnchor(request.headers, context.audience)

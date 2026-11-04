@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SUPPORTED_LOCALES } from '../constants'
+import { SERVED_LOCALES } from '../constants'
 
 import { productAdminReturnSchema } from './frontend-context'
 import { invitationFlowIdSchema } from './invitation-flow'
@@ -12,7 +12,7 @@ export const consoleReturnDestinationSchema = z
       .string()
       .startsWith('/')
       .refine((value) => !value.startsWith('//')),
-    locale: z.enum(SUPPORTED_LOCALES),
+    locale: z.enum(SERVED_LOCALES),
   })
   .strict()
 

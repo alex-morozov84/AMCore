@@ -18,7 +18,7 @@ jest.mock('@amcore/shared', () => {
   const actual = jest.requireActual('@amcore/shared')
   return {
     ...actual,
-    SUPPORTED_LOCALES: ['ru'],
+    SERVED_LOCALES: ['ru'],
     DEFAULT_LOCALE: 'ru',
     coerceSupportedLocale: () => 'ru',
   }

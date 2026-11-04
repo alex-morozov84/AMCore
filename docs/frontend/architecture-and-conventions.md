@@ -294,13 +294,13 @@ rules.
 ## Locale routing
 
 Every route lives under a `[locale]` segment: `src/app/[locale]/(auth)/login/page.tsx`.
-The locale set and default come from `SUPPORTED_LOCALES` / `DEFAULT_LOCALE` in
+The locale set and default come from `SERVED_LOCALES` / `DEFAULT_LOCALE` in
 `@amcore/shared` — the same source the API uses for `User.locale`,
 `Accept-Language` negotiation, and email rendering, so the frontend can never
 disagree with the backend about which locales exist.
 
 The served list is read from `packages/shared/src/config/locales.json`
-(`SUPPORTED_LOCALES` means the locales this build serves). With two or more served
+(`SERVED_LOCALES` means the locales this build serves). With two or more served
 locales `localePrefix` is `'always'`: **every** locale is explicit, including the
 default — `/en/login`, `/ru/login`. A request to `/login` redirects to
 `/en/login`; an unsupported locale such as `/de/login` is a 404, never a silent

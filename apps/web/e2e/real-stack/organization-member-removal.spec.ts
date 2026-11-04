@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { localizedFrontendUrl, SUPPORTED_LOCALES } from '@amcore/shared'
+import { localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -46,7 +46,7 @@ test('member removal: cancellation, last ADMIN, lost acknowledgment, narrow RU a
     }
   )
   let catalogue: Record<string, Record<string, string>>
-  const visit = async (locale: (typeof SUPPORTED_LOCALES)[number]) => {
+  const visit = async (locale: (typeof SERVED_LOCALES)[number]) => {
     catalogue = JSON.parse(
       readFileSync(join(target.snapshot, `apps/web/messages/${locale}.json`), 'utf8')
     )
@@ -75,7 +75,7 @@ test('member removal: cancellation, last ADMIN, lost acknowledgment, narrow RU a
   }
   const failures: string[] = []
   page.on('pageerror', (error) => failures.push(error.message))
-  for (const locale of SUPPORTED_LOCALES) {
+  for (const locale of SERVED_LOCALES) {
     await visit(locale)
     await open(colleagueEmail)
     const dialog = page.getByRole('alertdialog')

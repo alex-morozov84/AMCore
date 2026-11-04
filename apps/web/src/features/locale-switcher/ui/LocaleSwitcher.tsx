@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 
 import { useCurrentUser } from '@/entities/user'
 import { LocaleSelector } from '@/shared/ui/locale-selector'
@@ -18,12 +18,12 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     if (data?.user) persistLocale(locale)
   })
   // A build that serves one locale has nothing to choose; hooks above stay unconditional.
-  if (SUPPORTED_LOCALES.length < 2) return null
+  if (SERVED_LOCALES.length < 2) return null
   return (
     <div className={className}>
       <LocaleSelector
         label={t('label')}
-        items={SUPPORTED_LOCALES.map((locale) => ({ value: locale, label: t(locale) }))}
+        items={SERVED_LOCALES.map((locale) => ({ value: locale, label: t(locale) }))}
         value={value}
         pending={pending}
         onChange={change}

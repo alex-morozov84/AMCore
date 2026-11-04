@@ -4,9 +4,9 @@ import { PinoLogger } from 'nestjs-pino'
 
 import type { ProductAdminReturn } from '@amcore/shared'
 import type {
+  CatalogueLocale,
   InvitationOAuthCorrelation,
   OAuthUserProfile,
-  SupportedLocale,
   UserResponse,
 } from '@amcore/shared'
 import { AuthErrorCode, DEFAULT_LOCALE, parseSupportedLocale } from '@amcore/shared'
@@ -102,7 +102,7 @@ export class OAuthService {
 
   async getAuthorizationURL(
     providerName: string,
-    locale?: SupportedLocale,
+    locale?: CatalogueLocale,
     invited?: { credential: string; attemptId: string; handoff: InvitationHandoffProof },
     frontend?: BrowserFrontendContext,
     returnTo?: ProductAdminReturn,
@@ -487,7 +487,7 @@ export class OAuthService {
     tx: Prisma.TransactionClient,
     profile: OAuthUserProfile,
     providerName: string,
-    locale?: SupportedLocale,
+    locale?: CatalogueLocale,
     invited = false,
     expectedUserId?: string,
     signInOnly = false
@@ -581,7 +581,7 @@ export class OAuthService {
     tx: Prisma.TransactionClient,
     profile: OAuthUserProfile,
     provider: OAuthProvider,
-    locale?: SupportedLocale
+    locale?: CatalogueLocale
   ): Promise<User> {
     const email = this.emailIdentity.normalizeForStorage(profile.email!)
     const emailCanonical = this.emailIdentity.canonicalize(profile.email!)

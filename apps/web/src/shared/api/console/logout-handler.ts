@@ -1,7 +1,7 @@
 import { authFailureResponse } from '@/shared/api/bff/auth-failure-response'
 import { logoutConsoleReturnEntry } from '@/shared/api/bff/console-return-entry'
 import { handleLogout } from '@/shared/api/bff/logout-handler'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { consoleBrowserContext } from './browser-context'
 import { consolePersonalMutation } from './personal-mutation-route'

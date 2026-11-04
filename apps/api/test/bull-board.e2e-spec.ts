@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 
-import { BULL_BOARD_CONTEXT_HEADER, DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { BULL_BOARD_CONTEXT_HEADER, DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import { PrivilegedRoleService } from '../src/core/auth/privileged-role.service'
 import type { PrismaService } from '../src/prisma'
@@ -146,7 +146,7 @@ describe('Bull Board (e2e)', () => {
       locale: DEFAULT_LOCALE,
       returnHref: '/admin/background-work',
     }
-    const OTHER_LOCALE = SUPPORTED_LOCALES.at(-1) ?? DEFAULT_LOCALE
+    const OTHER_LOCALE = SERVED_LOCALES.at(-1) ?? DEFAULT_LOCALE
     /** What the board shows for a locale: its read-only label and its language tag. */
     const expectedFor = (locale: string) =>
       locale === 'ru'

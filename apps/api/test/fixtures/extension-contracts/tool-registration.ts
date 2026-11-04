@@ -2,7 +2,7 @@ import { type DynamicModule, Injectable, Module, type Type } from '@nestjs/commo
 import type { TestingModuleBuilder } from '@nestjs/testing'
 import type { ZodType } from 'zod'
 
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 
 import type {
   AiTool,
@@ -44,7 +44,7 @@ export function fixtureToolContract<T>(parameters: ZodType<T>): Pick<
     authority: { module: FixtureToolAuthorityModule, token: FixtureToolAuthority },
     async prepare(args: T) {
       const preview = Object.fromEntries(
-        SUPPORTED_LOCALES.map((locale) => [
+        SERVED_LOCALES.map((locale) => [
           locale,
           {
             title: 'Fixture action',

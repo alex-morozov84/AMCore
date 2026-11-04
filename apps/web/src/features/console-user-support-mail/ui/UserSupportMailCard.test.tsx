@@ -1,7 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
 import {
   coerceSupportedLocale,
-  SUPPORTED_LOCALES,
+  SERVED_LOCALES,
   type SupportMailPreparation,
   type SupportMailStatus,
 } from '@amcore/shared'
@@ -87,7 +87,7 @@ describe('support mail context and loading accessibility', () => {
         ['target', 'en', 'operator', 'other-recipient'],
         ['locale', 'ru', 'operator', 'recipient'],
       ] as const
-    ).filter(([change]) => change !== 'locale' || SUPPORTED_LOCALES.length > 1)
+    ).filter(([change]) => change !== 'locale' || SERVED_LOCALES.length > 1)
   )('discards a late preparation when %s changes', async (_change, locale, actor, target) => {
     let finish!: (value: SupportMailPreparation) => void
     vi.mocked(consoleApi.prepareSupportMail).mockReturnValue(

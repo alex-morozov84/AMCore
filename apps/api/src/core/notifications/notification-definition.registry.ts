@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import type { SupportedLocale } from '@amcore/shared'
+import type { CatalogueLocale } from '@amcore/shared'
 
 import type { NotificationChannelRegistry } from './channels/notification-channel.registry.js'
 import { NOTIFICATION_DEFINITIONS } from './definitions/index.js'
@@ -155,7 +155,7 @@ export class NotificationDefinitionRegistry {
     type: string,
     schemaVersion: number,
     payload: unknown,
-    locale: SupportedLocale
+    locale: CatalogueLocale
   ): RenderedNotificationContent {
     const fallback: RenderedNotificationContent = { title: type, body: '' }
     const definition = this.byVersion.get(`${type}:${schemaVersion}`)

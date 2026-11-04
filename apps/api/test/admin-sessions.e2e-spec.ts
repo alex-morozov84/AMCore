@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
 
 import { resolveTrustedWebPeers } from '../src/common/utils/trusted-web-peer'
 import { AuditLogService } from '../src/core/audit'
@@ -132,13 +132,13 @@ describe('Admin sessions (e2e)', () => {
         for (const [header, city] of [
           [
             'ru',
-            (SUPPORTED_LOCALES as readonly string[]).includes('ru')
+            (SERVED_LOCALES as readonly string[]).includes('ru')
               ? 'Лондон'
               : { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
           ],
           [
             'en',
-            (SUPPORTED_LOCALES as readonly string[]).includes('en')
+            (SERVED_LOCALES as readonly string[]).includes('en')
               ? 'London'
               : { en: 'London', ru: 'Лондон' }[DEFAULT_LOCALE],
           ],

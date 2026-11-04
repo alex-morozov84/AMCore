@@ -1,10 +1,10 @@
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
 /** Run against production as well: development does not exercise Next's route cache. */
 export async function verifyLocaleUrl(page: Page) {
-  const first = SUPPORTED_LOCALES[0]
-  const second = SUPPORTED_LOCALES.at(-1)!
+  const first = SERVED_LOCALES[0]
+  const second = SERVED_LOCALES.at(-1)!
   expect(first).not.toBe(second)
   const query = '?tag=a&tag=b&encoded=%23value'
   const profileRequests: string[] = []

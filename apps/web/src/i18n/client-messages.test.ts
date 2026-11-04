@@ -1,5 +1,5 @@
 import type { AbstractIntlMessages } from 'next-intl'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ messages: {} as AbstractIntlMessages }))
@@ -16,7 +16,7 @@ import {
 const core = { common: { close: 'Close' }, errors: {}, validation: {}, locale: {} }
 
 describe('explicit client messages', () => {
-  it.each(SUPPORTED_LOCALES)('selects only the root core for %s', async (locale) => {
+  it.each(SERVED_LOCALES)('selects only the root core for %s', async (locale) => {
     state.messages = (await import(`../../messages/${locale}.json`)).default
     const result = await getClientMessages(ROOT_CLIENT_NAMESPACES)
     expect(Object.keys(result)).toEqual([...ROOT_CLIENT_NAMESPACES])

@@ -1,7 +1,7 @@
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
 import type { ProductWebContext } from '@/shared/api/bff/product-web-context.server'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
 import { getConsoleOrigin } from '@/shared/lib/admin-console-config'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 import { isConsoleHost } from '@/shared/lib/console-host-guard'
 import { productAdminDeployment } from '@/shared/lib/product-admin-config.server'
 

@@ -1,6 +1,6 @@
 import { type ReactNode, Suspense, use, useState } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 
@@ -11,7 +11,7 @@ vi.mock('client-only', () => ({}))
 vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
   ...(await importOriginal()),
   // This test covers a two-locale build, whatever `locales.json` holds.
-  SUPPORTED_LOCALES: ['en', 'ru'],
+  SERVED_LOCALES: ['en', 'ru'],
   DEFAULT_LOCALE: 'en',
 }))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/login' }))
@@ -19,8 +19,8 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => ({ replace: state.replace }),
 }))
-const first = SUPPORTED_LOCALES[0]
-const second = SUPPORTED_LOCALES.at(-1)!
+const first = SERVED_LOCALES[0]
+const second = SERVED_LOCALES.at(-1)!
 function Provider({ children }: { children: ReactNode }) {
   return (
     <NextIntlClientProvider locale={first} messages={{}}>

@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '@amcore/shared'
+import { SERVED_LOCALES } from '@amcore/shared'
 import { expect, test } from '@playwright/test'
 
 import { expectNoAxeViolations } from '../shared/axe'
@@ -130,7 +130,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
   expect(new URL(page.url()).pathname).toBe(ui.path(`/${first.id}`))
   await expect(page.getByText('Company Alpha', { exact: true })).toHaveCount(0)
 
-  for (const locale of SUPPORTED_LOCALES)
+  for (const locale of SERVED_LOCALES)
     for (const dark of [false, true])
       for (const width of [1440, 375]) {
         // Each presentation variant is independent of source-volume admission.
@@ -156,7 +156,7 @@ test('organization foundation: ordered lifecycle, targets, session fence and res
       }
 
   resetBrowserProbeDomainBudget()
-  const lastUi = organizationUi(SUPPORTED_LOCALES.at(-1)!)
+  const lastUi = organizationUi(SERVED_LOCALES.at(-1)!)
   await page
     .getByRole('button', { name: /sidebar|меню|панел/i })
     .first()

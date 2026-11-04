@@ -1,14 +1,14 @@
 import type { AuditAction } from '@amcore/shared'
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 
 /**
  * Returns the public overview address, never the internal proxy target.
- * Host mode serves the console at its own host root; path mode uses its slug.
+ * Host mode serves the console at its own host root; path mode uses its alias.
  */
 export function getConsoleOverviewHref(): string {
   if (ADMIN_CONSOLE_CONFIG.mode === 'host') return '/'
-  if (ADMIN_CONSOLE_CONFIG.mode === 'path') return `/${ADMIN_CONSOLE_CONFIG.slug}`
+  if (ADMIN_CONSOLE_CONFIG.mode === 'path') return `/${ADMIN_CONSOLE_CONFIG.alias}`
   return '/'
 }
 
@@ -190,7 +190,7 @@ export function getConsoleSignInAgainHref(): string {
 /** Display-only normalization of the host edge's physical rewrite target. Never an auth selector. */
 export function getConsolePublicPathname(pathname: string | null): string | null {
   if (pathname === null || ADMIN_CONSOLE_CONFIG.mode !== 'host') return pathname
-  const physical = `/${ADMIN_CONSOLE_CONFIG.slug}`
+  const physical = `/${ADMIN_CONSOLE_CONFIG.alias}`
   if (pathname === physical) return '/'
   return pathname.startsWith(`${physical}/`) ? pathname.slice(physical.length) : pathname
 }

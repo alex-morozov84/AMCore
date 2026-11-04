@@ -7,7 +7,7 @@ vi.mock('./origin-guard', () => ({ isTrustedConsoleOrigin: vi.fn() }))
 vi.mock('@/shared/api/bff/browser-login-handler', () => ({ handleBrowserPassword: vi.fn() }))
 
 import { handleBrowserPassword } from '@/shared/api/bff/browser-login-handler'
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { handleConsoleLogin } from './auth-handler'
 import { consoleBrowserContext } from './browser-context'

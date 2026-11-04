@@ -9,7 +9,7 @@ import { Queue } from 'bullmq'
 import IORedis from 'ioredis'
 import request from 'supertest'
 
-import { BULL_BOARD_CONTENT_SECURITY_POLICY, SUPPORTED_LOCALES } from '@amcore/shared'
+import { BULL_BOARD_CONTENT_SECURITY_POLICY, SERVED_LOCALES } from '@amcore/shared'
 
 import { ControlConnection } from '../src/infrastructure/background-work/control-connection'
 import { BoundedBullMQAdapter } from '../src/infrastructure/queue/dashboard/bounded-bullmq-adapter'
@@ -31,7 +31,7 @@ import {
  * the canary must never come back. Not a DOM check, not a formatter check.
  */
 // A supported locale, not a spelled-out one: a fork that keeps a single locale supports only that.
-const JOB_LOCALE = SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1]
+const JOB_LOCALE = SERVED_LOCALES[SERVED_LOCALES.length - 1]
 const REAL_EMAIL_JOB = {
   template: 'welcome',
   to: `${CANARY}@example.com`,

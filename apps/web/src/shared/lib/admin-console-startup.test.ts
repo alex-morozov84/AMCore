@@ -8,8 +8,8 @@ vi.mock('@amcore/shared', async (original) => {
   return { ...actual, PRODUCT_ADMIN_CONFIG: { ...actual.PRODUCT_ADMIN_CONFIG, mode: 'host' } }
 })
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
 import { validateAdminConsoleStartupOrExit } from './admin-console-startup'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 
 const config = ADMIN_CONSOLE_CONFIG as unknown as { mode: 'path' | 'host' | 'disabled' }
 const originalMode = config.mode

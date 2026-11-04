@@ -11,7 +11,7 @@ vi.mock('client-only', () => ({}))
 vi.mock('@amcore/shared', async (importOriginal: () => Promise<object>) => ({
   ...(await importOriginal()),
   // This test covers a two-locale build, whatever `locales.json` holds.
-  SUPPORTED_LOCALES: ['en', 'ru'],
+  SERVED_LOCALES: ['en', 'ru'],
   DEFAULT_LOCALE: 'en',
 }))
 vi.mock('@/i18n/navigation', () => ({ usePathname: () => '/mfa' }))

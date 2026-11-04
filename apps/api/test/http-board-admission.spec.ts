@@ -6,7 +6,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import request from 'supertest'
 
-import { BULL_BOARD_CONTEXT_HEADER, SUPPORTED_LOCALES } from '@amcore/shared'
+import { BULL_BOARD_CONTEXT_HEADER, SERVED_LOCALES } from '@amcore/shared'
 
 import { configureHttp } from '../src/bootstrap/configure-http'
 import { createHttpAdapter } from '../src/bootstrap/create-http-adapter'
@@ -233,7 +233,7 @@ for (const [name, makeAdapter, boardAdapter] of [
     it('renders bearer context per request without changing shared UI state', async () => {
       const context = {
         basePath: '/api/console/bull-board',
-        locale: SUPPORTED_LOCALES[SUPPORTED_LOCALES.length - 1],
+        locale: SERVED_LOCALES[SERVED_LOCALES.length - 1],
         returnHref: '/admin/background-work',
       }
       const [localized, defaultShell] = await Promise.all([

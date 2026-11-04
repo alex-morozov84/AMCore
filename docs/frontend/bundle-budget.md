@@ -104,8 +104,8 @@ and `product-admin:/organizations`.
 
 The Operations Console keeps its rows in
 `apps/web/src/_pages/console/route-budgets.json`. Its scope `admin-console`
-claims the pages under the slug in
-`apps/web/src/shared/lib/admin-console.generated.ts`, and `admin-console:/` must
+claims the pages under the `alias` in
+`packages/shared/src/config/admin-console.json`, and `admin-console:/` must
 have a byte limit.
 
 To set a limit, take the page's current bytes from the check output and add

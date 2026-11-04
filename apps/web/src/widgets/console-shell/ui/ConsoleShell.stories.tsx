@@ -2,7 +2,7 @@ import { DEFAULT_LOCALE, localePathPrefix, type UserResponse } from '@amcore/sha
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
-import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from '@/shared/lib/admin-console-topology'
 
 import { ConsoleShell } from './ConsoleShell'
 

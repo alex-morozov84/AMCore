@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useLocale } from 'next-intl'
-import type { AdminSessionsListResponse, SupportedLocale } from '@amcore/shared'
+import type { AdminSessionsListResponse, CatalogueLocale } from '@amcore/shared'
 import { useQuery } from '@tanstack/react-query'
 
 import { consoleApi } from '@/shared/api/console-api'
@@ -16,7 +16,7 @@ export const userSessionsKeys = {
   /** Prefix shared by every locale/page variant for one target user — pass
    * this to `invalidateQueries` after a revoke. */
   all: (userId: string) => ['console', 'userSessions', userId] as const,
-  list: (userId: string, locale: SupportedLocale, page: number, limit: number) =>
+  list: (userId: string, locale: CatalogueLocale, page: number, limit: number) =>
     [...userSessionsKeys.all(userId), locale, page, limit] as const,
 }
 
@@ -30,7 +30,7 @@ export const userSessionsKeys = {
  * self-service `useSessions`.
  */
 export function useUserSessions(userId: string) {
-  const locale = useLocale() as SupportedLocale
+  const locale = useLocale() as CatalogueLocale
   const [page, setPage] = useState(1)
 
   const query = useQuery({

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { ADMIN_CONSOLE_CONFIG } from './admin-console.generated'
+import { ADMIN_CONSOLE_CONFIG } from './admin-console-topology'
 import { getConsolePublicApiPath } from './console-public-api-path'
 
 const mutableConfig = ADMIN_CONSOLE_CONFIG as { mode: 'disabled' | 'path' | 'host' }
