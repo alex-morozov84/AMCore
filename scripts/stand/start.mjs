@@ -6,6 +6,7 @@ import { configuration, builtServices } from './config.mjs'
 import { dataAdmission, cleanup } from './ownership.mjs'
 import { runBuild } from './build-intent.mjs'
 import { save } from './state.mjs'
+import { pullWithRetry } from './registry-pull.mjs'
 
 // The stand purges itself after a failed start, which removes the containers and
 // their logs. Print a bounded tail first so an unhealthy service can be diagnosed.
@@ -27,6 +28,7 @@ export async function start(m) {
   await configuration(m)
   m.state = 'configured'
   await save(m)
+  await pullWithRetry(() => compose(m, ['pull', '--quiet', 'postgres', 'redis'], { capture: true }))
   await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres', 'redis'])
   if (m.fixtureProfile === 'client-ip') {
     const { clientIpPeer } = await import('./client-ip-fixture.mjs')
