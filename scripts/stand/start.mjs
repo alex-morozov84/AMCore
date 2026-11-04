@@ -7,6 +7,19 @@ import { dataAdmission, cleanup } from './ownership.mjs'
 import { runBuild } from './build-intent.mjs'
 import { save } from './state.mjs'
 
+// The stand purges itself after a failed start, which removes the containers and
+// their logs. Print a bounded tail first so an unhealthy service can be diagnosed.
+async function reportUnhealthyServices(m, services) {
+  try {
+    const logs = await compose(m, ['logs', '--no-color', '--tail', '80', ...services], {
+      capture: true,
+    })
+    process.stderr.write(`Application services did not become healthy. Last log lines:\n${logs}\n`)
+  } catch (error) {
+    process.stderr.write(`Could not read service logs: ${error.message}\n`)
+  }
+}
+
 export async function start(m) {
   // A changed source rebuild must not admit previous application image IDs.
   // Preserve only the already-owned volumes, then recreate the local services.
@@ -51,16 +64,13 @@ export async function start(m) {
     await compose(m, ['up', '-d', '--wait', '--no-deps', 'mail-capture'])
   if (m.fixtureProfile === 'console-summary')
     await compose(m, ['up', '-d', '--no-deps', 'summary-source', 'summary-grafana'])
-  await compose(m, [
-    'up',
-    '-d',
-    '--wait',
-    '--no-deps',
-    'api',
-    'worker',
-    'web',
-    ...(m.topology === 'host' ? ['caddy'] : []),
-  ])
+  const applicationServices = ['api', 'worker', 'web', ...(m.topology === 'host' ? ['caddy'] : [])]
+  try {
+    await compose(m, ['up', '-d', '--wait', '--no-deps', ...applicationServices])
+  } catch (error) {
+    await reportUnhealthyServices(m, applicationServices)
+    throw error
+  }
   await dataAdmission(m)
   if (m.topology === 'host') {
     for (const id of m.resources.container) {
