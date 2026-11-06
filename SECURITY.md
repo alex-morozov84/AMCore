@@ -2,7 +2,12 @@
 
 ## Supported Versions
 
-We release security updates for the current major version. Check [Releases](https://github.com/alex-morozov84/AMCore/releases) for supported versions.
+We release security fixes for the latest published minor version only. We do not
+backport fixes to older minors or promise a remediation SLA. Check
+[Releases](https://github.com/alex-morozov84/AMCore/releases) for the latest line
+and required upgrade steps. A product must upgrade to that line to receive upstream
+support; a cherry-picked fix remains the product owner’s responsibility. See the
+[fork update contract](docs/operations/updating-a-fork.md#beta-compatibility-and-release-notes).
 
 ## Reporting a Vulnerability
 

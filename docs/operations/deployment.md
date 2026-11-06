@@ -1,5 +1,8 @@
 # Deployment & Migrations
 
+For upstream source integration, use the [fork update guide](updating-a-fork.md);
+source merges and database recovery are separate operations.
+
 How to take AMCore from clone → migrated schema → running app, locally and in
 production.
 

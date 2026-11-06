@@ -183,11 +183,15 @@ chore: unify github repository url
   squash commit message**, so it is linted as a Conventional Commit by CI.
 - **`strict` mode releases:** cut an annotated `vX.Y.Z` tag / GitHub Release from
   `main`; staging and production are promoted through deploy **environments**,
-  not branches. To patch an older version, branch `release/x.y` from that tag
-  when a backport is actually needed — no permanent `develop` required.
+  not branches. AMCore security fixes target the latest published minor only,
+  with no older-minor backports. A product owner may maintain its own `release/x.y`
+  branch; that is not a promise of upstream support.
 - **Downstream products:** choose `strict`, `flexible`, or `custom` in
   `PROJECT_CONTEXT.md`. `flexible` / `custom` forks may relax branch protection
-  or merge rules, but their own contributor docs become authoritative.
+  or merge rules, but their own contributor docs become authoritative. Source-update
+  PRs preserve true merge commits in every mode; never squash/rebase them. Eligible
+  strict products run setup with `--fork-updates` on every reconciliation. See the
+  [fork update guide](docs/operations/updating-a-fork.md).
 - First-time `strict` repo-protection setup (these settings do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — needs `gh` + `jq` and repo
   admin; see
@@ -210,8 +214,12 @@ Use the [backend conventions](docs/backend/architecture-and-conventions.md),
    pages when behavior, API contracts, extension points, security invariants,
    operations, commands, or contributor workflow changed. If no docs update is
    needed, say so in the PR.
-5. Add notable user-facing changes to `CHANGELOG.md` under `[Unreleased]`. Skip
-   internal refactors, tests, and typo-only documentation changes.
+5. Add notable AMCore changes to `CHANGELOG.md` under `[Unreleased]`. Downstream
+   products leave that upstream file untouched and name their own product notes file.
+   For incompatible integration/operational changes, state affected consumers, old/new
+   behavior, required action/order, checks and rollback limits. Review extension-fixture
+   adaptations for contract impact. Never rewrite already shared/applied migrations.
+   Skip internal refactors, tests, and typo-only documentation changes.
 6. **Next.js-specific changes** (see the trigger list in root `AGENTS.md` →
    _Next.js reference_ bullet): list the installed Next.js docs pages checked
    in the PR description or handoff, or say explicitly why none applied. This

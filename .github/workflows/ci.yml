@@ -391,6 +391,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Docker Hub mirror
         run: bash scripts/docker-registry-mirror.sh
@@ -406,6 +407,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Preserve shared migration history
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-migration-history.mjs
 
       # Unit and contract tests of the repository's own tooling: the init:brand
       # initializer with the engine, filesystem transaction and AST core it uses, product-admin

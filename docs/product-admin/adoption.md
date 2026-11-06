@@ -48,6 +48,9 @@ session; moving pages alone does not establish that boundary.
 
 Use the supported Node version and the `packageManager` version in your checkout.
 Start with a clean fork, without maintainer context, credentials or copied dependencies.
+For a real product, first follow [repository choice and source-tag setup](../operations/updating-a-fork.md#initialize-once-from-the-supported-source-tag).
+Before the identity commit below, verify that `initialized_from_amcore_version` matches the original source tag.
+This local demonstration alone does not establish supported release/update provenance.
 Install its frozen dependencies and prepare the shared/API generated artifacts:
 
 ```sh

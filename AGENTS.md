@@ -97,7 +97,15 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
 - **`strict` mode releases:** releases are tags, not a branch merge. Cut an
   annotated `vX.Y.Z` tag / GitHub Release from `main`; staging and production
   are driven by deploy **environments**, not branches. To maintain an older
-  line, branch `release/x.y` from its tag on demand.
+  line in a product, its owner may branch `release/x.y` from a tag. AMCore security
+  fixes target the latest published minor only; no older-minor backports are promised.
+- **Downstream source updates, in every mode:** follow [the fork update guide](docs/operations/updating-a-fork.md).
+  Preserve true merge ancestry through product PR delivery; never squash/rebase an AMCore integration.
+  Eligible strict products use `setup-repo-security.sh --fork-updates`; upstream stays squash-only.
+  Verify product PR target, source provenance and actual GitHub enforcement.
+  Never rewrite a migration already shared or applied to a retained database.
+  Document incompatible integration/operational changes with affected consumer, action/order, checks and rollback limits.
+  Extension-fixture adaptations prompt compatibility review; they are not automatically contract breaks.
 - **`flexible` / `custom` downstream modes:** follow the downstream product's
   declared rules. Do not force AMCore's protected-`main`, PR-only workflow onto
   a fork that explicitly chose a different mode.
@@ -136,7 +144,8 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   maps, changelog, this file, OpenAPI). If no docs change is needed, state why in
   the final response. Record
   significant or architectural choices in an ADR. Add notable user-facing
-  changes under `CHANGELOG.md` → `[Unreleased]`; ordinary PRs do not create or
+  changes under `CHANGELOG.md` → `[Unreleased]` for AMCore. Downstream products keep
+  this upstream log untouched and use their own named product notes file; ordinary PRs do not create or
   change release tags. See `CONTRIBUTING.md` → _Changelog & releases_ for the
   release procedure.
 - **Read the docs you are about to update — they find defects.** When a task
@@ -180,7 +189,8 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
 - First-time setup of `strict` repo protections (they do not travel with a
   fork): `bash scripts/setup-repo-security.sh` — see
   `docs/operations/ci-security.md` → _Strict security setup after forking_. The
-  security scripts need a Unix-like shell (macOS/Linux/WSL).
+  security scripts need a Unix-like shell (macOS/Linux/WSL). Downstream update profiles
+  must use `--fork-updates` on every setup/rerun; an unflagged run restores squash-only.
 
 ## Code conventions
 

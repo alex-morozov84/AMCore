@@ -67,8 +67,43 @@ delete_ruleset_by_name() {
   done <<<"$ids"
 }
 
+fork_updates=false
+if [[ $# -gt 0 ]]; then
+  if [[ $# -ne 1 || $1 != --fork-updates ]]; then
+    echo "usage: bash scripts/setup-repo-security.sh [--fork-updates]" >&2
+    exit 1
+  fi
+  fork_updates=true
+fi
+
+context_mode=$(awk '
+  /^[[:space:]]*[-*][[:space:]]+\*\*Mode:/ {
+    count++
+    if ($0 == "- **Mode:** `downstream-product`") downstream++
+  }
+  END { if (count == 1 && downstream == 1) print "downstream-product" }
+' "$ROOT_DIR/PROJECT_CONTEXT.md" 2>/dev/null || true)
+if [[ $fork_updates == true && $context_mode != downstream-product ]]; then
+  echo "setup-repo-security: --fork-updates requires one canonical downstream-product Mode in PROJECT_CONTEXT.md" >&2
+  exit 1
+fi
+if [[ $fork_updates == false && $context_mode == downstream-product ]]; then
+  echo "setup-repo-security: WARNING this invocation restores squash-only settings and blocks upstream update merges; use --fork-updates for that workflow" >&2
+fi
+
 need_cmd gh
 need_cmd jq
+
+main_ruleset="$RULESET_DIR/main.json"
+merge_policy=squash-only
+if [[ $fork_updates == true ]]; then
+  main_ruleset=$(mktemp)
+  trap 'rm -f "$main_ruleset"' EXIT
+  jq '.rules |= (map(select(.type != "required_linear_history")) |
+    map(if .type == "pull_request" then .parameters.allowed_merge_methods = ["squash", "merge"] else . end))' \
+    "$RULESET_DIR/main.json" >"$main_ruleset"
+  merge_policy="squash + merge (downstream updates)"
+fi
 
 if ! gh auth status >/dev/null 2>&1; then
   echo "setup-repo-security: gh auth status failed; log in with repository admin access first" >&2
@@ -82,10 +117,10 @@ repo=${repo_full_name#*/}
 
 echo "setup-repo-security: applying security settings to $repo_full_name"
 
-api --method PATCH "repos/$owner/$repo" --input - >/dev/null <<'JSON'
+api --method PATCH "repos/$owner/$repo" --input - >/dev/null <<JSON
 {
   "allow_squash_merge": true,
-  "allow_merge_commit": false,
+  "allow_merge_commit": $fork_updates,
   "allow_rebase_merge": false,
   "delete_branch_on_merge": true,
   "security_and_analysis": {
@@ -115,9 +150,9 @@ else
   echo "setup-repo-security: WARNING could not enable Dependabot security updates; enable manually in Settings -> Code security (Dependabot security updates)" >&2
 fi
 
-echo "setup-repo-security: ensured squash-only merges + delete-branch-on-merge, dependency graph, vulnerability alerts, secret scanning, and push protection"
+echo "setup-repo-security: ensured $merge_policy merges + delete-branch-on-merge, dependency graph, vulnerability alerts, secret scanning, and push protection"
 
-upsert_ruleset "$owner" "$repo" "$RULESET_DIR/main.json"
+upsert_ruleset "$owner" "$repo" "$main_ruleset"
 upsert_ruleset "$owner" "$repo" "$RULESET_DIR/tags-release.json"
 
 # Trunk-based migration (ADR-048): the long-lived `develop` branch is retired in

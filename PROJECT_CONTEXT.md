@@ -80,7 +80,9 @@ Two fields in this file describe the product's choices:
 
 - `strict` — protected `main`, PR-only changes, squash-only merges, required CI,
   and immutable release tags. This is AMCore upstream's mode and is supported by
-  `scripts/setup-repo-security.sh`.
+  `scripts/setup-repo-security.sh`. Downstream products that merge AMCore releases
+  use the [strict update profile](docs/operations/updating-a-fork.md#prepare-every-clone-including-an-agent-clone)
+  with `--fork-updates`: source-update PRs use merge commits, ordinary feature PRs may squash.
 - `flexible` — a downstream product may relax branch protection, merge method, or
   local delivery rules while the team is moving quickly. Document the chosen
   rules in this file or the product's contributor guide.

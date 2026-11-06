@@ -45,6 +45,7 @@ Tick each line, or write "not needed, because …". Skip the block only for a ch
 
 - [ ] `README.md`: capability table or "Going to production"
 - [ ] Doc maps: `docs/README.md` and the section README (for example `docs/frontend/README.md`)
-- [ ] `CHANGELOG.md` → `[Unreleased]`, when a user can see the change
+- [ ] AMCore: `CHANGELOG.md` → `[Unreleased]`; downstream: the named product notes file, when a user can see the change
+- [ ] Incompatible integration/operational change: affected consumer, action/order, verification and rollback limits; extension-fixture impact reviewed
 - [ ] `AGENTS.md`, when an agent could break it by not knowing it
 - [ ] OpenAPI (`@ApiTags`, responses, `apps/api/test/openapi.e2e-spec.ts`), when a route contract changed
