@@ -21,9 +21,9 @@ model SupportMailAttempt {
   readUntil DateTime
   purgeAfter DateTime
 
-  @@index([actorUserId, targetUserId, kind, preparedAt(sort: Desc)])
-  @@index([purgeAfter, id])
-  @@index([actorUserId, state, prepareExpiresAt])
+  @@index([actorUserId, targetUserId, kind, preparedAt(sort: Desc)], map: "support_mail_attempts_actoruserid_targetuserid_kind_preparedat_")
+  @@index([purgeAfter, id], map: "support_mail_attempts_purgeafter_id_idx")
+  @@index([actorUserId, state, prepareExpiresAt], map: "support_mail_attempts_actoruserid_state_prepareexpiresat_idx")
   @@map("support_mail_attempts")
   @@schema("core")
 }

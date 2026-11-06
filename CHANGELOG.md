@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Prisma schema definitions now match the existing migrated database, preventing unrelated
+  changes during migration authoring; an API database test checks schema agreement.
+
 - Invitation transaction proofs ignore unrelated operations while detecting a true
   repeat. CI checkout cleanup no longer inherits an expired admission deadline.
   Browser publication HTTP tests isolate scheduled handoff cleanup, and browser

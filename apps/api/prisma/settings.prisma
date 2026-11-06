@@ -4,7 +4,7 @@ model PlatformSetting {
   override      Json?
   schemaVersion Int      @default(1)
   revision      Int      @default(0)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
   @@schema("core")
   @@map("platform_settings")

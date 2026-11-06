@@ -54,7 +54,7 @@ model BackgroundCommandTarget {
   @@id([actorId, commandId, targetId])
   @@index([state, dispatchUntil])
   @@index([incarnation, state])
-  @@index([workId, state, targetId, incarnation])
+  @@index([workId, state, targetId, incarnation], map: "background_command_targets_workId_state_targetId_incarnation_id")
   @@index([finalizedAt, actorId, commandId, targetId])
   @@index([state, logicalBytes, actorId, commandId], map: "background_command_targets_compaction_idx")
   @@schema("core")

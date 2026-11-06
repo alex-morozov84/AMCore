@@ -102,11 +102,11 @@ model AiMessage {
   run          AiRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
   inputForRuns AiRun[]        @relation("AiRunInput")
   tombstoneInput AiRunTombstone? @relation("AiRunTombstoneInput")
-  archivedRun  AiRunTombstone? @relation("AiMessageArchivedOrigin", fields: [archivedRunId], references: [id], onDelete: SetNull)
+  archivedRun  AiRunTombstone? @relation("AiMessageArchivedOrigin", fields: [archivedRunId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "ai_messages_archivedrunid_fkey")
 
   @@unique([conversationId, sequence])
   @@index([runId])
-  @@index([archivedRunId])
+  @@index([archivedRunId], map: "ai_messages_archivedrunid_idx")
   @@map("ai_messages")
   @@schema("ai")
 }

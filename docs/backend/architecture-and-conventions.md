@@ -147,6 +147,8 @@ pnpm --filter api db:migrate                                  # prisma migrate d
 pnpm --filter api db:migrate -- --create-only --name <slug>  # emit SQL to review/edit before it applies
 ```
 
+Hand-written SQL must match the constraint/index names, types, defaults and referential actions declared in Prisma.
+
 Editing the _generated_ SQL is fine and sometimes necessary (data backfills, safe
 rollouts) — use `--create-only` to review it before apply; schema migrations must originate from the Prisma diff. For a data-only policy
 upgrade with no schema delta, use explicitly reviewed versioned SQL with exact-state
