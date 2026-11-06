@@ -253,7 +253,9 @@ If the action should be authorable in a future role editor, also register its
 implemented route, presets and record/field evaluator through the
 [capability catalogue](../auth/capability-catalogue.md). That metadata does not
 grant access or replace route authorization. The disposable PostgreSQL
-extension fixture is available through `pnpm test:capability-extension`.
+extension fixture runs through `pnpm test:capability-extension` on the starter only.
+Products receive a warning and must test their own modules against PostgreSQL;
+see the capability catalogue's product test requirements.
 
 Organization handlers additionally opt into the scoped
 [context boundary and own-method policy](../auth/organization-context.md#authorization-freshness-and-extension).

@@ -76,14 +76,17 @@ See [`docs/frontend/brand-theme-and-tokens.md` → Fork initialization](docs/fro
 
 ### API-specific test commands
 
-| Command                                                              | Description                                                                   |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `pnpm --filter api test`                                             | All unit tests                                                                |
-| `pnpm --filter api test -- path/to/file.spec.ts`                     | Single test file                                                              |
-| `pnpm --filter api test:e2e`                                         | All E2E tests (requires Docker — Testcontainers)                              |
-| `pnpm --filter api test:e2e --runTestsByPath test/oauth.e2e-spec.ts` | Single E2E suite                                                              |
-| `pnpm test:capability-extension`                                     | Disposable downstream resource compilation and PostgreSQL authorization proof |
-| `pnpm --filter api test:email`                                       | Email template integration tests (Vitest)                                     |
+| Command                                                              | Description                                                       |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `pnpm --filter api test`                                             | All unit tests                                                    |
+| `pnpm --filter api test -- path/to/file.spec.ts`                     | Single test file                                                  |
+| `pnpm --filter api test:e2e`                                         | All E2E tests (requires Docker — Testcontainers)                  |
+| `pnpm --filter api test:e2e --runTestsByPath test/oauth.e2e-spec.ts` | Single E2E suite                                                  |
+| `pnpm test:capability-extension`                                     | Starter-only extension proof; products warn without running tests |
+| `pnpm --filter api test:email`                                       | Email template integration tests (Vitest)                         |
+
+See [capability check applicability](docs/operations/ci-security.md) for the warning
+and the PostgreSQL access tests that products must own.
 
 API unit and E2E tests use `@swc/jest` with shared decorator/source-map settings.
 Run `pnpm --filter api typecheck` separately. API and shared source checks

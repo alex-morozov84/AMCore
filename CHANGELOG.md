@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Capability extension now runs only on the starter. An exact downstream Mode
+  declaration produces a log/summary warning and successful exit without tests,
+  including the Script contracts patch probe. Products retain inherited tests,
+  but must test their own modules: green `Test` no longer proves the complete
+  new-module extension path on product code.
+
 - Prisma schema definitions now match the existing migrated database, preventing unrelated
   changes during migration authoring; an API database test checks schema agreement.
 

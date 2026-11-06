@@ -49,9 +49,24 @@ For flexible private products:
    Free private repositories lack branch/tag rulesets. Pro/Team can supply rulesets without the security add-ons.
    Require the available checks where supported. Otherwise review and tag discipline depend on your team.
 5. Budget CI before enabling it. Inherited jobs may exceed your private account's included allowance.
-   Choose which jobs run, align required checks, and document any additional coverage reduction.
+   Select supported whole workflows through their Actions enable/disable state,
+   as in step 3, and align required checks with that selection. Do not select
+   individual `Test` dependencies by removing or skipping them in `ci.yml`.
+   Script contracts locks that dependency set and the guarded leaf commands
+   and conditions; `Test` rejects skipped dependencies.
+   Further coverage reductions need an explicit product policy and corresponding
+   contract changes; changing required checks alone does not change these contracts.
    **No runner-minute estimate is available yet.** Record minutes per job and total per update PR,
    including retries and follow-up push runs. Public standard-runner billing of zero is not a private cost estimate.
+
+An initialized product's **Test capability extension** job prints a warning in its
+log and step summary, then succeeds without running the disposable fixture.
+Exactly one canonical downstream Mode line in `PROJECT_CONTEXT.md` selects this
+behavior. The fixed starter patch cannot follow arbitrary product edits, so this
+warning is expected. Keep the job: removing it breaks Script contracts.
+Inherited tests still run, but green `Test` no longer proves the complete
+new-module extension path on product code. Test your own modules against PostgreSQL;
+see the [required access cases](../auth/capability-catalogue.md#extend-a-downstream-product).
 
 Do not run strict setup to bypass a missing license. The combined repository-security request can fail;
 setup does not silently downgrade protections. Existing scripts are not proof of live GitHub enforcement.

@@ -69,6 +69,6 @@ test('extension commands retain explicit selected inventory and copied preparati
   assert.ok(extended.includes('test/nested/new.e2e-spec.ts'))
   const capability = readFileSync('scripts/fixtures/t024-capability-extension.sh', 'utf8')
   assert.match(capability, /t024-capability-extension.patch/)
-  execFileSync('git', ['apply', '--check', 'scripts/fixtures/t024-capability-extension.patch'])
+  execFileSync('bash', ['scripts/fixtures/t024-capability-extension.sh', '--check-only'])
   assert.match(capability, /PATH=/)
 })

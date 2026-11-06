@@ -160,10 +160,22 @@ capacity when measured build consumption no longer leaves adequate headroom.
   Changes to shard selection require evidence. Full API coverage is declared
   mandatory for PRs; switching to full post-merge coverage requires a separate
   owner policy decision.
-- **Test capability extension** runs `pnpm test:capability-extension`: an isolated disposable
-  resource variant compiles shared, API and web consumers and exercises
-  authorization against PostgreSQL and Redis Testcontainers. The fixture does
-  not add a sample product domain to the shipped starter.
+- **Test capability extension** runs `pnpm test:capability-extension` on the starter.
+  Its fixed patch adds a disposable resource, compiles shared/API/web consumers,
+  and tests authorization against PostgreSQL and Redis Testcontainers.
+  No sample product domain ships in the starter. Normal product edits can break
+  the patch's exact source anchors without breaking authorization.
+  Exactly one canonical ``- **Mode:** `downstream-product` `` line in
+  `PROJECT_CONTEXT.md` makes the command warn in the log and step summary,
+  then succeed before copying or running tests. Typo or duplicate Mode lines
+  leave the check enabled. CI in the canonical `alex-morozov84/AMCore`
+  repository rejects this downstream declaration to prevent accidental disabling.
+  Products retain inherited tests, but a green `Test` no longer proves the full
+  new-module extension path on their code. Product-owned PostgreSQL tests must
+  cover roles, organizations, rows, DENY, fields and API keys; see
+  [extend a product](../auth/capability-catalogue.md#extend-a-downstream-product).
+  The job and `Test` aggregate remain enabled; the warning records unmeasured
+  coverage, not a failed test. Script contracts uses the same applicability decision.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
 - **Web E2E** is the declared aggregate check. Live required status is separate. Its plan selects all
