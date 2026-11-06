@@ -183,8 +183,9 @@ confirm Actions enablement and Dependabot state during the first actual run.
    A conflict is a review point. An already-integrated target needs no new integration commit.
 
 3. Resolve each conflict using the recipes below. Review the complete staged diff, including cleanly merged changes.
-   Keep hooks enabled; they process all staged files, not only conflict resolutions, and can rewrite files.
-   Inspect the staged diff again after a hook failure or rewrite. Never bypass hooks on an assumption that merges are exempt.
+   Keep hooks enabled. Pinned lint-staged 17.6.0 selects staged merge paths that differ from BOTH parents.
+   A clean upstream merge can therefore run no lint-staged tasks; combined edits may still be selected and rewritten.
+   This is not full validation. Run step 4 even when the commit succeeds, and inspect the staged diff after hook failures or rewrites.
 4. Run the target release's checks plus product tests and affected deployment/data checks.
    At minimum follow [contributor checks](../../CONTRIBUTING.md#before-submitting-a-pr).
    Verify product permissions, translations, dependencies and chosen locale/Console/admin placement.
