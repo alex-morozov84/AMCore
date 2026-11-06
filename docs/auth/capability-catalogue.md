@@ -142,7 +142,11 @@ another level does not prove the reading an operation needs. See the
 6. Compile shared, API and web consumers. Write PostgreSQL access tests for
    your product's modules. Cover multiple roles, organization boundaries,
    own/assigned/all rows, DENY rules, readable and writable fields, and API-key
-   intersection. Verify capability labels in every retained web catalogue.
+   intersection. If the capability appears in the member **Access** view, also
+   test that its explanation matches your real handlers on own, assigned and
+   other records. Verify capability labels in every retained web catalogue.
+   `scripts/fixtures/t024-capability-extension.patch` contains reference tests
+   you can adapt.
    Do not run `pnpm test:capability-extension` for product validation: its fixed patch tests
    the starter's extension recipe and can conflict with normal product edits.
    In `Mode = downstream-product`, the command warns and exits successfully

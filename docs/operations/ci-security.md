@@ -163,6 +163,8 @@ capacity when measured build consumption no longer leaves adequate headroom.
 - **Test capability extension** runs `pnpm test:capability-extension` on the starter.
   Its fixed patch adds a disposable resource, compiles shared/API/web consumers,
   and tests authorization against PostgreSQL and Redis Testcontainers.
+  It also runs the member access journey and the catalogue copy test by name,
+  each with a minimum reported count.
   No sample product domain ships in the starter. Normal product edits can break
   the patch's exact source anchors without breaking authorization.
   Exactly one canonical ``- **Mode:** `downstream-product` `` line in

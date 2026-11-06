@@ -9,11 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Capability extension now runs only on the starter. An exact downstream Mode
-  declaration produces a log/summary warning and successful exit without tests,
-  including the Script contracts patch probe. Products retain inherited tests,
-  but must test their own modules: green `Test` no longer proves the complete
-  new-module extension path on product code.
+- **Breaking for products relying on `pnpm test:capability-extension`:** it now
+  runs only on the starter. With exactly one canonical `downstream-product` Mode
+  line, it warns in the log and step summary and exits successfully without
+  tests, and the Script contracts patch probe is skipped too. Action: add
+  PostgreSQL access tests for your own modules, as listed in the
+  [capability guide](docs/auth/capability-catalogue.md#extend-a-downstream-product).
+  Verification: the job shows the warning, and your module tests pass.
+  Green `Test` no longer proves the complete new-module path on product code.
+  No data impact. To restore the check, change Mode, which is only valid for
+  the starter.
 
 - Prisma schema definitions now match the existing migrated database, preventing unrelated
   changes during migration authoring; an API database test checks schema agreement.
