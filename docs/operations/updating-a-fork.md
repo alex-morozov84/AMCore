@@ -183,17 +183,29 @@ confirm Actions enablement and Dependabot state during the first actual run.
    A conflict is a review point. An already-integrated target needs no new integration commit.
 
 3. Resolve each conflict using the recipes below. Review the complete staged diff, including cleanly merged changes.
-   Keep hooks enabled. Pinned lint-staged 17.6.0 selects staged merge paths that differ from BOTH parents.
-   A clean upstream merge can therefore run no lint-staged tasks; combined edits may still be selected and rewritten.
-   This is not full validation. Run step 4 even when the commit succeeds, and inspect the staged diff after hook failures or rewrites.
-4. Run the target release's checks plus product tests and affected deployment/data checks.
+   Keep hooks enabled; they run at the commit in step 5.
+   Pinned lint-staged 17.6.0 selects added, copied, modified or renamed staged paths that differ from BOTH parents.
+   A path taken whole from one parent is not selected, so a merge can select nothing.
+   Combined edits, automatic or manual, can be selected and rewritten. A passing hook does not replace full validation.
+4. Install dependencies from the merged lockfile before running checks or committing.
+   Run the target release's checks plus product tests and affected deployment/data checks.
    At minimum follow [contributor checks](../../CONTRIBUTING.md#before-submitting-a-pr).
    Verify product permissions, translations, dependencies and chosen locale/Console/admin placement.
    A successful textual merge does not prove the result works. Rehearse database changes as described below.
-5. Commit the reviewed integration and push its explicit branch. Open the PR in the **product**:
+5. Save the reviewed index tree, then commit and compare the committed tree with that saved tree:
 
    ```sh
-   git commit -m 'chore: update amcore'
+   BEFORE_TREE="$(git write-tree)"
+   git commit -m 'chore: update amcore' && git diff "$BEFORE_TREE" HEAD
+   ```
+
+   If a hook fails, stop here: the merge and your conflict resolution remain in progress.
+   Inspect the index and working tree, fix the cause, and repeat this step after the affected checks pass.
+   If hooks rewrite files and the commit succeeds, those edits are already in the commit; the staged diff can be empty.
+   Review the saved-tree comparison and rerun affected checks before pushing. Investigate any unexpected change.
+   Then push the explicit branch and open the PR in the **product**:
+
+   ```sh
    git push -u origin update/amcore-example
    gh pr create -R OWNER/PRODUCT --base main --head update/amcore-example
    ```
