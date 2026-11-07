@@ -502,6 +502,20 @@ still require review and browser verification.
 
 ## Unit and component tests
 
+For asynchronous interactions, wait for the rendered result with `findBy…` or
+`waitFor`. A mock call proves dispatch, not completion or a React update.
+Keep request assertions, but await the UI assertion separately:
+
+```tsx
+fireEvent.click(screen.getByRole('button', { name: 'Copy ID: user1' }))
+await waitFor(() => expect(writeText).toHaveBeenCalledWith('user1'))
+await waitFor(() =>
+  expect(screen.getByRole('button', { name: 'Copy ID: user1' })).toHaveAttribute('title', 'Copied')
+)
+```
+
+Do not replace this wait with a sleep, a larger timeout or automatic retries.
+
 Use the mocking pattern that matches the boundary under test:
 
 - **Hook/query tests** mock the typed client module:
