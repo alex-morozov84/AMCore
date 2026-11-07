@@ -110,3 +110,20 @@ it('D1 a resource refusal invalidates cached admission before a new owner mounts
   const second = mount()
   expect(second.result.current.ctx.controller.allowed()).toBe(false)
 })
+
+it('D2 focus revalidates admission while a fresh resource stays shared without another GET', async () => {
+  const f = fixture()
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  const h = renderHook(
+    () => {
+      const ctx = cachedContext(binding, input, true)
+      return { ctx, list: useOrganizationInvitations(ctx.controller, params) }
+    },
+    { wrapper: f.wrapper }
+  )
+  act(() => window.dispatchEvent(new Event('focus')))
+  await waitFor(() => expect(organizationContextClient.authority).toHaveBeenCalledOnce())
+  await waitFor(() => expect(h.result.current.list.available).toBe(true))
+  expect(h.result.current.list.data).toEqual(empty)
+  expect(invitationsClient.list).not.toHaveBeenCalled()
+})

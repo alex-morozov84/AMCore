@@ -6,7 +6,8 @@ import {
   inviteListResponseSchema,
 } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 import type {
@@ -31,6 +32,7 @@ const contextAffordances = {
   },
 } as const
 import { ContextRequestError } from '@/shared/api/bff/context-errors'
+import { ApiRequestError } from '@/shared/api/http-client'
 import { PrimaryUnavailableFallback } from '@/shared/ui/primary-unavailable-fallback'
 
 import en from '../../../../messages/en.json'
@@ -158,6 +160,49 @@ it.each([empty, populated])(
     }
   }
 )
+it('an open revoke stays blocked after a failed background read and returns focus safely', async () => {
+  mocks.seed.mockResolvedValue(populated)
+  const bootstrap = vi
+    .spyOn(organizationContextClient, 'bootstrap')
+    .mockImplementation(() => new Promise(() => {}))
+  const read = vi
+    .spyOn(invitationsClient, 'list')
+    .mockRejectedValue(new ApiRequestError(503, undefined))
+  const revoke = vi.spyOn(invitationsClient, 'revoke')
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const page = await OrganizationInvitationsMount({ id: 'org' })
+  const view = render(
+    <NextIntlClientProvider locale="en" timeZone="UTC" messages={en}>
+      <QueryClientProvider client={client}>{page}</QueryClientProvider>
+    </NextIntlClientProvider>
+  )
+  try {
+    const user = userEvent.setup()
+    const t = en.organizationInvitations
+    const action = (name: string) =>
+      t.actionFor.replace('{action}', name).replace('{email}', 'guest@example.test')
+    const row = screen.getByRole('row', { name: /guest@example.test/ })
+    await user.click(within(row).getByRole('button', { name: action(t.actions) }))
+    await user.click(await screen.findByRole('menuitem', { name: action(t.revoke) }))
+    const dialog = within(await screen.findByRole('alertdialog'))
+    expect(dialog.getByRole('button', { name: t.revoke })).toBeEnabled()
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ['organization-invitations'] })
+    })
+    await waitFor(() => expect(dialog.getByRole('button', { name: t.revoke })).toBeDisabled())
+    expect(read).toHaveBeenCalledOnce()
+    expect(dialog.getByText(t.checking)).toBeVisible()
+    expect(revoke).not.toHaveBeenCalled()
+    await user.click(dialog.getByRole('button', { name: t.cancel }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: t.search })).toHaveFocus())
+  } finally {
+    view.unmount()
+    client.clear()
+    bootstrap.mockRestore()
+    read.mockRestore()
+    revoke.mockRestore()
+  }
+})
 it.each([401, 403, 404])('thrown seed refusal %s never mounts dependent client', async (status) => {
   mocks.seed.mockRejectedValue(new ContextRequestError(status, 'FORBIDDEN'))
   await expect(OrganizationInvitationsMount({ id: 'org' })).rejects.toThrow(

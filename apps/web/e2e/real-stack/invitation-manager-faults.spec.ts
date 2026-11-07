@@ -52,19 +52,35 @@ for (const locale of SERVED_LOCALES)
     await menu.click()
     await page.getByRole('menuitem', { name: actionName(t.replace), exact: true }).click()
     await dialog.getByRole('checkbox', { name: 'VIEWER', exact: true }).check()
+    async function advanceGeneration() {
+      const list = await directApi(
+        `organizations/${org.id}/invites?status=pending`,
+        undefined,
+        login.accessToken
+      )
+      const stored = list.data.find((item: { email: string }) => item.email === email)
+      const changed = await fetch(
+        `http://127.0.0.1:${target.ports.api}/api/v1/organizations/${org.id}/invites/${stored.id}/reissue`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${login.accessToken}`,
+            'content-type': 'application/json',
+            'x-invitation-operation-id': createInvitationOperationId(),
+          },
+          body: JSON.stringify({ mode: 'repeat', expectedGeneration: stored.generation }),
+        }
+      )
+      expect(changed.status).toBe(202)
+    }
     const primaryRoute = (url: URL) => url.pathname.endsWith(`/organizations/${org.id}/invites`)
     let failList = true
     let release!: () => void
     let held = new Promise<void>((resolve) => {
       release = resolve
     })
-    let entered!: () => void
-    let observed = new Promise<void>((resolve) => {
-      entered = resolve
-    })
     await page.route(primaryRoute, async (route) => {
       if (route.request().method() !== 'GET' || !failList) return route.continue()
-      entered()
       await held
       await route.fulfill({
         status: 503,
@@ -72,10 +88,22 @@ for (const locale of SERVED_LOCALES)
         body: JSON.stringify({ errorCode: 'SERVICE_UNAVAILABLE' }),
       })
     })
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-    await observed
+    // Fresh cache survives focus. A rejected stale command refreshes its dependencies.
+    await advanceGeneration()
+    const firstRead = page.waitForRequest(
+      (request) => request.method() === 'GET' && primaryRoute(new URL(request.url()))
+    )
+    const replacementConflict = page.waitForResponse(
+      (response) => response.url().endsWith('/reissue') && response.status() === 409
+    )
+    await dialog.getByRole('checkbox', { name: t.reissueConfirmation, exact: true }).check()
+    await dialog.getByRole('button', { name: t.resend, exact: true }).click()
+    expect(await (await replacementConflict).json()).toMatchObject({
+      errorCode: 'INVITE_GENERATION_CONFLICT',
+    })
+    await firstRead
     await expect(invite).toBeDisabled()
-    await expect(dialog.getByText(t.checking, { exact: true })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: t.resend, exact: true })).toBeDisabled()
     const unavailable = page.waitForResponse(
       (r) =>
         new URL(r.url()).pathname.endsWith(`/organizations/${org.id}/invites`) && r.status() === 503
@@ -87,30 +115,9 @@ for (const locale of SERVED_LOCALES)
     await expect(page.getByRole('row').filter({ hasText: email })).toHaveCount(0)
     resetBrowserProbeDomainBudget()
     failList = false
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    // Error-latched reads recover explicitly; the form keeps its original draft.
+    await dialog.getByRole('button', { name: t.reviewCurrent, exact: true }).click()
     await expect(dialog.getByRole('checkbox', { name: 'VIEWER', exact: true })).toBeChecked()
-    resetBrowserProbeDomainBudget()
-    // Independent issuance changes generation while the local complete selection is dirty.
-    const list = await directApi(
-      `organizations/${org.id}/invites?status=pending`,
-      undefined,
-      login.accessToken
-    )
-    const stored = list.data.find((item: { email: string }) => item.email === email)
-    const changed = await fetch(
-      `http://127.0.0.1:${target.ports.api}/api/v1/organizations/${org.id}/invites/${stored.id}/reissue`,
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${login.accessToken}`,
-          'content-type': 'application/json',
-          'x-invitation-operation-id': createInvitationOperationId(),
-        },
-        body: JSON.stringify({ mode: 'repeat', expectedGeneration: stored.generation }),
-      }
-    )
-    expect(changed.status).toBe(202)
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await expect(dialog.getByText(t.generationChanged, { exact: true })).toBeVisible()
     await expect(dialog.getByRole('checkbox', { name: 'VIEWER', exact: true })).toBeChecked()
     await expect(dialog.getByRole('button', { name: t.resend, exact: true })).toBeDisabled()
@@ -118,31 +125,37 @@ for (const locale of SERVED_LOCALES)
     await dialog.getByRole('checkbox', { name: t.reissueConfirmation, exact: true }).check()
     await dialog.getByRole('button', { name: t.cancel, exact: true }).click()
     await expect(menu).toBeFocused()
-    // An open revoke confirmation is also blocked and masked during a failed primary refresh.
+    // Confirmation closes on submit; a refused stale revoke still refreshes the primary list.
     await menu.click()
     await page.getByRole('menuitem', { name: actionName(t.revoke), exact: true }).click()
     failList = true
     held = new Promise<void>((resolve) => {
       release = resolve
     })
-    observed = new Promise<void>((resolve) => {
-      entered = resolve
+    await advanceGeneration()
+    const secondRead = page.waitForRequest(
+      (request) => request.method() === 'GET' && primaryRoute(new URL(request.url()))
+    )
+    const revokeConflict = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'DELETE' &&
+        new URL(response.url()).pathname.includes(`/organizations/${org.id}/invites/`) &&
+        response.status() === 409
+    )
+    await page.getByRole('alertdialog').getByRole('button', { name: t.revoke, exact: true }).click()
+    expect(await (await revokeConflict).json()).toMatchObject({
+      errorCode: 'INVITE_GENERATION_CONFLICT',
     })
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-    await observed
-    await expect(
-      page.getByRole('alertdialog').getByRole('button', { name: t.revoke, exact: true })
-    ).toBeDisabled()
+    await secondRead
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(invite).toBeDisabled()
     release()
     await expect(page.locator('[data-slot="alert"]').first()).toBeVisible()
-    await expect(
-      page.getByRole('alertdialog').getByRole('button', { name: t.revoke, exact: true })
-    ).toBeDisabled()
-    await page.getByRole('alertdialog').getByRole('button', { name: t.cancel, exact: true }).click()
-    await expect(page.getByRole('textbox', { name: t.search, exact: true })).toBeFocused()
+    await expect(invite).toBeDisabled()
+    await expect(row).toHaveCount(0)
     resetBrowserProbeDomainBudget()
     failList = false
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.getByRole('button', { name: t.reviewCurrent, exact: true }).click()
     await expect(row).toBeVisible()
     // A roles-only outage cannot hide the primary list or disable independent revoke.
     await page.route('**/invites/role-choices?*', (route) =>
@@ -153,6 +166,7 @@ for (const locale of SERVED_LOCALES)
       })
     )
     await invite.click()
+    await dialog.getByRole('textbox', { name: t.roleSearch, exact: true }).fill('VIEWER')
     await expect(dialog.locator('[data-slot="alert"]')).toBeVisible()
     await expect(dialog.getByRole('button', { name: t.invite, exact: true })).toBeDisabled()
     await dialog.getByRole('button', { name: t.cancel, exact: true }).click()
