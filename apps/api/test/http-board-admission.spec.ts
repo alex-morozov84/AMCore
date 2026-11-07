@@ -125,15 +125,18 @@ for (const [name, makeAdapter, boardAdapter] of [
       expect(result.headers['x-frame-options']).toBe('DENY')
       expect(result.headers['access-control-allow-origin']).toBeUndefined()
     })
-    it('rejects mutation before parsing malformed JSON', async () => {
-      const result = await request(app.getHttpServer())
-        .post(mount + '/api/queues/probe/clean')
-        .set('Content-Type', 'application/json')
-        .send('{')
-      expect(result.status).toBe(405)
-      expect(result.headers.allow).toBe('GET, HEAD')
-      expect(result.headers['cache-control']).toBe('private, no-store')
-    })
+    it.each(['/api/queues/probe/clean', '/api/queues/probe/job-schedulers'])(
+      'rejects mutation before parsing malformed JSON: %s',
+      async (path) => {
+        const result = await request(app.getHttpServer())
+          .post(mount + path)
+          .set('Content-Type', 'application/json')
+          .send('{')
+        expect(result.status).toBe(405)
+        expect(result.headers.allow).toBe('GET, HEAD')
+        expect(result.headers['cache-control']).toBe('private, no-store')
+      }
+    )
     it('rejects unauthenticated reads without disclosing body', async () => {
       const result = await request(app.getHttpServer()).get(mount + '/api/queues')
       expect(result.status).toBe(401)
@@ -272,7 +275,7 @@ for (const [name, makeAdapter, boardAdapter] of [
     })
     it('keeps defaults query disabled in the installed read-only asset', async () => {
       const result = await request(app.getHttpServer())
-        .get(`${mount}/static/js/async/oa.cadae521aa.js`)
+        .get(`${mount}/static/js/async/oa.9a545df19d.js`)
         .auth('allowed', { type: 'bearer' })
       expect(result.status).toBe(200)
       expect(result.text).toContain('(a.name,l&&!a.readOnlyMode),_=Object.entries(L||{})')

@@ -49,7 +49,7 @@
     "@commitlint/config-conventional": "^21.2.4",
     "@eslint/js": "10.0.1",
     "@puppeteer/browsers": "3.2.6",
-    "eslint": "10.13.0",
+    "eslint": "10.14.0",
     "husky": "^9.1.7",
     "lighthouse": "13.6.0",
     "lint-staged": "^17.6.0",

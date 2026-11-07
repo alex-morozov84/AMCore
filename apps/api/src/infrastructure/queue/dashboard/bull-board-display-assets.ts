@@ -14,11 +14,11 @@ const translationsSchema = z
   })
   .passthrough()
 const LOCALES = ['en-US', 'en-GB', 'ru-RU'] as const
-const FLOW_ASSET = 'js/async/8.0350f20068.js'
-const FLOW_SHA256 = 'dace65826b2eca6ea89eb87419315f5b14e61f9b420ffcc829da71f0df2672cc'
+const FLOW_ASSET = 'js/async/8.62e4f22600.js'
+const FLOW_SHA256 = '4e0c086431632f6575bd700a1c494658990bdf1dff1ae07ca6db9887bd49f118'
 export const FLOW_CSS = '.jobFlowCard-Y7apDE{display:none!important}'
-export const INFO_ASSET = 'js/async/oa.cadae521aa.js'
-const INFO_SHA256 = '12c98c54fbc4134f4e3515449fe2a0e494ee7a00e8e08a653173adf3b9bac8ba'
+export const INFO_ASSET = 'js/async/oa.9a545df19d.js'
+const INFO_SHA256 = '4b984f468ab5ef1ea37421a9ba475bed79495a8bd7fdfee35237441abcf9a252'
 const DEFAULTS_QUERY = '(a.name,l),_=Object.entries(L||{})'
 export const BOARD_DISPLAY_CSS = 'amcore-board-display.css'
 

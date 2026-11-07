@@ -53,6 +53,8 @@ describe('installed Bull Board vs the reviewed boundary', () => {
         'GET /api/queues/:queueName/:jobId/flow',
         'GET /api/queues/:queueName/:jobId',
         'POST /api/queues/:queueName/add',
+        // Reviewed in 9.11: scheduler creation stays closed by the read-only boundary.
+        'POST /api/queues/:queueName/job-schedulers',
         'PUT /api/queues/:queueName/retry/:queueStatus',
         'PUT /api/queues/:queueName/promote',
         'PUT /api/queues/:queueName/clean/:queueStatus',

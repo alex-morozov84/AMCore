@@ -37,7 +37,7 @@ describe('installed Board truthful display seam', () => {
   it('disables the installed defaults query for read-only queues without opening its API', async () => {
     const app = express()
     installBoardDisplayAssets(app, '/static', directory)
-    const response = await request(app).get('/static/js/async/oa.cadae521aa.js').expect(200)
+    const response = await request(app).get('/static/js/async/oa.9a545df19d.js').expect(200)
     expect(response.text).toContain('(a.name,l&&!a.readOnlyMode),_=Object.entries(L||{})')
     expect(response.text).not.toContain('(a.name,l),_=Object.entries(L||{})')
   })
