@@ -256,6 +256,10 @@ grant access or replace route authorization. The disposable PostgreSQL
 extension fixture runs through `pnpm test:capability-extension` on the starter only.
 Products receive a warning and must test their own modules against PostgreSQL;
 see the capability catalogue's product test requirements.
+When AMCore itself adds a built-in capability, also add its ID to `BUILT_IN_CAPABILITY_IDS`
+in `apps/api/src/core/organizations/member-access/access.testkit.ts`. That list fails when a
+built-in disappears, but not when one is added, so a missed entry silently leaves the new
+capability out of the starter access truth tables.
 
 Organization handlers additionally opt into the scoped
 [context boundary and own-method policy](../auth/organization-context.md#authorization-freshness-and-extension).
