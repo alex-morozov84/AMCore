@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react'
 import { NextIntlClientProvider } from 'next-intl'
-import { inviteListResponseSchema } from '@amcore/shared'
+import {
+  actorAffordancesSchema,
+  CAPABILITY_CATALOGUE,
+  inviteListResponseSchema,
+} from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -13,12 +17,13 @@ const organizationContextClient = vi.hoisted(() => ({ bootstrap: vi.fn(), author
 vi.mock('@/entities/organization-context/api/context-client', () => ({ organizationContextClient }))
 import { invitationsClient } from '@/entities/organization-context'
 const contextAffordances = {
-  actorAffordances: {
+  actorAffordances: actorAffordancesSchema.parse({
+    ...Object.fromEntries(CAPABILITY_CATALOGUE.map(({ id }) => [id, 'denied'])),
     'teamAccess.manage': 'allowed',
     'organization.read': 'allowed',
     'organization.update': 'recordRequired',
     'organization.delete': 'recordRequired',
-  },
+  }),
   recordAffordances: {
     'organization.read': { allowed: true, fields: {} },
     'organization.update': { allowed: false, fields: { name: false, slug: false } },
