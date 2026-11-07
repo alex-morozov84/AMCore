@@ -15,7 +15,8 @@ When this file and the guide disagree, follow the guide and report the differenc
    stop if a product still says `upstream-starter`. A new product changes it only
    during initialization below.
 2. Read the guide banner. While it says that no supported starting release exists,
-   do not create a supported product from any tag. Report that limit instead.
+   no tag is a supported target: do not create a product or update one to any tag
+   as a supported release. Report that limit instead.
 3. Confirm the owner's permission for each outward action: repository creation,
    push, PR, merge, settings and network CLI access. A request to update is not
    permission to publish.
