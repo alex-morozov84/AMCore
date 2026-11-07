@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The capability extension example documents API-key protection failures as 503;
+  its starter check now includes the OpenAPI test. Member-access unit fixtures
+  use built-in capabilities so product additions do not change their truth tables.
+  The catalogue API test requires the full declared catalogue, including product additions,
+  instead of a fixed list of starter IDs.
+  Starter suites have been verified only with default locales and Console settings;
+  products using other settings may need to adapt inherited tests and selection.
+
+- **Breaking for products relying on `pnpm test:capability-extension`:** it now
+  runs only on the starter. With exactly one canonical `downstream-product` Mode
+  line, it warns in the log and step summary and exits successfully without
+  tests, and the Script contracts patch probe is skipped too. Action: add
+  PostgreSQL access tests for your own modules, as listed in the
+  [capability guide](docs/auth/capability-catalogue.md#extend-a-downstream-product).
+  Verification: the job shows the warning, and your module tests pass.
+  Green `Test` no longer proves the complete new-module path on product code.
+  No data impact. To restore the check, change Mode, which is only valid for
+  the starter.
+
+- Prisma schema definitions now match the existing migrated database, preventing unrelated
+  changes during migration authoring; an API database test checks schema agreement.
+
 - Role-definition forms retain their draft and save acknowledgment through access
   rechecks. The cached editor stays hidden until access is confirmed.
 
@@ -66,6 +88,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A [fork update contract](docs/operations/updating-a-fork.md) for history-preserving
+  product updates, compatibility notices and separate source/database recovery.
+  The first supported starting tag has not yet been released. A disposable independent-copy fixture completed hosted and database
+  rehearsal; existing old tags gain no support from this guide.
+- The shared `amcore-fork-update` agent skill orders the guide's creation and update
+  steps and lists where an agent must stop. It adds no rule beyond the guide.
+- `setup-repo-security.sh --fork-updates` enables merge commits for initialized
+  downstream products while preserving other strict checks. AMCore stays squash-only.
+  Unflagged downstream setup warns that it restores squash-only settings.
+- Required Script contracts now rejects edits, removal or renaming of SQL migrations
+  already present on a PR merge’s first parent. New migrations remain allowed;
+  this check does not prove SQL safety or detect object collisions.
+
 - Build settings files replace the removed scaffolding. `packages/shared/src/config/locales.json`
   selects the served locales and the default (for example Russian only, with bare URLs), and
   `packages/shared/src/config/admin-console.json` sets the Operations Console mode (`disabled`,
@@ -87,11 +122,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Shared locale exports now distinguish `CatalogueLocale` (all shipped catalogues; formerly
+- Security fixes target the latest published minor only; older minors receive no
+  backports. Upgrade to that line for upstream support; manually ported fixes are
+  product-owned. See SECURITY.md.
+
+- **Breaking for products importing locale/Console symbols:** shared locale exports now distinguish `CatalogueLocale` (all shipped catalogues; formerly
   `SupportedLocale`) from `SERVED_LOCALES` (languages enabled for this build; formerly
   `SUPPORTED_LOCALES`). Update downstream imports when upgrading. The handwritten web Console
   adapter is now `admin-console-topology.ts`, with `alias` replacing its `slug` property.
-  Locale parsing, fallback and Console routing behavior stay the same.
+  Locale parsing, fallback and Console routing behavior stay the same. Update imports
+  before building, then run typecheck and locale/Console tests. This rename needs no
+  data migration; revert the source integration if validation fails before deployment.
 
 - A weekly lockfile refresh opens one PR for compatible dependency resolutions,
   preserving existing pins and holds and relying on the required PR checks.

@@ -43,9 +43,15 @@ and lifecycle helpers.
 
 ## Extension conformance
 
-`pnpm test:capability-extension` proves a patched disposable product/resource copy.
-`pnpm test:extension-contracts` proves copied notification/AI registration and upgrades.
-Both require Docker and remain independent CI groups. Adding an ordinary API file
+`pnpm test:capability-extension` proves the starter's extension recipe on a patched
+copy, using Docker. Products with exactly one canonical downstream Mode declaration
+receive a warning and successful exit without executing that fixture.
+Inherited tests remain, but green CI does not prove the full new-module extension
+path on product code. Add your own PostgreSQL access tests for product modules;
+cover roles, organizations, rows, DENY, fields and API keys as described in the
+[capability guide](../auth/capability-catalogue.md#extend-a-downstream-product).
+`pnpm test:extension-contracts` proves copied notification/AI registration and upgrades
+and still requires Docker in products. These commands remain independent CI groups. Adding an ordinary API file
 only includes it in API discovery; it does not add it to an explicitly selected
 extension fixture. Update the relevant fixture's selected list and its guards when
 new extension conformance is required. Keep source-copy preparation, CLI/PATH behavior,

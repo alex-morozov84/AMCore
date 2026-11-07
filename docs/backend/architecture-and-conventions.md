@@ -147,6 +147,8 @@ pnpm --filter api db:migrate                                  # prisma migrate d
 pnpm --filter api db:migrate -- --create-only --name <slug>  # emit SQL to review/edit before it applies
 ```
 
+Hand-written SQL must match the constraint/index names, types, defaults and referential actions declared in Prisma.
+
 Editing the _generated_ SQL is fine and sometimes necessary (data backfills, safe
 rollouts) — use `--create-only` to review it before apply; schema migrations must originate from the Prisma diff. For a data-only policy
 upgrade with no schema delta, use explicitly reviewed versioned SQL with exact-state
@@ -251,7 +253,13 @@ If the action should be authorable in a future role editor, also register its
 implemented route, presets and record/field evaluator through the
 [capability catalogue](../auth/capability-catalogue.md). That metadata does not
 grant access or replace route authorization. The disposable PostgreSQL
-extension fixture is available through `pnpm test:capability-extension`.
+extension fixture runs through `pnpm test:capability-extension` on the starter only.
+Products receive a warning and must test their own modules against PostgreSQL;
+see the capability catalogue's product test requirements.
+When AMCore itself adds a built-in capability, also add its ID to `BUILT_IN_CAPABILITY_IDS`
+in `apps/api/src/core/organizations/member-access/access.testkit.ts`. That list fails when a
+built-in disappears, but not when one is added, so a missed entry silently leaves the new
+capability out of the starter access truth tables.
 
 Organization handlers additionally opt into the scoped
 [context boundary and own-method policy](../auth/organization-context.md#authorization-freshness-and-extension).
@@ -266,7 +274,8 @@ the operation with `@ApiSecurity('apiKeyBearer')` at the **handler level**. Do
 not put `apiKeyBearer` on the controller class: `@nestjs/swagger` concatenates
 class and method security metadata, so class-level API-key metadata leaks onto
 bearer-only handler overrides. The OpenAPI e2e test checks this allowlist in
-both directions.
+both directions. Add `@ApiProtectionUnavailable('API key')` to each eligible
+handler to document the 503 response when API-key failure counters cannot be checked.
 
 ### 5. Register in the correct process role
 

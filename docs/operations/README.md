@@ -1,5 +1,7 @@
 # Operations
 
+For source updates before deployment, start with [Create and update a product](updating-a-fork.md).
+
 [Local development, previews and browser tests](local-stands.md). Agents use managed commands for local DB writes and previews.
 
 Runbooks and contracts for deploying, running, and operating AMCore in

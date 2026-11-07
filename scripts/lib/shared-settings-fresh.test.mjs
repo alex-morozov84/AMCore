@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
@@ -43,8 +51,18 @@ test('a changed locale list, default or Console mode is reported', async (t) => 
   const dir = copy(t)
   const config = (name, value) =>
     writeFileSync(join(dir, `packages/shared/src/config/${name}.json`), JSON.stringify(value))
-  config('locales', { version: 1, enabled: ['ru'], default: 'ru' })
-  config('admin-console', { version: 1, mode: 'disabled', alias: 'admin' })
+  const locales = JSON.parse(
+    readFileSync(join(dir, 'packages/shared/src/config/locales.json'), 'utf8')
+  )
+  const adminConsole = JSON.parse(
+    readFileSync(join(dir, 'packages/shared/src/config/admin-console.json'), 'utf8')
+  )
+  const nextLocale = locales.default === 'en' ? 'ru' : 'en'
+  config('locales', { ...locales, enabled: [nextLocale], default: nextLocale })
+  config('admin-console', {
+    ...adminConsole,
+    mode: adminConsole.mode === 'disabled' ? 'path' : 'disabled',
+  })
   const problems = await sharedSettingsProblems(dir)
   assert.equal(problems.length, 3)
   assert.match(problems.join('\n'), /served locales/)

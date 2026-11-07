@@ -2,6 +2,36 @@
 set -euo pipefail
 
 source_root=$(cd "$(dirname "$0")/../.." && pwd)
+# Only a single canonical declaration can disable this starter-only proof.
+mode=$(awk '
+  /^[[:space:]]*[-*][[:space:]]+\*\*Mode:/ {
+    count++
+    if ($0 == "- **Mode:** `downstream-product`") downstream++
+  }
+  END { if (count == 1 && downstream == 1) print "downstream-product" }
+' "$source_root/PROJECT_CONTEXT.md" 2>/dev/null || true)
+if [[ "$mode" == downstream-product ]]; then
+  # GitHub supplies the repository identity; this guards AMCore, not product forks.
+  if [[ "${GITHUB_REPOSITORY:-}" == alex-morozov84/AMCore ]]; then
+    echo '::error::AMCore must retain Mode upstream-starter; capability extension cannot be disabled here.' >&2
+    exit 1
+  fi
+  message='Capability extension did not run: Mode is downstream-product. Its fixed source patch proves the starter extension path and cannot track product edits. A green Test no longer proves that full path on this product. Inherited tests remain; product PostgreSQL tests must cover roles, organizations, rows, DENY, fields and API keys for its own modules.'
+  echo "::warning::$message"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf '%s\n' "### Capability extension not run" "$message" >> "$GITHUB_STEP_SUMMARY"
+  fi
+  exit 0
+fi
+if [[ "${1:-}" == --check-only && $# == 1 ]]; then
+  git -C "$source_root" apply --check "$source_root/scripts/fixtures/t024-capability-extension.patch"
+  exit 0
+fi
+if [[ $# != 0 ]]; then
+  echo 'Usage: t024-capability-extension.sh [--check-only]' >&2
+  exit 2
+fi
+
 fixture_root=$(mktemp -d "${TMPDIR:-/tmp}/t024-extension.XXXXXX")
 finished=false
 cleanup() {
@@ -59,7 +89,7 @@ node -e '
 (cd "$fixture_root/apps/api" && \
   PATH="$fixture_root/fixture-bin:$PATH" NODE_OPTIONS=--experimental-vm-modules \
   ./node_modules/.bin/jest --config jest-e2e.config.js --runInBand \
-  --runTestsByPath test/fixture-order-extension.e2e-spec.ts --silent)
+  --runTestsByPath test/fixture-order-extension.e2e-spec.ts test/openapi.e2e-spec.ts --silent)
 cat "$fixture_root/apps/api/fixture-order-measurement.json"
 
 # The access journey: register -> configure a role -> assign -> explain, compared with the real

@@ -21,6 +21,9 @@ separate activation approval. The mechanism is account-owned; see
 this starter?” at the end of [Quick Start](#quick-start) first: fork identity, then the build
 settings (served languages, Operations Console, product administration), then the first deploy.
 The rest of Quick Start runs the starter itself.
+For repository choice, release support and subsequent updates, use
+[Create and update a product](docs/operations/updating-a-fork.md).
+If AMCore helps your project, consider giving it a star on GitHub.
 
 AMCore is a production-oriented application starter for building secure, modular
 SaaS products, internal tools, and AI-enabled systems. The reusable surface is

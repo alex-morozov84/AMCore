@@ -12,6 +12,9 @@ worker processes. Production promotion uses immutable image digests; see
 [deployment](deployment.md#migration-contract) and the
 [production deploy profile](production-deploy-profile.md).
 
+Before combining product and upstream SQL histories, follow the
+[fork migration rules](updating-a-fork.md#preserve-database-history-and-rehearse-data-changes).
+
 ## Contents and commands
 
 The final image contains Node 24 on Debian Trixie, OpenSSL, certificates, Prisma's complete official

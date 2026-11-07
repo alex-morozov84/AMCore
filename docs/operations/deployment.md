@@ -1,5 +1,8 @@
 # Deployment & Migrations
 
+For upstream source integration, use the [fork update guide](updating-a-fork.md);
+source merges and database recovery are separate operations.
+
 How to take AMCore from clone → migrated schema → running app, locally and in
 production.
 
@@ -48,9 +51,10 @@ gates, but the actual staging/production **deploy** wiring (GitHub Environments,
 hosting, secrets) is yours to add. Build the image **once** and promote the **same
 immutable digest** from staging to production — never rebuild from the tag.
 
-To use a previous version, check out its tag (`git checkout v1.2.0`) or fork from it;
-to keep an old line alive with backports, branch `release/1.x` from its tag, only when
-a backport is actually needed.
+To redeploy a previous release of your own repository, check out its tag (`git checkout v1.2.0`).
+A product owner may branch `release/1.x` from a tag to maintain an old line; AMCore itself
+does not backport fixes to older minors. To start or update a product from AMCore, follow
+[Create and update a product](updating-a-fork.md) instead of forking from an arbitrary tag.
 
 ## Migration contract
 

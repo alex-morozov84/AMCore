@@ -160,10 +160,24 @@ capacity when measured build consumption no longer leaves adequate headroom.
   Changes to shard selection require evidence. Full API coverage is declared
   mandatory for PRs; switching to full post-merge coverage requires a separate
   owner policy decision.
-- **Test capability extension** runs `pnpm test:capability-extension`: an isolated disposable
-  resource variant compiles shared, API and web consumers and exercises
-  authorization against PostgreSQL and Redis Testcontainers. The fixture does
-  not add a sample product domain to the shipped starter.
+- **Test capability extension** runs `pnpm test:capability-extension` on the starter.
+  Its fixed patch adds a disposable resource, compiles shared/API/web consumers,
+  and tests authorization against PostgreSQL and Redis Testcontainers.
+  It also runs the member access journey and the catalogue copy test by name,
+  each with a minimum reported count.
+  No sample product domain ships in the starter. Normal product edits can break
+  the patch's exact source anchors without breaking authorization.
+  Exactly one canonical ``- **Mode:** `downstream-product` `` line in
+  `PROJECT_CONTEXT.md` makes the command warn in the log and step summary,
+  then succeed before copying or running tests. Typo or duplicate Mode lines
+  leave the check enabled. CI in the canonical `alex-morozov84/AMCore`
+  repository rejects this downstream declaration to prevent accidental disabling.
+  Products retain inherited tests, but a green `Test` no longer proves the full
+  new-module extension path on their code. Product-owned PostgreSQL tests must
+  cover roles, organizations, rows, DENY, fields and API keys; see
+  [extend a product](../auth/capability-catalogue.md#extend-a-downstream-product).
+  The job and `Test` aggregate remain enabled; the warning records unmeasured
+  coverage, not a failed test. Script contracts uses the same applicability decision.
 - **workflow-lint** checks workflow syntax and hardening rules, and verifies
   that every `uses:` pin matches the real tag commit (including annotated tags).
 - **Web E2E** is the declared aggregate check. Live required status is separate. Its plan selects all
@@ -208,6 +222,12 @@ capacity when measured build consumption no longer leaves adequate headroom.
   keeps this job, the root `test:scripts` script and the ruleset entry consistent. It
   does **not** cover the public/private-path ratchet — that is the separate
   "Observability contract (static)" job above.
+  On PRs it also runs `node scripts/check-migration-history.mjs` against the default
+  synthetic merge checkout (`fetch-depth: 2`, credentials not persisted). HEAD must
+  match GITHUB_SHA and have two parents with the first-parent tree available. Existing
+  migration SQL paths/blobs must remain identical; additions are allowed. A mismatch
+  fails this required job. Push runs do not perform the history comparison; the guard
+  does not prove SQL safety or detect collisions between new migrations.
 
 **The observability-contract and script-contracts job contexts ("Observability
 contract (static)", "Observability contract (live)", "Script contracts") are listed
@@ -352,11 +372,11 @@ guaranteed to match upstream (platform/org defaults and fork-network rules may d
 
 Downstream products should declare one workflow mode in `PROJECT_CONTEXT.md`:
 
-- `strict` — mirrors AMCore upstream: protected `main`, PR-only changes,
-  squash-only merges, required status checks, immutable release tags, secret
-  scanning, push protection, Dependabot alerts, and Dependabot security updates. Use
-  `scripts/setup-repo-security.sh` to apply the supported GitHub repository
-  settings.
+- `strict` — protected `main`, PR-only changes, required status checks, immutable
+  release tags, secret scanning, push protection and Dependabot alerts/updates.
+  AMCore upstream uses squash-only. A downstream integrating AMCore releases uses
+  `scripts/setup-repo-security.sh --fork-updates` and preserves source-update merge
+  commits. Ordinary feature PRs may squash; GitHub does not choose per-PR methods for you.
 - `flexible` — keeps the same CI/security files but lets the product relax
   branch protection, merge method, or review rules. Document the chosen rules
   and understand that GitHub will not enforce guarantees you did not enable.
@@ -370,23 +390,36 @@ declared by the checkout instead of assuming every fork uses protected `main`.
 
 Some protections — branch rulesets, secret scanning, push protection — are
 **repository settings** and do NOT travel with a clone/fork. For a fork that chose
-`strict`, enable them with one command:
+`strict`, first check [feature availability and repository choice](updating-a-fork.md#choose-the-repository-and-protection-mode).
+The full profile needs the corresponding GitHub features; flexible private products
+use the manual route there. Then:
 
 1. Install the GitHub CLI — `brew install gh` (or see https://cli.github.com).
 2. Sign in with repository **admin** access — `gh auth login`
    (no manual token needed; the CLI handles it).
-3. Apply the settings — `bash ./scripts/setup-repo-security.sh` (also needs `jq`).
+3. Verify the product CLI target with `gh repo set-default OWNER/PRODUCT` and `--view`.
+4. For an initialized downstream, apply `bash ./scripts/setup-repo-security.sh --fork-updates`
+   (also needs `jq`). AMCore upstream runs the command without the flag.
 
 This enables native **secret scanning** + **push protection**, the **dependency
 graph** + Dependabot alerts + **Dependabot security updates** (auto-PRs that fix
 vulnerable dependencies — the only channel that patches a vuln whose fix is a
 semver-major, since `dependabot.yml` ignores majors), and imports the **rulesets**
 for `main` (PR-only,
-**Squash-only** merges, required status checks, block force-push, restrict
-deletions) and for **release tags** (`refs/tags/v*` — block tag update and
+**squash-only** upstream, or **squash + merge** with `--fork-updates`,
+required status checks, block force-push, restrict deletions) and for **release tags** (`refs/tags/v*` — block tag update and
 deletion, so published versions are immutable). It is the supported `strict`
 setup. It is **idempotent** — safe to re-run (it also removes the retired
-`Protect develop` ruleset if present).
+`Protect develop` ruleset if present). The flag requires one canonical
+`downstream-product` Mode field in PROJECT_CONTEXT.md. Unknown arguments and invalid
+flag/context combinations fail before any GitHub call. The main profile is rendered
+temporarily; tracked upstream rules stay unchanged. An unflagged downstream rerun
+warns before mutation and restores squash-only policy. Repeat the flag for reconciliation.
+
+A Fork using `product/v*` release tags needs its own separately named tag ruleset,
+with the same update/deletion protection for `refs/tags/product/v*`. Setup only
+manages `v*`; verify product-prefix protection after reruns. An unavailable feature
+can fail the API request; setup never silently removes protections to make it pass.
 
 Notes:
 

@@ -20,11 +20,11 @@ model OrganizationAdministratorInvitation {
   mailOutcome        String?
   mailObservedAt     DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  currentInvite OrgInvite? @relation(fields: [currentInviteId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  currentInvite OrgInvite? @relation(fields: [currentInviteId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  @@index([organizationId, state, createdAt, id])
-  @@index([state, completedAt, cancelledAt])
+  @@index([organizationId, state, createdAt, id], map: "organization_administrator_invitations_organizationId_state_c_i")
+  @@index([state, completedAt, cancelledAt], map: "organization_administrator_invitations_state_completedAt_can_id")
   @@map("organization_administrator_invitations")
   @@schema("core")
 }

@@ -56,7 +56,7 @@ model AiRun {
   incarnation              String      @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   controlRevision          Int         @default(0)
   inputMessageId           String?
-  retryOfRunId             String?     @unique
+  retryOfRunId             String?     @unique(map: "ai_runs_retryofrunid_key")
   assistantBindingCaptured Boolean     @default(false)
   assistantIdAtCreation    String?
   status                   AiRunStatus @default(QUEUED)
@@ -97,8 +97,8 @@ model AiRun {
   messages        AiMessage[]
   approvals       AiApproval[]
   artifacts       AiArtifact[]
-  inputMessage    AiMessage?         @relation("AiRunInput", fields: [inputMessageId], references: [id], onDelete: SetNull)
-  retryOf         AiRun?             @relation("AiRunRetries", fields: [retryOfRunId], references: [id], onDelete: Restrict)
+  inputMessage    AiMessage?         @relation("AiRunInput", fields: [inputMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "ai_runs_inputmessageid_fkey")
+  retryOf         AiRun?             @relation("AiRunRetries", fields: [retryOfRunId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "ai_runs_retryofrunid_fkey")
   retriedBy       AiRun[]            @relation("AiRunRetries")
 
   @@unique([conversationId, idempotencyKey])
@@ -106,7 +106,7 @@ model AiRun {
   @@index([status, availableAt])
   @@index([status, nextAttemptAt])
   @@index([status, leaseExpiresAt])
-  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "ai_runs_status_createdAt_id_idx")
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "ai_runs_status_createdat_id_idx")
   @@map("ai_runs")
   @@schema("ai")
 }
@@ -116,7 +116,7 @@ model AiRunControl {
   id        Int      @id
   paused    Boolean  @default(false)
   revision  Int      @default(0)
-  updatedAt DateTime @default(now())
+  updatedAt DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(3)
 
   @@map("ai_run_control")
   @@schema("ai")
@@ -131,16 +131,16 @@ model AiRunTombstone {
   idempotencyKey     String?
   terminalStatus     AiRunStatus
   terminalReasonCode String?
-  finishedAt         DateTime
-  archivedAt         DateTime    @default(now())
+  finishedAt         DateTime @db.Timestamptz(3)
+  archivedAt         DateTime    @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(3)
   cleanupActorId     String
   cleanupCommandId   String
 
-  conversation     AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  inputMessage     AiMessage      @relation("AiRunTombstoneInput", fields: [inputMessageId], references: [id], onDelete: Cascade)
+  conversation     AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ai_run_tombstone_conversation_fk")
+  inputMessage     AiMessage      @relation("AiRunTombstoneInput", fields: [inputMessageId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ai_run_tombstone_input_fk")
   archivedMessages AiMessage[]    @relation("AiMessageArchivedOrigin")
 
-  @@unique([conversationId, idempotencyKey])
+  @@unique([conversationId, idempotencyKey], map: "ai_run_tombstones_conversationid_idempotencykey_key")
   @@map("ai_run_tombstones")
   @@schema("ai")
 }

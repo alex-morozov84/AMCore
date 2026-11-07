@@ -115,6 +115,9 @@ For session management, see [own and admin API contracts](auth/sessions.md) and
 The optional [Console actions](operations-console/users.md#manage-sessions)
 provide an operator interface for admin session management.
 
+Create or update a downstream product: [fork update guide](operations/updating-a-fork.md).
+It covers repository choice, release support, merge delivery and recovery.
+
 ## Documentation map
 
 - **[Backend architecture & conventions](backend/architecture-and-conventions.md)** —

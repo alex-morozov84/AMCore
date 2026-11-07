@@ -5,6 +5,7 @@ import Redis from 'ioredis'
 import request from 'supertest'
 
 import {
+  CAPABILITY_CATALOGUE,
   createInvitationOperationId,
   ORGANIZATION_CONTEXT_FAMILY,
   SystemRole,
@@ -969,12 +970,9 @@ describe('Organizations (e2e)', () => {
         .get(discovery)
         .set('Authorization', `Bearer ${orgToken}`)
         .expect(200)
-      expect(catalogue.body.capabilities.map((entry: { id: string }) => entry.id)).toEqual([
-        'teamAccess.manage',
-        'organization.read',
-        'organization.update',
-        'organization.delete',
-      ])
+      expect(catalogue.body.capabilities.map((entry: { id: string }) => entry.id)).toEqual(
+        CAPABILITY_CATALOGUE.map((entry) => entry.id)
+      )
       const created = await request(app.getHttpServer())
         .post(preset)
         .set('Authorization', `Bearer ${orgToken}`)

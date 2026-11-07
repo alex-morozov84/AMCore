@@ -139,17 +139,24 @@ another level does not prove the reading an operation needs. See the
    web catalogue (and `organizationRoles.areas.<Subject>` for a new subject). The role editor and the member **Access**
    view then list the new operation with no further UI code. Set `access: 'none'` on the adapter only to opt out of
    the member access explanation (the capability is then shown as not evaluated).
-6. Compile shared, API and web consumers; exercise multiple roles, conditional
-   own/assigned/all, DENY, wrong tenant, fields and API-key intersection on
-   PostgreSQL. Run `pnpm test:capability-extension` from the repository root:
-   it applies a disposable `FixtureOrder` source/migration/controller variant
-   in an isolated temporary copy, compiles all three consumers and runs its
-   Testcontainers e2e. It also runs, by name and with a floor on the reported counts, the member access journey
-   (register, configure a role through the editor routes, assign, explain, compare with the real handlers on own,
-   assigned and other records; 13 cases) and the catalogue copy parity test (every label key, area and level needs
-   copy in every web catalogue). The command needs installed dependencies and local Docker.
-   No fixture model or route ships in the starter. Document the domain's actual
-   screens separately.
+6. Compile shared, API and web consumers. Write PostgreSQL access tests for
+   your product's modules. Cover multiple roles, organization boundaries,
+   own/assigned/all rows, DENY rules, readable and writable fields, and API-key
+   intersection. If the capability appears in the member **Access** view, also
+   test that its explanation matches your real handlers on own, assigned and
+   other records. Verify capability labels in every retained web catalogue.
+   `scripts/fixtures/t024-capability-extension.patch` contains reference tests
+   you can adapt.
+   Do not run `pnpm test:capability-extension` for product validation: its fixed patch tests
+   the starter's extension recipe and can conflict with normal product edits.
+   In `Mode = downstream-product`, the command warns and exits successfully
+   without copying the project or running tests. Inherited tests still run,
+   but a green `Test` no longer proves the complete new-module extension path
+   on product code. The product must test its own modules.
+   Starter member-access unit tests use only built-in capabilities and synthetic
+   fixtures. They do not validate capabilities registered by your product; cover
+   those capabilities in your own PostgreSQL tests.
+   Document the domain's actual screens separately.
 
 An issued `read:all` key does **not** acquire access merely because a subject
 appears in the catalogue. If the owner later receives a read grant for a new

@@ -1,6 +1,6 @@
 diff --git a/apps/api/prisma/fixture-order.prisma b/apps/api/prisma/fixture-order.prisma
 new file mode 100644
-index 0000000..64f2a3d
+index 0000000000000000000000000000000000000000..64f2a3d6f2a8a9a937d0ed60842d71aa020f2138
 --- /dev/null
 +++ b/apps/api/prisma/fixture-order.prisma
 @@ -0,0 +1,12 @@
@@ -18,7 +18,7 @@ index 0000000..64f2a3d
 +}
 diff --git a/apps/api/prisma/migrations/20261001000000_fixture_order/migration.sql b/apps/api/prisma/migrations/20261001000000_fixture_order/migration.sql
 new file mode 100644
-index 0000000..24bd3e1
+index 0000000000000000000000000000000000000000..24bd3e1953fcf805a2c3b17307901cb9efa761ea
 --- /dev/null
 +++ b/apps/api/prisma/migrations/20261001000000_fixture_order/migration.sql
 @@ -0,0 +1,9 @@
@@ -32,9 +32,10 @@ index 0000000..24bd3e1
 +);
 +CREATE INDEX fixture_orders_organization_id_idx ON core.fixture_orders ("organizationId");
 diff --git a/apps/api/src/core/auth/casl/ability.factory.ts b/apps/api/src/core/auth/casl/ability.factory.ts
+index 61bc8b197af45af6b4de851657df68911193662a..43c607cc4e08ec6f9134ed8751777ddcaa40a031 100644
 --- a/apps/api/src/core/auth/casl/ability.factory.ts
 +++ b/apps/api/src/core/auth/casl/ability.factory.ts
-@@ -3,7 +3,7 @@
+@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common'
  
  import { Action, type RequestPrincipal, Subject, SystemRole } from '@amcore/shared'
  
@@ -43,7 +44,7 @@ diff --git a/apps/api/src/core/auth/casl/ability.factory.ts b/apps/api/src/core/
  import { OrgAclVersionService } from '../org-acl-version.service.js'
  import {
    assertVerifiedContext,
-@@ -29,6 +29,7 @@
+@@ -29,6 +29,7 @@ type AppSubjects =
        Organization: Organization
        Role: Role
        Permission: Permission
@@ -52,7 +53,7 @@ diff --git a/apps/api/src/core/auth/casl/ability.factory.ts b/apps/api/src/core/
  export type AppAbility = Ability<[string, AppSubjects], PrismaQuery>
  
 diff --git a/apps/api/src/core/auth/casl/permission-model-fields.ts b/apps/api/src/core/auth/casl/permission-model-fields.ts
-index d16a961..ea2e209 100644
+index b12f41bc03636346dee91e3ffa66cfe1693414ba..9fbd0474763576e33897976212814c1fe185db28 100644
 --- a/apps/api/src/core/auth/casl/permission-model-fields.ts
 +++ b/apps/api/src/core/auth/casl/permission-model-fields.ts
 @@ -1,6 +1,6 @@
@@ -63,7 +64,7 @@ index d16a961..ea2e209 100644
  export type ScalarKind =
    'string' | 'nullableString' | 'boolean' | 'integer' | 'date' | 'nullableDate'
  
-@@ -41,6 +41,10 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
+@@ -42,6 +42,10 @@ export const MODEL_FIELDS: Record<ModelSubject, Record<string, ScalarKind>> = {
      inverted: 'boolean',
      organizationId: 'nullableString',
    },
@@ -75,7 +76,7 @@ index d16a961..ea2e209 100644
  
  export const MODEL_SUBJECTS = Object.keys(MODEL_FIELDS) as ModelSubject[]
 diff --git a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
-index 93e3962..d53b176 100644
+index 93e3962f5f8fa93e9ee35b7286d6766c3985b203..d53b1764590bee44e1840967b6e02d6f3a2b975d 100644
 --- a/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
 +++ b/apps/api/src/core/auth/decorators/adr-034-api-key-allowlist.ts
 @@ -155,6 +155,19 @@ export const ADR_034_APIKEY_ALLOWLIST: readonly HandlerAllowlistEntry[] = [
@@ -99,7 +100,7 @@ index 93e3962..d53b176 100644
    // Stable opt-in per AK-01 — identity self-check surface.
    {
 diff --git a/apps/api/src/core/organizations/capability-policy-parity.spec.ts b/apps/api/src/core/organizations/capability-policy-parity.spec.ts
-index 999a3bc..cda8311 100644
+index 999a3bc6e96b707dffc90eda8e35407c8713e3c6..cda831138467f441cc82fc083d5867b0c16bc291 100644
 --- a/apps/api/src/core/organizations/capability-policy-parity.spec.ts
 +++ b/apps/api/src/core/organizations/capability-policy-parity.spec.ts
 @@ -11,6 +11,7 @@ import { REQUEST_CONTEXT_POLICY } from '../auth/organization-context/request-con
@@ -130,7 +131,7 @@ index 999a3bc..cda8311 100644
      }
    })
 diff --git a/apps/api/src/core/organizations/capability-registry.service.ts b/apps/api/src/core/organizations/capability-registry.service.ts
-index 9f52640..d526a2d 100644
+index 402fd37a16a63703a60c1b98a5864b66e47fbc52..55691dfdef17cab5999e4c183be7a7d604db2311 100644
 --- a/apps/api/src/core/organizations/capability-registry.service.ts
 +++ b/apps/api/src/core/organizations/capability-registry.service.ts
 @@ -56,6 +56,20 @@ const organizationPreset = (
@@ -216,7 +217,7 @@ index 9f52640..d526a2d 100644
    if (checks.some((check) => !check.possible)) return 'denied'
    if (checks.every((check) => check.unconditional)) return 'allowed'
    return 'recordRequired'
-@@ -229,6 +264,10 @@ export class CapabilityRegistry {
+@@ -237,6 +272,10 @@ export class CapabilityRegistry {
        'organization.read': 'allowed', // verified membership on this bearer-only context
        'organization.update': update,
        'organization.delete': team ? classify(ability, Action.Delete, ORG_READ_FIELDS) : 'denied',
@@ -229,13 +230,25 @@ index 9f52640..d526a2d 100644
  
 diff --git a/apps/api/src/core/organizations/fixture-orders.controller.ts b/apps/api/src/core/organizations/fixture-orders.controller.ts
 new file mode 100644
-index 0000000..4c08cba
+index 0000000000000000000000000000000000000000..6aa8888aea7340bf00be3e8cc5623cae5d85b6b1
 --- /dev/null
 +++ b/apps/api/src/core/organizations/fixture-orders.controller.ts
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,146 @@
 +import { subject } from '@casl/ability'
 +import { BadRequestException, Body, Controller, Get, Param, Patch } from '@nestjs/common'
-+import { ApiBearerAuth, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger'
++import {
++  ApiBadRequestResponse,
++  ApiBearerAuth,
++  ApiBody,
++  ApiForbiddenResponse,
++  ApiNotFoundResponse,
++  ApiOkResponse,
++  ApiOperation,
++  ApiParam,
++  ApiSecurity,
++  ApiTags,
++  ApiUnauthorizedResponse,
++} from '@nestjs/swagger'
 +import { createSchemaDto } from '../../common/schemas/schema-dto'
 +
 +import {
@@ -243,7 +256,7 @@ index 0000000..4c08cba
 +  ORGANIZATION_CONTEXT_FAMILY,
 +} from '@amcore/shared'
 +
-+import { ForbiddenException, NotFoundException } from '../../common/exceptions'
++import { ApiProtectionUnavailable, ForbiddenException, NotFoundException } from '../../common/exceptions'
 +import { PrismaService } from '../../prisma'
 +import type { AppAbility } from '../auth/casl/ability.factory'
 +import { accessibleBy, createCaslExtension } from '../auth/casl/prisma-ability'
@@ -272,6 +285,11 @@ index 0000000..4c08cba
 +  return { allowed: Object.values(fields).some(Boolean), fields }
 +}
 +
++@ApiUnauthorizedResponse({ description: 'Credential required' })
++@ApiForbiddenResponse({ description: 'Order access denied' })
++@ApiNotFoundResponse({ description: 'Organization or order missing' })
++@ApiBadRequestResponse({ description: 'Invalid input or scan limit exceeded' })
++@ApiParam({ name: 'orgId', description: 'Selected organization ID' })
 +@ApiTags('fixture-orders')
 +@ApiBearerAuth()
 +@ApiSecurity('apiKeyBearer')
@@ -281,10 +299,39 @@ index 0000000..4c08cba
 +export class FixtureOrdersController {
 +  constructor(private readonly prisma: PrismaService) {}
 +
++  @ApiOkResponse({
++    schema: {
++      type: 'object',
++      required: ['data', 'total'],
++      properties: {
++        data: {
++          type: 'array',
++          items: {
++            type: 'object',
++            required: ['id', 'status', 'access'],
++            properties: {
++              id: { type: 'string' },
++              status: { type: 'string' },
++              access: {
++                type: 'object',
++                required: ['allowed', 'fields'],
++                properties: {
++                  allowed: { type: 'boolean' },
++                  fields: { type: 'object', additionalProperties: { type: 'boolean' } },
++                },
++              },
++            },
++          },
++        },
++        total: { type: 'integer' },
++      },
++    },
++  })
 +  @Get()
 +  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' },
 +    legacyPlatformMembershipBypass: true })
 +  @ApiOperation({ summary: 'List authorized fixture orders' })
++  @ApiProtectionUnavailable('API key')
 +  async list(@Param('orgId') orgId: string, @CurrentAbility() ability: AppAbility) {
 +    const client = this.prisma.$extends(createCaslExtension())
 +    const where: Prisma.FixtureOrderWhereInput = {
@@ -301,10 +348,20 @@ index 0000000..4c08cba
 +    return { data, total: visible.length }
 +  }
 +
++  @ApiOkResponse({
++    schema: {
++      type: 'object',
++      required: ['id', 'status'],
++      properties: { id: { type: 'string' }, status: { type: 'string' } },
++    },
++  })
++  @ApiParam({ name: 'id', description: 'Selected order ID' })
++  @ApiBody({ type: FixtureOrderUpdateDto })
 +  @Patch(':id')
 +  @RequestContextPolicy({ kind: 'organization', selector: { param: 'orgId' },
 +    legacyPlatformMembershipBypass: true })
 +  @ApiOperation({ summary: 'Update authorized fixture order fields' })
++  @ApiProtectionUnavailable('API key')
 +  async update(@Param('orgId') orgId: string, @Param('id') id: string,
 +    @Body({ schema: FixtureOrderUpdateDto.schema }) input: FixtureOrderUpdateDto, @CurrentAbility() ability: AppAbility) {
 +    return this.prisma.$transaction(async (tx) => {
@@ -324,10 +381,10 @@ index 0000000..4c08cba
 +  }
 +}
 diff --git a/apps/api/src/core/organizations/organizations.module.ts b/apps/api/src/core/organizations/organizations.module.ts
-index 48c5b9d..8d2b9bd 100644
+index b4bd1bb5f59b89c98752b94e32ca19b2a21adc1c..0103875918b6ff3aa0ed0ca6ec2d181a48e92c32 100644
 --- a/apps/api/src/core/organizations/organizations.module.ts
 +++ b/apps/api/src/core/organizations/organizations.module.ts
-@@ -32,6 +32,7 @@ import { OrganizationCreationService } from './organization-creation.service.js'
+@@ -37,6 +37,7 @@ import { OrganizationCreationService } from './organization-creation.service.js'
  import { OrganizationsController } from './organizations.controller.js'
  import { OrganizationsService } from './organizations.service.js'
  import { PresetPermissionsController } from './preset-permissions.controller.js'
@@ -335,7 +392,7 @@ index 48c5b9d..8d2b9bd 100644
  import { ProvisioningController } from './provisioning/provisioning.controller.js'
  import { ProvisioningService } from './provisioning/provisioning.service.js'
  import { ProvisioningLimiterService } from './provisioning/provisioning-limiter.service.js'
-@@ -48,7 +49,8 @@ import { RolesController } from './roles.controller.js'
+@@ -63,6 +64,7 @@ import { RolesController } from './roles.controller.js'
      OrganizationsController,
      CapabilitiesController,
      PresetPermissionsController,
@@ -343,10 +400,9 @@ index 48c5b9d..8d2b9bd 100644
      MembersController,
      MemberKeyController,
      RoleDefinitionsController,
-     RolesController,
 diff --git a/apps/api/test/fixture-order-access.e2e-spec.ts b/apps/api/test/fixture-order-access.e2e-spec.ts
 new file mode 100644
-index 0000000..f395187
+index 0000000000000000000000000000000000000000..f3a7b807e93e0d24532b5dafa66b7d1191e58cc2
 --- /dev/null
 +++ b/apps/api/test/fixture-order-access.e2e-spec.ts
 @@ -0,0 +1,430 @@
@@ -782,7 +838,7 @@ index 0000000..f395187
 +})
 diff --git a/apps/api/test/fixture-order-extension.e2e-spec.ts b/apps/api/test/fixture-order-extension.e2e-spec.ts
 new file mode 100644
-index 0000000..5795deb
+index 0000000000000000000000000000000000000000..5795debc8f0e49aca1635ee4e94b40c205d34c53
 --- /dev/null
 +++ b/apps/api/test/fixture-order-extension.e2e-spec.ts
 @@ -0,0 +1,269 @@
@@ -1055,8 +1111,21 @@ index 0000000..5795deb
 +      .set('Authorization', `Bearer ${staff.token}`).expect(400)
 +  })
 +})
+diff --git a/apps/api/test/openapi.e2e-spec.ts b/apps/api/test/openapi.e2e-spec.ts
+index d8e1e8b4f8e7301965aa653f3446b3444f4ba9e0..50263ef576dae2a30fa356c033fbd2694eb5ee23 100644
+--- a/apps/api/test/openapi.e2e-spec.ts
++++ b/apps/api/test/openapi.e2e-spec.ts
+@@ -44,6 +44,8 @@ interface Expected {
+ // Paths carry no global prefix here — `setupE2ETest` does not call
+ // `setGlobalPrefix('api/v1')`, matching how the document is scanned.
+ const EXPECTED: Record<string, Expected> = {
++  'get /organizations/{orgId}/fixture-orders': { status: '200', kind: 'json' },
++  'patch /organizations/{orgId}/fixture-orders/{id}': { status: '200', kind: 'json' },
+   // auth
+   'post /auth/register': { status: '201', kind: 'json' },
+   'post /auth/login': { status: ['200', '202'], kind: 'json' },
 diff --git a/apps/web/src/entities/organization-context/model/context-fixture.ts b/apps/web/src/entities/organization-context/model/context-fixture.ts
-index 6e1fa06..681d9b4 100644
+index 6e1fa06104763d6f3c2d3016770dbd502dc584e9..681d9b4a3f66a4fb7a72bd72f92629304a9a53a6 100644
 --- a/apps/web/src/entities/organization-context/model/context-fixture.ts
 +++ b/apps/web/src/entities/organization-context/model/context-fixture.ts
 @@ -7,6 +7,8 @@ export const contextAffordances = {
@@ -1069,7 +1138,7 @@ index 6e1fa06..681d9b4 100644
    recordAffordances: {
      'organization.read': { allowed: true, fields: {} },
 diff --git a/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx b/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx
-index db1b79c..1f13909 100644
+index db1b79cf6af9e12b1ad3f85c119a950aa63f6588..1f13909d4a2d23d45205a2ec541cbc7d988ffc3b 100644
 --- a/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx
 +++ b/apps/web/src/widgets/organization-context-summary/ui/organization-context-summary.stories.tsx
 @@ -19,6 +19,8 @@ const meta = {
@@ -1083,7 +1152,7 @@ index db1b79c..1f13909 100644
          'organization.read': { allowed: true, fields: {} },
 diff --git a/fixture-bin/pnpm b/fixture-bin/pnpm
 new file mode 100755
-index 0000000..bac1316
+index 0000000000000000000000000000000000000000..bac1316d5dff51d6110fa65c302f75e2ad7e008c
 --- /dev/null
 +++ b/fixture-bin/pnpm
 @@ -0,0 +1,7 @@
@@ -1095,10 +1164,10 @@ index 0000000..bac1316
 +echo 'Fixture only supports pnpm prisma' >&2
 +exit 2
 diff --git a/packages/shared/src/constants/capability-catalogue.ts b/packages/shared/src/constants/capability-catalogue.ts
-index e1d4d35..6e3761a 100644
+index d99ae807396da5c4e2eb7edaf14210c6bc536a3a..04573a54679bbc80c313d35863a29ede446f721f 100644
 --- a/packages/shared/src/constants/capability-catalogue.ts
 +++ b/packages/shared/src/constants/capability-catalogue.ts
-@@ -66,6 +66,21 @@ export const CAPABILITY_CATALOGUE = [
+@@ -70,6 +70,21 @@ export const CAPABILITY_CATALOGUE = [
      presets: ['own', 'all'] as const,
      editableFields: [] as const,
    },
@@ -1121,7 +1190,7 @@ index e1d4d35..6e3761a 100644
  
  export type CapabilityId = (typeof CAPABILITY_CATALOGUE)[number]['id']
 diff --git a/packages/shared/src/enums/permissions.ts b/packages/shared/src/enums/permissions.ts
-index e71faa5..b22234d 100644
+index e71faa556356221942e24a2ec19e9cd3ea7ba162..b22234d6a4f77d23aaf8ea7e88c14458861349be 100644
 --- a/packages/shared/src/enums/permissions.ts
 +++ b/packages/shared/src/enums/permissions.ts
 @@ -14,6 +14,7 @@ export enum Subject {
@@ -1133,7 +1202,7 @@ index e71faa5..b22234d 100644
    All = 'all', // wildcard: all subjects
  }
 diff --git a/packages/shared/src/schemas/capability.ts b/packages/shared/src/schemas/capability.ts
-index 751ec4d..772156e 100644
+index 751ec4d7aa09b310f28ccd59f13b754582685457..772156ea878461dc8f9155ddbc05111d51d254cf 100644
 --- a/packages/shared/src/schemas/capability.ts
 +++ b/packages/shared/src/schemas/capability.ts
 @@ -7,6 +7,8 @@ export const capabilityIdSchema = z.enum([
@@ -1156,7 +1225,7 @@ index 751ec4d..772156e 100644
  export const recordActionSchema = z.strictObject({
 diff --git a/packages/shared/src/schemas/fixture-order.ts b/packages/shared/src/schemas/fixture-order.ts
 new file mode 100644
-index 0000000..fdbda7f
+index 0000000000000000000000000000000000000000..fdbda7ff3c67187b4d4e7522ccdf5f663492d098
 --- /dev/null
 +++ b/packages/shared/src/schemas/fixture-order.ts
 @@ -0,0 +1,7 @@
@@ -1168,10 +1237,10 @@ index 0000000..fdbda7f
 +})
 +export type FixtureOrderUpdate = z.infer<typeof fixtureOrderUpdateSchema>
 diff --git a/packages/shared/src/schemas/index.ts b/packages/shared/src/schemas/index.ts
-index 679bfd5..e99598b 100644
+index 5e4dbec80130417b13ab10ffe7a54a7ce8cf37b0..fcc5100aae27c018251966904ae040f0ceca57f4 100644
 --- a/packages/shared/src/schemas/index.ts
 +++ b/packages/shared/src/schemas/index.ts
-@@ -55,6 +55,7 @@ export {
+@@ -64,6 +64,7 @@ export {
  } from './auth'
  
  // Organization schemas
@@ -1180,7 +1249,7 @@ index 679bfd5..e99598b 100644
    type ActorAffordances,
    actorAffordancesSchema,
 diff --git a/packages/shared/src/schemas/organization.ts b/packages/shared/src/schemas/organization.ts
-index 419811f..609dffc 100644
+index 419811fea71ce012eff8250b6de36a8397bbb899..609dffce72a5a61584006ee7de11451c3b1bdcce 100644
 --- a/packages/shared/src/schemas/organization.ts
 +++ b/packages/shared/src/schemas/organization.ts
 @@ -56,7 +56,7 @@ const permissionActionSchema = z.enum(Action)
@@ -1193,7 +1262,7 @@ index 419811f..609dffc 100644
    fields: permissionFieldsSchema.optional(),
    inverted: z.boolean().optional().default(false),
 diff --git a/packages/shared/src/schemas/product-access.test.ts b/packages/shared/src/schemas/product-access.test.ts
-index cdddff2..dbd5dc5 100644
+index cdddff2c41792caad28a35c6b9715bd8217fbaad..dbd5dc51556bc05c7378b65e85a509ddafbc41b2 100644
 --- a/packages/shared/src/schemas/product-access.test.ts
 +++ b/packages/shared/src/schemas/product-access.test.ts
 @@ -18,6 +18,8 @@ describe('product organization wire boundaries', () => {

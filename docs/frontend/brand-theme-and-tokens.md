@@ -314,6 +314,10 @@ and chart tokens.
 
 ### Fork initialization
 
+For release-based products, first follow the [source-tag and provenance order](../operations/updating-a-fork.md#initialize-once-from-the-supported-source-tag).
+Initialize at the original plain source tag before product commits or tag namespacing,
+then verify `initialized_from_amcore_version` equals that tag.
+
 Run `pnpm init:brand` while initializing a fresh downstream fork, before applying
 that fork's database migrations. It writes source files only; it never connects to or
 migrates a database. `pnpm init:brand` is the only initializer command. The commands

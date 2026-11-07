@@ -7,6 +7,7 @@ import {
 
 import {
   input,
+  ORDER_READ,
   ORDER_UPDATE,
   orderCapabilities,
   orderPresetRule,
@@ -48,7 +49,7 @@ describe('configured items: what the role settings configure', () => {
         rules: [orders('read', 'all', 'rd'), orders('update', 'own', 'up')],
       }))
     )
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     const source = item.sources.find(
       (source) => source.kind === 'rule' && source.permissionId === 'up'
     )
@@ -91,7 +92,7 @@ describe('configured items: what the role settings configure', () => {
     const access = explain([
       { id: 'R', rules: [orders('read', 'own', 'rd'), orders('update', 'own', 'up')] },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'configured',
       evaluation: 'configured',
       areas: [{ kind: 'own', prerequisite: 'met', masked: false, absorbed: false }],
@@ -106,7 +107,7 @@ describe('configured items: what the role settings configure', () => {
     const access = explain([
       { id: 'R', rules: [orders('read', 'own', 'rd'), orders('update', 'assigned', 'up')] },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'configured',
       areas: [{ kind: 'assigned', prerequisite: 'unproven' }],
     })
@@ -114,7 +115,7 @@ describe('configured items: what the role settings configure', () => {
 
   it('update without any read is a missing prerequisite', () => {
     const access = explain([{ id: 'R', rules: [orders('update', 'all', 'up')] }])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'missingPrerequisite',
       areas: [{ kind: 'all', prerequisite: 'missing' }],
     })
@@ -131,7 +132,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.state).toBe('blocked')
     expect(item.areas[0]).toMatchObject({ prerequisite: 'blocked' })
     expect(item.blockedBy).toEqual({ roleIds: ['R'], total: 1 })
@@ -148,7 +149,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item).toMatchObject({
       state: 'configured',
       areas: [{ kind: 'all', prerequisite: 'unproven' }],
@@ -178,10 +179,8 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update.name').areas[0]?.roles.roleIds).toEqual([
-      'Names',
-    ])
-    expect(configured(access, 'fixtureOrder.update.description').areas[0]?.roles.roleIds).toEqual([
+    expect(configured(access, `${ORDER_UPDATE.id}.name`).areas[0]?.roles.roleIds).toEqual(['Names'])
+    expect(configured(access, `${ORDER_UPDATE.id}.description`).areas[0]?.roles.roleIds).toEqual([
       'Descriptions',
     ])
   })
@@ -197,7 +196,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.state).toBe('blocked')
     expect(item.areas).toMatchObject([{ kind: 'own', masked: true }])
     expect(item.sources[0]).toMatchObject({ effect: 'deny', status: 'vetoes' })
@@ -217,7 +216,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'configured',
       limits: [{ kind: 'denyCondition' }],
       sources: expect.arrayContaining([
@@ -237,12 +236,12 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'configured',
       limits: [{ kind: 'denyFields', fields: ['description'] }],
     })
-    expect(configured(access, 'fixtureOrder.update.description').state).toBe('blocked')
-    expect(configured(access, 'fixtureOrder.update.name').state).toBe('allowed')
+    expect(configured(access, `${ORDER_UPDATE.id}.description`).state).toBe('blocked')
+    expect(configured(access, `${ORDER_UPDATE.id}.name`).state).toBe('allowed')
   })
 
   it('own and assigned from two roles stay two independent areas', () => {
@@ -250,7 +249,7 @@ describe('configured items: what the role settings configure', () => {
       { id: 'A', rules: [orders('read', 'all', 'rd'), orders('update', 'own', 'upo')] },
       { id: 'B', rules: [orders('read', 'all', 'rd'), orders('update', 'assigned', 'upa')] },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(kinds(item)).toEqual(['assigned', 'own'])
     expect(item.areas.map((area) => area.roles.roleIds)).toEqual([['B'], ['A']])
     expect(item.state).toBe('configured')
@@ -271,7 +270,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.state).toBe('allowed')
     expect(item.limits).toEqual([])
     expect(item.areas.filter((area) => area.absorbed).map((area) => area.kind)).toEqual([
@@ -292,7 +291,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.state).toBe('configured')
     expect(item.limits).toEqual(expect.arrayContaining([{ kind: 'fields', fields: ['name'] }]))
     expect(item.areas.some((area) => area.absorbed)).toBe(false)
@@ -310,7 +309,7 @@ describe('configured items: what the role settings configure', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.state).toBe('configured')
     expect(item.limits).toEqual([{ kind: 'denyCondition' }])
     expect(item.areas.find((area) => area.kind === 'own')?.masked).toBe(true)
@@ -320,7 +319,7 @@ describe('configured items: what the role settings configure', () => {
     const access = explain([
       { id: 'R', rules: [orders('read', 'own', 'rd'), orders('update', 'all', 'up')] },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'configured',
       areas: [{ kind: 'all', prerequisite: 'unproven' }],
     })
@@ -328,7 +327,7 @@ describe('configured items: what the role settings configure', () => {
 
   it('reading needs no prerequisite', () => {
     const access = explain([{ id: 'R', rules: [orders('read', 'assigned', 'rd')] }])
-    expect(configured(access, 'fixtureOrder.read')).toMatchObject({
+    expect(configured(access, ORDER_READ.id)).toMatchObject({
       state: 'configured',
       areas: [{ kind: 'assigned', prerequisite: 'notRequired' }],
     })
@@ -336,7 +335,7 @@ describe('configured items: what the role settings configure', () => {
 
   it('without any rule the item is none and carries nothing', () => {
     const access = explain([{ id: 'R', rules: [] }])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'none',
       areas: [],
       limits: [],
@@ -386,7 +385,7 @@ describe('the prerequisite of a custom area is aggregated from its rules (§14)'
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.areas).toMatchObject([{ kind: 'custom', prerequisite: 'unproven' }])
     expect(item.state).toBe('configured')
     expect(item.limits).toEqual(expect.arrayContaining([{ kind: 'condition' }]))
@@ -404,7 +403,7 @@ describe('the prerequisite of a custom area is aggregated from its rules (§14)'
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update').areas).toMatchObject([
+    expect(configured(access, ORDER_UPDATE.id).areas).toMatchObject([
       { kind: 'custom', prerequisite: 'met' },
     ])
   })
@@ -413,7 +412,7 @@ describe('the prerequisite of a custom area is aggregated from its rules (§14)'
     const access = explain([
       { id: 'R', rules: [custom('cx', OWN, ['name']), custom('cy', TEAM, ['description'])] },
     ])
-    expect(configured(access, 'fixtureOrder.update')).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id)).toMatchObject({
       state: 'missingPrerequisite',
       areas: [{ kind: 'custom', prerequisite: 'missing' }],
     })
@@ -431,7 +430,7 @@ describe('the prerequisite of a custom area is aggregated from its rules (§14)'
         ],
       },
     ])
-    const area = configured(access, 'fixtureOrder.update').areas[0]
+    const area = configured(access, ORDER_UPDATE.id).areas[0]
     expect(area).toMatchObject({ kind: 'custom', masked: false, prerequisite: 'met' })
   })
 
@@ -446,7 +445,7 @@ describe('the prerequisite of a custom area is aggregated from its rules (§14)'
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update').areas[0]).toMatchObject({
+    expect(configured(access, ORDER_UPDATE.id).areas[0]).toMatchObject({
       kind: 'all',
       prerequisite: 'unproven',
     })
@@ -465,7 +464,7 @@ describe('missingPrerequisite looks at unmasked areas only (§15)', () => {
         ],
       },
     ])
-    const item = configured(access, 'fixtureOrder.update')
+    const item = configured(access, ORDER_UPDATE.id)
     expect(item.state).toBe('missingPrerequisite')
     expect(item.areas.find((area) => area.kind === 'own')?.masked).toBe(true)
   })
@@ -482,7 +481,7 @@ describe('missingPrerequisite looks at unmasked areas only (§15)', () => {
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update').state).toBe('configured')
+    expect(configured(access, ORDER_UPDATE.id).state).toBe('configured')
   })
 
   it('when every area is masked the item is blocked', () => {
@@ -497,7 +496,7 @@ describe('missingPrerequisite looks at unmasked areas only (§15)', () => {
         ],
       },
     ])
-    expect(configured(access, 'fixtureOrder.update').state).toBe('blocked')
+    expect(configured(access, ORDER_UPDATE.id).state).toBe('blocked')
   })
 })
 

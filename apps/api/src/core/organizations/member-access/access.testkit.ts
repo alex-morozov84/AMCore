@@ -2,7 +2,7 @@ import { Action, Subject } from '@amcore/shared'
 
 import type { Organization } from '../../../generated/prisma/client.js'
 import { ORG_READ_FIELDS } from '../../auth/casl/org-role-defaults.js'
-import { CapabilityRegistry } from '../capability-registry.service.js'
+import { CAPABILITY_ADAPTERS, CapabilityRegistry } from '../capability-registry.service.js'
 
 import {
   type AccessCapability,
@@ -11,6 +11,23 @@ import {
 } from './access-capabilities.js'
 import { type AccessInput } from './access-evaluator.js'
 import type { StoredPolicyRule } from './access-facts.js'
+
+/** Keep starter truth tables independent of capabilities registered by a product. */
+const BUILT_IN_CAPABILITY_IDS = [
+  'teamAccess.manage',
+  'organization.read',
+  'organization.update',
+  'organization.delete',
+] as const
+
+const starterCapabilities = (): readonly AccessCapability[] => {
+  const catalogue = defaultCapabilities()
+  return BUILT_IN_CAPABILITY_IDS.map((id) => {
+    const capability = catalogue.find((entry) => entry.id === id)
+    if (!capability) throw new Error(`Missing built-in test capability: ${id}`)
+    return capability
+  })
+}
 
 export const ORG_ID = 'org-1'
 export const USER_ID = 'user-1'
@@ -83,6 +100,7 @@ export function input(roles: RoleSpec[], over: Partial<AccessInput> = {}): Acces
     rules,
     unsafeLinkCount: 0,
     registry,
+    capabilities: starterCapabilities(),
     ...over,
   }
 }
@@ -111,7 +129,7 @@ const orderPreset =
   })
 
 export const ORDER_READ: AccessCapability = {
-  id: 'fixtureOrder.read',
+  id: 'syntheticOrder.read',
   subject: ORDER_SUBJECT,
   action: 'read',
   editableFields: [],
@@ -122,7 +140,7 @@ export const ORDER_READ: AccessCapability = {
 }
 
 export const ORDER_UPDATE: AccessCapability = {
-  id: 'fixtureOrder.update',
+  id: 'syntheticOrder.update',
   subject: ORDER_SUBJECT,
   action: 'update',
   editableFields: ['name', 'description'],
@@ -132,8 +150,15 @@ export const ORDER_UPDATE: AccessCapability = {
   preset: orderPreset('update', ['name', 'description']),
 }
 
+// The classifier also reads the real registry; synthetic fixtures must stay outside it.
+for (const { id } of [ORDER_READ, ORDER_UPDATE]) {
+  if (id in CAPABILITY_ADAPTERS) {
+    throw new Error(`Rename the synthetic test capability: ${id} is registered by the product`)
+  }
+}
+
 export const orderCapabilities = (...extra: AccessCapability[]): readonly AccessCapability[] => [
-  ...defaultCapabilities(),
+  ...starterCapabilities(),
   ORDER_READ,
   ORDER_UPDATE,
   ...extra,
