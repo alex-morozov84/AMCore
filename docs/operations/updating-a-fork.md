@@ -10,7 +10,9 @@ A **merge commit** records both histories, so Git can recognize changes already 
 > Do not substitute an old tag for the placeholders below. Commit-based experiments
 > do not establish release support.
 
-This procedure has not yet completed its hosted CI, database and cold-reader rehearsal.
+A disposable independent-copy product completed two updates with full PR and post-merge CI.
+Its test user and order survived; fresh-database replay and runtime checks also passed.
+An independent readability check is pending.
 The private flexible route and GitHub Fork-specific behavior are not rehearsed.
 Do not treat the examples as evidence of a tested production upgrade.
 
@@ -286,7 +288,10 @@ Before rollout, use owned disposable databases and a verified backup/restore pro
 4. Stop before application rollout on any migration failure. A duplicate table/column can fail even when Git merged cleanly.
    Restore a known-good snapshot and verify data and ledger using the [recovery runbook](backup-restore.md).
 
-These scenarios have not yet been rehearsed at the pinned Prisma version for this update procedure.
+Disposable fixtures at the pinned Prisma version exercised fresh and upgraded databases,
+out-of-order migration application, `migrate dev`, failure on a duplicate column and chained backup restoration.
+These checks cover the fixtures, not your product's migrations, production volume or custom grants.
+Repeat the relevant scenarios for your product before rollout.
 Use product-owned tables/fields where suitable, but prefixes do not prove collision safety.
 A later compensating migration cannot repair a fresh replay that fails before reaching it.
 `migrate resolve` changes bookkeeping, not data: never mark an upstream migration applied merely because one column exists.
