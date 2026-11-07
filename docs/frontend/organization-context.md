@@ -53,8 +53,10 @@ the admitted login/actor binding before current authority is reread. Changed
 binding displays Reload, with no old authority request. Same binding with
 changed membership or permissions displays unavailable/recomputed access.
 Validated target/page/locale input changes issue one active authority read.
-Disabled Query observers own cached server data and never independently
-refetch, retry or poll. Idle causes no requests.
+The bootstrap/context authority observers are disabled; the scheduler owns their
+reads. They never independently refetch, retry or poll. Dependent resource lists
+use the shared native Query reader instead. Cached rows do not grant command
+permission. Idle causes no requests.
 
 A429 respects Retry-After; recovery is explicit, not polling. Transport/schema
 failures never appear as an empty list or stale authorized content. One bounded

@@ -80,6 +80,7 @@ export function InvitationForm({
       <form
         className="space-y-4"
         onSubmit={draft.form.handleSubmit(async (values) => {
+          if (blocked || !access.allowed() || (mode !== 'create' && !confirmed)) return
           const outcome = await draft.submit(values)
           if (outcome?.status === 'committed') onClose()
         })}

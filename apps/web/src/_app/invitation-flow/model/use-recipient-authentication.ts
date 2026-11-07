@@ -11,6 +11,7 @@ import { invitationFlowClient } from '@/entities/invitation-flow'
 import { userKeys } from '@/entities/user'
 import { ClientErrorCode, ClientStateError } from '@/shared/api/error-codes'
 import { getErrorCode } from '@/shared/api/errors'
+import { publishCurrentUser, type UserEnvelope } from '@/shared/api/query-session'
 import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-progress-router'
 
 import { createInvitationCredentialAdapters } from './credential-adapters'
@@ -36,6 +37,7 @@ export function useRecipientAuthentication(
   // notice survives remounts and tab changes (not a full page reload).
   const [createdFailure, setCreatedFailure] = useState<unknown>()
   const lifecycle = useRef({ active: true, epoch: 0 })
+  const confirmedBinding = useRef(initial.sessionBinding)
   const recoverRef = useRef<() => Promise<void>>(async () => undefined)
   const client = useQueryClient()
   useEffect(() => {
@@ -45,23 +47,38 @@ export function useRecipientAuthentication(
       lifecycle.current.epoch++
     }
   }, [])
-  const confirmed = (
+  const confirmed = async (
     next: InvitationFlowBinding,
-    account: UserResponse,
+    account: UserResponse | null,
     contextSession?: string
   ) => {
+    const captured = lifecycle.current.epoch
+    const old = client.getQueryData<UserEnvelope>(userKeys.me())
+    const token =
+      contextSession ??
+      (account &&
+      user?.id === account.id &&
+      old?.user?.id === account.id &&
+      confirmedBinding.current === next.sessionBinding
+        ? old.contextSession
+        : undefined)
+    if (
+      !(await publishCurrentUser(
+        client,
+        { user: account, ...(token ? { contextSession: token } : {}) },
+        () => lifecycle.current.active && lifecycle.current.epoch === captured
+      ))
+    )
+      return null
+    confirmedBinding.current = next.sessionBinding
     setBinding(next)
     setUser(account)
     setPhase('active')
     setHandoff(null)
     setError(undefined)
-    setCreatedFailure(undefined)
-    client.setQueryData(userKeys.me(), {
-      user: account,
-      ...(contextSession ? { contextSession } : {}),
-    })
-    if (!contextSession) void client.invalidateQueries({ queryKey: userKeys.me() })
-    lifecycle.current.epoch++
+    if (account) setCreatedFailure(undefined)
+    if (account && !token) void client.invalidateQueries({ queryKey: userKeys.me() })
+    return ++lifecycle.current.epoch
   }
   const adapters = useMemo(() => {
     let captured: number | undefined
@@ -85,6 +102,7 @@ export function useRecipientAuthentication(
         setPhase('completing_signin')
       },
       onConfirmed: (next, account) => {
+        confirmedBinding.current = next.sessionBinding
         setUser(account)
         setBinding(next)
         setPhase('active')
@@ -157,22 +175,18 @@ export function useRecipientAuthentication(
         return
       }
       if ('user' in response.data) {
-        confirmed(response.binding, response.data.user, response.data.contextSession)
+        await confirmed(response.binding, response.data.user, response.data.contextSession)
         return
       }
       if (response.binding.sessionBinding === null) {
-        setBinding(response.binding)
-        setUser(null)
-        setPhase('active')
-        setHandoff(null)
-        lifecycle.current.epoch++
+        await confirmed(response.binding, null)
       } else {
         const profile = await invitationFlowClient.verificationStatus(
           response.binding,
           AbortSignal.timeout(10000)
         )
         if (!lifecycle.current.active || lifecycle.current.epoch !== captured) return
-        confirmed(profile.binding, profile.data.user)
+        await confirmed(profile.binding, profile.data.user)
       }
     } catch (failure) {
       if (lifecycle.current.active && lifecycle.current.epoch === captured) {
@@ -228,19 +242,21 @@ export function useRecipientAuthentication(
     capture: () => lifecycle.current.epoch,
     current: (captured: number) => lifecycle.current.active && lifecycle.current.epoch === captured,
     updateUser(account: UserResponse) {
+      if (
+        !lifecycle.current.active ||
+        user?.id !== account.id ||
+        confirmedBinding.current !== binding.sessionBinding
+      )
+        return
       setUser(account)
-      client.setQueryData(userKeys.me(), { user: account })
+      client.setQueryData<UserEnvelope>(userKeys.me(), (old) =>
+        old?.user?.id === account.id ? { ...old, user: account } : old
+      )
       void client.invalidateQueries({ queryKey: userKeys.me() })
     },
     signedOut(next: InvitationFlowBinding) {
-      lifecycle.current.epoch++
-      setBinding(next)
-      setUser(null)
-      setPhase('active')
-      setHandoff(null)
-      setError(undefined)
       setCreatedFailure(undefined)
-      client.setQueryData(userKeys.me(), { user: null })
+      return confirmed(next, null)
     },
   }
 }

@@ -31,6 +31,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prisma schema definitions now match the existing migrated database, preventing unrelated
   changes during migration authoring; an API database test checks schema agreement.
 
+- Role-definition forms retain their draft and save acknowledgment through access
+  rechecks. The cached editor stays hidden until access is confirmed.
+
+- Lighthouse identity/access probes use out-of-page transport while preserving
+  document/session checks. Page-originated authentication failures remain visible.
+
+- Host Console login clears cached queries before MFA, matching the generic login
+  form and preventing previous target-session reads from surviving reentry.
+
+- AI hooks now require a user/session owner; read keys retire with that session.
+  Run commands and realtime hints refresh the originating run/transcript without
+  delaying write acknowledgment. Cancel and stream accept a run/conversation pair;
+  `aiKeys.all` is now an owner factory. See the frontend API-consumption guide.
+
+- Notification feed/count, actions and realtime hooks now require a user/session
+  owner. Stream hints cancel old reads before refreshing; retired connections and
+  late writes cannot refresh a replacement session. Feed key factories now take
+  owner arguments; `notificationKeys.all` covers only the capability registry.
+
+- Own API-key revocation refreshes active lists and invalidates previously visited
+  filters without waiting for a follow-up read. The exported revoke hook and
+  standalone revoke component now require `QueryClientProvider`.
+
+- Own sessions and notification preferences isolate cached data by user and session.
+  Late writes cannot update a replacement session's cache. Personal key factories
+  and preference hooks now require an owner; `useSessions` exposes a composed result.
+  Avatar/locale updates preserve session metadata, and AI creation no longer seeds
+  its read cache. See the API-consumption guide for the updated contracts.
+
+- Notification preference saves complete on write acknowledgment without waiting for
+  list refresh; a failed refresh remains a read error. Corrected mandatory-channel
+  editability guidance and added an ordinary Query/form documentation example.
+
+- Organization invitations and members hydrate their initial lists into TanStack
+  Query. Interactive controls wait for their handlers; shared admission stays
+  revoked after a known refusal. Invitation conflict recovery remains reachable
+  inside the editor, and role forms preserve their draft during access rechecks.
+
 - Invitation transaction proofs ignore unrelated operations while detecting a true
   repeat. CI checkout cleanup no longer inherits an expired admission deadline.
   Browser publication HTTP tests isolate scheduled handoff cleanup, and browser
@@ -52,8 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A [fork update contract](docs/operations/updating-a-fork.md) for history-preserving
   product updates, compatibility notices and separate source/database recovery.
-  The first supported starting tag has not yet been released. Hosted and database
-  rehearsal remain pending; existing old tags gain no support from this guide.
+  The first supported starting tag has not yet been released. A disposable independent-copy fixture completed hosted and database
+  rehearsal; existing old tags gain no support from this guide.
 - `setup-repo-security.sh --fork-updates` enables merge commits for initialized
   downstream products while preserving other strict checks. AMCore stays squash-only.
   Unflagged downstream setup warns that it restores squash-only settings.

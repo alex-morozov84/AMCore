@@ -1,32 +1,108 @@
 import type { PropsWithChildren } from 'react'
-import { AuthErrorCode } from '@amcore/shared'
+import {
+  AuthErrorCode,
+  DEFAULT_LOCALE,
+  invitationFlowAuthResponseSchema,
+  invitationFlowPendingResponseSchema,
+  type UserResponse,
+} from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { notificationKeys } from '@/entities/notifications'
+import { userKeys } from '@/entities/user'
 import { ApiRequestError } from '@/shared/api/http-client'
 
 import { useRecipientAuthentication } from './use-recipient-authentication'
 
-const { context, createAdapters } = vi.hoisted(() => ({
+const { context, acknowledge, createAdapters } = vi.hoisted(() => ({
   context: vi.fn(),
+  acknowledge: vi.fn(),
   createAdapters: vi.fn((_input: unknown) => ({})),
 }))
 const navigation = vi.hoisted(() => ({ replace: vi.fn() }))
 vi.mock('@/shared/lib/route-progress/use-route-progress-router', () => ({
   useRouteProgressRouter: () => navigation,
 }))
-vi.mock('@/entities/invitation-flow', () => ({ invitationFlowClient: { context } }))
+vi.mock('@/entities/invitation-flow', () => ({ invitationFlowClient: { context, acknowledge } }))
 vi.mock('./credential-adapters', () => ({ createInvitationCredentialAdapters: createAdapters }))
 afterEach(() => vi.clearAllMocks())
 const binding = { flowId: 'a'.repeat(22), flowRevision: 1, sessionBinding: null }
-function setup(actionBase: '/auth' | '/product-admin/auth' = '/auth') {
+function setup(
+  actionBase: '/auth' | '/product-admin/auth' = '/auth',
+  initialUser: UserResponse | null = null
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   )
-  return renderHook(() => useRecipientAuthentication(binding, null, actionBase), { wrapper })
+  return {
+    client,
+    ...renderHook(() => useRecipientAuthentication(binding, initialUser, actionBase), { wrapper }),
+  }
 }
+
+it('retires A private entries through signedOut and real context/ack recovery for B', async () => {
+  const user = {
+    id: 'B',
+    email: 'b@example.test',
+    emailVerified: true,
+    name: null,
+    avatarUrl: null,
+    phone: null,
+    locale: DEFAULT_LOCALE,
+    timezone: 'UTC',
+    createdAt: '2026-11-06T00:00:00.000Z',
+    lastLoginAt: null,
+  }
+  const { result, client } = setup('/auth', { ...user, id: 'A' })
+  const ownerA = { userId: 'A', contextSession: 'A-context' }
+  const key = userKeys.sessions(ownerA, DEFAULT_LOCALE, 1, 10)
+  client.setQueryData(userKeys.me(), { user: { ...user, id: 'A' }, contextSession: 'A-context' })
+  client.setQueryData(key, ['A-session'])
+  client.setQueryData(notificationKeys.preferences(ownerA), ['A-preference'])
+  const epochA = result.current.capture()
+  const signedOut = { ...binding, flowRevision: 2 }
+  await act(async () => {
+    await result.current.signedOut(signedOut)
+  })
+  expect(result.current.user).toBeNull()
+  expect(result.current.current(epochA)).toBe(false)
+  expect(client.getQueryData(userKeys.me())).toEqual({ user: null })
+  const next = { ...binding, flowRevision: 3, sessionBinding: 'b'.repeat(64) }
+  const handoff = { attemptId: 'h'.repeat(22) }
+  context.mockResolvedValueOnce(
+    invitationFlowPendingResponseSchema.parse({
+      state: 'completing_signin',
+      binding: next,
+      handoff,
+    })
+  )
+  const confirmed = invitationFlowAuthResponseSchema.parse({
+    binding: next,
+    handoff,
+    data: { user, contextSession: 'c'.repeat(64) },
+  })
+  acknowledge.mockResolvedValueOnce(confirmed)
+  await act(async () => {
+    await result.current.recover()
+  })
+  expect(result.current.handoff).toBe(handoff.attemptId)
+  const beforeAck = result.current.capture()
+  await act(async () => {
+    await result.current.recover()
+  })
+  expect(context).toHaveBeenCalledWith(binding.flowId, expect.any(AbortSignal))
+  expect(acknowledge).toHaveBeenCalledWith(next, handoff.attemptId, expect.any(AbortSignal))
+  expect(result.current.user).toEqual(user)
+  expect(result.current.binding).toEqual(next)
+  expect(result.current.phase).toBe('active')
+  expect(result.current.current(beforeAck)).toBe(false)
+  expect(client.getQueryData(userKeys.me())).toEqual(confirmed.data)
+  expect.soft(client.getQueryData(key)).toBeUndefined()
+  expect.soft(client.getQueryData(notificationKeys.preferences(ownerA))).toBeUndefined()
+})
 
 describe('recipient pending authentication recovery', () => {
   it.each(['/auth', '/product-admin/auth'] as const)(

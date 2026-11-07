@@ -9,6 +9,7 @@ import {
   type OwnApiKeyController,
   OwnKeyOrganizationPicker,
   useOwnApiKeys,
+  useRevokeOwnApiKey,
 } from '@/entities/api-key'
 import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
 import { Button } from '@/shared/ui/button'
@@ -50,6 +51,7 @@ export function OwnApiKeys({
   const commandTrigger = useRef<HTMLElement | null>(null)
   const detailTrigger = useRef<HTMLElement | null>(null)
   const query = useOwnApiKeys(controller, criteria, !invalidQuery)
+  const revokeKey = useRevokeOwnApiKey(controller)
   const [detailId, setDetailId] = useState<string>()
   const detail = query.data?.data.find((key) => key.id === detailId)
   const [revokeTarget, setRevokeTarget] = useState<RevokeTarget>()
@@ -98,10 +100,9 @@ export function OwnApiKeys({
   const revoke = async () => {
     if (!revokeTarget) return
     try {
-      if (await controller.revoke(revokeTarget.id, revokeTarget)) {
+      if (await revokeKey(revokeTarget.id, revokeTarget)) {
         toast.add({ type: 'success', title: t('revokeSuccess') })
         setDetailId(undefined)
-        await query.refetch()
       }
     } catch {
       /* Entity retains the typed outcome for this binding/key. */

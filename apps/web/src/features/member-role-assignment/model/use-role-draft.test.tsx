@@ -25,16 +25,21 @@ function fixture() {
   const controller = {
     capture: () => 0,
     current: () => true,
-    refresh: vi.fn().mockResolvedValue('ready'),
+    allowed: () => true,
+    refreshAuthority: vi.fn().mockResolvedValue('ready'),
   } as unknown as OrganizationAccessController
   const reads = {
     data: initial,
+    retainedData: initial,
     ready: true,
     available: true,
     pending: false,
+    fetching: false,
+    retryAt: undefined,
     busy: false,
     identity: '',
     refresh: vi.fn().mockResolvedValue(initial),
+    review: vi.fn().mockResolvedValue(initial),
     save: vi.fn(),
     error: undefined,
   } as ReturnType<typeof useMemberRoleAssignments>
@@ -52,7 +57,7 @@ describe('role draft recovery and settlement', () => {
     rerender({ data: fresh })
     expect(result.current.selected).toEqual(['one', 'two'])
     expect(result.current.needsReview).toBe(true)
-    vi.mocked(reads.refresh).mockResolvedValue(fresh)
+    vi.mocked(reads.review).mockResolvedValue(fresh)
     await act(async () => result.current.review())
     expect(result.current.selected).toEqual(['one'])
     expect(result.current.snapshot.aclVersion).toBe(2)
@@ -68,6 +73,7 @@ describe('role draft recovery and settlement', () => {
     const { result } = renderHook(() => useRoleDraft(initial, reads, controller, complete), {
       wrapper,
     })
+    act(() => result.current.form.setValue('roleIds', ['one', 'two']))
     await act(async () =>
       result.current.submit({
         expectedMemberId: 'member',
@@ -82,10 +88,11 @@ describe('role draft recovery and settlement', () => {
     const { controller, reads } = fixture()
     const complete = vi.fn()
     vi.mocked(reads.save).mockResolvedValue({ status: 'unknown', error: new Error('ack lost') })
-    vi.mocked(reads.refresh).mockRejectedValue(new Error('offline'))
+    vi.mocked(reads.review).mockRejectedValue(new Error('offline'))
     const { result } = renderHook(() => useRoleDraft(initial, reads, controller, complete), {
       wrapper,
     })
+    act(() => result.current.form.setValue('roleIds', ['one', 'two']))
     act(() => result.current.form.setValue('roleIds', ['one', 'two']))
     await act(async () =>
       result.current.submit({
@@ -106,7 +113,9 @@ describe('role draft recovery and settlement', () => {
     vi.useFakeTimers()
     try {
       const { controller, reads } = fixture()
-      vi.mocked(controller.refresh).mockImplementationOnce(() => new Promise(() => undefined))
+      vi.mocked(controller.refreshAuthority).mockImplementationOnce(
+        () => new Promise(() => undefined)
+      )
       const { result } = renderHook(() => useRoleDraft(initial, reads, controller), { wrapper })
       act(() => result.current.form.setValue('roleIds', ['one', 'two']))
       let work!: Promise<void>

@@ -45,6 +45,8 @@ see `architecture-and-conventions.md`'s "See also" section for related guides.
 - Choosing button/tab semantics, list pagination, empty states or detail reveal →
   [Interaction patterns](./architecture-and-conventions.md#interaction-patterns-buttons-tabs-and-lists)
 
+- Choosing server display, interactive Query or required domain rules →
+  [Interactive data ownership](./api-consumption.md#data-ownership-for-interactive-pages)
 - Selecting organization authority or adding another tenant namespace →
   [Explicit organization context](../auth/organization-context.md)
 - Extending or adding a route/page → [Architecture & conventions](./architecture-and-conventions.md#the-recipe--adding-a-route)

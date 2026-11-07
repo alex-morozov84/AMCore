@@ -1,27 +1,46 @@
 import { useLocale } from 'next-intl'
-import type { CatalogueLocale, SessionsListResponse, UserResponse } from '@amcore/shared'
+import type { CatalogueLocale, SessionsListResponse } from '@amcore/shared'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { authApi } from '@/shared/api'
+import { ClientErrorCode, ClientStateError } from '@/shared/api/error-codes'
+import {
+  captureQuerySession,
+  currentUserKey,
+  isCurrentQuerySession,
+  personalKey,
+  type QueryOwner,
+  queryOwner,
+  retirePersonalQueries,
+  sameQueryOwner,
+  type UserEnvelope,
+} from '@/shared/api/query-session'
 
 export const userKeys = {
-  all: ['user'] as const,
-  me: () => [...userKeys.all, 'me'] as const,
-  // Prefix shared by every `sessions(locale, page, limit)` variant — pass
+  all: ['user'] as const, // Bootstrap only; owned sessions use sessionsAll(owner).
+  me: () => currentUserKey,
+  // Prefix shared by every `sessions(owner, locale, page, limit)` variant — pass
   // this to `invalidateQueries` after a revoke to match every locale/page/
   // limit variant at once without also invalidating `me()`.
-  sessionsAll: () => [...userKeys.all, 'sessions'] as const,
-  sessions: (locale: CatalogueLocale, page: number, limit: number) =>
-    [...userKeys.sessionsAll(), locale, page, limit] as const,
+  sessionsAll: (owner: QueryOwner | null) => [...personalKey(owner), 'sessions'] as const,
+  sessions: (owner: QueryOwner | null, locale: CatalogueLocale, page: number, limit: number) =>
+    [...userKeys.sessionsAll(owner), locale, page, limit] as const,
 }
 
 /** The locale segment's fixed index in `userKeys.sessions(...)`'s key shape. */
-const SESSIONS_KEY_LOCALE_INDEX = 2
+const SESSIONS_KEY_LOCALE_INDEX = 4
 
 export function useCurrentUser() {
+  const client = useQueryClient()
   return useQuery({
     queryKey: userKeys.me(),
-    queryFn: () => authApi.getMe(),
+    queryFn: async ({ signal }) => {
+      const envelope = await authApi.getMe(signal)
+      signal.throwIfAborted()
+      await retirePersonalQueries(client, queryOwner(envelope), () => !signal.aborted)
+      signal.throwIfAborted()
+      return envelope
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false,
   })
@@ -36,24 +55,54 @@ export function useCurrentUser() {
  * hook would violate the rules of hooks); the resolved locale is passed
  * down as a plain argument.
  *
- * The custom `placeholderData` below is a locale-aware variant of
+ * The custom `placeholderData` below is an owner/session/locale-aware variant of
  * `keepPreviousData`: the built-in helper would reuse the *previous*
  * query's data across ANY key change, including a locale switch, which
  * would flash a still-loading page's location column with the previous
  * locale's city name for a moment. Reusing previous data stays correct
- * for an ordinary same-locale page change; it must not survive a locale
- * change, so switching locale falls through to the ordinary loading state.
+ * for a page change within the same owner, session and locale; an identity or locale
+ * change falls through to the ordinary loading state.
  */
 export function useSessions(page: number, limit: number) {
   const locale = useLocale() as CatalogueLocale
+  const client = useQueryClient()
+  const me = useCurrentUser()
+  const owner = queryOwner(me.data)
 
-  return useQuery({
-    queryKey: userKeys.sessions(locale, page, limit),
-    queryFn: () => authApi.getSessions(page, limit, locale),
+  const list = useQuery({
+    queryKey: userKeys.sessions(owner, locale, page, limit),
+    enabled: !!owner,
+    queryFn: () => {
+      if (!sameQueryOwner(owner, captureQuerySession(client).owner))
+        throw new ClientStateError(ClientErrorCode.AUTH_CONTINUATION_CHANGED)
+      return authApi.getSessions(page, limit, locale)
+    },
     staleTime: 60 * 1000, // 1 minute
     placeholderData: (previousData: SessionsListResponse | undefined, previousQuery) =>
-      previousQuery?.queryKey[SESSIONS_KEY_LOCALE_INDEX] === locale ? previousData : undefined,
+      owner &&
+      previousQuery?.queryKey[1] === owner.contextSession &&
+      previousQuery.queryKey[2] === owner.userId &&
+      previousQuery.queryKey[SESSIONS_KEY_LOCALE_INDEX] === locale
+        ? previousData
+        : undefined,
   })
+  const waiting = !owner && (me.isPending || me.isFetching)
+  return {
+    data: owner ? list.data : undefined,
+    error: owner
+      ? list.error
+      : waiting
+        ? null
+        : (me.error ?? new ClientStateError(ClientErrorCode.AUTH_CONTINUATION_CHANGED)),
+    isPending: owner ? list.isPending : waiting,
+    isFetching: owner ? list.isFetching : me.isFetching,
+    isError: owner ? list.isError : !waiting,
+    isSuccess: !!owner && list.isSuccess,
+    refetch: async () => {
+      if (owner) await list.refetch()
+      else await me.refetch()
+    },
+  }
 }
 
 /**
@@ -64,9 +113,11 @@ export function useSessions(page: number, limit: number) {
  */
 function setCachedAvatarUrl(
   queryClient: ReturnType<typeof useQueryClient>,
-  avatarUrl: string | null
+  avatarUrl: string | null,
+  captured: ReturnType<typeof captureQuerySession> | undefined
 ): void {
-  queryClient.setQueryData<{ user: UserResponse | null }>(userKeys.me(), (old) =>
+  if (!isCurrentQuerySession(queryClient, captured)) return
+  queryClient.setQueryData<UserEnvelope>(userKeys.me(), (old) =>
     old?.user ? { ...old, user: { ...old.user, avatarUrl } } : old
   )
 }
@@ -76,7 +127,9 @@ export function useUploadAvatar() {
 
   return useMutation({
     mutationFn: (file: File) => authApi.uploadAvatar(file),
-    onSuccess: (response) => setCachedAvatarUrl(queryClient, response.avatarUrl),
+    onMutate: () => captureQuerySession(queryClient),
+    onSuccess: (response, _file, captured) =>
+      setCachedAvatarUrl(queryClient, response.avatarUrl, captured),
   })
 }
 
@@ -85,6 +138,7 @@ export function useDeleteAvatar() {
 
   return useMutation({
     mutationFn: () => authApi.deleteAvatar(),
-    onSuccess: () => setCachedAvatarUrl(queryClient, null),
+    onMutate: () => captureQuerySession(queryClient),
+    onSuccess: (_response, _input, captured) => setCachedAvatarUrl(queryClient, null, captured),
   })
 }

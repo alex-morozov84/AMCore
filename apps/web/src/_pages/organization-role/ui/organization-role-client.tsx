@@ -55,6 +55,11 @@ export function OrganizationRoleClient({
   const hidden = authorityLost || denied
   const detail = !hidden && !role.error ? role.data : undefined
   const capabilities = !hidden && !catalogue.error ? catalogue.data?.capabilities : undefined
+  const checking = access.state.status === 'pending'
+  const editorDetail = detail ?? (checking && !role.error ? role.retainedData : undefined)
+  const editorCapabilities =
+    capabilities ??
+    (checking && !catalogue.error ? catalogue.retainedData?.capabilities : undefined)
   const missing = getErrorCode(role.error) === 'ROLE_UNAVAILABLE'
   const failed = Boolean(role.error ?? catalogue.error)
   const name =
@@ -103,20 +108,22 @@ export function OrganizationRoleClient({
           </AlertDescription>
         </Alert>
       )}
-      {detail && capabilities && (
-        <RoleEditor
-          key={`${admission.binding}:${organizationId}:${roleId}`}
-          role={role}
-          detail={detail}
-          capabilities={capabilities}
-          holderHref={(email) =>
-            `${hrefs.members ?? hrefs.overview}?search=${encodeURIComponent(email)}`
-          }
-          allHoldersHref={`${hrefs.members ?? hrefs.overview}?role=${encodeURIComponent(roleId)}`}
-          onDeleted={() => router.push(hrefs.roles)}
-          onLeave={(href) => router.push(href)}
-          onReview={() => void role.refresh().catch(() => undefined)}
-        />
+      {editorDetail && editorCapabilities && (
+        <div hidden={checking}>
+          <RoleEditor
+            key={`${admission.binding}:${organizationId}:${roleId}`}
+            role={role}
+            detail={editorDetail}
+            capabilities={editorCapabilities}
+            holderHref={(email) =>
+              `${hrefs.members ?? hrefs.overview}?search=${encodeURIComponent(email)}`
+            }
+            allHoldersHref={`${hrefs.members ?? hrefs.overview}?role=${encodeURIComponent(roleId)}`}
+            onDeleted={() => router.push(hrefs.roles)}
+            onLeave={(href) => router.push(href)}
+            onReview={() => void role.refresh().catch(() => undefined)}
+          />
+        </div>
       )}
       <noscript>
         <p>{t('javascriptRequired')}</p>

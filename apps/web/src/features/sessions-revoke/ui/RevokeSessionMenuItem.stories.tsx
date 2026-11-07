@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MoreHorizontal } from 'lucide-react'
 import { http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { userKeys } from '@/entities/user'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { Toaster } from '@/shared/ui/toast'
@@ -33,6 +35,20 @@ function RevokeSessionMenuItemDemo({ sessionId }: { sessionId: string }) {
 const meta = {
   title: 'features/sessions-revoke/RevokeSessionMenuItem',
   component: RevokeSessionMenuItemDemo,
+  decorators: [
+    (Story) => {
+      const client = new QueryClient()
+      client.setQueryData(userKeys.me(), {
+        user: { id: 'story-user' },
+        contextSession: 'story-session',
+      })
+      return (
+        <QueryClientProvider client={client}>
+          <Story />
+        </QueryClientProvider>
+      )
+    },
+  ],
   args: {
     sessionId: 'session-123',
   },

@@ -64,7 +64,7 @@ describe('current primary availability and independent secondary failure', () =>
     }
   })
 
-  it('cached success is unavailable during pending or failed primary refresh', async () => {
+  it('background refresh retains available data; a settled error requires recovery', async () => {
     const { controller, wrapper } = fixture()
     const load = vi.fn().mockResolvedValue({ rows: ['owned'] })
     const { result } = renderHook(() => useOrganizationRead(controller, 'primary', load), {
@@ -83,15 +83,16 @@ describe('current primary availability and independent secondary failure', () =>
       refresh = result.current.refresh()
       void refresh.catch(() => undefined)
     })
-    await waitFor(() => expect(result.current.pending).toBe(true))
+    await waitFor(() => expect(result.current.fetching).toBe(true))
+    expect(result.current.pending).toBe(false)
     expect(result.current.ready).toBe(true)
-    expect(result.current.available).toBe(false)
+    expect(result.current.available).toBe(true)
     expect(result.current.data).toEqual({ rows: ['owned'] })
     await act(async () => {
       reject(new Error('unavailable'))
       await refresh.catch(() => undefined)
     })
-    expect(result.current.error).toBeInstanceOf(Error)
+    await waitFor(() => expect(result.current.error).toBeInstanceOf(Error))
     expect(result.current.available).toBe(false)
   })
   it('secondary failure is visible locally but cannot poison primary write followup', async () => {

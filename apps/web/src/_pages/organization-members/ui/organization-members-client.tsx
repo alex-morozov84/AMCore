@@ -43,7 +43,7 @@ export function OrganizationMembersClient({
   const locale = useLocale()
   const t = useTranslations('organizationMembers')
   const input = { kind: 'selected' as const, id: organizationId, locale }
-  const access = useOrganizationContext(admission.binding, input)
+  const access = useOrganizationContext(admission.binding, input, true)
   const allowed =
     access.data && 'canManageTeamAccess' in access.data.data && access.data.data.canManageTeamAccess
   const identity = `${admission.binding}:${organizationId}`

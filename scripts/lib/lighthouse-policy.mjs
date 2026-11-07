@@ -70,11 +70,7 @@ export function evaluateResult(lhr, scenario, observation) {
     notApplicable = []
   for (const request of lhr.audits['network-requests']?.details?.items ?? []) {
     const path = new URL(request.url).pathname
-    const refusal = scenario.id === 'login' && path === '/api/auth/me' && request.statusCode === 401
-    invariant(
-      !(path.startsWith('/api/') && request.statusCode >= 400 && !refusal),
-      'required-data-refused'
-    )
+    invariant(!(path.startsWith('/api/') && request.statusCode >= 400), 'required-data-refused')
     if (
       ['Document', 'Script', 'Stylesheet', 'Font', 'Image'].includes(request.resourceType) &&
       (request.statusCode === 0 || request.statusCode >= 400)

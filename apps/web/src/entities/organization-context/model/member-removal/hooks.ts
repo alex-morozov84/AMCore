@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { MemberRemovalResult } from '@amcore/shared'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { getErrorCode, getErrorStatus, getRetryAfterMs } from '@/shared/api/errors'
 import { withDeadline } from '@/shared/lib/with-deadline'
@@ -7,6 +8,7 @@ import { withDeadline } from '@/shared/lib/with-deadline'
 import { memberRemovalRejectionCodes, removeMember } from '../../api/member-removal-client'
 import { membersClient } from '../../api/members-client'
 import type { OrganizationAccessController, OrganizationWriteOutcome } from '../access-controller'
+import { refreshLegacyOrganizationEffects } from '../read-effects'
 
 import 'client-only'
 
@@ -28,6 +30,7 @@ export function useMemberRemoval(
   target?: MemberRemovalTarget,
   onAcknowledged?: () => void
 ) {
+  const client = useQueryClient()
   const orgId = controller.organizationId
   const identity = JSON.stringify([controller.binding, orgId, target?.userId, target?.memberId])
   const lease = useRef<string | undefined>(identity)
@@ -112,7 +115,11 @@ export function useMemberRemoval(
           if (lease.current === identity && controller.current(epoch)) onAcknowledged?.()
           return result
         },
-        { timeoutMs: 20000, rejectionCodes: memberRemovalRejectionCodes }
+        {
+          timeoutMs: 20000,
+          rejectionCodes: memberRemovalRejectionCodes,
+          refresh: (signal) => refreshLegacyOrganizationEffects(client, controller, signal),
+        }
       )
       if (lease.current !== identity || !controller.current(epoch))
         return { status: 'retired' as const }

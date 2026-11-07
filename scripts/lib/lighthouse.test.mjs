@@ -136,6 +136,10 @@ test('owner resolver keeps one exact audit assignment in all four topologies and
           'local audit must never launch the ordinary E2E suite'
         )
         assert.equal(args[args.indexOf('--id') + 1], 'audit-example')
+        assert.equal(args.includes('--fixture'), owner === 'staff-oauth')
+        const reused = auditCommand(p, owner, 'audit-example', true)
+        assert.ok(reused.includes('--reuse-audit'))
+        assert.equal(reused.includes('--fixture'), false)
       }
       assert.deepEqual(Object.values(p.assignments).flat().sort(), [
         'console-overview',
@@ -382,4 +386,23 @@ test('mandatory registry matches pinned non-performance categories and rejects u
     await writeFile(join(dir, 'apps/web/e2e/lighthouse/catalogue.json'), JSON.stringify(bad))
     assert.throws(() => auditCatalogue(dir, { extensions: [] }), /unsupported-required-audits/)
   }
+})
+
+test('anonymous page me401 is a real page failure, not an identity-probe exemption', () => {
+  const lhr = result()
+  lhr.audits['network-requests'] = {
+    id: 'network-requests',
+    score: 1,
+    scoreDisplayMode: 'informative',
+    details: { items: [{ url: 'https://example.test/api/auth/me', statusCode: 401 }] },
+  }
+  assert.throws(
+    () =>
+      evaluateResult(
+        lhr,
+        { id: 'login', requiredAudits: [], indexable: false },
+        { identity: true, requiredData: true, url: lhr.finalDisplayedUrl, indexable: false }
+      ),
+    /required-data-refused/
+  )
 })

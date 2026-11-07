@@ -1,29 +1,40 @@
 'use client'
 
-import { aiRunSseEventSchema } from '@amcore/shared'
+import { type AiRunResponse, aiRunSseEventSchema } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
+import { captureQuerySession, type QueryOwner, sameQueryOwner } from '@/shared/api/query-session'
 import { useEventSource } from '@/shared/api/sse/use-event-source'
 
-import { aiKeys } from './ai-queries'
+import { refreshAiRun } from './ai-queries'
 
 import 'client-only'
 
-/**
- * Realtime run-status stream (ADR-053 pattern). `status_changed` is the only
- * reason today — a content-free hint, never the status itself — so this
- * just refetches the run; `useAiRun(runId)` stays the source of truth.
- */
-export function useAiRunStream(runId: string, enabled = true): void {
-  const queryClient = useQueryClient()
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: aiKeys.run(runId) })
-
+/** Hints refresh the captured run and transcript; HTTP remains authoritative. */
+export function useAiRunStream(
+  owner: QueryOwner | null,
+  run: Pick<AiRunResponse, 'id' | 'conversationId'> | null,
+  enabled = true
+): void {
+  const client = useQueryClient()
+  const captured = captureQuerySession(client)
+  const admitted = sameQueryOwner(owner, captured.owner)
+  const refresh = () => {
+    if (admitted && run) void refreshAiRun(client, captured, run)
+  }
   useEventSource({
-    url: `/api/ai/runs/${encodeURIComponent(runId)}/stream`,
+    url: run ? `/api/ai/runs/${encodeURIComponent(run.id)}/stream` : null,
     schema: aiRunSseEventSchema,
-    enabled,
-    onOpen: invalidate,
-    onEvent: invalidate,
+    enabled: enabled && admitted && !!run,
+    connectionKey: JSON.stringify([
+      owner?.contextSession,
+      owner?.userId,
+      run?.id,
+      run?.conversationId,
+    ]),
+    onOpen: refresh,
+    onEvent: (event) => {
+      if (event.runId === run?.id) refresh()
+    },
   })
 }

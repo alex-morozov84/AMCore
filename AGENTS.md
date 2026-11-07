@@ -240,9 +240,17 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   The explicitly named `entities/organization-context/index.server.ts`,
   `entities/invitation-flow/index.server.ts` and `entities/api-key/index.server.ts` are server-only public DAL entries;
   other deep server imports remain forbidden.
-  TanStack Query for server state, Zustand for local client state (kept as
-  the convention; no live store exists today — see
-  `docs/frontend/architecture-and-conventions.md` → State model). Theme
+  TanStack Query owns browser-managed server data; Server Components may retain
+  direct server DAL reads. Forms keep local input; add domain rules only for a
+  concrete requirement. Server hydration is optional. Follow
+  `docs/frontend/api-consumption.md` → Data ownership for interactive pages.
+  For data-flow changes, use the shared
+  [amcore-data-patterns skill](.agents/skills/amcore-data-patterns/SKILL.md).
+  Codex discovers it in `.agents/skills`; Claude Code uses the relative link in
+  `.claude/skills`. Invoke it as `$amcore-data-patterns` in Codex or
+  `/amcore-data-patterns` in Claude Code, or read the file with another agent.
+  Zustand remains the convention for shared local client state; no live store is
+  required today (see `docs/frontend/architecture-and-conventions.md` → State model). Theme
   defaults to `system` (light/dark), owned by `shared/lib/theme.ts` — no
   `next-themes` dependency. **These import rules fail lint, they are not
   conventions.** Full contract:

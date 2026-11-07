@@ -240,6 +240,14 @@ are allowed to settle; their late results are discarded. See
 This is not token streaming. Treat the event as “refetch `GET /ai/runs/:id`”.
 Postgres remains the source of truth.
 
+The starter's browser hooks bind reads, commands and stream connections to the
+confirmed user/session. Run creation/cancel and stream hints refresh the exact run
+and conversation transcript. Cancellation acknowledgment does not wait for those
+reads and can still report a running worker. Loaded transcript pages refresh;
+new pages still require explicit pagination. See the [frontend composition and
+migration contract](../frontend/api-consumption.md#ai--conversations-runs-messages).
+No ready AI screen ships; downstream UI composition still needs runtime verification.
+
 Conversation and run endpoint shapes (`/ai/conversations`, `/ai/runs`, the
 keyset-paginated list, cancel, and the SSE stream) are in the OpenAPI document at
 `/docs`. All are bearer-authenticated and owner-scoped; missing or not-owned

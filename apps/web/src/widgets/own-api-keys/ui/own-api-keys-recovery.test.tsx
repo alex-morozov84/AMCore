@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { type ApiKeyListItemResponse, DEFAULT_LOCALE } from '@amcore/shared'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 
@@ -46,7 +47,12 @@ function fixture() {
         invalidQuery={false}
         onQueryChange={() => undefined}
       />
-    </NextIntlClientProvider>
+    </NextIntlClientProvider>,
+    {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+      ),
+    }
   )
   return { controller, client }
 }

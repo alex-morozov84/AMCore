@@ -65,6 +65,12 @@ CLAUDE.local.md
 
 # Claude Code local agent state (permissions, locks) — never commit
 .claude/
+# Share only the frontend data skill link; keep all other local state ignored.
+!/.claude/
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/amcore-data-patterns
 
 # Local Prisma generated client (will be in node_modules)
 generated/

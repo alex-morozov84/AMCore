@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 import type { InviteListItem, InviteListQuery } from '@amcore/shared'
 
@@ -30,6 +30,8 @@ import { InvitationTable } from './invitation-table'
 import { InvitationOperationStatus } from './operation-status'
 
 type View = Pick<InviteListQuery, 'search' | 'page' | 'status'>
+const subscribeHydration = () => () => {}
+
 export function OrganizationInvitations({
   controller,
   authorityStatus,
@@ -41,6 +43,11 @@ export function OrganizationInvitations({
   query?: View
   onQueryChange?(query: View, reason: 'search' | 'status' | 'page'): void
 }) {
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false
+  )
   const t = useTranslations('organizationInvitations')
   const [local, setLocal] = useState<View>({ page: 1, search: '', status: 'pending' })
   const query = controlled ?? local
@@ -58,7 +65,7 @@ export function OrganizationInvitations({
   const inviteButton = useRef<HTMLButtonElement>(null)
   const denied = !['ready', 'pending'].includes(authorityStatus)
   const settled = operation.status === 'committed' && operation.followup === 'ready'
-  const disabled = !list.available || (operation.status !== 'idle' && !settled)
+  const disabled = !hydrated || !list.available || (operation.status !== 'idle' && !settled)
   const pages = Math.max(1, Math.ceil((list.data?.total ?? 0) / 20))
   const focusNextPage = useRef(false)
   const recoveredPage = useRef<string | undefined>(undefined)
@@ -97,7 +104,7 @@ export function OrganizationInvitations({
     setRevoking(undefined)
   }
   function action(row: InviteListItem, kind: 'repeat' | 'replace' | 'revoke', source: HTMLElement) {
-    if (disabled) return
+    if (disabled || !controller.allowed()) return
     trigger.current = source
     if (kind === 'revoke') setRevoking(row)
     else setEditor({ mode: kind, initial: row })
@@ -117,7 +124,7 @@ export function OrganizationInvitations({
       tabIndex={-1}
       className="space-y-4 outline-none"
     >
-      <InvitationOperationStatus operation={operation} />
+      {!editor && <InvitationOperationStatus operation={operation} />}
       <FilterPanel>
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
@@ -131,13 +138,14 @@ export function OrganizationInvitations({
               placeholder={t('searchPlaceholder')}
               clearLabel={t('clear')}
               maxLength={254}
-              disabled={denied}
+              disabled={!hydrated || denied}
             />
           </div>
           <Button
             ref={inviteButton}
             disabled={disabled}
             onClick={(event) => {
+              if (!controller.allowed()) return
               trigger.current = event.currentTarget
               setEditor({ mode: 'create' })
             }}
@@ -150,7 +158,7 @@ export function OrganizationInvitations({
             <Button
               key={status}
               variant={query.status === status ? 'default' : 'outline'}
-              disabled={denied}
+              disabled={!hydrated || denied}
               aria-pressed={query.status === status}
               onClick={() => change({ ...query, status, page: 1 }, 'status')}
             >
@@ -189,6 +197,7 @@ export function OrganizationInvitations({
               {(query.search || query.status !== 'pending') && (
                 <Button
                   variant="outline"
+                  disabled={!hydrated}
                   onClick={() => change({ page: 1, search: '', status: 'pending' }, 'status')}
                 >
                   {t('resetFilters')}
@@ -202,6 +211,7 @@ export function OrganizationInvitations({
               query.page > 1 && (
                 <Button
                   variant="outline"
+                  disabled={!hydrated}
                   onClick={() => {
                     focusNextPage.current = true
                     change({ ...query, page: query.page - 1 }, 'page')
@@ -215,6 +225,7 @@ export function OrganizationInvitations({
               query.page < pages && (
                 <Button
                   variant="outline"
+                  disabled={!hydrated}
                   onClick={() => {
                     focusNextPage.current = true
                     change({ ...query, page: query.page + 1 }, 'page')
@@ -253,6 +264,7 @@ export function OrganizationInvitations({
                 {t(editor?.mode === 'create' ? 'inviteHelp' : 'reissueHelp')}
               </DialogDescription>
             </DialogHeader>
+            <InvitationOperationStatus operation={operation} />
             {editor && (
               <InvitationForm
                 key={`${editor.mode}:${editor.initial?.id ?? 'new'}`}

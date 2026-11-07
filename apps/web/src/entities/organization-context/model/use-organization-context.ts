@@ -16,18 +16,32 @@ import {
 
 import 'client-only'
 
-export function useOrganizationContext(binding: string, input: OrganizationContextInput) {
+export function useOrganizationContext(
+  binding: string,
+  input: OrganizationContextInput,
+  reuseCachedAdmission = false
+) {
   const client = useQueryClient()
+  const queryKey = organizationContextKey(binding, input)
+  const cached = client.getQueryCache().find<OrganizationContextData>({ queryKey })
+  const seed =
+    reuseCachedAdmission && cached?.state.status === 'success' && !cached.isStaleByTime(60000)
+      ? cached.state.data
+      : undefined
   const [initialInput] = useState(input)
   const ownerTarget = input.kind === 'selected' ? input.id : 'list'
-  const controller = useMemo(
-    () => createOrganizationAccessController(binding, ownerTarget),
-    [binding]
-  )
+  const controller = useMemo(() => {
+    const access = createOrganizationAccessController(binding, ownerTarget)
+    access.setAuthority(
+      Boolean(seed && 'canManageTeamAccess' in seed.data && seed.data.canManageTeamAccess)
+    )
+    return access
+  }, [binding])
   const scheduler = useMemo(
     () =>
       createOrganizationContextScheduler(binding, initialInput, {
         ...organizationContextClient,
+        initialData: seed,
         beforeAuthority: controller.waitTransports,
         publish: (target, data) =>
           client.setQueryData(organizationContextKey(binding, target), data),
@@ -42,7 +56,7 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
   const initialPending = useSyncExternalStore(
     scheduler.subscribe,
     scheduler.isInitialPending,
-    () => true
+    () => !seed
   )
   const query = useQuery<OrganizationContextData>({
     queryKey: organizationContextKey(binding, input),
@@ -97,12 +111,35 @@ export function useOrganizationContext(binding: string, input: OrganizationConte
     }
   }, [scheduler, controller])
   useEffect(() => {
-    const data = query.data?.data
-    const ready =
-      state.status === 'ready' && data && 'canManageTeamAccess' in data && data.canManageTeamAccess
-    controller.setAuthority(Boolean(ready))
-    if (state.status === 'changed' || state.status === 'missing') controller.retire()
-  }, [controller, state.status, query.data])
+    const synchronize = () => {
+      const state = scheduler.getSnapshot()
+      if (state.status !== 'ready') void client.invalidateQueries({ queryKey, refetchType: 'none' })
+      const data = client.getQueryData<OrganizationContextData>(queryKey)?.data
+      const ready =
+        state.status === 'ready' &&
+        data &&
+        'canManageTeamAccess' in data &&
+        data.canManageTeamAccess
+      controller.setAuthority(Boolean(ready))
+      if (state.status === 'changed' || state.status === 'missing') controller.retire()
+    }
+    synchronize()
+    return scheduler.subscribe(synchronize)
+  }, [controller, scheduler, client, binding, target])
+  useEffect(
+    () =>
+      client.getQueryCache().subscribe((event) => {
+        if (event.type !== 'updated' || event.action.type !== 'success') return
+        const key = event.query.queryKey
+        if (key[0] !== 'organization-context' || key[1] !== binding || key[2] !== target) return
+        const data = (event.query.state.data as OrganizationContextData | undefined)?.data
+        if (data && 'canManageTeamAccess' in data && !data.canManageTeamAccess) {
+          controller.setAuthority(false)
+          scheduler.refuse()
+        }
+      }),
+    [client, binding, target, controller, scheduler]
+  )
   return {
     controller,
     initialPending,

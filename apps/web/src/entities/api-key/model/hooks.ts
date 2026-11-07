@@ -60,10 +60,18 @@ export function useOwnApiKeys(controller: OwnApiKeyController, query: ApiKeyQuer
 export const useCreateOwnApiKey =
   (controller: OwnApiKeyController) => (input: Parameters<OwnApiKeyController['create']>[0]) =>
     controller.create(input)
-export const useRevokeOwnApiKey =
-  (controller: OwnApiKeyController) =>
-  (...args: Parameters<OwnApiKeyController['revoke']>) =>
-    controller.revoke(...args)
+export function useRevokeOwnApiKey(controller: OwnApiKeyController) {
+  const client = useQueryClient()
+  return async (...args: Parameters<OwnApiKeyController['revoke']>) => {
+    const filter = { queryKey: ['own-api-keys', controller.admission.binding] }
+    const revoked = await controller.revoke(...args)
+    if (revoked) {
+      await client.cancelQueries(filter)
+      void client.invalidateQueries(filter)
+    }
+    return revoked
+  }
+}
 
 /** Plaintext projection for the active local result only; never place it in a shared journal/cache. */
 export function useOwnApiKeySecret(controller: OwnApiKeyController, target?: string) {

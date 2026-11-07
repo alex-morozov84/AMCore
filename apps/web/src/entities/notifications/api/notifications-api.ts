@@ -17,14 +17,20 @@ import { apiClient } from '@/shared/api'
  * `/auth/sessions`).
  */
 export const notificationsApi = {
-  getFeed: (cursor: string | undefined, limit: number): Promise<NotificationFeedResponse> => {
+  getFeed: (
+    cursor: string | undefined,
+    limit: number,
+    signal?: AbortSignal
+  ): Promise<NotificationFeedResponse> => {
     const params = new URLSearchParams({ limit: String(limit) })
     if (cursor) params.set('cursor', cursor)
-    return apiClient.get<NotificationFeedResponse>(`/notifications?${params.toString()}`)
+    return apiClient.get<NotificationFeedResponse>(`/notifications?${params.toString()}`, {
+      signal,
+    })
   },
 
-  getUnreadCount: (): Promise<UnreadCountResponse> =>
-    apiClient.get<UnreadCountResponse>('/notifications/unread-count'),
+  getUnreadCount: (signal?: AbortSignal): Promise<UnreadCountResponse> =>
+    apiClient.get<UnreadCountResponse>('/notifications/unread-count', { signal }),
 
   markRead: (id: string): Promise<void> =>
     apiClient.post<void>(`/notifications/${encodeURIComponent(id)}/read`),

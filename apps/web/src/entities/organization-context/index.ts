@@ -38,6 +38,7 @@ export { useMemberApiKeys } from './model/member-api-keys/hooks'
 export { type MemberRemovalTarget, useMemberRemoval } from './model/member-removal/hooks'
 export {
   type AuthorityRefreshResult,
+  createOrganizationAccessController,
   type OrganizationAccessController,
   type RoleWriteOutcome,
 } from './model/members/controller'

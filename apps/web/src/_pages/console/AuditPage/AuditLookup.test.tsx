@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE } from '@amcore/shared'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,17 +20,67 @@ const copy = {
 afterEach(() => vi.unstubAllGlobals())
 
 function renderLookup(children: ReactNode) {
+  const client = new QueryClient()
   return render(
     <NextIntlClientProvider
       locale={DEFAULT_LOCALE}
       messages={{ console: { identityLookup: copy } }}
     >
-      {children}
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
     </NextIntlClientProvider>
   )
 }
 
 describe('AuditLookup', () => {
+  it('resets through the real kind adapter and sends only the selected ID', async () => {
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      const { kind } = JSON.parse(String(init.body))
+      return {
+        ok: true,
+        json: async () => ({
+          kind,
+          ...{
+            items: [{ id: `${kind}-id`, name: `${kind} result` }],
+            hasMore: false,
+          },
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetch)
+    const selected = vi.fn()
+    const client = new QueryClient()
+    const view = (kind: 'user' | 'organization') => (
+      <NextIntlClientProvider
+        locale={DEFAULT_LOCALE}
+        messages={{ console: { identityLookup: copy } }}
+      >
+        <QueryClientProvider client={client}>
+          <AuditLookup kind={kind} copy={copy} onSelect={selected} />
+        </QueryClientProvider>
+      </NextIntlClientProvider>
+    )
+    const h = render(view('user'))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    await screen.findByText('user result')
+    h.rerender(view('organization'))
+    expect(screen.queryByText('user result')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('')
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select record\s*:\s*organization result/ })
+    )
+    expect(selected).toHaveBeenCalledExactlyOnceWith('organization-id')
+    expect(screen.queryByText('organization result')).not.toBeInTheDocument()
+    expect(
+      fetch.mock.calls.map(([url, init]) => [url.includes('Ada'), JSON.parse(String(init.body))])
+    ).toEqual([
+      [false, { kind: 'user', search: 'Ada' }],
+      [false, { kind: 'organization', search: 'Ada' }],
+    ])
+  })
+
   it('runs Enter as an explicit lookup without submitting surrounding filters', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true,

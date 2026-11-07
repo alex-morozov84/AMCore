@@ -1,7 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { DEFAULT_LOCALE } from '@amcore/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { authApi } from '@/shared/api'
@@ -14,6 +14,7 @@ vi.mock('@/shared/api', () => ({
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient.setQueryData(userKeys.me(), { user: { id: 'u1' }, contextSession: 'session-u1' })
   return (
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -23,7 +24,11 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 function wrapperWithCachedUser(avatarUrl: string | null) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  queryClient.setQueryData(userKeys.me(), { user: { id: 'u1', avatarUrl } })
+  queryClient.setQueryData(userKeys.me(), { user: { id: 'u1' }, contextSession: 'session-u1' })
+  queryClient.setQueryData(userKeys.me(), {
+    user: { id: 'u1', avatarUrl },
+    contextSession: 'session-u1',
+  })
   return {
     queryClient,
     Wrapper: ({ children }: { children: React.ReactNode }) => (
@@ -34,8 +39,10 @@ function wrapperWithCachedUser(avatarUrl: string | null) {
 
 describe('userKeys.sessions', () => {
   it('includes page and limit, so different pages get different cache entries', () => {
-    expect(userKeys.sessions(DEFAULT_LOCALE, 1, 20)).not.toEqual(
-      userKeys.sessions(DEFAULT_LOCALE, 2, 20)
+    expect(
+      userKeys.sessions({ userId: 'u1', contextSession: 'session-u1' }, DEFAULT_LOCALE, 1, 20)
+    ).not.toEqual(
+      userKeys.sessions({ userId: 'u1', contextSession: 'session-u1' }, DEFAULT_LOCALE, 2, 20)
     )
   })
 })
@@ -65,6 +72,7 @@ describe('useUploadAvatar', () => {
 
     expect(queryClient.getQueryData(userKeys.me())).toEqual({
       user: { id: 'u1', avatarUrl: 'https://x/new.png' },
+      contextSession: 'session-u1',
     })
   })
 })
@@ -79,6 +87,78 @@ describe('useDeleteAvatar', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(queryClient.getQueryData(userKeys.me())).toEqual({ user: { id: 'u1', avatarUrl: null } })
+    expect(queryClient.getQueryData(userKeys.me())).toEqual({
+      user: { id: 'u1', avatarUrl: null },
+      contextSession: 'session-u1',
+    })
   })
 })
+
+it.each(['upload', 'delete'] as const)(
+  'late avatar %s cannot update replacement user B',
+  async (action) => {
+    const held = Promise.withResolvers<{ avatarUrl: string }>()
+    if (action === 'upload') vi.mocked(authApi.uploadAvatar).mockReturnValueOnce(held.promise)
+    else
+      vi.mocked(authApi.deleteAvatar).mockImplementationOnce(async () => {
+        await held.promise
+      })
+    const { queryClient, Wrapper } = wrapperWithCachedUser('A-avatar')
+    const hook = renderHook(() => ({ upload: useUploadAvatar(), remove: useDeleteAvatar() }), {
+      wrapper: Wrapper,
+    })
+    let pending!: Promise<unknown>
+    act(() => {
+      pending =
+        action === 'upload'
+          ? hook.result.current.upload.mutateAsync(new File(['x'], 'avatar.png'))
+          : hook.result.current.remove.mutateAsync()
+    })
+    await waitFor(() =>
+      expect(
+        action === 'upload' ? authApi.uploadAvatar : authApi.deleteAvatar
+      ).toHaveBeenCalledOnce()
+    )
+    const replacement = { user: { id: 'B', avatarUrl: 'B-avatar' } }
+    act(() => {
+      queryClient.clear()
+      queryClient.setQueryData(userKeys.me(), replacement)
+    })
+    await act(async () => {
+      held.resolve({ avatarUrl: 'A-late-avatar' })
+      await pending
+    })
+    expect(queryClient.getQueryData(userKeys.me())).toEqual(replacement)
+  }
+)
+
+it.each(['tokenless', 'missing', 'removed', 'changed-token'] as const)(
+  'does not publish an avatar through an unusable %s capture',
+  async (boundary) => {
+    const { queryClient, Wrapper } = wrapperWithCachedUser(null)
+    if (boundary === 'tokenless')
+      queryClient.setQueryData(userKeys.me(), { user: { id: 'u1', avatarUrl: null } })
+    if (boundary === 'missing') queryClient.clear()
+    const held = Promise.withResolvers<{ avatarUrl: string }>()
+    vi.mocked(authApi.uploadAvatar).mockReturnValueOnce(held.promise)
+    const hook = renderHook(() => useUploadAvatar(), { wrapper: Wrapper })
+    let pending!: Promise<unknown>
+    act(() => {
+      pending = hook.result.current.mutateAsync(new File(['x'], 'avatar.png'))
+    })
+    await waitFor(() => expect(authApi.uploadAvatar).toHaveBeenCalledOnce())
+    if (boundary === 'removed') queryClient.removeQueries({ queryKey: userKeys.me(), exact: true })
+    if (boundary === 'changed-token')
+      queryClient.setQueryData(userKeys.me(), {
+        user: { id: 'u1', avatarUrl: null },
+        contextSession: 'next-session',
+      })
+    const before = queryClient.getQueryData(userKeys.me())
+    await act(async () => {
+      held.resolve({ avatarUrl: 'late' })
+      await pending
+    })
+    expect(queryClient.getQueryData(userKeys.me())).toEqual(before)
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true))
+  }
+)
