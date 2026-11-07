@@ -106,6 +106,8 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
   Never rewrite a migration already shared or applied to a retained database.
   Document incompatible integration/operational changes with affected consumer, action/order, checks and rollback limits.
   Extension-fixture adaptations prompt compatibility review; they are not automatically contract breaks.
+  Agents use the shared [amcore-fork-update skill](.agents/skills/amcore-fork-update/SKILL.md):
+  `$amcore-fork-update` in Codex, `/amcore-fork-update` in Claude Code, or read the file.
 - **`flexible` / `custom` downstream modes:** follow the downstream product's
   declared rules. Do not force AMCore's protected-`main`, PR-only workflow onto
   a fork that explicitly chose a different mode.

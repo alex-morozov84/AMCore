@@ -92,6 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   product updates, compatibility notices and separate source/database recovery.
   The first supported starting tag has not yet been released. A disposable independent-copy fixture completed hosted and database
   rehearsal; existing old tags gain no support from this guide.
+- The shared `amcore-fork-update` agent skill orders the guide's creation and update
+  steps and lists where an agent must stop. It adds no rule beyond the guide.
 - `setup-repo-security.sh --fork-updates` enables merge commits for initialized
   downstream products while preserving other strict checks. AMCore stays squash-only.
   Unflagged downstream setup warns that it restores squash-only settings.
