@@ -182,9 +182,11 @@ describe('Audit event row', () => {
     renderRow()
     fireEvent.click(screen.getByRole('button', { name: 'Copy ID: user1' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('user1'))
-    expect(screen.getByRole('button', { name: 'Copy ID: user1' })).toHaveAttribute(
-      'title',
-      'Copied'
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copy ID: user1' })).toHaveAttribute(
+        'title',
+        'Copied'
+      )
     )
   })
 
