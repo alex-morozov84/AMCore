@@ -45,11 +45,15 @@ export function OrganizationInvitationsClient({
   const accessT = useTranslations('organizationAccess')
   const locale = useLocale()
   const router = useRouteProgressRouter()
-  const access = useOrganizationContext(admission.binding, {
-    kind: 'selected',
-    id: organizationId,
-    locale,
-  })
+  const access = useOrganizationContext(
+    admission.binding,
+    {
+      kind: 'selected',
+      id: organizationId,
+      locale,
+    },
+    true
+  )
   const permissionDenied =
     access.state.status === 'ready' &&
     access.data &&

@@ -17,14 +17,16 @@ export const aiApi = {
   createConversation: (input: CreateAiConversationInput): Promise<AiConversationResponse> =>
     apiClient.post<AiConversationResponse>('/ai/conversations', input),
 
-  getConversation: (id: string): Promise<AiConversationResponse> =>
-    apiClient.get<AiConversationResponse>(`/ai/conversations/${encodeURIComponent(id)}`),
+  getConversation: (id: string, signal?: AbortSignal): Promise<AiConversationResponse> =>
+    apiClient.get<AiConversationResponse>(`/ai/conversations/${encodeURIComponent(id)}`, {
+      signal,
+    }),
 
   createRun: (input: CreateAiRunInput): Promise<AiRunResponse> =>
     apiClient.post<AiRunResponse>('/ai/runs', input),
 
-  getRun: (id: string): Promise<AiRunResponse> =>
-    apiClient.get<AiRunResponse>(`/ai/runs/${encodeURIComponent(id)}`),
+  getRun: (id: string, signal?: AbortSignal): Promise<AiRunResponse> =>
+    apiClient.get<AiRunResponse>(`/ai/runs/${encodeURIComponent(id)}`, { signal }),
 
   cancelRun: (id: string): Promise<AiRunCancelResponse> =>
     apiClient.post<AiRunCancelResponse>(`/ai/runs/${encodeURIComponent(id)}/cancel`),
@@ -32,12 +34,17 @@ export const aiApi = {
   // Keyset by `sequence` (oldest first) — the `id`/`GET .../messages` route lives on the
   // conversation-control controller (takeover surface), not the conversations one, even
   // though the path reads like it belongs there.
-  getMessages: (conversationId: string, cursor?: number): Promise<AiTranscriptResponse> => {
+  getMessages: (
+    conversationId: string,
+    cursor?: number,
+    signal?: AbortSignal
+  ): Promise<AiTranscriptResponse> => {
     const params = new URLSearchParams()
     if (cursor !== undefined) params.set('cursor', String(cursor))
     const query = params.toString()
     return apiClient.get<AiTranscriptResponse>(
-      `/ai/conversations/${encodeURIComponent(conversationId)}/messages${query ? `?${query}` : ''}`
+      `/ai/conversations/${encodeURIComponent(conversationId)}/messages${query ? `?${query}` : ''}`,
+      { signal }
     )
   },
 }

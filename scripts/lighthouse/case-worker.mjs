@@ -9,12 +9,18 @@ import { auditCatalogue, auditChoices, invariant, digest } from '../lib/lighthou
 import { evaluateResult } from '../lib/lighthouse-policy.mjs'
 import { writePair } from '../lib/lighthouse-reports.mjs'
 import { launchAuditBrowser } from './browser.mjs'
-import { assertMeasuredPage, watchMeasuredPage } from './page-state.mjs'
+import {
+  assertMeasuredPage,
+  watchMeasuredPage,
+  measuredErrorKind,
+  bfCacheConfig,
+} from './page-state.mjs'
 import { saveAcceptanceFixture, restoreAcceptance } from './acceptance-controls.mjs'
 import { prepareFixture } from './fixture.mjs'
+import { probeProof } from './session-probe.mjs'
 
 const [id, output, resultFile, control, acceptanceDirectory] = process.argv.slice(2)
-let browser, pw, watch, profile
+let browser, pw, watch, profile, probeContext
 let stage = 'admission'
 const navigationProof = []
 try {
@@ -36,6 +42,7 @@ try {
     ...(control && control !== 'sign-in-stall'
       ? { storageState: join(acceptanceDirectory, 'state.json') }
       : {}),
+    proxy: { server: m.relay },
     baseURL: saved ? new URL(saved.url).origin : m.origins.product,
     ignoreHTTPSErrors: m.topology === 'host',
     serviceWorkers: 'block',
@@ -57,6 +64,7 @@ try {
     })
   } else {
     const { page, fixture, url } = prepared
+    probeContext = page.context()
     stage = 'page-identity'
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 })
     await assertMeasuredPage(page, scenario, fixture, url)
@@ -69,15 +77,22 @@ try {
     )
     const client = await measured.createCDPSession()
     await client.send('Network.enable')
+    await client.send('Page.enable')
+    const { frameTree } = await client.send('Page.getFrameTree')
     await client.send('Network.clearBrowserCache')
     await client.send('Network.setBypassServiceWorker', { bypass: true })
     const pending = []
     const navigation = {}
-    const onNavigation = (frame) => {
-      if (frame !== page.mainFrame()) return
+    const verifyPending = async () => {
+      const outcomes = await Promise.all(pending).catch(() => [false])
+      invariant(outcomes.every(Boolean), 'navigation-identity-refused')
+      completeNavigation(navigation)
+    }
+    const onNavigation = ({ frame }) => {
+      if (frame.parentId) return
       let kind
       try {
-        kind = admitNavigation(navigation, frame.url(), url)
+        kind = admitNavigation(navigation, frame.url + (frame.urlFragment ?? ''), url)
       } catch {
         navigationProof.push({ kind: 'unexpected-navigation' })
         pending.push(Promise.resolve(false))
@@ -87,26 +102,52 @@ try {
         navigationProof.push({ kind })
         return
       }
+      const generation = navigation.measured
+      const check = { kind: 'measured', generation, stage: 'capture', passed: false }
+      navigationProof.push(check)
+      const captured = page
+        .waitForURL(url, { waitUntil: 'domcontentloaded', timeout: 10_000 })
+        .then(() => page.evaluateHandle(() => globalThis.document))
       pending.push(
-        page
-          .waitForLoadState('domcontentloaded')
-          .then(() => assertMeasuredPage(page, scenario, fixture, url))
+        captured
+          .then(async (document) => {
+            try {
+              invariant(generation === navigation.measured, 'navigation-identity-refused')
+              const value = await assertMeasuredPage(
+                page,
+                scenario,
+                fixture,
+                url,
+                Promise.resolve(document),
+                check
+              )
+              check.stage = 'final-document-check'
+              invariant(generation === navigation.measured, 'navigation-identity-refused')
+              return value
+            } catch (error) {
+              await document.dispose().catch(() => {})
+              throw error
+            }
+          })
           .then((value) => {
-            navigationProof.push({ kind: 'measured', passed: true })
+            Object.assign(check, { passed: true, stage: 'complete' })
             return value
           })
           .catch((error) => {
-            navigationProof.push({
-              kind: 'measured',
-              passed: false,
+            Object.assign(check, {
+              currentGeneration: navigation.measured,
+              away: Boolean(navigation.away),
+              errorKind: measuredErrorKind(error),
               code: [
                 'invalid-measured-identity-or-state',
                 'measured-subject-refused',
+                'measured-session-cookie-changed',
                 'measured-session-fence-missing',
                 'measured-credentials-present',
                 'measured-state-busy',
                 'unexpected-measured-url',
                 'console-audience-refused',
+                'navigation-identity-refused',
               ].includes(error.message)
                 ? error.message
                 : 'operation-refused',
@@ -115,7 +156,11 @@ try {
           })
       )
     }
-    page.on('framenavigated', onNavigation)
+    const onSameDocument = ({ frameId, url: actual }) => {
+      if (frameId === frameTree.frame.id && actual !== url) navigation.invalid = true
+    }
+    client.on('Page.frameNavigated', onNavigation)
+    client.on('Page.navigatedWithinDocument', onSameDocument)
     if (control === 'audit-stall' || control === 'expired') {
       await page.route(
         url,
@@ -146,12 +191,12 @@ try {
         throttlingMethod: 'simulate',
         ...(control === 'audit-stall' ? { maxWaitForLoad: 180_000, maxWaitForFcp: 180_000 } : {}),
       },
-      undefined,
+      bfCacheConfig(verifyPending),
       measured
     )
-    page.off('framenavigated', onNavigation)
-    invariant((await Promise.all(pending)).every(Boolean), 'navigation-identity-refused')
-    completeNavigation(navigation)
+    client.off('Page.frameNavigated', onNavigation)
+    client.off('Page.navigatedWithinDocument', onSameDocument)
+    await verifyPending()
     const state = await assertMeasuredPage(page, scenario, fixture, url)
     await watch.assert()
     const robots = await page.evaluate(
@@ -183,7 +228,7 @@ try {
       },
       secrets
     )
-    if (!control && process.env.AMCORE_AUDIT_ACCEPTANCE === 'true' && id === 'members')
+    if (!control && process.env.AMCORE_AUDIT_ACCEPTANCE === 'true' && id !== 'login')
       await saveAcceptanceFixture(page, fixture, url, output)
     await writeFile(
       resultFile,
@@ -193,6 +238,7 @@ try {
         identity: true,
         requiredData: true,
         navigationProof,
+        probes: probeProof(probeContext),
         subject: fixture.subject ? digest(fixture.subject) : 'anonymous',
         policy,
         files,
@@ -205,8 +251,18 @@ try {
 } catch (error) {
   // Arbitrary browser/Lighthouse exceptions may contain credentials or setup DOM.
   const known = [
+    'fixture-subject-unproved',
+    'fixture-api-login-refused',
+    'fixture-api-subject-mismatch',
+    'fixture-organization-refused',
+    'fixture-api-logout-refused',
+    'fixture-organization-missing',
+    'negative-subject-registration-refused',
+    'negative-subject-logout-refused',
+    'negative-subject-unproved',
     'invalid-measured-identity-or-state',
     'measured-subject-refused',
+    'measured-session-cookie-changed',
     'measured-session-fence-missing',
     'measured-credentials-present',
     'measured-state-busy',
@@ -229,7 +285,15 @@ try {
   const reason = known.includes(error.message) ? error.message : 'operation-refused'
   await writeFile(
     resultFile,
-    JSON.stringify({ id, valid: false, stage, reason, navigationProof }),
+    JSON.stringify({
+      id,
+      valid: false,
+      stage,
+      reason,
+      errorKind: measuredErrorKind(error),
+      navigationProof,
+      probes: probeProof(probeContext),
+    }),
     {
       flag: 'wx',
       mode: 0o600,

@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react'
 import { renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -108,4 +109,84 @@ describe('useEventSource', () => {
 
     expect(source.closed).toBe(true)
   })
+})
+
+it.each(['key', 'url', 'enabled'] as const)(
+  'rejects saved handlers before cleanup and after %s cycling',
+  (mode) => {
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const onOpen = vi.fn()
+    const onEvent = vi.fn()
+    const frame = {
+      data: JSON.stringify({ eventId: 'e', reason: 'created' }),
+    } as MessageEvent<string>
+    let oldOpen: (() => void) | null = null
+    let oldMessage: ((event: MessageEvent<string>) => void) | null = null
+    const { rerender, unmount } = renderHook(
+      ({ changed }) => {
+        useEventSource({
+          url: mode === 'url' && changed ? '/api/b' : '/api/a',
+          enabled: mode !== 'enabled' || !changed,
+          connectionKey: mode === 'key' ? (changed ? 'b' : 'a') : undefined,
+          schema,
+          onOpen,
+          onEvent,
+        })
+        useLayoutEffect(() => {
+          if (changed) {
+            oldOpen?.()
+            oldMessage?.(frame)
+          }
+        }, [changed])
+      },
+      { initialProps: { changed: false } }
+    )
+    const old = FakeEventSource.instances[0]!
+    oldOpen = old.onopen
+    oldMessage = old.onmessage
+    rerender({ changed: true })
+    expect(old.closed).toBe(true)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(onEvent).not.toHaveBeenCalled()
+    rerender({ changed: false })
+    oldOpen?.()
+    oldMessage?.(frame)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(onEvent).not.toHaveBeenCalled()
+    const active = FakeEventSource.instances.at(-1)!
+    const activeOpen = active.onopen!
+    const activeMessage = active.onmessage!
+    activeOpen()
+    activeMessage(frame)
+    expect(onOpen).toHaveBeenCalledOnce()
+    expect(onEvent).toHaveBeenCalledOnce()
+    unmount()
+    activeOpen()
+    activeMessage(frame)
+    expect(onOpen).toHaveBeenCalledOnce()
+    expect(onEvent).toHaveBeenCalledOnce()
+  }
+)
+
+it('keeps the source and uses latest callbacks and schema for the same connection', () => {
+  vi.stubGlobal('EventSource', FakeEventSource)
+  const first = vi.fn(),
+    latest = vi.fn()
+  const { rerender } = renderHook(
+    ({ updated }) =>
+      useEventSource({
+        url: '/api/a',
+        schema: updated ? z.object({ fresh: z.boolean() }) : z.object({ old: z.string() }),
+        onOpen: updated ? latest : first,
+        onEvent: updated ? latest : first,
+      }),
+    { initialProps: { updated: false } }
+  )
+  rerender({ updated: true })
+  expect(FakeEventSource.instances).toHaveLength(1)
+  const source = FakeEventSource.instances[0]!
+  source.onopen?.()
+  source.onmessage?.({ data: JSON.stringify({ fresh: true }) } as MessageEvent<string>)
+  expect(first).not.toHaveBeenCalled()
+  expect(latest).toHaveBeenNthCalledWith(2, { fresh: true })
 })

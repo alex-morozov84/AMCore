@@ -95,6 +95,21 @@ props, logs, notifications and accessible labels. Local references are not secur
 
 ## Custom presentation
 
+Provide the application's `QueryClientProvider` for the inventory hooks,
+`useRevokeOwnApiKey` and standalone `OwnApiKeyRevoke` component.
+After confirmed revocation, the revoke hook cancels older inventory reads and
+invalidates every filter/page for that session binding. Active lists refetch;
+inactive lists become stale. Other bindings and organization options are unchanged.
+Success does not wait for the replacement GET. A slow or failed refresh cannot
+undo the receipt or repeat DELETE; recover the read with Refresh.
+Cached rows may remain visible while the new read runs.
+Use `OwnApiKeyRevoke.onRevoked` for local UI feedback, without duplicating refresh.
+
+The raw controller remains independent of Query. Custom hosts calling it directly
+own their read refresh: cancel superseded inventory reads before invalidating the
+captured binding's inventory prefix. The ready host applies this order during
+inspection, including revocation after losing a known key's secret.
+
 Application composition reads `readOwnApiKeyAdmission(await headers())` from
 `@/entities/api-key/index.server`. Handle missing sessions with the normal login redirect.
 Pass only `{binding, actorId}` and the target to the client. Keep the host keyed by binding.

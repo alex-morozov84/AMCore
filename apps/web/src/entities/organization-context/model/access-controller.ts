@@ -69,6 +69,7 @@ export function createOrganizationAccessController(binding: string, organization
     async waitTransports() {
       while (transports.size) await Promise.all([...transports])
     },
+    refreshAuthority: (signal?: AbortSignal) => refreshAuthority(signal),
     async refresh(signal?: AbortSignal): Promise<AuthorityRefreshResult> {
       const captured = epoch
       signal?.throwIfAborted()
@@ -96,7 +97,11 @@ export function createOrganizationAccessController(binding: string, organization
     async execute<T>(
       memberId: string,
       work: (signal: AbortSignal) => Promise<T>,
-      options?: { timeoutMs?: number; rejectionCodes?: ReadonlySet<string> }
+      options?: {
+        timeoutMs?: number
+        rejectionCodes?: ReadonlySet<string>
+        refresh?: (signal: AbortSignal) => Promise<AuthorityRefreshResult>
+      }
     ): Promise<OrganizationWriteOutcome<T>> {
       if (!active) return { status: 'retired' }
       const pendingKey = JSON.stringify([binding, organizationId, memberId])
@@ -128,14 +133,16 @@ export function createOrganizationAccessController(binding: string, organization
         const followupAbort = new AbortController()
         try {
           followup = await withDeadline(
-            controller.refresh(followupAbort.signal),
+            options?.refresh
+              ? options.refresh(followupAbort.signal)
+              : controller.refresh(followupAbort.signal),
             5000,
             followupAbort
           )
         } catch {
           if (!current(captured)) return { status: 'retired' }
           followup = 'error'
-          allowed = false
+          if (!options?.refresh) allowed = false
           notify()
         }
         if (!current(captured)) return { status: 'retired' }

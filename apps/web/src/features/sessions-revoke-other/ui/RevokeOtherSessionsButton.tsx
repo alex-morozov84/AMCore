@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 
+import { useCurrentUser } from '@/entities/user'
+import { queryOwner } from '@/shared/api/query-session'
 import { Button } from '@/shared/ui/button'
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog'
 
@@ -13,10 +15,12 @@ export function RevokeOtherSessionsButton() {
   const tCommon = useTranslations('common')
   const [open, setOpen] = useState(false)
   const { mutate, isPending } = useRevokeOtherSessions()
+  const { data } = useCurrentUser()
+  const disabled = isPending || !queryOwner(data)
 
   return (
     <>
-      <Button variant="destructive" size="sm" disabled={isPending} onClick={() => setOpen(true)}>
+      <Button variant="destructive" size="sm" disabled={disabled} onClick={() => setOpen(true)}>
         {t('revokeOthers')}
       </Button>
       <ConfirmDialog
@@ -27,7 +31,7 @@ export function RevokeOtherSessionsButton() {
         confirmLabel={t('revokeOthers')}
         cancelLabel={tCommon('cancel')}
         variant="destructive"
-        disabled={isPending}
+        disabled={disabled}
         onConfirm={() => mutate()}
       />
     </>

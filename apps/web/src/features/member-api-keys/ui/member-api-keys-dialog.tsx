@@ -65,7 +65,7 @@ export function MemberApiKeysDialog({
   const check = async () => {
     setChecking(true)
     try {
-      await keys.refresh()
+      await keys.review()
       setChecked(true)
     } catch {
       setChecked(false)

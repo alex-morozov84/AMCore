@@ -17,7 +17,7 @@ export async function prepareFixture(context, m, scenario, alias) {
   invariant(/^[a-zA-Z0-9_-]{10,80}$/.test(subject), 'fixture-subject-unproved')
   let organization
   if (scenario.id === 'members') {
-    const api = `http://127.0.0.1:${m.ports.api}/api/v1`
+    const api = `${m.origins.api}/api/v1`
     const response = await context.request.post(`${api}/auth/login`, {
       data: { email, password: TEST_PASSWORD },
     })
@@ -41,7 +41,7 @@ export async function prepareFixture(context, m, scenario, alias) {
   let otherSubject
   if (process.env.AMCORE_AUDIT_ACCEPTANCE === 'true' && scenario.id === 'members') {
     const otherEmail = `audit-other-${randomUUID()}@e2e.amcore.test`
-    const api = `http://127.0.0.1:${m.ports.api}/api/v1`
+    const api = `${m.origins.api}/api/v1`
     const response = await context.request.post(`${api}/auth/register`, {
       data: { email: otherEmail, password: TEST_PASSWORD },
     })
@@ -63,6 +63,7 @@ export async function prepareFixture(context, m, scenario, alias) {
   }
   const fixture = {
     subject,
+    staffHost: Boolean(m.productAdminHost),
     otherSubject,
     email,
     organizationName: organization?.name,
@@ -76,6 +77,7 @@ export async function prepareFixture(context, m, scenario, alias) {
   // Fresh audience context proves actual password/MFA admission, without copying cookies.
   const session = await context.browser().newContext({
     baseURL: new URL(url).origin,
+    proxy: { server: m.relay },
     ignoreHTTPSErrors: m.topology === 'host',
     serviceWorkers: 'block',
   })

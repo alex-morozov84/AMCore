@@ -37,7 +37,7 @@ export function MemberRoleForm({
     section: initial.editMode === 'editable' ? ('available' as const) : ('assigned' as const),
   })
   const roles = useMemberRoleAssignments(controller, { userId, ...query })
-  const draft = useRoleDraft(initial, roles, controller, onClose)
+  const draft = useRoleDraft(initial, roles, controller, onClose, isSelf)
   const readOnly = draft.snapshot.editMode !== 'editable'
   const disabled = roles.busy || !roles.ready || draft.reviewing
   return (

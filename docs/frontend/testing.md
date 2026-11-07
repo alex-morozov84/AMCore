@@ -180,6 +180,19 @@ Plan -> own build and fixtures -> actual-page identity -> Lighthouse
      -> validity and defect policy -> safe bundle -> owned cleanup
 ```
 
+Identity/access probes use the measured browser context's Node request transport
+through the managed relay. They do not appear as page-originated requests in the
+Lighthouse network log. Probes reject redirects, timeouts and changed auth cookies.
+Anonymous login expects an external profile401; a page-originated401 remains a
+failure. Authenticated documents must carry the captured session/audience binding
+before, during and after navigation. An intermediate refusal cannot be cleared by
+a later successful return. These checks still consume backend work; comparisons
+must use the same probe schedule for both versions.
+The pinned Lighthouse configuration awaits the full measured-document check before
+its native BFCache departure, then checks the return. Native BFCache collection is
+retained; its departure is postponed, outside sensitive trace capture. Verify the
+configuration and ordering contract when upgrading Lighthouse.
+
 A stopped stand created by this audit command can be reused with
 `pnpm audit:web path-standard --reuse <stand-id>`. The runner first compares every
 application/package/Docker/patch input, root manifest and lockfile with its frozen
@@ -914,6 +927,40 @@ there are no independent endpoint overrides. See
   flows, and anything crossing `requireSession()` stay owned by the E2E
   lanes above — Storybook's own React Server Component support is
   experimental and deliberately not enabled here.
+
+## Interactive data ownership
+
+For the [interactive-page pattern](./api-consumption.md#data-ownership-for-interactive-pages),
+test the observable contract rather than a custom loader's implementation:
+
+- Render real server envelopes and the actual form. Keep Query clients request-local
+  and keys scoped to session, organization and inputs. Cover changed identity and return navigation.
+- Mount two observers of one resource. Detaching one must preserve its peer;
+  cancelled late responses must not publish into another identity.
+- Distinguish background data retention from permission to submit. A known refusal
+  must block the next command and survive cancellation/remount. Check this before
+  waiting for a React render; Query observer notifications are deferred by default.
+- Use `waitFor` for settled UI. With fake timers, advance the notification task
+  after settling the request/deadline. Do not replace the production Query scheduler
+  with a synchronous test scheduler or treat a resolved fetch as a completed render.
+- Exercise cancelled explicit review, dirty selection, version conflicts and fresh
+  confirmation. A failed follow-up read must preserve acknowledged write success.
+  Check receipt recovery without replaying an acknowledged command.
+- Cover active and inactive dependencies, legacy disabled observers, cooldowns and
+  actor-affecting role writes. Verify both existing and migrated consumers of shared hooks.
+- Retain one QueryClient across list -> detail write -> list. Check that inactive
+  data becomes stale after rename/delete and another session stays untouched.
+  Reject or abort authority refresh after a successful write: dependencies must
+  already be invalidated, and the write must remain acknowledged without replay.
+  Cover an observer resuming during authority recovery and cancellation of its read.
+- In a production browser, distinguish visible server content from the first enabled
+  control's real effect. Click once and assert the opened form; repeated clicks can
+  conceal missing handlers. Scan the loaded form using `expectNoAxeViolations()`.
+
+Performance comparisons use matched fixtures and settings, alternate control and
+candidate, and separate content visibility, successful interaction and loaded form
+data. Browser-only throttling does not measure total backend work. Preserve failed
+samples and report Lighthouse results separately from interaction timing.
 
 ## See also
 

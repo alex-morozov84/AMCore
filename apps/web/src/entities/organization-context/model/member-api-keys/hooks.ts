@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { MemberKeyQuery } from '@amcore/shared'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { memberKeysClient } from '../../api/member-api-keys-client'
 import type { OrganizationAccessController } from '../access-controller'
+import { refreshLegacyOrganizationEffects } from '../read-effects'
 import { useOrganizationRead } from '../use-organization-read'
 
 import 'client-only'
@@ -29,6 +31,7 @@ export function useMemberApiKeys(
   userId: string,
   query: MemberKeyQuery
 ) {
+  const client = useQueryClient()
   const orgId = controller.organizationId
   const target = JSON.stringify([controller.binding, orgId, userId, query.expectedMemberId])
   const lease = useRef<string | undefined>(target)
@@ -63,11 +66,15 @@ export function useMemberApiKeys(
             signal,
             keyId
           ),
-        { timeoutMs: 20000, rejectionCodes: memberKeyRejectionCodes }
+        {
+          timeoutMs: 20000,
+          rejectionCodes: memberKeyRejectionCodes,
+          refresh: (signal) => refreshLegacyOrganizationEffects(client, controller, signal),
+        }
       )
       return lease.current === target ? result : { status: 'retired' as const }
     },
-    [controller, orgId, userId, query.expectedMemberId, target]
+    [client, controller, orgId, userId, query.expectedMemberId, target]
   )
   return { ...read, busy, revoke }
 }

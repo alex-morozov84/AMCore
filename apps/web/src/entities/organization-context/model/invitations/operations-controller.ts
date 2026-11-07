@@ -47,7 +47,8 @@ type State = {
 export function createInvitationManagerOperations(
   access: OrganizationAccessController,
   transport = invitationsClient,
-  journal = createInvitationManagerJournal()
+  journal = createInvitationManagerJournal(),
+  refresh?: () => Promise<AuthorityRefreshResult>
 ) {
   const organizationId = access.organizationId
   let record = journal.read(access.binding, organizationId)
@@ -140,7 +141,7 @@ export function createInvitationManagerOperations(
         }
         return execute(saved, signal)
       },
-      { timeoutMs: 15000, rejectionCodes: REJECTIONS }
+      { timeoutMs: 15000, rejectionCodes: REJECTIONS, refresh }
     )
     if (!current(captured) || !access.current(authorityEpoch)) {
       journal.clear(saved)
@@ -180,7 +181,7 @@ export function createInvitationManagerOperations(
       if (!active || state.status === 'pending' || state.status === 'unknown') return false
       const captured = epoch
       const authorityEpoch = access.capture()
-      const status = await access.refresh()
+      const status = await (refresh ? refresh() : access.refresh())
       if (!current(captured) || !access.current(authorityEpoch) || status !== 'ready') return false
       if (record) journal.clear(record)
       record = null

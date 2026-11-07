@@ -15,6 +15,7 @@ export interface OrganizationContextState {
 }
 
 interface SchedulerDeps {
+  initialData?: OrganizationContextData
   beforeAuthority?: () => Promise<void>
   bootstrap: (signal: AbortSignal) => Promise<ProductAccessBootstrap>
   authority: (
@@ -36,7 +37,7 @@ export function createOrganizationContextScheduler(
   let input = initial
   let state: OrganizationContextState = {
     target: organizationContextTarget(input),
-    status: 'pending',
+    status: deps.initialData ? 'ready' : 'pending',
   }
   let timer: ReturnType<typeof setTimeout> | undefined
   let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -44,7 +45,8 @@ export function createOrganizationContextScheduler(
   let run: OrganizationContextRun | undefined
   let authorityRun: OrganizationContextRun | undefined
   let validatedIdentity = false
-  let initialPending = true
+  let initialPending = !deps.initialData
+  let initialActivation = Boolean(deps.initialData)
   const update = (next: OrganizationContextState) => {
     state = next
     if (next.status !== 'pending') initialPending = false
@@ -154,6 +156,10 @@ export function createOrganizationContextScheduler(
       }
     },
     activate() {
+      if (initialActivation) {
+        initialActivation = false
+        return
+      }
       // An in-flight identity check is safe to join: its following domain read is fenced.
       // A domain response may already be authorized under the previous browser session.
       if (
@@ -189,6 +195,11 @@ export function createOrganizationContextScheduler(
         return
       }
       void start(!validatedIdentity)
+    },
+    refuse() {
+      this.stop()
+      initialActivation = false
+      update({ target: organizationContextTarget(input), status: 'denied' })
     },
     stop() {
       if (timer) clearTimeout(timer)

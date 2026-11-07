@@ -126,6 +126,11 @@ shows how to key data by target user, UI locale and local page; retain previous
 rows only for paging within the same target/locale. Its retry button refetches
 that Query, and revocation invalidates every page/locale for the target.
 
+Both generic and host Console password forms clear the browser QueryClient before
+navigating to an MFA-required flow. This retires previous cached reads before
+reauthentication. Preserve this order in custom login compositions; target-user
+query keys alone do not identify the viewing operator's session.
+
 Reuse `shared/ui/pagination.tsx`'s `PaginationButtons` for local Previous/Next
 paging and `shared/lib/format-session.ts` for descriptive device/location
 presentation. API sessionId is a family identity that survives rotation; never
@@ -371,6 +376,9 @@ fresh eligible results; confirmation owns a captured snapshot through step-up.
 Generic `shared/ui/identity-lookup` owns the input/debounce/result interaction;
 Console adapters own lookup transport and copy. It remains available in a fork
 without Console. Import the shared module rather than a sibling page's internals.
+Its results/loading/errors use Query under the application's `QueryClientProvider`.
+The Console adapter forwards cancellation and remounts on lookup-kind changes.
+See [standalone prerequisites and lifetime](../frontend/api-consumption.md#short-lived-identity-suggestions).
 The safe inventory reads directly in RSC with the console-aware token/no-store;
 fixed revoke BFF routes use the existing origin/session seam. Optional Console
 removal leaves backend admin endpoints, core lifecycle and shared API contracts.

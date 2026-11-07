@@ -366,16 +366,29 @@ other shutdown steps; see [Graceful shutdown](../operations/deployment.md#gracef
 Resolving which channels deliver a notification is **top wins**:
 
 1. The definition's `mandatoryChannels` — always on, never disabled by a user
-   preference, and locked in the preferences read response.
+   preference or the master toggle.
 2. The master toggle (`UserSettings.notificationsEnabled`) — gates **all
    optional** channels; mandatory channels are unaffected.
 3. The stored user override for `(category, channel)`.
 4. The definition's default.
 
 In the read response, `enabled: null` means no override is stored (definition
-default applies) and `mandatory: true` means a definition in the category forces
-the channel, so a `PUT` attempting to disable it is rejected `400`. The starter
-ships `account.profile_updated` (in-app only, best-effort, produced by
+defaults apply after the master gate) and `mandatory: true` means at least one
+definition in the category forces the channel. Editability comes from
+`GET /notifications/capabilities`: a pair can be updated only when its channel is
+in that category's `overridableChannels`. A mixed category can have both mandatory
+and optional definitions. Its override affects only optional delivery; mandatory
+delivery remains enabled. The server rejects an unsupported or non-overridable
+pair with `400`.
+
+`PUT /notifications/preferences` accepts a boolean override and returns `204`.
+It does not support resetting an override to null. If `notificationsEnabled` is
+false, optional delivery stays off even with a stored true override. A preferences
+editor should explain this while still allowing the override to be saved; it
+must not label the stored value as guaranteed effective delivery. See the
+[ordinary Query/form example](../frontend/api-consumption.md#start-with-an-ordinary-resource).
+
+The starter ships `account.profile_updated` (in-app only, best-effort, produced by
 `AuthService.updateProfile` — `PATCH /auth/me` — only when a field's value
 actually changed), `account.telegram_linked`, and `account.password_changed`
 (in-app **and** email mandatory), which exercises the resolver end-to-end.
@@ -435,6 +448,14 @@ truth. Contract:
 
 A Redis outage degrades realtime to "updates appear on your next refetch"; the
 feed is always correct without it.
+
+The starter's browser hooks use the same-origin BFF and require a confirmed
+user/session owner. Stream open/message hints cancel older feed/count reads before
+refreshing that owner's cache. Session replacement closes the old connection;
+preferences and the capability registry are separate dependencies. See the
+[frontend hook signatures and composition example](../frontend/api-consumption.md#notifications).
+A downstream feed UI still needs runtime verification; the starter ships hooks,
+not a ready feed screen. The direct bearer-client contract above is unchanged.
 
 ## Add a channel
 

@@ -71,16 +71,19 @@ export function MemberRoleDialog({
           </DialogDescription>
         </DialogHeader>
         <ApiErrorAlert error={roles.error} />
-        {roles.data ? (
-          <MemberRoleForm
-            key={roles.data.member.memberId}
-            controller={controller}
-            userId={userId}
-            initial={roles.data}
-            isSelf={userId === actorId}
-            onClose={onClose}
-          />
-        ) : (
+        {roles.retainedData && (
+          <div hidden={!roles.ready}>
+            <MemberRoleForm
+              key={roles.retainedData.member.memberId}
+              controller={controller}
+              userId={userId}
+              initial={roles.retainedData}
+              isSelf={userId === actorId}
+              onClose={onClose}
+            />
+          </div>
+        )}
+        {(!roles.retainedData || !roles.ready) && (
           <div className="space-y-4">
             {roles.pending ? (
               <>

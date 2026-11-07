@@ -10,6 +10,7 @@ function withUser(user: { name: string | null; avatarUrl: string | null }) {
   return function Decorator(Story: () => React.ReactElement) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     queryClient.setQueryData(userKeys.me(), {
+      contextSession: 'story-session',
       user: { id: 'story-user', email: 'ada@example.com', ...user },
     })
     return (

@@ -3,9 +3,10 @@
 import { notificationSseEventSchema } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
+import { captureQuerySession, type QueryOwner, sameQueryOwner } from '@/shared/api/query-session'
 import { useEventSource } from '@/shared/api/sse/use-event-source'
 
-import { notificationKeys } from './notification-queries'
+import { refreshNotificationFeed } from './notification-queries'
 
 import 'client-only'
 
@@ -15,18 +16,20 @@ import 'client-only'
  * notification itself, so every reason just invalidates both; the durable
  * feed in Postgres stays the source of truth.
  */
-export function useNotificationsStream(enabled = true): void {
+export function useNotificationsStream(owner: QueryOwner | null, enabled = true): void {
   const queryClient = useQueryClient()
 
+  const captured = captureQuerySession(queryClient)
+  const admitted = sameQueryOwner(owner, captured.owner)
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: notificationKeys.feedAll() })
-    queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
+    if (admitted) void refreshNotificationFeed(queryClient, captured)
   }
 
   useEventSource({
     url: '/api/notifications/stream',
     schema: notificationSseEventSchema,
-    enabled,
+    enabled: enabled && admitted,
+    connectionKey: JSON.stringify([owner?.contextSession, owner?.userId]),
     onOpen: invalidate,
     onEvent: invalidate,
   })

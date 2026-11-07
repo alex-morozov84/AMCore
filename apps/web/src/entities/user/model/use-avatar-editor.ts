@@ -1,11 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { UserResponse } from '@amcore/shared'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { authApi } from '@/shared/api'
 import { ApiRequestError } from '@/shared/api/http-client'
+import {
+  captureQuerySession,
+  isCurrentQuerySession,
+  type UserEnvelope,
+} from '@/shared/api/query-session'
 
 import { useCurrentUser, userKeys } from '../api/user-queries'
 
@@ -64,11 +68,11 @@ function classify(error: unknown): AvatarOutcome {
 }
 
 function mergeAvatarUrl(
-  setData: (updater: (old: { user: UserResponse | null } | undefined) => unknown) => void,
+  setData: (updater: (old: UserEnvelope | undefined) => unknown) => void,
   userId: string,
   avatarUrl: string | null
 ): void {
-  setData((old) => (old?.user?.id === userId ? { user: { ...old.user, avatarUrl } } : old))
+  setData((old) => (old?.user?.id === userId ? { ...old, user: { ...old.user, avatarUrl } } : old))
 }
 
 /**
@@ -81,19 +85,17 @@ export function useAvatarEditor() {
   const queryClient = useQueryClient()
   const { data } = useCurrentUser()
   const user = data?.user ?? null
-  const currentId = useRef<string | null>(user?.id ?? null)
   const inFlight = useRef(false)
   const [state, setState] = useState<AvatarEditorState>(IDLE)
 
   useEffect(() => {
-    currentId.current = user?.id ?? null
     setState(IDLE)
-  }, [user?.id])
+  }, [user?.id, data?.contextSession])
 
   const run = useCallback(
     async (action: 'upload' | 'remove', send: () => Promise<string | null>) => {
-      const userId = currentId.current
-      if (!userId) return { kind: 'retired' } as AvatarOutcome
+      const captured = captureQuerySession(queryClient)
+      if (!captured.owner) return { kind: 'retired' } as AvatarOutcome
       if (inFlight.current) return { kind: 'busy' } as AvatarOutcome
       inFlight.current = true
       setState({ status: 'pending', action, error: null, outcome: null })
@@ -106,7 +108,7 @@ export function useAvatarEditor() {
       } finally {
         inFlight.current = false
       }
-      if (currentId.current !== userId) return { kind: 'retired' } as AvatarOutcome
+      if (!isCurrentQuerySession(queryClient, captured)) return { kind: 'retired' } as AvatarOutcome
       // The request may or may not have reached the server: read the user again so the shown
       // avatar is the real one. Never for rejected or busy (nothing changed) or retired.
       if (outcome.kind === 'unknown')
@@ -114,7 +116,7 @@ export function useAvatarEditor() {
       if (outcome.kind === 'committed') {
         mergeAvatarUrl(
           (updater) => queryClient.setQueryData(userKeys.me(), updater),
-          userId,
+          captured.owner.userId,
           outcome.avatarUrl
         )
         setState({ status: 'idle', action, error: null, outcome })

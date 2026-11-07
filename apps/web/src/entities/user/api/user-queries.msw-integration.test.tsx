@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ApiRequestError } from '@/shared/api/http-client'
 import { server } from '@/test/msw/server'
 
-import { useSessions } from './user-queries'
+import { userKeys, useSessions } from './user-queries'
 
 /**
  * Integration layer (FINAL PLAN §1, `ai/models-talk.md`): renders the real
@@ -20,6 +20,7 @@ import { useSessions } from './user-queries'
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient.setQueryData(userKeys.me(), { user: { id: 'u1' }, contextSession: 'session-u1' })
   return (
     <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={{}}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

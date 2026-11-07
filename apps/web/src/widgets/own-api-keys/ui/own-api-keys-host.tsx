@@ -84,7 +84,11 @@ export function OwnApiKeysHost({
       else router.replace(href, { scroll: false })
     })
   }
-  const refresh = () => client.invalidateQueries({ queryKey: ['own-api-keys', admission.binding] })
+  const refresh = async () => {
+    const filter = { queryKey: ['own-api-keys', admission.binding] }
+    await client.cancelQueries(filter)
+    await client.invalidateQueries(filter)
+  }
   if (session === 'retired')
     return (
       <div role="alert">

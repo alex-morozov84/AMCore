@@ -121,9 +121,10 @@ export const authApi = {
   resendVerification: (data: ResendVerificationInput): Promise<MessageResponse> =>
     apiClient.post<MessageResponse>('/auth/resend-verification', data),
 
-  getMe: async (): Promise<MeResponse> => {
+  getMe: async (signal?: AbortSignal): Promise<MeResponse> => {
     let contextSession: string | undefined
     const result = await apiClient.get<MeResponse>('/auth/me', {
+      signal,
       onResponseHeaders: (headers) => {
         contextSession = headers.get('x-amcore-context-session') ?? undefined
       },

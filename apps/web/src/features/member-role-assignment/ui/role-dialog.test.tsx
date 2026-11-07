@@ -64,7 +64,8 @@ it('settled first503 respects Retry-After, removes loading and can retry to snap
     new ApiRequestError(503, { errorCode: 'MEMBER_READ_UNAVAILABLE' } as never, 2)
   )
   const { close } = await view()
-  await act(async () => {})
+  // Flush Query's deferred observer notification without changing its scheduler.
+  await act(async () => vi.advanceTimersByTimeAsync(1))
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
   const retry = screen.getByRole('button', { name: messages.organizationMembers.retry })
   expect(retry).toBeDisabled()
@@ -77,6 +78,7 @@ it('settled first503 respects Retry-After, removes loading and can retry to snap
   await act(async () => {
     fireEvent.click(retry)
   })
+  await act(async () => vi.advanceTimersByTimeAsync(1))
   expect(screen.getByText('Snapshot ready')).toBeInTheDocument()
   expect(close).not.toHaveBeenCalled()
 })
@@ -91,6 +93,7 @@ it('first deadline settles, Close works, retirement masks late response', async 
   )
   const { controller, close, unmount } = await view()
   await act(async () => vi.advanceTimersByTimeAsync(5000))
+  await act(async () => vi.advanceTimersByTimeAsync(1))
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: messages.organizationMembers.retry })).toBeEnabled()
   fireEvent.click(screen.getByRole('button', { name: messages.organizationMembers.close }))

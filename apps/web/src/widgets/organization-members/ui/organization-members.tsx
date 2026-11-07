@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 
 import {
@@ -23,6 +23,8 @@ import { RoleFilter } from './role-filter'
 
 type MemberListQuery = { page: number; search: string; roleId?: string }
 
+const subscribeHydration = () => () => {}
+
 export function OrganizationMembers({
   controller,
   actorId,
@@ -42,6 +44,11 @@ export function OrganizationMembers({
   query?: MemberListQuery
   onQueryChange?: (query: MemberListQuery, reason: 'search' | 'page') => void
 }) {
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false
+  )
   const t = useTranslations('organizationMembers')
   const heading = useRef<HTMLHeadingElement>(null)
   const [localQuery, setLocalQuery] = useState<MemberListQuery>({ page: 1, search: '' })
@@ -130,26 +137,28 @@ export function OrganizationMembers({
       {!selfRemoved && (
         <>
           <FilterPanel>
-            <MemberSearch
-              identity={JSON.stringify([
-                controller.binding,
-                controller.organizationId,
-                'members',
-                navigation,
-              ])}
-              search={query.search}
-              page={query.page}
-              id="organization-member-search"
-              placeholder={t('memberSearchPlaceholder')}
-              onCommit={(search) => setQuery({ ...query, search, page: 1 })}
-            />
-            {query.roleId && (
-              <RoleFilter
-                controller={controller}
-                roleId={query.roleId}
-                onClear={() => setQuery({ search: query.search, page: 1 })}
+            <fieldset disabled={!hydrated} className="contents">
+              <MemberSearch
+                identity={JSON.stringify([
+                  controller.binding,
+                  controller.organizationId,
+                  'members',
+                  navigation,
+                ])}
+                search={query.search}
+                page={query.page}
+                id="organization-member-search"
+                placeholder={t('memberSearchPlaceholder')}
+                onCommit={(search) => setQuery({ ...query, search, page: 1 })}
               />
-            )}
+              {query.roleId && (
+                <RoleFilter
+                  controller={controller}
+                  roleId={query.roleId}
+                  onClear={() => setQuery({ search: query.search, page: 1 })}
+                />
+              )}
+            </fieldset>
           </FilterPanel>
           <ApiErrorAlert error={members.error} />
           {Boolean(members.error) && (
@@ -187,7 +196,7 @@ export function OrganizationMembers({
               <MemberTable
                 rows={members.data.data}
                 actorId={actorId}
-                disabled={!members.ready || members.busy}
+                disabled={!hydrated || !members.ready || members.busy}
                 removalDisabled={removalLocked}
                 onRemove={(row) => {
                   if (removalLocked) return
@@ -225,7 +234,7 @@ export function OrganizationMembers({
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={members.pending}
+                    disabled={!hydrated || members.pending}
                     onClick={() => navigatePage(query.page - 1)}
                   >
                     {t('previous')}
@@ -237,7 +246,7 @@ export function OrganizationMembers({
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={members.pending}
+                    disabled={!hydrated || members.pending}
                     onClick={() => navigatePage(query.page + 1)}
                   >
                     {t('next')}

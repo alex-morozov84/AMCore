@@ -22,6 +22,8 @@ interface UseEventSourceOptions<T> {
    */
   onEvent: (data: T) => void
   enabled?: boolean
+  /** Reconnect when the authenticated lifetime changes without a URL change. */
+  connectionKey?: string
 }
 
 /**
@@ -56,13 +58,11 @@ export function useEventSource<T>({
   onOpen,
   onEvent,
   enabled = true,
+  connectionKey,
 }: UseEventSourceOptions<T>): void {
-  const onOpenRef = useRef(onOpen)
-  const onEventRef = useRef(onEvent)
-  const schemaRef = useRef(schema)
-  onOpenRef.current = onOpen
-  onEventRef.current = onEvent
-  schemaRef.current = schema
+  const identity = JSON.stringify([url, enabled, connectionKey])
+  const latest = useRef({ identity, onOpen, onEvent, schema })
+  latest.current = { identity, onOpen, onEvent, schema }
 
   useEffect(() => {
     if (!enabled || !url) return
@@ -70,23 +70,33 @@ export function useEventSource<T>({
 
     const source = new EventSource(url, { withCredentials: true })
 
-    source.onopen = () => onOpenRef.current?.()
+    let disposed = false
+    const current = () => !disposed && latest.current.identity === identity
+    source.onopen = () => {
+      if (current()) latest.current.onOpen?.()
+    }
 
     source.onmessage = (event: MessageEvent<string>) => {
+      if (!current()) return
       let parsed: unknown
       try {
         parsed = JSON.parse(event.data)
       } catch {
         return
       }
-      const result = schemaRef.current.safeParse(parsed)
+      const result = latest.current.schema.safeParse(parsed)
       if (!result.success) {
         console.error('useEventSource: dropped an unparseable frame', result.error)
         return
       }
-      onEventRef.current(result.data)
+      latest.current.onEvent(result.data)
     }
 
-    return () => source.close()
-  }, [url, enabled])
+    return () => {
+      disposed = true
+      source.onopen = null
+      source.onmessage = null
+      source.close()
+    }
+  }, [url, enabled, identity])
 }
