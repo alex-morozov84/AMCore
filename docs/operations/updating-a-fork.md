@@ -12,7 +12,6 @@ A **merge commit** records both histories, so Git can recognize changes already 
 
 A disposable independent-copy product completed two updates with full PR and post-merge CI.
 Its test user and order survived; fresh-database replay and runtime checks also passed.
-An independent readability check is pending.
 The private flexible route and GitHub Fork-specific behavior are not rehearsed.
 Do not treat the examples as evidence of a tested production upgrade.
 
