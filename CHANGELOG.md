@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The capability extension example documents API-key protection failures as 503;
   its starter check now includes the OpenAPI test. Member-access unit fixtures
   use built-in capabilities so product additions do not change their truth tables.
+  The catalogue API test requires the full declared catalogue, including product additions,
+  instead of a fixed list of starter IDs.
   Starter suites have been verified only with default locales and Console settings;
   products using other settings may need to adapt inherited tests and selection.
 
