@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Role-definition forms retain their draft and save acknowledgment through access
+  rechecks. The cached editor stays hidden until access is confirmed.
+
 - Lighthouse identity/access probes use out-of-page transport while preserving
   document/session checks. Page-originated authentication failures remain visible.
 

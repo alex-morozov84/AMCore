@@ -515,7 +515,7 @@ uses `review()`, which requires an uncancelled fresh observation. Ordinary
 `refresh()` can retain Query's cached fallback on cancellation; it is not proof
 of a completed review. Each form defines what successful review resets.
 Invitation generation review preserves roles and clears confirmation. Temporary
-authority checks hide the member form while preserving its draft.
+authority checks hide member and role-definition forms while preserving their drafts.
 
 ### Refresh the dependencies of a write
 
