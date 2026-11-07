@@ -56,6 +56,11 @@ test('later membership loss hides data on refresh/reload and permits independent
       page.getByRole('heading', { name: 'Private removed organization', exact: true })
     ).toBeVisible()
     await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible()
+    // Server-rendered rows can precede hydration; prove interaction before revoking access.
+    await page.getByRole('button', { name: `Actions for ${email}`, exact: true }).click()
+    await expect(page.getByRole('menuitem', { name: 'Edit roles', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
     const removed = await fetch(
       `http://127.0.0.1:${ports.api}/api/v1/organizations/${org.id}/members/${member.user.id}?expectedMemberId=${memberId}`,
       { method: 'DELETE', headers: { authorization: `Bearer ${owner.accessToken}` } }
