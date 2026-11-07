@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The capability extension example documents API-key protection failures as 503;
+  its starter check now includes the OpenAPI test. Member-access unit fixtures
+  use built-in capabilities so product additions do not change their truth tables.
+  Starter suites have been verified only with default locales and Console settings;
+  products using other settings may need to adapt inherited tests and selection.
+
 - **Breaking for products relying on `pnpm test:capability-extension`:** it now
   runs only on the starter. With exactly one canonical `downstream-product` Mode
   line, it warns in the log and step summary and exits successfully without

@@ -153,6 +153,9 @@ another level does not prove the reading an operation needs. See the
    without copying the project or running tests. Inherited tests still run,
    but a green `Test` no longer proves the complete new-module extension path
    on product code. The product must test its own modules.
+   Starter member-access unit tests use only built-in capabilities and synthetic
+   fixtures. They do not validate capabilities registered by your product; cover
+   those capabilities in your own PostgreSQL tests.
    Document the domain's actual screens separately.
 
 An issued `read:all` key does **not** acquire access merely because a subject

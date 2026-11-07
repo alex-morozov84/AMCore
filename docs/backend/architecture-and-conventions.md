@@ -270,7 +270,8 @@ the operation with `@ApiSecurity('apiKeyBearer')` at the **handler level**. Do
 not put `apiKeyBearer` on the controller class: `@nestjs/swagger` concatenates
 class and method security metadata, so class-level API-key metadata leaks onto
 bearer-only handler overrides. The OpenAPI e2e test checks this allowlist in
-both directions.
+both directions. Add `@ApiProtectionUnavailable('API key')` to each eligible
+handler to document the 503 response when API-key failure counters cannot be checked.
 
 ### 5. Register in the correct process role
 

@@ -59,6 +59,11 @@ For flexible private products:
    **No runner-minute estimate is available yet.** Record minutes per job and total per update PR,
    including retries and follow-up push runs. Public standard-runner billing of zero is not a private cost estimate.
 
+The starter test suites have been verified only with the default served locales
+(`en` and `ru`, default `en`) and Console settings (`path`, alias `admin`).
+A product that changes these settings may need to adapt inherited tests and their
+selection. This verification does not establish coverage for other settings.
+
 An initialized product's **Test capability extension** job prints a warning in its
 log and step summary, then succeeds without running the disposable fixture.
 Exactly one canonical downstream Mode line in `PROJECT_CONTEXT.md` selects this

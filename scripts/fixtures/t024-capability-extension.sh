@@ -89,7 +89,7 @@ node -e '
 (cd "$fixture_root/apps/api" && \
   PATH="$fixture_root/fixture-bin:$PATH" NODE_OPTIONS=--experimental-vm-modules \
   ./node_modules/.bin/jest --config jest-e2e.config.js --runInBand \
-  --runTestsByPath test/fixture-order-extension.e2e-spec.ts --silent)
+  --runTestsByPath test/fixture-order-extension.e2e-spec.ts test/openapi.e2e-spec.ts --silent)
 cat "$fixture_root/apps/api/fixture-order-measurement.json"
 
 # The access journey: register -> configure a role -> assign -> explain, compared with the real
