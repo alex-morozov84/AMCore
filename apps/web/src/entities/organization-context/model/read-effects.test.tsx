@@ -1,4 +1,4 @@
-import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query'
+import { isCancelledError, QueryClient, QueryObserver, skipToken } from '@tanstack/react-query'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { ApiRequestError } from '@/shared/api/http-client'
@@ -154,9 +154,14 @@ it.each(['complete', 'cancel'] as const)(
         return 'ready'
       }
     )
+    // Query may reject cancellation before the invalidation fallback runs.
     const assertion =
       finish === 'cancel'
-        ? expect(refresh).rejects.toThrow('REFRESH_CANCELLED')
+        ? expect(refresh).rejects.toSatisfy(
+            (error: unknown) =>
+              isCancelledError(error) ||
+              (error instanceof Error && error.message === 'REFRESH_CANCELLED')
+          )
         : expect(refresh).resolves.toBe('ready')
     await vi.waitFor(() => expect(read).toHaveBeenCalledOnce())
     if (finish === 'cancel') await client.cancelQueries({ queryKey })
@@ -164,6 +169,7 @@ it.each(['complete', 'cancel'] as const)(
     await assertion
     expect(read).toHaveBeenCalledOnce()
     expect(client.getQueryData(queryKey)).toEqual({ version: finish === 'cancel' ? 1 : 2 })
+    expect(client.getQueryCache().find({ queryKey })?.state.isInvalidated).toBe(finish === 'cancel')
     detach()
   }
 )
