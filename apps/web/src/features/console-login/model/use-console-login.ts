@@ -2,6 +2,7 @@
 
 import type { UseFormSetError } from 'react-hook-form'
 import type { LoginInput } from '@amcore/shared'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { apiClient } from '@/shared/api'
 import type { BrowserLoginResponse } from '@/shared/api/auth-api'
@@ -11,6 +12,7 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
 
 export function useConsoleLogin(setError?: UseFormSetError<LoginInput>) {
   const router = useRouteProgressRouter()
+  const queryClient = useQueryClient()
 
   return useFormMutation({
     retry: false,
@@ -24,7 +26,9 @@ export function useConsoleLogin(setError?: UseFormSetError<LoginInput>) {
       })
     },
     setError,
-    onSuccess: (result) =>
-      router.push('kind' in result ? `/mfa?flow=${encodeURIComponent(result.flowBinding)}` : '/'),
+    onSuccess: (result) => {
+      if ('kind' in result) queryClient.clear()
+      router.push('kind' in result ? `/mfa?flow=${encodeURIComponent(result.flowBinding)}` : '/')
+    },
   })
 }

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { userKeys } from '@/entities/user'
 import { authApi } from '@/shared/api'
+import { captureQuerySession, isCurrentQuerySession } from '@/shared/api/query-session'
 
 /**
  * Persist the chosen locale to the signed-in user's profile.
@@ -19,11 +20,14 @@ export function usePersistLocale() {
 
   const { mutate } = useMutation({
     mutationFn: (locale: CatalogueLocale) => authApi.updateMe({ locale }),
-    onSuccess: (response) =>
+    onMutate: () => captureQuerySession(queryClient),
+    onSuccess: (response, _locale, captured) => {
+      if (!isCurrentQuerySession(queryClient, captured)) return
       queryClient.setQueryData<{ user: UserResponse | null; contextSession?: string }>(
         userKeys.me(),
-        (old) => ({ ...old, ...response })
-      ),
+        (old) => (old ? { ...old, user: response.user } : old)
+      )
+    },
   })
 
   return mutate

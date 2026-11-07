@@ -18,6 +18,11 @@ depends on the optional Operations Console.
 
 ## Choose a pattern
 
+For a person/organization suggestion picker, use the separate
+[`IdentityLookup` pattern](../api-consumption.md#short-lived-identity-suggestions).
+It uses Query and requires `QueryClientProvider`; the search primitives below remain
+provider-free. Choosing a suggestion returns an ID, rather than submitting list search.
+
 | Need                                                      | Use                                                                               | Keep in the feature                                                           |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Filter an already-loaded list in this tab                 | `SearchField` and local state                                                     | Matching rules and result rendering                                           |

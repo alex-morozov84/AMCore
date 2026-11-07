@@ -16,7 +16,10 @@ export function ConsoleIdentityLookup({
   onSelect: (id: string) => void
 }) {
   const t = useTranslations('console.identityLookup')
-  const searchItems = useCallback((term: string) => lookupConsoleIdentity(kind, term), [kind])
+  const searchItems = useCallback(
+    (term: string, signal?: AbortSignal) => lookupConsoleIdentity(kind, term, signal),
+    [kind]
+  )
   const copy = {
     lookupSearch: t('lookupSearch'),
     lookupEmpty: t('lookupEmpty'),
@@ -25,5 +28,5 @@ export function ConsoleIdentityLookup({
     lookupRefine: t('lookupRefine'),
     loading: t('loading'),
   }
-  return <IdentityLookup {...props} searchItems={searchItems} copy={copy} />
+  return <IdentityLookup key={kind} {...props} searchItems={searchItems} copy={copy} />
 }

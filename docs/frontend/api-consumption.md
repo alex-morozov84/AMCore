@@ -200,7 +200,7 @@ copy — is [Server-rendered graceful degradation](./server-rendered-resilience.
 ## Retry policy: 429 and `Retry-After` (ADR-073)
 
 `getQueryClient()`'s `defaultOptions.queries` (`shared/api/query-client.ts`)
-applies one retry policy to every `useQuery` call in the app — TanStack
+supplies the default retry policy unless a resource overrides it — TanStack
 Query's own default retries _any_ error up to 3 times, including a genuine
 client-input error (400/404/422/...) that will never succeed unchanged.
 This starter's default instead:
@@ -220,12 +220,331 @@ This starter's default instead:
 
 A Route Handler or API-proxy request that cannot be admitted because the session vault is
 slow or unreachable answers `503` with `errorCode` `SERVICE_UNAVAILABLE` and keeps the session;
-this is not a 4xx and is not retried by the rule above. Details:
+the default Query policy can retry this 5xx, while organization access readers require explicit recovery. Details:
 [Authentication when Redis is slow or unavailable](../auth/redis-outage.md#the-web-servers-session-vault).
 
 Only `useQuery`/`useInfiniteQuery` are affected — `useMutation` never
 retries by default in TanStack Query, and this starter doesn't override
 that.
+
+Organization access readers disable automatic retries, focus refetch and reconnect
+refetch. A failed resource waits for explicit recovery and honors its cached
+`Retry-After`, including after remount. Authority revalidation has separate
+focus/visibility/restored-page handling.
+
+## Data ownership for interactive pages
+
+Use TanStack Query for browser-owned server data. Keep the typed transport
+responsible for HTTP, session handling, validation and error codes. Do not add
+a second request cache or loading state machine around Query.
+
+| Data owner                | Starting pattern                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| Server display            | Server Component and existing server DAL; URL navigation or route refresh updates the result.   |
+| Ordinary interactive data | Typed transport and Query hook; form input stays local; writes update affected keys.            |
+| Query with domain rules   | The same Query ownership, plus only required authorization, secret or operation-recovery rules. |
+
+Server initial data is optional. Use request-local Query hydration when it improves
+an initial view; a dialog or adequate client-loaded list does not need it merely
+for consistency. Version checks and confirmation belong to forms whose API or
+consequences require them, not every ordinary edit.
+
+### Short-lived identity suggestions
+
+Use `IdentityLookup` from `@/shared/ui/identity-lookup` to select a person or
+organization from suggestions. Mount it under your existing `QueryClientProvider`;
+standalone consumers must supply that provider too. Pass localized copy, `onSelect`
+and `searchItems(term, signal?)`, returning `{ items, hasMore }`. Forward the signal
+to your typed transport when supported; existing one-argument callbacks remain valid.
+
+Query owns results, errors and loading. The field keeps input, debounce and dismissal
+local: two trimmed characters, 400 ms or Enter, and explicit Enter retry after failure.
+Editing hides old results immediately. Each field and edit has a separate query key;
+unused entries use `gcTime: 0`. There is no shared suggestions cache or background
+refresh. Collection is scheduled, not synchronous secure erasure; abort cannot undo
+server work. A callback identity change does not restart the search. When replacing
+the data source, remount with a React `key` identifying that source. Selection returns
+an ID; the feature owns navigation or subsequent writes. URL-backed list search uses
+the separate [search primitives](./search/README.md).
+
+### Start with an ordinary resource
+
+Notification preferences already have typed transport and Query hooks in
+`entities/notifications/api/`. The following **documentation example** shows their
+list/edit lifecycle; AMCore does not include a ready preferences screen. It is
+form logic for a downstream UI, not a new shared wrapper.
+
+Supply QueryClientProvider and the `common`, `errors` and form localization
+messages. The host below reads the confirmed session, handles its prerequisite
+states and remounts the form when its owner changes. The `render` callback supplies
+your list/dialog UI; it receives the form logic shown below. No screen is shipped.
+
+```tsx
+'use client'
+
+import { type ReactNode, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { type NotificationPreferenceItem, updateNotificationPreferenceSchema } from '@amcore/shared'
+import {
+  useNotificationCapabilities,
+  useNotificationPreferences,
+  useUpdateNotificationPreference,
+} from '@/entities/notifications'
+import { useCurrentUser } from '@/entities/user'
+import { ClientErrorCode, ClientStateError } from '@/shared/api/error-codes'
+import { type QueryOwner, queryOwner } from '@/shared/api/query-session'
+import { useLocalizedForm } from '@/shared/hooks/use-localized-form'
+import { ApiErrorAlert } from '@/shared/ui/api-error-alert'
+import { Button } from '@/shared/ui/button'
+
+type PreferenceView = (model: ReturnType<typeof usePreferenceExample>) => ReactNode
+
+export function PreferenceExampleHost({ render }: { render: PreferenceView }) {
+  const me = useCurrentUser()
+  const owner = queryOwner(me.data)
+  const t = useTranslations('common')
+  if (!owner) {
+    if (me.isPending || me.isFetching) return <p role="status">{t('loading')}</p>
+    const error = me.error ?? new ClientStateError(ClientErrorCode.AUTH_CONTINUATION_CHANGED)
+    return (
+      <>
+        <ApiErrorAlert error={error} />
+        <Button onClick={() => void me.refetch()}>{t('retry')}</Button>
+      </>
+    )
+  }
+  return (
+    <PreferenceSession
+      key={JSON.stringify([owner.userId, owner.contextSession])}
+      owner={owner}
+      render={render}
+    />
+  )
+}
+
+function PreferenceSession({ owner, render }: { owner: QueryOwner; render: PreferenceView }) {
+  return render(usePreferenceExample(owner))
+}
+
+export function usePreferenceExample(owner: QueryOwner) {
+  const list = useNotificationPreferences(owner)
+  const capabilities = useNotificationCapabilities()
+  const save = useUpdateNotificationPreference(owner)
+  const [editing, setEditing] = useState<NotificationPreferenceItem | null>(null)
+  const form = useLocalizedForm(updateNotificationPreferenceSchema)
+  const canEdit = (row: Pick<NotificationPreferenceItem, 'category' | 'channel'>) =>
+    !list.isError &&
+    !capabilities.isError &&
+    capabilities.data?.categories.some(
+      (item) => item.category === row.category && item.overridableChannels.includes(row.channel)
+    ) === true
+
+  function edit(row: NotificationPreferenceItem) {
+    if (save.isPending || !canEdit(row)) return
+    save.reset()
+    setEditing(row)
+    form.reset({ category: row.category, channel: row.channel, enabled: row.enabled ?? undefined })
+  }
+  const submit = form.handleSubmit((input) => {
+    if (!editing || save.isPending || !canEdit(input)) return
+    save.mutate(input, { onSuccess: () => setEditing(null) })
+  })
+  return {
+    list,
+    capabilities,
+    editing,
+    form,
+    save,
+    edit,
+    submit,
+    canEdit,
+    cancel: () => {
+      if (!save.isPending) setEditing(null)
+    },
+    optionalDeliveryOff: list.data?.notificationsEnabled === false,
+  }
+}
+```
+
+Render `list.data.preferences` as rows after handling pending/error states. Use
+capabilities to gate Edit. Bind the form's `enabled` field to an explicit boolean
+choice; keep category/channel as the selected row's identity. Disable submission
+while saving. Show localized validation and API errors with the shared controls.
+The selected row is captured only on Edit: a background refetch must not reset
+unfinished input. Cancel discards the draft; reopening uses the latest row.
+
+Display `enabled: null` as **Default**, not disabled. The API accepts only a boolean
+write, so the user must choose before saving; there is no reset-to-default operation.
+When `optionalDeliveryOff` is true, explain that the general switch disables optional
+notifications even if this preference is enabled. Editing remains possible.
+`mandatory` describes delivery, not editability: a mixed category can still have
+optional definitions. Follow `overridableChannels`; mandatory delivery bypasses the
+override. See [Preferences and mandatory channels](../notifications/README.md#preferences--mandatory-channels).
+
+`useUpdateNotificationPreference` calls the existing typed PUT transport and, on
+204 acknowledgment, schedules invalidation of `notificationKeys.preferences(capturedOwner)`
+without awaiting the refetch. The form can close on success while the list shows
+`isFetching`. A failed follow-up GET belongs to `list.error`; offer `list.refetch()`
+and keep the saved outcome. Do not repeat PUT to recover a list-read failure.
+Feed, unread count and capabilities are not dependencies of this write.
+
+A failed PUT retains input and `save.error`. A network/5xx failure can leave the
+write outcome unknown: offer a fresh read and an explicit later save, never an
+automatic replay. This API overwrites one preference; it has no version or receipt
+protocol. A refreshed list must not silently discard an open draft.
+
+The example is type-checked against the existing exports. Narrow HTTP-mocked hook
+tests check acknowledgment before a delayed/failed refetch and read-only recovery;
+they do not prove a rendered form. Separate hook tests cover the subscribed
+session transition; this example still requires your own UI verification. Anonymous
+users must sign in through the host's existing entry; Retry only rereads the session.
+No notification controller, operation journal or extra loading state is needed.
+
+For optional initial server data, use the entity's server DAL with request-local
+QueryClient and matching keys. Never call the relative browser client from the
+server or serialize secrets. Public resources need an explicitly anonymous backend
+transport/BFF route: the generic notification proxy requires a session. Public
+keys must include inputs such as locale that affect the response. Existing ordinary
+list/write consumers also include `entities/user/api/user-queries.ts` and session
+revocation features.
+
+### Personal data and session changes
+
+Own sessions, notification feeds/counts/preferences and AI reads use keys under
+`['personal', contextSession, userId, ...resourceInputs]`. `contextSession` is a
+non-secret server binding, not an access token. A user ID alone cannot distinguish
+two sign-ins by the same person. Public data needs only its response inputs.
+
+`useCurrentUser()` keeps the stable `['user', 'me']` query. Login, registration and
+invitation acknowledgment publish the confirmed envelope on that query. Its
+notification switches dependent readers; ordinary me refetch also detects a changed
+session. Obsolete personal queries are cancelled and removed. Same-session data
+stays cached. Sessions reuse previous-page data only for the same owner/session/locale.
+With an empty cache, the personal GET follows me; there is no speed guarantee here.
+
+Use `userKeys.sessionsAll(owner)` / `sessions(owner, locale, page, limit)` and
+`notificationKeys.preferences(owner)`. `userKeys.all` no longer matches sessions;
+`notificationKeys.all` matches only the registry, not feed/count/preferences. Use the captured owner's
+resource key after a write, not the entire personal prefix. Preferences hooks take
+an owner argument; their mutation DTOs are unchanged. Missing/mismatched ownership
+rejects a preference write before transport. Reads accept null and stay disabled.
+Both session-revoke hooks also reject writes without a confirmed owner. The bulk
+revoke button and its confirmation wait for that owner, not for background refresh.
+
+Writes capture the initiating owner and current-user Query. Late success remains
+success, but cannot update the replacement session's cache. Avatar and locale merges
+preserve the current-user envelope. A keyed form subtree drops the old owner's draft;
+a same-owner background refresh keeps it. Cancellation does not undo server writes.
+This is not atomic protection against another tab changing cookies at dispatch,
+nor a general offline-paused mutation guarantee. The notification feed and AI actions below
+recheck ownership before paused dispatch. Never replay an uncertain write automatically.
+
+`useSessions(page, limit)` composes bootstrap and list states. It returns `data`,
+`error`, `isPending`, `isFetching`, `isError`, `isSuccess` and an async
+`refetch(): Promise<void>` recovery action, not the full raw Query result. Without
+an owner, refetch retries me; normal key activation then loads the list. A failed
+or completed unusable bootstrap is an error, not endless list loading.
+
+The personal-key contract covers sessions, notification feeds/counts/preferences
+and the AI hooks below. It does not certify every private export. Other consumers
+retain their host/session requirements. Organization access has the separate domain contract below.
+
+### Organization access: additional domain requirements
+
+Organization invitations and members demonstrate initial hydration in
+`src/_app/organization-access/ui/{invitations,members}-mount.tsx`. Each mount creates
+its own QueryClient, reads admission and the actual list envelope, seeds the exact
+browser keys, and serializes only safe data. Do not put a server QueryClient
+in a module singleton or hydrate credentials, receipts or one-time secrets.
+Keep the existing authentication/error mapping around the DAL.
+
+Invitation, member and role resource keys use `[resourceName, JSON.stringify([binding, orgId, input])]`.
+The binding identifies the session; input includes filters, page and any member/role
+identifier. Server and browser must construct identical inputs. Authority keys also
+include locale. Import hooks through the entity public API; server compositions use
+its explicit `index.server.ts` entry.
+
+For example, a component inside an admitted organization composition can reuse
+the invitation resource without another loader:
+
+```tsx
+'use client'
+
+import { useTranslations } from 'next-intl'
+import {
+  type OrganizationAccessController,
+  useOrganizationInvitations,
+} from '@/entities/organization-context'
+
+export function InvitationCount({ controller }: { controller: OrganizationAccessController }) {
+  const t = useTranslations('organizationInvitations')
+  const list = useOrganizationInvitations(controller, {
+    page: 1,
+    search: '',
+    status: 'pending',
+    limit: 20,
+  })
+  if (!list.available || !list.data) return null
+  return <p>{t('count', { count: list.data.total })}</p>
+}
+```
+
+This secondary count relies on the owning page to show loading/errors and provide
+the `organizationInvitations` message namespace. For a primary list, follow the
+existing widget's skeleton, error/retry, empty state and pagination.
+
+### Display, permission and form intent
+
+Organization resources use a 60-second freshness window. A second observer can
+reuse a fresh result; attaching it does not require a new request. Stale observed
+resources follow Query's mount/enabling behavior. Background fetching can keep
+existing data visible. `pending` describes an initial read; `fetching` also covers
+background refresh. A settled error makes the resource unavailable until recovery.
+Expiration of `Retry-After` alone does not initiate a request.
+
+Fresh data is not a permission lease. Admission, handler readiness and resource
+availability are separate. These two page compositions reuse fresh server admission;
+focus, visibility return and persisted-page restoration still revalidate it.
+Known resource 401/403/409 responses revoke scoped admission before another owner
+can reuse it. The server still authorizes every command. Disable event-driven
+controls in server HTML until their browser handlers attach.
+
+Keep dirty forms based on their original version. Background results must not
+silently replace selections or confirm destructive actions. The member role form
+uses `review()`, which requires an uncancelled fresh observation. Ordinary
+`refresh()` can retain Query's cached fallback on cancellation; it is not proof
+of a completed review. Each form defines what successful review resets.
+Invitation generation review preserves roles and clears confirmation. Temporary
+authority checks hide member and role-definition forms while preserving their drafts.
+
+### Refresh the dependencies of a write
+
+| Command                          | Dependencies in the current organization/session                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Invitation create/reissue/revoke | Invitation lists and role details with invitation-impact counts                                   |
+| Member role replacement          | Member lists/role assignments, role details/lists and member access; also refresh actor authority |
+
+The shared implementation cancels superseded reads before invalidating these keys.
+It invalidates before checking authority, so a failed authority check cannot leave
+known-old dependencies fresh. Only the subsequent network reads require authority.
+Inactive entries remain invalidated until observed. Observed entries use explicit
+typed resource functions and obey cooldowns. Do not replay arbitrary cached
+observer options, which may contain `skipToken`. Retain successful acknowledgment
+when a follow-up read fails. Recover the read without resending the write.
+Invitation commands keep their stable operation ID and receipt-based recovery.
+
+Legacy role create/edit/delete, member removal and member-key revocation first
+invalidate organization resource entries for the current session and organization,
+including inactive entries and nested member-key keys. They then retain their
+existing authority check and registered-reader refresh. This conservative scope
+deliberately covers cross-resource revision/access effects and preserves
+compatibility. It is a supported broad policy, not an unfinished narrow migration.
+For member-key revocation alone, the broad scope is a deliberate compatibility
+tradeoff: that operation does not change roles, membership or ACL revision.
+These resource and command hooks require the application QueryClientProvider.
+For each new command, identify dependencies and actor-permission effects in the
+entity, not separately on each page. See [state conventions](./architecture-and-conventions.md#state-model)
+and [verification](./testing.md#interactive-data-ownership).
 
 ## Server request boundary
 
@@ -400,47 +719,146 @@ ahead of time would silently break.
 `entities/notifications` wraps the feed, unread count, and preferences
 surface (`docs/notifications/README.md`):
 
-- `useNotificationsFeed(limit)` — `useInfiniteQuery` over the cursor envelope
+- `useNotificationsFeed(owner, limit)` — `useInfiniteQuery` over the cursor envelope
   (`{ data, nextCursor, hasMore }`, ADR-036 keyset pagination — not `page`/`total`).
-- `useUnreadCount()`, `useNotificationPreferences()`,
+- `useUnreadCount(owner)`, `useNotificationPreferences(owner)`,
   `useNotificationCapabilities()` — plain queries. Capabilities is the active
   channel/category registry (ADR-052): a preferences UI reads it to render
   which channels/categories exist and which are user-overridable, rather than
   hardcoding a set that can go stale or advertise a dead channel.
-- `useMarkNotificationRead(id)`, `useMarkAllNotificationsRead()`,
-  `useArchiveNotification(id)`, `useUpdateNotificationPreference(input)`,
-  `useUpdateNotificationSettings(input)` — mutations, each invalidating
+- `useMarkNotificationRead(owner)`, `useMarkAllNotificationsRead(owner)`,
+  `useArchiveNotification(owner)`, `useUpdateNotificationPreference(owner)`,
+  `useUpdateNotificationSettings(owner)` — mutations; pass the notification ID to mark-read/archive `mutate(id)`,
+  no argument to mark-all `mutate()`, or the preference/settings DTO to `mutate(input)`. Each invalidates
   exactly the query keys its endpoint can affect (the feed/unread-count pair,
   or preferences — never both).
-- `useNotificationsStream()` — realtime; see below.
+- `useNotificationsStream(owner, enabled)` — realtime; see below.
+
+All notification hooks require `QueryClientProvider`. Derive the owner from the
+subscribed current-user query; do not construct it from a user ID or token.
+This is a composition example, not a shipped feed screen:
+
+```tsx
+'use client'
+
+import {
+  useNotificationsFeed,
+  useUnreadCount,
+  useMarkNotificationRead,
+  useNotificationsStream,
+} from '@/entities/notifications'
+import { useCurrentUser } from '@/entities/user'
+import { queryOwner } from '@/shared/api/query-session'
+
+function useNotificationExample() {
+  const owner = queryOwner(useCurrentUser().data)
+  const feed = useNotificationsFeed(owner, 20)
+  const count = useUnreadCount(owner)
+  const markRead = useMarkNotificationRead(owner)
+  useNotificationsStream(owner)
+  return { owner, feed, count, markRead }
+}
+```
+
+A null owner disables automatic reads and the stream; reads/writes also check
+ownership before transport. Disable actions until an owner is available. Feed
+mutations keep their initiating session even when offline pause delays dispatch.
+Successful POST acknowledgment completes the mutation independently of refresh.
+A refresh error requires retrying the GET, not repeating a successful POST.
+For local work after `await mutateAsync(...)`, call `captureQuerySession(client)` before awaiting
+and check `isCurrentQuerySession` before closing/resetting the current form.
+
+Custom invalidators use `notificationKeys.owned(owner)` for feed plus count,
+`feedAll(owner)` for all page sizes, `feed(owner, limit)` for one list, or
+`unreadCount(owner)` for count only. Preferences use their separate key;
+`notificationKeys.all` covers only the registry. Confirmed feed writes and stream
+open/message hints cancel old owned reads before invalidating; active queries
+refetch, inactive variants become stale. The owner is checked again after cancellation.
+Query passes AbortSignal to feed/count transport; direct adapter callers may omit it.
 
 ## AI — conversations, runs, messages
 
-`entities/ai` wraps the minimal flow `docs/ai/README.md` documents:
-create a conversation, create a run, observe it, read the transcript.
+The seven `entities/ai` hooks require `QueryClientProvider` and a confirmed
+user/session owner: `useCreateAiConversation(owner)`, `useAiConversation(owner, id)`,
+`useCreateAiRun(owner)`, `useAiRun(owner, runId)`, `useCancelAiRun(owner)`,
+`useAiMessages(owner, conversationId)` and `useAiRunStream(owner, run, enabled)`.
+Read IDs and the stream pair may be null before selection; automatic reads/stream
+stay disabled. Forced reads and commands still check owner admission before HTTP.
 
-```ts
-const { mutateAsync: createConversation } = useCreateAiConversation()
-const { mutateAsync: createRun } = useCreateAiRun()
+This documentation example composes the existing hooks, not a shipped AI screen.
+Mount its local selection/input subtree with a key derived from the current
+owner/session, so replacement discards old drafts and selected IDs. Obtain the
+run pair from that owner's run GET or acknowledged creation, never invent it.
 
-const conversation = await createConversation({})
-const run = await createRun({
-  conversationId: conversation.id,
-  inputParts: [{ type: 'text', text: 'Hello' }],
-})
-// useAiRun(run.id) / useAiRunStream(run.id) now observe it; useAiMessages(conversation.id)
-// reads the transcript once a message lands.
+```tsx
+'use client'
+
+import type { AiRunResponse, CreateAiRunInput } from '@amcore/shared'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  useAiConversation,
+  useAiMessages,
+  useAiRun,
+  useAiRunStream,
+  useCancelAiRun,
+  useCreateAiConversation,
+  useCreateAiRun,
+} from '@/entities/ai'
+import { useCurrentUser } from '@/entities/user'
+import { captureQuerySession, isCurrentQuerySession, queryOwner } from '@/shared/api/query-session'
+
+function useAiExample(
+  conversationId: string | null,
+  selected: Pick<AiRunResponse, 'id' | 'conversationId'> | null
+) {
+  const client = useQueryClient()
+  const owner = queryOwner(useCurrentUser().data)
+  const conversation = useAiConversation(owner, conversationId)
+  const messages = useAiMessages(owner, conversationId)
+  const run = useAiRun(owner, selected?.id ?? null)
+  const createConversation = useCreateAiConversation(owner)
+  const createRun = useCreateAiRun(owner)
+  const cancel = useCancelAiRun(owner)
+  useAiRunStream(owner, selected)
+  async function start(input: CreateAiRunInput, select: (run: AiRunResponse) => void) {
+    const captured = captureQuerySession(client)
+    const created = await createRun.mutateAsync(input)
+    if (isCurrentQuerySession(client, captured)) select(created)
+  }
+  return { owner, conversation, messages, run, createConversation, createRun, cancel, start }
+}
 ```
 
-`inputParts` is a structured content-part array, never a flat string — the
-same contract the transcript itself uses, so an image/PDF turn needs no
-shape change later. `useAiRun(runId)` fetches the durable run; `useCancelAiRun()`
-cancels it. `useAiMessages(conversationId)` is a `useInfiniteQuery` over the
-transcript, keyset-paginated by the monotonic `sequence` field (a plain
-integer cursor, unlike the notification feed's opaque cursor string) — the
-route lives on `ai-conversation-control.controller.ts` even though its path
-(`/ai/conversations/:id/messages`) reads like it belongs on the plain
-conversations controller.
+Keep `conversationId` and `selected.conversationId` aligned in the caller. Disable
+commands until owner/selection is ready. Create DTOs are unchanged: `inputParts`
+contains structured content parts. Cancel now takes the original run pair through
+`cancel.mutate({ id, conversationId })`; the HTTP endpoint still receives only id.
+Apply the same captured-session check after awaiting conversation creation before
+changing local selection/navigation. While a command is pending, either prevent
+selection changes or check the initiating selection before updating local input.
+These local checks are separate from the hooks' protection of cache dependencies.
+
+`aiKeys.all(owner)` is now an owner-qualified factory, not a static array.
+`conversation(owner, id)`, `run(owner, id)` and `messages(owner, conversationId)`
+are the resource factories. Creation/cancel and stream hints refresh only the
+initiating run and transcript: cancel older reads, recheck the captured session,
+then invalidate exact keys. Other conversations, metadata and owners stay untouched.
+No run or message is seeded from a write/SSE payload. Optional GET signals remain
+compatible with direct adapter callers. Delayed commands recheck ownership before
+POST; a dispatched write can finish without affecting a replacement session.
+
+A successful write completes independently of subsequent GETs. A failed refresh
+needs GET-only recovery, not a repeated successful POST. Cancel may return
+`status: 'running', cancellationRequested: true`; this acknowledges a request,
+not worker termination. Retain the backend's unknown-result/idempotency rules.
+
+Messages use oldest-first numeric sequence cursors. Refresh rereads loaded pages:
+an append within their capacity appears there; an append beyond a full last page
+exposes `hasNextPage`. Call `fetchNextPage()` to load that page. This is not automatic
+tail-following or token streaming. Stream open/matching status hints refresh both
+run and messages from HTTP; dropped hints recover on reconnect or explicit refresh.
+Future real AI UI composition needs runtime verification. These hooks do not make
+unobserved cross-tab cookie changes atomic or implement persisted command replay.
 
 ## Realtime: why `EventSource` is enough here
 
@@ -456,25 +874,36 @@ the generic BFF proxy resolves the real access token from the Redis vault and
 attaches it upstream, exactly as it does for every other proxied call.
 
 So `shared/api/sse/use-event-source.ts` wraps native `EventSource` instead of
-a custom reader:
+a custom reader. The following shows its options; use the notification wrapper
+above for its captured-owner refresh implementation:
 
 ```ts
 useEventSource({
   url: '/api/notifications/stream', // relative + same-origin — never an apps/api URL
   schema: notificationSseEventSchema, // shared Zod schema; an unparseable frame is dropped, not trusted
-  onOpen: refetch, // connect the stream, *then* refetch — closes the subscribe-vs-snapshot race
-  onEvent: refetch, // content-free hint: "something changed", never the new state itself
+  connectionKey: JSON.stringify([owner?.contextSession, owner?.userId]),
+  enabled: !!owner,
+  onOpen: refreshOwned, // cancel old reads, recheck captured owner, then invalidate
+  onEvent: refreshOwned, // content-free hint: "something changed", never the new state itself
 })
 ```
 
-`useNotificationsStream()` and `useAiRunStream(runId)` are both thin
-wrappers over this: `onOpen`/`onEvent` both invalidate the relevant
+`useNotificationsStream(owner, enabled)` and `useAiRunStream(owner, run, enabled)` are both thin
+wrappers over this: both cancel older captured-owner reads before invalidation.
+AI refreshes its run/transcript pair; notifications refresh feed/count. They refresh the relevant
 TanStack Query key(s), never write the event payload into the cache
 directly — Postgres (fetched over plain HTTP) stays the source of truth,
 matching the "content-free hint" design both backend surfaces already
 document. `EventSource`'s own automatic reconnect covers the "stream closes
 at token expiry, client reconnects" behavior the backend enforces
 server-side.
+
+The optional `connectionKey` reconnects when identity changes at the same URL.
+Notification streams supply the non-secret owner/session pair. Null ownership
+closes the connection; saved obsolete handlers cannot invoke a new owner's callbacks.
+Same-identity callback/schema updates keep the connection. Other callers may omit
+`connectionKey`; URL/enabled changes still close and replace the connection.
+This does not detect an unobserved cookie change in another tab.
 
 The "always a relative `/api/...` path" rule isn't just a comment — the hook
 throws at connect time if `url` doesn't start with `/api/`, so an absolute or

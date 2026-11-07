@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getRetryAfterMs } from '@/shared/api/errors'
-import { withDeadline } from '@/shared/lib/with-deadline'
+import { useRetryDeadline } from '@/shared/hooks/use-retry-deadline'
 
 import type { OrganizationAccessController } from './access-controller'
+import {
+  assertReadCooldown,
+  isOrganizationRefusal,
+  organizationReadKey,
+  organizationReadOptions,
+  refuseOrganizationAdmission,
+} from './read-options'
 
 import 'client-only'
 
-/** Each target/query owns a separate fence; list queries never retire an editor. */
+/** Query owns shared reads; controllers own command admission, and forms own drafts. */
 export function useOrganizationRead<T>(
   controller: OrganizationAccessController,
   identity: string,
@@ -16,109 +23,41 @@ export function useOrganizationRead<T>(
   options?: { namespace: string; timeoutMs: number; secondary?: boolean }
 ) {
   const client = useQueryClient()
+  const { binding, organizationId } = controller
   const key = useMemo(
-    () => [options?.namespace ?? 'organization-members', identity] as const,
+    () => organizationReadKey(options?.namespace ?? 'organization-members', identity),
     [identity, options?.namespace]
   )
-  const ready = useSyncExternalStore(controller.subscribe, controller.allowed, () => false)
-  const query = useQuery<T>({
-    queryKey: key,
-    queryFn: skipToken,
-    enabled: false,
-    retry: false,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+  const ready = useSyncExternalStore(controller.subscribe, controller.allowed, controller.allowed)
+  const definition = organizationReadOptions(key, load, options?.timeoutMs)
+  const query = useQuery({
+    ...definition,
+    enabled: (entry) => ready && entry.state.status !== 'error',
   })
-  const [state, setState] = useState<{
-    identity: string
-    error?: unknown
-    pending: boolean
-    retryAt?: number
-  }>({
-    identity,
-    pending: true,
-  })
-  const cooldown = useRef<{ identity: string; retryAt: number; error: unknown } | undefined>(
-    undefined
+  useEffect(
+    () =>
+      client.getQueryCache().subscribe((event) => {
+        if (event.type !== 'updated' || event.action.type !== 'error') return
+        const entry = event.query
+        if (entry.queryKey[0] !== key[0] || entry.queryKey[1] !== key[1]) return
+        if (isOrganizationRefusal(entry.state.error)) {
+          controller.setAuthority(false)
+          refuseOrganizationAdmission(client, binding, organizationId)
+        }
+      }),
+    [client, controller, key, binding, organizationId]
   )
-  const sequence = useRef(0)
-  const abort = useRef<AbortController>(undefined)
-  const loader = useRef(load)
-  loader.current = load
-  const pending = useRef<{ identity: string; promise: Promise<T | undefined> }>(undefined)
   const refresh = useCallback(
-    (parentSignal?: AbortSignal) => {
-      if (cooldown.current?.identity === identity && Date.now() < cooldown.current.retryAt)
-        return Promise.reject(cooldown.current.error)
-      if (pending.current?.identity === identity) return pending.current.promise
-      const work = (async () => {
-        const run = ++sequence.current
-        const epoch = controller.capture()
-        abort.current?.abort()
-        const signal = new AbortController()
-        abort.current = signal
-        const cancel = () => signal.abort()
-        parentSignal?.addEventListener('abort', cancel, { once: true })
-        if (parentSignal?.aborted) cancel()
-        setState({ identity, pending: true })
-        const current = () =>
-          sequence.current === run && controller.current(epoch) && !signal.signal.aborted
-        try {
-          const data = await withDeadline(
-            loader.current(signal.signal),
-            options?.timeoutMs ?? 5000,
-            signal
-          )
-          if (current()) {
-            client.setQueryData(key, data)
-            setState({ identity, pending: false })
-            return data
-          }
-        } catch (error) {
-          if (sequence.current === run && controller.current(epoch)) {
-            const delay = getRetryAfterMs(error)
-            const retryAt = delay ? Date.now() + delay : undefined
-            cooldown.current = retryAt ? { identity, retryAt, error } : undefined
-            setState({ identity, error, pending: false, retryAt })
-          }
-          throw error
-        } finally {
-          parentSignal?.removeEventListener('abort', cancel)
-        }
-      })()
-      pending.current = { identity, promise: work }
-      void work.then(
-        () => {
-          if (pending.current?.promise === work) pending.current = undefined
-        },
-        () => {
-          if (pending.current?.promise === work) pending.current = undefined
-        }
-      )
-      return work
+    async (signal?: AbortSignal) => {
+      signal?.throwIfAborted()
+      const epoch = controller.capture()
+      assertReadCooldown(client, key)
+      const result = await query.refetch({ cancelRefetch: false, throwOnError: true })
+      signal?.throwIfAborted()
+      return controller.current(epoch) ? result.data : undefined
     },
-    [client, controller, identity, key, options?.timeoutMs]
+    [client, controller, key, query.refetch]
   )
-  useEffect(() => {
-    if (ready) void refresh().catch(() => undefined)
-    return () => {
-      sequence.current++
-      pending.current = undefined
-      abort.current?.abort()
-    }
-  }, [ready, refresh])
-  useEffect(() => {
-    if (state.retryAt === undefined) return
-    const timer = setTimeout(
-      () =>
-        setState((latest) =>
-          latest.identity === state.identity ? { ...latest, retryAt: undefined } : latest
-        ),
-      Math.max(0, state.retryAt - Date.now())
-    )
-    return () => clearTimeout(timer)
-  }, [state.retryAt, state.identity])
   useEffect(
     () =>
       controller.registerRead(
@@ -126,17 +65,39 @@ export function useOrganizationRead<T>(
       ),
     [controller, refresh, options?.secondary]
   )
+  // Explicit review requires an uncancelled observation, not cancellation's cached fallback.
+  async function review(signal?: AbortSignal) {
+    const epoch = controller.capture()
+    signal?.throwIfAborted()
+    assertReadCooldown(client, key)
+    await client.cancelQueries({ queryKey: key, exact: true })
+    let observed: AbortSignal | undefined
+    const result = await client.fetchQuery({
+      ...definition,
+      staleTime: 0,
+      queryFn: (context) => {
+        observed = context.signal
+        return definition.queryFn!(context)
+      },
+    })
+    signal?.throwIfAborted()
+    if (!observed || observed.aborted || !controller.current(epoch) || !controller.allowed())
+      throw new Error('REVIEW_CANCELLED')
+    return result
+  }
+  const deadline = query.errorUpdatedAt + (getRetryAfterMs(query.error) ?? 0)
+  const cooling = useRetryDeadline(deadline)
   return {
-    ...(state.identity === identity ? state : { identity, pending: true }),
-    data: state.identity === identity ? query.data : undefined,
-    refresh,
+    identity,
+    data: ready ? query.data : undefined,
+    retainedData: controller.current(controller.capture()) ? query.data : undefined,
+    error: query.error ?? undefined,
+    pending: ready && query.isPending && !query.error,
+    fetching: query.isFetching,
     ready,
-    // Authority readiness is distinct from success of this identity's current read.
-    available:
-      ready &&
-      state.identity === identity &&
-      !state.pending &&
-      !state.error &&
-      query.data !== undefined,
+    available: ready && query.data !== undefined && !query.error,
+    refresh,
+    review,
+    retryAt: cooling ? deadline : undefined,
   }
 }

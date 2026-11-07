@@ -1,7 +1,7 @@
 import { writeView } from '../lib/lighthouse-view-export.mjs'
 import { admitAuditAfterTests } from '../lib/lighthouse-admission.mjs'
 import { packReports } from '../lib/lighthouse-archive.mjs'
-import { auditAcceptance } from './lighthouse-acceptance.mjs'
+import { auditAcceptance, acceptanceTarget } from './lighthouse-acceptance.mjs'
 import { mkdir, readFile, copyFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { auditPlan, digest, invariant } from '../lib/lighthouse-plan.mjs'
@@ -102,7 +102,9 @@ export async function runAuditPhase(m, token) {
               valid: false,
               stage: failure.stage,
               reason: failure.reason,
+              errorKind: failure.errorKind,
               navigationProof: failure.navigationProof,
+              probes: failure.probes,
             }
           : { id, valid: false, reason: 'case-refused-or-timed-out' }
       console.error(JSON.stringify(safe))
@@ -112,11 +114,26 @@ export async function runAuditPhase(m, token) {
     }
   }
   invariant(Date.now() <= deadline, 'audit-phase-deadline-exhausted')
-  const acceptance =
-    process.env.AMCORE_AUDIT_ACCEPTANCE === 'true' &&
-    results.some((r) => r.id === 'members' && r.valid)
-      ? await auditAcceptance(m, token, deadline)
-      : []
+  let acceptance = []
+  if (process.env.AMCORE_AUDIT_ACCEPTANCE === 'true') {
+    const target = acceptanceTarget(plan.assignments[lane], results, m.consoleTopology)
+    try {
+      acceptance = target.scenario
+        ? await auditAcceptance(m, token, deadline, target.scenario)
+        : [{ mode: 'unexecuted', passed: false, reason: target.reason }]
+    } catch (error) {
+      acceptance = [
+        {
+          mode: 'failed',
+          passed: false,
+          reason:
+            error.code === 'ENOENT'
+              ? 'acceptance-fixture-or-result-missing'
+              : 'acceptance-control-failed',
+        },
+      ]
+    }
+  }
   for (const id of plan.assignments[lane])
     await rm(join(directory(m.id), 'tmp', `lighthouse-${id}`), { recursive: true, force: true })
   const manifest = {
@@ -158,7 +175,7 @@ export async function runAuditPhase(m, token) {
     output,
     manifestHash,
     observed: results.map((r) => r.id),
-    passed: results.every((r) => r.valid && r.policy.passed),
+    passed: results.every((r) => r.valid && r.policy.passed) && acceptance.every((r) => r.passed),
   }
   await save(m)
   invariant(m.audit.passed, 'audit-policy-or-measurement-failure')

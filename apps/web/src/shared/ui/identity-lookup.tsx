@@ -22,7 +22,10 @@ export interface IdentityLookupCopy {
 interface IdentityLookupProps {
   inputId: string
   label: string
-  searchItems: (term: string) => Promise<{ items: IdentityLookupItem[]; hasMore: boolean }>
+  searchItems: (
+    term: string,
+    signal?: AbortSignal
+  ) => Promise<{ items: IdentityLookupItem[]; hasMore: boolean }>
   copy: IdentityLookupCopy
   onSelect: (id: string) => void
 }

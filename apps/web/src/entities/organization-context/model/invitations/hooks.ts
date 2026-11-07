@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { InviteListQuery, InviteRoleChoicesQuery } from '@amcore/shared'
 import { invitationOperationTimestamp } from '@amcore/shared'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { invitationsClient } from '../../api/invitations-client'
 import type { OrganizationAccessController } from '../access-controller'
+import { invitationEffects, refreshOrganizationEffects } from '../read-effects'
 import { useOrganizationRead } from '../use-organization-read'
 
 import { createInvitationManagerOperations } from './operations-controller'
@@ -14,12 +16,12 @@ export function useOrganizationInvitations(
   controller: OrganizationAccessController,
   query: InviteListQuery
 ) {
-  const identity = JSON.stringify([controller.binding, controller.organizationId, query])
+  const { binding, organizationId: readOrganizationId } = controller
+  const identity = JSON.stringify([binding, readOrganizationId, query])
   return useOrganizationRead(
     controller,
     identity,
-    (signal) =>
-      invitationsClient.list(controller.binding, controller.organizationId, query, signal),
+    (signal) => invitationsClient.list(binding, readOrganizationId, query, signal),
     { namespace: 'organization-invitations', timeoutMs: 10000 }
   )
 }
@@ -27,20 +29,28 @@ export function useInvitationRoleChoices(
   controller: OrganizationAccessController,
   query: InviteRoleChoicesQuery
 ) {
-  const identity = JSON.stringify([controller.binding, controller.organizationId, query])
+  const { binding, organizationId: readOrganizationId } = controller
+  const identity = JSON.stringify([binding, readOrganizationId, query])
   return useOrganizationRead(
     controller,
     identity,
-    (signal) =>
-      invitationsClient.roles(controller.binding, controller.organizationId, query, signal),
+    (signal) => invitationsClient.roles(binding, readOrganizationId, query, signal),
     { namespace: 'organization-invitation-roles', timeoutMs: 10000, secondary: true }
   )
 }
 export function useInvitationManagerOperations(access: OrganizationAccessController) {
   const organizationId = access.organizationId
+  const client = useQueryClient()
+  const refresh = useCallback(
+    () =>
+      refreshOrganizationEffects(client, access, invitationEffects, undefined, async () =>
+        access.allowed() ? 'ready' : access.refreshAuthority()
+      ),
+    [client, access, organizationId]
+  )
   const controller = useMemo(
-    () => createInvitationManagerOperations(access),
-    [access, organizationId]
+    () => createInvitationManagerOperations(access, undefined, undefined, refresh),
+    [access, organizationId, refresh]
   )
   const state = useSyncExternalStore(
     controller.subscribe,

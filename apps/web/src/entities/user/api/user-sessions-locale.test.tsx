@@ -11,9 +11,11 @@ vi.mock('@/shared/api', () => ({
   authApi: { getSessions: vi.fn(), uploadAvatar: vi.fn(), deleteAvatar: vi.fn() },
 }))
 
+const owner = { userId: 'u1', contextSession: 'session-u1' }
+
 describe('session locale cache isolation', () => {
   it('includes locale, so a locale switch gets a different cache entry', () => {
-    expect(userKeys.sessions('en', 1, 20)).not.toEqual(userKeys.sessions('ru', 1, 20))
+    expect(userKeys.sessions(owner, 'en', 1, 20)).not.toEqual(userKeys.sessions(owner, 'ru', 1, 20))
   })
 
   it('does not reuse a previous locale’s cached data as a placeholder after a locale switch', async () => {
@@ -38,6 +40,10 @@ describe('session locale cache isolation', () => {
 
     let locale: 'en' | 'ru' = 'en'
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(userKeys.me(), {
+      user: { id: owner.userId },
+      contextSession: owner.contextSession,
+    })
     function LocaleWrapper({ children }: { children: React.ReactNode }) {
       return (
         <NextIntlClientProvider locale={locale} messages={{}}>

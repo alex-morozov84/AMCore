@@ -71,11 +71,27 @@ describe('OrganizationRoleClient authority', () => {
     expect(screen.getByTestId('editor')).toBeInTheDocument()
   })
 
-  it('keeps the editor in place while permission is only being rechecked', () => {
-    state.context = context('pending', true)
-    state.role = { data: detail, ready: false, available: false }
-    render(view())
-    expect(screen.getByTestId('editor')).toBeInTheDocument()
+  it('keeps the same editor mounted but masked through the real pending read shape', () => {
+    const page = render(view())
+    const editor = screen.getByTestId('editor')
+    state.context = { ...context('pending', true), data: undefined }
+    state.role = { data: undefined, retainedData: detail, ready: false, available: false }
+    state.catalogue = {
+      data: undefined,
+      retainedData: { capabilities: [] },
+      ready: false,
+      available: false,
+    }
+    page.rerender(view())
+    expect(screen.getByTestId('editor')).toBe(editor)
+    expect(editor).not.toBeVisible()
+    expect(screen.queryByText('Support')).toBeNull()
+    state.context = context('ready', true)
+    state.role = { data: detail, ready: true, available: true }
+    state.catalogue = { data: { capabilities: [] }, ready: true, available: true }
+    page.rerender(view())
+    expect(screen.getByTestId('editor')).toBe(editor)
+    expect(editor).toBeVisible()
   })
 
   it('hides the editor and its cached data once the check resolves to no team access', () => {

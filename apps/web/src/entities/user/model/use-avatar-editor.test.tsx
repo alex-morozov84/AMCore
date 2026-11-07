@@ -17,9 +17,15 @@ const png = (size = 10, type = 'image/png') => new File([new Uint8Array(size)], 
 
 function setup(userId = 'u1', avatarUrl: string | null = null) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  queryClient.setQueryData(userKeys.me(), { user: { id: userId, avatarUrl } })
+  queryClient.setQueryData(userKeys.me(), {
+    user: { id: userId, avatarUrl },
+    contextSession: 'session-u1',
+  })
   // A re-read (after an unknown outcome) returns the same signed-in user.
-  vi.mocked(authApi.getMe).mockResolvedValue({ user: { id: userId, avatarUrl } } as never)
+  vi.mocked(authApi.getMe).mockResolvedValue({
+    user: { id: userId, avatarUrl },
+    contextSession: 'session-u1',
+  } as never)
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
@@ -42,6 +48,7 @@ describe('useAvatarEditor', () => {
     expect(outcome).toEqual({ kind: 'committed', avatarUrl: 'https://f/new.webp' })
     expect(queryClient.getQueryData(userKeys.me())).toEqual({
       user: { id: 'u1', avatarUrl: 'https://f/new.webp' },
+      contextSession: 'session-u1',
     })
     expect(result.current.status).toBe('idle')
     expect(result.current.avatarUrl).toBe('https://f/new.webp')
@@ -121,6 +128,7 @@ describe('useAvatarEditor', () => {
     // The reread brings the server's real avatar, and the hook shows it.
     vi.mocked(authApi.getMe).mockResolvedValue({
       user: { id: 'u1', avatarUrl: 'https://f/real.webp' },
+      contextSession: 'session-u1',
     } as never)
     await act(async () => {
       await result.current.upload(png())
@@ -237,3 +245,36 @@ describe('useAvatarEditor', () => {
     expect(result.current.error).toBeNull()
   })
 })
+
+it.each(['success', 'unknown'] as const)(
+  'retires same-user old-session %s local outcomes and cache effects',
+  async (settlement) => {
+    const held = Promise.withResolvers<{ avatarUrl: string }>()
+    vi.mocked(authApi.uploadAvatar).mockReturnValueOnce(held.promise)
+    const { result, queryClient } = setup()
+    let pending!: Promise<unknown>
+    act(() => {
+      pending = result.current.upload(png())
+    })
+    await waitFor(() => expect(result.current.isPending).toBe(true))
+    const replacement = {
+      user: { id: 'u1', avatarUrl: 'new-session-avatar' },
+      contextSession: 'new-session',
+    }
+    act(() => queryClient.setQueryData(userKeys.me(), replacement))
+    await waitFor(() => expect(result.current.isPending).toBe(false))
+    expect(result.current.outcome).toBeNull()
+    let outcome: unknown
+    await act(async () => {
+      if (settlement === 'success') held.resolve({ avatarUrl: 'old-session-avatar' })
+      else held.reject(new ApiNetworkError(new Error('lost response')))
+      outcome = await pending
+    })
+    expect(outcome).toEqual({ kind: 'retired' })
+    expect(result.current.status).toBe('idle')
+    expect(result.current.error).toBeNull()
+    expect(result.current.outcome).toBeNull()
+    expect(queryClient.getQueryData(userKeys.me())).toEqual(replacement)
+    expect(authApi.getMe).not.toHaveBeenCalled()
+  }
+)

@@ -153,6 +153,8 @@ describe('headless member lifecycle fences', () => {
         { wrapper }
       )
       await act(async () => vi.advanceTimersByTimeAsync(5000))
+      // Query publishes observer notifications in the next timer task.
+      await act(async () => vi.advanceTimersByTimeAsync(1))
       expect(result.current.pending).toBe(false)
       expect(result.current.error).toBeDefined()
       await act(async () => read.resolve({ aclVersion: 42 } as never))
@@ -171,7 +173,7 @@ describe('headless member lifecycle fences', () => {
         () => useOrganizationMembers(controller, { page: 1, search: 'cooldown' }),
         { wrapper }
       )
-      await act(async () => {})
+      await act(async () => vi.advanceTimersByTimeAsync(1))
       expect(result.current.retryAt).toBeDefined()
       const before = vi.mocked(membersClient.list).mock.calls.length
       await expect(result.current.refresh()).rejects.toBe(unavailable)
@@ -186,6 +188,7 @@ describe('headless member lifecycle fences', () => {
         aclVersion: 3,
       })
       await act(async () => result.current.refresh())
+      await act(async () => vi.advanceTimersByTimeAsync(1))
       expect(result.current.error).toBeUndefined()
       expect(result.current.data?.aclVersion).toBe(3)
     } finally {

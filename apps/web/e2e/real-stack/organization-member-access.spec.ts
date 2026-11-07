@@ -98,6 +98,8 @@ test('member access: roles, decisions, a veto with its cause, a failed read and 
       body: JSON.stringify({ statusCode: 503, errorCode: 'ROLE_ACCESS_UNAVAILABLE', message: 'x' }),
     })
   )
+  // A reopened fresh result is cached; reload to test an actual initial-read outage.
+  await page.reload()
   await openAccess()
   await expect(page.getByText(t.unavailable)).toBeVisible()
   await expect(page.getByText(capabilities.teamAccessManagement.label)).toHaveCount(0)

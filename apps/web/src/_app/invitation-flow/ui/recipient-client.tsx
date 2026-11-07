@@ -85,8 +85,8 @@ export function RecipientClient({
         AbortSignal.timeout(15000)
       )
       if (auth.current(captured)) {
-        auth.signedOut(result.binding)
-        setActionBusy(false)
+        const published = await auth.signedOut(result.binding)
+        if (published !== null && auth.current(published)) setActionBusy(false)
       }
     })
   const verify = () =>

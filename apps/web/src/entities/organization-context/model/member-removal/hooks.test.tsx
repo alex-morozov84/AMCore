@@ -1,3 +1,5 @@
+import type { PropsWithChildren } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -13,12 +15,20 @@ vi.mock('../../api/member-removal-client', async (original) => ({
   removeMember: vi.fn(),
 }))
 vi.mock('../../api/members-client', () => ({ membersClient: { roles: vi.fn() } }))
+let client: QueryClient
+const wrapper = ({ children }: PropsWithChildren) => (
+  <QueryClientProvider client={client}>{children}</QueryClientProvider>
+)
+beforeEach(() => {
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+})
+afterEach(() => client.clear())
 const target = { userId: 'user', memberId: 'member', email: 'user@example.test' }
 function setup() {
   const controller = createOrganizationAccessController('binding', 'org')
   controller.setAuthority(true)
   controller.setRefresh(async () => 'ready')
-  return { controller, ...renderHook(() => useMemberRemoval(controller, target)) }
+  return { controller, ...renderHook(() => useMemberRemoval(controller, target), { wrapper }) }
 }
 beforeEach(() => vi.resetAllMocks())
 describe('member removal state', () => {
@@ -34,10 +44,12 @@ describe('member removal state', () => {
       })
       if (ack) vi.mocked(removeMember).mockResolvedValue({ removed: true })
       else vi.mocked(removeMember).mockRejectedValue(new Error('lost acknowledgement'))
-      const { result } = renderHook(() =>
-        useMemberRemoval(controller, target, () => {
-          events.push('acknowledged')
-        })
+      const { result } = renderHook(
+        () =>
+          useMemberRemoval(controller, target, () => {
+            events.push('acknowledged')
+          }),
+        { wrapper }
       )
       await act(async () => {
         await result.current.remove()
@@ -122,7 +134,7 @@ describe('member removal state', () => {
       const initial = { controller: first, target }
       const { result, rerender } = renderHook(
         (props) => useMemberRemoval(props.controller, props.target),
-        { initialProps: initial }
+        { initialProps: initial, wrapper }
       )
       const captured = result.current.remove
       let pending!: ReturnType<typeof captured>

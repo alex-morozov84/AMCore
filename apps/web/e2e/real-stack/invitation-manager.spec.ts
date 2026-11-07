@@ -84,8 +84,12 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
     )
     await dialog.getByRole('button', { name: t.invite, exact: true }).click()
     expect((await issuance).status()).toBe(202)
-    await expect(page.getByText(t.processed, { exact: true })).toBeVisible()
     await expect(dialog).toHaveCount(0)
+    await expect(
+      page
+        .getByRole('region', { name: t.title, exact: true })
+        .getByText(t.processed, { exact: true })
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: t.invite, exact: true })).toBeEnabled()
     const row = page.getByRole('row').filter({ hasText: recipient })
     await expect(row).toBeVisible()
@@ -118,8 +122,12 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
     )
     await dialog.getByRole('button', { name: t.resend, exact: true }).click()
     expect((await resend).status()).toBe(202)
-    await expect(page.getByText(t.processed, { exact: true })).toBeVisible()
     await expect(dialog).toHaveCount(0)
+    await expect(
+      page
+        .getByRole('region', { name: t.title, exact: true })
+        .getByText(t.processed, { exact: true })
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: t.invite, exact: true })).toBeEnabled()
     await expect(
       row.getByRole('button', {
@@ -150,8 +158,12 @@ test('invitations manager: complete roles,202, reissue,204, search and mobile EN
     )
     await dialog.getByRole('button', { name: t.resend, exact: true }).click()
     expect((await replacement).status()).toBe(202)
-    await expect(page.getByText(t.processed, { exact: true })).toBeVisible()
     await expect(dialog).toHaveCount(0)
+    await expect(
+      page
+        .getByRole('region', { name: t.title, exact: true })
+        .getByText(t.processed, { exact: true })
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: t.invite, exact: true })).toBeEnabled()
     await expect(row.getByText('MEMBER', { exact: true })).toBeVisible()
     await expect(row.getByText('VIEWER', { exact: true })).toHaveCount(0)

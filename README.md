@@ -40,6 +40,8 @@ the full email/password reference flow (login, register, forgot/reset
 password, email verification/resend) plus an active-sessions screen, and
 documented hooks for consuming media, notifications, and AI through the BFF.
 Feature-specific admin surfaces remain intentionally product-owned.
+For downstream data loading, start with the [server display, interactive Query
+and domain-rule recipes](docs/frontend/api-consumption.md#data-ownership-for-interactive-pages).
 
 The optional [Operations Console](docs/operations-console/README.md) is a
 separate `SUPER_ADMIN` control plane. It ships **Overview** for

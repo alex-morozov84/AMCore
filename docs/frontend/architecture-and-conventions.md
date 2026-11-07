@@ -416,24 +416,29 @@ require moving the complete catalogue into client props.
 
 ## State model
 
-| Kind                                                        | Use            | Example                             |
-| ----------------------------------------------------------- | -------------- | ----------------------------------- |
-| **Server state** (data owned by the backend)                | TanStack Query | `entities/user/api/user-queries.ts` |
-| **Local client state** (UI-only, not persisted server-side) | Zustand        | none live currently — see below     |
+| Kind                        | Owner                                                                       | Example                             |
+| --------------------------- | --------------------------------------------------------------------------- | ----------------------------------- |
+| Server-rendered data        | Server Component and server DAL; URL navigation or route refresh updates it | Console inventories                 |
+| Browser-managed server data | TanStack Query; add only required domain rules                              | `entities/user/api/user-queries.ts` |
+| Local client state          | Component/form state; Zustand for shared local state when needed            | No Zustand store required today     |
 
-"Server state" above is deliberately split by who owns the fetch, not a
-single universal rule. A Server Component page can fetch the backend directly;
-there is no TanStack Query involved in that path, and `router.refresh()`
-re-runs it.
-A client interactive leaf that owns pending/error/pagination/mutation UI
-without full navigation uses TanStack Query instead. These models can
-coexist inside the same server-rendered page.
+Choose ownership by behavior. A server-rendered page can keep server-owned rows
+and compose interactive Query leaves. Do not add a browser cache merely because
+its data comes from an API.
+
+When server hydration improves an interactive initial view, seed a request-local
+QueryClient from the server DAL and use `HydrationBoundary`. This is optional;
+client-loaded lists and on-demand dialogs can be appropriate. Organization
+invitations and members show the hydration variant. Keep form input separate
+from cached data and current command permission. Writes update their actual
+dependencies. Use the [data ownership recipe](./api-consumption.md#data-ownership-for-interactive-pages)
+for the three patterns, ordinary list/edit example and named domain rules.
 
 The optional Console's User Detail page uses this split for its Sessions card
 (`features/console-user-sessions/model/use-user-sessions.ts`); its server-side
 fetches follow ADR-079's primary/secondary graceful-degradation contract.
 
-Keep server data in its Query cache. Use Zustand only for local client state that
+Keep browser-managed server data in its Query cache. Use Zustand only for local client state that
 needs to survive navigation; add such stores under `shared/store/stores/`.
 No Zustand store is currently required. The sidebar owns its state through
 `SidebarProvider`/`useSidebar()` from `shared/ui/sidebar.tsx`.

@@ -138,7 +138,7 @@ describe('role-definition hooks', () => {
     })
     // Authority is still ready, yet stale data must not count as the current resource.
     expect(result.current.ready).toBe(true)
-    expect(result.current.available).toBe(false)
+    await waitFor(() => expect(result.current.available).toBe(false))
     expect(result.current.error).toBeDefined()
     failing = false
     await act(async () => {

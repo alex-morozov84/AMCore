@@ -1,17 +1,54 @@
+import { sessionProbe, boundDocument, probeProof } from './session-probe.mjs'
+import BFCacheFailures from 'lighthouse/core/gather/gatherers/bf-cache-failures.js'
 import { invariant } from '../lib/lighthouse-plan.mjs'
 
-export async function assertMeasuredPage(page, scenario, fixture, url) {
+export function measuredErrorKind(error) {
+  const text = String(error?.message ?? '')
+  for (const [pattern, kind] of [
+    [/context.*destroyed|cannot find context/i, 'context-destroyed'],
+    [/handle.*disposed|disposed.*handle/i, 'handle-disposed'],
+    [/target.*closed|browser.*closed|page.*closed/i, 'target-closed'],
+    [/timeout|timed out/i, 'timeout'],
+  ])
+    if (pattern.test(text)) return kind
+  return 'other'
+}
+
+export async function assertMeasuredPage(
+  page,
+  scenario,
+  fixture,
+  url,
+  captured = page.evaluateHandle(() => globalThis.document),
+  check = {}
+) {
+  const document = await captured
   invariant(page.url() === url, 'unexpected-measured-url')
+  await page.waitForLoadState('domcontentloaded')
+  check.stage = 'session-probe'
+  check.probeStart = probeProof(page.context()).length
+  const binding = await sessionProbe(
+    page.context(),
+    url,
+    scenario.id === 'login' ? undefined : fixture.subject,
+    fixture.consoleHost ? 'console' : fixture.staffHost ? 'staff' : 'product',
+    fixture.accessPath
+  )
+  check.probeEnd = probeProof(page.context()).length
+  check.stage = 'binding'
+  if (binding) await boundDocument(document, binding)
   if (scenario.id === 'members') {
+    check.stage = 'members-heading'
     await page
       .getByRole('heading', { name: fixture.organizationName, exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
+    check.stage = 'members-record'
     await page
-      .getByRole('row')
-      .filter({ hasText: fixture.email })
+      .locator('tr, [data-slot="card"]')
+      .filter({ has: page.getByText(fixture.email, { exact: true }), visible: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
   }
-  let isolatedSession = false
+  check.stage = 'remaining-page-readiness'
   if (scenario.scope === 'console') {
     if (fixture.consoleHost) {
       const { digest } = await import('../lib/lighthouse-plan.mjs')
@@ -28,18 +65,12 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
       const binding = digest(
         JSON.stringify(['product-context-v2', 'console', cookie.value, fixture.subject])
       )
-      invariant((await page.content()).includes(binding), 'measured-session-fence-missing')
+      await boundDocument(document, binding)
       await page
         .getByRole('button')
         .filter({ hasText: fixture.email })
         .waitFor({ state: 'visible', timeout: 10_000 })
-      isolatedSession = true
     }
-    const access = await page.evaluate(
-      async (path) => (await fetch(path, { redirect: 'error' })).status,
-      fixture.accessPath
-    )
-    invariant(access === 204, 'console-audience-refused')
     await page
       .locator('#overview-api-checks time')
       .first()
@@ -57,22 +88,9 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
   )
   await page.evaluate(() => globalThis.document.fonts.ready.then(() => undefined))
   const state = await page.evaluate(
-    async ({ anonymous, expected, isolatedSession }) => {
-      const response = isolatedSession
-        ? undefined
-        : await fetch('/api/auth/me', {
-            credentials: 'same-origin',
-            redirect: 'error',
-          })
-      const body = response ? await response.json().catch(() => ({})) : {}
-      const user = body.user
+    ({ expected }) => {
       const fields = [...globalThis.document.querySelectorAll('input')]
       return {
-        subject:
-          isolatedSession ||
-          (anonymous ? response.status === 401 && !user : response.ok && user?.id === expected),
-        fence:
-          isolatedSession || anonymous || Boolean(response.headers.get('x-amcore-context-session')),
         credentials: fields.some(
           (input) => /^(password|email)$/.test(input.type) && input.value !== ''
         ),
@@ -90,11 +108,9 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
           : false,
       }
     },
-    { anonymous: scenario.id === 'login', expected: fixture.subject, isolatedSession }
+    { expected: fixture.subject }
   )
   for (const [passed, reason] of [
-    [state.subject, 'measured-subject-refused'],
-    [state.fence, 'measured-session-fence-missing'],
     [!state.credentials, 'measured-credentials-present'],
     [!state.busy, 'measured-state-busy'],
   ])
@@ -107,6 +123,13 @@ export async function assertMeasuredPage(page, scenario, fixture, url) {
       'invalid-anonymous-form'
     )
   else invariant(!state.hasPassword, 'auth-setup-page-refused')
+  check.stage = 'final-document-check'
+  invariant(
+    await document.evaluate((doc) => doc === globalThis.document),
+    'navigation-identity-refused'
+  )
+  check.stage = 'disposal'
+  await document.dispose()
   return { identity: true, indexable: state.indexable }
 }
 
@@ -125,10 +148,7 @@ export function watchMeasuredPage(page, origin, anonymous, subject) {
           })
           .catch(() => failures.push({ kind: 'invalid-profile-response' }))
       )
-    if (
-      response.status() >= 400 &&
-      !(anonymous && url.pathname === '/api/auth/me' && response.status() === 401)
-    )
+    if (response.status() >= 400)
       failures.push({
         status: response.status(),
         kind: response.status() === 429 ? 'required-data-429' : 'required-data-refused',
@@ -150,5 +170,18 @@ export function watchMeasuredPage(page, origin, anonymous, subject) {
       page.off('response', onResponse)
       page.off('requestfailed', onRequestFailed)
     },
+  }
+}
+
+export function bfCacheConfig(verifyPending) {
+  class CheckedBFCacheFailures extends BFCacheFailures {
+    async getArtifact(context) {
+      await verifyPending()
+      return super.getArtifact(context)
+    }
+  }
+  return {
+    extends: 'lighthouse:default',
+    artifacts: [{ id: 'BFCacheFailures', gatherer: CheckedBFCacheFailures }],
   }
 }

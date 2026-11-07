@@ -23,7 +23,8 @@ export function useRoleDraft(
   initial: MemberRolesResponse,
   roles: Reads,
   controller: OrganizationAccessController,
-  onComplete?: () => void
+  onComplete?: () => void,
+  isSelf = false
 ) {
   const [snapshot, setSnapshot] = useState(initial)
   const form = useLocalizedForm<ReplaceMemberRoles>(replaceMemberRolesSchema, {
@@ -59,6 +60,23 @@ export function useRoleDraft(
   const epoch = controller.capture()
   const current = () => mounted.current && controller.current(epoch)
   async function submit(dto: ReplaceMemberRoles) {
+    if (
+      !current() ||
+      !controller.allowed() ||
+      roles.busy ||
+      reviewing ||
+      needsReview ||
+      outdated ||
+      roles.pending ||
+      roles.error ||
+      retryAt ||
+      !changed ||
+      (isSelf && !ack) ||
+      snapshot.editMode !== 'editable' ||
+      dto.expectedMemberId !== snapshot.member.memberId ||
+      dto.expectedAclVersion !== snapshot.aclVersion
+    )
+      return
     setError(undefined)
     setNotice(undefined)
     const outcome = await roles.save(dto)
@@ -83,10 +101,10 @@ export function useRoleDraft(
     try {
       const fresh = await withDeadline(
         (async () => {
-          const status = await controller.refresh(abort.signal)
+          const status = await controller.refreshAuthority(abort.signal)
           abort.signal.throwIfAborted()
           if (status !== 'ready') throw new Error('FORBIDDEN')
-          return roles.refresh(abort.signal)
+          return roles.review(abort.signal)
         })(),
         10000,
         abort
