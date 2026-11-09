@@ -11,7 +11,7 @@ import { directApi } from './credential-containment.helpers'
 import { browserCredentialRequest, TEST_PASSWORD, uniqueEmail } from './helpers'
 
 for (const locale of SERVED_LOCALES)
-  test(`manager ${locale}: primary faults, dirty generation, unknown recovery and late retirement`, async ({
+  test(`manager ${locale}: primary faults, dirty generation, unknown recovery and completed late response after session denial`, async ({
     page,
     context,
   }) => {
@@ -206,6 +206,13 @@ for (const locale of SERVED_LOCALES)
     const commit = new Promise<void>((resolve) => {
       committed = resolve
     })
+    const lateEmail = uniqueEmail('manager-late')
+    const latePost = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' &&
+        primaryRoute(new URL(request.url())) &&
+        request.postDataJSON()?.email === lateEmail
+    )
     await page.route(primaryRoute, async (route) => {
       if (route.request().method() !== 'POST') return route.continue()
       const response = await route.fetch()
@@ -215,11 +222,11 @@ for (const locale of SERVED_LOCALES)
       await route.fulfill({ response })
     })
     await invite.click()
-    await dialog
-      .getByRole('textbox', { name: t.email, exact: true })
-      .fill(uniqueEmail('manager-late'))
+    await dialog.getByRole('textbox', { name: t.email, exact: true }).fill(lateEmail)
     await dialog.getByRole('button', { name: t.invite, exact: true }).click()
     await commit
+    const heldRequest = await latePost
+    const browserResponse = heldRequest.response()
     const replacement = uniqueEmail('replacement-session')
     expect(
       (
@@ -232,6 +239,16 @@ for (const locale of SERVED_LOCALES)
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await expect(page.getByText(t.denied, { exact: true })).toBeVisible()
     finish()
+    const response = await browserResponse
+    expect(response).not.toBeNull()
+    expect(response!.status()).toBe(202)
+    expect(await response!.finished()).toBeNull()
+    expect(await response!.json()).toEqual({
+      binding: heldRequest.headers()['x-amcore-context-session'],
+      data: { status: 'invited' },
+    })
+    // Transport/body completion does not certify the hidden manager continuation.
+    await expect(page.getByText(t.denied, { exact: true })).toBeVisible()
     await expect(dialog).toHaveCount(0)
     await expect(page.getByRole('row').filter({ hasText: email })).toHaveCount(0)
     await expect(invite).toBeDisabled()
