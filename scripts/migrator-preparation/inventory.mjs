@@ -9,7 +9,7 @@ const registryPrepare = {
   'signal-exit@4.1.0':
     'tsc -p tsconfig.json && tsc -p tsconfig-esm.json && bash ./scripts/fixup.sh',
   'postgres@3.4.7': 'npm run build',
-  'ret@0.5.0': 'tsc',
+  'ret@0.5.1': 'tsc -p tsconfig.build.json',
 }
 const hash = (file) => createHash('sha256').update(readFileSync(file)).digest('hex')
 export function inventory(root) {

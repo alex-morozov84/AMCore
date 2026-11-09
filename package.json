@@ -12,9 +12,9 @@
   },
   "engines": {
     "node": ">=24.15.0",
-    "pnpm": ">=12.17.0"
+    "pnpm": ">=12.18.0"
   },
-  "packageManager": "pnpm@12.17.0",
+  "packageManager": "pnpm@12.18.0",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
@@ -53,7 +53,7 @@
     "husky": "^9.1.7",
     "lighthouse": "13.6.0",
     "lint-staged": "^17.6.0",
-    "oxlint": "1.90.0",
+    "oxlint": "1.91.0",
     "prettier": "^3.9.10",
     "puppeteer-core": "25.16.0",
     "turbo": "^2.11.10",
