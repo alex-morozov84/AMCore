@@ -24,9 +24,9 @@ test('last ADMIN refusal preserves membership and authority; cancellation restor
   await expect(dialog).toContainText(t.warning!)
   await expect(dialog.getByRole('button', { name: t.cancel, exact: true })).toBeFocused()
   await page.setViewportSize({ width: 320, height: 320 })
+  await expectNoAxeViolations(page)
   await expect(dialog.getByRole('button', { name: t.confirm, exact: true })).toBeInViewport()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await expectNoAxeViolations(page)
   await dialog.getByRole('button', { name: t.cancel, exact: true }).click()
   await expect(
     page.getByRole('heading', { name: catalogue.organizationMembers!.title, exact: true })
