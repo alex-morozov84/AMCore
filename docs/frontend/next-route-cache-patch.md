@@ -1,10 +1,10 @@
 # Temporary Next.js route-cache patch
 
-Next.js 16.4.2 can duplicate a fragment when navigation returns to a route opened
+Next.js 16.4.5 can duplicate a fragment when navigation returns to a route opened
 with a fragment. For example, returning to `/login#section` can produce
 `/login#section#section`.
 
-`patches/next@16.4.2.patch` fixes the stored route-cache canonical URL in both
+`patches/next@16.4.5.patch` fixes the stored route-cache canonical URL in both
 published module variants. Cache entries are shared across fragments. Their stored
 URL must omit the fragment because the router appends the destination fragment.
 The navigation URL itself retains its complete fragment and query.
