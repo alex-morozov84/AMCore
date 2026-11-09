@@ -22,4 +22,4 @@ allowBuilds:
   ssh2: true
   unrs-resolver: true
 patchedDependencies:
-  next@16.4.2: patches/next@16.4.2.patch
+  next@16.4.5: patches/next@16.4.5.patch
