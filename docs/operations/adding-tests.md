@@ -3,12 +3,33 @@
 Choose the smallest test that proves the changed risk. Use the existing family
 and runner. A file's existence alone does not prove that CI executes it.
 
+Before adding a case, name the defect or guarantee and inspect existing coverage.
+Extend an existing case when it proves the same contract. Do not add a test for
+every implementation branch or retain one only because it passes.
+
+Distinguish product behavior from starter checks: generated/copied fixture tests
+prove the extension recipe, while product tests prove the application's own behavior.
+Also name the boundary: logic, component, adapter, real dependency or assembled system.
+An E2E filename alone does not establish which boundary runs.
+
+Before replacing an expensive case, identify the retained guarantee, smaller
+replacement and lost coverage. Show that a relevant deliberate defect fails the
+replacement, then restore the source and require a passing result. Keep real SQL,
+Redis/Lua or browser-to-API witnesses when the defect depends on that boundary.
+If the replacement cannot prove the guarantee, retain the old case.
+
+Assert the outcome and relevant state after a refusal. Test each independent bad
+input with a fresh fixture. Keep causal journeys together when a later action needs
+the earlier result. Use a controlled clock for exact timer boundaries; never replace
+a negative time window with an immediate assertion. Record the first failed attempt
+and distinguish setup, discovery and transport failures from assertion failures.
+
 ## Backend unit tests
 
 Add co-located `*.spec.ts` files under `apps/api/src`. Existing Jest discovery
 includes them in `pnpm --filter api test` and the CI unit+Redis group.
-Mock infrastructure for isolated logic; use E2E when real database or HTTP behavior
-is the assertion. See [backend conventions](../backend/architecture-and-conventions.md).
+Mock infrastructure for isolated logic. Use real dependency integration for SQL,
+transactions or Lua; use HTTP when request/response wiring is the assertion. See [backend conventions](../backend/architecture-and-conventions.md).
 
 ## Backend E2E
 
@@ -22,7 +43,8 @@ pnpm --filter api test:e2e --runTestsByPath test/oauth.e2e-spec.ts
 ```
 
 The supervisor discovers ordinary files automatically and assigns each exactly
-once to the complete API plan. The current 91 suites are not a permanent limit.
+once to the complete API plan. Inspect the runner discovery for the current inventory;
+there is no required suite count.
 Do not add a focused CI call for every feature. No skipped, focused-only or retried
 declarations are admitted. Each child must exit naturally and clean its resources.
 Source or build-config changes can invalidate preparation; prepare again when needed.

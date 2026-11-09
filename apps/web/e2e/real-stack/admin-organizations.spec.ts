@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Route, test } from '@playwright/test'
 
 import {
   createOrganization,
@@ -123,21 +123,63 @@ test('path-mode Organizations panel paginates real data with the Next/Previous l
   // tests in this file (those are older still and only sink further).
   createOrganizationsForPagination(marker)
 
-  await page.goto('/en/admin/organizations')
-  await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
+  const isPage2 = (url: URL) =>
+    url.pathname === '/en/admin/organizations' && url.searchParams.get('page') === '2'
+  let releasePage2!: () => void
+  let page2Entered!: () => void
+  const heldResponse = new Promise<void>((resolve) => {
+    releasePage2 = resolve
+  })
+  const entered = new Promise<void>((resolve) => {
+    page2Entered = resolve
+  })
+  const responses: Promise<void>[] = []
+  const gatePage2 = (route: Route) => {
+    const work = (async () => {
+      page2Entered()
+      const response = await route.fetch()
+      await heldResponse
+      await route.fulfill({ response })
+    })()
+    responses.push(work)
+    return work
+  }
+  await page.clock.install()
+  try {
+    await page.route(isPage2, gatePage2)
+    await page.goto('/en/admin/organizations')
+    const search = page.getByLabel(/search organizations/i)
+    await expect(search).toBeEnabled()
+    await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
+    // Pause after loaded controls; the conditional clear button below proves client handling.
+    await page.clock.pauseAt(new Date(Date.now() + 1000))
+    const searches: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/en/admin/organizations' && url.searchParams.has('search'))
+        searches.push(request.url())
+    })
+    await search.fill('uncommitted-page-draft')
+    await expect(page.getByRole('button', { name: /clear search/i })).toBeVisible()
+    // Hold the real Next response: a fast navigation must not cancel the bug for the test.
+    await page.getByRole('link', { name: /next/i }).click({ noWaitAfter: true })
+    await entered
+    await page.clock.runFor(1000)
+    expect(searches).toEqual([])
+    releasePage2()
+    await expect(page).toHaveURL(/[?&]page=2\b/)
+    await expect(page).not.toHaveURL(/[?&]search=/)
+    await expect(search).toHaveValue('')
+    await expect(page.getByRole('cell', { name: lastOrgName })).toBeVisible()
 
-  await page.getByLabel(/search organizations/i).fill('uncommitted-page-draft')
-  await page.getByRole('link', { name: /next/i }).click()
-  await expect(page).toHaveURL(/[?&]page=2\b/)
-  await page.waitForTimeout(400)
-  await expect(page).not.toHaveURL(/[?&]search=/)
-  await expect(page.getByLabel(/search organizations/i)).toHaveValue('')
-  await expect(page.getByRole('cell', { name: lastOrgName })).toBeVisible()
-
-  await page.getByRole('link', { name: /previous/i }).click()
-  // `page=1` is the canonical URL's default and is omitted, not written out
-  // explicitly (`buildDiscoveryHref`) — so back on page 1 means no `page`
-  // param at all, not `page=1`.
-  await expect(page).not.toHaveURL(/[?&]page=/)
-  await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
+    await page.getByRole('link', { name: /previous/i }).click()
+    // Page1 is the default and its parameter is omitted.
+    await expect(page).not.toHaveURL(/[?&]page=/)
+    await expect(page.getByRole('cell', { name: lastOrgName })).toHaveCount(0)
+  } finally {
+    releasePage2()
+    await page.unroute(isPage2, gatePage2)
+    await Promise.allSettled(responses)
+    await page.clock.resume()
+  }
 })

@@ -246,9 +246,12 @@ describe('Role definitions: list, detail, atomic save, confirmed delete (real DB
     const withFull = definition(detail, {
       presets: [{ capabilityId: 'teamAccess.manage', presetId: 'all' }],
     })
+    const beforeAudit = await auditRows('org.role_updated')
     await save(role.role.id, withFull)
       .expect(400)
       .then((r) => expect(r.body.errorCode).toBe('ROLE_FULL_CONTROL_ACK_REQUIRED'))
+    expect((await get(`/${role.role.id}`).expect(200)).body).toEqual(detail)
+    expect(await auditRows('org.role_updated')).toEqual(beforeAudit)
     const done = await save(role.role.id, { ...withFull, acknowledgeFullControl: true }).expect(200)
     expect(done.body.detail.grantsFullControl).toBe(true)
     expect(await auditRows('org.role_updated').then((rows) => rows[0].metadata)).toMatchObject({
@@ -266,9 +269,12 @@ describe('Role definitions: list, detail, atomic save, confirmed delete (real DB
     const held = (await get(`/${role.role.id}`).expect(200)).body
     expect(held.selfHeld).toBe(true)
     const removeFull = definition(held, { presets: [] })
+    const heldAudit = await auditRows('org.role_updated')
     await save(role.role.id, removeFull)
       .expect(400)
       .then((r) => expect(r.body.errorCode).toBe('ROLE_SELF_HELD_ACK_REQUIRED'))
+    expect((await get(`/${role.role.id}`).expect(200)).body).toEqual(held)
+    expect(await auditRows('org.role_updated')).toEqual(heldAudit)
     await save(role.role.id, { ...removeFull, acknowledgeSelfHeld: true }).expect(200)
   })
 

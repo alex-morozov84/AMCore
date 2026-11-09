@@ -404,7 +404,9 @@ change using the procedure above.
 Vitest + React Testing Library, matching the existing pattern in
 `button.test.tsx`/`skeleton.test.tsx`/`dialog.test.tsx`: render the
 component, assert on `data-slot`/`data-variant` attributes and behavior
-(click, open/close, variant switching), not implementation detail. Every
+(click, open/close, variant switching), not implementation detail. Attribute
+propagation proves the component API, not rendered size, color or contrast.
+Attempt disabled activation and assert no callback; an attribute alone is weaker. Every
 primitive in the inventory above also has a Storybook story — see
 [Storybook](./storybook.md) for story conventions and the CLI-safety
 procedure that page's own section mirrors from this one. Adding or changing a

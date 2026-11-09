@@ -1,7 +1,7 @@
 /**
  * Integration test for the generic Notification email template.
  *
- * Real React Email rendering (Vitest + happy-dom), no mocks — see ai/TESTING.md.
+ * Real React Email rendering (Vitest + happy-dom), no mocks. See docs/email/README.md.
  */
 
 import { render } from '@react-email/render'
@@ -20,6 +20,8 @@ describe('NotificationEmail Template (Integration)', () => {
       })
     )
 
+    expect(html).toMatch(/<table/i)
+    expect(html).toMatch(/style="/i)
     expect(html).toContain('<!DOCTYPE html')
     expect(html).toContain('Профиль обновлён')
     expect(html).toContain('Вы изменили данные профиля.')
@@ -62,13 +64,5 @@ describe('NotificationEmail Template (Integration)', () => {
     expect(html).toContain('Quote')
     // The raw script tag must be HTML-escaped, not passed through verbatim.
     expect(html).not.toContain('<script>alert(1)</script>')
-  })
-
-  it('produces email-client-friendly HTML structure', async () => {
-    const html = await render(
-      NotificationEmail({ title: 'T', body: 'B', actionUrl: 'https://app.example', locale: 'en' })
-    )
-    expect(html).toMatch(/<table/i)
-    expect(html).toMatch(/style="/i)
   })
 })

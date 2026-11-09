@@ -63,7 +63,9 @@ compiler API and secondary checker. Avoid bare `tsc`: the two installed CLI
 packages export that name. Native incremental state stays in
 `apps/api/.amcore/typescript7/`, separate from the retained compiler cache.
 
-Email template tests retain Vitest, happy-dom and `vitest.config.ts`.
+Email template tests retain Vitest, happy-dom and `vitest.config.ts`. The six rendering
+files run through the separate local `pnpm --filter api test:email` command; default
+`pnpm test` and current CI do not run them. See [render verification](../../docs/email/README.md#verify-rendered-templates).
 `test:email:watch`, `test:email:ui` and `test:email:cov` remain separate commands.
 API coverage uses `test:cov` and writes text/lcov/html to `coverage`;
 email coverage writes to `coverage-email`. No API coverage threshold is configured.

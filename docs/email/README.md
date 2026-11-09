@@ -78,6 +78,18 @@ changes. The Console shows only closed codes, never the provider's own error tex
 - [Queued safety and recovery](./queued-safety.md) — immutable request, certainty, finite starts, cooldown/horizon, legacy handling and protected evidence.
 - [Security](./security.md) — secret-link invariants, logging rules, and queue boundaries.
 
+## Verify rendered templates
+
+Run `pnpm --filter api test:email` from the repository root. The six
+`templates/*.integration.spec.ts` files use the real React Email renderer with
+Vitest and happy-dom. This is a separate local command: default `pnpm test` and
+current CI do not execute this family. Run it when changing templates or messages.
+
+Check localized text, actual CTA anchor hrefs, supplied recipient data and escaping.
+A URL somewhere in the HTML does not prove the CTA points to it. An icon does not
+prove the warning text exists. Table/style assertions are structural checks, not
+email-client compatibility certification. These tests do not send mail.
+
 ## See Also
 
 - Notifications guide — [`docs/notifications/`](../notifications/README.md)

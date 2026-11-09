@@ -12,6 +12,9 @@ import { describe, expect, it } from 'vitest'
 
 import WelcomeEmail from './welcome'
 
+// Supplied by the configured happy-dom test environment.
+declare const DOMParser: typeof import('happy-dom').DOMParser
+
 describe('WelcomeEmail Template (Integration)', () => {
   it('should render in the base locale (English) by default', async () => {
     const html = await render(
@@ -22,8 +25,8 @@ describe('WelcomeEmail Template (Integration)', () => {
     )
 
     // Check that HTML is generated
-    expect(html).toBeTruthy()
-    expect(typeof html).toBe('string')
+    expect(html).toMatch(/<table/i)
+    expect(html).toMatch(/style="/i)
 
     // Check English content
     expect(html).toContain('Alexander Morozov')
@@ -56,13 +59,14 @@ describe('WelcomeEmail Template (Integration)', () => {
   it('should handle special characters in name', async () => {
     const html = await render(
       WelcomeEmail({
-        name: 'Иван "Тест" Петров',
+        name: 'Иван <script>alert(1)</script> & "Тест" Петров',
         email: 'ivan@example.com',
       })
     )
 
-    expect(html).toContain('Иван')
-    expect(html).toContain('Петров')
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    expect(document.body.textContent).toContain('Иван <script>alert(1)</script> & "Тест" Петров')
+    expect(document.querySelector('script')).toBeNull()
   })
 
   it('should include email info box', async () => {
@@ -76,20 +80,5 @@ describe('WelcomeEmail Template (Integration)', () => {
     // Email should be in info box
     expect(html).toContain('Email')
     expect(html).toContain('test@example.com')
-  })
-
-  it('should have proper HTML structure for email clients', async () => {
-    const html = await render(
-      WelcomeEmail({
-        name: 'Test',
-        email: 'test@example.com',
-      })
-    )
-
-    // Tables for email client compatibility
-    expect(html).toMatch(/<table/i)
-
-    // Inline styles (email clients requirement)
-    expect(html).toMatch(/style="/i)
   })
 })

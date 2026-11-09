@@ -1,11 +1,8 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
-
 import {
   type MfaProjectionDatabase,
   readMfaPrimaryProjection,
 } from '../src/core/auth/mfa/mfa-primary-projection.js'
-import { Prisma } from '../src/generated/prisma/client.js'
+import type { Prisma } from '../src/generated/prisma/client.js'
 
 import { createAuthorityAccount } from './mfa-authority.fixture.js'
 import { MfaProofFixture } from './mfa-proof.fixture.js'
@@ -49,33 +46,6 @@ describe('Compact primary authority SQL projection', () => {
       expect(queries).toHaveLength(2)
       expect(probe?.session?.id).toBe(f.session.id)
       expect(probe?.now).toBeInstanceOf(Date)
-      const plans: unknown[] = []
-      for (const query of queries) {
-        const [row] = await client.$queryRaw<Array<{ 'QUERY PLAN': unknown }>>(
-          Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`
-        )
-        // Keep physical plan shape/counters only; predicates and outputs can contain bound identifiers.
-        const serialized = JSON.stringify(row!['QUERY PLAN'], (key, value: unknown) =>
-          ['Output', 'Filter', 'Index Cond', 'Join Filter', 'Hash Cond', 'Merge Cond'].includes(key)
-            ? undefined
-            : value
-        )
-        plans.push(JSON.parse(serialized))
-      }
-      const output = resolve(process.cwd(), '../../.amcore/t076-pr18/auth-cost-optimization')
-      await mkdir(output, { recursive: true })
-      await writeFile(
-        resolve(output, `query-plan-${protectedAccount ? 'protected' : 'ordinary'}.json`),
-        JSON.stringify(
-          {
-            limitation:
-              'Small isolated fixtures; query plans are not a production cardinality benchmark. No forced planner settings.',
-            plans,
-          },
-          null,
-          2
-        ) + '\n'
-      )
     }
   )
 })

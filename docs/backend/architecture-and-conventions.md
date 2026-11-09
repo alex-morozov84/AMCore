@@ -532,7 +532,10 @@ Cover the critical paths and the project-specific gates:
 - **Unit** — service logic in isolation.
 - **Shared contract** (Vitest, `packages/shared`) — a new or changed Zod
   schema's own validation-boundary test lives beside it, per step 2 above.
-- **E2E** (Jest + SWC + Testcontainers, needs Docker) — the HTTP contract end to end.
+- **Real dependency integration** (Jest + SWC + Testcontainers, needs Docker) —
+  SQL constraints, transactions, locks and Redis/Lua. These tests may call services directly.
+- **HTTP E2E** — assembled request/response, guards, headers and persistence.
+  Both families use the existing API E2E runner; their names do not imply equal startup cost.
 - **OpenAPI inventory** — a new public handler **must** be added to the expected
   inventory in [`apps/api/test/openapi.e2e-spec.ts`](../../apps/api/test/openapi.e2e-spec.ts).
   The check runs both ways: a handler that ships without a typed `@SchemaResponse` (or

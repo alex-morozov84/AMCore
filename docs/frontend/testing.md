@@ -76,6 +76,11 @@ From the repository root, with dependencies and Playwright Chromium installed:
 node scripts/run-deployment-version-e2e.mjs
 ```
 
+Run this separate manual regression before delivery when changing reload recovery,
+version checking, Server Action version handling or service-worker recovery.
+Default unit/browser commands and current CI do not execute it. A cancelled build,
+timeout or transport failure is no production verdict.
+
 This separate, infrastructure-free production lane builds A and B sequentially
 in temporary copies, adds different real Server Actions and a custom 500 ms
 client timer that swallows failures, then switches one isolated proxy between
@@ -925,21 +930,19 @@ there are no independent endpoint overrides. See
   doesn't cross a server-side data read → **mocked E2E lane**
   (`page.route()`, or the `testProxy`/MSW fixture if the boundary is
   server-side).
-- The behavior involves `requireSession()`, cookies, Redis, or genuine
-  per-request server context → **real-stack E2E lane** — nothing else can
-  prove it. Pure conditional branching inside an `async` page over an
-  already-mocked `DataOutcome`, with every nested component flattened to
-  synchronous, may instead use the narrow `render(await Page())` unit-test
-  exception described above — it is not a substitute for the real-stack
-  lane whenever session/cookie/Redis/request behavior is what's actually
-  under test.
+- Match session-related tests to the changed boundary: use real Redis integration
+  for vault/Lua/CAS behavior; use an actual Next request for per-request context;
+  retain real-stack browser tests for assembled auth, BFF, cookies and navigation.
+  A mocked session cannot prove authorization. Pure decisions over supplied data
+  can use units; they do not replace a real wiring witness. The narrow
+  `render(await Page())` exception above proves only flattened conditional rendering.
 - Adding or touching a page/component with visible copy or a popup →
   add or extend an axe scan on the E2E layer that already visits it.
 - Adding or changing a `shared/ui` primitive's variant/state, or a
   feature-flow's reference composition → add or extend a **Storybook
   story** ([Storybook](./storybook.md)). Full pages, auth/BFF/session
-  flows, and anything crossing `requireSession()` stay owned by the E2E
-  lanes above — Storybook's own React Server Component support is
+  flows and request-scoped authorization retain their real request/browser
+  witnesses above — Storybook's own React Server Component support is
   experimental and deliberately not enabled here.
 
 ## Interactive data ownership

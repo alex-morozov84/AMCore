@@ -10,15 +10,9 @@ import { registerViaUi, uniqueEmail } from './helpers'
  * These tests prove without reading any email:
  * the enumeration-safe success response for both an existing and a
  * non-existing account (a real backend call either way), and the
- * missing/invalid-token states, which are exactly what a mistyped or stale
- * link produces.
+ * well-formed unknown-token refusals. Missing-token page/query/link branches
+ * run in the mocked login-validation suite; they do not require this stack.
  */
-
-test('login page links to forgot-password', async ({ page }) => {
-  await page.goto('/en/login')
-  await page.getByRole('link', { name: /forgot your password/i }).click()
-  await expect(page).toHaveURL(/\/en\/forgot-password/)
-})
 
 test('forgot-password shows the same success message for an existing account', async ({ page }) => {
   const email = uniqueEmail('forgot-password-existing')
@@ -42,22 +36,12 @@ test('forgot-password shows the same success message for a non-existing email', 
   await expect(page.getByText(/we've sent a link to reset your password/i)).toBeVisible()
 })
 
-test('resend-verification shows the same success message regardless of account state', async ({
-  page,
-}) => {
+test('resend-verification shows success for a non-existing email', async ({ page }) => {
   await page.goto('/en/resend-verification')
   await page.getByRole('textbox', { name: /email/i }).fill(uniqueEmail('never-registered'))
   await page.getByRole('button', { name: /resend verification email/i }).click()
 
   await expect(page.getByText(/we've sent a new verification link/i)).toBeVisible()
-})
-
-test('reset-password with no token shows the invalid-link state', async ({ page }) => {
-  await page.goto('/en/reset-password')
-
-  await expect(page.getByText('This link is invalid or has expired.')).toBeVisible()
-  await page.getByRole('link', { name: /request a new link/i }).click()
-  await expect(page).toHaveURL(/\/en\/forgot-password/)
 })
 
 test('reset-password with a well-formed but unknown token gets a real 401 from the backend', async ({
@@ -69,14 +53,6 @@ test('reset-password with a well-formed but unknown token gets a real 401 from t
   await page.getByRole('button', { name: /reset password/i }).click()
 
   await expect(page.getByText('This link is invalid or has expired.')).toBeVisible()
-})
-
-test('verify-email with no token shows the invalid-link state', async ({ page }) => {
-  await page.goto('/en/verify-email')
-
-  await expect(page.getByText('This link is invalid or has expired.')).toBeVisible()
-  await page.getByRole('link', { name: /resend verification/i }).click()
-  await expect(page).toHaveURL(/\/en\/resend-verification/)
 })
 
 test('verify-email with a well-formed but unknown token gets a real 401 from the backend', async ({

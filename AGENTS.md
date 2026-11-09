@@ -421,6 +421,12 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
 
 ## Testing
 
+Before adding tests, follow [test necessity and replacement](docs/operations/adding-tests.md).
+Name the guarantee, reuse an existing case where possible, and choose the smallest
+sufficient boundary. Removing or moving a test requires a retained witness, a
+relevant controlled fault and explicit lost coverage; a passing test alone is not
+a reason to keep it. Preserve the first failure and distinguish prerequisites from verdicts.
+
 API E2E policy and measurement triggers are defined in
 [CI security](docs/operations/ci-security.md#api-e2e-budget-policy).
 Use the accepted layout and absolute budgets; do not recreate a historical hardware

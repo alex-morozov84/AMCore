@@ -203,7 +203,10 @@ chore: unify github repository url
 
 ## Adding tests
 
-Follow [test discovery and CI ownership](docs/operations/adding-tests.md).
+Follow [test necessity, replacement and CI ownership](docs/operations/adding-tests.md).
+Inspect existing cases first. A passing test is not automatically needed; remove
+a repeated case only with a named replacement, relevant fault proof and explicit
+lost coverage. Do not infer execution from a filename.
 Use the [backend conventions](docs/backend/architecture-and-conventions.md),
 [frontend taxonomy](docs/frontend/testing.md) and [CI gate map](docs/operations/ci-security.md#current-gates).
 

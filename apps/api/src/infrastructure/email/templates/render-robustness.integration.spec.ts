@@ -7,7 +7,7 @@
  *  - NO raw message-id leakage (a missing key would render its literal id),
  *  - a non-empty plaintext alternative (`render(node, { plainText: true })`)
  *    that contains the localized words and no HTML tags,
- *  - locale fallback to Russian when `locale` is omitted.
+ *  - locale fallback to English when `locale` is omitted.
  *
  * @see https://react.email/docs/introduction#testing
  */

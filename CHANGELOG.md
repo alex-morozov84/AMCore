@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Testing guidance now distinguishes product behavior, starter checks and real
+  dependency boundaries. Email checks verify warning text and CTA targets; refusal
+  checks verify unchanged state instead of relying only on response codes.
+
 - The capability extension example documents API-key protection failures as 503;
   its starter check now includes the OpenAPI test. Member-access unit fixtures
   use built-in capabilities so product additions do not change their truth tables.

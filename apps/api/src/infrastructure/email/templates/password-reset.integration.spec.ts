@@ -18,19 +18,26 @@ const baseProps = {
   expiresInMinutes: 60,
 }
 
+// Supplied by the configured happy-dom test environment.
+declare const DOMParser: typeof import('happy-dom').DOMParser
+
 describe('PasswordResetEmail Template (Integration)', () => {
   it('should render in the base locale (English) by default', async () => {
     const html = await render(PasswordResetEmail(baseProps))
 
-    expect(html).toBeTruthy()
-    expect(typeof html).toBe('string')
+    expect(html).toMatch(/<table/i)
+    expect(html).toMatch(/style="/i)
 
     expect(html).toContain('Alexander')
     expect(html).toContain('Password Reset')
     expect(html).toContain('60 minutes')
 
     // The raw reset token must reach the recipient via the button href.
-    expect(html).toContain('https://app.example.com/reset-password?token=raw-token-abc')
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    const cta = Array.from(document.querySelectorAll('a')).find((link) =>
+      link.textContent?.includes('Reset Password')
+    )
+    expect(cta?.getAttribute('href')).toBe(baseProps.resetUrl)
 
     expect(html).toContain('<!DOCTYPE html')
     expect(html).toContain('</html>')
@@ -43,18 +50,13 @@ describe('PasswordResetEmail Template (Integration)', () => {
     expect(html).toContain(baseProps.resetUrl)
   })
 
-  it('should include the security warning about unrequested resets', async () => {
-    const html = await render(PasswordResetEmail(baseProps))
-
-    // The ⚠️-prefixed warning text block (passwordReset.ignoreInfo).
-    expect(html).toContain('⚠️')
-  })
-
-  it('should have proper HTML structure for email clients', async () => {
-    const html = await render(PasswordResetEmail(baseProps))
-
-    expect(html).toMatch(/<table/i)
-    expect(html).toMatch(/style="/i)
+  it.each([
+    ['en', 'If you did not request a password reset, please ignore this email.'],
+    ['ru', 'Если вы не запрашивали сброс пароля, проигнорируйте это письмо.'],
+  ] as const)('renders the unrequested-reset warning in %s', async (locale, warning) => {
+    const html = await render(PasswordResetEmail({ ...baseProps, locale }))
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    expect(document.body.textContent).toContain(warning)
   })
 
   it('getPasswordResetSubject returns a localized, non-empty subject', () => {

@@ -635,18 +635,61 @@ describe('Managed queue pause/resume — real BullMQ/Redis', () => {
     }
   )
 
-  it('rejects stale revision and corrupt marker without writes', async () => {
-    await redis.hset(`${prefix}meta`, 'amControlRevision', '2')
-    expect(await control('pause', false)).toEqual({ status: 'rejected', code: 'STATE_CHANGED' })
-    await redis.hset(`${prefix}meta`, 'amControlRevision', '0')
-    await redis.zadd(`${prefix}marker`, 0, 'unexpected')
-    expect(await control('pause', false)).toEqual({
-      status: 'rejected',
-      code: 'CONTENT_UNSUPPORTED',
-    })
-    expect(await redis.hget(`${prefix}meta`, 'paused')).toBeNull()
-    expect(await redis.xlen(`${prefix}events`)).toBe(0)
-  })
+  it.each(['stale revision', 'corrupt marker'] as const)(
+    'rejects %s without writes or expiry changes',
+    async (kind) => {
+      if (kind === 'stale revision') await redis.hset(`${prefix}meta`, 'amControlRevision', '2')
+      else {
+        await redis.hset(`${prefix}meta`, 'amControlRevision', '0')
+        await redis.zadd(`${prefix}marker`, 0, 'unexpected')
+      }
+      const snapshot = () =>
+        Promise.all(
+          ['meta', 'wait', 'paused', 'active', 'prioritized', 'delayed', 'marker', 'events'].map(
+            async (name) => {
+              const key = prefix + name
+              const type = await redis.type(key)
+              const ttl = await redis.pttl(key)
+              expect({ key, ttl }).toEqual({ key, ttl: type === 'none' ? -2 : -1 })
+              let value: unknown = null
+              switch (type) {
+                case 'hash':
+                  value = Object.entries(await redis.hgetall(key)).sort(([a], [b]) =>
+                    a.localeCompare(b)
+                  )
+                  break
+                case 'list':
+                  value = await redis.lrange(key, 0, -1)
+                  break
+                case 'set':
+                  value = (await redis.smembers(key)).sort()
+                  break
+                case 'zset':
+                  value = await redis.call('ZRANGE', key, 0, -1, 'WITHSCORES')
+                  break
+                case 'stream':
+                  value = await redis.xrange(key, '-', '+')
+                  break
+                case 'string':
+                  value = await redis.get(key)
+                  break
+                case 'none':
+                  break
+                default:
+                  throw new Error(`Unexpected Redis fixture type: ${type}`)
+              }
+              return { key, type, ttl, value }
+            }
+          )
+        )
+      const before = await snapshot()
+      expect(await control('pause', false)).toEqual({
+        status: 'rejected',
+        code: kind === 'stale revision' ? 'STATE_CHANGED' : 'CONTENT_UNSUPPORTED',
+      })
+      expect(await snapshot()).toEqual(before)
+    }
+  )
 
   it('allows active completion while concurrent producers remain paused, then resumes claims', async () => {
     let firstClaimed!: () => void
