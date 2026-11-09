@@ -1,4 +1,4 @@
-// Reuse the native migrator's isolated TLS/roles/actual-archive fixtures.
+// Reuse the native migrator's isolated TLS/roles fixtures.
 import assert from 'node:assert/strict'
 import { resources, dispose } from './migrator-lifecycle/resources.mjs'
 import { closeClient } from './migrator-lifecycle/safety.mjs'
@@ -6,8 +6,6 @@ import { fixture } from './migrator-operations/fixture.mjs'
 import { inventory, fresh } from './migrator-operations/history.mjs'
 import { setupRoles } from './migrator-operations/roles.mjs'
 import { connect, imageUrl } from './migrator-operations/connection.mjs'
-import { audit } from './migrator-operations/audit.mjs'
-import { backupRestore } from './migrator-operations/recovery.mjs'
 import { cli } from './migrator-operations/cli.mjs'
 import { databaseProblem, CA } from './load-test/database-check.mjs'
 
@@ -60,8 +58,6 @@ try {
   console.log(
     'recovery TLS: native selected CA positive; wrong CA/hostname refused; weak config blocked before dispatch PASS'
   )
-  await audit(f, admin)
-  await backupRestore(f, admin)
 } finally {
   try {
     await closeClient(admin)

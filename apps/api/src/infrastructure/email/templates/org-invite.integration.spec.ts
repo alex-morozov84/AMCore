@@ -21,12 +21,12 @@ const baseProps = {
   expiresInDays: 7,
 }
 
+// Supplied by the configured happy-dom test environment.
+declare const DOMParser: typeof import('happy-dom').DOMParser
+
 describe('OrgInviteEmail Template (Integration)', () => {
   it('should render in the base locale (English) by default with the sign-in CTA', async () => {
     const html = await render(OrgInviteEmail({ ...baseProps, hasAccount: true }))
-
-    expect(html).toBeTruthy()
-    expect(typeof html).toBe('string')
 
     // English content
     expect(html).toContain('Acme Inc.')
@@ -35,7 +35,11 @@ describe('OrgInviteEmail Template (Integration)', () => {
     expect(html).toContain('Sign in to accept the invitation')
 
     // The raw accept token must reach the recipient via the button href.
-    expect(html).toContain('https://app.example.com/invite/accept?token=raw-token-123')
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    const cta = Array.from(document.querySelectorAll('a')).find((link) =>
+      link.textContent?.includes('Sign in to accept the invitation')
+    )
+    expect(cta?.getAttribute('href')).toBe(baseProps.acceptUrl)
 
     // HTML structure
     expect(html).toContain('<!DOCTYPE html')

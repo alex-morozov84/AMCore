@@ -11,7 +11,7 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: /click me/i })).toBeInTheDocument()
   })
 
-  it('renders with different variants', () => {
+  it('propagates variant data attributes', () => {
     const { rerender } = render(<Button variant="destructive">Delete</Button>)
     expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'destructive')
 
@@ -22,7 +22,7 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'ghost')
   })
 
-  it('renders with different sizes', () => {
+  it('propagates size data attributes', () => {
     const { rerender } = render(<Button size="sm">Small</Button>)
     expect(screen.getByRole('button')).toHaveAttribute('data-size', 'sm')
 
@@ -41,9 +41,17 @@ describe('Button', () => {
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
 
-  it('is disabled when disabled prop is true', () => {
-    render(<Button disabled>Disabled</Button>)
+  it('does not invoke the callback when disabled', async () => {
+    const user = userEvent.setup()
+    const handleClick = vi.fn()
+    render(
+      <Button disabled onClick={handleClick}>
+        Disabled
+      </Button>
+    )
 
     expect(screen.getByRole('button')).toBeDisabled()
+    await user.click(screen.getByRole('button'))
+    expect(handleClick).not.toHaveBeenCalled()
   })
 })

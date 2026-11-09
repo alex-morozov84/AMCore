@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import ts from 'typescript'
@@ -19,7 +20,7 @@ import { describe, expect, it } from 'vitest'
  * forbidden form and requires a finding, and requires the allowed forms to produce none.
  */
 const SRC_ROOT = path.resolve(import.meta.dirname, '../../..')
-const SEO_DIR = path.join(SRC_ROOT, 'shared', 'lib', 'seo')
+const scopeAnchors = ['app/[locale]/layout.tsx', '_app/seo/public-pages.ts', 'proxy.ts']
 
 function isRobotsName(name: ts.PropertyName | ts.Expression): boolean {
   if (ts.isIdentifier(name)) return name.text === 'robots'
@@ -58,27 +59,78 @@ export function findRobotsKeys(source: string, fileName = 'file.tsx'): number[] 
 }
 
 function sourceFiles(dir: string): string[] {
+  const seoDir = path.join(dir, 'shared', 'lib', 'seo')
   return readdirSync(dir, { withFileTypes: true, recursive: true })
     .filter((entry) => entry.isFile() && /\.(ts|tsx)$/.test(entry.name))
     .map((entry) => path.join(entry.parentPath, entry.name))
     .filter(
       (file) =>
-        !file.startsWith(SEO_DIR + path.sep) &&
+        !file.startsWith(seoDir + path.sep) &&
         !/\.(test|spec|stories)\.(ts|tsx)$/.test(file) &&
         !file.endsWith('.d.ts')
     )
 }
 
+function completeScope(files: string[], root: string): boolean {
+  return files.length > 0 && scopeAnchors.every((anchor) => files.includes(path.join(root, anchor)))
+}
+
+function withSourceTree(run: (root: string) => void): void {
+  const root = mkdtempSync(path.join(tmpdir(), 'robots-guard-'))
+  try {
+    for (const name of [
+      ...scopeAnchors,
+      'shared/lib/seo/allowed.ts',
+      'features/example.test.ts',
+      'types.d.ts',
+    ]) {
+      const file = path.join(root, name)
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, 'export const metadata = { robots: "all" }')
+    }
+    run(root)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
 describe('the robots metadata key belongs to shared/lib/seo', () => {
   it('no other source file writes it', () => {
     const files = sourceFiles(SRC_ROOT)
-    expect(files.length, 'the scan itself must not be vacuous').toBeGreaterThan(100)
+    expect(completeScope(files, SRC_ROOT), 'scanner must include every entrypoint anchor').toBe(
+      true
+    )
     const offenders = files.flatMap((file) =>
       findRobotsKeys(readFileSync(file, 'utf8'), file).map(
         (line) => `${path.relative(SRC_ROOT, file)}:${line}`
       )
     )
     expect(offenders, 'use noindexMetadata or buildPageMetadata from shared/lib/seo').toEqual([])
+  })
+})
+
+describe('source collection covers entrypoints and respects exclusions', () => {
+  it('detects forbidden keys in each scanned root and excludes trusted/test sources', () => {
+    withSourceTree((root) => {
+      const files = sourceFiles(root)
+      expect(completeScope(files, root)).toBe(true)
+      expect(files.map((file) => path.relative(root, file)).sort()).toEqual(
+        [...scopeAnchors].sort()
+      )
+      for (const file of files) {
+        expect(findRobotsKeys(readFileSync(file, 'utf8'), file)).not.toHaveLength(0)
+      }
+    })
+  })
+
+  it('rejects empty scope and any missing entrypoint anchor', () => {
+    withSourceTree((root) => {
+      expect(completeScope([], root)).toBe(false)
+      for (const anchor of scopeAnchors) {
+        const files = sourceFiles(root).filter((file) => file !== path.join(root, anchor))
+        expect(completeScope(files, root), anchor).toBe(false)
+      }
+    })
   })
 })
 

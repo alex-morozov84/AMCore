@@ -108,22 +108,53 @@ describe('Pending identity confirms publication without ordinary pending rights'
     ).toMatchObject({ status: 'pending' })
   })
 
-  it('refuses wrong browser/vault/receipt proof and omission of the server-required MFA receipt', async () => {
+  it.each([
+    'missing receipt',
+    'wrong receipt',
+    'wrong vault',
+    'wrong generation',
+    'wrong audience',
+    'wrong handoff',
+  ] as const)('refuses %s without changing publication state', async (kind) => {
     const db = fixture.clients[0]!
     const f = await pendingPublication(fixture, { protected: true, invitation: true })
     await db.mfaProtocol.update({ where: { id: 'platform' }, data: { state: 'active' } })
-    for (const command of [
-      { ...f.command, receipt: null },
-      { ...f.command, receipt: mfaCredential() },
-      { ...f.command, vaultBinding: mfaCredential() },
-      { ...f.command, browser: { ...f.requestBinding, generation: 2 } },
-      { ...f.command, browser: { ...f.requestBinding, audience: 'console' as const } },
-      { ...f.command, handoff: { ...f.command.handoff!, cleanupKeyHash: 'wrong' } },
-    ])
-      expect(await settle(command)).toEqual({ outcome: 'changed' })
+    const command: PublicationCommand = {
+      ...f.command,
+      ...(kind === 'missing receipt' && { receipt: null }),
+      ...(kind === 'wrong receipt' && { receipt: mfaCredential() }),
+      ...(kind === 'wrong vault' && { vaultBinding: mfaCredential() }),
+      ...(kind === 'wrong generation' && { browser: { ...f.requestBinding, generation: 2 } }),
+      ...(kind === 'wrong audience' && {
+        browser: { ...f.requestBinding, audience: 'console' as const },
+      }),
+      ...(kind === 'wrong handoff' && {
+        handoff: { ...f.command.handoff!, cleanupKeyHash: 'wrong' },
+      }),
+    }
+    const snapshot = () =>
+      Promise.all([
+        db.authSessionFamily.findUnique({ where: { id: f.family.id } }),
+        db.browserAuthContext.findUnique({ where: { id: f.requestBinding.contextId } }),
+        db.invitationAuthHandoff.findUnique({
+          where: { attemptId: f.record.invitation!.attemptId },
+        }),
+        db.orgInvite.findUnique({ where: { id: f.record.invitation!.inviteId } }),
+        db.session.findMany({ where: { userId: f.user.id }, orderBy: { id: 'asc' } }),
+        db.mfaFlow.findUnique({ where: { id: f.flow.id } }),
+        db.mfaOperation.findUnique({ where: { id: f.command.operationId } }),
+        db.orgMember.findMany({ where: { userId: f.user.id }, orderBy: { id: 'asc' } }),
+      ])
+    const before = await snapshot()
+    expect(await settle(command)).toEqual({ outcome: 'changed' })
+    expect(await snapshot()).toEqual(before)
     expect(await db.authSessionFamily.findUnique({ where: { id: f.family.id } })).toMatchObject({
       publicationState: 'pending',
     })
+    expect((await authorityReader(fixture.clients[1]!).read(f.claims, f.requestBinding)).kind).toBe(
+      'denied'
+    )
+    expect(await db.orgMember.count({ where: { userId: f.user.id } })).toBe(0)
   })
 
   it('rolls back handoff, family and browser together after an enclosing failure', async () => {

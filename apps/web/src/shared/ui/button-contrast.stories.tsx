@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import axe from 'axe-core'
 import { expect, waitFor, within } from 'storybook/test'
 
+import { waitForStorybookVisualStability } from '@/test/storybook/visual-stability'
+
 import { Button } from './button'
 import { Card, CardContent } from './card'
 import { ConfirmDialog } from './confirm-dialog'
@@ -53,15 +55,6 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-async function settled(element: Element) {
-  await waitFor(() => {
-    element.getBoundingClientRect()
-    expect(element.getAnimations({ subtree: true }).some((a) => a.playState === 'running')).toBe(
-      false
-    )
-  })
-}
-
 async function checkSurfaces(canvasElement: HTMLElement, dark: boolean, surface: string) {
   // Trusted pointer movement is available in the Vitest browser runner.
   // A standalone Storybook preview remains an interactive component showcase.
@@ -73,12 +66,12 @@ async function checkSurfaces(canvasElement: HTMLElement, dark: boolean, surface:
   const body = within(document.body)
   try {
     root.classList.toggle('dark', dark)
-    await settled(document.body)
+    await waitForStorybookVisualStability(document.body)
     if (surface !== 'Confirmation') {
       const button = await body.findByRole('button', { name: `${surface} action` })
       for (const hover of [false, true]) {
         await page.elementLocator(hover ? button : body.getByRole('heading', { level: 1 })).hover()
-        await settled(button)
+        await waitForStorybookVisualStability(button)
         await expect(button.matches(':hover')).toBe(hover)
         const result = await axe.run(button, { runOnly: ['color-contrast'] })
         await expect(result.violations).toEqual([])
@@ -90,11 +83,11 @@ async function checkSurfaces(canvasElement: HTMLElement, dark: boolean, surface:
     }
     await page.elementLocator(body.getByRole('button', { name: 'Card action' })).click()
     const dialog = await body.findByRole('alertdialog')
-    await settled(dialog)
+    await waitForStorybookVisualStability(dialog)
     const confirm = within(dialog).getByRole('button', { name: 'Confirm action' })
     for (const hover of [false, true]) {
       await page.elementLocator(hover ? confirm : within(dialog).getByRole('heading')).hover()
-      await settled(confirm)
+      await waitForStorybookVisualStability(confirm)
       await expect(confirm.matches(':hover')).toBe(hover)
       const result = await axe.run(confirm, { runOnly: ['color-contrast'] })
       await expect(result.violations).toEqual([])
@@ -106,6 +99,7 @@ async function checkSurfaces(canvasElement: HTMLElement, dark: boolean, surface:
     await waitFor(() => expect(body.queryByRole('alertdialog')).not.toBeInTheDocument())
   } finally {
     root.classList.toggle('dark', wasDark)
+    await waitForStorybookVisualStability(document.body)
   }
 }
 

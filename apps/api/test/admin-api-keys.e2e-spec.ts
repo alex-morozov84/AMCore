@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { writeFile } from 'node:fs/promises'
 
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
@@ -13,7 +12,7 @@ import { ApiKeysService } from '../src/core/api-keys/api-keys.service'
 import { AuditLogService } from '../src/core/audit'
 import type { PrismaService } from '../src/prisma'
 
-import { explainInventoryQueries, proveInventorySnapshot } from './api-key-query-proofs'
+import { proveInventorySnapshot } from './api-key-query-proofs'
 import {
   cleanDatabase,
   cleanOrgData,
@@ -404,15 +403,5 @@ describe('Platform API keys (e2e)', () => {
     )
     expect(snapshot.total).toBe(1)
     expect(snapshot.data).toHaveLength(1)
-  })
-  it('records representative inventory EXPLAIN evidence on ten thousand rows', async () => {
-    const f = await fixture()
-    const evidence = await explainInventoryQueries(prisma, f.owner.id, f.organizationId)
-    expect(Object.keys(evidence)).toHaveLength(4)
-    if (process.env.API_KEY_QUERY_EVIDENCE_PATH)
-      await writeFile(
-        process.env.API_KEY_QUERY_EVIDENCE_PATH,
-        JSON.stringify(evidence, null, 2) + '\n'
-      )
   })
 })

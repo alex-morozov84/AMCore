@@ -1,27 +1,27 @@
 import { expect, test } from '@playwright/test'
 
-import { registerViaUi, signOutViaUi, uniqueEmail } from './helpers'
+import { loginViaUi, registerViaUi, signOutViaUi, uniqueEmail } from './helpers'
 
 /**
- * Real-stack lane (Track 7 FINAL PLAN §4, `ai/models-talk.md`): a real
- * `POST /api/auth/register` against `apps/api`/Postgres via the BFF, real
- * cookie-backed session vault (Redis). No mocking — `page.route()` can't
- * reach either side of this, and that's exactly why this flow belongs here
- * instead of the mocked lane.
+ * Real registration and second login traverse the BFF, API and Redis session vault.
  *
  * Deliberately registers with no `name` — `registerSchema`'s `name` is
  * optional, and this is the end-to-end proof that omitting it really works
  * (the dashboard's generic "Welcome!" instead of "Welcome, {name}!" is the
  * observable signal that no name reached the backend).
  */
-test('register creates an account, lands on the dashboard, and logout signs out', async ({
+test('register creates an account, lands on the dashboard, logs out and authenticates the same account again', async ({
   page,
 }) => {
-  await registerViaUi(page, uniqueEmail('register-logout'))
+  const email = uniqueEmail('register-logout')
+  await registerViaUi(page, email)
 
   await expect(page).toHaveURL(/\/en\/?$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome!')
 
   await signOutViaUi(page)
   await expect(page).toHaveURL(/\/en\/login/)
+  await loginViaUi(page, email)
+  await expect(page).toHaveURL(/\/en\/?$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome!')
 })

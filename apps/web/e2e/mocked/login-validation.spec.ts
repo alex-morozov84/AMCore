@@ -1,6 +1,8 @@
-import { DEFAULT_LOCALE, SERVED_LOCALES } from '@amcore/shared'
+import { DEFAULT_LOCALE, localizedFrontendUrl, SERVED_LOCALES } from '@amcore/shared'
 import { expect, type Page } from '@playwright/test'
 
+import en from '../../messages/en.json'
+import ru from '../../messages/ru.json'
 import { test } from '../shared/auth-test'
 import { expectNoAxeViolations } from '../shared/axe'
 
@@ -154,3 +156,36 @@ test('valid reset submission reaches the BFF and replaces the form on success', 
   )
   expect(resetRequestSeen).toBe(true)
 })
+
+// These page branches need actual Next route/query/link wiring but no live backend.
+const authCopy = { en, ru }[DEFAULT_LOCALE]
+const authPath = (route: string) =>
+  new URL(localizedFrontendUrl('https://page.example', DEFAULT_LOCALE, route)).pathname
+
+test('login page links to forgot-password', async ({ page }) => {
+  await page.goto(authPath('login'))
+  await page.getByRole('link', { name: authCopy.auth.forgotPassword }).click()
+  await expect(page).toHaveURL(new RegExp(`${authPath('forgot-password')}$`))
+})
+
+for (const route of ['reset-password', 'verify-email'] as const) {
+  test(`${route} with no token shows the invalid-link state`, async ({ page }) => {
+    let mutations = 0
+    page.on('request', (request) => {
+      if (
+        ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) &&
+        /\/api\/auth\/(reset-password|verify-email)$/.test(new URL(request.url()).pathname)
+      )
+        mutations++
+    })
+    await page.goto(authPath(route))
+    const linkTarget = route === 'reset-password' ? 'forgot-password' : 'resend-verification'
+    const link = page.locator(`a[href="${authPath(linkTarget)}"]`)
+    await expect(page.getByText(authCopy.errors.TOKEN_INVALID, { exact: true })).toBeVisible()
+    await expect(page.locator('input[name="password"]')).toHaveCount(0)
+    await expect(link).toBeVisible()
+    await link.click()
+    await expect(page).toHaveURL(new RegExp(`${authPath(linkTarget)}$`))
+    expect(mutations).toBe(0)
+  })
+}

@@ -18,12 +18,15 @@ const baseProps = {
   expiresInHours: 24,
 }
 
+// Supplied by the configured happy-dom test environment.
+declare const DOMParser: typeof import('happy-dom').DOMParser
+
 describe('EmailVerificationEmail Template (Integration)', () => {
   it('should render in the base locale (English) by default', async () => {
     const html = await render(EmailVerificationEmail(baseProps))
 
-    expect(html).toBeTruthy()
-    expect(typeof html).toBe('string')
+    expect(html).toMatch(/<table/i)
+    expect(html).toMatch(/style="/i)
 
     expect(html).toContain('Alexander')
     expect(html).toContain('24 hours')
@@ -36,7 +39,11 @@ describe('EmailVerificationEmail Template (Integration)', () => {
     expect(html).not.toContain('Подтвердите ваш email')
 
     // The raw verification token must reach the recipient via the button href.
-    expect(html).toContain('https://app.example.com/verify-email?token=raw-token-xyz')
+    const document = new DOMParser().parseFromString(html, 'text/html')
+    const cta = Array.from(document.querySelectorAll('a')).find((link) =>
+      link.textContent?.includes('Verify Email')
+    )
+    expect(cta?.getAttribute('href')).toBe(baseProps.verificationUrl)
 
     expect(html).toContain('<!DOCTYPE html')
     expect(html).toContain('</html>')
@@ -49,13 +56,6 @@ describe('EmailVerificationEmail Template (Integration)', () => {
     expect(html).toContain('Подтвердить email')
     expect(html).not.toContain('Verify your email')
     expect(html).toContain(baseProps.verificationUrl)
-  })
-
-  it('should have proper HTML structure for email clients', async () => {
-    const html = await render(EmailVerificationEmail(baseProps))
-
-    expect(html).toMatch(/<table/i)
-    expect(html).toMatch(/style="/i)
   })
 
   it('getEmailVerificationSubject returns a localized, non-empty subject', () => {

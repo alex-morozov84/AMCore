@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Testing guidance now distinguishes product behavior, starter checks and real
+  dependency boundaries. Email checks verify warning text and CTA targets; refusal
+  checks verify unchanged state instead of relying only on response codes.
+
 - Update Next.js to 16.4.5 with its security fixes, retaining the exact-version
   fragment-navigation patch. Refresh Node 24 image pins, pnpm to 12.18.0,
   Stylelint/config-standard to 18/41, jsdom to 31 and pinned security scanners.

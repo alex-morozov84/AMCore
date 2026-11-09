@@ -105,6 +105,44 @@ describe('AiToolRecoveryService', () => {
     expect(prisma.aiToolInvocation.findFirst).not.toHaveBeenCalled()
   })
 
+  it('starts no pending-list query when sealed during the unknown-effect read', async () => {
+    const latch = new ShutdownLatch({ warn: jest.fn() }, 'ai.run')
+    let markEntered!: () => void
+    let release!: (value: null) => void
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve
+    })
+    const firstRead = new Promise<null>((resolve) => {
+      release = resolve
+    })
+    prisma.aiToolInvocation.findFirst.mockImplementation(() => {
+      markEntered()
+      return firstRead as never
+    })
+    const service = new AiToolRecoveryService(
+      prisma,
+      registry as unknown as AiToolRegistry,
+      actions as unknown as AiToolActionService,
+      transitions as unknown as AiRunTransitions,
+      latch
+    )
+    prisma.aiToolInvocation.findMany.mockResolvedValue([] as never)
+    const result = service.recover(CTX)
+    try {
+      await entered
+      latch.seal()
+      release(null)
+      const outcome = await result
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(prisma.aiToolInvocation.findMany).not.toHaveBeenCalled()
+      expect(outcome).toBe('done')
+    } finally {
+      latch.seal()
+      release(null)
+      await result
+    }
+  })
+
   it('proceeds (asks the model) only when nothing is pending', async () => {
     pending()
 

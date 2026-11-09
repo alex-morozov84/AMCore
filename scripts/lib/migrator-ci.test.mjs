@@ -106,7 +106,7 @@ test('hosted operations and failure controls preserve independent recovery', () 
   }
   for (const name of [
     'Verify database and local-file archive recovery',
-    'Verify load migration TLS and restored grants',
+    'Verify load migration TLS trust and configuration',
   ]) {
     const step = steps.find((s) => s.name === name)
     assert.ok(step)

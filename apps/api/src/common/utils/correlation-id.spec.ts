@@ -14,6 +14,7 @@ describe('correlation ID', () => {
     'rejects %j',
     (value) => {
       expect(isCorrelationId(value)).toBe(false)
+      expect(pickCorrelationId([value], generate)).toBe('generated-id')
     }
   )
 

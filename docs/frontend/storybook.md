@@ -146,6 +146,18 @@ catch different things, and Storybook's own default ruleset disables the
 `region` rule specifically to avoid false positives at component-isolation
 granularity that wouldn't apply to a full page.
 
+For portalled dialogs, test the actual feature component and its controller boundary.
+Use the real browser viewport for narrow geometry; a small CSS container or JSDOM
+cannot establish viewport behavior. Assert initial/final focus and cancellation.
+Assert the intended loaded/open state first. Then call
+`waitForStorybookVisualStability(element)` from `@/test/storybook/visual-stability`
+before geometry or accessibility assertions. This shared helper waits for fonts,
+rendered frames and finite visual transitions; infinite spinners do not block it.
+DOM presence alone can be transient; do not replace readiness with fixed sleeps or disabled contrast checks. Restore temporary
+viewport changes in `finally`. If an automatic accessibility scan follows, wait for
+the restored viewport or theme to settle too. Retain a real page smoke for
+application composition.
+
 `shared/ui/button-contrast.stories.tsx` tests the actual destructive Button
 and confirmation action on body/card/popover surfaces in light and dark.
 Each theme/surface case checks normal and hover separately. In the Vitest

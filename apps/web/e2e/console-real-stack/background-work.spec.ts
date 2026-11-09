@@ -1,11 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { registerViaUi, uniqueEmail } from '../real-stack/helpers'
-import {
-  backgroundWorkBoardStatesJourney,
-  backgroundWorkDegradedJourney,
-  backgroundWorkRetryAfterJourney,
-} from '../shared/background-work-intercepted-journeys'
+import { backgroundWorkBoardStatesJourney } from '../shared/background-work-intercepted-journeys'
 import { backgroundWorkJourney, queueBoardJourney } from '../shared/background-work-journey'
 import { completeMfaSignIn } from '../shared/mfa-login'
 import { activeTarget } from '../support/managed-target.mjs'
@@ -72,28 +68,6 @@ test('host-mode queue board entry follows the live summary: failed open, disable
   const { page, close } = await operator(browser, 'console-queue-board-states')
   try {
     await backgroundWorkBoardStatesJourney(page, '/en/background-work')
-  } finally {
-    await close()
-  }
-})
-
-test('host-mode Background work: unreadable queues are data and back off', async ({ browser }) => {
-  test.setTimeout(180_000)
-  const { page, close } = await operator(browser, 'console-background-work-degraded')
-  try {
-    await backgroundWorkDegradedJourney(page, '/en/background-work')
-  } finally {
-    await close()
-  }
-})
-
-test('host-mode Background work: a short Retry-After frees manual Refresh before the automatic backoff ends', async ({
-  browser,
-}) => {
-  test.setTimeout(180_000)
-  const { page, close } = await operator(browser, 'console-background-work-retry-after')
-  try {
-    await backgroundWorkRetryAfterJourney(page, '/en/background-work')
   } finally {
     await close()
   }

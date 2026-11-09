@@ -70,10 +70,14 @@ describe('RoleEditor', () => {
   it('shows no action bar until something changes, then offers save and discard', () => {
     show(detail())
     expect(screen.queryByRole('button', { name: t.save })).toBeNull()
+    fireEvent.change(screen.getByLabelText(t.nameLabel), { target: { value: 'Changed draft' } })
     fireEvent.click(level(like(label.organizationRead.label), t.levels.all))
     expect(screen.getByText(t.unsaved)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: t.discard }))
     expect(screen.queryByRole('button', { name: t.save })).toBeNull()
+    expect(screen.getByLabelText(t.nameLabel)).toHaveValue('Support')
+    expect(level(like(label.organizationRead.label), t.levels.all)).not.toBeChecked()
+    expect(save).not.toHaveBeenCalled()
   })
 
   it('asks to confirm full control, sends nothing on cancel and the acknowledgment on confirm', async () => {
@@ -151,7 +155,13 @@ describe('RoleEditor', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Elsewhere' }))
     const dialog = await screen.findByRole('alertdialog', { name: t.leaveTitle })
     expect(onLeave).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: t.leaveConfirm }))
+    fireEvent.click(within(dialog).getByRole('button', { name: t.leaveStay }))
+    expect(onLeave).not.toHaveBeenCalled()
+    expect(level(like(label.organizationRead.label), t.levels.all)).toBeChecked()
+    expect(screen.getByText(t.unsaved)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Elsewhere' }))
+    const confirmed = await screen.findByRole('alertdialog', { name: t.leaveTitle })
+    fireEvent.click(within(confirmed).getByRole('button', { name: t.leaveConfirm }))
     expect(onLeave).toHaveBeenCalledWith('/elsewhere')
   })
 

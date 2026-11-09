@@ -32,32 +32,33 @@ const catalogues: Record<string, { errors: Record<string, string> }> = { en, ru 
  * translating it fails this test instead of silently degrading the UI to a
  * generic message — which is exactly how the original gap went unnoticed.
  */
-const backendCodes = [
-  ...Object.values(AuthErrorCode),
-  ...Object.values(ResourceErrorCode),
-  ...Object.values(InfrastructureErrorCode),
-  ...Object.values(IntegrationErrorCode),
-  ...Object.values(SupportMailErrorCode),
-  ...Object.values(ApiKeyScopeErrorCode),
-  ...Object.values(MemberApiKeyErrorCode),
-  ...Object.values(InviteErrorCode),
-  ...Object.values(OrganizationMemberErrorCode),
-  ...Object.values(OrganizationEstablishmentErrorCode),
-  ...Object.values(OrganizationProvisioningErrorCode),
-  ...Object.values(OrganizationAdministrationErrorCode),
-  ...Object.values(CommonErrorCode),
-  ...Object.values(PermissionErrorCode),
-  ...Object.values(RoleDefinitionErrorCode),
-  ...WORK_REASONS.filter((code) => code !== 'RATE_LIMIT_EXCEEDED'),
-]
+const backendCodeFamilies = {
+  AuthErrorCode,
+  ResourceErrorCode,
+  InfrastructureErrorCode,
+  IntegrationErrorCode,
+  SupportMailErrorCode,
+  ApiKeyScopeErrorCode,
+  MemberApiKeyErrorCode,
+  InviteErrorCode,
+  OrganizationMemberErrorCode,
+  OrganizationEstablishmentErrorCode,
+  OrganizationProvisioningErrorCode,
+  OrganizationAdministrationErrorCode,
+  CommonErrorCode,
+  PermissionErrorCode,
+  RoleDefinitionErrorCode,
+  workReasons: WORK_REASONS.filter((code) => code !== 'RATE_LIMIT_EXCEEDED'),
+}
+const backendCodes = Object.values(backendCodeFamilies).flatMap((family) => Object.values(family))
 
 const clientCodes = Object.values(ClientErrorCode)
 
 describe('API error message coverage', () => {
-  it('derives a non-trivial set of backend codes', () => {
-    // Guards the guard: if the enums were ever renamed or the import shape
-    // changed, the loops below would vacuously pass over an empty list.
-    expect(backendCodes.length).toBeGreaterThan(20)
+  it('includes every imported backend code family without duplicates', () => {
+    for (const [name, family] of Object.entries(backendCodeFamilies)) {
+      expect(Object.values(family), name).not.toHaveLength(0)
+    }
     expect(new Set(backendCodes).size).toBe(backendCodes.length)
   })
 

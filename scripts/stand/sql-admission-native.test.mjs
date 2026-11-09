@@ -260,19 +260,24 @@ test('SQL admission contract native proof pack', async (t) => {
         await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres'])
         await assert.rejects(() => fixtureCommand(m, 'UPDATE public.admission_probe SET value=99;'))
         const resources = await discover(m, false)
+        const replacements = []
         for (const id of resources.container) {
           const item = await inspect(m, 'container', id)
-          if (item.Config.Labels['com.docker.compose.service'] === 'postgres') {
-            assert.notEqual(id, original)
-            assert.equal(
-              (
-                await adminSql({ ...m, postgres: id }, 'SELECT value FROM public.admission_probe;')
-              ).trim(),
-              '1'
-            )
-            await docker(m, ['container', 'stop', id])
-          }
+          if (item.Config.Labels['com.docker.compose.service'] === 'postgres') replacements.push(id)
         }
+        assert.equal(replacements.length, 1, 'exactly one owned replacement PostgreSQL is required')
+        const replacement = replacements[0]
+        assert.notEqual(replacement, original)
+        assert.equal(
+          (
+            await adminSql(
+              { ...m, postgres: replacement },
+              'SELECT value FROM public.admission_probe;'
+            )
+          ).trim(),
+          '1'
+        )
+        await docker(m, ['container', 'stop', replacement])
       }
     )
   } finally {

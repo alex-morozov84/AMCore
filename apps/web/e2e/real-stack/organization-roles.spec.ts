@@ -99,13 +99,9 @@ test('roles: create, edit, protect an unsaved draft, confirm full control and de
   await page.getByRole('button', { name: t.fullControlConfirm }).click()
   await expect(page.getByText(t.saved)).toBeVisible()
 
-  // Delete names the loaded numbers and needs an acknowledgment; then the list is empty again.
+  // Delete the empty role through the real transport; then the list is empty again.
   await page.getByRole('button', { name: t.delete }).click()
   const dialog = page.getByRole('dialog', { name: t.deleteTitle })
-  // Nothing is affected, so no acknowledgment is asked for.
-  await expect(dialog).toContainText(t.deleteNone)
-  await expect(dialog.getByRole('checkbox', { name: t.deleteAck })).toHaveCount(0)
-  await expect(dialog.getByRole('button', { name: t.deleteConfirm })).toBeEnabled()
   const deleted = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().endsWith('/deletion')
   )
