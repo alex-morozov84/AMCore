@@ -39,11 +39,6 @@ test('measurement uses fresh cold stores only in API jobs and retains runner evi
     assert.equal(steps[cold].if, "env.API_E2E_CACHE_MODE == 'cold'")
     assert.match(steps[cold].run, /RUNNER_TEMP/)
   }
-  assert.equal(
-    workflow.jobs['test-focused-background'].steps.find((step) => step.name === 'Setup Node.js')
-      .with.cache,
-    'pnpm'
-  )
   const final = workflow.jobs['api-e2e-shards'].steps.find(
     (step) => step.name === 'Record final resource measurement'
   )

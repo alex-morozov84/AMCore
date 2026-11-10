@@ -54,24 +54,49 @@ The stand also retries its own `postgres` and `redis` pulls on registry 5xx and 
 
 ## Docker E2E disk preparation
 
-Hosted Linux runners guarantee only about 14 GB of free disk, and some machines have
-less than others. Every job that builds application images runs
-`scripts/free-runner-disk.sh` after checkout: the Docker-backed Web E2E lanes (all but
-`mocked`, which uses no Docker, and including `safety`, whose stand tests build the
-images), `docker-image-smoke` and `observability-contract-live`. **Add the same step
-to any new job that builds images.** Jobs that only pull small images (Redis,
-Postgres) do not need it; the removal takes one to two minutes.
+GitHub [lists 14 GB SSD for standard Linux runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners); actual available space varies.
+Do not depend on the larger disks observed on some machines. Every job that builds
+application images calls `scripts/free-runner-disk.sh` after checkout: Docker-backed
+Web E2E lanes (all but `mocked`, including `safety`), production image smoke and live
+observability. New image-building jobs must keep this preparation. Jobs that only
+pull small Redis/Postgres images do not need it.
 
-The script removes the preinstalled Android SDK (`/usr/local/lib/android`) and system
-.NET SDK (`/usr/share/dotnet`); no job uses either. The runner's own bundled runtime
-remains intact. The API readiness check fails when disk use passes
-`HEALTH_DISK_THRESHOLD_PERCENT` (90% by default), so a nearly full runner shows up as
-an unhealthy `api` container. The script prints free bytes and inode availability
-before and after removal. On an Azure runner it freed about 17 GiB; that is an
-observation, not a promise, and a successful removal alone does not prove sufficient
-build capacity. If a job still fails on disk, read those `df` lines first.
-Do not rely on the extra disk observed on some hosted machines. Reassess runner
-capacity when measured build consumption no longer leaves adequate headroom.
+The default call removes the unused Android SDK (`/usr/local/lib/android`) and
+system .NET SDK (`/usr/share/dotnet`). No application job uses them; the runner's
+bundled runtime stays intact. Actual deletion time and reclaimed bytes vary. The
+script reports available bytes and inodes before and after; deletion/report errors
+remain failures. It does not prune Docker images or alter application readiness.
+
+Only `path-standard` and `path-disruptive` may skip deletion through the explicit
+`--lane` option. Admission requires known GitHub-hosted Ubuntu 24.04 x64, local
+Docker `overlay2`, and one filesystem for workspace, temporary files, Docker data
+and application root. Available bytes must satisfy BOTH 80 GiB and
+40 GiB plus 10% of filesystem capacity. Free inodes must satisfy BOTH 80% of total
+and 2,000,000 plus 5% of total. All comparisons use exact integer arithmetic.
+The 40 GiB allowance comprises 32 GiB for workload growth and 8 GiB reserve;
+these are conservative policy allowances, not measured peak guarantees.
+
+Effective readiness must remain the reviewed default 0.9. Before dependencies are
+installed, a source receipt binds the schema, environment-generation/override
+code, image/snapshot inputs and selected locale/placement settings. Changes to
+those files disable skip until reviewed; never refresh
+`scripts/runner-disk/known-readiness.json` merely to obtain a skip. Its fingerprints
+protect the known effective configuration, rather than trusting a host variable
+that may not reach the container. Explicit overrides also retain deletion.
+
+The isolated probe has a five-second deadline and terminates its process group.
+It logs the branch, primitive capacity counters and admission reason. Unknown or
+unsupported identity/storage/configuration, malformed counters, filesystem mismatch,
+probe failure or timeout retains deletion. Safety, smoke, observability and other
+lanes keep deletion. A no-option call always retains the original behavior.
+
+The API checks disk use against `HEALTH_DISK_THRESHOLD_PERCENT` (default 90%).
+A nearly full runner can therefore produce an unhealthy API even before ENOSPC.
+Read the decision and `df` output when diagnosing a failure. Keep the readiness
+threshold intact; successful SDK removal alone does not prove sufficient capacity.
+Use actual phase/minimum observations in required delivery runs before expanding
+the eligible lanes. Sampling does not establish an instantaneous peak or guarantee
+against arbitrary future workload growth. Reassess capacity when the application grows.
 
 ## What Each Gate Proves
 
@@ -115,16 +140,19 @@ capacity when measured build consumption no longer leaves adequate headroom.
     Caddy test-entry removal without changing database data and private model-file
     ownership for a non-root operator.
 - **Test** is the aggregate for unit+real-Redis, capability extension,
-  notification/AI extension, focused API fallback and **API E2E**.
+  notification/AI extension and **API E2E**.
   Independent hosted jobs install frozen dependencies and own their preparation.
   The aggregate runs after dependency failure or skipping and accepts only its
   exact nonempty dependency set with every result `success`. Missing, skipped,
   cancelled or unknown outcomes fail; cleanup cannot turn failure into success.
   The aggregate itself needs no checkout, installation or API receipt.
-  The fallback prepares a fresh API receipt and preserves six focused suites and
-  twenty-three background-work suites. Separate output roots retain both reports.
-  Repeated invocations remain until assertion, condition, natural-exit and cleanup
-  equivalence with full API coverage is demonstrated.
+  Standard API suites run once through full API coverage. The former focused and
+  background-work CI job repeated the same source and per-suite supervision without
+  a distinct application scenario. Controlled readiness and shutdown defects remain
+  detectable by the retained suites; strict inventory, process and aggregate guards
+  remain required. Removing the second execution loses independent repetition and
+  its separate artifact, not the original assertions. Focused local commands remain
+  available for diagnosis.
 - **API E2E** provides full standard PR coverage in separate plan, shard and
   aggregate jobs. Each fresh discovery/execution job installs the frozen lockfile,
   generates Prisma and builds shared. The measured layout uses three built-in shards
@@ -138,13 +166,10 @@ capacity when measured build consumption no longer leaves adequate headroom.
   The tracked main ruleset requires the stable **API E2E** aggregate from GitHub
   Actions. Individual shard contexts are not required. Applying the declaration
   to live GitHub protection remains a separate owner-authorized repository action.
-  The six existing focused suites remain in the fallback feeding **Test**.
-  Background-work contracts select 23 original-checkout paths; notification/AI
-  extension contracts select nine copied paths. One path overlaps those groups.
-  Together with six focused files this names 37 distinct stock paths, not the full
-  dynamically discovered API inventory. Extension-copy execution remains separate
-  because its source and process context differ. API91 is the current baseline,
-  not a fixed maximum; ordinary new files enter discovery automatically.
+  Background-work suites remain in complete standard API discovery. The separate
+  notification/AI extension fixture still executes copied source to prove registration
+  and upgrade behavior; it is not replaced by the stock API run. The inventory is
+  discovered dynamically rather than limited to a fixed historical suite count.
   Initial layout admission requires Linux cold and cached setup evidence, measured
   runner-minutes and three comparable successful final warm observations.
   The [API E2E budget policy](#api-e2e-budget-policy) defines the accepted limits.
@@ -770,5 +795,6 @@ A new job or test family requires an explicit aggregate, inventory and docs upda
 The required `Test` name is retained; tracked workflows do not prove live protection.
 Scheduling changes require whole-workflow timings and hosted runner-minute evidence.
 Separate queue, setup, cache and container costs; do not infer speed from a shorter step.
-Rollback restores the previous sequential Test graph, focused calls, fresh prepare
-and associated docs together. It does not migrate dependencies or persistent data.
+Rollback of the repeat removal restores the focused/background job, its fresh
+prepare and artifact upload, the Test dependency and expected set, contract tests
+and documentation together. It does not migrate dependencies or persistent data.

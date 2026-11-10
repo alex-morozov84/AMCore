@@ -40,7 +40,8 @@ invoked by the notification/AI extension job feeding Test; see [channel conforma
 `pnpm test:background-work-contracts` runs the common registration, image and
 transactional durable recipes, administrative controls, queued-email safety,
 queue inventory/observation and read-only Board regression suites against isolated
-Testcontainers. Docker is required; the focused API fallback job feeding Test runs this lane. See the
+Testcontainers. Docker is required. These standard suites run once through full API E2E
+coverage in CI; this focused command remains available locally. See the
 [background-work contract](docs/backend/background-work.md#verify-a-registration).
 
 Migration image dependencies use a minimal workspace manifest and the root lock.

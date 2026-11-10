@@ -110,7 +110,7 @@ test('aggregate rejects omitted, duplicate, unexpected or wrong-SHA shard report
     assert.throws(() => validateReports(plan, reports))
 })
 
-test('CI full coverage retains original focused obligations and strict aggregate', async () => {
+test('CI full coverage keeps one stock execution path and strict aggregate', async () => {
   const { readFileSync } = await import('node:fs')
   const { root } = await import('../api-e2e/paths.mjs')
   const workflow = readFileSync(`${root}/.github/workflows/ci.yml`, 'utf8')
@@ -121,9 +121,6 @@ test('CI full coverage retains original focused obligations and strict aggregate
   )
   assert.match(workflow, /fail-fast: false/)
   assert.match(workflow, /node scripts\/api-e2e\/aggregate.mjs api-e2e-evidence/)
-  assert.equal((workflow.match(/node scripts\/api-e2e-ci.mjs --prepare/g) || []).length, 3)
-  assert.match(
-    workflow,
-    /pnpm --filter api test:e2e --runTestsByPath test\/process-role.e2e-spec.ts/
-  )
+  assert.equal((workflow.match(/node scripts\/api-e2e-ci.mjs --prepare/g) || []).length, 2)
+  assert.doesNotMatch(workflow, /test-focused-background:/)
 })

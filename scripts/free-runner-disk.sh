@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Free about 17 GiB on a hosted Linux runner by removing the Android and .NET SDKs, which
-# no AMCore job uses. Hosted runners guarantee only about 14 GB of free disk, and some
-# machines have less than others. The API readiness check fails above 90% disk use, so a
-# job that builds images on a nearly full runner shows up as an unhealthy `api` container.
-# The df lines before and after show how much space the job really had.
+# Reclaim unused SDK space unless an explicitly selected lane passes conservative
+# capacity, storage and effective-readiness admission. No option keeps legacy cleanup.
 set -euo pipefail
 
 report() {
@@ -12,5 +9,11 @@ report() {
 }
 
 report
+if [[ "${1:-}" == "--lane" && "$#" == 2 ]]; then
+  if node "$(dirname "$0")/runner-disk-admission.mjs" "$2"; then
+    report
+    exit 0
+  fi
+fi
 sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet
 report
