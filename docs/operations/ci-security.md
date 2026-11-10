@@ -84,6 +84,12 @@ those files disable skip until reviewed; never refresh
 protect the known effective configuration, rather than trusting a host variable
 that may not reach the container. Explicit overrides also retain deletion.
 
+Dependency updates, including automated lockfile refreshes, may invalidate this
+receipt. This is a supported fallback: CI performs SDK deletion and continues;
+it does not require renewed admission to pass. Contract tests use an isolated
+reviewed fixture to verify both admission and fallback for every recorded input.
+Only a separate review of the effective configuration can renew skip admission.
+
 The isolated probe has a five-second deadline and terminates its process group.
 It logs the branch, primitive capacity counters and admission reason. Unknown or
 unsupported identity/storage/configuration, malformed counters, filesystem mismatch,

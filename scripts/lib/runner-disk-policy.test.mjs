@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { capacityDecision } from '../runner-disk/policy.mjs'
-import { knownReadiness, probe, storageDecision } from '../runner-disk/probe.mjs'
+import { probe, storageDecision } from '../runner-disk/probe.mjs'
 
 const gib = 1024n ** 3n
 const counters = {
@@ -35,8 +35,7 @@ test('capacity uses exact integer byte and both inode boundaries', () => {
   assert.equal(decide({ freeInodes: counters.inodes + 1n }), false)
 })
 
-test('only admitted lanes, runner and actual readiness source may reach storage probe', () => {
-  assert.equal(knownReadiness(), true)
+test('only admitted lanes, runner and admitted readiness may reach storage probe', () => {
   let calls = 0
   const io = {
     release,
