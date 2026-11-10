@@ -34,7 +34,9 @@ test('transfer admits the observed 19m38s non-owner completion and refuses a spe
       [
         '--input-type=module',
         '-e',
-        `Date.now = () => ${epoch} + ${minutes} * 60_000; await import(${JSON.stringify(script)});`,
+        'Date.now = () => Number(process.argv[1]); await import(process.argv[2]);',
+        String(epoch + minutes * 60_000),
+        script,
       ],
       {
         env: {
