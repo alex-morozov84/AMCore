@@ -45,6 +45,7 @@ jobs:
       - name: Generate freshness report
         env:
           GH_TOKEN: ${{ github.token }}
+          DEPENDABOT_READ_TOKEN: ${{ secrets.DEPENDABOT_READ_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: node scripts/dependency-freshness.mjs > "$RUNNER_TEMP/report.md"
 

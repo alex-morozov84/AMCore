@@ -57,3 +57,20 @@ test('missing checkout version cannot claim a known blocking parent', () => {
         : ok([[]])
   assert.match(securityFreshness(run, 'owner/repo').join('\n'), /alert version absent/)
 })
+
+test('dedicated credential is used only for Dependabot reads and never rendered', () => {
+  const token = '<fake-read-token>'
+  const calls = []
+  const run = (command, args, timeout, credential) => {
+    calls.push({ command, args, credential })
+    assert.ok(!args.includes(token))
+    return ok([[]])
+  }
+  const report = securityFreshness(run, 'owner/repo', token).join('\n')
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0].credential, token)
+  assert.match(calls[0].args.at(-1), /dependabot/)
+  assert.equal(calls[1].credential, undefined)
+  assert.match(calls[1].args.at(-1), /code-scanning/)
+  assert.ok(!report.includes(token))
+})

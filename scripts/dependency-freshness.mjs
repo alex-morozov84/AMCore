@@ -16,12 +16,15 @@ import { securityFreshness } from './lib/security-freshness.mjs'
 // a slow/hanging registry or API degrades to a note in the report instead of
 // stalling the job. `pnpm outdated` is legitimately slow (whole workspace), so it
 // gets a generous budget; network one-shots get short ones so `❔` appears fast.
-const run = (cmd, args, timeoutMs = 30000) => {
+const run = (cmd, args, timeoutMs = 30000, token) => {
+  const { DEPENDABOT_READ_TOKEN: _readToken, ...env } = process.env
+  if (token) env.GH_TOKEN = token
   try {
     const out = execFileSync(cmd, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: timeoutMs,
+      env,
     })
     return { ok: true, out: out.trim() }
   } catch (e) {
@@ -190,7 +193,7 @@ const outdated = loadOutdated()
 console.log(
   render({
     npm: npmMajors(outdated),
-    security: securityFreshness(run, process.env.GH_REPO),
+    security: securityFreshness(run, process.env.GH_REPO, process.env.DEPENDABOT_READ_TOKEN),
     health: renderDependabotHealth({
       runs: dependabotRuns(),
       backlog: outdated.error ? { error: outdated.error } : { count: backlogCount(outdated.data) },
