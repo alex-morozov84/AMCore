@@ -1,12 +1,15 @@
+import { performance } from 'node:perf_hooks'
+import { setTimeout as delay } from 'node:timers/promises'
 import { clearTimeout } from 'node:timers'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readRows, supervise } from '../api-e2e/process.mjs'
 
-test('F2 malformed progress cannot disable KILL watchdog or turn late exit0 green', async () => {
+test('F2 malformed progress cannot disable KILL watchdog or turn late exit0 green', async (t) => {
+  const clock = supervisorClock(t)
   for (const progress of [
     '{broken',
     'null',
@@ -31,30 +34,55 @@ test('F2 malformed progress cannot disable KILL watchdog or turn late exit0 gree
           /* Owned group already exited. */
         }
       }, 1000)
-      const began = performance.now()
+      const began = clock.realNow()
+      const release = join(directory, 'release')
+      const running = supervise(
+        process.execPath,
+        [
+          '-e',
+          `const fs=require('node:fs');process.on('SIGTERM',${term});fs.writeFileSync(process.env.PROGRESS,${JSON.stringify(progress)}+String.fromCharCode(10));const gate=new Int32Array(new SharedArrayBuffer(4));while(!fs.existsSync(process.env.RELEASE))Atomics.wait(gate,0,0,5);setInterval(()=>{},100)`,
+        ],
+        {
+          cwd: directory,
+          progress: join(directory, 'progress.jsonl'),
+          env: { ...process.env, PROGRESS: join(directory, 'progress.jsonl'), RELEASE: release },
+          wallMilliseconds: 200,
+          termMilliseconds: 30,
+          killMilliseconds: 20,
+          pollMilliseconds: 10,
+          onState: (state) => {
+            pid = state.pid
+            if (state.forced) assert.equal(state.lifecycleFailure, true)
+          },
+        }
+      ).then(
+        (result) => ({ result }),
+        (error) => ({ error })
+      )
       try {
-        const result = await supervise(
-          process.execPath,
-          [
-            '-e',
-            `process.on('SIGTERM',${term});require('node:fs').writeFileSync(process.env.PROGRESS,${JSON.stringify(progress)}+String.fromCharCode(10));setInterval(()=>{},100)`,
-          ],
-          {
-            cwd: directory,
-            progress: join(directory, 'progress.jsonl'),
-            env: { ...process.env, PROGRESS: join(directory, 'progress.jsonl') },
-            wallMilliseconds: 200,
-            termMilliseconds: 30,
-            killMilliseconds: 20,
-            pollMilliseconds: 10,
-            onState: (state) => {
-              pid = state.pid
-              if (state.forced) assert.equal(state.lifecycleFailure, true)
-            },
-          }
+        await waitForProgress(
+          join(directory, 'progress.jsonl'),
+          progress + '\n',
+          began + 800,
+          clock.realNow
         )
+        clock.tick(10)
+        assert.deepEqual(clock.signals(pid), ['SIGTERM'])
+        clock.tick(30)
+        assert.deepEqual(
+          clock.signals(pid),
+          ['SIGTERM'],
+          'KILL must not precede its grace boundary'
+        )
+        if (term.includes('exit(0)')) writeFileSync(release, '')
+        else {
+          clock.tick(10)
+          assert.deepEqual(clock.signals(pid), ['SIGTERM', 'SIGKILL'])
+        }
+        const { result, error } = await running
+        if (error) throw error
         assert.equal(safetyUsed, false)
-        assert.ok(performance.now() - began < 800)
+        assert.ok(clock.realNow() - began < 800)
         assert.equal(result.closed, true)
         assert.equal(result.forced, true)
         assert.equal(result.lifecycleFailure, true)
@@ -69,6 +97,7 @@ test('F2 malformed progress cannot disable KILL watchdog or turn late exit0 gree
         } catch {
           /* Owned group already exited. */
         }
+        await running
         rmSync(directory, { recursive: true, force: true })
       }
     }
@@ -98,3 +127,32 @@ test('F2 valid progress events and incomplete live tail remain readable', () => 
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+// Only the supervisor's clock is virtual. Child startup, signal delivery and reaping stay real.
+function supervisorClock(t) {
+  const realNow = performance.now.bind(performance)
+  let now = 1
+  t.mock.method(performance, 'now', () => now)
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  const kill = t.mock.method(process, 'kill')
+  return {
+    realNow,
+    tick(milliseconds) {
+      now += milliseconds
+      t.mock.timers.tick(milliseconds)
+    },
+    signals(pid) {
+      return kill.mock.calls
+        .filter(({ arguments: args }) => args[0] === -pid && typeof args[1] === 'string')
+        .map(({ arguments: args }) => args[1])
+    },
+  }
+}
+
+async function waitForProgress(path, expected, deadline, realNow) {
+  while (realNow() < deadline) {
+    if (existsSync(path) && readFileSync(path, 'utf8') === expected) return
+    await delay(5)
+  }
+  throw new Error('Child did not publish progress after installing its SIGTERM handler')
+}
