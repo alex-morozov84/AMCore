@@ -9,6 +9,20 @@ export const durations = {
   cleanup: 120_000,
   transfer: 90_000,
 }
+// The final minute belongs to status generation and action post steps.
+export function laneJobMinutes(owner) {
+  const work = durations.preAudit + (owner ? durations.audit : 0)
+  return (work + durations.terminate + durations.cleanup + durations.transfer) / 60_000 + 1
+}
+export function standDeadline(epoch, phase, owner, now = Date.now()) {
+  invariant(Number.isSafeInteger(epoch) && epoch > 0 && epoch <= now, 'invalid-job-epoch')
+  if (phase === 'prepare') return epoch + durations.preAudit
+  const work = durations.preAudit + (owner ? durations.audit : 0)
+  if (phase === 'terminate')
+    return Math.min(now + durations.terminate, epoch + work + durations.terminate)
+  invariant(phase === 'cleanup', 'unknown-stand-phase')
+  return Math.min(now + durations.cleanup, epoch + work + durations.terminate + durations.cleanup)
+}
 export function phaseDeadline(epoch, now = Date.now()) {
   invariant(Number.isSafeInteger(epoch) && epoch > 0 && epoch <= now, 'invalid-job-epoch')
   invariant(now <= epoch + durations.preAudit, 'pre-audit-deadline-exhausted')

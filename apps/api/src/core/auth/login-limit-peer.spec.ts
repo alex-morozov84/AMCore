@@ -1,5 +1,5 @@
 import { once } from 'node:events'
-import { createServer, type Socket } from 'node:net'
+import { createServer, Socket } from 'node:net'
 import { performance } from 'node:perf_hooks'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 
@@ -96,6 +96,25 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
       ],
     })
     jest.spyOn(performance, 'now').mockImplementation(() => jest.now())
+    // Socket timers use Node's internal clock, outside Jest's fake timers.
+    // These clients use socket timeouts only while connecting; keep that deadline
+    // on the same controlled clock as command/work/cleanup deadlines. I/O stays real.
+    const timeouts = new WeakMap<Socket, ReturnType<typeof setTimeout>>()
+    jest.spyOn(Socket.prototype, 'setTimeout').mockImplementation(function (
+      this: Socket,
+      milliseconds,
+      callback
+    ) {
+      const previous = timeouts.get(this)
+      if (previous) clearTimeout(previous)
+      if (callback) this.once('timeout', callback)
+      if (milliseconds > 0) {
+        const timer = setTimeout(() => this.emit('timeout'), milliseconds)
+        timeouts.set(this, timer)
+        this.once('close', () => clearTimeout(timer))
+      }
+      return this
+    })
   })
   afterEach(() => {
     jest.restoreAllMocks()
@@ -196,7 +215,12 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
       for (let wave = 0; wave < 2; wave++) {
         // Real sockets prove dispatch/closure; only the clock advances under test control.
         const settled = await withinWatchdog(async () => {
-          const batch = Array.from({ length: 32 }, () => run(p.url))
+          let finished = 0
+          const batch = Array.from({ length: 32 }, () =>
+            run(p.url).finally(() => {
+              finished++
+            })
+          )
           const results = Promise.allSettled(batch)
           expect(() => LoginLimitConnection.acquire()).toThrow('capacity')
           await waitForPeer(
@@ -205,7 +229,9 @@ describe('actual ioredis bounded lifecycle against controlled RESP peer', () => 
               `wave ${wave}: ${evalCount(p.commands)}/${(wave + 1) * 32} EVAL, ` +
               `${p.commands.length} commands, ${p.sockets.size} open sockets`
           )
-          await jest.advanceTimersByTimeAsync(250)
+          await jest.advanceTimersByTimeAsync(249)
+          expect(finished).toBe(0)
+          await jest.advanceTimersByTimeAsync(1)
           return results
         })
         expect(settled.every((r) => r.status === 'rejected')).toBe(true)

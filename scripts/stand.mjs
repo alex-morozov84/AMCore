@@ -1,3 +1,4 @@
+import { standDeadline } from './lib/lighthouse-deadlines.mjs'
 import { productAdminProfiles } from './stand/product-admin-source.mjs'
 import { snapshot } from './stand/snapshot.mjs'
 import { refresh } from './stand/refresh.mjs'
@@ -27,7 +28,9 @@ if (reuseAudit && (!auditOnly || process.env.CI === 'true'))
 const auditOwner = process.env.AMCORE_AUDIT_OWNER
 if (auditOnly && (!auditOwner || process.env.CI === 'true'))
   throw new Error('Audit-only requires explicit local audit dispatcher')
-if (auditOwner) setProcessDeadline(Number(process.env.AMCORE_AUDIT_EPOCH) + 20 * 60_000)
+const epoch = process.env.AMCORE_E2E_EPOCH ?? process.env.AMCORE_AUDIT_EPOCH
+if (epoch !== undefined)
+  setProcessDeadline(standDeadline(Number(epoch), 'prepare', Boolean(auditOwner)))
 const edge = value('--edge')
 if (
   edge &&
@@ -206,10 +209,8 @@ async function execute() {
   } finally {
     await stopChildren()
     allowCleanup()
-    if (auditOwner)
-      setProcessDeadline(
-        Math.min(Date.now() + 120_000, Number(process.env.AMCORE_AUDIT_EPOCH) + 37.5 * 60_000)
-      )
+    if (epoch !== undefined)
+      setProcessDeadline(standDeadline(Number(epoch), 'cleanup', Boolean(auditOwner)))
     let cleanupError
     if (m && action === 'e2e' && lane !== 'mocked') {
       try {

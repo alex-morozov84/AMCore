@@ -10,7 +10,14 @@ import { checkCoverage } from './lighthouse-coverage.mjs'
 import { evaluateResult, validateResult } from './lighthouse-policy.mjs'
 import { writePair, writeManifest, verifyBundle } from './lighthouse-reports.mjs'
 import { validateEnvelopes, validateOwnerBundle } from './lighthouse-ci-evidence.mjs'
-import { admitCase, phaseDeadline, durations, boundedCase } from './lighthouse-deadlines.mjs'
+import {
+  admitCase,
+  phaseDeadline,
+  durations,
+  boundedCase,
+  standDeadline,
+  laneJobMinutes,
+} from './lighthouse-deadlines.mjs'
 
 const root = new URL('../..', import.meta.url).pathname
 const identity = { run: '123', attempt: '1', source: 'a'.repeat(40) }
@@ -272,6 +279,18 @@ test('case admission preserves export, termination and cleanup; timeout invokes 
   const epoch = 1000
   assert.equal(phaseDeadline(epoch, epoch + durations.preAudit), epoch + 35 * 60_000)
   assert.throws(() => phaseDeadline(epoch, epoch + durations.preAudit + 1))
+  for (const owner of [false, true]) {
+    const workEnd = epoch + durations.preAudit + (owner ? durations.audit : 0)
+    const terminated = standDeadline(epoch, 'terminate', owner, workEnd)
+    const cleaned = standDeadline(epoch, 'cleanup', owner, terminated)
+    assert.equal(standDeadline(epoch, 'prepare', owner, epoch), epoch + durations.preAudit)
+    assert.equal(terminated, workEnd + durations.terminate)
+    assert.equal(cleaned, terminated + durations.cleanup)
+    assert.equal(cleaned + durations.transfer + 60_000, epoch + laneJobMinutes(owner) * 60_000)
+    assert.equal(standDeadline(epoch, 'cleanup', owner, cleaned), cleaned)
+  }
+  assert.equal(laneJobMinutes(false), 25)
+  assert.equal(laneJobMinutes(true), 40)
   assert.throws(() => admitCase(1000 + durations.case + durations.export - 1, 1000))
   let stopped
   await assert.rejects(

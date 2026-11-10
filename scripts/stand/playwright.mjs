@@ -1,3 +1,4 @@
+import { standDeadline } from '../lib/lighthouse-deadlines.mjs'
 import { toolingFingerprint, compiledFingerprint } from '../lighthouse/reuse.mjs'
 import { runAuditPhase } from './lighthouse-phase.mjs'
 import { setProcessDeadline } from './process.mjs'
@@ -78,9 +79,10 @@ export async function test(m, lane, token, extra = [], group, auditOnly = false)
     if (!['passed', 'not_run_local_audit'].includes(m.testOutcome)) m.testOutcome = 'failed'
     throw error
   } finally {
-    if (process.env.AMCORE_AUDIT_OWNER)
+    const epoch = process.env.AMCORE_E2E_EPOCH ?? process.env.AMCORE_AUDIT_EPOCH
+    if (epoch !== undefined)
       setProcessDeadline(
-        Math.min(Date.now() + 30_000, Number(process.env.AMCORE_AUDIT_EPOCH) + 35.5 * 60_000)
+        standDeadline(Number(epoch), 'terminate', Boolean(process.env.AMCORE_AUDIT_OWNER))
       )
     endInvocation(m)
     if (close) {
