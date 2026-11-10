@@ -65,6 +65,10 @@ updates:
           - 'patch'
           - 'minor'
     ignore:
+      # Exact-version route-cache patch: review every Next update manually.
+      # Freshness reports patch/minor/major releases; removal checks are in
+      # docs/frontend/next-route-cache-patch.md.
+      - dependency-name: 'next'
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
       # jest-mock-extended: 4.0.1+ breaks Prisma 7's generic-overloaded groupBy

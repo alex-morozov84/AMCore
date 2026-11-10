@@ -11,17 +11,21 @@ import { backlogCount, renderDependabotHealth } from './lib/dependabot-health.mj
 import { renderToolchain, toolchainFreshness } from './lib/toolchain-freshness.mjs'
 import { dockerPins } from './lib/docker-pins.mjs'
 import { securityFreshness } from './lib/security-freshness.mjs'
+import { nextFreshness } from './lib/next-freshness.mjs'
 
 // Every probe is bounded: on timeout execFileSync kills the child and throws, so
 // a slow/hanging registry or API degrades to a note in the report instead of
 // stalling the job. `pnpm outdated` is legitimately slow (whole workspace), so it
 // gets a generous budget; network one-shots get short ones so `❔` appears fast.
-const run = (cmd, args, timeoutMs = 30000) => {
+const run = (cmd, args, timeoutMs = 30000, token) => {
+  const { DEPENDABOT_READ_TOKEN: _readToken, ...env } = process.env
+  if (token) env.GH_TOKEN = token
   try {
     const out = execFileSync(cmd, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: timeoutMs,
+      env,
     })
     return { ok: true, out: out.trim() }
   } catch (e) {
@@ -129,7 +133,7 @@ function cliDrift() {
   })
 }
 
-function render({ npm, health, security, docker, cli, toolchain }) {
+function render({ npm, health, security, next, docker, cli, toolchain }) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const out = [
     '<!-- dependency-freshness:auto -->',
@@ -147,6 +151,7 @@ function render({ npm, health, security, docker, cli, toolchain }) {
     '',
     ...health,
     ...security,
+    ...next,
     '## Pending major updates (Dependabot ignores majors)',
     '',
   ]
@@ -190,7 +195,8 @@ const outdated = loadOutdated()
 console.log(
   render({
     npm: npmMajors(outdated),
-    security: securityFreshness(run, process.env.GH_REPO),
+    next: nextFreshness(run, readFileSync('pnpm-workspace.yaml', 'utf8')),
+    security: securityFreshness(run, process.env.GH_REPO, process.env.DEPENDABOT_READ_TOKEN),
     health: renderDependabotHealth({
       runs: dependabotRuns(),
       backlog: outdated.error ? { error: outdated.error } : { count: backlogCount(outdated.data) },

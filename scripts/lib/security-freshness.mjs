@@ -4,8 +4,8 @@ const cell = (value) =>
     .replaceAll('|', '\\|')
     .replaceAll('\n', ' ')
 
-function json(run, command, args) {
-  const result = run(command, args, 20000)
+function json(run, command, args, token) {
+  const result = run(command, args, 20000, token)
   if (!result.ok) return null
   try {
     return JSON.parse(result.out)
@@ -14,13 +14,18 @@ function json(run, command, args) {
   }
 }
 
-function alerts(run, repository, family) {
-  const pages = json(run, 'gh', [
-    'api',
-    '--paginate',
-    '--slurp',
-    `repos/${repository}/${family}/alerts?state=open&per_page=100`,
-  ])
+function alerts(run, repository, family, token) {
+  const pages = json(
+    run,
+    'gh',
+    [
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/${repository}/${family}/alerts?state=open&per_page=100`,
+    ],
+    token
+  )
   return Array.isArray(pages) && pages.every(Array.isArray) ? pages.flat() : null
 }
 
@@ -80,7 +85,7 @@ function dependencyRows(run, rows) {
   return out
 }
 
-export function securityFreshness(run, repository) {
+export function securityFreshness(run, repository, dependabotToken) {
   const out = [
     '## Security update blockers',
     '',
@@ -90,11 +95,11 @@ export function securityFreshness(run, repository) {
   ]
   if (!repository || !/^[\w.-]+\/[\w.-]+$/.test(repository))
     return [...out, '> ❔ Repository context unavailable; set GH_REPO.', '']
-  const dependencies = alerts(run, repository, 'dependabot')
+  const dependencies = alerts(run, repository, 'dependabot', dependabotToken)
   out.push('### Dependabot', '')
   if (dependencies === null)
     out.push(
-      '> ❔ Alerts unavailable (check token permissions/API access). This does not mean zero alerts.'
+      '> ❔ Alerts unavailable. Configure the DEPENDABOT_READ_TOKEN Actions secret with Dependabot alerts read access for this repository, or check its expiry/access. This does not mean zero alerts.'
     )
   else if (!dependencies.length)
     out.push('_No open Dependabot alerts. Code scanning is reported separately._')

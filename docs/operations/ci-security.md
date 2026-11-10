@@ -645,10 +645,25 @@ review the parent ranges and run the affected consumer checks. Image findings
 require a rebuilt-image scan even when the upstream digest has not changed.
 Recheck on advisory changes, supported parent/distro/toolchain releases and before
 release. Existing holds remain; the report adds no overrides or automatic migrations.
-The workflow requests `security-events: read`; token restrictions can leave either
-alert API unavailable. Keep that gap visible and inspect Security with authorized access.
+The workflow requests `security-events: read` for code scanning. Dependabot reads
+use the optional `DEPENDABOT_READ_TOKEN` Actions secret. Create a fine-grained PAT
+restricted to this repository with **Dependabot alerts: Read-only**, then save it
+under **Settings → Secrets and variables → Actions → New repository secret**.
+The token is used only for the Dependabot read; issue writes retain `github.token`.
+Set an expiry and renew the secret before it expires. Never paste the token into
+an issue or workflow file. Without a working secret, the report keeps an explicit
+gap instead of reporting zero alerts. No additional token is needed for code scanning.
+After setup or renewal, run **Actions → Dependency freshness → Run workflow** on
+`main`. Verify the updated issue's generation time and populated Dependabot rows;
+a green workflow alone does not prove access. To revoke access, delete the secret
+and revoke the PAT; the next report shows the gap again.
 
 ### Weekly lockfile refresh
+
+Next.js is excluded from Dependabot updates while its exact-version route-cache
+patch remains. The freshness report compares the patched version with npm's
+`latest` tag separately, including patch/minor releases. Follow the
+[patch update/removal checks](../frontend/next-route-cache-patch.md) before updating.
 
 `lockfile-refresh.yml` runs on Tuesday at 07:00 UTC, or manually through
 **Actions → Lockfile refresh → Run workflow**, selecting `main`. It refreshes direct
