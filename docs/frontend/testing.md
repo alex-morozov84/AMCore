@@ -431,8 +431,12 @@ aggregate independently resolves ownership, retrieves those IDs and checks hashe
 source/config/build identity, coverage and scenario outcomes. Earlier test, report,
 transfer or cleanup failures remain failures.
 
-Candidate ceilings are40 minutes per owning job,20 per non-owner and5 for the
-aggregate. Report pairs allow8MiB. The complete physical upload, including payload, copied HTML
+Job ceilings are40 minutes per owning job,25 per non-owner and5 for the
+aggregate. Both browser job types allow20 minutes for preparation and ordinary
+tests, measured from the enclosing job epoch. Owners additionally allow15 minutes
+for audits. Both reserve30 seconds for termination,120 seconds for cleanup,
+90 seconds for transfer and one minute for status and action post steps.
+These are ceilings, not target durations; an exhausted phase remains a failure. Report pairs allow8MiB. The complete physical upload, including payload, copied HTML
 and index, allows256MiB and200 files, retained seven days.
 Transfer and aggregate actions use absolute phase deadlines in addition to GitHub's
 minute-based fallback. No phase spends the owned termination/cleanup reserve.

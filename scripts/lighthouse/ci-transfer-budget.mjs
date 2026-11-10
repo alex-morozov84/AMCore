@@ -1,10 +1,18 @@
+import { durations, laneJobMinutes } from '../lib/lighthouse-deadlines.mjs'
 import { appendFileSync } from 'node:fs'
 import { invariant } from '../lib/lighthouse-plan.mjs'
 
 const epoch = Number(process.env.AMCORE_CI_EPOCH)
 const owner = process.env.AMCORE_AUDIT_JOB_OWNER === 'true'
-const end = Math.min(Date.now() + 90_000, epoch + (owner ? 39 : 19.5) * 60_000)
-invariant(Number.isSafeInteger(epoch) && end > Date.now(), 'transfer-reserve-exhausted')
+const now = Date.now()
+const end = now + durations.transfer
+invariant(
+  Number.isSafeInteger(epoch) &&
+    epoch > 0 &&
+    epoch <= now &&
+    end <= epoch + (laneJobMinutes(owner) - 1) * 60_000,
+  'transfer-reserve-exhausted'
+)
 for (const [name, offset] of [
   ['E2E', 70_000],
   ['BUNDLE', 20_000],

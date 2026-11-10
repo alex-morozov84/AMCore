@@ -35,7 +35,6 @@ export default {
   hooks: {
     ...config.hooks,
     'build:done': async (context) => {
-      await config.hooks['build:done'](context)
       console.log('SHARED_BUILD_DONE:' + context.options.format)
     },
   },

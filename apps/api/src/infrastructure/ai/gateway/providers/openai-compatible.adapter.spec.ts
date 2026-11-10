@@ -274,17 +274,21 @@ describe('OpenAICompatibleAdapter', () => {
     ).rejects.toMatchObject({ code: 'model_not_configured' })
   })
 
-  it('documents the installed compatible SDK limitation for message.refusal', async () => {
+  it('rejects message.refusal and retains only safe observed usage', async () => {
     const body = completion('')
-    const message = { ...body.choices[0]!.message, refusal: 'provider-refusal-sentinel' }
+    const sentinel = 'provider-refusal-sentinel'
+    const message = { ...body.choices[0]!.message, refusal: sentinel }
     const fetchImpl = fakeFetch({ ...body, choices: [{ ...body.choices[0], message }] })
-    const result = await new OpenAICompatibleAdapter(fetchImpl).generateText(
-      call(AiProviderType.OPENAI_COMPATIBLE, 'm', 'https://endpoint.example/v1')
-    )
-    expect(result.finishReason).toBe('stop')
-    expect(result.text).toBe('')
-    expect(JSON.stringify(result)).not.toContain('provider-refusal-sentinel')
-    expect(result.usage).toMatchObject({ source: 'reported', totalTokens: 12 })
+    const error = await new OpenAICompatibleAdapter(fetchImpl)
+      .generateText(call(AiProviderType.OPENAI_COMPATIBLE, 'm', 'https://endpoint.example/v1'))
+      .catch((value: unknown) => value)
+    expect(error).toMatchObject({ code: 'content_filtered' })
+    expect(providerReceipt(error)).toMatchObject({
+      finishReason: 'content_filtered',
+      usage: { source: 'reported', inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+    })
+    expect(fetchImpl.calls).toHaveLength(1)
+    expect(JSON.stringify({ error, receipt: providerReceipt(error) })).not.toContain(sentinel)
   })
 })
 
