@@ -660,6 +660,11 @@ and revoke the PAT; the next report shows the gap again.
 
 ### Weekly lockfile refresh
 
+Next.js is excluded from Dependabot updates while its exact-version route-cache
+patch remains. The freshness report compares the patched version with npm's
+`latest` tag separately, including patch/minor releases. Follow the
+[patch update/removal checks](../frontend/next-route-cache-patch.md) before updating.
+
 `lockfile-refresh.yml` runs on Tuesday at 07:00 UTC, or manually through
 **Actions → Lockfile refresh → Run workflow**, selecting `main`. It refreshes direct
 and transitive versions within existing manifest ranges and opens or updates one

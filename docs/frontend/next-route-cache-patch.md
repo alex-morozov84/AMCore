@@ -32,6 +32,12 @@ and disabled-Console projects retain this generic navigation fix.
 
 ## Updating Next.js
 
+Dependabot excludes `next` while this exact-version patch is retained. The weekly
+dependency freshness issue has a separate Next.js section for patch, minor and
+major releases, including the patch-removal trigger. Review each reported release
+manually. After removing the patch under the checks below, remove the `next` ignore
+entry from `.github/dependabot.yml` in the same PR to restore automatic updates.
+
 1. Check the upstream issue/PR and the proposed release's actual cache implementation.
    Do not assume a newer version fixes the issue or widen the patch version range.
 2. If the release fixes the invariant, remove the patch registration and patch file.

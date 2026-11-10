@@ -11,6 +11,7 @@ import { backlogCount, renderDependabotHealth } from './lib/dependabot-health.mj
 import { renderToolchain, toolchainFreshness } from './lib/toolchain-freshness.mjs'
 import { dockerPins } from './lib/docker-pins.mjs'
 import { securityFreshness } from './lib/security-freshness.mjs'
+import { nextFreshness } from './lib/next-freshness.mjs'
 
 // Every probe is bounded: on timeout execFileSync kills the child and throws, so
 // a slow/hanging registry or API degrades to a note in the report instead of
@@ -132,7 +133,7 @@ function cliDrift() {
   })
 }
 
-function render({ npm, health, security, docker, cli, toolchain }) {
+function render({ npm, health, security, next, docker, cli, toolchain }) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const out = [
     '<!-- dependency-freshness:auto -->',
@@ -150,6 +151,7 @@ function render({ npm, health, security, docker, cli, toolchain }) {
     '',
     ...health,
     ...security,
+    ...next,
     '## Pending major updates (Dependabot ignores majors)',
     '',
   ]
@@ -193,6 +195,7 @@ const outdated = loadOutdated()
 console.log(
   render({
     npm: npmMajors(outdated),
+    next: nextFreshness(run, readFileSync('pnpm-workspace.yaml', 'utf8')),
     security: securityFreshness(run, process.env.GH_REPO, process.env.DEPENDABOT_READ_TOKEN),
     health: renderDependabotHealth({
       runs: dependabotRuns(),
