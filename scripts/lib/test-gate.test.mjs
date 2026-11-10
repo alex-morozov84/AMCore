@@ -5,13 +5,7 @@ import { test } from 'node:test'
 import { parse } from 'yaml'
 
 const jobs = parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs
-const expected = [
-  'test-unit-redis',
-  'test-capability',
-  'test-notification-ai',
-  'test-focused-background',
-  'api-e2e',
-]
+const expected = ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e']
 const gate = jobs.test
 const script = gate.steps[0].run.trim().slice("node -e '".length, -1)
 const success = () => Object.fromEntries(expected.map((key) => [key, { result: 'success' }]))
@@ -72,22 +66,14 @@ test('independent leaves preserve commands and frozen preparation without aggreg
   visit('test')
 })
 
-test('fallback retains all29 launches and separate partial reports', () => {
-  const steps = jobs['test-focused-background'].steps
-  const focused = steps.find((step) => step.name === 'Run focused API contracts')
-  const background = steps.find((step) => step.name === 'Run background-work contracts')
+test('stock API coverage has one CI execution path while focused local commands remain', () => {
+  assert.equal(jobs['test-focused-background'], undefined)
+  assert.ok(gate.needs.includes('api-e2e'))
   const root = JSON.parse(readFileSync('package.json', 'utf8'))
-  const paths = `${focused.run} ${root.scripts['test:background-work-contracts']}`.match(
-    /test\/[^\s]+\.e2e-spec\.ts/g
+  const api = JSON.parse(readFileSync('apps/api/package.json', 'utf8'))
+  assert.match(
+    root.scripts['test:background-work-contracts'],
+    /^pnpm --filter api test:e2e --runTestsByPath /
   )
-  assert.equal(paths.length, 29)
-  assert.equal(new Set(paths).size, 29)
-  assert.equal(background.run, 'pnpm test:background-work-contracts')
-  assert.notEqual(focused.env.API_E2E_OUTPUT, background.env.API_E2E_OUTPUT)
-  for (const step of [focused, background])
-    assert.ok(step.env.API_E2E_OUTPUT.startsWith('${{ github.workspace }}/.amcore/test-fallback/'))
-  const artifact = steps.find((step) => step.uses?.startsWith('actions/upload-artifact@'))
-  assert.equal(artifact.if, 'always()')
-  assert.equal(artifact.with['if-no-files-found'], 'error')
-  assert.equal(artifact.with['include-hidden-files'], true)
+  assert.equal(api.scripts['test:e2e'], 'node ../../scripts/api-e2e-ci.mjs')
 })

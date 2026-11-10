@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Skip unused SDK deletion only for two browser CI lanes that pass conservative
+  disk, inode, storage and configuration admission. Small or unknown machines
+  and all other image-building lanes retain the existing cleanup.
+
+- Run standard API suites once through complete CI coverage instead of repeating
+  focused and background-work suites in an additional job. Keep full shards,
+  supervision, strict aggregate checks and separate extension conformance.
+
 - Preserve Web E2E cleanup and report-transfer reserves after ordinary tests.
   Update dependency contracts for provider safety refusals and dual-format shared builds.
 

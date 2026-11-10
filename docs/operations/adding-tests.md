@@ -45,7 +45,9 @@ pnpm --filter api test:e2e --runTestsByPath test/oauth.e2e-spec.ts
 The supervisor discovers ordinary files automatically and assigns each exactly
 once to the complete API plan. Inspect the runner discovery for the current inventory;
 there is no required suite count.
-Do not add a focused CI call for every feature. No skipped, focused-only or retried
+Focused and background-work commands remain available locally; their standard suites
+run through the complete API inventory in CI. Do not add a duplicate CI call for
+every feature. No skipped, focused-only or retried
 declarations are admitted. Each child must exit naturally and clean its resources.
 Source or build-config changes can invalidate preparation; prepare again when needed.
 Use separate absolute `API_E2E_OUTPUT` directories when retaining multiple focused
