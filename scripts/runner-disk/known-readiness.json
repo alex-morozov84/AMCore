@@ -101,10 +101,10 @@
   },
   {
     "path": "pnpm-lock.yaml",
-    "sha256": "b49232e9d4dfc325c861537c21274f94ed4c3e38f112634d20b9a665aa64c358"
+    "sha256": "f4ba82deff59d768ffd9bc5e1febe6ced2e1e93658baacc79477e706523ca6ce"
   },
   {
     "path": "apps/api/package.json",
-    "sha256": "251c8d01d58de60ee13f015c1f3a5343acc8a9020a4d6c7f4b86edb053e3fe12"
+    "sha256": "47e259f6fdf2ea86b83b78bfe58a7041cc2ed339fc165ea515486286c743f223"
   }
 ]
