@@ -637,6 +637,17 @@ coverage and installation policies. Record intentional deferrals in the
 product's own backlog or issue tracker. Dependabot's major-version ignore and
 automatic update groups remain unchanged.
 
+The freshness report also reads open Dependabot and code-scanning alerts. For npm
+alerts it shows installed immediate parents and the dependency ranges declared by
+their latest published releases. Missing API/registry/graph evidence is explicitly
+unknown, never a clean result. A listed fix is not proof of a compatible upgrade;
+review the parent ranges and run the affected consumer checks. Image findings
+require a rebuilt-image scan even when the upstream digest has not changed.
+Recheck on advisory changes, supported parent/distro/toolchain releases and before
+release. Existing holds remain; the report adds no overrides or automatic migrations.
+The workflow requests `security-events: read`; token restrictions can leave either
+alert API unavailable. Keep that gap visible and inspect Security with authorized access.
+
 ### Weekly lockfile refresh
 
 `lockfile-refresh.yml` runs on Tuesday at 07:00 UTC, or manually through
