@@ -60,7 +60,7 @@ test('shell preserves no-option deletion, conditional fallback and original fail
   )
   const run = (args, change = {}) => {
     writeFileSync(log, '')
-    const result = spawnSync('bash', typeof args === 'string' ? ['-c', args] : [script, ...args], {
+    const options = {
       env: {
         ...process.env,
         PATH: '/usr/bin:/bin',
@@ -73,7 +73,11 @@ test('shell preserves no-option deletion, conditional fallback and original fail
       },
       encoding: 'utf8',
       timeout: 2000,
-    })
+    }
+    const result =
+      typeof args === 'string'
+        ? spawnSync('bash', ['-c', args], options)
+        : spawnSync('bash', [script, ...args], options)
     return { status: result.status, calls: readFileSync(log, 'utf8') }
   }
   try {
