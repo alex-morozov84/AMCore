@@ -1,3 +1,4 @@
+import { laneJobMinutes } from './lib/lighthouse-deadlines.mjs'
 import { publishPlan } from './lighthouse/ci-plan.mjs'
 import { productAdminE2ePlans } from './product-admin-e2e-plan.mjs'
 import { spawnSync } from 'node:child_process'
@@ -47,6 +48,7 @@ async function browserLane(lane, epoch) {
       cwd: root,
       env: cleanEnvironment({
         CI: 'true',
+        ...(process.env.GITHUB_ACTIONS === 'true' ? { AMCORE_E2E_EPOCH: String(epoch) } : {}),
         ...(plan.assignments[lane].length
           ? auditEnvironment(plan, lane, epoch, join(auditDirectory(lane), 'bundle'))
           : {}),
@@ -93,7 +95,10 @@ async function browserLane(lane, epoch) {
 if (requested === '--matrix')
   console.log(
     JSON.stringify({
-      include: lanes.map((lane) => ({ lane, timeout: plan.assignments[lane].length ? 40 : 20 })),
+      include: lanes.map((lane) => ({
+        lane,
+        timeout: laneJobMinutes(plan.assignments[lane].length > 0),
+      })),
     })
   )
 else if (requested === '--audit-plan') console.log(JSON.stringify(plan))

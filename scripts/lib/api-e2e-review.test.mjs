@@ -34,7 +34,7 @@ test('F1 every fresh wrapper job prepares before execution; missing/late/skipped
   const wrappers = Object.entries(jobs).filter(([, job]) =>
     job.steps?.some((step) => /api-e2e-ci.mjs --prepare/.test(step.run || ''))
   )
-  assert.ok(wrappers.length >= 3)
+  assert.deepEqual(wrappers.map(([name]) => name).sort(), ['api-e2e-plan', 'api-e2e-shards'])
   for (const [name] of wrappers)
     for (const change of ['missing', 'late', 'skipped']) {
       const bad = globalThis.structuredClone(jobs)

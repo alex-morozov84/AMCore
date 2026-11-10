@@ -140,9 +140,10 @@ expose it. No raw SDK payload is written to the ledger or logs.
 Detection follows the installed SDK's `content-filter` finish reason for both text
 and structured output. A schema-valid object is still rejected when that finish
 reason reports filtering; only safe observed usage is retained. Caller abort after
-observation takes precedence over filter classification. Its
-OpenAI-compatible adapter does not expose `message.refusal`; AMCore does not claim
-to detect every provider safety refusal. Structured-output validation failures
+observation takes precedence over filter classification. The installed
+OpenAI-compatible SDK classifies a nonempty `message.refusal` with a `stop`
+finish reason as `content-filter`. AMCore rejects it without exposing refusal text.
+Other provider-specific refusal signals may remain undetected. Structured-output validation failures
 retain observed usage when the SDK supplies response evidence. A timeout before
 observation does not invent usage. See [Runs](./runs.md#usage-after-refusal) and
 [Providers](./providers.md#frozen-execution-and-live-permission) for atomic

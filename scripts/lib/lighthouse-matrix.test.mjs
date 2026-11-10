@@ -28,7 +28,7 @@ test('matrix works without Git or dependencies while evidence modes still requir
   const rows = JSON.parse(matrix.stdout).include
   assert.ok(rows.length > 0)
   assert.equal(rows.find((row) => row.lane === 'path-standard').timeout, 40)
-  assert.equal(rows.find((row) => row.lane === 'mocked').timeout, 20)
+  assert.equal(rows.find((row) => row.lane === 'mocked').timeout, 25)
   assert.equal(new Set(rows.map((row) => row.lane)).size, rows.length)
   for (const argument of ['--audit-plan', '--plan-ci']) {
     const refused = dispatch(argument)

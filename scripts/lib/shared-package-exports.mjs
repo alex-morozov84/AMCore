@@ -51,7 +51,9 @@ function verifyMirroredOutput(packageRoot) {
   for (const file of files) {
     const module = file.match(/^(.+?)\.(?:js|cjs|js\.map|cjs\.map|d\.ts|d\.cts)$/)?.[1]
     assert.ok(module, `unexpected dist file ${file}`)
-    const sources = [`${module}.ts`, `${module}.json`].map((name) => join(packageRoot, 'src', name))
+    const sources = (module.endsWith('.json') ? [module] : [`${module}.ts`, `${module}.json`]).map(
+      (name) => join(packageRoot, 'src', name)
+    )
     assert.ok(
       sources.some((path) => existsSync(path)),
       `dist/${file} has no source module`

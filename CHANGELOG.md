@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   focused and background-work suites in an additional job. Keep full shards,
   supervision, strict aggregate checks and separate extension conformance.
 
+- Preserve Web E2E cleanup and report-transfer reserves after ordinary tests.
+  Update dependency contracts for provider safety refusals and dual-format shared builds.
+
 - Testing guidance now distinguishes product behavior, starter checks and real
   dependency boundaries. Email checks verify warning text and CTA targets; refusal
   checks verify unchanged state instead of relying only on response codes.

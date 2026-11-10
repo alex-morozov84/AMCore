@@ -22,6 +22,7 @@ covers this behavior.
 
 - ESM: `dist/index.js`, `dist/index.d.ts` and one `.js`/`.d.ts` per source module.
 - CommonJS: `dist/index.cjs`, `dist/index.d.cts` and one `.cjs`/`.d.cts` per module.
+- JSON settings keep their `.json` stem, such as `config/locales.json.js`.
 - JavaScript source maps embed their source content. The entry files only re-export,
   so they have no map.
 
@@ -44,11 +45,8 @@ import-time effect, list that file in `sideEffects` instead of breaking the prom
 Zod remains an external runtime and declaration dependency. Generated declarations
 preserve inferred schemas; `isolatedDeclarations` is not required.
 Declaration maps are disabled because the package does not ship its source tree.
-A public build completion hook removes residual declaration map URLs left by
-Rolldown after the declaration plugin discards those map assets. The hook processes
-only declarations emitted by its build. It does not scan or rewrite another format's
-files in the shared output directory. It does not alter types or JavaScript maps. Remove this normalization only after the artifact check
-passes without it on an upstream fix.
+The declaration plugin removes dangling declaration map URLs. The artifact checks
+reject any remaining declaration map URL; no completion hook rewrites declarations.
 
 ## Verification and consumers
 

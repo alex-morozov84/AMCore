@@ -27,7 +27,7 @@ The planner independently lists every expected page on the run Summary. Owners
 link downloadable native HTML; absent owner output leaves its expected pages incomplete.
 Each owning lane reuses its admitted build/stack; non-owners record N/A.
 Missing audits, wrong artifact identity, invalid hashes or earlier lane failures keep the aggregate red.
-The proposed40/20/5-minute job ceilings and15-minute audit phase require hosted cold/warm
+The 40/25/5-minute job ceilings and15-minute audit phase require hosted cold/warm
 admission and actual artifact upload/retrieval before adoption. Configuration alone is
 not proof of cost, successful transfer or live branch protection. Seven-day safe artifacts
 exclude credentials and private fixture state. Publication, CI execution and repository
@@ -213,8 +213,9 @@ against arbitrary future workload growth. Reassess capacity when the application
   Grouped runs verify actual Playwright inventory before browser execution.
   All lanes retain browser reports/test results/inventories for seven days.
   Parallelism changes wall time, not coverage or within-stand concurrency.
-  The 20-minute lane timeout is emergency headroom, not a runtime target or
-  performance proof. Measure cold setup and runner-minutes as well as test time.
+  Browser lanes retain a20-minute preparation/test phase. Job ceilings include
+  separate finalization reserves; see [phase budgets](../frontend/testing.md#ci-evidence-and-admission).
+  These limits are emergency headroom, not a runtime target or performance proof. Measure cold setup and runner-minutes as well as test time.
   [Local reproduction and isolation](../frontend/testing.md#complete-ci-e2e-locally).
   In `ci.yml`, browser jobs prefer the existing Ubuntu
   archive mirror over the Azure entry in the hosted runner's APT mirror list.

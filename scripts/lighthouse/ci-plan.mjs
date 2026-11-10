@@ -1,3 +1,4 @@
+import { laneJobMinutes } from '../lib/lighthouse-deadlines.mjs'
 import { appendFileSync } from 'node:fs'
 import { invariant } from '../lib/lighthouse-plan.mjs'
 import { expectedSummary } from '../lib/lighthouse-view-summary.mjs'
@@ -7,7 +8,7 @@ export function publishPlan(plan, env = process.env) {
   const matrix = {
     include: Object.entries(plan.assignments).map(([lane, ids]) => ({
       lane,
-      timeout: ids.length ? 40 : 20,
+      timeout: laneJobMinutes(ids.length > 0),
     })),
   }
   appendFileSync(env.GITHUB_STEP_SUMMARY, expectedSummary(plan))

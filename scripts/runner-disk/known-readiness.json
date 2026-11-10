@@ -65,11 +65,11 @@
   },
   {
     "path": "scripts/stand.mjs",
-    "sha256": "4523470c1b7a714abc4db0a622fbc67079b6d8366894b196a2a79bd3b91520ce"
+    "sha256": "74c47b32ab85e9d85952c41cce7569c4e117d32c656cad0b1ed34c3febd07680"
   },
   {
     "path": "scripts/e2e-ci.mjs",
-    "sha256": "2eed514b2aad42224e2c41a1b92fed22918d3669fd0d4b909a6499f50b6e9525"
+    "sha256": "34bb212ce25543a2d272d5129360102056b24c6cc21e36a6133d931f772ff470"
   },
   {
     "path": "docker-compose.yml",
@@ -101,10 +101,10 @@
   },
   {
     "path": "pnpm-lock.yaml",
-    "sha256": "f4ba82deff59d768ffd9bc5e1febe6ced2e1e93658baacc79477e706523ca6ce"
+    "sha256": "d0ab8c3bfdc092e5969b52b598b8150ae1b80af894dc59d1f35534c50f35ea24"
   },
   {
     "path": "apps/api/package.json",
-    "sha256": "47e259f6fdf2ea86b83b78bfe58a7041cc2ed339fc165ea515486286c743f223"
+    "sha256": "18569d2fbf86e28ef56a99d1def631780f95a20eb018c828eb7fc2e78fb245d4"
   }
 ]

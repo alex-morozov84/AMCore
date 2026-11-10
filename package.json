@@ -53,7 +53,7 @@
     "husky": "^9.1.7",
     "lighthouse": "13.6.0",
     "lint-staged": "^17.6.0",
-    "oxlint": "1.91.0",
+    "oxlint": "1.92.0",
     "prettier": "^3.9.10",
     "puppeteer-core": "25.16.0",
     "turbo": "^2.11.10",
