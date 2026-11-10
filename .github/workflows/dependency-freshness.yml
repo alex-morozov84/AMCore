@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       actions: read # lists the Dependabot update runs for the health section
+      security-events: read # code scanning; inaccessible APIs remain explicit
       contents: read
       issues: write
     steps:
