@@ -238,7 +238,8 @@ test('a removal conflict is recorded as failed, replaces a stale purged state an
 
 test('closeout output separates verified absence from accepted unresolved-build risk', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'amcore-risk-closeout-'))
-  await mkdir(`${fixture}/scripts`)
+  await mkdir(`${fixture}/scripts/runner-disk`, { recursive: true })
+  await cp(`${root}/scripts/runner-disk/policy.mjs`, `${fixture}/scripts/runner-disk/policy.mjs`)
   await symlink(`${root}/node_modules`, `${fixture}/node_modules`)
   await cp(`${root}/scripts/stand`, `${fixture}/scripts/stand`, {
     recursive: true,
@@ -319,7 +320,8 @@ test('a foreign alias or a foreign container refuses removal; retry after cleanu
 
 test('closeout refuses an image labelled for the worktree and passes once it is gone', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'amcore-image-closeout-'))
-  await mkdir(`${fixture}/scripts`)
+  await mkdir(`${fixture}/scripts/runner-disk`, { recursive: true })
+  await cp(`${root}/scripts/runner-disk/policy.mjs`, `${fixture}/scripts/runner-disk/policy.mjs`)
   await symlink(`${root}/node_modules`, `${fixture}/node_modules`)
   await cp(`${root}/scripts/stand`, `${fixture}/scripts/stand`, {
     recursive: true,

@@ -7,7 +7,8 @@ import { run } from './process.mjs'
 
 test('wrapper retains its lease/journal when managed runner cleanup is incomplete', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'amcore-wrapper-state-'))
-  await mkdir(`${fixture}/scripts`)
+  await mkdir(`${fixture}/scripts/runner-disk`, { recursive: true })
+  await cp(`${root}/scripts/runner-disk/policy.mjs`, `${fixture}/scripts/runner-disk/policy.mjs`)
   await symlink(`${root}/node_modules`, `${fixture}/node_modules`)
   await cp(`${root}/scripts/stand`, `${fixture}/scripts/stand`, {
     recursive: true,
