@@ -18,7 +18,7 @@ export function probe(
   },
   contract = managedReadiness
 ) {
-  if (!['path-standard', 'path-disruptive'].includes(lane))
+  if (!['path-standard', 'path-disruptive', 'staff-path-oauth'].includes(lane))
     return { skip: false, reason: 'ineligible-lane' }
   if (
     env.RUNNER_ENVIRONMENT !== 'github-hosted' ||

@@ -95,12 +95,22 @@ test('shell preserves no-option deletion, conditional fallback and original fail
       (item) => item.name === 'Free unused SDK disk space for Docker lanes'
     )
     assert.equal(step.if, "matrix.lane != 'mocked'")
-    for (const lane of ['path-standard', 'path-disruptive', 'safety', 'host']) {
+    for (const lane of ['path-standard', 'path-disruptive', 'staff-path-oauth', 'safety', 'host']) {
       const called = run(step.run, { E2E_CI_LANE: lane, PROBE_EXIT: '0' })
       assert.equal(called.status, 0)
-      assert.equal(called.calls.includes('node '), lane.startsWith('path-'))
-      assert.equal(called.calls.includes('rm -rf'), !lane.startsWith('path-'))
+      assert.equal(
+        called.calls.includes('node '),
+        ['path-standard', 'path-disruptive', 'staff-path-oauth'].includes(lane)
+      )
+      assert.equal(
+        called.calls.includes('rm -rf'),
+        !['path-standard', 'path-disruptive', 'staff-path-oauth'].includes(lane)
+      )
     }
+    assert.match(
+      run(step.run, { E2E_CI_LANE: 'staff-path-oauth', PROBE_EXIT: '1' }).calls,
+      /rm -rf/
+    )
     for (const name of ['docker-image-smoke', 'observability-contract-live'])
       assert.ok(
         workflow.jobs[name].steps.some((item) => item.run === 'bash scripts/free-runner-disk.sh')

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { type BrowserContext, expect, test } from '@playwright/test'
 
 import { settingsProof } from '../support/runtime-settings-proof'
 
@@ -20,89 +20,102 @@ const forbidden = (body: string) => {
   expect(body).not.toContain('Background queues</caption>')
 }
 
-test('Console route during a vault stall: no cookie, invented cookie and ordinary user', async ({
+test('Console vault stall preserves four isolated sessions and recovery', async ({
   browser,
   baseURL,
 }) => {
   test.setTimeout(240_000)
-  // An ordinary signed-in user, a signed-out visitor and a visitor with an invented cookie.
-  const user = await browser.newContext({ baseURL })
-  const anonymous = await browser.newContext({ baseURL })
-  const invented = await browser.newContext({ baseURL })
+  const contexts: BrowserContext[] = []
+  const failures: unknown[] = []
+  const createContext = async () => {
+    const context = await browser.newContext({ baseURL })
+    contexts.push(context)
+    return context
+  }
   try {
+    const user = await createContext()
+    const anonymous = await createContext()
+    const invented = await createContext()
+    const operator = await createContext()
     const page = await user.newPage()
     await registerViaUi(page, uniqueEmail('console-outage-user'))
     await expect(page).toHaveURL(/\/en\/?$/)
     await invented.addCookies([{ name: 'amcore_session', value: 'A'.repeat(43), url: baseURL! }])
+    const operatorPage = await operator.newPage()
+    const email = uniqueEmail('console-outage-operator')
+    await registerViaUi(operatorPage, email)
+    setSystemRole(email, 'SUPER_ADMIN')
+    await operator.clearCookies()
+    await loginViaUi(operatorPage, email)
 
-    // Healthy controls first: all three get the plain 404.
-    for (const ctx of [user, anonymous, invented]) {
-      expect((await ctx.request.get(URL, { timeout: 15_000 })).status()).toBe(404)
-    }
-
-    settingsProof('pause-redis')
-    const TEMPORARY = /usually temporary|temporarily unavailable/i
-    const during: Record<string, { status: number; shown: boolean }> = {}
-    for (const [name, ctx] of [
-      ['anonymous', anonymous],
-      ['invented', invented],
-      ['user', user],
-    ] as const) {
-      // The rendered page, not the payload: the translated text also sits in unrelated bundles.
-      const page = await ctx.newPage()
-      const response = await page.goto(URL, { timeout: 15_000 })
-      during[name] = {
-        status: response!.status(),
-        shown: await page.getByText(TEMPORARY).first().isVisible(),
-      }
-      // Nothing rendered for anyone: no operator chrome, no queue data.
-      forbidden(await page.content())
-      await page.close()
-    }
-    // No cookie: the vault is never asked, so the plain denial stays a 404.
-    expect(during.anonymous).toEqual({ status: 404, shown: false })
-    // Disclosure under an outage (accepted limit): a cookie, even invented, sees the temporary
-    // page instead of the 404. This is the page response (200 with the temporary text), not the
-    // generic API 503. The assertions keep the accepted limit from changing unnoticed.
-    expect(during.invented).toEqual({ status: 200, shown: true })
-    expect(during.user).toEqual({ status: 200, shown: true })
-
-    // After the stall the normal denial is back for all three.
-    await sleep(STALL_MS + 2000)
-    await expect(async () => {
+    await test.step('healthy outsider sessions receive plain denial', async () => {
       for (const ctx of [user, anonymous, invented]) {
-        expect((await ctx.request.get(URL, { timeout: 10_000 })).status()).toBe(404)
+        expect((await ctx.request.get(URL, { timeout: 15_000 })).status()).toBe(404)
       }
-    }).toPass({ timeout: 60_000, intervals: [2000, 5000] })
-  } finally {
-    await user.close()
-    await anonymous.close()
-    await invented.close()
-  }
-})
-
-test('an operator sees the temporary state, no shell, then the board after recovery', async ({
-  page,
-}) => {
-  test.setTimeout(240_000)
-  const email = uniqueEmail('console-outage-operator')
-  await registerViaUi(page, email)
-  setSystemRole(email, 'SUPER_ADMIN')
-  await page.context().clearCookies()
-  await loginViaUi(page, email)
-
-  settingsProof('pause-redis')
-  const response = await page.request.get(URL, { timeout: 10_000 })
-  const body = await response.text()
-  expect(body).toMatch(/temporarily unavailable/i)
-  forbidden(body)
-  expect(body).not.toContain(email)
-
-  await sleep(STALL_MS + 2000)
-  await expect(async () => {
-    await page.goto(URL)
-    await expect(page.getByRole('table', { name: 'Background queues' })).toBeVisible({
-      timeout: 5000,
     })
-  }).toPass({ timeout: 90_000, intervals: [2000, 5000] })
+
+    // Start before the synchronous command: its latency must not extend the fault window.
+    const started = performance.now()
+    settingsProof('pause-redis')
+    await test.step('outsiders see only the accepted temporary state during the stall', async () => {
+      const TEMPORARY = /usually temporary|temporarily unavailable/i
+      const during: Record<string, { status: number; shown: boolean }> = {}
+      for (const [name, ctx] of [
+        ['anonymous', anonymous],
+        ['invented', invented],
+        ['user', user],
+      ] as const) {
+        // Inspect rendered DOM: translated text also occurs in unrelated bundles.
+        const page = await ctx.newPage()
+        const response = await page.goto(URL, { timeout: 15_000 })
+        during[name] = {
+          status: response!.status(),
+          shown: await page.getByText(TEMPORARY).first().isVisible(),
+        }
+        forbidden(await page.content())
+        await page.close()
+      }
+      expect(during.anonymous).toEqual({ status: 404, shown: false })
+      expect(during.invented).toEqual({ status: 200, shown: true })
+      expect(during.user).toEqual({ status: 200, shown: true })
+    })
+    await test.step('operator temporary response contains no shell, queue or identity', async () => {
+      const response = await operatorPage.request.get(URL, { timeout: 10_000 })
+      const body = await response.text()
+      expect(body).toMatch(/temporarily unavailable/i)
+      forbidden(body)
+      expect(body).not.toContain(email)
+    })
+    expect(
+      performance.now() - started,
+      'all during-stall checks finish inside the fault'
+    ).toBeLessThan(STALL_MS)
+
+    await sleep(STALL_MS + 2000)
+    await test.step('outsider denial returns after recovery', async () => {
+      await expect(async () => {
+        for (const ctx of [user, anonymous, invented]) {
+          expect((await ctx.request.get(URL, { timeout: 10_000 })).status()).toBe(404)
+        }
+      }).toPass({ timeout: 60_000, intervals: [2000, 5000] })
+    })
+    await test.step('operator board returns after recovery', async () => {
+      await expect(async () => {
+        await operatorPage.goto(URL)
+        await expect(operatorPage.getByRole('table', { name: 'Background queues' })).toBeVisible({
+          timeout: 5000,
+        })
+      }).toPass({ timeout: 90_000, intervals: [2000, 5000] })
+    })
+  } catch (error) {
+    failures.push(error)
+  } finally {
+    const closed = await Promise.allSettled(contexts.map(async (context) => context.close()))
+    for (const result of closed) {
+      if (result.status === 'rejected') failures.push(result.reason)
+    }
+  }
+  if (failures.length === 1) throw failures[0]
+  if (failures.length > 1)
+    throw new AggregateError(failures, 'Console outage checks or cleanup failed')
 })

@@ -67,7 +67,7 @@ bundled runtime stays intact. Actual deletion time and reclaimed bytes vary. The
 script reports available bytes and inodes before and after; deletion/report errors
 remain failures. It does not prune Docker images or alter application readiness.
 
-Only `path-standard` and `path-disruptive` may skip deletion through the explicit
+Only `path-standard`, `path-disruptive` and `staff-path-oauth` may skip deletion through the explicit
 `--lane` option. Admission requires known GitHub-hosted Ubuntu 24.04 x64, local
 Docker `overlay2`, and one filesystem for workspace, temporary files, Docker data
 and application root. Available bytes must satisfy BOTH 80 GiB and
