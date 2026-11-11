@@ -33,13 +33,19 @@ test('capacity uses exact integer byte and both inode boundaries', () => {
   }
   assert.equal(decide({ freeBytes: counters.bytes + 1n }), false)
   assert.equal(decide({ freeInodes: counters.inodes + 1n }), false)
+  for (const contract of [
+    null,
+    {},
+    { path: '/', threshold: '0.75' },
+    { path: '/other', threshold: '0.9' },
+  ])
+    assert.equal(capacityDecision(counters, contract).skip, false)
 })
 
 test('only admitted lanes, runner and admitted readiness may reach storage probe', () => {
   let calls = 0
   const io = {
     release,
-    readiness: () => true,
     storage: () => {
       calls++
       return { skip: true }
@@ -62,6 +68,7 @@ test('only admitted lanes, runner and admitted readiness may reach storage probe
     { RUNNER_ARCH: 'ARM64' },
     { DOCKER_HOST: 'ssh://remote' },
     { DOCKER_CONTEXT: 'other' },
+    { DOCKER_CONFIG: '/other' },
     { DOCKER_TLS_VERIFY: '' },
     { HEALTH_DISK_THRESHOLD_PERCENT: '0.9' },
   ])
@@ -70,7 +77,7 @@ test('only admitted lanes, runner and admitted readiness may reach storage probe
     probe('path-standard', env, { ...io, release: () => 'ID=ubuntu\nVERSION_ID="26.04"' }).skip,
     false
   )
-  assert.equal(probe('path-standard', env, { ...io, readiness: () => false }).skip, false)
+  assert.equal(probe('path-standard', env, io, { path: '/other', threshold: '0.9' }).skip, false)
   assert.equal(calls, 2)
 })
 

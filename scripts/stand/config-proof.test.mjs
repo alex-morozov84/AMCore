@@ -1,7 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { rm } from 'node:fs/promises'
+import { rm, readFile, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { join } from 'node:path'
+import { composeArguments } from './docker.mjs'
 import { create } from './create.mjs'
 import { configuration, validateModel, labels, builtServices } from './config.mjs'
 import { directory } from './state.mjs'
@@ -13,9 +16,41 @@ test('actual Compose rendering replaces poisoned ports/environment with owned lo
   process.env.MIGRATION_DATABASE_URL = 'postgresql://foreign.invalid/migrate'
   process.env.COMPOSE_FILE = 'foreign.yml'
   process.env.COMPOSE_PROFILES = 'backup,restore,monitoring'
+  process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.4'
   try {
     const m = await create(id, 'e2e', 'path')
+    const base = join(m.snapshot, 'docker-compose.yml')
+    const source = await readFile(base, 'utf8')
+    assert.ok(source.includes('${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}'))
+    await writeFile(
+      base,
+      source.replace(
+        '${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}',
+        '${HEALTH_DISK_THRESHOLD_PERCENT:-0.3}'
+      )
+    )
     await configuration(m)
+    for (const name of ['api', 'worker'])
+      assert.equal(m.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT, '0.9')
+    const rendered = execFileSync(
+      'docker',
+      ['--host', m.engine.endpoint, ...composeArguments(m), 'config', '--format', 'json'],
+      { env: process.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000 }
+    )
+    for (const name of ['api', 'worker'])
+      assert.equal(
+        JSON.parse(rendered).services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT,
+        '0.9'
+      )
+    for (const name of ['api', 'worker']) {
+      for (const value of [undefined, '0.75']) {
+        const changed = globalThis.structuredClone(m)
+        if (value === undefined)
+          delete changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT
+        else changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT = value
+        assert.throws(() => validateModel(changed), /Managed disk readiness/)
+      }
+    }
     assert.equal(m.model.services.postgres.ports, undefined)
     assert.equal(m.model.services.api.environment.GEOIP_ENABLED, 'false')
     const keys = m.model.services.api.environment.MFA_ENCRYPTION_KEYS

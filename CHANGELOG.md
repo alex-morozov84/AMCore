@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Keep CI script contracts passing after automated dependency updates invalidate
-  disk-cleanup admission. Changed inputs retain SDK deletion; reviewed fingerprints
-  are not refreshed automatically.
+- Preserve capacity-based SDK cleanup savings across compatible automatic dependency
+  updates. Managed API and worker readiness stays explicitly at the existing 0.9
+  threshold; small or unknown machines retain cleanup without dependency fingerprints.
 
 - Skip unused SDK deletion only for two browser CI lanes that pass conservative
   disk, inode, storage and configuration admission. Small or unknown machines

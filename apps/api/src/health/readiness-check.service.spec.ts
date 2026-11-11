@@ -81,6 +81,17 @@ describe('ReadinessCheckService', () => {
     expect(memoryIndicator.checkHeap).toHaveBeenCalledWith('memory_heap', 1024 * 1024 * 1024)
   })
 
+  it('forwards a non-default disk threshold without replacing it with the managed default', async () => {
+    env.get.mockImplementation((key: string) =>
+      key === 'HEALTH_DISK_THRESHOLD_PERCENT' ? 0.75 : undefined
+    )
+    await runCheck()
+    expect(diskIndicator.checkStorage).toHaveBeenCalledWith('disk', {
+      thresholdPercent: 0.75,
+      path: '/',
+    })
+  })
+
   it('uses the HEALTH_MEMORY_HEAP_BYTES override when set', async () => {
     const override = 8 * 1024 * 1024 * 1024
     env.get.mockImplementation((key: string) =>

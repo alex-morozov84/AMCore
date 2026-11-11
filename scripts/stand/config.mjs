@@ -1,3 +1,4 @@
+import { managedReadiness } from '../runner-disk/policy.mjs'
 import { mfaE2EEnvironment } from './mfa-e2e.mjs'
 import { operatorMfaEnvironment } from './operator-mfa.mjs'
 import { consoleSummaryServices } from './console-summary-fixture.mjs'
@@ -43,6 +44,7 @@ export async function configuration(m) {
   const seoIndexing = process.env.AMCORE_STAND_WEB_SEO_INDEXING ?? ''
   const app = {
     NODE_ENV: 'development',
+    HEALTH_DISK_THRESHOLD_PERCENT: managedReadiness.threshold,
     ...mfaE2EEnvironment(m),
     ...operatorMfaEnvironment(m),
     API_PORT: '5002',
@@ -227,6 +229,12 @@ export async function configuration(m) {
 export function validateModel(m) {
   assertOrganizationSetupFixture(m)
   assertAppleOAuthFixture(m)
+  for (const name of ['api', 'worker'])
+    if (
+      m.model.services[name]?.environment?.HEALTH_DISK_THRESHOLD_PERCENT !==
+      managedReadiness.threshold
+    )
+      throw new Error('Managed disk readiness setting changed')
   const collector = m.model.services['mail-capture']
   if (isOrganizationMailFixture(m)) {
     if (
