@@ -6,6 +6,12 @@ ports and configuration. Native `pnpm dev` and ordinary `docker compose` retain
 their manual environment semantics; these commands do not guard arbitrary shell
 or database operations.
 
+Managed API and worker services explicitly use `HEALTH_DISK_THRESHOLD_PERCENT=0.9`,
+the existing API default. The resolved Compose model must retain this setting.
+Ordinary API deployments keep their environment override; managed CI uses this
+fixed setting to check disk headroom before dependency installation. See
+[runner disk cleanup](ci-security.md#docker-e2e-disk-preparation).
+
 ## Prerequisites and commands
 
 Install the repository's frozen dependencies. Use its supported Node/pnpm versions

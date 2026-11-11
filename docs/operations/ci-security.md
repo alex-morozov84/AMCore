@@ -76,19 +76,19 @@ and 2,000,000 plus 5% of total. All comparisons use exact integer arithmetic.
 The 40 GiB allowance comprises 32 GiB for workload growth and 8 GiB reserve;
 these are conservative policy allowances, not measured peak guarantees.
 
-Effective readiness must remain the reviewed default 0.9. Before dependencies are
-installed, a source receipt binds the schema, environment-generation/override
-code, image/snapshot inputs and selected locale/placement settings. Changes to
-those files disable skip until reviewed; never refresh
-`scripts/runner-disk/known-readiness.json` merely to obtain a skip. Its fingerprints
-protect the known effective configuration, rather than trusting a host variable
-that may not reach the container. Explicit overrides also retain deletion.
+The managed disk-readiness contract is root path `/` with used-space threshold
+`0.9`. Managed Compose generation explicitly sets `HEALTH_DISK_THRESHOLD_PERCENT`
+to string `'0.9'` for API and worker; validation rejects a missing or changed
+resolved setting before services start. The early probe uses the same small
+contract without installing application dependencies. Its logged contract is a
+configuration guarantee, not a live container observation.
 
-Dependency updates, including automated lockfile refreshes, may invalidate this
-receipt. This is a supported fallback: CI performs SDK deletion and continues;
-it does not require renewed admission to pass. Contract tests use an isolated
-reviewed fixture to verify both admission and fallback for every recorded input.
-Only a separate review of the effective configuration can renew skip admission.
+Compatible dependency, lockfile and base-image updates do not require renewed
+fingerprints or disable admission. Tests check the actual resolved Compose model,
+installed Nest Config/EnvService conversion and readiness forwarding, alongside
+update compatibility and unsafe-capacity refusal. Genuine incompatibilities remain
+CI failures. Ordinary API deployments retain their configurable health threshold;
+managed stands keep the existing default explicitly. Host overrides retain deletion.
 
 The isolated probe has a five-second deadline and terminates its process group.
 It logs the branch, primitive capacity counters and admission reason. Unknown or

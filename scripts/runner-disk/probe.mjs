@@ -1,21 +1,6 @@
-import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, realpathSync, statSync, statfsSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { capacityDecision } from './policy.mjs'
-
-const root = fileURLToPath(new URL('../../', import.meta.url))
-const receipt = JSON.parse(readFileSync(new URL('./known-readiness.json', import.meta.url)))
-
-export function knownReadiness(directory = root) {
-  return receipt.every(
-    ({ path, sha256 }) =>
-      createHash('sha256')
-        .update(readFileSync(resolve(directory, path)))
-        .digest('hex') === sha256
-  )
-}
+import { capacityDecision, managedReadiness, supportsManagedReadiness } from './policy.mjs'
 
 function docker(args) {
   return execFileSync('docker', args, {
@@ -29,9 +14,9 @@ export function probe(
   env = process.env,
   io = {
     release: () => readFileSync('/etc/os-release', 'utf8'),
-    readiness: knownReadiness,
     storage: storageDecision,
-  }
+  },
+  contract = managedReadiness
 ) {
   if (!['path-standard', 'path-disruptive'].includes(lane))
     return { skip: false, reason: 'ineligible-lane' }
@@ -54,7 +39,7 @@ export function probe(
   const release = io.release()
   if (!/^ID=ubuntu$/m.test(release) || !/^VERSION_ID="24\.04"$/m.test(release))
     return { skip: false, reason: 'unknown-os' }
-  if (!io.readiness()) return { skip: false, reason: 'readiness-source-changed' }
+  if (!supportsManagedReadiness(contract)) return { skip: false, reason: 'unsupported-readiness' }
   return io.storage(env)
 }
 
@@ -86,5 +71,10 @@ export function storageDecision(
     inodes: stats.files,
     freeInodes: stats.ffree,
   })
-  return { ...decision, filesystem: devices[0], storage: info.Driver, readinessSource: 'matched' }
+  return {
+    ...decision,
+    filesystem: devices[0],
+    storage: info.Driver,
+    readinessSource: 'managed-contract',
+  }
 }
