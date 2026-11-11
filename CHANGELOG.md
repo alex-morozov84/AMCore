@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Extend guarded CI SDK cleanup admission to three single-stack staff profiles.
+  Preserve disk, inode, readiness and fallback cleanup requirements.
+
 - Share one Redis outage across four isolated Console browser sessions while retaining
   access, privacy and recovery checks. Extend guarded SDK cleanup admission to the
   path-mode staff OAuth lane with unchanged capacity and readiness safeguards.

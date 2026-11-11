@@ -168,41 +168,95 @@ test('console summary E2E owns its internal fault source and loopback offline Gr
   }
 })
 
-test('path OAuth resolved API and worker retain readiness despite conflicting defaults', async () => {
-  const id = `oauth-readiness-${randomUUID()}`
-  try {
-    const m = await create(id, 'e2e', undefined, false, 'product-admin-oauth-path')
-    const base = join(m.snapshot, 'docker-compose.yml')
-    await writeFile(
-      base,
-      (await readFile(base, 'utf8')).replaceAll(
-        '${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}',
-        '${HEALTH_DISK_THRESHOLD_PERCENT:-0.3}'
+for (const profile of [
+  'product-admin-oauth-path',
+  'product-admin-oauth',
+  'product-admin-console-path',
+  'product-admin-three-host',
+]) {
+  test(`${profile} resolved readiness and single-stack resource closure survive conflicts`, async () => {
+    const id = `staff-readiness-${randomUUID()}`
+    const before = process.env.HEALTH_DISK_THRESHOLD_PERCENT
+    process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.4'
+    try {
+      const m = await create(id, 'e2e', undefined, false, profile)
+      const base = join(m.snapshot, 'docker-compose.yml')
+      const source = await readFile(base, 'utf8')
+      assert.ok(source.includes('${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}'))
+      await writeFile(
+        base,
+        source.replaceAll(
+          '${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}',
+          '${HEALTH_DISK_THRESHOLD_PERCENT:-0.3}'
+        )
       )
-    )
-    await configuration(m)
-    const rendered = JSON.parse(
-      execFileSync(
-        'docker',
-        ['--host', m.engine.endpoint, ...composeArguments(m), 'config', '--format', 'json'],
-        { encoding: 'utf8', timeout: 10000 }
+      await configuration(m)
+      const rendered = JSON.parse(
+        execFileSync(
+          'docker',
+          ['--host', m.engine.endpoint, ...composeArguments(m), 'config', '--format', 'json'],
+          { encoding: 'utf8', timeout: 10000 }
+        )
       )
-    )
-    for (const name of ['api', 'worker']) {
-      assert.equal(rendered.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT, '0.9')
-      for (const value of [undefined, '0.75']) {
-        const changed = globalThis.structuredClone(m)
-        if (value === undefined)
-          delete changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT
-        else changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT = value
-        assert.throws(() => validateModel(changed), /Managed disk readiness/)
+      assert.deepEqual(Object.keys(rendered.services).sort(), [
+        'api',
+        'caddy',
+        'migrate',
+        'postgres',
+        'redis',
+        'seed',
+        'web',
+        'worker',
+      ])
+      for (const [name, target] of Object.entries({
+        api: undefined,
+        worker: undefined,
+        web: undefined,
+        seed: 'build',
+        migrate: 'migrator',
+      })) {
+        assert.equal(rendered.services[name].build.target, target)
+        assert.equal(rendered.services[name].build.context, m.snapshot)
       }
+      for (const app of ['api', 'web']) {
+        const dockerfile = await readFile(join(m.snapshot, `apps/${app}/Dockerfile`), 'utf8')
+        assert.match(dockerfile.match(/^FROM .+$/gm).at(-1), / AS runner$/)
+      }
+      assert.equal(m.topology, 'host')
+      assert.equal(m.productAdminHost, profile !== 'product-admin-oauth-path')
+      assert.equal(m.consoleTopology, profile === 'product-admin-three-host' ? 'host' : 'path')
+      for (const name of ['api', 'worker']) {
+        assert.equal(rendered.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT, '0.9')
+        assert.equal(rendered.services[name].environment.EMAIL_PROVIDER, 'mock')
+        for (const value of [undefined, '0.75']) {
+          const changed = globalThis.structuredClone(m)
+          if (value === undefined)
+            delete changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT
+          else changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT = value
+          assert.throws(() => validateModel(changed), /Managed disk readiness/)
+        }
+      }
+      assert.equal(
+        rendered.services.api.environment.NODE_OPTIONS,
+        profile.includes('oauth') ? '--import=/app/fixtures/apple-oidc.mjs' : undefined
+      )
+      assert.equal(rendered.services.worker.environment.NODE_OPTIONS, undefined)
+      const placement = JSON.parse(
+        await readFile(join(m.snapshot, 'packages/shared/src/config/product-admin.json'), 'utf8')
+      )
+      const console = JSON.parse(
+        await readFile(join(m.snapshot, 'packages/shared/src/config/admin-console.json'), 'utf8')
+      )
+      assert.equal(placement.mode, m.productAdminHost ? 'host' : 'path')
+      // Path OAuth also rehearses Console over the existing host transport.
+      assert.equal(
+        console.mode,
+        profile === 'product-admin-oauth-path' ? 'host' : m.consoleTopology
+      )
+    } finally {
+      if (before === undefined) delete process.env.HEALTH_DISK_THRESHOLD_PERCENT
+      else process.env.HEALTH_DISK_THRESHOLD_PERCENT = before
+      await rm(directory(id), { recursive: true, force: true })
     }
-    assert.equal(
-      rendered.services.api.environment.NODE_OPTIONS,
-      '--import=/app/fixtures/apple-oidc.mjs'
-    )
-  } finally {
-    await rm(directory(id), { recursive: true, force: true })
-  }
-})
+  })
+}

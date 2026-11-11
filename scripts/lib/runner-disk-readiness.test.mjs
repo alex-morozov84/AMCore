@@ -70,7 +70,14 @@ test('compatible dependency inputs retain admission while unsafe capacity and co
     for (const path of updates) {
       assert.equal(probe('path-standard', env, io).skip, true, `before ${path}`)
       writeFileSync(join(directory, path), dependencyInput(path, 1))
-      for (const lane of ['path-standard', 'path-disruptive', 'staff-path-oauth'])
+      for (const lane of [
+        'path-standard',
+        'path-disruptive',
+        'staff-path-oauth',
+        'staff-oauth',
+        'staff-console-path',
+        'staff-host',
+      ])
         assert.equal(probe(lane, env, io).skip, true, `after ${path}: ${lane}`)
     }
     const low = {
@@ -81,7 +88,14 @@ test('compatible dependency inputs retain admission while unsafe capacity and co
           statfs: () => ({ ...storageIO.statfs(), bavail: 79n * gib }),
         }),
     }
-    for (const lane of ['path-standard', 'path-disruptive', 'staff-path-oauth'])
+    for (const lane of [
+      'path-standard',
+      'path-disruptive',
+      'staff-path-oauth',
+      'staff-oauth',
+      'staff-console-path',
+      'staff-host',
+    ])
       assert.equal(probe(lane, env, low).skip, false)
     for (const contract of [
       null,
