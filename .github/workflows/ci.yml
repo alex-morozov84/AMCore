@@ -779,7 +779,7 @@ jobs:
         timeout-minutes: 10
         run: |
           case "$E2E_CI_LANE" in
-            path-standard|path-disruptive)
+            path-standard|path-disruptive|staff-path-oauth)
               bash scripts/free-runner-disk.sh --lane "$E2E_CI_LANE"
               ;;
             *) bash scripts/free-runner-disk.sh ;;

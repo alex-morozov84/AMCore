@@ -51,7 +51,7 @@ test('only admitted lanes, runner and admitted readiness may reach storage probe
       return { skip: true }
     },
   }
-  for (const lane of ['path-standard', 'path-disruptive'])
+  for (const lane of ['path-standard', 'path-disruptive', 'staff-path-oauth'])
     assert.equal(probe(lane, env, io).skip, true)
   for (const lane of [
     '',
@@ -72,13 +72,14 @@ test('only admitted lanes, runner and admitted readiness may reach storage probe
     { DOCKER_TLS_VERIFY: '' },
     { HEALTH_DISK_THRESHOLD_PERCENT: '0.9' },
   ])
-    assert.equal(probe('path-standard', { ...env, ...change }, io).skip, false)
+    for (const lane of ['path-standard', 'path-disruptive', 'staff-path-oauth'])
+      assert.equal(probe(lane, { ...env, ...change }, io).skip, false)
   assert.equal(
     probe('path-standard', env, { ...io, release: () => 'ID=ubuntu\nVERSION_ID="26.04"' }).skip,
     false
   )
   assert.equal(probe('path-standard', env, io, { path: '/other', threshold: '0.9' }).skip, false)
-  assert.equal(calls, 2)
+  assert.equal(calls, 3)
 })
 
 test('storage admission requires default local socket and one filesystem including application root', () => {

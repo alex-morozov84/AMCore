@@ -167,3 +167,42 @@ test('console summary E2E owns its internal fault source and loopback offline Gr
     await rm(directory(id), { recursive: true, force: true })
   }
 })
+
+test('path OAuth resolved API and worker retain readiness despite conflicting defaults', async () => {
+  const id = `oauth-readiness-${randomUUID()}`
+  try {
+    const m = await create(id, 'e2e', undefined, false, 'product-admin-oauth-path')
+    const base = join(m.snapshot, 'docker-compose.yml')
+    await writeFile(
+      base,
+      (await readFile(base, 'utf8')).replaceAll(
+        '${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}',
+        '${HEALTH_DISK_THRESHOLD_PERCENT:-0.3}'
+      )
+    )
+    await configuration(m)
+    const rendered = JSON.parse(
+      execFileSync(
+        'docker',
+        ['--host', m.engine.endpoint, ...composeArguments(m), 'config', '--format', 'json'],
+        { encoding: 'utf8', timeout: 10000 }
+      )
+    )
+    for (const name of ['api', 'worker']) {
+      assert.equal(rendered.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT, '0.9')
+      for (const value of [undefined, '0.75']) {
+        const changed = globalThis.structuredClone(m)
+        if (value === undefined)
+          delete changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT
+        else changed.model.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT = value
+        assert.throws(() => validateModel(changed), /Managed disk readiness/)
+      }
+    }
+    assert.equal(
+      rendered.services.api.environment.NODE_OPTIONS,
+      '--import=/app/fixtures/apple-oidc.mjs'
+    )
+  } finally {
+    await rm(directory(id), { recursive: true, force: true })
+  }
+})

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Share one Redis outage across four isolated Console browser sessions while retaining
+  access, privacy and recovery checks. Extend guarded SDK cleanup admission to the
+  path-mode staff OAuth lane with unchanged capacity and readiness safeguards.
+
 - Preserve capacity-based SDK cleanup savings across compatible automatic dependency
   updates. Managed API and worker readiness stays explicitly at the existing 0.9
   threshold; small or unknown machines retain cleanup without dependency fingerprints.

@@ -129,6 +129,12 @@ HTTPS host tests when the Console is retained. Every Docker lane owns fresh
 Postgres, Redis, origins, volumes, lease, marker and cleanup. Keep `workers: 1`:
 Redis pauses, runtime-setting revisions and registration IP budgets are shared
 within a stand. Unique emails do not isolate those mechanisms.
+The Console vault-stall case uses one 40-second Redis pause for four isolated
+browser sessions. It retains anonymous, invented-cookie, ordinary-user and operator
+access/privacy checks, followed by denial and operator-board recovery. It does not
+provide a second independent outage. All during-stall checks must finish within
+40 seconds measured before the pause command. Every created context is closed,
+including after setup or assertion failures; cleanup errors retain the original failure.
 Domain fixtures reset only their known MFA source and browser-probe IP budgets
 on the leased disposable stand before an independent journey. Limiter tests do
 not use these resets. Domain success is not a production capacity measurement.
