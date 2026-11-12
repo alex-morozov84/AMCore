@@ -275,7 +275,7 @@ for (const [name, makeAdapter, boardAdapter] of [
     })
     it('keeps defaults query disabled in the installed read-only asset', async () => {
       const result = await request(app.getHttpServer())
-        .get(`${mount}/static/js/async/oa.9a545df19d.js`)
+        .get(`${mount}/static/js/async/oa.84a9cd88ce.js`)
         .auth('allowed', { type: 'bearer' })
       expect(result.status).toBe(200)
       expect(result.text).toContain('(a.name,l&&!a.readOnlyMode),_=Object.entries(L||{})')
