@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Extend guarded SDK cleanup admission to the six remaining normal browser CI
+  configurations. Require read-only, build-free mail collectors while preserving
+  provisioning compatibility and mandatory cleanup on unsafe runners.
+
 - Extend guarded CI SDK cleanup admission to three single-stack staff profiles.
   Preserve disk, inode, readiness and fallback cleanup requirements.
 

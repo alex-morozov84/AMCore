@@ -240,6 +240,8 @@ export function validateModel(m) {
     if (
       !collector ||
       collector.image !== `${m.project}-api:latest` ||
+      collector.read_only !== true ||
+      Object.hasOwn(collector, 'build') ||
       collector.ports?.length ||
       collector.volumes?.length ||
       collector.environment?.AMCORE_SETUP_MAIL_CAPTURE_KEY !== m.mailCaptureKey

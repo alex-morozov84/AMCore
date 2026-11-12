@@ -26,6 +26,12 @@ export function probe(
       'staff-oauth',
       'staff-console-path',
       'staff-host',
+      'host',
+      'setup-cli',
+      'setup-console',
+      'staff-invitation',
+      'support-mail-path',
+      'support-mail-host',
     ].includes(lane)
   )
     return { skip: false, reason: 'ineligible-lane' }

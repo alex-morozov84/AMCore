@@ -9,6 +9,38 @@ import { create } from './create.mjs'
 import { configuration, validateModel, labels, builtServices } from './config.mjs'
 import { directory } from './state.mjs'
 
+function assertCollectorPolicy(m, required) {
+  const collector = m.model.services['mail-capture']
+  if (!required) {
+    const changed = globalThis.structuredClone(m)
+    changed.model.services['mail-capture'] = {}
+    assert.throws(() => validateModel(changed), /Unexpected setup mail collector/)
+    return
+  }
+  assert.equal(collector.read_only, true)
+  assert.equal(Object.hasOwn(collector, 'build'), false)
+  for (const [field, values] of [
+    ['read_only', [undefined, false, 'true', 1]],
+    ['build', [undefined, null, false, {}, { context: m.snapshot }]],
+    ['image', ['foreign:latest']],
+    ['ports', [[{ target: 8099, published: '19099' }]]],
+    ['volumes', [[{ type: 'volume', source: 'foreign', target: '/mail' }]]],
+    [
+      'environment',
+      [{ ...collector.environment, AMCORE_SETUP_MAIL_CAPTURE_KEY: '<fake-wrong-key>' }],
+    ],
+  ]) {
+    for (const value of values) {
+      const changed = globalThis.structuredClone(m)
+      changed.model.services['mail-capture'][field] = value
+      assert.throws(() => validateModel(changed), /Unsafe setup mail collector/)
+    }
+  }
+  const missing = globalThis.structuredClone(m)
+  delete missing.model.services['mail-capture'].read_only
+  assert.throws(() => validateModel(missing), /Unsafe setup mail collector/)
+}
+
 test('actual Compose rendering replaces poisoned ports/environment with owned local model', async () => {
   const id = `config-proof-${randomUUID()}`
   const before = { ...process.env }
@@ -168,18 +200,57 @@ test('console summary E2E owns its internal fault source and loopback offline Gr
   }
 })
 
-for (const profile of [
-  'product-admin-oauth-path',
-  'product-admin-oauth',
-  'product-admin-console-path',
-  'product-admin-three-host',
+for (const [profile, fixture, topology, consoleMode, staffMode, provider, mail] of [
+  [
+    'product-admin-oauth-path',
+    'product-admin-oauth-path',
+    undefined,
+    'host',
+    'path',
+    'mock',
+    false,
+  ],
+  ['product-admin-oauth', 'product-admin-oauth', undefined, 'path', 'host', 'mock', false],
+  [
+    'product-admin-console-path',
+    'product-admin-console-path',
+    undefined,
+    'path',
+    'host',
+    'mock',
+    false,
+  ],
+  [
+    'product-admin-three-host',
+    'product-admin-three-host',
+    undefined,
+    'host',
+    'host',
+    'mock',
+    false,
+  ],
+  ['host', undefined, 'host', 'host', 'path', 'mock', false],
+  ['setup-cli', 'organization-setup', undefined, 'path', 'path', 'mock', true],
+  ['setup-console', 'organization-setup', 'host', 'host', 'path', 'mock', true],
+  ['staff-invitation', 'product-admin-closed-signup', undefined, 'path', 'host', 'mock', true],
+  ['support-mail-path', 'support-mail-path', undefined, 'path', 'host', 'resend', true],
+  ['support-mail-host', 'support-mail-host', undefined, 'host', 'host', 'resend', true],
+  [
+    'organization-provisioning',
+    'organization-provisioning',
+    undefined,
+    'path',
+    'path',
+    'resend',
+    true,
+  ],
 ]) {
   test(`${profile} resolved readiness and single-stack resource closure survive conflicts`, async () => {
     const id = `staff-readiness-${randomUUID()}`
     const before = process.env.HEALTH_DISK_THRESHOLD_PERCENT
     process.env.HEALTH_DISK_THRESHOLD_PERCENT = '0.4'
     try {
-      const m = await create(id, 'e2e', undefined, false, profile)
+      const m = await create(id, 'e2e', topology, false, fixture)
       const base = join(m.snapshot, 'docker-compose.yml')
       const source = await readFile(base, 'utf8')
       assert.ok(source.includes('${HEALTH_DISK_THRESHOLD_PERCENT:-0.9}'))
@@ -198,16 +269,23 @@ for (const profile of [
           { encoding: 'utf8', timeout: 10000 }
         )
       )
-      assert.deepEqual(Object.keys(rendered.services).sort(), [
-        'api',
-        'caddy',
-        'migrate',
-        'postgres',
-        'redis',
-        'seed',
-        'web',
-        'worker',
-      ])
+      const expectedTopology = ['setup-cli', 'organization-provisioning'].includes(profile)
+        ? 'path'
+        : 'host'
+      assert.deepEqual(
+        Object.keys(rendered.services).sort(),
+        [
+          'api',
+          'migrate',
+          'postgres',
+          'redis',
+          'seed',
+          'web',
+          'worker',
+          ...(expectedTopology === 'host' ? ['caddy'] : []),
+          ...(mail ? ['mail-capture'] : []),
+        ].sort()
+      )
       for (const [name, target] of Object.entries({
         api: undefined,
         worker: undefined,
@@ -222,12 +300,13 @@ for (const profile of [
         const dockerfile = await readFile(join(m.snapshot, `apps/${app}/Dockerfile`), 'utf8')
         assert.match(dockerfile.match(/^FROM .+$/gm).at(-1), / AS runner$/)
       }
-      assert.equal(m.topology, 'host')
-      assert.equal(m.productAdminHost, profile !== 'product-admin-oauth-path')
-      assert.equal(m.consoleTopology, profile === 'product-admin-three-host' ? 'host' : 'path')
+      assert.equal(m.topology, expectedTopology)
+      assert.equal(m.productAdminHost, staffMode === 'host')
+      if (profile.startsWith('product-admin-'))
+        assert.equal(m.consoleTopology, profile === 'product-admin-three-host' ? 'host' : 'path')
       for (const name of ['api', 'worker']) {
         assert.equal(rendered.services[name].environment.HEALTH_DISK_THRESHOLD_PERCENT, '0.9')
-        assert.equal(rendered.services[name].environment.EMAIL_PROVIDER, 'mock')
+        assert.equal(rendered.services[name].environment.EMAIL_PROVIDER, provider)
         for (const value of [undefined, '0.75']) {
           const changed = globalThis.structuredClone(m)
           if (value === undefined)
@@ -238,7 +317,7 @@ for (const profile of [
       }
       assert.equal(
         rendered.services.api.environment.NODE_OPTIONS,
-        profile.includes('oauth') ? '--import=/app/fixtures/apple-oidc.mjs' : undefined
+        fixture?.includes('oauth') ? '--import=/app/fixtures/apple-oidc.mjs' : undefined
       )
       assert.equal(rendered.services.worker.environment.NODE_OPTIONS, undefined)
       const placement = JSON.parse(
@@ -247,12 +326,9 @@ for (const profile of [
       const console = JSON.parse(
         await readFile(join(m.snapshot, 'packages/shared/src/config/admin-console.json'), 'utf8')
       )
-      assert.equal(placement.mode, m.productAdminHost ? 'host' : 'path')
-      // Path OAuth also rehearses Console over the existing host transport.
-      assert.equal(
-        console.mode,
-        profile === 'product-admin-oauth-path' ? 'host' : m.consoleTopology
-      )
+      assert.equal(placement.mode, staffMode)
+      assert.equal(console.mode, consoleMode)
+      assertCollectorPolicy(m, mail)
     } finally {
       if (before === undefined) delete process.env.HEALTH_DISK_THRESHOLD_PERCENT
       else process.env.HEALTH_DISK_THRESHOLD_PERCENT = before
