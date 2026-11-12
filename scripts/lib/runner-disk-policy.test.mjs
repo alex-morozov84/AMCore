@@ -51,20 +51,27 @@ test('only admitted lanes, runner and admitted readiness may reach storage probe
       return { skip: true }
     },
   }
-  for (const lane of [
+  const eligible = [
     'path-standard',
     'path-disruptive',
     'staff-path-oauth',
     'staff-oauth',
     'staff-console-path',
     'staff-host',
-  ])
-    assert.equal(probe(lane, env, io).skip, true)
+    'host',
+    'setup-cli',
+    'setup-console',
+    'staff-invitation',
+    'support-mail-path',
+    'support-mail-host',
+  ]
+  for (const lane of eligible) assert.equal(probe(lane, env, io).skip, true)
   for (const lane of [
     '',
     'safety',
     'mocked',
-    'host',
+    'organization-provisioning',
+    'organization-shop',
     'docker-image-smoke',
     'observability-contract-live',
   ])
@@ -79,21 +86,13 @@ test('only admitted lanes, runner and admitted readiness may reach storage probe
     { DOCKER_TLS_VERIFY: '' },
     { HEALTH_DISK_THRESHOLD_PERCENT: '0.9' },
   ])
-    for (const lane of [
-      'path-standard',
-      'path-disruptive',
-      'staff-path-oauth',
-      'staff-oauth',
-      'staff-console-path',
-      'staff-host',
-    ])
-      assert.equal(probe(lane, { ...env, ...change }, io).skip, false)
+    for (const lane of eligible) assert.equal(probe(lane, { ...env, ...change }, io).skip, false)
   assert.equal(
     probe('path-standard', env, { ...io, release: () => 'ID=ubuntu\nVERSION_ID="26.04"' }).skip,
     false
   )
   assert.equal(probe('path-standard', env, io, { path: '/other', threshold: '0.9' }).skip, false)
-  assert.equal(calls, 6)
+  assert.equal(calls, eligible.length)
 })
 
 test('storage admission requires default local socket and one filesystem including application root', () => {

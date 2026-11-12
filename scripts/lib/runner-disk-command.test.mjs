@@ -95,42 +95,27 @@ test('shell preserves no-option deletion, conditional fallback and original fail
       (item) => item.name === 'Free unused SDK disk space for Docker lanes'
     )
     assert.equal(step.if, "matrix.lane != 'mocked'")
-    for (const lane of [
+    const eligible = [
       'path-standard',
       'path-disruptive',
       'staff-path-oauth',
       'staff-oauth',
       'staff-console-path',
       'staff-host',
-      'safety',
       'host',
-    ]) {
+      'setup-cli',
+      'setup-console',
+      'staff-invitation',
+      'support-mail-path',
+      'support-mail-host',
+    ]
+    for (const lane of [...eligible, 'safety', 'organization-provisioning', 'organization-shop']) {
       const called = run(step.run, { E2E_CI_LANE: lane, PROBE_EXIT: '0' })
       assert.equal(called.status, 0)
-      assert.equal(
-        called.calls.includes('node '),
-        [
-          'path-standard',
-          'path-disruptive',
-          'staff-path-oauth',
-          'staff-oauth',
-          'staff-console-path',
-          'staff-host',
-        ].includes(lane)
-      )
-      assert.equal(
-        called.calls.includes('rm -rf'),
-        ![
-          'path-standard',
-          'path-disruptive',
-          'staff-path-oauth',
-          'staff-oauth',
-          'staff-console-path',
-          'staff-host',
-        ].includes(lane)
-      )
+      assert.equal(called.calls.includes('node '), eligible.includes(lane))
+      assert.equal(called.calls.includes('rm -rf'), !eligible.includes(lane))
     }
-    for (const lane of ['staff-path-oauth', 'staff-oauth', 'staff-console-path', 'staff-host'])
+    for (const lane of eligible)
       assert.match(run(step.run, { E2E_CI_LANE: lane, PROBE_EXIT: '1' }).calls, /rm -rf/)
     for (const name of ['docker-image-smoke', 'observability-contract-live'])
       assert.ok(

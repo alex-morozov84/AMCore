@@ -6,6 +6,20 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const gib = 1024n ** 3n
+const eligible = [
+  'path-standard',
+  'path-disruptive',
+  'staff-path-oauth',
+  'staff-oauth',
+  'staff-console-path',
+  'staff-host',
+  'host',
+  'setup-cli',
+  'setup-console',
+  'staff-invitation',
+  'support-mail-path',
+  'support-mail-host',
+]
 const updates = [
   'pnpm-lock.yaml',
   'package.json',
@@ -70,14 +84,7 @@ test('compatible dependency inputs retain admission while unsafe capacity and co
     for (const path of updates) {
       assert.equal(probe('path-standard', env, io).skip, true, `before ${path}`)
       writeFileSync(join(directory, path), dependencyInput(path, 1))
-      for (const lane of [
-        'path-standard',
-        'path-disruptive',
-        'staff-path-oauth',
-        'staff-oauth',
-        'staff-console-path',
-        'staff-host',
-      ])
+      for (const lane of eligible)
         assert.equal(probe(lane, env, io).skip, true, `after ${path}: ${lane}`)
     }
     const low = {
@@ -88,33 +95,26 @@ test('compatible dependency inputs retain admission while unsafe capacity and co
           statfs: () => ({ ...storageIO.statfs(), bavail: 79n * gib }),
         }),
     }
-    for (const lane of [
-      'path-standard',
-      'path-disruptive',
-      'staff-path-oauth',
-      'staff-oauth',
-      'staff-console-path',
-      'staff-host',
-    ])
-      assert.equal(probe(lane, env, low).skip, false)
+    for (const lane of eligible) assert.equal(probe(lane, env, low).skip, false)
     for (const contract of [
       null,
       {},
       { path: '/other', threshold: '0.9' },
       { path: '/', threshold: '0.75' },
     ]) {
-      assert.deepEqual(
-        probe(
-          'path-standard',
-          env,
-          {
-            ...io,
-            storage: () => assert.fail('unsupported readiness must not probe storage'),
-          },
-          contract
-        ),
-        { skip: false, reason: 'unsupported-readiness' }
-      )
+      for (const lane of eligible)
+        assert.deepEqual(
+          probe(
+            lane,
+            env,
+            {
+              ...io,
+              storage: () => assert.fail('unsupported readiness must not probe storage'),
+            },
+            contract
+          ),
+          { skip: false, reason: 'unsupported-readiness' }
+        )
     }
   } finally {
     rmSync(directory, { recursive: true, force: true })

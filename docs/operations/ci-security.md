@@ -68,8 +68,9 @@ script reports available bytes and inodes before and after; deletion/report erro
 remain failures. It does not prune Docker images or alter application readiness.
 
 Only `path-standard`, `path-disruptive`, `staff-path-oauth`, `staff-oauth`,
-`staff-console-path` and `staff-host` may skip deletion through the explicit
-`--lane` option. Admission requires known GitHub-hosted Ubuntu 24.04 x64, local
+`staff-console-path`, `staff-host`, `host`, `setup-cli`, `setup-console`,
+`staff-invitation`, `support-mail-path` and `support-mail-host` may skip deletion
+through the explicit `--lane` option. Admission requires known GitHub-hosted Ubuntu 24.04 x64, local
 Docker `overlay2`, and one filesystem for workspace, temporary files, Docker data
 and application root. Available bytes must satisfy BOTH 80 GiB and
 40 GiB plus 10% of filesystem capacity. Free inodes must satisfy BOTH 80% of total
@@ -78,7 +79,11 @@ The 40 GiB allowance comprises 32 GiB for workload growth and 8 GiB reserve;
 these are conservative policy allowances, not measured peak guarantees. The eligible
 staff profiles retain one managed stack and the same five build services. Their
 resolved configuration checks cover each profile separately, including host
-placement, OAuth preload and conflicting readiness settings.
+placement, OAuth preload and conflicting readiness settings. Eligible mail
+fixtures reuse the API image for their collector, with a read-only filesystem,
+no build, no mounted volume and no published port. Validation rejects changed
+collector conditions. The shared `organization-provisioning` fixture retains
+these safety checks but does not receive SDK cleanup admission.
 
 The managed disk-readiness contract is root path `/` with used-space threshold
 `0.9`. Managed Compose generation explicitly sets `HEALTH_DISK_THRESHOLD_PERCENT`
