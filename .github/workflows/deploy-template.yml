@@ -30,7 +30,11 @@ name: Deploy Template (Registry + Digest Promotion)
 # (`packages: write` to push, `packages: read` to resolve). The two deploy
 # jobs' final step is an intentionally illustrative placeholder — replace it
 # with your real deploy command (SSH + `docker compose pull && up -d`, or your
-# platform's deploy API) once you have a real target. A fork that goes live
+# platform's deploy API) once you have a real target. The printed Compose sketch is
+# illustrative, not an executable runbook, and no job here validates staging: green
+# jobs prove only that images were built, pushed and their digests resolved. All three
+# builds receive BUILD_SOURCE_COMMIT (the full commit), which MFA deployment artifacts
+# need from the api and web images. A fork that goes live
 # should also replace the `workflow_dispatch` trigger below with real `push`
 # triggers (branches: [main] for the build path, tags: ['v*'] for the promote
 # path).
@@ -108,6 +112,7 @@ jobs:
         with:
           context: .
           file: apps/web/Dockerfile
+          build-args: BUILD_SOURCE_COMMIT=${{ github.sha }}
           target: runner
           push: true
           tags: ghcr.io/${{ steps.image-base.outputs.value }}/web:${{ steps.tag.outputs.value }}
@@ -130,7 +135,8 @@ jobs:
 
       - name: Deploy (placeholder — replace with your real staging deploy)
         run: |
-          echo "This step is a placeholder. Replace it with your real deploy command, e.g."
+          echo "This step is a placeholder. Nothing was deployed or validated."
+          echo "Replace it with your real deploy command. Illustrative sketch only, not a runbook:"
           echo "(VPS/Compose path — docker/compose/prod.yml, see docs/operations/deployment.md):"
           echo "  ssh deploy@staging-host '"
           echo "    export COMPOSE_API_IMAGE=ghcr.io/.../api@<api digest>"
@@ -239,14 +245,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Confirm the exact digests staging already validated
+      - name: Show the exact digests published by the prior main run
         env:
           API_DIGEST: ${{ needs.resolve-production-digests.outputs.api_digest }}
           API_MIGRATOR_DIGEST: ${{ needs.resolve-production-digests.outputs.api_migrator_digest }}
           WEB_DIGEST: ${{ needs.resolve-production-digests.outputs.web_digest }}
         run: |
           echo "This job only runs after production's required-reviewer approval."
-          echo "It deploys the same digests already published by a prior main run — nothing here was rebuilt."
+          echo "These are the digests published by a prior main run — nothing here was rebuilt."
+          echo "This template does not prove staging validated them; your real staging deploy and approval do."
           echo "api:            $API_DIGEST"
           echo "api-migrator:   $API_MIGRATOR_DIGEST"
           echo "web:            $WEB_DIGEST"
