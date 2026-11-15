@@ -67,7 +67,10 @@ graph; it does not inherit this API build or move client generation to rollout.
 Use [managed local development](../operations/local-stands.md) when another
 checkout runs or ordinary environment files point at remote resources. For a
 manually configured local environment, `pnpm --filter api dev` runs stock
-`nest start --watch`.
+`nest start --watch`. The root `pnpm dev` builds shared first (Turborepo `dev`
+depends on `^build`), then starts API and web; web needs the shell exports in the
+[README Quick Start](../../README.md#quick-start). When you start packages separately, run
+`pnpm --filter @amcore/shared build` first.
 
 Nest/SWC's development checker reports diagnostics asynchronously. A listening
 HTTP endpoint or a restarted process does not prove a fresh TypeScript 7 check.
