@@ -274,17 +274,19 @@ FRONTEND_URL=http://localhost:3000 WEB_TRUSTED_ORIGINS=http://localhost:3000 doc
 pnpm install --frozen-lockfile
 docker compose up -d postgres redis   # or point DATABASE_URL/REDIS_URL at your own
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL development only)
-export REDIS_URL="redis://localhost:6379"   # the same value as in .env (web reads no .env)
+export REDIS_URL="redis://localhost:6379"   # the same value as in .env (web does not read the root .env)
 pnpm dev
 ```
 
-The web app reads no `.env` file, so export `WEB_FRONTEND_CONTEXT_KEY` (above) and
+The web app does not read the root `.env`, so export `WEB_FRONTEND_CONTEXT_KEY` (above) and
 `REDIS_URL` in the shell that runs `pnpm dev`. Turborepo passes five variables from your
 shell to the dev processes: those two, `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN` and
-`WEB_TRUSTED_ORIGINS`. If you changed the last three in `.env`, export them too so web
-sees the same origins as the API.
-Without the key, web refuses to start. Without `REDIS_URL`, web starts, but its
-authentication endpoints (for example session bootstrap) answer 503.
+`WEB_TRUSTED_ORIGINS`. If you change any of the last three in `.env`, export them too so web
+sees the same origins as the API, and keep `WEB_TRUSTED_ORIGINS` equal to the web origin.
+The web port is fixed at 3002 in the web dev script; changing an origin does not move it.
+Without the key, web refuses to start. Without `REDIS_URL`, or when its key differs from
+the API's, web starts, but its authentication endpoints (for example session bootstrap)
+answer 503.
 
 > Production uses `prisma migrate deploy` from the CLI-capable migrator image as
 > a one-shot step before rolling out the slim app image — never `db:migrate`
