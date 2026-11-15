@@ -273,6 +273,7 @@ FRONTEND_URL=http://localhost:3000 WEB_TRUSTED_ORIGINS=http://localhost:3000 doc
 ```bash
 pnpm install --frozen-lockfile
 docker compose up -d postgres redis   # or point DATABASE_URL/REDIS_URL at your own
+# first set DATABASE_URL in .env for the bundled Postgres (see below)
 pnpm --filter api db:migrate          # prisma migrate dev (LOCAL development only)
 export REDIS_URL="redis://localhost:6379"   # the same value as in .env (web does not read the root .env)
 pnpm dev
