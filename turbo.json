@@ -5,7 +5,15 @@
   "tasks": {
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"],
+      "passThroughEnv": [
+        "WEB_FRONTEND_CONTEXT_KEY",
+        "REDIS_URL",
+        "FRONTEND_URL",
+        "PRODUCT_ADMIN_ORIGIN",
+        "WEB_TRUSTED_ORIGINS"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],

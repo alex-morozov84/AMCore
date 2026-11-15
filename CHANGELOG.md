@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Make the native `pnpm dev` path start web: Turborepo's strict environment mode
+  filtered the web-to-API proof key and Redis URL, and `dev` did not build shared first.
+  Pass the key, Redis URL and origin settings through, build shared before `dev`, and ship
+  `WEB_FRONTEND_CONTEXT_KEY` empty in `.env.example` instead of a usable placeholder, so
+  web refuses to start until a generated value is exported.
+
 - Pass the full source commit to the web image build in the deploy template, as the API
   and migrator builds already did, so MFA deployment artifacts from all three images can
   pass preflight. Make the template's placeholder messages state that no job validates staging.
