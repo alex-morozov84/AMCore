@@ -279,11 +279,12 @@ pnpm dev
 ```
 
 The web app reads no `.env` file, so export `WEB_FRONTEND_CONTEXT_KEY` (above) and
-`REDIS_URL` in the shell that runs `pnpm dev`. Turborepo passes these two to the dev
-processes, plus `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN` and `WEB_TRUSTED_ORIGINS` when
-you change them from the defaults in `.env`; export those too so web sees the same
-origins as the API. Without the key, web refuses to start. Without `REDIS_URL`, web
-starts but authentication requests answer 503.
+`REDIS_URL` in the shell that runs `pnpm dev`. Turborepo passes five variables from your
+shell to the dev processes: those two, `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN` and
+`WEB_TRUSTED_ORIGINS`. If you changed the last three in `.env`, export them too so web
+sees the same origins as the API.
+Without the key, web refuses to start. Without `REDIS_URL`, web starts, but its
+authentication endpoints (for example session bootstrap) answer 503.
 
 > Production uses `prisma migrate deploy` from the CLI-capable migrator image as
 > a one-shot step before rolling out the slim app image — never `db:migrate`
