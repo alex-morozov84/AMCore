@@ -279,13 +279,17 @@ pnpm dev
 ```
 
 The web app does not read the root `.env`, so export `WEB_FRONTEND_CONTEXT_KEY` (above) and
-`REDIS_URL` in the shell that runs `pnpm dev`. Turborepo passes five variables from your
-shell to the dev processes: those two, `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN` and
-`WEB_TRUSTED_ORIGINS`. If you change any of the last three in `.env`, export them too so web
-sees the same origins as the API, and keep `WEB_TRUSTED_ORIGINS` equal to the web origin.
-The web port is fixed at 3002 in the web dev script; changing an origin does not move it.
-Without the key, web refuses to start. Without `REDIS_URL`, or when its key differs from
-the API's, web starts, but its authentication endpoints (for example session bootstrap)
+`REDIS_URL` in the shell that runs `pnpm dev`. The API reads the root `.env`, and a value
+exported in the shell overrides it. With the bundled Postgres, first set
+`DATABASE_URL="postgresql://amcore:amcore@localhost:5432/amcore?schema=public"` in `.env`;
+the migration command reads it there. Turborepo passes five variables from your shell to the
+dev processes: those two, `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN` and `WEB_TRUSTED_ORIGINS`.
+`FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` name the address where you open the web app (default
+`http://localhost:3002`; the web port is fixed at 3002 in the web dev script). Change them only
+if you reach web through another address, such as a proxy. Then export every origin variable you
+changed so web sees the same origins as the API, and keep `WEB_TRUSTED_ORIGINS` equal to the
+web origin. Without the key, web refuses to start. Without `REDIS_URL`, or when its key differs
+from the API's, web starts, but its authentication endpoints (for example session bootstrap)
 answer 503.
 
 > Production uses `prisma migrate deploy` from the CLI-capable migrator image as
