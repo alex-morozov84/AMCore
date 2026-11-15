@@ -180,7 +180,15 @@ automation.
   goes (SSH + `docker compose pull && docker compose up -d` for the VPS path,
   or your platform's deploy API). Replace that step once you have a real
   target — the workflow's job is to prove the promotion mechanics, not to
-  guess your infrastructure.
+  guess your infrastructure. Nothing in the workflow validates staging: green
+  jobs prove only that images were built, pushed and their digests resolved.
+- **Every build receives the full source commit.** The `api`, `api` migrator
+  and `web` builds all get `BUILD_SOURCE_COMMIT=<commit>`. MFA deployment
+  artifacts need it from the `api` and `web` images; a build without it writes
+  `sourceCommit: null` and deployment preflight refuses that artifact. Image
+  publication alone does not make a fleet deployable: collect and check the
+  artifact of every actual instance as described in
+  [MFA deployment](../auth/mfa-deployment.md#check-the-exact-images).
 - **Create the `staging`/`production` GitHub Environments first.** Referencing
   an environment that doesn't exist yet makes GitHub silently create it with
   no protection rules at all — exactly the ungated behavior this whole

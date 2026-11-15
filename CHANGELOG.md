@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pass the full source commit to the web image build in the deploy template, as the API
+  and migrator builds already did, so MFA deployment artifacts from all three images can
+  pass preflight. Make the template's placeholder messages state that no job validates staging.
+
 - Extend guarded SDK cleanup admission to the six remaining normal browser CI
   configurations. Require read-only, build-free mail collectors while preserving
   provisioning compatibility and mandatory cleanup on unsafe runners.

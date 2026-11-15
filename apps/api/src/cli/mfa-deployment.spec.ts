@@ -53,6 +53,12 @@ describe('Deployment command accepts only explicit, bounded, image-based prerequ
     expect(result.sourceCommit).toBe('c'.repeat(40))
     expect(result.evidenceHash).toMatch(/^[a-f0-9]{64}$/)
   })
+  it('refuses an artifact from a build without BUILD_SOURCE_COMMIT', () => {
+    const input = fleet()
+    // Such a build writes `sourceCommit: null` into its artifact.
+    input.instances[0]!.artifact.sourceCommit = null as unknown as string
+    expect(() => validateMfaFleetEvidence(input)).toThrow()
+  })
   it('supports the documented single-process all role without a separate worker replica', () => {
     const input = fleet()
     input.instances[0]!.role = 'all'
