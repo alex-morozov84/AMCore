@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Rewrite steps 4 and 5 of the PostgreSQL major-upgrade guide after an end-to-end
+  rehearsal (PostgreSQL 16.15 to 18.6): validate the restored data with the matching
+  API and worker on a separate validation copy, then restore the same dump into a
+  separate cutover database, recreate every database consumer, check readiness and run
+  a canary before opening ingress. State what the rehearsal did and did not cover, and
+  treat the first application start against the cutover database as the rollback boundary.
+
 - Make the native `pnpm dev` path start web: Turborepo's strict environment mode
   filtered the web-to-API proof key and Redis URL, and `dev` did not build shared first.
   Pass the key, Redis URL and origin settings through, build shared before `dev`, and ship

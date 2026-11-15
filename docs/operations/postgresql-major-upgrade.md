@@ -208,37 +208,131 @@ amcore-pg16-migration.dump`) for extensions, publications,
       promises to reconstruct AMCore's own canonical three-role setup, not
       whatever a specific downstream product added on top of it.
 
-4. **Verify before declaring cutover — not after:**
+4. **Verify on a validation copy — before cutover, not after.** The database
+   you restored in steps 2 and 3 is the _validation copy_. Never cut over to
+   it: step 5 makes its own restore, because the checks below write test
+   data.
 
-   - Schema/table inventory matches: `\dn`, `\dt` on both source and
-     target.
-   - Per-table row counts (or a documented checksum) match.
-   - Sequence current values match (`pg_sequences`).
-   - Extensions present on the source are present and correctly versioned
-     on the target.
-   - **Default/bundled path:** all objects are owned by `amcore`.
-   - **Role-separated path:** application objects are owned by
-     `amcore_migrator`; default table/sequence privileges are recorded for
-     future `amcore_migrator`-created objects; `amcore_runtime` succeeds at
-     ordinary DML and fails DDL/privilege-escalation attempts;
-     `amcore_observer` cannot read application tables but does have the
-     intended `pg_monitor` membership and can read the documented
-     statistics surface; neither `amcore_runtime` nor `amcore_migrator` can
-     execute `pg_stat_statements_reset` (only the separately authorized
-     recovery path can — see [Recovery](pg-stat-statements-recovery.md)).
-   - Run the full application test/e2e suite against the restored PostgreSQL
-     18 target before enabling writes.
+   1. **Compare data with the frozen source** before any application starts:
+      - Schema and table inventory match: `\dn`, `\dt` on both sides.
+      - Per-table row counts (or a documented checksum) match. Counts alone
+        cannot show that values match: also compare a few known source
+        values captured during the freeze (a known account, organization and
+        membership are enough).
+      - The migration history table matches: same migration names and
+        checksums, all finished, none rolled back.
+      - Extensions present on the source are present and correctly versioned.
+      - Sequence current values match (`pg_sequences`; the AMCore schema
+        has no sequences, a product may).
+      - **Default/bundled path:** all objects are owned by `amcore`.
+      - **Role-separated path:** application objects are owned by
+        `amcore_migrator`; default table/sequence privileges are recorded for
+        future `amcore_migrator`-created objects; `amcore_runtime` succeeds at
+        ordinary DML and fails DDL/privilege-escalation attempts (use uniquely
+        named disposable tables, remove only those afterwards, and never run
+        these probes after ingress is open);
+        `amcore_observer` cannot read application tables but does have the
+        intended `pg_monitor` membership and can read the documented
+        statistics surface; neither `amcore_runtime` nor `amcore_migrator` can
+        execute `pg_stat_statements_reset` (only the separately authorized
+        recovery path can — see [Recovery](pg-stat-statements-recovery.md)).
+   2. **Start the matching application against the validation copy:** the same
+      API and worker images you will run after cutover, no new migration (the
+      restored database already holds the full history; do not run migrations
+      against it), a private network with no public ingress, its own empty Redis
+      (never the production Redis: a validation worker would take real queued
+      jobs and write sessions into the live store; in the bundled Compose stack
+      the `redis` service is that production Redis, so start a separate Redis
+      container for the validation copy), and external effects disabled or
+      mocked (for example `EMAIL_PROVIDER=mock`; no production provider keys). A
+      changed `DATABASE_URL` alone proves nothing: check each process's real
+      connection on the validation database (`pg_stat_activity`: its
+      `datid`/`datname` and the client address).
+   3. **Exercise it:** sign in with a dedicated test or staff account that
+      existed before the migration (operators do not know users' passwords);
+      read data that existed before it (profile, organization); write one
+      disposable record (for example register a new account) and read it back;
+      run one background job whose effect is mocked and wait for it to complete.
+      Then repeat the data comparison from step 4.1 for the data that existed
+      before: it must be unchanged.
+   4. **Stop these processes and discard the validation copy** (drop its
+      database, or remove its scratch instance and volume). Expected
+      result: every comparison and exercise passed with no reset or reseed.
+      Any failure or unknown result means do not cut over: find the cause
+      with the source still frozen.
 
-5. **Declare cutover.** Only once every check above passes: point
-   `docker-compose.yml` (or your production configuration) at the new
-   PostgreSQL 18 service/volume, lift the write freeze, and resume normal
-   operation.
+   A fresh-database test or e2e run does not replace this step. It proves the
+   code against a database created by the current migrations, not a restored
+   copy of your data. Run it for regression if you want, but only the restored
+   copy shows whether your data and the application work together.
+
+5. **Cut over.** Only once every check in step 4 passed:
+
+   1. **Restore the same dump again, following step 3, into a separate,
+      empty PostgreSQL 18 database** — the cutover database. For the bundled
+      Compose stack, step 4.4 removed the validation volume: recreate the
+      `postgres` service with a new empty `postgres_data_pg18` volume and
+      restore into it (this path was not rehearsed). Then repeat the
+      comparison from step 4.1 on it. If it differs, start no application:
+      discard this database, find the cause (the dump, the restore command,
+      the target) and restore again. Do not reuse the validation copy.
+   2. **Keep ingress and every writer to the source closed** until the end
+      of this step. Once the new processes start (step 5.4), do not return
+      to the source.
+   3. **Save the new connection settings and recreate every process that
+      connects to the database:** API, worker, and any backup or maintenance
+      client you run. A restart alone does not change a saved URL. For the
+      bundled Compose stack, point `docker-compose.yml` at the new PostgreSQL
+      18 service and volume (see "What was rehearsed": this swap was not
+      covered).
+      Remove the old API and worker containers; no process may stay connected
+      to the source (`pg_stat_activity` on the source server shows no client
+      connections).
+   4. **Start the new processes and confirm their real connections** are to
+      the cutover database, as in step 4.2. They use the deployment's own
+      Redis, which may hold queued jobs: a job that runs now can have an
+      external effect, so count it in step 5.5. In this reference setup the web
+      app has no database connection; do not change its settings for this
+      step.
+   5. **Check readiness and run one controlled canary** on the private
+      network: sign in, read, and write one disposable record. Note the time of
+      the first start, because it marks the rollback boundary:
+      from the first start of the application against the cutover database,
+      follow
+      [Rollback boundary](#rollback-boundary--read-this-before-you-start-writing-to-pg18).
+      If any check fails or its result is unknown, keep ingress closed and
+      fix forward. Discard the cutover database and repeat from the restore
+      only if no real user wrote data (your own canary record does not
+      count) and no external effect happened (no real email, no provider
+      call); otherwise keep it and repair forward.
+   6. **Open ingress and lift the write freeze.** Take a first backup of the
+      new database and confirm it completes.
+
+### What was rehearsed
+
+The procedure above was run end to end once, on PostgreSQL 16.15 to PostgreSQL
+18.6 (arm64), with a small synthetic data set: the default single-role setup,
+API and worker started as containers with a changed `DATABASE_URL`, one instance
+per role, the mock email provider and no web app, and a scratch Redis replaced
+by a new empty one before cutover; a Redis that holds queued jobs or sessions
+was not part of it. The restored copy and the separate cutover database passed
+their checks; the first backup afterwards completed (it was not restored or
+verified). It did **not** cover the bundled Compose volume swap under the same
+hostname, the role-separated restore together with the application, several
+replicas of one role, other extensions or providers, large databases or other
+CPU architectures. Rehearse those for your deployment before relying on them.
 
 ## Rollback boundary — read this before you start writing to PG18
 
 Rolling back by simply pointing back at the untouched PostgreSQL 16 volume
 is safe **only while the write freeze from "Before you start" still holds**
-— that is, only _before_ PostgreSQL 18 has accepted a single write.
+— that is, only before the first start of the API or worker against the
+cutover database. Restoring the dump, the comparisons and the role probes do
+not count.
+
+That first start counts as the write (step 5.4): a sign-in creates a session,
+and worker startup may write. The validation copy in step 4 is a different
+database, discarded before cutover, and does not cross the boundary.
 
 **Once PostgreSQL 18 accepts writes, there is no supported downgrade
 rollback.** PostgreSQL gives no guarantee that dump output from a newer
