@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filtered the web-to-API proof key and Redis URL, and `dev` did not build shared first.
   Pass the key, Redis URL and origin settings through, build shared before `dev`, and ship
   `WEB_FRONTEND_CONTEXT_KEY` empty in `.env.example` instead of a usable placeholder, so
-  web refuses to start until a generated value is exported.
+  web refuses to start until a generated value is exported. If your `.env` still holds the old
+  placeholder, replace it with an empty value or your generated key; otherwise the API accepts
+  that public string while web refuses to start.
 
 - Pass the full source commit to the web image build in the deploy template, as the API
   and migrator builds already did, so MFA deployment artifacts from all three images can
