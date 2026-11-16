@@ -17,8 +17,8 @@ const LOCALES = ['en-US', 'en-GB', 'ru-RU'] as const
 const FLOW_ASSET = 'js/async/8.554a91bfb8.js'
 const FLOW_SHA256 = 'b376b5911a51022cc510216e36d96ca8f2b3912134f5488859118f7718d6040f'
 export const FLOW_CSS = '.jobFlowCard-Y7apDE{display:none!important}'
-export const INFO_ASSET = 'js/async/oa.84a9cd88ce.js'
-const INFO_SHA256 = '4774c93737b1bb12c31a466dbd5cbe8bfd32e3f4d68eb0d30d3cac8d260f5ed7'
+export const INFO_ASSET = 'js/async/o.7d9ce0ec2c.js'
+const INFO_SHA256 = '438b5e7d43dadefbb2c98dd374310b8e6f382195a1892c9df2cf1c9ff4096098'
 const DEFAULTS_QUERY = '(a.name,l),_=Object.entries(L||{})'
 export const BOARD_DISPLAY_CSS = 'amcore-board-display.css'
 
