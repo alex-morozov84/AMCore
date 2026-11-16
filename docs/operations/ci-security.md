@@ -22,29 +22,122 @@ of workflow self-hardening to keep the example forkable.
 ## Aggregate CI gate
 
 `CI required` runs after every job in `ci.yml`, including Web E2E and Storybook.
-It succeeds only when all18 declared dependencies report success. Missing or extra
-job results, invalid input, failure, cancellation and skipped dependencies fail
-this aggregate. The existing jobs remain unconditional, and both PR and main
-runs retain their current checks. Other workflows keep their own required checks.
+It accepts only success from all18 declared dependencies. Missing or extra job
+results, invalid input, failure, cancellation and skipped dependencies fail it.
+Existing jobs remain unconditional. PR and main retain their current executions;
+this gate does not authorize removing another check or the post-merge execution.
+Other workflows keep their own required checks.
 
-The tracked main ruleset adds `CI required` with the same GitHub Actions publisher
-ID already used for API E2E. This declaration does not prove live enforcement.
-Before applying it, confirm the actual check publisher and current effective rules.
+### Add the requirement to an existing repository
 
-For an existing strict repository, deliver the aggregate under the old protections
-first. Then add its verified context to the live ruleset without removing any old
-required checks, pins, conditions or bypass settings. If live strict status checks
-are disabled, obtain explicit approval before enabling them. Read back the effective
-rules and verify a successful aggregate and a controlled failing aggregate on
-review PRs. Record exact commits, check publishers and the reason merge is blocked;
-another failed check is not evidence that this aggregate blocks merge.
+Use installed GitHub CLI and `jq`, repository-admin access and separately approved
+publication, CI, merge and ruleset changes. Do not run the full setup script to
+make this narrow change. For a new fork, use [strict setup](#strict-security-setup-after-forking).
+The tracked publisher15368 is the GitHub Actions ID already used for API E2E;
+confirm the new check's own publisher before applying that declaration.
 
-Cancellation requires its own verification: a skipped GitHub check can count as
-successful. Do not enable conditional job execution until the aggregate and live
-protection handle the observed failure and cancellation cases. If admission fails,
-retain the old requirements and correct the aggregate first. Removing its new live
-requirement needs a separate approved recovery action; do not restore a stale
-ruleset over unrelated security changes.
+1. Deliver the aggregate through a PR under the old protection. Preserve every
+   existing job and requirement. Keep its exact head/base commits and successful
+   workflow/run attempt. Merge requires its own approval.
+2. Read current protection and the new check. Replace the following placeholders
+   with the actual repository, PR head commit and repository-owned main ruleset ID.
+   Store responses outside the repository. A tracked JSON file is not live state.
+
+   ```sh
+   ci_repo='<owner>/<repo>'
+   ci_head='<full-PR-head-commit>'
+   ci_rule='<main-ruleset-id>'
+   ci_evidence=$(mktemp -d)
+   gh api "repos/$ci_repo/rules/branches/main" > "$ci_evidence/effective.json"
+   gh api "repos/$ci_repo/rulesets/$ci_rule" > "$ci_evidence/before.json"
+   gh api --paginate "repos/$ci_repo/commits/$ci_head/check-runs?per_page=100" > "$ci_evidence/checks.json"
+   ```
+
+   Verify that this active rule applies to main. Preserve other effective or
+   inherited rules. Identify `CI required` by name, `head_sha`, `app.id`, check ID,
+   `details_url` and the associated workflow/run attempt. Other successful checks
+   do not prove this new check's publisher. If it has not run, stop here.
+
+3. Set `ci_app` to that observed numeric app ID. Choose `ci_strict=true` only with
+   approval to enable strict when the live value is false. Preserve existing
+   strict=true. If the effective rule is ambiguous, obtain a reviewed plan first.
+   Prepare the narrow request without changing the old contexts or pins:
+
+   ```sh
+   ci_app='<observed-numeric-app-id>'
+   ci_strict=true
+   jq --argjson app "$ci_app" --argjson strict "$ci_strict" '
+     {name,target,enforcement,conditions,bypass_actors,rules} |
+     .rules |= map(if .type == "required_status_checks" then
+       .parameters.strict_required_status_checks_policy = $strict |
+       .parameters.required_status_checks |=
+         (if any(.[]; .context == "CI required") then
+            error("Context already exists: verify it instead of adding another")
+          else . + [{context:"CI required",integration_id:$app}] end)
+       else . end)
+   ' "$ci_evidence/before.json" > "$ci_evidence/request.json"
+   ```
+
+   Review the semantic diff: only the new context and, if separately approved,
+   strict false→true may differ. Require exactly one intended status-check rule.
+   Leave all old checks, pins, conditions, bypass and enforcement unchanged.
+
+4. Agree a short exclusive administration window with other maintainers. Re-read
+   the rule immediately before the approved write. If `updated_at` or any reviewed
+   field changed, rebuild and review the request. GitHub's PUT is not an atomic
+   compare-and-swap; do not claim that re-reading eliminates concurrent updates.
+
+   ```sh
+   gh api "repos/$ci_repo/rulesets/$ci_rule" > "$ci_evidence/latest.json"
+   diff -u "$ci_evidence/before.json" "$ci_evidence/latest.json"
+   # Proceed only after reviewing an unchanged rule and obtaining write approval.
+   gh api --method PUT "repos/$ci_repo/rulesets/$ci_rule" --input "$ci_evidence/request.json"
+   gh api "repos/$ci_repo/rules/branches/main" > "$ci_evidence/after.json"
+   ```
+
+   Confirm the effective context/app pin, strict policy and every old protection.
+   A successful PUT alone does not prove the rule applies to main.
+
+### Verify failure, pending results and cancellation
+
+Use separately approved disposable validation PRs. Keep the normal aggregate
+step with `CI_RESULTS: ${{ toJSON(needs) }}` unchanged. After it, add one temporary
+step only on the validation branch:
+
+```yaml
+- name: Disposable aggregate failure witness
+  env:
+    CI_RESULTS: '{}'
+  run: node scripts/ci-required.mjs
+```
+
+Run the existing gate and Script contracts checks on that fault diff before
+publishing. Do not weaken their assertions. This added step must fail the aggregate
+while other required checks succeed. Never merge the temporary step into main.
+
+Collect `gh pr checks PR_NUMBER --required`, `gh pr view PR_NUMBER --json headRefOid,baseRefOid,mergeStateStatus,statusCheckRollup`
+and the exact commit's check-runs. Record each required context, app, conclusion
+and pending/missing result. Also exclude stale base, unresolved conversations and
+other failing requirements as the reason for blocking. A generic blocked result
+with another failed check does not isolate the aggregate's effect.
+
+Observe pending admission separately. For cancellation, obtain explicit permission
+to rerun/cancel the named validation workflow. Use `gh run cancel RUN_ID`, then
+verify terminal jobs, cleanup and actual merge admission. A skipped GitHub check
+can count as successful. If cancellation permits merge, protection is unproven:
+retain old requirements, fix the specific defect and do not enable conditional jobs.
+Do not attempt a destructive merge probe or automatically rerun a failed CI.
+
+### Recover without overwriting other protection
+
+First correct the aggregate while retaining the old requirements. If emergency
+removal of only its new live requirement is approved, read a fresh ruleset and
+remove only the matching context/app pair from that fresh request. Review the
+semantic delta, coordinate the administration window, write and read back as above.
+Do not restore `before.json` wholesale over another maintainer's changes. Do not
+silently revert an independently approved strict policy. Preserve evidence of both
+the failure and recovery; publisher/protection verification remains incomplete
+until the intended checks and effective rules agree.
 
 ## Lighthouse evidence admission
 
