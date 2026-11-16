@@ -18,6 +18,44 @@ env:
   API_E2E_PR_HEAD: ${{ github.event.pull_request.head.sha || '' }}
 
 jobs:
+  ci-required:
+    name: CI required
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ always() }}
+    needs:
+      - lint
+      - typecheck
+      - build
+      - test-unit-redis
+      - test-capability
+      - test-notification-ai
+      - test
+      - api-e2e-plan
+      - api-e2e-shards
+      - api-e2e
+      - script-contracts
+      - docker-image-smoke
+      - web-e2e-plan
+      - web-e2e-lanes
+      - web-e2e
+      - promtool
+      - observability-contract-live
+      - storybook
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Require every CI family
+        env:
+          CI_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci-required.mjs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

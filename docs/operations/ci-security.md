@@ -19,6 +19,33 @@ of workflow self-hardening to keep the example forkable.
 | `workflow-lint.yml`     | `push`, `pull_request`                  | actionlint, zizmor, action pin verifier                                                             | blocking                             |
 | `pr-title.yml`          | `pull_request`                          | Conventional-Commits PR-title lint                                                                  | blocking (squash title = commit msg) |
 
+## Aggregate CI gate
+
+`CI required` runs after every job in `ci.yml`, including Web E2E and Storybook.
+It succeeds only when all18 declared dependencies report success. Missing or extra
+job results, invalid input, failure, cancellation and skipped dependencies fail
+this aggregate. The existing jobs remain unconditional, and both PR and main
+runs retain their current checks. Other workflows keep their own required checks.
+
+The tracked main ruleset adds `CI required` with the same GitHub Actions publisher
+ID already used for API E2E. This declaration does not prove live enforcement.
+Before applying it, confirm the actual check publisher and current effective rules.
+
+For an existing strict repository, deliver the aggregate under the old protections
+first. Then add its verified context to the live ruleset without removing any old
+required checks, pins, conditions or bypass settings. If live strict status checks
+are disabled, obtain explicit approval before enabling them. Read back the effective
+rules and verify a successful aggregate and a controlled failing aggregate on
+review PRs. Record exact commits, check publishers and the reason merge is blocked;
+another failed check is not evidence that this aggregate blocks merge.
+
+Cancellation requires its own verification: a skipped GitHub check can count as
+successful. Do not enable conditional job execution until the aggregate and live
+protection handle the observed failure and cancellation cases. If admission fails,
+retain the old requirements and correct the aggregate first. Removing its new live
+requirement needs a separate approved recovery action; do not restore a stale
+ruleset over unrelated security changes.
+
 ## Lighthouse evidence admission
 
 The Web E2E workflow declares explicit Lighthouse owners and exact current-run/attempt
