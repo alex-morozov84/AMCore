@@ -111,8 +111,8 @@ step only on the validation branch:
   run: node scripts/ci-required.mjs
 ```
 
-Run the existing gate and Script contracts checks on that fault diff before
-publishing. Do not weaken their assertions. This added step must fail the aggregate
+Run `node --test scripts/lib/ci-required.test.mjs scripts/lib/script-contracts-ci.test.mjs`
+on that fault diff before publishing. Do not weaken their assertions. This added step must fail the aggregate
 while other required checks succeed. Never merge the temporary step into main.
 
 Collect `gh pr checks PR_NUMBER --required`, `gh pr view PR_NUMBER --json headRefOid,baseRefOid,mergeStateStatus,statusCheckRollup`
@@ -121,7 +121,10 @@ and pending/missing result. Also exclude stale base, unresolved conversations an
 other failing requirements as the reason for blocking. A generic blocked result
 with another failed check does not isolate the aggregate's effect.
 
-Observe pending admission separately. For cancellation, obtain explicit permission
+Observe pending admission while an approved validation run is still executing its
+dependencies. If it finishes before observation, pending admission remains unproved;
+do not trigger another run without its own authorization and budget.
+For cancellation, obtain explicit permission
 to rerun/cancel the named validation workflow. Use `gh run cancel RUN_ID`, then
 verify terminal jobs, cleanup and actual merge admission. A skipped GitHub check
 can count as successful. If cancellation permits merge, protection is unproven:
