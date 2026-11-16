@@ -5,6 +5,10 @@
 // moveChildBackToParentDependencies. Neither is reachable from idempotent-command.lua.ts, which
 // denies PRIORITY_RETRY_UNSUPPORTED and RELATED_JOB, so its narrowed copy needs no change.
 // 6.3.15 -> 6.3.16: all pinned sources and compiled scripts are byte-identical.
+// 6.7.2 -> 6.7.6: pause-7, reprocessJob-9 and moveToDelayed-11 are byte-identical. removeJob-2
+// changed only through includes/removeParentDependencyKey.lua, which now also removes the
+// parent's deduplication key. That path needs a parent or child relationship, which
+// idempotent-command.lua.ts denies (RELATED_JOB), so its narrowed copy needs no change.
 export const SCRIPT_PROVENANCE = {
   package: 'bullmq',
   version: '6.3.16',
@@ -61,7 +65,7 @@ export const SCRIPT_PROVENANCE = {
         'includes/removeJobKeys.lua':
           '3ef7537779443d1f580acce3352f3d57050b9dbbac952c62911ca36d4201ad67',
         'includes/removeParentDependencyKey.lua':
-          '2a97d866674d7c98ad82fec7a897c24cd46e22ab12ce6a305480414005b66633',
+          'bfce2df83c9769caa1f6b50c0088f68e56c2e9d3b219e2f3c1f1575dd86e923a',
         'includes/addJobInTargetList.lua':
           '356385ce8c4ba1841de955ac76af5381f3b2074628133e870c2035c3d64a62a2',
         'includes/addBaseMarkerIfNeeded.lua':
@@ -69,7 +73,7 @@ export const SCRIPT_PROVENANCE = {
         'includes/isQueuePausedOrMaxed.lua':
           'b347fdeb087c7a7c6fda41e845f56f6ab8a34999238cff57fc33efcf63e9bee3',
       },
-      compiledSha256: 'f2acb16fda20ccac200abd5289a8910e48870d454c1577b19bd375ab809bb4b6',
+      compiledSha256: 'a523e7d9273626074b5308ffec5a010385e7501d7004763610f888cd36eea3f1',
     },
     'moveToDelayed-11': {
       sources: {
