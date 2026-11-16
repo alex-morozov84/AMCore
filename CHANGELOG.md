@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Add an aggregate CI gate covering every main workflow job, including browser
+  and Storybook results. Declare it as an additional required check while
+  preserving existing checks and the separate live-enforcement rollout.
+
 - Rewrite steps 4 and 5 of the PostgreSQL major-upgrade guide after an end-to-end
   rehearsal (PostgreSQL 16.15 to 18.6): validate the restored data with the matching
   API and worker on a separate validation copy, then restore the same dump into a
