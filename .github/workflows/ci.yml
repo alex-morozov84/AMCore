@@ -56,6 +56,13 @@ jobs:
           CI_RESULTS: ${{ toJSON(needs) }}
         run: node scripts/ci-required.mjs
 
+      - name: Disposable pending and failure witness
+        env:
+          CI_RESULTS: '{}'
+        run: |
+          node -e 'setTimeout(() => {}, 30000)'
+          node scripts/ci-required.mjs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
