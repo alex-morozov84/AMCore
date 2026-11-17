@@ -43,3 +43,24 @@ test('every required check of the main ruleset names a job in a tracked workflow
     'a required check without a job can never pass and blocks every merge'
   )
 })
+
+test('the broad bridge preflight dominates application preparation without selecting paths away', () => {
+  const jobs = ci.jobs
+  const selector = jobs['ci-selection']
+  assert.equal(selector.permissions, undefined)
+  assert.equal(selector.steps.find((step) => step.id === 'filter').with.token, '')
+  assert.equal(
+    selector.steps.find((step) => step.id === 'filter').with['predicate-quantifier'],
+    'every'
+  )
+  const reaches = (id) => id === 'ci-selection' || [].concat(jobs[id].needs ?? []).some(reaches)
+  for (const [id, job] of Object.entries(jobs)) {
+    if (id === 'ci-selection') continue
+    assert.ok(reaches(id), `${id} must depend on preflight`)
+    assert.ok(!job.if || job.if === '${{ always() }}', `${id} cannot exclude paths`)
+  }
+  assert.equal(
+    jobs['ci-required'].steps.find((step) => step.run).env.CI_PLAN,
+    '${{ needs.ci-selection.outputs.plan }}'
+  )
+})

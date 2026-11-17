@@ -18,12 +18,47 @@ env:
   API_E2E_PR_HEAD: ${{ github.event.pull_request.head.sha || '' }}
 
 jobs:
+  ci-selection:
+    name: CI selection (broad bridge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Admit supported policy and source before filtering
+        run: node scripts/ci-policy.mjs
+      - name: Classify changed paths
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          token: ''
+          base: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          filters: .github/ci-paths.yml
+          list-files: json
+          predicate-quantifier: every
+      - name: Admit broad execution plan
+        id: plan
+        env:
+          CI_FILTER_OUTPUTS: ${{ toJSON(steps.filter.outputs) }}
+        run: node scripts/ci-selection.mjs
+
   ci-required:
     name: CI required
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ always() }}
     needs:
+      - ci-selection
       - lint
       - typecheck
       - build
@@ -47,6 +82,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -54,9 +90,11 @@ jobs:
       - name: Require every CI family
         env:
           CI_RESULTS: ${{ toJSON(needs) }}
+          CI_PLAN: ${{ needs.ci-selection.outputs.plan }}
         run: node scripts/ci-required.mjs
 
   lint:
+    needs: [ci-selection]
     name: Lint
     runs-on: ubuntu-latest
     steps:
@@ -90,6 +128,7 @@ jobs:
         run: pnpm format:check
 
   typecheck:
+    needs: [ci-selection]
     name: Type Check
     runs-on: ubuntu-latest
     steps:

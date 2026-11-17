@@ -179,6 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Add diagnostic CI selection and source-policy preflight while retaining all existing CI families and protection requirements. Proposed exclusions do not activate conditional execution or downstream heavy-off support.
+
 - Security fixes target the latest published minor only; older minors receive no
   backports. Upgrade to that line for upstream support; manually ported fixes are
   product-owned. See SECURITY.md.

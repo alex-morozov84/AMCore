@@ -1,0 +1,35 @@
+# Used with predicate-quantifier: every and list-files: json.
+# The action owns glob matching; consumers only subtract admitted ownership lists.
+# Keep positive alternatives in one brace union: separate entries are ANDed.
+all:
+  - '**'
+docs:
+  - '{README.md,CONTRIBUTING.md,AGENTS.md,docs/**/*.md}'
+  - '!docs/operations/**'
+  - '!docs/backend/recipes/**'
+ui:
+  - '{apps/web/src/**/ui/**,apps/web/messages/**}'
+  - '!apps/web/src/shared/**'
+  - '!apps/web/src/_app/**'
+  - '!apps/web/src/app/**'
+web:
+  - 'apps/web/**'
+api:
+  - '{apps/api/**,docs/backend/recipes/**}'
+common:
+  - '{packages/**,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,turbo.json,.env.example,PROJECT_CONTEXT.md,ci/**,.github/**,scripts/ci-*.mjs,scripts/lib/ci-*.mjs}'
+  - '!.github/ISSUE_TEMPLATE/**'
+infra:
+  - '{docker/**,docker-compose*.yml,apps/*/Dockerfile,docs/operations/**,scripts/verify-*.mjs,scripts/cleanup-*.mjs,scripts/load-test/**}'
+monitoring:
+  - '{docker/monitoring/**,docker/log-search/**,docs/operations/prometheus/**,docs/operations/runbooks/**,scripts/observability-contract/**}'
+tools:
+  - 'scripts/**'
+  - '!scripts/observability-contract/**'
+  - '!scripts/verify-*.mjs'
+  - '!scripts/cleanup-*.mjs'
+  - '!scripts/load-test/**'
+email:
+  - '{apps/api/src/infrastructure/email/**,apps/api/src/core/notifications/**,apps/api/vitest.config.ts,apps/api/package.json}'
+deployment:
+  - '{scripts/deployment-version/**,scripts/run-deployment-version-e2e.mjs,apps/web/src/**/deployment-version/**,apps/web/src/**/deployment-version.*,apps/web/next.config.ts,apps/web/package.json,apps/web/Dockerfile}'
