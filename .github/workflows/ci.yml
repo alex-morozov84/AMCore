@@ -56,6 +56,11 @@ jobs:
           CI_RESULTS: ${{ toJSON(needs) }}
         run: node scripts/ci-required.mjs
 
+      - name: Disposable positive aggregate witness
+        env:
+          CI_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci-required.mjs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
