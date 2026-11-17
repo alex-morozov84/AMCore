@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { requiredCiJobs } from './ci-required.mjs'
@@ -36,6 +36,12 @@ test('actual bridge reports narrow diagnostics but keeps all groups and refuses 
     git('commit', '-qm', 'fixture')
     return git('rev-parse', 'HEAD')
   }
+  const cataloguePath = 'packages/shared/src/constants/locales.ts'
+  const catalogue = readFileSync(
+    new URL('../../packages/shared/src/constants/locales.ts', import.meta.url),
+    'utf8'
+  )
+  put(cataloguePath, catalogue)
   const base = commit()
   put('leaf.tsx', 'heading')
   const head = commit()
@@ -87,4 +93,34 @@ test('actual bridge reports narrow diagnostics but keeps all groups and refuses 
   put('ci/product.json', '{"version":1,"mode":"heavy-off"}')
   const heavy = commit()
   assert.equal(invoke({ GITHUB_SHA: heavy }).status, 1)
+  // Restore unrelated admission inputs before each independent locale refusal.
+  put('ci/product.json', '{"version":1,"mode":"normal"}')
+  for (const locales of [
+    { version: 1, enabled: ['en'], default: 'en' },
+    { version: 1, enabled: ['ru'], default: 'ru' },
+    { version: 1, enabled: ['en', 'ru'], default: 'ru' },
+  ]) {
+    put(
+      'packages/shared/src/config/admin-console.json',
+      JSON.stringify(settings['admin-console.json'])
+    )
+    put('packages/shared/src/config/locales.json', JSON.stringify(locales))
+    const failed = invoke({ GITHUB_SHA: commit() })
+    assert.equal(failed.status, 1)
+    assert.match(failed.stderr, /supports source S0 only/)
+  }
+  put('packages/shared/src/config/locales.json', JSON.stringify(settings['locales.json']))
+  put(cataloguePath, catalogue + '\n// Deliberate source/checkout mismatch\n')
+  const differentCatalogue = commit()
+  const mismatch = invoke({ GITHUB_SHA: differentCatalogue })
+  assert.equal(mismatch.status, 1)
+  assert.match(mismatch.stderr, /catalogue definition/)
+  put(cataloguePath, catalogue)
+  const restored = commit()
+  writeFileSync(event, JSON.stringify({ before: differentCatalogue }))
+  const baselineMismatch = invoke({ GITHUB_SHA: restored })
+  assert.equal(baselineMismatch.status, 1)
+  assert.match(baselineMismatch.stderr, /catalogue definition/)
+  writeFileSync(event, JSON.stringify({ before: base }))
+  assert.equal(invoke({ GITHUB_SHA: restored }).status, 0)
 })

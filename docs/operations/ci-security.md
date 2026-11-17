@@ -42,6 +42,11 @@ S0 settings: English and Russian, path Console `admin`, path product admin
 application preparation. Console on a separate host is unsupported by this
 bridge. This limitation does not certify downstream CI.
 
+The bridge temporarily requires identical
+`packages/shared/src/constants/locales.ts` files in the source head, checkout and
+event base. Any difference, including comments or formatting, or an unavailable
+base stops admission.
+
 `ci/product.json` declares version 1 and the saved mode. A missing policy file
 means `normal`; a missing commit or malformed policy fails admission. Pull
 requests use the base policy and validate the proposed head policy. Full-once

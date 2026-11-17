@@ -5,6 +5,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { normalizeCiAreas, selectCiGroups } from './lib/ci-selection.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
 import { requiredCiJobs } from './lib/ci-required.mjs'
+import { LOCALE_CATALOGUES } from './lib/settings-files.mjs'
 
 try {
   const policy = JSON.parse(
@@ -15,8 +16,24 @@ try {
   )
   if (policy.role !== 'upstream-starter' || policy.mode === 'heavy-off')
     throw new Error('Broad bridge supports upstream normal/full only')
+  const payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+  const acquired = readSelectionSource(process.cwd(), policy.event, payload, process.env.GITHUB_SHA)
+  const cataloguePath = 'packages/shared/src/constants/locales.ts'
+  const catalogueAt = (sha) =>
+    execFileSync('git', ['show', `${sha}:${cataloguePath}`], { encoding: 'utf8' })
+  const sourceCatalogue = catalogueAt(acquired.source.head)
+  if (
+    !acquired.source.base ||
+    sourceCatalogue !==
+      readFileSync(
+        new URL('../packages/shared/src/constants/locales.ts', import.meta.url),
+        'utf8'
+      ) ||
+    sourceCatalogue !== catalogueAt(acquired.source.base)
+  )
+    throw new Error('Broad bridge requires the unchanged source/checkout catalogue definition')
   const expected = {
-    'locales.json': { version: 1, enabled: ['en', 'ru'], default: 'en' },
+    'locales.json': { version: 1, enabled: LOCALE_CATALOGUES, default: 'en' },
     'admin-console.json': { version: 1, mode: 'path', alias: 'admin' },
     'product-admin.json': { version: 1, mode: 'path', alias: 'manage' },
   }
@@ -29,8 +46,6 @@ try {
     if (!isDeepStrictEqual(actual, settings))
       throw new Error('Broad bridge supports source S0 only; native settings are not prepared')
   }
-  const payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
-  const acquired = readSelectionSource(process.cwd(), policy.event, payload, process.env.GITHUB_SHA)
   const outputs = JSON.parse(process.env.CI_FILTER_OUTPUTS)
   const areas = normalizeCiAreas(outputs)
   // Git ancestry is admitted above. REST completeness and fork permissions remain unproved here.
