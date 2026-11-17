@@ -1,0 +1,65 @@
+import { execFileSync } from 'node:child_process'
+import { appendFileSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
+import { normalizeCiAreas, selectCiGroups } from './lib/ci-selection.mjs'
+import { readSelectionSource } from './lib/ci-selection-source.mjs'
+import { requiredCiJobs } from './lib/ci-required.mjs'
+
+try {
+  const policy = JSON.parse(
+    execFileSync(process.execPath, [fileURLToPath(new URL('./ci-policy.mjs', import.meta.url))], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  )
+  if (policy.role !== 'upstream-starter' || policy.mode === 'heavy-off')
+    throw new Error('Broad bridge supports upstream normal/full only')
+  const expected = {
+    'locales.json': { version: 1, enabled: ['en', 'ru'], default: 'en' },
+    'admin-console.json': { version: 1, mode: 'path', alias: 'admin' },
+    'product-admin.json': { version: 1, mode: 'path', alias: 'manage' },
+  }
+  for (const [file, settings] of Object.entries(expected)) {
+    const actual = JSON.parse(
+      execFileSync('git', ['show', `${policy.source.head}:packages/shared/src/config/${file}`], {
+        encoding: 'utf8',
+      })
+    )
+    if (!isDeepStrictEqual(actual, settings))
+      throw new Error('Broad bridge supports source S0 only; native settings are not prepared')
+  }
+  const payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+  const acquired = readSelectionSource(process.cwd(), policy.event, payload, process.env.GITHUB_SHA)
+  const outputs = JSON.parse(process.env.CI_FILTER_OUTPUTS)
+  const areas = normalizeCiAreas(outputs)
+  // Git ancestry is admitted above. REST completeness and fork permissions remain unproved here.
+  const proposed = selectCiGroups({ ...policy, ...acquired, areas })
+  if (
+    !/^\d+$/.test(process.env.GITHUB_RUN_ID ?? '') ||
+    !/^[1-9]\d*$/.test(process.env.GITHUB_RUN_ATTEMPT ?? '')
+  )
+    throw new Error('Selection requires a run and attempt identity')
+  const plan = {
+    run: process.env.GITHUB_RUN_ID,
+    attempt: process.env.GITHUB_RUN_ATTEMPT,
+    version: 1,
+    phase: 'broad',
+    repository: policy.repository,
+    event: policy.event,
+    source: acquired.source,
+    proposed,
+    effective: [...requiredCiJobs],
+  }
+  const json = JSON.stringify(plan)
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `plan=${json}\n`)
+  if (process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      `## Diagnostic CI selection\nProposed only; all 18 existing groups remain mandatory.\n\n\`\`\`json\n${json}\n\`\`\`\n`
+    )
+  console.log(json)
+} catch (error) {
+  console.error(error.message)
+  process.exitCode = 1
+}
