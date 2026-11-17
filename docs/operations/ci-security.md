@@ -22,7 +22,7 @@ of workflow self-hardening to keep the example forkable.
 ## Aggregate CI gate
 
 `CI required` runs after every job in `ci.yml`, including Web E2E and Storybook.
-It accepts only success from all18 existing families and the selection preflight. Missing or extra job
+It accepts only success from all 18 existing families and the selection preflight. Missing or extra job
 results, invalid input, failure, cancellation and skipped dependencies fail it.
 Existing jobs remain unconditional. PR and main retain their current executions;
 this gate does not authorize removing another check or the post-merge execution.
@@ -39,7 +39,8 @@ selector and a plan for the same repository, event, source, run and attempt.
 The bridge supports upstream starter `normal`/`full` execution with the current
 S0 settings: English and Russian, path Console `admin`, path product admin
 `manage`. Unsupported source settings or product modes fail preflight before
-application preparation. This limitation does not certify downstream CI.
+application preparation. Console on a separate host is unsupported by this
+bridge. This limitation does not certify downstream CI.
 
 `ci/product.json` declares version 1 and the saved mode. A missing policy file
 means `normal`; a missing commit or malformed policy fails admission. Pull
@@ -48,7 +49,8 @@ is reserved for an explicit manual event; it does not modify the saved mode.
 The bridge does not yet wire a manual trigger or operational heavy-off support.
 
 Existing application jobs, browser inventories, companion scans and live required
-contexts stay in place. The selector adds preparation time; this bridge makes no
+contexts stay in place. Companion workflows run independently; an application
+preflight refusal does not disable their configured scans. The selector adds preparation time; this bridge makes no
 runtime savings claim. Incomplete history widens diagnostics or fails admission.
 It does not authorize skipping work. Read-only local action replay does not prove
 hosted fork permissions or API completeness.
