@@ -4,10 +4,9 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { requiredCiJobs } from './ci-required.mjs'
 
 const command = join(import.meta.dirname, '../ci-selection.mjs')
-test('actual bridge reports narrow diagnostics but keeps all groups and refuses unsupported preparation', (t) => {
+test('actual selector activates only admitted independent web changes and refuses unsupported preparation', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'ci-bridge-source-'))
   const control = mkdtempSync(join(tmpdir(), 'ci-bridge-control-'))
   t.after(() => {
@@ -78,12 +77,37 @@ test('actual bridge reports narrow diagnostics but keeps all groups and refuses 
       encoding: 'utf8',
       env: { ...env, ...extra },
     })
-  const result = invoke()
+  const output = join(control, 'outputs.txt')
+  const result = invoke({ GITHUB_OUTPUT: output })
   assert.equal(result.status, 0, result.stderr)
+  assert.match(readFileSync(output, 'utf8'), /server=false\n/)
   const plan = JSON.parse(result.stdout)
   assert.equal(plan.proposed.api, false)
-  assert.deepEqual(plan.effective, requiredCiJobs)
+  assert.equal(plan.reason, 'independent-web')
+  assert.equal(plan.effective.length, 12)
+  for (const retained of [
+    'test-unit-redis',
+    'web-e2e-plan',
+    'web-e2e-lanes',
+    'web-e2e',
+    'storybook',
+  ])
+    assert.ok(plan.effective.includes(retained))
   assert.deepEqual(plan.source, { base, head })
+  for (const owner of ['web', 'docs', 'common', 'api', 'deployment', 'infra', 'tools', 'email']) {
+    const wideOutputs = { ...outputs, [owner + '_files']: '["leaf.tsx"]' }
+    if (owner === 'web') wideOutputs.ui_files = '[]'
+    const actual = invoke({ CI_FILTER_OUTPUTS: JSON.stringify(wideOutputs) })
+    assert.equal(actual.status, 0, actual.stderr)
+    assert.equal(JSON.parse(actual.stdout).reason, owner === 'web' ? 'independent-web' : 'broad')
+  }
+  const fullOutput = join(control, 'full-output.txt')
+  const fullResult = invoke({
+    GITHUB_OUTPUT: fullOutput,
+    CI_FILTER_OUTPUTS: JSON.stringify({ ...outputs, common_files: '["leaf.tsx"]' }),
+  })
+  assert.equal(fullResult.status, 0, fullResult.stderr)
+  assert.match(readFileSync(fullOutput, 'utf8'), /server=true\n/)
   assert.equal(invoke({ CI_FILTER_OUTPUTS: '{}' }).status, 1)
   assert.equal(invoke({ GITHUB_RUN_ATTEMPT: '' }).status, 1)
   assert.equal(invoke({ GITHUB_SHA: 'f'.repeat(40) }).status, 1)

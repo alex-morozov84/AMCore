@@ -44,7 +44,7 @@ test('every required check of the main ruleset names a job in a tracked workflow
   )
 })
 
-test('the broad bridge preflight dominates application preparation without selecting paths away', () => {
+test('selection preflight dominates preparation and exclusions have direct selector dependencies', () => {
   const jobs = ci.jobs
   const selector = jobs['ci-selection']
   assert.equal(selector.permissions, undefined)
@@ -57,10 +57,50 @@ test('the broad bridge preflight dominates application preparation without selec
   for (const [id, job] of Object.entries(jobs)) {
     if (id === 'ci-selection') continue
     assert.ok(reaches(id), `${id} must depend on preflight`)
-    assert.ok(!job.if || job.if === '${{ always() }}', `${id} cannot exclude paths`)
+    const conditional = [
+      'test-capability',
+      'test-notification-ai',
+      'api-e2e-plan',
+      'api-e2e-shards',
+      'docker-image-smoke',
+      'observability-contract-live',
+    ].includes(id)
+    assert.equal(
+      job.if,
+      conditional
+        ? "${{ needs.ci-selection.outputs.server == 'true' }}"
+        : ['test', 'api-e2e', 'web-e2e', 'ci-required'].includes(id)
+          ? '${{ always() }}'
+          : undefined
+    )
+    if (conditional) assert.ok(job.needs.includes('ci-selection'))
   }
   assert.equal(
     jobs['ci-required'].steps.find((step) => step.run).env.CI_PLAN,
     '${{ needs.ci-selection.outputs.plan }}'
+  )
+})
+
+test('API aggregate admits applicability before evidence and keeps selected coverage validation', () => {
+  const api = ci.jobs['api-e2e']
+  assert.deepEqual(api.needs, ['ci-selection', 'api-e2e-plan', 'api-e2e-shards'])
+  assert.equal(api.if, '${{ always() }}')
+  const admission = api.steps.findIndex((step) => step.id === 'admission')
+  assert.equal(api.steps[admission].run, 'node scripts/ci-required.mjs api')
+  assert.equal(api.steps[admission].env.CI_PLAN, '${{ needs.ci-selection.outputs.plan }}')
+  for (const name of [
+    'Download current-attempt evidence',
+    'Require complete coverage and natural process exits',
+  ]) {
+    const index = api.steps.findIndex((step) => step.name === name)
+    assert.ok(index > admission)
+    assert.equal(api.steps[index].if, "steps.admission.outputs.selected == 'true'")
+  }
+  assert.equal(api.steps.at(-1).run, 'node scripts/api-e2e/aggregate.mjs api-e2e-evidence')
+  assert.equal(ci.jobs['ci-selection'].outputs.server, '${{ steps.plan.outputs.server }}')
+  assert.equal(ci.jobs['api-e2e-shards'].if, "${{ needs.ci-selection.outputs.server == 'true' }}")
+  assert.equal(
+    ci.jobs['api-e2e-shards'].strategy.matrix,
+    '${{ fromJSON(needs.api-e2e-plan.outputs.matrix) }}'
   )
 })

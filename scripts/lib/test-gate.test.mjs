@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parse } from 'yaml'
@@ -7,34 +6,17 @@ import { parse } from 'yaml'
 const jobs = parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs
 const expected = ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e']
 const gate = jobs.test
-const script = gate.steps[0].run.trim().slice("node -e '".length, -1)
-const success = () => Object.fromEntries(expected.map((key) => [key, { result: 'success' }]))
-function verdict(results) {
-  return spawnSync(process.execPath, ['-e', script], {
-    env: { ...process.env, TEST_RESULTS: JSON.stringify(results) },
-    encoding: 'utf8',
-  }).status
-}
-
-test('Test accepts only the exact nonempty successful dependency set', () => {
+test('Test retains always admission and shares the tested selection-aware CLI', () => {
   assert.equal(gate.name, 'Test')
   assert.equal(gate['timeout-minutes'], 5)
   assert.equal(gate.if, '${{ always() }}')
-  assert.deepEqual(gate.needs, expected)
-  assert.equal(gate.steps.length, 1)
-  assert.equal(gate.steps[0].env.TEST_RESULTS, '${{ toJSON(needs) }}')
-  assert.equal(verdict(success()), 0)
-  for (const key of expected) {
-    for (const result of ['failure', 'skipped', 'cancelled', 'neutral', 'unknown', '', null]) {
-      assert.equal(verdict({ ...success(), [key]: { result } }), 1, `${key}: ${result}`)
-    }
-    const missing = success()
-    delete missing[key]
-    assert.equal(verdict(missing), 1)
-    assert.equal(verdict({ ...success(), [key]: null }), 1)
-  }
-  for (const bad of [{}, [], null, { ...success(), undeclared: { result: 'success' } }])
-    assert.equal(verdict(bad), 1)
+  assert.deepEqual(gate.needs, ['ci-selection', ...expected])
+  const admission = gate.steps.find((step) => step.run)
+  assert.equal(admission.run, 'node scripts/ci-required.mjs test')
+  assert.equal(admission.env.CI_RESULTS, '${{ toJSON(needs) }}')
+  assert.equal(admission.env.CI_PLAN, '${{ needs.ci-selection.outputs.plan }}')
+  assert.equal(gate.steps.find((step) => step.name === 'Checkout').with['fetch-depth'], 0)
+  // Broad/narrow success and fault exits for this exact command live in ci-required.test.mjs.
 })
 
 test('independent leaves preserve commands and frozen preparation without aggregate cycles', () => {
@@ -47,7 +29,10 @@ test('independent leaves preserve commands and frozen preparation without aggreg
   }
   for (const [key, runs] of Object.entries(commands)) {
     const job = jobs[key]
-    assert.deepEqual(job.needs, ['lint', 'typecheck'])
+    assert.deepEqual(
+      job.needs,
+      key === 'test-unit-redis' ? ['lint', 'typecheck'] : ['ci-selection', 'lint', 'typecheck']
+    )
     assert.deepEqual(
       job.steps
         .filter((step) => step.run && !step.run.startsWith('pnpm install'))
