@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
@@ -56,7 +57,26 @@ test('one lost, cancelled, failed or skipped family cannot be hidden by the othe
 test('the actual gate command rejects malformed input and propagates the failure exit', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'ci-bridge-gate-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
-  const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim()
+  git('init', '-q')
+  writeFileSync(join(dir, 'PROJECT_CONTEXT.md'), '- **Mode:** `upstream-starter`\n')
+  git('add', 'PROJECT_CONTEXT.md')
+  git(
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    'commit',
+    '-qm',
+    'fixture'
+  )
+  const head = git('rev-parse', 'HEAD')
+  const command = new URL('../ci-required.mjs', import.meta.url)
+  const run = (args, options) =>
+    spawnSync(process.execPath, [fileURLToPath(command), ...args], {
+      cwd: dir,
+      ...options,
+    })
   const event = join(dir, 'event.json')
   writeFileSync(event, JSON.stringify({ before: head }))
   const identity = {
@@ -111,7 +131,7 @@ test('the actual gate command rejects malformed input and propagates the failure
     JSON.stringify(missing),
     JSON.stringify({ ...broad(), unexpected: { result: 'success' } }),
   ]) {
-    const result = spawnSync(process.execPath, ['scripts/ci-required.mjs'], {
+    const result = run([], {
       env: { ...env, CI_RESULTS: value },
       encoding: 'utf8',
     })
@@ -138,7 +158,7 @@ test('the actual gate command rejects malformed input and propagates the failure
       ),
     }
     const invoke = (values, execution = narrow) =>
-      spawnSync(process.execPath, ['scripts/ci-required.mjs', scope], {
+      run([scope], {
         encoding: 'utf8',
         env: {
           ...env,
@@ -154,7 +174,7 @@ test('the actual gate command rejects malformed input and propagates the failure
     assert.equal(invoke(results, { ...narrow, effective: ['lint'] }).status, 1)
     assert.equal(invoke({ ...results, 'ci-selection': { result: 'skipped' } }).status, 1)
   }
-  const result = spawnSync(process.execPath, ['scripts/ci-required.mjs'], {
+  const result = run([], {
     env: { ...env, CI_RESULTS: JSON.stringify(broad()) },
     encoding: 'utf8',
   })
@@ -166,11 +186,29 @@ test('the actual gate command rejects malformed input and propagates the failure
     { ...plan, attempt: '2' },
     { ...plan, source: { ...plan.source, head: 'f'.repeat(40) } },
   ]) {
-    const failed = spawnSync(process.execPath, ['scripts/ci-required.mjs'], {
+    const failed = run([], {
       env: { ...env, CI_RESULTS: JSON.stringify(broad()), CI_PLAN: JSON.stringify(mutation) },
     })
     assert.equal(failed.status, 1)
   }
+  // Mark the fixture's sole commit as a shallow boundary, as in the CI checkout.
+  writeFileSync(join(dir, '.git', 'shallow'), head + '\n')
+  const incomplete = { ...inputs, diffComplete: false, areas: { ui: true } }
+  const shallow = run([], {
+    env: {
+      ...env,
+      CI_RESULTS: JSON.stringify(broad()),
+      CI_PLAN: JSON.stringify({ ...plan, inputs: incomplete, ...coarseExecution(incomplete) }),
+    },
+    encoding: 'utf8',
+  })
+  assert.equal(shallow.status, 0, shallow.stderr)
+  const falselyComplete = run([], {
+    env: { ...env, CI_RESULTS: JSON.stringify(broad()) },
+    encoding: 'utf8',
+  })
+  assert.equal(falselyComplete.status, 1)
+  assert.match(falselyComplete.stderr, /admission inputs disagree/)
   assert.throws(
     () => requireSelectedCi({ ...broad(), 'ci-selection': { result: 'failure' } }, plan, identity),
     /selector/
