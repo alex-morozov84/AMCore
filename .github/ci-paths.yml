@@ -17,8 +17,10 @@ web:
 api:
   - '{apps/api/**,docs/backend/recipes/**}'
 common:
-  - '{packages/**,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,turbo.json,.env.example,PROJECT_CONTEXT.md,ci/**,.github/**,scripts/ci-*.mjs,scripts/lib/ci-*.mjs}'
+  - '{packages/**,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,turbo.json,.env.example,PROJECT_CONTEXT.md,apps/web/**,ci/**,.github/**,scripts/ci-*.mjs,scripts/lib/ci-*.mjs}'
   - '!.github/ISSUE_TEMPLATE/**'
+  - '!apps/web/src/**'
+  - '!apps/web/messages/**'
 infra:
   - '{docker/**,docker-compose*.yml,apps/*/Dockerfile,docs/operations/**,scripts/verify-*.mjs,scripts/cleanup-*.mjs,scripts/load-test/**}'
 monitoring:

@@ -22,48 +22,60 @@ of workflow self-hardening to keep the example forkable.
 ## Aggregate CI gate
 
 `CI required` runs after every job in `ci.yml`, including Web E2E and Storybook.
-It accepts only success from all 18 existing families and the selection preflight. Missing or extra job
-results, invalid input, failure, cancellation and skipped dependencies fail it.
-Existing jobs remain unconditional. PR and main retain their current executions;
-this gate does not authorize removing another check or the post-merge execution.
-Other workflows keep their own required checks.
+It validates the selector's source, run, attempt and effective execution plan.
+Every selected job must succeed. Every explicitly unselected leaf must report
+`skipped`. Missing or extra results, unexpected execution, failure, cancellation
+and an unjustified skip block the gate. Test and API E2E use the same admission
+logic. Selected API E2E still requires complete artifacts and natural exits.
 
-### Diagnostic selection bridge
+### Conservative web selection
 
-The selector classifies changes with the pinned path filter and the repository CI
-policy. Its proposed plan is diagnostic. The effective execution plan still
-requires every existing CI family. A proposed exclusion cannot hide a failed,
-cancelled, skipped or missing family. `CI required` also requires a successful
-selector and a plan for the same repository, event, source, run and attempt.
+For upstream AMCore with the default build settings and `normal` policy, an
+independent web source or message change can omit API E2E, capability extensions,
+notification/AI extensions, Docker image smoke and live observability. The API
+aggregate reports validated non-applicability; it does not claim executed tests.
+Quality, build, unit tests, Redis, script contracts, static observability,
+Storybook and the complete browser inventory remain selected.
 
-The bridge supports upstream starter `normal`/`full` execution with the current
-S0 settings: English and Russian, path Console `admin`, path product admin
-`manage`. Unsupported source settings or product modes fail preflight before
-application preparation. Console on a separate host is unsupported by this
-bridge. This limitation does not certify downstream CI.
+Mixed changes, web tooling or harness changes, root/shared/API/dependency changes,
+unknown paths, retained integration merges, incomplete history and `full` policy
+keep the full execution plan. Documentation-only changes also remain broad.
+The pinned path filter owns matching; the gate recomputes the permitted inventory
+from the admitted inputs. It does not accept an arbitrary list of exclusions.
+See `.github/ci-paths.yml` for path ownership and the **CI selection** job summary
+for the effective job list. Selection is automatic; do not skip jobs manually.
 
-The bridge temporarily requires identical
+The selector still refuses downstream products, `heavy-off`, Console host/off,
+changed administrative placement and non-default served locales. These modes are
+not operational in this rollout. The supported settings are both repository
+catalogue locales with default `en`, Console `path` with alias `admin`, and product
+administration `path` with alias `manage`. Admission requires identical
 `packages/shared/src/constants/locales.ts` files in the source head, checkout and
 event base. Any difference, including comments or formatting, or an unavailable
-base stops admission.
+base stops admission. Restore a supported configuration to recover; do not bypass
+the gate or remove a required check.
 
 `ci/product.json` declares version 1 and the saved mode. A missing policy file
-means `normal`; a missing commit or malformed policy fails admission. Pull
-requests use the base policy and validate the proposed head policy. Full-once
-is reserved for an explicit manual event; it does not modify the saved mode.
-The bridge does not yet wire a manual trigger or operational heavy-off support.
+means `normal`; malformed policy fails admission. Pull requests use the base
+policy and validate the head policy. Set the saved mode to `full` in a reviewed
+change to retain broad execution. Editing `ci/product.json` itself selects broad
+checks. The saved mode takes effect on the post-merge push; the PR uses its base
+policy. Manual full-once and operational heavy-off are
+not wired into this workflow yet.
 
-Existing application jobs, browser inventories, companion scans and live required
-contexts stay in place. Companion workflows run independently; an application
-preflight refusal does not disable their configured scans. The selector adds preparation time; this bridge makes no
-runtime savings claim. Incomplete history widens diagnostics or fails admission.
-It does not authorize skipping work. Read-only local action replay does not prove
-hosted fork permissions or API completeness.
+All existing required check names remain. Conditional leaves use job-level
+conditions; the workflow itself still runs on PR and main. `CI required` remains
+mandatory and the Test/API aggregates always run. GitHub's acceptance of a skipped
+leaf does not replace the gate's admission. Companion workflows keep their own
+checks and configured executions. Do not remove requirements to enable selection.
+PR and post-merge runs remain separate. Browser work can still dominate elapsed
+time; fewer machine minutes do not guarantee a shorter wait.
 
-Before any later conditional execution, review the effective plan, family
-aggregates and actual gate result together. Changing required contexts or
-activating exclusions requires a separate approved transition and readback.
-Do not remove an existing requirement merely because a proposed plan excludes it.
+Read-only local action replay proves local matching, not GitHub scheduling,
+mergeability or fork permissions. Confirm the final broad PR/push and independent
+web PR results before accepting the rollout. For recovery, restore broad job
+execution and its matching gate together in a reviewed change; keep required
+checks and protection enabled.
 
 ### Add the requirement to an existing repository
 

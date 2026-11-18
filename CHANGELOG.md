@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Select a conservative CI subset for independent upstream web changes. Keep all
+  browser and Redis checks, preserve required check names, and reject unexpected
+  skips or execution through the aggregate gate. Shared, mixed and tooling changes
+  retain full execution; product settings and heavy-off remain unsupported here.
+
 - Add an aggregate CI gate covering every main workflow job, including browser
   and Storybook results. Declare it as an additional required check while
   preserving existing checks and the separate live-enforcement rollout.

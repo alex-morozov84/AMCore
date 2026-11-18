@@ -21,7 +21,7 @@ export const requiredCiJobs = Object.freeze([
   'storybook',
 ])
 
-/** Initial admission keeps every existing job mandatory; selection is not activated here. */
+/** Retained broad-inventory assertion for the original all-success contract. */
 export function requireCompleteCi(results) {
   if (!results || typeof results !== 'object' || Array.isArray(results))
     throw new Error('CI dependency results must be an object')
@@ -36,61 +36,105 @@ export function requireCompleteCi(results) {
     throw new Error(`Required CI jobs did not succeed: ${incomplete.join(', ')}`)
 }
 
-/** Broad bridge admits the selector but never uses its proposed exclusions as permission. */
-export function requireBridgeCi(results, plan, identity) {
-  if (!results || results['ci-selection']?.result !== 'success')
-    throw new Error('CI selector did not succeed')
-  const shape = selectCiGroups({
-    role: 'upstream-starter',
-    mode: 'normal',
-    diffComplete: false,
-    areas: {},
-  })
-  const proposed = plan?.proposed
-  const invalid =
-    !proposed ||
-    Array.isArray(proposed) ||
-    Object.keys(proposed).length !== Object.keys(shape).length ||
-    Object.entries(shape).some(([key, value]) => {
-      const actual = proposed[key]
-      if (Array.isArray(value))
-        return (
-          !Array.isArray(actual) ||
-          new Set(actual).size !== actual.length ||
-          actual.some((item) => !['api', 'web', 'shared'].includes(item))
-        )
-      return (
-        typeof actual !== typeof value ||
-        (typeof value === 'string' &&
-          !{
-            quality: ['code', 'docs'],
-            web: ['none', 'ui', 'runtime'],
-            monitoring: ['static', 'live'],
-          }[key]?.includes(actual))
-      )
-    })
+/** Only independent web changes may omit these server-side jobs in the first rollout. */
+export function coarseExecution(inputs) {
+  const proposed = selectCiGroups(inputs)
+  if (inputs.role !== 'upstream-starter' || !['normal', 'full'].includes(inputs.mode))
+    throw new Error('Coarse execution supports upstream normal/full only')
+  const areas = inputs.areas
+  const narrow =
+    inputs.mode === 'normal' &&
+    inputs.diffComplete &&
+    inputs.integration === false &&
+    (areas.ui === true || areas.web === true) &&
+    Object.entries(areas).every(([key, value]) => !value || ['ui', 'web'].includes(key))
+  const omitted = narrow
+    ? [
+        'test-capability',
+        'test-notification-ai',
+        'api-e2e-plan',
+        'api-e2e-shards',
+        'docker-image-smoke',
+        'observability-contract-live',
+      ]
+    : []
+  return {
+    proposed,
+    reason: narrow ? 'independent-web' : 'broad',
+    effective: requiredCiJobs.filter((job) => !omitted.includes(job)),
+  }
+}
+
+/** Recompute permission from admitted inputs; an arbitrary effective list is never authority. */
+export function validateExecutionPlan(plan, identity) {
+  const keys = [
+    'run',
+    'attempt',
+    'version',
+    'phase',
+    'repository',
+    'event',
+    'source',
+    'inputs',
+    'proposed',
+    'reason',
+    'effective',
+  ]
   if (
-    invalid ||
-    Object.keys(plan).length !== 9 ||
-    !/^[\w.-]+\/[\w.-]+$/.test(identity.repository ?? '') ||
     !plan ||
-    plan.version !== 1 ||
-    plan.phase !== 'broad' ||
-    plan.run !== identity.run ||
-    plan.attempt !== identity.attempt ||
+    typeof plan !== 'object' ||
+    Array.isArray(plan) ||
+    Object.keys(plan).length !== keys.length ||
+    keys.some((key) => !(key in plan)) ||
+    plan.version !== 2 ||
+    plan.phase !== 'coarse' ||
+    !/^[\w.-]+\/[\w.-]+$/.test(identity.repository ?? '') ||
     !/^\d+$/.test(identity.run ?? '') ||
     !/^[1-9]\d*$/.test(identity.attempt ?? '') ||
-    plan.repository !== identity.repository ||
-    plan.event !== identity.event ||
-    plan.source?.head !== identity.source.head ||
-    plan.source?.base !== identity.source.base ||
-    JSON.stringify(plan.effective) !== JSON.stringify(requiredCiJobs) ||
-    !plan.proposed ||
-    typeof plan.proposed !== 'object' ||
-    Array.isArray(plan.proposed)
+    ['run', 'attempt', 'repository', 'event'].some((key) => plan[key] !== identity[key]) ||
+    JSON.stringify(plan.source) !== JSON.stringify(identity.source)
   )
-    throw new Error('Invalid broad CI execution plan or source identity')
-  const families = { ...results }
-  delete families['ci-selection']
-  requireCompleteCi(families)
+    throw new Error('Invalid CI execution plan or source identity')
+  const inputs = plan.inputs
+  if (
+    !inputs ||
+    Object.keys(inputs).sort().join() !==
+      ['role', 'mode', 'areas', 'diffComplete', 'integration'].sort().join() ||
+    inputs.diffComplete !== identity.diffComplete ||
+    inputs.integration !== identity.integration ||
+    inputs.role !== identity.role ||
+    inputs.mode !== identity.mode
+  )
+    throw new Error('CI execution admission inputs disagree')
+  const expected = coarseExecution(inputs)
+  for (const key of ['proposed', 'reason', 'effective'])
+    if (JSON.stringify(plan[key]) !== JSON.stringify(expected[key]))
+      throw new Error('CI execution plan differs from coarse policy')
+  return expected
+}
+
+/** Shared admission for the final gate and the two aggregates affected by legitimate skips. */
+export function requireSelectedCi(results, plan, identity, scope = 'all') {
+  const execution = validateExecutionPlan(plan, identity)
+  const scopes = {
+    all: requiredCiJobs,
+    test: ['test-unit-redis', 'test-capability', 'test-notification-ai', 'api-e2e'],
+    api: ['api-e2e-plan', 'api-e2e-shards'],
+  }
+  const jobs = scopes[scope]
+  if (!jobs) throw new Error('Unknown CI admission scope')
+  if (!results || results['ci-selection']?.result !== 'success')
+    throw new Error('CI selector did not succeed')
+  const actual = Object.keys(results)
+  if (
+    actual.length !== jobs.length + 1 ||
+    actual.some((job) => job !== 'ci-selection' && !jobs.includes(job))
+  )
+    throw new Error('CI dependency inventory differs from the required jobs')
+  const incomplete = jobs.filter(
+    (job) => results[job]?.result !== (execution.effective.includes(job) ? 'success' : 'skipped')
+  )
+  if (incomplete.length)
+    throw new Error(`CI jobs disagree with execution plan: ${incomplete.join(', ')}`)
+  return execution
 }

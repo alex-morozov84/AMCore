@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
-import { normalizeCiAreas, selectCiGroups } from './lib/ci-selection.mjs'
+import { normalizeCiAreas } from './lib/ci-selection.mjs'
 import { readSelectionSource } from './lib/ci-selection-source.mjs'
-import { requiredCiJobs } from './lib/ci-required.mjs'
+import { coarseExecution } from './lib/ci-required.mjs'
 import { LOCALE_CATALOGUES } from './lib/settings-files.mjs'
 
 try {
@@ -49,7 +49,14 @@ try {
   const outputs = JSON.parse(process.env.CI_FILTER_OUTPUTS)
   const areas = normalizeCiAreas(outputs)
   // Git ancestry is admitted above. REST completeness and fork permissions remain unproved here.
-  const proposed = selectCiGroups({ ...policy, ...acquired, areas })
+  const inputs = {
+    role: policy.role,
+    mode: policy.mode,
+    areas,
+    diffComplete: acquired.diffComplete,
+    integration: acquired.integration,
+  }
+  const execution = coarseExecution(inputs)
   if (
     !/^\d+$/.test(process.env.GITHUB_RUN_ID ?? '') ||
     !/^[1-9]\d*$/.test(process.env.GITHUB_RUN_ATTEMPT ?? '')
@@ -58,20 +65,23 @@ try {
   const plan = {
     run: process.env.GITHUB_RUN_ID,
     attempt: process.env.GITHUB_RUN_ATTEMPT,
-    version: 1,
-    phase: 'broad',
+    version: 2,
+    phase: 'coarse',
     repository: policy.repository,
     event: policy.event,
     source: acquired.source,
-    proposed,
-    effective: [...requiredCiJobs],
+    inputs,
+    ...execution,
   }
   const json = JSON.stringify(plan)
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `plan=${json}\n`)
+  if (process.env.GITHUB_OUTPUT) {
+    const selected = execution.reason === 'broad'
+    appendFileSync(process.env.GITHUB_OUTPUT, `plan=${json}\nserver=${selected}\n`)
+  }
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `## Diagnostic CI selection\nProposed only; all 18 existing groups remain mandatory.\n\n\`\`\`json\n${json}\n\`\`\`\n`
+      `## CI execution selection\nReason: ${execution.reason}. Selected groups: ${execution.effective.length}/18.\n\n\`\`\`json\n${json}\n\`\`\`\n`
     )
   console.log(json)
 } catch (error) {
