@@ -9,6 +9,7 @@ export function DashboardPage({ userName }: DashboardPageProps) {
 
   return (
     <div className="space-y-4">
+      {/* Use the generic greeting when no display name is available. */}
       <h1 className="text-2xl font-bold">
         {userName ? t('welcomeNamed', { name: userName }) : t('welcome')}
       </h1>
