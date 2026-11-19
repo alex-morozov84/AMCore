@@ -167,10 +167,10 @@ Returned in the response root `errorCode`:
 | `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                                                                                     |
 | `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable                                                                        |
 | `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                                                                                         |
-| `TOKEN_INVALID`                 | 401  | Reset/verify token expired, used, or not found; invalid refresh token                                                                                         |
+| `TOKEN_INVALID`                 | 401  | Reset/verify token expired, used, or not found; invalid refresh token                                                                  |
 | `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)                                                                   |
-| `SERVICE_UNAVAILABLE`           | 503  | Dependency/protection unavailable; use route-specific retry and unknown-outcome rules                                                                        |
-| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT, or missing refresh cookie                                                                                                                 |
+| `SERVICE_UNAVAILABLE`           | 503  | Dependency/protection unavailable; use route-specific retry and unknown-outcome rules                                                  |
+| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT, or missing refresh cookie                                                                                      |
 | `SESSION_CHANGED`               | 409  | Family, account version or actual browser authority changed; stop the operation without refresh fallback                               |
 | `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                                                                                               |
 | `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                                                                                      |
@@ -215,11 +215,11 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 
 ### Required
 
-| Variable       | Description                                     |
-| -------------- | ----------------------------------------------- |
-| `DATABASE_URL` | PostgreSQL connection string                    |
-| `REDIS_URL`    | Redis connection string                         |
-| `JWT_SECRET`   | Minimum 32 characters                           |
+| Variable       | Description                                          |
+| -------------- | ---------------------------------------------------- |
+| `DATABASE_URL` | PostgreSQL connection string                         |
+| `REDIS_URL`    | Redis connection string                              |
+| `JWT_SECRET`   | Minimum 32 characters                                |
 | `FRONTEND_URL` | e.g. `https://app.example.com` — for OAuth redirects |
 
 ### Optional (with defaults)

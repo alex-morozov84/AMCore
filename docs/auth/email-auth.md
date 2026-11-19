@@ -153,10 +153,10 @@ curl -X POST https://api.example.com/api/v1/auth/login \
 
 **Errors:**
 
-| Code                  | HTTP | When                                                             |
-| --------------------- | ---- | ---------------------------------------------------------------- |
+| Code                  | HTTP | When                                                   |
+| --------------------- | ---- | ------------------------------------------------------ |
 | `INVALID_CREDENTIALS` | 401  | Wrong email or password; same credential error message |
-| `RATE_LIMIT_EXCEEDED` | 429  | Too many failed attempts                                         |
+| `RATE_LIMIT_EXCEEDED` | 429  | Too many failed attempts                               |
 
 The shared error message avoids disclosing account existence through that message.
 It does not promise constant-time execution or indistinguishable email delivery.

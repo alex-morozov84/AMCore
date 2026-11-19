@@ -158,14 +158,14 @@ curl --fail-with-body -X PATCH \
 Align API/worker deployment baselines if reset must produce one effective
 interval. The responding API's baseline does not describe other processes.
 
-| Response / symptom                        | Operator action                                                                                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 400                                       | Check the strict body, integer range and revision. Extra fields are rejected.                                                                     |
+| Response / symptom                        | Operator action                                                                                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 400                                       | Check the strict body, integer range and revision. Extra fields are rejected.                                                                                        |
 | 401 / 403                                 | Check personal authentication and the current platform role. For `STEP_UP_REQUIRED`, complete the required password and factor proofs before a new deliberate write. |
-| 409 `SETTING_REVISION_CONFLICT`           | Reread saved state and decide whether the proposed value is still intended. Never overwrite using a guessed revision.                             |
-| 429                                       | Respect the privileged mutation rate limit; do not create a retry loop.                                                                           |
-| 500 / 503 or an ambiguous network timeout | There is no success receipt. Reread before deciding on another write; a missing response alone does not prove that no commit occurred.            |
-| Saved revision ahead of applied revision  | Check reader health and process-local application events; wait for reconciliation rather than triggering a probe.                                 |
+| 409 `SETTING_REVISION_CONFLICT`           | Reread saved state and decide whether the proposed value is still intended. Never overwrite using a guessed revision.                                                |
+| 429                                       | Respect the privileged mutation rate limit; do not create a retry loop.                                                                                              |
+| 500 / 503 or an ambiguous network timeout | There is no success receipt. Reread before deciding on another write; a missing response alone does not prove that no commit occurred.                               |
+| Saved revision ahead of applied revision  | Check reader health and process-local application events; wait for reconciliation rather than triggering a probe.                                                    |
 
 Redis session/rate failures can block operator admission while existing database
 readers and probes keep their last configuration. Storage observations can remain

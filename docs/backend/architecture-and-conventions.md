@@ -82,7 +82,6 @@ AMCore is a **modular monolith**. The rules that keep it modular:
     load Postgres; a Redis outage is not permission to bypass current authority.
     See [authentication Redis failures](../auth/redis-outage.md).
 
-
 `core/` holds domain modules (auth, organizations, api-keys, admin).
 `infrastructure/` holds cross-cutting providers (email, queue, storage, redis,
 webhooks, idempotency, schedule, observability). Put a new product module under

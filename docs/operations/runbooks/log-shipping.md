@@ -200,6 +200,7 @@ On Docker Desktop and OrbStack it describes the virtual machine's disk, not the 
    docker volume inspect "$LOKI_VOLUME" >/dev/null &&
    docker run --rm -v "$LOKI_VOLUME:/d:ro" alpine du -sh /d
    ```
+
 2. Lower `LOGS_RETENTION_PERIOD` in `.env` and recreate Loki (`docker compose up -d loki`). The
    compactor applies it when it next runs, deletes expired data after `retention_delete_delay` (2h)
    and then on its 10-minute cycle, so space returns gradually and this is not an emergency lever.

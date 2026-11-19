@@ -158,13 +158,13 @@ shows up as a CSP `img-src` report).
 
 ## Failure reference
 
-| Symptom                                                   | Cause                                                      | Fix                                                                                             |
-| --------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Upload fails with `AccessControlListNotSupported`         | `acl` mode on a bucket with ACLs disabled (AWS default)    | Use `external` and publish the location                                                         |
-| Upload fails with `NotImplemented` mentioning `x-amz-acl` | `acl` mode on a provider without object ACLs (R2, ...)     | Use `external`                                                                                  |
-| Upload succeeds, the image URL answers 403                | Possible policy, ACL or URL mapping issue | Check the object, URL and delivery mode. Then correct the cause. |
-| Alert `AMCoreStoragePrivateExposed`                       | The tested address served a private canary anonymously        | Treat as an incident and determine its scope. Follow the [runbook](../operations/runbooks/storage.md#private-exposure)             |
-| Image URL answers 404                                     | Possible missing object or incorrect public URL mapping | Check the object, URL and delivery mode before changing the configuration                                      |
-| Boot error naming `STORAGE_PUBLIC_BASE_URL`               | Missing base for `s3`, or `local` in production            | Set the base                                                                                    |
-| Boot error naming `STORAGE_PRESIGN_ENDPOINT`              | The value has a path (often a CDN address)                 | Use the bare S3 API origin; put the CDN in `STORAGE_PUBLIC_BASE_URL`                            |
-| Presigned URL has a wrong host (`<bucket>.<your CDN>`)    | CDN used as the presign endpoint                           | Same as above                                                                                   |
+| Symptom                                                   | Cause                                                   | Fix                                                                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Upload fails with `AccessControlListNotSupported`         | `acl` mode on a bucket with ACLs disabled (AWS default) | Use `external` and publish the location                                                                                |
+| Upload fails with `NotImplemented` mentioning `x-amz-acl` | `acl` mode on a provider without object ACLs (R2, ...)  | Use `external`                                                                                                         |
+| Upload succeeds, the image URL answers 403                | Possible policy, ACL or URL mapping issue               | Check the object, URL and delivery mode. Then correct the cause.                                                       |
+| Alert `AMCoreStoragePrivateExposed`                       | The tested address served a private canary anonymously  | Treat as an incident and determine its scope. Follow the [runbook](../operations/runbooks/storage.md#private-exposure) |
+| Image URL answers 404                                     | Possible missing object or incorrect public URL mapping | Check the object, URL and delivery mode before changing the configuration                                              |
+| Boot error naming `STORAGE_PUBLIC_BASE_URL`               | Missing base for `s3`, or `local` in production         | Set the base                                                                                                           |
+| Boot error naming `STORAGE_PRESIGN_ENDPOINT`              | The value has a path (often a CDN address)              | Use the bare S3 API origin; put the CDN in `STORAGE_PUBLIC_BASE_URL`                                                   |
+| Presigned URL has a wrong host (`<bucket>.<your CDN>`)    | CDN used as the presign endpoint                        | Same as above                                                                                                          |

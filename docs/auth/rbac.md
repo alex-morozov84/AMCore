@@ -139,6 +139,7 @@ administrator exists; organization `ADMIN` is a different role.
 
    Stop unless the target is the approved verified `USER` and the count is zero.
    Replace `<verified-user-id>` with that account's exact ID in both examples.
+
 3. While writers remain paused, grant the initial role:
 
    ```sql
@@ -155,6 +156,7 @@ administrator exists; organization `ADMIN` is a different role.
 
    Require exactly one returned row for the approved ID. Zero rows or an error
    means stop and investigate; do not remove predicates or promote another account.
+
 4. Record the operator, target and result privately. Resume the supported deployment,
    sign in again and complete [factor setup](./mfa-browser.md) when requested.
    Verify the access probe above

@@ -30,7 +30,7 @@ comment. If a rule is available only through an unavailable record, report the g
 | Extend or operate the API HTTP runtime                                                   | [`backend/http-runtime.md`](backend/http-runtime.md) — Fastify plugins, upgrade checks and rollback.                                    |
 | Understand request parsing, decoded limits and transport errors                          | [`backend/request-body-contract.md`](backend/request-body-contract.md)                                                                  |
 | Build, develop or extend the ESM API                                                     | [`backend/api-build.md`](backend/api-build.md)                                                                                          |
-| Build the migration image or recover an interrupted migration                                          | [`operations/migrator-image.md`](operations/migrator-image.md)                                                                          |
+| Build the migration image or recover an interrupted migration                            | [`operations/migrator-image.md`](operations/migrator-image.md)                                                                          |
 | Build or verify shared package distribution                                              | [`backend/shared-package-build.md`](backend/shared-package-build.md)                                                                    |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                                    |
 | Register background work, an idempotent handler or a database-owned control adapter      | [`backend/background-work.md`](backend/background-work.md)                                                                              |
@@ -154,7 +154,6 @@ It covers repository choice, release support, merge delivery and recovery.
   the deployment platforms decision matrix (Kubernetes, Cloud Run, Fly,
   Render, Railway, Vercel), observability, CI/repo security, audit log,
   webhooks, and idempotency.
-
 
 ## Common extension tasks
 

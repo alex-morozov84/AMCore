@@ -25,7 +25,7 @@ approval; the default prepared protocol does not enable MFA or operator grants.
 | [Concepts](./concepts.md)                             | How tokens, sessions, and the security model work                                  |
 | [CSRF Posture](./csrf.md)                             | Which cookie surfaces exist and how CSRF is handled                                |
 | [Email Auth](./email-auth.md)                         | Register, login, password reset, email verification                                |
-| [OAuth](./oauth.md)                                   | Google/GitHub/Apple login, provider linking and link-only Telegram                   |
+| [OAuth](./oauth.md)                                   | Google/GitHub/Apple login, provider linking and link-only Telegram                 |
 | [Sessions](./sessions.md)                             | Own/admin session listing and revocation, rotation, device/IP/location metadata    |
 | [RBAC](./rbac.md)                                     | System roles, organizations, permissions, CASL — the auth-z guide                  |
 | [Redis outage behavior](./redis-outage.md)            | What authentication does when Redis is slow or down: `503`, deadlines, recovery    |

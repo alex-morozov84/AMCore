@@ -584,13 +584,13 @@ a failure class, never the URL.
 
 ## OAuth errors
 
-| Code                            | HTTP | When                                                              |
-| ------------------------------- | ---- | ----------------------------------------------------------------- |
-| `OAUTH_STATE_INVALID`           | 400  | State missing, expired (>5 min), or already used                  |
-| `OAUTH_PROVIDER_ERROR`          | 502  | Provider returned an error or unexpected response                 |
-| `OAUTH_EMAIL_REQUIRED`          | 400  | Login: provider returned no email |
-| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | Provider is not set up (missing env vars)                         |
-| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Linking: that provider account belongs to a different user        |
+| Code                            | HTTP | When                                                       |
+| ------------------------------- | ---- | ---------------------------------------------------------- |
+| `OAUTH_STATE_INVALID`           | 400  | State missing, expired (>5 min), or already used           |
+| `OAUTH_PROVIDER_ERROR`          | 502  | Provider returned an error or unexpected response          |
+| `OAUTH_EMAIL_REQUIRED`          | 400  | Login: provider returned no email                          |
+| `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | Provider is not set up (missing env vars)                  |
+| `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Linking: that provider account belongs to a different user |
 
 ## Public signup and invited sign-in
 

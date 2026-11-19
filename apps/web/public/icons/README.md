@@ -2,10 +2,10 @@
 
 `apps/web/src/app/manifest.ts` references three PNG files:
 
-| File | Size | Purpose |
-| --- | --- | --- |
-| `icon-192x192.png` | 192 × 192 | General |
-| `icon-512x512.png` | 512 × 512 | General |
+| File                        | Size      | Purpose  |
+| --------------------------- | --------- | -------- |
+| `icon-192x192.png`          | 192 × 192 | General  |
+| `icon-512x512.png`          | 512 × 512 | General  |
 | `icon-512x512-maskable.png` | 512 × 512 | Maskable |
 
 Extend the solid background to the edges of the maskable icon. Keep

@@ -120,7 +120,7 @@ Backend:
 
 | Method           | Mechanism                                     |
 | ---------------- | --------------------------------------------- |
-| Email + password | Argon2id password hash    |
+| Email + password | Argon2id password hash                        |
 | OAuth            | Provider identity verified via OIDC/OAuth 2.0 |
 | API key          | Scoped token, hashed in DB                    |
 
@@ -136,9 +136,9 @@ There are two independent layers:
 
 **1. System role** — applies everywhere, regardless of organization.
 
-| Role          | What it means                         |
-| ------------- | ------------------------------------- |
-| `USER`        | Normal user, default for everyone     |
+| Role          | What it means                                                |
+| ------------- | ------------------------------------------------------------ |
+| `USER`        | Normal user, default for everyone                            |
 | `SUPER_ADMIN` | Platform role, subject to route and current-authority checks |
 
 **2. Organization permissions** — fine-grained rules within an org context (see [RBAC](./rbac.md)).
@@ -248,13 +248,13 @@ Verification tokens are single-use and expire after `EMAIL_VERIFICATION_EXPIRY_H
 
 The refresh token lives in a cookie with these flags:
 
-| Flag       | Value                | Why                                        |
-| ---------- | -------------------- | ------------------------------------------ |
+| Flag       | Value                | Why                                         |
+| ---------- | -------------------- | ------------------------------------------- |
 | `httpOnly` | `true`               | JavaScript cannot directly read this cookie |
-| `secure`   | `true` in production | Only sent over HTTPS                       |
-| `sameSite` | `strict`             | Primary CSRF layer for the refresh cookie  |
-| `path`     | `/`                  | Available to all paths                     |
-| `maxAge`   | 7 days               | Browser discards it after this             |
+| `secure`   | `true` in production | Only sent over HTTPS                        |
+| `sameSite` | `strict`             | Primary CSRF layer for the refresh cookie   |
+| `path`     | `/`                  | Available to all paths                      |
+| `maxAge`   | 7 days               | Browser discards it after this              |
 
 A custom browser client should keep access tokens out of persistent browser storage.
 Bundled web clients keep them server-side, not in browser memory.

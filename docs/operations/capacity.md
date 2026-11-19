@@ -103,7 +103,7 @@ with the restart policies of `docker/compose/supervise.yml`):
 
 | Service | Observed result                                                                                                                                                        |
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| web     | Killed and restarted; during the restarts about 12 % of requests got `502`. Web restarts did not clear sessions stored in Redis.                                                   |
+| web     | Killed and restarted; during the restarts about 12 % of requests got `502`. Web restarts did not clear sessions stored in Redis.                                       |
 | worker  | Restarts in a loop while the limit is too low. Three jobs queued during the loop waited and completed once the limit was raised. Repeated deliveries were not checked. |
 | api     | Restarts in a loop; the API answers `502` until the limit is raised. Back in about 15 s after that.                                                                    |
 

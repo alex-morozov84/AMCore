@@ -185,4 +185,3 @@ BFF uses session binding, strict Origin on mutations, runtime schemas and privat
 when supplying your own layout. Shared primitives and contracts remain usable when
 Console is disabled. [Integration](integration.md) and
 [extension rules](extending-modules.md) explain placement and ownership.
-

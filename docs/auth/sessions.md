@@ -126,8 +126,8 @@ A new `refresh_token` cookie is set with the rotated token.
 
 | Code              | HTTP | When                                                                                                 |
 | ----------------- | ---- | ---------------------------------------------------------------------------------------------------- |
-| `TOKEN_INVALID`   | 401  | Present token not found, reused or expired                                            |
-| `UNAUTHORIZED`    | 401  | Refresh cookie missing                                                                                |
+| `TOKEN_INVALID`   | 401  | Present token not found, reused or expired                                                           |
+| `UNAUTHORIZED`    | 401  | Refresh cookie missing                                                                               |
 | `SESSION_CHANGED` | 409  | Internal family/account/browser authority changed; do not refresh again or select another credential |
 
 ---
@@ -333,17 +333,17 @@ expiry. Browser and protected credentials also require the current account versi
 
 Sessions don't just expire — they can be invalidated by specific events:
 
-| Event                      | What gets invalidated                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------------------------- |
-| Password reset             | All sessions (every device signs out)                                                               |
-| Protected OAuth linking    | All previous sessions and pending continuations; [sign in again](oauth.md#after-successful-linking) |
-| Session revoked by user    | That specific session only                                                                          |
-| "Sign out everywhere"      | All sessions except current                                                                         |
-| Logout                     | Current session only                                                                                |
-| System-role change         | All sessions of the affected user                                                                   |
-| Admin-revoked session      | That specific session only                                                                          |
-| Admin-revoked all sessions | All sessions of the target user                                                                     |
-| Session token expired (default 7 days) | Refused by expiry checks; physical rows swept by the cleanup job                                                                           |
+| Event                                  | What gets invalidated                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Password reset                         | All sessions (every device signs out)                                                               |
+| Protected OAuth linking                | All previous sessions and pending continuations; [sign in again](oauth.md#after-successful-linking) |
+| Session revoked by user                | That specific session only                                                                          |
+| "Sign out everywhere"                  | All sessions except current                                                                         |
+| Logout                                 | Current session only                                                                                |
+| System-role change                     | All sessions of the affected user                                                                   |
+| Admin-revoked session                  | That specific session only                                                                          |
+| Admin-revoked all sessions             | All sessions of the target user                                                                     |
+| Session token expired (default 7 days) | Refused by expiry checks; physical rows swept by the cleanup job                                    |
 
 A **system-role change** (e.g. a `SUPER_ADMIN` promotion or demotion via the
 admin API) revokes **all** of the target user's sessions, so they must

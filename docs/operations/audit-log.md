@@ -163,9 +163,7 @@ grammar for the action's actual values:
 const invoiceId = boundedString(64, /^[A-Za-z0-9_-]+$/)
 const code = boundedString(64, /^[a-z][a-z0-9_]*$/)
 const amountCents = (value: unknown) =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-    ? value
-    : undefined
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
 ```
 
 Insert this property inside the existing `specs` object. Keep its other entries:
@@ -295,7 +293,6 @@ The `cursorKey` migration adds a volatile UUID default and unique index to
 every existing audit row. It can rewrite and lock a large table. Rehearse
 `prisma migrate deploy` against a production-sized copy and schedule a
 maintenance window if necessary; do not disable the append-only trigger.
-
 
 ## API-key lifecycle events
 

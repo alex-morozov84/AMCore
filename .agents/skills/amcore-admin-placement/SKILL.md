@@ -10,6 +10,7 @@ optional Operations Console from product administration; they have different
 settings, entry guards and session audiences.
 
 Read the current selected owner:
+
 - [Console configuration](../../../docs/operations-console/configuration.md)
   and [Console development](../../../docs/operations-console/development.md).
 - [Product placement and sessions](../../../docs/product-admin/placement-and-sessions.md)

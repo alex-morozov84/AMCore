@@ -41,14 +41,14 @@ Only a current platform `SUPER_ADMIN`. An organization role does not grant acces
 are rejected. The check runs on **every** request the page makes (page, assets and data), against
 the database, not a cache.
 
-| What happens                                          | When the board stops answering                                                                            |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| You sign out of the Console                           | At once for new requests. A tab that is already open keeps what it shows and its next refresh is refused. |
-| Your sessions are revoked from somewhere else         | On the next request: current family/browser authority is checked before access.                           |
-| Your access token expires while your session is valid | The Console attempts normal refresh. Revocation, failed verification or unavailable dependencies can still refuse access.                                                                     |
-| You are demoted from `SUPER_ADMIN`                    | On the next request.                                                                                      |
-| You are promoted to `SUPER_ADMIN`                     | After your next sign-in. Refresh never upgrades an earlier USER credential to administrator.              |
-| Your account is deleted                               | On the next request.                                                                                      |
+| What happens                                          | When the board stops answering                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| You sign out of the Console                           | At once for new requests. A tab that is already open keeps what it shows and its next refresh is refused.                 |
+| Your sessions are revoked from somewhere else         | On the next request: current family/browser authority is checked before access.                                           |
+| Your access token expires while your session is valid | The Console attempts normal refresh. Revocation, failed verification or unavailable dependencies can still refuse access. |
+| You are demoted from `SUPER_ADMIN`                    | On the next request.                                                                                                      |
+| You are promoted to `SUPER_ADMIN`                     | After your next sign-in. Refresh never upgrades an earlier USER credential to administrator.                              |
+| Your account is deleted                               | On the next request.                                                                                                      |
 
 Both Board credentials require current family, account security version and verified
 browser binding. Family revocation or browser replacement refuses the next request;

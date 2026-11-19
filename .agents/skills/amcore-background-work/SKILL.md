@@ -26,7 +26,7 @@ Identify the requested result, stable business identity and actual side effect.
   [queue entrypoint](../../../apps/api/src/infrastructure/queue/README.md)
   as applicable. Distinguish queue-owned jobs from database-owned work
   and wake hints. Ordinary module/HTTP wiring belongs to backend-module;
-authentication and authorization changes retain their own workflows.
+  authentication and authorization changes retain their own workflows.
 
 ## Connect queued or database-owned work
 

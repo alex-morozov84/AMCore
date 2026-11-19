@@ -21,7 +21,7 @@ accessible route-change announcement.
 | Browser Back/Forward (`popstate`) to a different pathname/query                                                                   | Yes             |
 | A caller cancelling a Link in `onClick` or `onNavigate`                                                                           | No              |
 | Modifier/right click, a non-self `target`, `download`, or an external URL                                                         | No              |
-| A `RouteProgressLink` to the current pathname/query, including a hash-only change | No |
+| A `RouteProgressLink` to the current pathname/query, including a hash-only change                                                 | No              |
 | `router.refresh()` / `router.prefetch()`                                                                                          | No              |
 | A native `<a>`, `window.location`, hard reload, or server-side redirect (the browser owns these full-document/server transitions) | No              |
 

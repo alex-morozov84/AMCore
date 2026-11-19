@@ -22,8 +22,8 @@ a second native search clear control.
 | `value`, `onValueChange(value)`      | Current text and edit callback                            |
 | `onClear()`                          | Feature-owned reset or immediate search action            |
 | `label`, `placeholder`, `clearLabel` | Caller-supplied, localized accessible copy                |
-| `onKeyDown?` | Optional keyboard handler on the input |
-| `disabled?` | Disables the input and clear button |
+| `onKeyDown?`                         | Optional keyboard handler on the input                    |
+| `disabled?`                          | Disables the input and clear button                       |
 | `maxLength?`, `className?`           | Optional presentation constraints                         |
 
 The field creates no form, request, debounce, URL, or results. Put its copy in

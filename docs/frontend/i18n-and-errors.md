@@ -362,15 +362,15 @@ Re-test any change here against the standalone build (`node server.js`), never o
 
 ## What the guards catch
 
-| Guard                                        | Catches                                                                      |
-| -------------------------------------------- | ---------------------------------------------------------------------------- |
-| `pnpm typecheck`                             | A translation key that does not exist in `en.json`                           |
-| `src/i18n/messages.test.ts`                  | Catalogues out of sync, empty values, missing plurals, `.` inside a key      |
-| `e2e/mocked/message-payload.spec.ts`         | Unexpected namespaces in serialized client message payloads                  |
-| `src/shared/api/error-messages.test.ts`      | A shared error code with no translation, or an orphaned message              |
-| `apps/api/.../messages.spec.ts`              | The same, for email copy                                                     |
+| Guard                                        | Catches                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm typecheck`                             | A translation key that does not exist in `en.json`                                     |
+| `src/i18n/messages.test.ts`                  | Catalogues out of sync, empty values, missing plurals, `.` inside a key                |
+| `e2e/mocked/message-payload.spec.ts`         | Unexpected namespaces in serialized client message payloads                            |
+| `src/shared/api/error-messages.test.ts`      | A shared error code with no translation, or an orphaned message                        |
+| `apps/api/.../messages.spec.ts`              | The same, for email copy                                                               |
 | `apps/api/.../frontend-url-coverage.spec.ts` | A covered API source reading `FRONTEND_URL` outside `localizedFrontendUrl()` arguments |
-| Oxlint + ESLint                              | Non-ASCII literals in code, locale-unaware navigation, `z.config`            |
+| Oxlint + ESLint                              | Non-ASCII literals in code, locale-unaware navigation, `z.config`                      |
 
 Review the wording in the rendered journey. These checks cover keys,
 message shape and selected boundaries.

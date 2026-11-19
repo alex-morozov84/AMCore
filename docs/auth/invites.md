@@ -215,19 +215,19 @@ for commands. Success uses `{binding,data}`. Create/reissue return 202; browser
 revoke returns 200 with `data:{status:"revoked"}` only after direct API empty 204.
 Unknown outcomes retain the same operation ID and complete command.
 
-| Method and path suffix under `/api/invitation-flows/{flowId}` | Body                                                        | Successful result                                                  |
-| ------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------ |
-| `GET context`                                                 | None                                                        | `200 {binding,data:{email,expiresAt}}` or pending auth state       |
-| `GET inspect`                                                 | None                                                        | `200 {binding,data:<private inspect state>}` or pending auth state |
-| `POST auth-context` | `{}` | Neutral browser attempt, including `attemptId`; no login or membership |
-| `POST login` | `{binding,email,password}`, `X-AMCore-Login-Attempt` | Completed `200` auth envelope, or `202 {kind:"mfa",flowBinding}` requiring continuation |
-| `POST register`                                               | `{binding,password,name?,locale?}`                          | Same envelope,201; server selects email                            |
-| `POST auth-handoffs/{attemptId}/ack`                          | `{binding}`                                                 | Same auth envelope,200; confirms current new cookie                |
-| `POST accept`                                                 | `{binding,operationId,expectedInviteId,expectedGeneration}` | `200 {binding,data:<acceptance result>}`                           |
-| `POST switch-account`                                         | `{binding}`                                                 | `200 {binding,data:{status:"signed_out"}}`                         |
-| `POST oauth/{provider}`                                       | `{binding}`                                                 | `200 {binding,authorizeHref}` for a code-owned local redirect      |
-| `POST verification-status`                                    | `{binding}`                                                 | `200 {binding,data:{user,inspection}}`                             |
-| `POST verification-return`                                    | `{binding}`                                                 | `200 {verifyHref}`; explicit same-browser return selector          |
+| Method and path suffix under `/api/invitation-flows/{flowId}` | Body                                                        | Successful result                                                                       |
+| ------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `GET context`                                                 | None                                                        | `200 {binding,data:{email,expiresAt}}` or pending auth state                            |
+| `GET inspect`                                                 | None                                                        | `200 {binding,data:<private inspect state>}` or pending auth state                      |
+| `POST auth-context`                                           | `{}`                                                        | Neutral browser attempt, including `attemptId`; no login or membership                  |
+| `POST login`                                                  | `{binding,email,password}`, `X-AMCore-Login-Attempt`        | Completed `200` auth envelope, or `202 {kind:"mfa",flowBinding}` requiring continuation |
+| `POST register`                                               | `{binding,password,name?,locale?}`                          | Same envelope,201; server selects email                                                 |
+| `POST auth-handoffs/{attemptId}/ack`                          | `{binding}`                                                 | Same auth envelope,200; confirms current new cookie                                     |
+| `POST accept`                                                 | `{binding,operationId,expectedInviteId,expectedGeneration}` | `200 {binding,data:<acceptance result>}`                                                |
+| `POST switch-account`                                         | `{binding}`                                                 | `200 {binding,data:{status:"signed_out"}}`                                              |
+| `POST oauth/{provider}`                                       | `{binding}`                                                 | `200 {binding,authorizeHref}` for a code-owned local redirect                           |
+| `POST verification-status`                                    | `{binding}`                                                 | `200 {binding,data:{user,inspection}}`                                                  |
+| `POST verification-return`                                    | `{binding}`                                                 | `200 {verifyHref}`; explicit same-browser return selector                               |
 
 Before browser login or registration, the typed client completes `POST auth-context`
 and sends its returned `attemptId` as `X-AMCore-Login-Attempt`. Preserve that attempt

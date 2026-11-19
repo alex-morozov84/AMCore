@@ -28,53 +28,53 @@ tab is visible and online. They never start
 a check and never send an email. Labels in this guide are the English ones; the Russian
 Console shows translations of the same texts.
 
-| Column | What it tells you |
-| --- | --- |
-| **Service** | The name and one headline word (see below). |
-| **Provider** | Safe facts: the provider or driver, the sender domain, counts. Never a key, address, URL or bucket name. |
-| **Setup** | **Set up** means the required settings exist. It does not prove that they work. **Not set up** and **Off** are also shown. |
-| **Last check** | What was last observed, when, where, and the reason if it failed. A configuration-only row says **Not verified**. |
-| **Action** | **Send test email** and **Last test** on the email row; links to the page that has more detail for the others. |
+| Column         | What it tells you                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Service**    | The name and one headline word (see below).                                                                                |
+| **Provider**   | Safe facts: the provider or driver, the sender domain, counts. Never a key, address, URL or bucket name.                   |
+| **Setup**      | **Set up** means the required settings exist. It does not prove that they work. **Not set up** and **Off** are also shown. |
+| **Last check** | What was last observed, when, where, and the reason if it failed. A configuration-only row says **Not verified**.          |
+| **Action**     | **Send test email** and **Last test** on the email row; links to the page that has more detail for the others.             |
 
 ### Headline word
 
 Each row has one word for scanning. The columns beside it are the facts behind it.
 
-| Headline | Meaning |
-| --- | --- |
-| **Cannot read** | This row could not be read now. The other rows are not affected. Select **Refresh**. If it persists, ask the maintainer to check reader timeouts, dependency availability and the reading schema. Schema rejection is not explained in registry logs; never dump raw provider data to diagnose it. |
-| **Off** / **Not set up** | The module is switched off, or its required settings are missing. |
-| **Set up, not verified** | Settings exist but nothing has confirmed them. This is the normal state for AI and sign-in, and for Telegram until a worker has reported its check. |
-| **Working (as last checked)** | The last check succeeded and is still recent. It says nothing about the time after that check. |
-| **Check passed** | Telegram only, in place of **Working (as last checked)**: the workers reached Telegram and it accepted the bot token. It does not prove that messages are delivered. An old success shows **Last check is old**. |
-| **Last check is old** | The last check succeeded, but longer ago than its freshness limit. |
-| **Failed** | The last check failed. The row keeps showing it when the check is old; the age is shown beside it. |
-| **Outcome unknown** | A check ran and could not establish whether it worked, for example after a timeout. |
-| **Simulated (mock provider)** | The mock provider is in use, so nothing real was sent. It is never shown as working. |
-| **Test in progress** | A test email is still running. |
+| Headline                      | Meaning                                                                                                                                                                                                                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cannot read**               | This row could not be read now. The other rows are not affected. Select **Refresh**. If it persists, ask the maintainer to check reader timeouts, dependency availability and the reading schema. Schema rejection is not explained in registry logs; never dump raw provider data to diagnose it. |
+| **Off** / **Not set up**      | The module is switched off, or its required settings are missing.                                                                                                                                                                                                                                  |
+| **Set up, not verified**      | Settings exist but nothing has confirmed them. This is the normal state for AI and sign-in, and for Telegram until a worker has reported its check.                                                                                                                                                |
+| **Working (as last checked)** | The last check succeeded and is still recent. It says nothing about the time after that check.                                                                                                                                                                                                     |
+| **Check passed**              | Telegram only, in place of **Working (as last checked)**: the workers reached Telegram and it accepted the bot token. It does not prove that messages are delivered. An old success shows **Last check is old**.                                                                                   |
+| **Last check is old**         | The last check succeeded, but longer ago than its freshness limit.                                                                                                                                                                                                                                 |
+| **Failed**                    | The last check failed. The row keeps showing it when the check is old; the age is shown beside it.                                                                                                                                                                                                 |
+| **Outcome unknown**           | A check ran and could not establish whether it worked, for example after a timeout.                                                                                                                                                                                                                |
+| **Simulated (mock provider)** | The mock provider is in use, so nothing real was sent. It is never shown as working.                                                                                                                                                                                                               |
+| **Test in progress**          | A test email is still running.                                                                                                                                                                                                                                                                     |
 
 ### Words in the Last check column
 
-| Word | Meaning |
-| --- | --- |
-| **Confirmed** | The last observation succeeded. Its time and where it was taken (**this server**, **shared** or **workers**) are shown beside it. |
-| **Failed** | The last observation failed. The safe reason is shown beside it. |
-| **Outcome unknown** | A check ran and could not establish whether it worked. |
-| **Simulated** | The mock provider was used. Nothing real was sent. |
-| **Not verified** | Nothing was observed. The row shows the settings only (**Configuration only**). |
-| **No stored result** | The email row has no result for the current settings: none was stored, it expired, or settings changed. |
-| **…, old** | The observation is older than its freshness limit. A failed result stays failed. |
+| Word                 | Meaning                                                                                                                           |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Confirmed**        | The last observation succeeded. Its time and where it was taken (**this server**, **shared** or **workers**) are shown beside it. |
+| **Failed**           | The last observation failed. The safe reason is shown beside it.                                                                  |
+| **Outcome unknown**  | A check ran and could not establish whether it worked.                                                                            |
+| **Simulated**        | The mock provider was used. Nothing real was sent.                                                                                |
+| **Not verified**     | Nothing was observed. The row shows the settings only (**Configuration only**).                                                   |
+| **No stored result** | The email row has no result for the current settings: none was stored, it expired, or settings changed.                           |
+| **…, old**           | The observation is older than its freshness limit. A failed result stays failed.                                                  |
 
 ### What each row proves
 
-| Row | Source | What it proves | Freshness limit |
-| --- | --- | --- | --- |
-| **Email** | Provider settings, and the latest stored test result of the whole platform (**Last test** opens your own) | After an **Accepted** test: the provider accepted a direct send from the API server. Never queued email, invitations or an inbox. **Simulated** proves nothing about a real provider. | 24 hours |
-| **Files** | The storage check that the API runs by itself (write, read and delete of its own test file) | The answering API server could use the storage. Other servers are not covered. | Three times the check interval |
-| **Sign-in providers** | Settings | Nothing about sign-in itself. A configured provider does not prove that a user can sign in. | none |
-| **Queue** | A short read-only question to the broker | The broker answered. It does not prove that workers run. Queue depths are on Background work. | 1 minute |
-| **AI** | The cached catalogue of enabled providers and models | Only configuration. It counts providers that have an enabled model and whether a key is present. It is not a call to any provider and can be up to 5 minutes old. | none |
-| **Telegram** | The check each worker runs by itself every minute (see [Telegram check](#telegram-check)) | The workers that reported could reach Telegram, and it accepted the bot token. Not message delivery, not incoming messages. | 210 seconds |
+| Row                   | Source                                                                                                    | What it proves                                                                                                                                                                        | Freshness limit                |
+| --------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Email**             | Provider settings, and the latest stored test result of the whole platform (**Last test** opens your own) | After an **Accepted** test: the provider accepted a direct send from the API server. Never queued email, invitations or an inbox. **Simulated** proves nothing about a real provider. | 24 hours                       |
+| **Files**             | The storage check that the API runs by itself (write, read and delete of its own test file)               | The answering API server could use the storage. Other servers are not covered.                                                                                                        | Three times the check interval |
+| **Sign-in providers** | Settings                                                                                                  | Nothing about sign-in itself. A configured provider does not prove that a user can sign in.                                                                                           | none                           |
+| **Queue**             | A short read-only question to the broker                                                                  | The broker answered. It does not prove that workers run. Queue depths are on Background work.                                                                                         | 1 minute                       |
+| **AI**                | The cached catalogue of enabled providers and models                                                      | Only configuration. It counts providers that have an enabled model and whether a key is present. It is not a call to any provider and can be up to 5 minutes old.                     | none                           |
+| **Telegram**          | The check each worker runs by itself every minute (see [Telegram check](#telegram-check))                 | The workers that reported could reach Telegram, and it accepted the bot token. Not message delivery, not incoming messages.                                                           | 210 seconds                    |
 
 Reading this page never sends an email and never calls an outside provider. Files shows
 what the API already observed; Telegram shows what the workers stored. Queue asks the broker one short, bounded, read-only
@@ -120,13 +120,13 @@ result of an attempt as saved on the server.
 
 ### Results
 
-| Result | What happened | Next step |
-| --- | --- | --- |
-| **Accepted** | The provider took the message. This does not prove that it reached an inbox. | If users still get no mail, check spam folders, the provider's delivery log and **Background work** (queued email and invitations are not covered by this test). |
-| **Simulated** | The mock provider is in use. Nothing was sent. | Configure a real provider for production. |
-| **Refused** | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected. | Check the provider key and the sender address in the mail settings. |
+| Result              | What happened                                                                                                                  | Next step                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Accepted**        | The provider took the message. This does not prove that it reached an inbox.                                                   | If users still get no mail, check spam folders, the provider's delivery log and **Background work** (queued email and invitations are not covered by this test).                                                               |
+| **Simulated**       | The mock provider is in use. Nothing was sent.                                                                                 | Configure a real provider for production.                                                                                                                                                                                      |
+| **Refused**         | The provider rejected the request. The reason is one of: key not accepted, sender rejected, request rejected.                  | Check the provider key and the sender address in the mail settings.                                                                                                                                                            |
 | **Outcome unknown** | The provider may or may not have accepted the message: no answer in time, a lost connection, or a limit or quota was reported. | Reopen the result once the provider log shows what happened (the Console result itself stays as stored). Do not assume the email was not sent. Start a new test only if you need one (it must also pass the one-minute limit). |
-| **Did not start** | The test stopped before anything was sent (for example the audit record could not be written). | Start a new test. |
+| **Did not start**   | The test stopped before anything was sent (for example the audit record could not be written).                                 | Start a new test.                                                                                                                                                                                                              |
 
 **Outcome unknown** does not change by itself: a late answer from the provider is not
 applied. To learn what really happened, read the provider's own log. For **Refused** with
@@ -139,26 +139,26 @@ Console cannot prove from that answer that nothing was accepted.
 
 ### When the button is unavailable
 
-| Text under the button | Meaning | What to do |
-| --- | --- | --- |
-| **A test was started a moment ago. (N s)** | The one-minute limit of one operator. | Wait N seconds. The button returns by itself; **Refresh** shows the new time. |
-| **Another test is being sent.** | A test is in flight (here or on another server). | Wait, then **Refresh**. Do not try another account or server to get around it. |
-| **Your account has no verified email address.** | See Before you start. | Verify the address. |
-| **Production email is only simulated.** | Production uses the mock provider. | Configure a real provider. |
-| **You are offline.** | The result could not be read back. | Restore the connection. |
+| Text under the button                           | Meaning                                          | What to do                                                                     |
+| ----------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| **A test was started a moment ago. (N s)**      | The one-minute limit of one operator.            | Wait N seconds. The button returns by itself; **Refresh** shows the new time.  |
+| **Another test is being sent.**                 | A test is in flight (here or on another server). | Wait, then **Refresh**. Do not try another account or server to get around it. |
+| **Your account has no verified email address.** | See Before you start.                            | Verify the address.                                                            |
+| **Production email is only simulated.**         | Production uses the mock provider.               | Configure a real provider.                                                     |
+| **You are offline.**                            | The result could not be read back.               | Restore the connection.                                                        |
 
 The hourly limit of the platform is not known in advance: the button stays available and
 the attempt ends with **The hourly limit for test emails is reached.** Try again later.
 
 ### When nothing was sent
 
-| Message | Meaning |
-| --- | --- |
-| **The confirmation expired. Start the test again.** | A confirmation that was not yet used is older than 30 minutes. A confirmation that was already used returns its stored result instead; if that result is gone, it is **No stored result** and nothing is sent again. |
-| **Your email address changed…** / **The email settings changed…** | The confirmation no longer matches. Start again. |
-| **The hourly limit for test emails is reached.** | Platform limit (below). |
-| **A test was started a moment ago…** / **Another test is being sent.** | See the table above. |
-| **The check could not start. Nothing was sent.** | Redis or the audit record was unavailable _before_ the send. |
+| Message                                                                | Meaning                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The confirmation expired. Start the test again.**                    | A confirmation that was not yet used is older than 30 minutes. A confirmation that was already used returns its stored result instead; if that result is gone, it is **No stored result** and nothing is sent again. |
+| **Your email address changed…** / **The email settings changed…**      | The confirmation no longer matches. Start again.                                                                                                                                                                     |
+| **The hourly limit for test emails is reached.**                       | Platform limit (below).                                                                                                                                                                                              |
+| **A test was started a moment ago…** / **Another test is being sent.** | See the table above.                                                                                                                                                                                                 |
+| **The check could not start. Nothing was sent.**                       | Redis or the audit record was unavailable _before_ the send.                                                                                                                                                         |
 
 A request refused before the test was reserved (the hourly limit, the cooldown) is not counted.
 **Another test is being sent.** can also appear after the reservation, when the start then fails:
@@ -168,13 +168,13 @@ unused. Wait for the cooldown shown on the button.
 
 ### Limits
 
-| Limit | Value |
-| --- | --- |
-| Waiting for the provider | 10 seconds, then **Outcome unknown** |
-| Per operator | One test per minute |
-| Whole platform | 20 tests per hour; the count restarts at the start of each hour (UTC) |
-| At the same time | One test at a time, in normal operation (see below) |
-| Time to confirm after step 1 | 30 minutes; after that, start again |
+| Limit                        | Value                                                                 |
+| ---------------------------- | --------------------------------------------------------------------- |
+| Waiting for the provider     | 10 seconds, then **Outcome unknown**                                  |
+| Per operator                 | One test per minute                                                   |
+| Whole platform               | 20 tests per hour; the count restarts at the start of each hour (UTC) |
+| At the same time             | One test at a time, in normal operation (see below)                   |
+| Time to confirm after step 1 | 30 minutes; after that, start again                                   |
 
 The limits are shared by all API servers through Redis.
 
@@ -271,17 +271,17 @@ reads it. To be told without opening the Console, alert on the metric (see
 
 ### Reasons and next steps
 
-| Reason on the row | Result | Next step |
-| --- | --- | --- |
-| **the server cannot reach Telegram** | Failed | From the worker's host or container, check outgoing HTTPS to `api.telegram.org` (or to your relay) without the token, for example `curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org/` (for a relay, its base address). Any HTTP code, 404 included, shows that this address answers; it does not show that a relay forwards to Telegram or that `getMe` works. A timeout or connection error is a symptom: find its cause in the firewall, DNS, proxy and the address itself. "The server" here is the host of the failing worker, not the API server. If the provider blocks Telegram, configure a relay that you control, never a public Bot API mirror: the token travels in every request (see the relay rules and the leaked-token steps in [Notifications](../notifications/README.md)). |
-| **Telegram did not answer within 8 s** | Failed | The same network checks; a very slow path or a relay that does not answer also ends here. |
-| **Telegram or the relay did not accept the bot token** | Failed | Check `TELEGRAM_BOT_TOKEN` against the token from BotFather. If you use a relay, check that the relay forwards the token. After changing it, restart the workers and the API server: both must use the same token. If you use the webhook, register it again with the new token ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)). |
-| **Telegram or the relay refused the request** | Failed | Usually a wrong `TELEGRAM_API_BASE_URL` (a path that does not exist on the relay). Check the address. |
-| **Telegram reported a request limit** | Outcome unknown | Wait; change no settings. Telegram limits the bot (the check itself is one request per worker per minute); delivery retries follow their own policy. The next checks show whether reachability recovers. With the example alert loaded and metrics scraped, a persistent result can trigger it after 10 minutes; then check the relay logs and Telegram's status. The check itself does not retry a user delivery. |
-| **Telegram or the relay reported an error** / **unexpected answer** | Outcome unknown | Wait for the next checks. If it stays, check the relay's logs or Telegram's status. |
-| **more workers report than can be stored** | Outcome unknown | More than 32 workers wrote a result within an hour (for example after many restarts). The row stays like this for one hour after the last refused result. |
-| **a stored result could not be read** | Outcome unknown | A stored value has a format this server does not read, usually because workers and the API server run different AMCore versions, or the value was changed by hand. Run the same version everywhere. A value without a readable time is removed at the next check; other damaged values are not cleared on a fixed schedule. If the row stays like this after every process runs the same version, delete the stored results: `redis-cli DEL 'integrations:{telegram_check}:obs'`. They hold only check results; the workers write new ones within a minute. |
-| **settings changed since the last check** | Not verified | Results exist only for other settings: the token or address of the workers differs from the API server's. Both must use the same `TELEGRAM_BOT_TOKEN` and `TELEGRAM_API_BASE_URL`. The Console does not show which process has the old values: compare the variables of the API server and of each worker without printing the token. Inside each process's own environment (for example its container), with shell tracing off (`set +x`), first check that the variable is not empty, then compare a hash: `test -n "$TELEGRAM_BOT_TOKEN" && printf %s "$TELEGRAM_BOT_TOKEN" \| sha256sum`. Compare `TELEGRAM_API_BASE_URL` separately; it is not secret, and a trailing `/` does not matter. (The Console itself compares a fingerprint of the token and the address, never the raw values.) This also appears when only the API server still has the old values. Restart the processes that still have them; workers with the new settings report within a minute. |
+| Reason on the row                                                   | Result          | Next step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **the server cannot reach Telegram**                                | Failed          | From the worker's host or container, check outgoing HTTPS to `api.telegram.org` (or to your relay) without the token, for example `curl -sS -o /dev/null -w '%{http_code}\n' https://api.telegram.org/` (for a relay, its base address). Any HTTP code, 404 included, shows that this address answers; it does not show that a relay forwards to Telegram or that `getMe` works. A timeout or connection error is a symptom: find its cause in the firewall, DNS, proxy and the address itself. "The server" here is the host of the failing worker, not the API server. If the provider blocks Telegram, configure a relay that you control, never a public Bot API mirror: the token travels in every request (see the relay rules and the leaked-token steps in [Notifications](../notifications/README.md)).                                                                                                                                                       |
+| **Telegram did not answer within 8 s**                              | Failed          | The same network checks; a very slow path or a relay that does not answer also ends here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Telegram or the relay did not accept the bot token**              | Failed          | Check `TELEGRAM_BOT_TOKEN` against the token from BotFather. If you use a relay, check that the relay forwards the token. After changing it, restart the workers and the API server: both must use the same token. If you use the webhook, register it again with the new token ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Telegram or the relay refused the request**                       | Failed          | Usually a wrong `TELEGRAM_API_BASE_URL` (a path that does not exist on the relay). Check the address.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Telegram reported a request limit**                               | Outcome unknown | Wait; change no settings. Telegram limits the bot (the check itself is one request per worker per minute); delivery retries follow their own policy. The next checks show whether reachability recovers. With the example alert loaded and metrics scraped, a persistent result can trigger it after 10 minutes; then check the relay logs and Telegram's status. The check itself does not retry a user delivery.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Telegram or the relay reported an error** / **unexpected answer** | Outcome unknown | Wait for the next checks. If it stays, check the relay's logs or Telegram's status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **more workers report than can be stored**                          | Outcome unknown | More than 32 workers wrote a result within an hour (for example after many restarts). The row stays like this for one hour after the last refused result.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **a stored result could not be read**                               | Outcome unknown | A stored value has a format this server does not read, usually because workers and the API server run different AMCore versions, or the value was changed by hand. Run the same version everywhere. A value without a readable time is removed at the next check; other damaged values are not cleared on a fixed schedule. If the row stays like this after every process runs the same version, delete the stored results: `redis-cli DEL 'integrations:{telegram_check}:obs'`. They hold only check results; the workers write new ones within a minute.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **settings changed since the last check**                           | Not verified    | Results exist only for other settings: the token or address of the workers differs from the API server's. Both must use the same `TELEGRAM_BOT_TOKEN` and `TELEGRAM_API_BASE_URL`. The Console does not show which process has the old values: compare the variables of the API server and of each worker without printing the token. Inside each process's own environment (for example its container), with shell tracing off (`set +x`), first check that the variable is not empty, then compare a hash: `test -n "$TELEGRAM_BOT_TOKEN" && printf %s "$TELEGRAM_BOT_TOKEN" \| sha256sum`. Compare `TELEGRAM_API_BASE_URL` separately; it is not secret, and a trailing `/` does not matter. (The Console itself compares a fingerprint of the token and the address, never the raw values.) This also appears when only the API server still has the old values. Restart the processes that still have them; workers with the new settings report within a minute. |
 
 **Not verified** without a reason means no worker has reported yet: wait a minute after the
 workers start. If it stays, look at **Scheduled jobs** → **Telegram check**: that row tells

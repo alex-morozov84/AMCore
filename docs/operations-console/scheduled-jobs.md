@@ -27,14 +27,14 @@ of** is the time of the latest successful read. **Refresh** requests a new read;
 online and outside the shared cooldown. Both honor Retry-After and neither
 starts or changes a job.
 
-| Column           | What it tells you                                                                                          |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Job**          | The name and a one-line purpose. A job added by your own code without a translation shows its id.          |
+| Column           | What it tells you                                                                                                     |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Job**          | The name and a one-line purpose. A job added by your own code without a translation shows its id.                     |
 | **Schedule**     | When it runs: a recognized phrase or the raw cron expression. Daily clock-time schedules show the reported time zone. |
-| **Last result**  | The recorded outcome, or a daily run whose end has not been recorded.                                                                    |
-| **Freshness**    | Whether a successful run has happened when one was due.                                                    |
-| **Last success** | When the last successful run started, in the display time zone of the header.                              |
-| **Took**         | How long the latest finished run took.                                                                     |
+| **Last result**  | The recorded outcome, or a daily run whose end has not been recorded.                                                 |
+| **Freshness**    | Whether a successful run has happened when one was due.                                                               |
+| **Last success** | When the last successful run started, in the display time zone of the header.                                         |
+| **Took**         | How long the latest finished run took.                                                                                |
 
 Notes under a row explain why it looks the way it does. Jobs that run every
 few seconds show only their latest completed pass; a footnote says their current
@@ -54,12 +54,12 @@ They answer different questions, so a job can show both **Partly done** and
 | **Result not recorded** | A run started, but nobody recorded its end within 30 minutes. The worker may have stopped. This is not a failure and not a success. |
 | **No runs yet**         | No run has been recorded since a worker first reported the job.                                                                     |
 
-| Freshness      | Meaning                                                                                                                                                                                                             |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **On time**    | A success has been recorded for the latest due time, or the next one is not due yet.                                                                                                                                |
+| Freshness      | Meaning                                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **On time**    | A success has been recorded for the latest due time, or the next one is not due yet.                                                                                                                           |
 | **Overdue**    | No success was recorded by the time one was due plus a grace period (30 minutes for daily jobs). For frequent jobs, no successful completed pass within the configured threshold: max(10 × period, 5 minutes). |
-| **Not known**  | Freshness cannot be established: for example, no worker configuration or no usable due time is available. An enabled job can still have an earlier success.                                                         |
-| **Turned off** | A worker reported the job as turned off by configuration, for example GeoIP when `GEOIP_ENABLED` is `false`. The note says why.                                                                                     |
+| **Not known**  | Freshness cannot be established: for example, no worker configuration or no usable due time is available. An enabled job can still have an earlier success.                                                    |
+| **Turned off** | A worker reported the job as turned off by configuration, for example GeoIP when `GEOIP_ENABLED` is `false`. The note says why.                                                                                |
 
 A frequent job with a 5-minute period has a 50-minute threshold. Before its
 first success, the threshold starts at its first recorded worker report.

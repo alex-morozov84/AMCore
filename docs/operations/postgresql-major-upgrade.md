@@ -301,13 +301,13 @@ is insufficient. See [PostgreSQL pg_dump](https://www.postgresql.org/docs/18/app
       comparison from step 4.1 on it. If it differs, start no application:
       discard this database, find the cause (the dump, the restore command,
       the target) and restore again. Do not reuse the validation copy.
-   Verify the actual isolated cutover target separately, including existing
-   owners/grants/default privileges. Use the
-   [isolated role probes](backup-restore.md#verify-a-role-separated-restore)
-   before opening ingress. Use uniquely named disposable tables/sequences,
-   remove only those probes as owner and recompare original data/history/sequence
-   evidence. A passing validation copy does not certify the final target. Unknown
-   cleanup or comparison keeps ingress closed; repair or rebuild that target.
+      Verify the actual isolated cutover target separately, including existing
+      owners/grants/default privileges. Use the
+      [isolated role probes](backup-restore.md#verify-a-role-separated-restore)
+      before opening ingress. Use uniquely named disposable tables/sequences,
+      remove only those probes as owner and recompare original data/history/sequence
+      evidence. A passing validation copy does not certify the final target. Unknown
+      cleanup or comparison keeps ingress closed; repair or rebuild that target.
 
    2. **Keep ingress and every writer to the source closed** until the end
       of this step. Once the new processes start (step 5.4), do not return

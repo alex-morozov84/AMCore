@@ -44,12 +44,12 @@ both the key and exact input when retrying the same operation.
 
 For the same scope and key, while its Redis record remains valid:
 
-| Record | Result |
-| --- | --- |
-| None | Reserve the key and run the handler. |
-| Completed, matching fingerprint | Replay the stored response, subject to the empty-body limitation below. |
-| Completed, different fingerprint | `422 IDEMPOTENCY_KEY_REUSE`. |
-| In-flight reservation, with any fingerprint | `409 IDEMPOTENCY_CONFLICT`. |
+| Record                                      | Result                                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| None                                        | Reserve the key and run the handler.                                    |
+| Completed, matching fingerprint             | Replay the stored response, subject to the empty-body limitation below. |
+| Completed, different fingerprint            | `422 IDEMPOTENCY_KEY_REUSE`.                                            |
+| In-flight reservation, with any fingerprint | `409 IDEMPOTENCY_CONFLICT`.                                             |
 
 A replay returns the stored status, body and `content-type`, with
 `Idempotency-Replayed: true`. It does not restore `set-cookie`, authorization,

@@ -90,7 +90,10 @@ import type { NotificationDefinition } from '../notification-definition.types.js
 // Allowlisted, bounded payload — durable rows and renderers see this shape, so
 // keep it small, language-neutral, and free of secrets.
 const payloadSchema = z.object({
-  updatedFields: z.array(z.enum(['name', 'email', 'locale'])).min(1).max(3),
+  updatedFields: z
+    .array(z.enum(['name', 'email', 'locale']))
+    .min(1)
+    .max(3),
 })
 type Payload = z.infer<typeof payloadSchema>
 

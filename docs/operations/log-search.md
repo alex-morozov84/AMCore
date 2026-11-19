@@ -158,8 +158,8 @@ The application never waits for the pipeline: it writes to stdout.
 
 | Event                        | Effect on the application | Effect on logs                                                                                     |
 | ---------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------- |
-| Loki stops                   | None                      | Alloy retries. If it exhausts retries, some lines may remain only in Docker's files.                       |
-| Alloy stops                  | None                      | Alloy resumes from its stored position. Check for gaps or duplicate lines.                                |
+| Loki stops                   | None                      | Alloy retries. If it exhausts retries, some lines may remain only in Docker's files.               |
+| Alloy stops                  | None                      | Alloy resumes from its stored position. Check for gaps or duplicate lines.                         |
 | Outage longer than the files | None                      | Lines that rotated out of Docker's files meanwhile are lost                                        |
 | Volume full                  | None                      | Loki fails to flush, retries, then drops chunks; see [Disk low](runbooks/log-shipping.md#disk-low) |
 | A container logs over 16 KiB | None                      | Docker splits the line; fragments are stored and only the first holds the `correlationId`          |
@@ -256,11 +256,11 @@ host, or outside Docker, cannot be attached; use the second choice.
 
 **Check by hand.** No alert fires, so run these after changes and about once a day:
 
-| Alert it replaces       | Manual check                                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| collector or store down | `docker compose ps alloy loki`                                                                            |
-| retrying, dropped       | `docker compose exec logs-grafana wget -q -O- http://alloy:12345/metrics`, look at `loki_write_*`         |
-| refusing, flush failing | `docker compose logs --tail 50 loki` (look for `failed to flush`, `rate limit`) and the Alloy log         |
+| Alert it replaces       | Manual check                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| collector or store down | `docker compose ps alloy loki`                                                                                 |
+| retrying, dropped       | `docker compose exec logs-grafana wget -q -O- http://alloy:12345/metrics`, look at `loki_write_*`              |
+| refusing, flush failing | `docker compose logs --tail 50 loki` (look for `failed to flush`, `rate limit`) and the Alloy log              |
 | disk low, critical      | [Check the log-store volume](runbooks/log-shipping.md#disk-low) and compare its size with the host’s free disk |
 
 Until you configure and verify alert delivery, these checks do not notify anyone.

@@ -78,12 +78,12 @@ docker compose run --rm --no-deps api node dist/cli/welcome-upgrade.js \
   --id '<job-id>' --mutators-stopped
 ```
 
-| Result                     | Required action                                                                                 |
-| -------------------------- | ----------------------------------------------------------------------------------------------- |
+| Result                     | Required action                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
 | `eligible`                 | Untouched policy 1 job: zero starts, no evidence, body, grant or history ambiguity. May convert. |
-| `converted` / `already_v2` | Record the result. Repeating the original command does not reset identity or attempts.          |
-| `protected`                | Retain original evidence. Accepted suppresses sending; unknown remains blocked. No conversion.  |
-| `blocked` / `unconfirmed`  | Keep maintenance active. Investigate the safe reason; never force metadata to fit.              |
+| `converted` / `already_v2` | Record the result. Repeating the original command does not reset identity or attempts.           |
+| `protected`                | Retain original evidence. Accepted suppresses sending; unknown remains blocked. No conversion.   |
+| `blocked` / `unconfirmed`  | Keep maintenance active. Investigate the safe reason; never force metadata to fit.               |
 
 Convert only an eligible job:
 
