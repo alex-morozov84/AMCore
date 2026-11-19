@@ -15,7 +15,8 @@ STORAGE_ENDPOINT=https://hb.ru-msk.vkcloud-storage.ru
 STORAGE_PUBLIC_BASE_URL=https://<public-bucket>.hb.ru-msk.vkcloud-storage.ru
 ```
 
-The signing region (SigV4) is `ru-msk`. VK Cloud uses virtual-hosted addresses.
+This example uses the signing region `ru-msk` and virtual-hosted addresses.
+Confirm the current endpoint and permissions in your VK Cloud account.
 
 ## Publish the public files
 

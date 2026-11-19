@@ -84,13 +84,16 @@ import {
   NotificationCategory,
   NotificationChannel,
   NotificationContentClass,
-} from '../notification.constants'
-import type { NotificationDefinition } from '../notification-definition.types'
+} from '../notification.constants.js'
+import type { NotificationDefinition } from '../notification-definition.types.js'
 
 // Allowlisted, bounded payload — durable rows and renderers see this shape, so
 // keep it small, language-neutral, and free of secrets.
 const payloadSchema = z.object({
-  updatedFields: z.array(z.enum(['name', 'email', 'locale'])).min(1),
+  updatedFields: z
+    .array(z.enum(['name', 'email', 'locale']))
+    .min(1)
+    .max(3),
 })
 type Payload = z.infer<typeof payloadSchema>
 
@@ -186,9 +189,9 @@ writes the rows but enqueues nothing (the caller owns commit timing). Contract:
   due rows with `FOR UPDATE SKIP LOCKED`, leases the row (`PROCESSING` with a TTL),
   records an immutable attempt, and finalizes with a compare-and-set on the lease
   token so a stale holder can never overwrite newer state.
-- **A recovery `@Cron`** drains due deliveries on every replica, so a **lost wake**
-  (Redis blip) or a `notifyTx` delivery is still delivered — at-least-once with
-  provider-side idempotency.
+- **The scheduled recovery job** scans for due deliveries on each worker. It can
+  discover committed work after a lost wake or a call to `notifyTx`. Eligibility
+  and provider outcomes still determine delivery.
 - **Transient** failures retry with exponential backoff (capped, jittered) up to a
   budget, then dead-letter as `FAILED`; **permanent** failures fail immediately. A
   crashed worker's expired lease is reclaimed and the attempt marked abandoned.
@@ -206,8 +209,7 @@ Channels:
 stable provider idempotency key `notification-delivery:<deliveryId>` — it **never
 uses the email queue** (secret-bearing mail keeps its own direct path). Delivery
 is to a **verified destination only**: an unverified account email is recorded
-`SKIPPED` (`destination_unverified`), never `PENDING`, and the mandatory in-app
-delivery still guarantees the user sees the event. Mail targets the produce-time
+`SKIPPED` (`destination_unverified`), never `PENDING`, and any selected in-app delivery remains available in the feed. Mail targets the produce-time
 canonical verified-address snapshot, not the display address.
 
 **Telegram channel.** Opt-in via config (see
@@ -224,31 +226,9 @@ error (`403` / chat-not-found) → terminal `FAILED` and the connection is fence
 `BLOCKED` (user must relink); a `429 retry_after` is honored as a retry floor. No
 chat/user id, provider text, or token ever appears in an attempt or log.
 
-**Telegram relay (blocked regions).** Telegram's Bot API (`api.telegram.org`) is
-blocked at the network level in some deployment regions, independent of the bot
-token or account. `TELEGRAM_API_BASE_URL` (see `.env.example`) overrides the Bot
-API origin that the workers (sending and the reachability check) and the
-`telegram:setup` CLI call — set it to a relay you run instead of the default
-public API. A web-only API server (`PROCESS_ROLE=web`) makes no Bot API call; it
-reads the same token and address only to match the workers' check results to the
-current settings. A process with `PROCESS_ROLE=all` serves HTTP and also sends and
-runs the check, so treat it as a worker (its network path matters too). Set both
-variables identically on every process. Every request the client makes is built as
-`<TELEGRAM_API_BASE_URL>/bot<token>/<method>`
-([`telegram-bot-api.client.ts`](../../apps/api/src/core/notifications/channels/telegram/telegram-bot-api.client.ts)),
-and the `telegram:setup` CLI's `setWebhook` call honors the same override, so
-both outbound sends and webhook registration go through the relay consistently.
-The relay itself is just a reverse proxy that forwards `/bot*` requests
-unmodified to the real `https://api.telegram.org` (nginx/Caddy or similar) —
-AMCore doesn't ship one.
-
-**Is Telegram reachable?** Every worker with a token asks `getMe` once a minute
-through the same `TELEGRAM_API_BASE_URL`, so a blocked network, a refused token
-or a broken relay shows up before users notice missing messages. The result is
-the `amcore_telegram_reachability_state` metric with example alerts
-([Telegram runbook](../operations/runbooks/telegram.md)) and, with the optional
-Console, the **Telegram** row on **Integrations**. The check sends nothing and
-does not cover the incoming webhook.
+**Telegram relay.** For worker reachability, relay setup and credential recovery,
+follow the [Telegram runbook](../operations/runbooks/telegram.md). A successful
+reachability check covers the configured Bot API path for the observed worker.
 
 **Removing the Telegram channel** from `NOTIFICATION_CHANNELS` also removes its
 check: delete `telegram-reachability.service.ts` (with its import and provider line in
@@ -257,46 +237,18 @@ check: delete `telegram-reachability.service.ts` (with its import and provider l
 fails while the catalogue still lists the job but no worker registers it; the source scan
 in `scheduled-jobs.catalogue.spec.ts` fails for a decorated method without its entry.
 
-**Only point this at infrastructure you control.** The bot token travels in the
-URL path of every request, so whoever terminates TLS on the relay gets full
-control of the bot (read/send messages, change the webhook). Never point it at
-a third-party or public Bot API mirror.
-
-If the token was ever sent to such a mirror, treat it as leaked, together with the
-webhook secret (`setWebhook` sent it through the same address) and the messages that
-passed through it (handle those under your incident process). Do these steps in this
-order, and start nothing with the new token before step 2 is done everywhere:
-
-1. In BotFather, revoke the token and generate a new one
-   ([Telegram: generating a token](https://core.telegram.org/bots/features#generating-an-authentication-token)).
-2. Replace the untrusted `TELEGRAM_API_BASE_URL` with the official API (remove the
-   variable; the default is `https://api.telegram.org`) or a relay you control, in every
-   place that uses it: the API server, every worker or `all` process, and the one-shot job
-   or container that runs `telegram:setup`. If your hosting blocks Telegram, have your own
-   relay running before this step. If your platform restarts a process as soon as a
-   variable changes, change the address first: a restart with the old, revoked token is
-   harmless.
-3. Set the new `TELEGRAM_BOT_TOKEN` and a new `WEBHOOK_TELEGRAM_SECRET` in the same places,
-   in one change where your platform allows it; a restart between the two is harmless,
-   because the address is already trusted.
-4. Start or restart those processes.
-5. If you use the webhook, register it again
-   ([Telegram webhook registration](../operations/deployment.md#telegram-webhook-registration-one-shot-optional)).
-
-The check itself sends the token once a minute from every worker, so keeping the old
-address even for a few minutes sends the new token to the same recipient.
-
 ## Delivery guarantees and operating limits
 
 These are the current guarantees of the worker-side dispatcher (a worker process
 runs both the BullMQ wake path and the recovery cron through the same code).
 
-**At-least-once, never exactly-once.** A send can be accepted by the provider and
+**Retries can cause duplicate delivery.** A send can be accepted by the provider and
 the worker can still lose its lease or time out before recording it, so a
 recipient can occasionally receive a message twice. Email sends carry the stable
 idempotency key `notification-delivery:<deliveryId>` (Resend honors it for 24 h);
 Telegram has no equivalent, so its duplicate risk is real. A timeout is an
-**ambiguous** outcome — the message may have been sent — and is retried.
+**ambiguous** outcome — the message may have been sent. Automatic retries follow the delivery budget.
+An unknown effect does not authorize [manual retry](control.md#external-effect-evidence).
 
 **Capacity is per process.** A worker runs at most `NOTIFICATION_DISPATCH_CONCURRENCY`
 (default 2, a code constant in `notification-dispatch.constants.ts`) deliveries at
@@ -388,15 +340,8 @@ editor should explain this while still allowing the override to be saved; it
 must not label the stored value as guaranteed effective delivery. See the
 [ordinary Query/form example](../frontend/api-consumption.md#start-with-an-ordinary-resource).
 
-The starter ships `account.profile_updated` (in-app only, best-effort, produced by
-`AuthService.updateProfile` — `PATCH /auth/me` — only when a field's value
-actually changed), `account.telegram_linked`, and `account.password_changed`
-(in-app **and** email mandatory), which exercises the resolver end-to-end.
-
-All three shipped definitions have real producers in the current backend:
-`account.profile_updated` from `PATCH /auth/me`, `account.password_changed`
-from a completed password reset, and `account.telegram_linked` from a
-completed Telegram link. None are demo-only.
+See the [definition inventory](../../apps/api/src/core/notifications/definitions/index.ts)
+for the shipped event types and their channel rules.
 
 ## Content & security rules
 

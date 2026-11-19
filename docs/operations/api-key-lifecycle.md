@@ -1,7 +1,8 @@
 # API key lifecycle operations
 
-Revocation retains safe metadata and destroys both verifier columns. This changes
-the schema and the behavior of API and cleanup processes together.
+Use this runbook to deploy retained revocation, complete bounded offboarding and
+keep revoked keys invalid after restoration. Revocation retains safe metadata
+and destroys both verifier columns.
 See [API keys](../auth/api-keys.md) for credential semantics.
 See [Console API keys](../operations-console/api-keys.md) for operator controls.
 
@@ -28,6 +29,12 @@ User/organization Cascade may delete rows earlier. Audit retention is independen
 ## Emergency rollback after a revoke
 
 Prefer a forward fix. Never start an old binary on retained nullable-verifier data.
+The SQL below reverses only the retained-revocation schema. It does not reverse
+later migrations or make an arbitrary old binary compatible. An active MFA
+installation must retain its [protocol and protected-account enforcement](../auth/mfa-deployment.md);
+do not start a binary that cannot enforce that state. Stop for a deployment-specific
+review if the selected binary, full migration set and protocol do not agree.
+
 If reverting the application is unavoidable, retain trusted audit evidence and a
 backup, enter maintenance, and stop all application/cleanup writers. Have the DBA
 review and execute this explicit reverse-schema procedure on the intended database:
@@ -122,16 +129,30 @@ the SUPER_ADMIN claim at issuance and the current primary system role must both 
    Never select secret/verifier/scopes for this recovery. Put at most 100 distinct
    IDs in a protected file `{"ids":["<key-id>"]}`. Verify target org/user carefully.
 
-4. Authenticate the platform operator through existing `/api/v1/auth/login` on
-   `http://127.0.0.1:15002`. Store the returned access token as the bearer header
-   in a 0600 curl config; keep password/tokens out of history and logs.
-   If fresh authentication is required, send an authenticated
-   `POST http://127.0.0.1:15002/api/v1/auth/step-up` with JSON
-   `{"password":"<operator-password>"}` from a protected request file.
-   Replace the bearer header in the protected config with the returned
-   `accessToken` before the next platform request. Refreshing a token alone does
-   not renew authentication freshness. If step-up cannot succeed, stop recovery
-   and reauthenticate through a supported method; never bypass fresh-auth. Submit:
+4. Use a supported MFA-capable native API client to authenticate the platform
+   operator on `http://127.0.0.1:15002`. Prepare that client and the required local
+   password/factor access before recovery; see [MFA transport](../auth/mfa-foundation.md#password-and-publication-transport)
+   and the installed OpenAPI contract. A protected `/api/v1/auth/login` can return
+   `202` with a restricted continuation, not an access token. Complete its required
+   proofs, credential issuance and publication acknowledgement before using credentials.
+   A prepared deployment cannot grant operator access.
+
+   For stale fresh-auth, `/api/v1/auth/step-up` can likewise return `202` without
+   credentials. Complete the original family's required password and second-factor
+   proofs: start `POST /api/v1/auth/mfa/session-flow` with purpose `reauthenticate`
+   using the original bearer token, then use its restricted continuation for the
+   required password/verify commands and `POST /api/v1/auth/mfa/reauthenticate`.
+   Follow the strict OpenAPI bodies and operation IDs. Reauthentication updates
+   that original family's proofs; it issues no new credentials. Do not substitute
+   refresh for fresh proof or expect every response to contain `accessToken`. A changed family/account context is
+   terminal: authenticate again rather than replaying the old operation. Never send
+   bearer or session-cookie credentials to restricted continuation endpoints.
+
+   Store only the usable native access token as the bearer header in a 0600 curl
+   config. Keep passwords, continuation/proof credentials and tokens out of history
+   and logs. Do not extract browser-vault tokens or bypass MFA/fresh-auth. If the
+   supported client cannot complete these prerequisites on the isolated endpoint,
+   keep maintenance and stop; a password-only curl example is not a fallback. Submit:
 
    ```sh
    curl --fail-with-body --config ./protected-auth.conf \

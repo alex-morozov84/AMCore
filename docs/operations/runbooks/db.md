@@ -38,8 +38,9 @@ Database check failed -> check from the affected API environment
 ## Pool waiting
 
 **Symptom:** `AMCoreDbPoolWaitingElevated` is firing (more than
-`DATABASE_POOL_WAITING_THRESHOLD`, default 5, connections waiting on the pool
-for 5m).
+5 connections waiting on the pool for 5m). The shipped Prometheus rule
+uses a fixed threshold. `DATABASE_POOL_WAITING_THRESHOLD` separately configures
+the API readiness check.
 
 **Likely causes, ranked:**
 
@@ -85,7 +86,8 @@ File a ticket and investigate before pool exhaustion needs manual remediation.
 ## Slow queries
 
 **Symptom:** `AMCoreDbSlowQueriesRising` is firing (queries slower than
-`SLOW_QUERY_THRESHOLD_MS` recorded over the last 15m).
+`SLOW_QUERY_THRESHOLD_MS` produce a positive counter rate over a 15-minute
+window, sustained for 15 minutes).
 
 **Likely causes, ranked:**
 
@@ -105,15 +107,16 @@ File a ticket and investigate before pool exhaustion needs manual remediation.
    settings](../pg-stat-statements-security.md), and provision [the `amcore_observer`
    role](../pg-stat-statements-observer-role.md) first; then use [Slow query
    investigation](../slow-query-investigation.md)'s triage queries to
-   identify the offending query directly.
+   find candidate queries. Confirm their link to the incident by time,
+   query plan or blocking evidence.
 3. Cross-check the **"5xx error ratio"** and **"p99 latency by route"** panels
    (HTTP row, see [`http.md`](http.md)) for the same window — never treat a
    slow-query alert alone as proof of user-facing impact; correlate first.
 
 **Mitigation:**
 
-- Add or fix an index once `pg_stat_statements` identifies the specific
-  query.
+- Add or fix an index only if the plan supports it for a query linked to the
+  incident.
 - If caused by a concurrent long-running transaction (lock contention): find
   and terminate or fix that transaction rather than the queries it's blocking.
 

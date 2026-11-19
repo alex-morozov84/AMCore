@@ -8,15 +8,15 @@ caps enforced in
 
 ## Environment Variables
 
-| Variable                         | Default                               | Purpose                                                             |
-| -------------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
-| `MEDIA_MAX_SOURCE_BYTES`         | `5242880` (5 MB)                      | Reject a source object larger than this **before** download.        |
-| `MEDIA_MAX_WIDTH`                | `8000`                                | Reject sources wider than this (px).                                |
-| `MEDIA_MAX_HEIGHT`               | `8000`                                | Reject sources taller than this (px).                               |
-| `MEDIA_MAX_PIXELS`               | `40000000` (40 MP)                    | Global decoded-pixel cap (`width × height`).                        |
-| `MEDIA_SHARP_LIMIT_INPUT_PIXELS` | `40000000`                            | Hard libvips decode guard (defense-in-depth). Must be ≤ MAX_PIXELS. |
-| `MEDIA_AVATAR_MAX_PIXELS`        | `8000000` (8 MP)                      | Tighter cap for the synchronous avatar path. Must be ≤ MAX_PIXELS.  |
-| `MEDIA_AVATAR_CACHE_CONTROL`     | `public, max-age=31536000, immutable` | Cache-control written on public avatar derivatives.                 |
+| Variable                         | Default                               | Purpose                                                               |
+| -------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
+| `MEDIA_MAX_SOURCE_BYTES`         | `5242880` (5 MB)                      | Check stored source size before download. Use a stable source object. |
+| `MEDIA_MAX_WIDTH`                | `8000`                                | Reject sources wider than this (px).                                  |
+| `MEDIA_MAX_HEIGHT`               | `8000`                                | Reject sources taller than this (px).                                 |
+| `MEDIA_MAX_PIXELS`               | `40000000` (40 MP)                    | Global decoded-pixel cap (`width × height`).                          |
+| `MEDIA_SHARP_LIMIT_INPUT_PIXELS` | `40000000`                            | Hard libvips decode guard (defense-in-depth). Must be ≤ MAX_PIXELS.   |
+| `MEDIA_AVATAR_MAX_PIXELS`        | `8000000` (8 MP)                      | Tighter cap for the synchronous avatar path. Must be ≤ MAX_PIXELS.    |
+| `MEDIA_AVATAR_CACHE_CONTROL`     | `public, max-age=31536000, immutable` | Cache-control written on public avatar derivatives.                   |
 
 Startup validation enforces `MEDIA_AVATAR_MAX_PIXELS ≤ MEDIA_MAX_PIXELS` and
 `MEDIA_SHARP_LIMIT_INPUT_PIXELS ≤ MEDIA_MAX_PIXELS`.

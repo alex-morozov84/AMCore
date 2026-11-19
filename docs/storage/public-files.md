@@ -30,7 +30,7 @@ bucket "public"    public/avatars/<user>/v-1-x/avatar-256.webp   (generated copy
 
 | Layout                                   | When to use it                                                                                              |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Two buckets** (recommended)            | Works on every provider, because publicity is a property of a whole bucket.                                 |
+| **Two buckets** (recommended)            | Use when the provider publishes whole buckets or you want separate origins.                                 |
 | One bucket, publish the `public/` prefix | Only where the provider can publish a prefix: AWS (policy), Yandex (flag **and** policy, see its page), ... |
 
 With two buckets set `STORAGE_PUBLIC_BUCKET` to the public one. The public bucket
@@ -72,9 +72,8 @@ The API serves `public/` objects itself. The unauthenticated route
 `GET /api/v1/storage/public?key=<key>` reads the object from the storage with the
 application's own credentials and streams it, so **nothing has to be public on the
 provider**: the buckets stay private, no bucket policy, public-access setting, ACL or CDN
-origin is involved. It is the only mode that works on every provider, including accounts
-that cannot publish a bucket at all (Wasabi accounts created after 2023-03-13, locked-down
-AWS organizations).
+origin is needed. Use this mode when the account cannot publish a bucket and
+the API can read the configured storage.
 
 Set `STORAGE_PUBLIC_BASE_URL` to the absolute address of that route as a browser reaches
 it, for example `https://api.example.com/api/v1/storage/public`. Public URLs then have the
@@ -92,7 +91,10 @@ form `<base>?key=public%2Favatars%2F...`. The route behaves like this:
 - it has its own limit of 600 requests per minute (burst 300) for each address, so a page
   with dozens of avatars does not hit the default limit.
 
-The price is that every public file passes through the API: bandwidth, CPU and two storage
+The route checks the key namespace. For an image-only feature, restrict which
+writers can publish and allow only generated outputs under its public keys.
+
+Every public file passes through the API: bandwidth, CPU and two storage
 requests per uncached request (a metadata `HEAD` and the `GET` of the body), both billed as
 reads by most providers. Immutable cache headers keep that low for avatars; put a CDN in
 front of the route for real traffic. Use `external` with a CDN when you can, and `api` when
@@ -103,66 +105,10 @@ The local driver always serves public files through this route and ignores
 
 ## Publish the location
 
-Replace every `<...>`. These are structural examples taken from the providers'
-documentation and were not run by the maintainers, except Yandex, which was run on
-2026-10-15. Every provider has a [page](providers/README.md) with its status.
-
-### AWS S3
-
-Keep Block Public Access and ACLs at their defaults and put CloudFront in front of
-the public bucket with **origin access control**. The bucket stays private to the
-internet and only the distribution reads it. Set `STORAGE_PUBLIC_BASE_URL` to the
-distribution domain.
-
-To publish a prefix without CloudFront, turn off _Block public access_ for that
-bucket's policy settings and attach:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadForPublicPrefix",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::<bucket>/public/*"
-    }
-  ]
-}
-```
-
-Then `STORAGE_PUBLIC_BASE_URL=https://<bucket>.s3.<region>.amazonaws.com`.
-Never grant `GetObject` on `arn:aws:s3:::<bucket>/*` in a bucket that also holds
-private files.
-
-### Yandex Object Storage
-
-Verified on 2026-10-15. Publishing a prefix on Yandex needs the bucket's public read flag **and** a
-bucket policy; the policy alone publishes nothing. The policy also changes the bucket to "closed
-unless allowed", so it must name the application account and the console. The full recipe, the
-measurements and the traps are on the [Yandex page](providers/yandex.md).
-
-### Providers that publish a whole bucket
-
-Use a separate public bucket and mark **that bucket** public:
-
-| Provider      | How to publish the bucket                                                           | `STORAGE_PUBLIC_BASE_URL`                       |
-| ------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Cloudflare R2 | Attach a custom domain to the bucket (`r2.dev` is rate-limited, development only)   | `https://assets.example.com`                    |
-| Backblaze B2  | Set the bucket type to public                                                       | `https://f<NNN>.backblazeb2.com/file/<bucket>`  |
-| Selectel      | Create a public bucket; use its public domain or a custom domain                    | `https://<bucket-uuid>.selstorage.ru`           |
-| VK Cloud      | Set the **bucket** ACL to `public-read` (no policies on this provider)              | `https://<bucket>.hb.ru-msk.vkcloud-storage.ru` |
-| Cloud.ru      | Make the bucket public (policy or `AllUsers` bucket ACL after the ownership change) | `https://<bucket>.s3.cloud.ru`                  |
-
-Do not put private files into a bucket you publish this way.
-
-### Wasabi and locked-down accounts
-
-Wasabi accounts created after 2023-03-13 cannot enable public access without a
-support request, and some organizations forbid public buckets. Then no `external`
-setup is possible. Use the [`api` mode](#api), or put a CDN with origin authentication in
-front of the bucket.
+Choose the recipe in the [provider matrix](providers/README.md). Keep a bucket
+that holds private files closed. For one bucket, publish only the `public/`
+prefix using a policy the provider supports. If your account cannot publish a
+bucket or prefix, use the [API route](#api) or a CDN with authenticated origin access.
 
 ## Verify the setup
 
@@ -174,16 +120,17 @@ Three tools cover that.
 (`STORAGE_PUBLIC_CHECK_ENABLED`, on by default; a dedicated worker skips it because the
 result depends on the deployment, not on the process). At start-up it writes two
 fixed canary objects, one under `public/` and one private. Every
-`STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS` (one hour by default) it then only reads:
+`STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS` (one hour by default) it checks whether the private canary exists using application credentials,
+then makes anonymous reads. The check can recreate missing canaries:
 
 1. The public canary must be served anonymously at `STORAGE_PUBLIC_BASE_URL` with its
-   own bytes. A 403 or 404 means nothing publishes the namespace; in `acl` mode it also
-   catches a server that accepted the ACL and ignored it.
+   own bytes. A 403 or 404 means the tested URL did not serve the canary.
+   Check the object, URL and delivery mode before changing the publication settings.
 2. The private canary must be refused (401, 403 or 404) when requested from the storage
-   API without credentials. A 2xx means the private bucket is open to everyone.
-3. With **one** bucket, the private canary must also be refused at the public base. With
-   two buckets this request would test nothing, because the private key never exists in
-   the public bucket, so the check does not make it.
+   API without credentials. A 2xx exposes the private canary at that address. Treat it as an incident and
+   determine which other objects and addresses are affected.
+3. With one bucket or the API route form, the public base must also refuse the
+   private canary. A separate bucket-root public base skips this request.
 
 The result is the metrics `storage_public_check_state` and `storage_private_exposed`
 (alerts `AMCoreStoragePublicDeliveryFailed` and `AMCoreStoragePrivateExposed`) and the
@@ -211,13 +158,13 @@ shows up as a CSP `img-src` report).
 
 ## Failure reference
 
-| Symptom                                                   | Cause                                                      | Fix                                                                                             |
-| --------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Upload fails with `AccessControlListNotSupported`         | `acl` mode on a bucket with ACLs disabled (AWS default)    | Use `external` and publish the location                                                         |
-| Upload fails with `NotImplemented` mentioning `x-amz-acl` | `acl` mode on a provider without object ACLs (R2, ...)     | Use `external`                                                                                  |
-| Upload succeeds, the image URL answers 403                | Nothing publishes `public/`, or the server ignored the ACL | Publish the location; in `acl` mode switch to `external`. The check reports `public_not_served` |
-| Alert `AMCoreStoragePrivateExposed`                       | The check read a private canary without credentials        | Treat as an incident: [runbook](../operations/runbooks/storage.md#private-exposure)             |
-| Image URL answers 404                                     | `STORAGE_PUBLIC_BASE_URL` does not map to the bucket root  | Compare the URL with the real object address; fix the base                                      |
-| Boot error naming `STORAGE_PUBLIC_BASE_URL`               | Missing base for `s3`, or `local` in production            | Set the base                                                                                    |
-| Boot error naming `STORAGE_PRESIGN_ENDPOINT`              | The value has a path (often a CDN address)                 | Use the bare S3 API origin; put the CDN in `STORAGE_PUBLIC_BASE_URL`                            |
-| Presigned URL has a wrong host (`<bucket>.<your CDN>`)    | CDN used as the presign endpoint                           | Same as above                                                                                   |
+| Symptom                                                   | Cause                                                   | Fix                                                                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Upload fails with `AccessControlListNotSupported`         | `acl` mode on a bucket with ACLs disabled (AWS default) | Use `external` and publish the location                                                                                |
+| Upload fails with `NotImplemented` mentioning `x-amz-acl` | `acl` mode on a provider without object ACLs (R2, ...)  | Use `external`                                                                                                         |
+| Upload succeeds, the image URL answers 403                | Possible policy, ACL or URL mapping issue               | Check the object, URL and delivery mode. Then correct the cause.                                                       |
+| Alert `AMCoreStoragePrivateExposed`                       | The tested address served a private canary anonymously  | Treat as an incident and determine its scope. Follow the [runbook](../operations/runbooks/storage.md#private-exposure) |
+| Image URL answers 404                                     | Possible missing object or incorrect public URL mapping | Check the object, URL and delivery mode before changing the configuration                                              |
+| Boot error naming `STORAGE_PUBLIC_BASE_URL`               | Missing base for `s3`, or `local` in production         | Set the base                                                                                                           |
+| Boot error naming `STORAGE_PRESIGN_ENDPOINT`              | The value has a path (often a CDN address)              | Use the bare S3 API origin; put the CDN in `STORAGE_PUBLIC_BASE_URL`                                                   |
+| Presigned URL has a wrong host (`<bucket>.<your CDN>`)    | CDN used as the presign endpoint                        | Same as above                                                                                                          |

@@ -35,10 +35,7 @@ Each row has **API keys** for [safe inventory and explicit revocation](member-ap
 organization and which roles give or block it; see the
 [member access explanation](member-access.md).
 
-The page uses shared FilterPanel, DataTableSurface, Table and SearchField primitives,
-with the same filter/table surfaces as the Console. The search panel precedes the
-result count and the separately framed table; no repeated visible Members heading. Desktop shows a table;
-small screens show member cards. Name/email search commits after 300 ms of idle
+The ready page shows a table on desktop and member cards on small screens. Name/email search commits after 300 ms of idle
 input. Enter and Clear commit immediately and return to page 1. Results paginate
 in groups of 20. Ready-page search and page are canonical URL parameters; search
 uses replace navigation without scrolling, so keystrokes do not add history
@@ -231,9 +228,8 @@ state is not an availability error. Confirmed access failures remain visible at
 the page boundary; failed member reads expose localized errors and retry controls.
 Role badges in this list expose existing descriptions on hover or keyboard focus,
 with a localized missing-description fallback. The descriptions remain available
-in the editor on touch devices. The editor choice region is 256 px on mobile and
-up to 400 px (bounded by 45% of viewport height) on desktop; its size stays stable
-across searches. These are reference UI choices, not headless layout requirements.
+in the editor on touch devices. Keep the choice region stable across searches; this is a reference UI choice,
+not a headless layout requirement.
 
 ## Remove a member
 

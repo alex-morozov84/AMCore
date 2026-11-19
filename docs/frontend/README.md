@@ -1,9 +1,6 @@
 # Frontend
 
-`apps/web` is AMCore's Next.js frontend/admin starter. It has the same
-production-starter shape expected from the backend: documented contracts,
-enforceable conventions, and a test surface a cold agent can extend without
-guessing.
+`apps/web` is AMCore's Next.js frontend/admin starter. Use this index to find route, UI, data, security and verification guidance.
 
 ## What's included
 
@@ -28,9 +25,6 @@ guessing.
 | [Product administration foundation](../product-admin/README.md)          | Organization selector and overview, member role assignment and confirmed removal, [member-key management](../product-admin/member-api-keys.md), account menu with profile and avatar, one-placement integration and custom headless UI; product-domain screens remain downstream-owned                                                 |
 | [Organization foundation UI](./organization-context.md)                  | Selected organization overview, ordered identity/authority lifecycle and custom mounts                                                                                                                                                                                                                                                 |
 | [Capability catalogue and access hints](../auth/capability-catalogue.md) | Authorable actions, current-employee status and actual-record decisions for future role editors and domain UI                                                                                                                                                                                                                          |
-
-This index is the public entry point for the current frontend starter surface;
-see `architecture-and-conventions.md`'s "See also" section for related guides.
 
 ## Start here
 

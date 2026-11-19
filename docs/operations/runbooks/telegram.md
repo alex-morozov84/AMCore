@@ -3,7 +3,8 @@
 Each worker (`PROCESS_ROLE=worker` or `all`) with `TELEGRAM_BOT_TOKEN` set asks Telegram
 `getMe` once a minute through `TELEGRAM_API_BASE_URL`, the same address the notification
 delivery uses. The request has no recipient and changes nothing. A successful check proves that
-this worker reached Telegram (or the relay) and the bot token was accepted. It does not prove
+the configured endpoint answered this worker's token check successfully. Interpret a relay's
+answer only after verifying that you control the relay and it forwards to Telegram. The check does not prove
 that a message was delivered, and it does not check incoming messages (the webhook).
 
 The worker publishes the result as `amcore_telegram_reachability_state{state}`; exactly one
@@ -17,8 +18,9 @@ state is 1:
 | `stale`   | The worker's own last check is older than 210 seconds: the check stopped.         |
 | `none`    | No check finished since the worker started.                                       |
 
-Without a token the metric does not exist. The optional Operations Console shows the same
-results on **Integrations** → **Telegram**.
+Without a token the metric does not exist. In the optional Operations Console,
+**Integrations** → **Telegram** summarizes stored worker results for the current
+Telegram configuration. To check one worker, use the metric with its `instance` label.
 Delivery of the alert itself needs your own receiver configuration in Alertmanager or the
 downstream monitoring system.
 
@@ -41,8 +43,7 @@ max without (state) (amcore_telegram_reachability_state{state=~"failed|unknown|s
    find its cause in firewall and security group rules, DNS, an outbound proxy and the address
    itself. If the hosting provider blocks Telegram, run a relay **that you control** and set
    `TELEGRAM_API_BASE_URL`; never use a public Bot API mirror, because the token travels in every
-   request. See the relay rules and the leaked-token steps in
-   [Notifications](../../notifications/README.md).
+   request. See [Relay and leaked credentials](#relay-and-leaked-credentials).
 3. If the network check succeeds but the metric stays `failed`, check both the token and the
    request address (step 4): the metric does not distinguish their failures. With the optional
    Operations Console, **Telegram or the relay did not accept the bot token** identifies a token
@@ -66,3 +67,39 @@ monitoring, not by this metric.
 normal start produces a result within about a minute. Check that the worker runs the scheduler
 (`PROCESS_ROLE=worker` or `all`) and the worker logs for start-up errors; with the optional
 Console, **Scheduled jobs** shows whether **Telegram check** runs.
+
+## Relay and leaked credentials
+
+Set the same `TELEGRAM_API_BASE_URL` and `TELEGRAM_BOT_TOKEN` for the API,
+workers and setup job. The web role uses these values to match worker results.
+Workers and the setup job send requests to the configured address. The relay
+must forward them to the official Bot API. Use infrastructure you control.
+
+**Only point this at infrastructure you control.** The bot token travels in the
+URL path of every request, so whoever terminates TLS on the relay gets full
+control of the bot (read/send messages, change the webhook). Never point it at
+a third-party or public Bot API mirror.
+
+If the token was ever sent to such a mirror, treat it as leaked, together with the
+webhook secret (`setWebhook` sent it through the same address) and the messages that
+passed through it (handle those under your incident process). Do these steps in this
+order, and start nothing with the new token before step 2 is done everywhere:
+
+1. In BotFather, revoke the token and generate a new one
+   ([Telegram: generating a token](https://core.telegram.org/bots/features#generating-an-authentication-token)).
+2. Replace the untrusted `TELEGRAM_API_BASE_URL` with the official API (remove the
+   variable; the default is `https://api.telegram.org`) or a relay you control, in every
+   place that uses it: the API server, every worker or `all` process, and the one-shot job
+   or container that runs `telegram:setup`. If your hosting blocks Telegram, have your own
+   relay running before this step. If your platform restarts a process as soon as a
+   variable changes, change the address first: a restart with the old, revoked token is
+   harmless.
+3. Set the new `TELEGRAM_BOT_TOKEN` and a new `WEBHOOK_TELEGRAM_SECRET` in the same places,
+   in one change where your platform allows it; a restart between the two is harmless,
+   because the address is already trusted.
+4. Start or restart those processes.
+5. If you use the webhook, register it again
+   ([Telegram webhook registration](../deployment.md#telegram-webhook-registration-one-shot-optional)).
+
+Before starting any process with the replacement token, verify that its configured
+Bot API address points to the official API or your trusted relay.

@@ -10,13 +10,17 @@ With the optional [Operations Console](../operations-console/integrations.md), t
 Integrations page shows the registered service without page or controller changes.
 Add its display text to the message catalogues as described in step 3.
 
-Use this for services such as a payment provider or a CRM sync. It reports state. It does
-not edit settings and it does not run checks when the page is read.
+Use this for services such as a payment provider or a CRM sync. Reading status
+does not edit settings or call the outside provider. A reader may make a bounded
+read of stored state or its technical dependency, as the queue reader does.
 
 ## Register a reader
 
 You need a module that already owns the service your reader uses. In the example it is
-`CrmModule`, which exports `CrmStatusService`. Your own names will differ.
+`CrmModule`, which exports `CrmStatusService`. This illustrative service returns
+validated required settings when enabled. If your service can be enabled with
+missing settings, map that state to `not_configured` before using this example.
+Your own names and service contract will differ.
 
 1. **Write a reader and a module for it.** The reader is a singleton provider with
    `read(signal)`; `signal` is an `AbortSignal` that is aborted after the 1.5-second row
@@ -97,7 +101,7 @@ You need a module that already owns the service your reader uses. In the example
    code your reader returns (here `timeout`). `failureFor.<id>.<code>` is shown for your row
    only and wins over the shared `failure.<code>`, which every row uses; never change a shared
    `failure.<code>` text for your own meaning, because other rows show it too. Once you add a key to
-   one catalogue, add it to all of them: a mismatch fails a test. For a bilingual product treat the keys as required. The catalogue is
+   one catalogue, add it to all of them: a mismatch fails a test. The catalogue is
    nested JSON; the path below is relative to `apps/web` (the repository rule calls it
    `messages/en.json`):
 
@@ -114,12 +118,14 @@ You need a module that already owns the service your reader uses. In the example
    ```
 
 The configured backend imports the composition list at startup; you do not call
-`IntegrationsModule.register(...)` yourself (tests do). Restart the API. The integration appears in
+`IntegrationsModule.register(...)` yourself (tests do). Build/deploy the changed
+API and message catalogues through your normal workflow, then restart the API.
+A restart alone does not compile source or publish frontend catalogues. The integration appears in
 `GET /api/v1/admin/integrations`. A test runs this exact example:
 `apps/api/src/core/admin/integrations/integrations-guide-example.spec.ts`.
 
 To remove an integration your product does not need, delete its entry from the composition
-list and restart the API. It then has no status item and the registry no longer imports
+list and deploy/restart the changed API. It then has no status item and the registry no longer imports
 `CrmIntegrationModule`. Your own module (`CrmModule`) is not touched; if the registry was
 the only place that imported it, import it where it belongs. Delete the reader files and the
 messages yourself if you no longer need them.
@@ -146,6 +152,10 @@ the probe `action` together. `action` only reports whether the button may be use
 read); the send itself, `run`, has its own deadline from the policy. One failing or slow
 reader never hides the others. A negative or fractional number is not a valid fact. The
 registry does not log why a reading was rejected, so check your reading with a test.
+The timeout aborts the signal and bounds the row response. It does not forcibly
+cancel reader work. One physical read stays in flight until it settles; honor the
+signal and use bounded dependency reads. No-provider-I/O is a reader contract,
+not a network sandbox enforced by the registry.
 
 ### Evidence
 
@@ -187,7 +197,7 @@ reviewed addition to `INTEGRATION_SCOPES` in `packages/shared`, with its message
 
 ## Add an operator probe
 
-A probe is an action the operator starts. v1 supports one kind, `operator_email_test`,
+A probe is an action the operator starts. The registry supports one kind, `operator_email_test`,
 which sends a fixed message to the operator's own verified address. A registration
 cannot supply a recipient, URL, subject, text or command. To add a new kind, add it to
 `INTEGRATION_PROBE_KINDS` in `packages/shared`, with its copy, its admission strategy and
@@ -282,10 +292,11 @@ and read the list. Assert that your reading passes the schema and that it contai
 secret. Two assertions that are worth copying:
 
 ```ts
-// POLICY, attemptId, store and port are your own test fixtures
-// the reading shows no secret
+// POLICY, attemptId, store and port are your own test fixtures.
+// Configure the reader fixture with this same obviously fake secret first.
+const fixtureSecret = '<fake-crm-secret>'
 const text = JSON.stringify(await registry.list('operator'))
-expect(text).not.toContain(process.env.CRM_API_KEY!)
+expect(text).not.toContain(fixtureSecret)
 
 // the declared policy reaches the admission (fake store, as in email-test.probe.spec.ts)
 const strict = { ...POLICY, operatorCooldownSeconds: 120 }
@@ -299,8 +310,8 @@ pnpm --filter api test -- src/core/admin/integrations
 
 ## Rules to keep
 
-- A reader never calls the service. Run the check elsewhere and let the reader report its
-  stored result: a scheduled job (see [Scheduled jobs](scheduled-jobs.md)), a worker, or your
+- A reader never calls the outside provider. Run provider checks elsewhere and
+  let the reader report their stored result: a scheduled job (see [Scheduled jobs](scheduled-jobs.md)), a worker, or your
   service after each sync. The reader only reads what they stored.
 - Never put a key, token, URL, address or provider message into a reading, a log or an
   audit record.

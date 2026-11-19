@@ -60,7 +60,8 @@ Both links open Audit with the user's identity and event types already selected,
 for the same last-31-day interval. Choose an earlier interval in Audit to look
 further back. The interval is a search limit, not an event retention period.
 Ordinary sign-in attempts are not recorded in Audit. Password confirmation
-recording is best-effort, and some early refusals create no event. An empty
+recording is best-effort, and some early refusals create no event. A recorded
+password confirmation does not prove completion of required second-factor proofs. An empty
 result does not establish that no sign-in or password confirmation occurred.
 
 No linked accounts is a valid setup fact. If the service fails, the page shows
@@ -90,8 +91,8 @@ keys do not authorize these actions. You can also help your own account.
 2. Check the stored recipient and link lifetime in the confirmation. You cannot
    edit the address. A new link cancels the previous link of the same type,
    even when the subsequent email fails. The other type is unaffected.
-3. Select **Send email**. If asked, enter **your own password**. Cancelling the
-   password dialog prevents continuation. The recipient chooses their new
+3. Select **Send email**. Complete your required password and second-factor
+   confirmation if prompted. Cancelling the confirmation prevents continuation. The recipient chooses their new
    password or confirms their address through the email; you cannot do either
    for them.
 
@@ -150,10 +151,11 @@ MFA-protected credentials also require the current security version.
 They do not receive the ordinary token exception. MFA activation requires the separate
 [deployment procedure](../auth/mfa-deployment.md).
 
-If the password is wrong, your account has no password, or the request fails,
-the role change does not complete. The Console shows an error and leaves the
-displayed role unchanged. See [system roles](../auth/rbac.md#layer-1--system-roles)
-for the authorization rules.
+A confirmed authentication or authorization refusal prevents the role change.
+A lost response, timeout or service error can leave its outcome unknown: refresh
+the current user state before another deliberate action, never replay blindly.
+The displayed role alone does not prove that an uncertain request failed. See
+[system roles](../auth/rbac.md#layer-1--system-roles) for authorization rules.
 
 ## Manage sessions
 
@@ -172,12 +174,14 @@ until completion. Session controls keep their existing loading guards.
 2. To end one session, open its row menu and choose **Revoke session**;
    confirm. To end every active session for that user at once, choose
    **Revoke all sessions** in the card header.
-3. If asked, enter **your own password** to verify this sensitive action.
+3. Complete your required password and second-factor confirmation if prompted.
 
-Revoking blocks that session's future refresh immediately. An access token
-already issued before the revoke can remain valid until it expires (typically
-within minutes) — the user is not forced out mid-request, but cannot silently
-continue past that point. The Console cannot revoke your own sessions this
+Revocation retires the logical session family and blocks future refresh. Browser
+and protected credentials also require current family/account authority on later
+protected requests; do not promise access until JWT expiry. The ordinary
+independent-client token exception remains bounded by its expiry. Already admitted
+work may finish. See [session admission](../auth/mfa-foundation.md#session-admission).
+The Console cannot revoke your own sessions this
 way; opening your own detail page shows a note pointing to the product's own
 Settings → Sessions page instead.
 

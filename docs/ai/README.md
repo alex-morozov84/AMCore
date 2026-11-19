@@ -57,27 +57,9 @@ The key-less `mock` provider works out of the box for local development. For the
 seeded Claude default, set `ANTHROPIC_API_KEY=<your-key>` and restart the
 API/worker.
 
-A minimal text run — create a conversation, queue a run, then refetch durable
-state (this is not token streaming; poll `GET /ai/runs/:id` or subscribe to the
-status-only stream, then refetch):
-
-```bash
-CONV_ID=$(curl -s -X POST /ai/conversations \
-  -H 'Authorization: Bearer <user-jwt>' -H 'Content-Type: application/json' \
-  -d '{"title":"Support question"}' | jq -r '.id')
-
-RUN_ID=$(curl -s -X POST /ai/runs \
-  -H 'Authorization: Bearer <user-jwt>' -H 'Content-Type: application/json' \
-  -d "{\"conversationId\":\"$CONV_ID\",\"inputParts\":[{\"type\":\"text\",\"text\":\"Summarize my options.\"}],\"idempotencyKey\":\"demo-001\"}" \
-  | jq -r '.id')
-
-curl /ai/runs/$RUN_ID -H 'Authorization: Bearer <user-jwt>'
-curl /ai/conversations/$CONV_ID/messages -H 'Authorization: Bearer <user-jwt>'
-```
-
-In a real client, generate from the OpenAPI contract or use the shared Zod
-schemas rather than string-building JSON. Multimodal input (`artifact_ref`) is in
-[Artifacts](./artifacts.md).
+Follow [Create a conversation and run](runs.md#create-a-conversation-and-run)
+for the API base URL, bearer token, and status and transcript checks.
+See [Artifacts](artifacts.md#upload-and-use-an-artifact) to attach an image or PDF.
 
 ## Normal product flow
 
@@ -98,22 +80,11 @@ requires fresh auth and a bounded reason, and is fail-closed audited. Privileged
 assistant/operator surfaces **reject API keys** — use bearer sessions. See `/docs`
 for exact shapes; each guide documents the semantics that matter.
 
-## Current scope & deferred work
+## Current scope
 
-Shipped: persistence/contracts, gateway/catalog runtime, durable runs, guardrails,
-tools/approvals, assistant registry, human takeover, and multimodal image/PDF
-artifacts.
-
-Deferred, additive follow-ons: provider/model/policy admin HTTP surface and UI;
-operator role/assignment/org-shared support inbox; bot-initiated handoff and a
-realtime control console; per-assistant guardrail policy; image generation and
-non-image/PDF file artifacts; provider Files API, artifact retention/GC, and
-RAG/embeddings; OCR, malware scanning, DLP/moderation, and visual
-prompt-injection scanning.
-
-Until provider/model/policy admin ships, customize the model catalog through seed
-data or explicit migrations. Assistant management is already available via the
-assistant registry API.
+Configure models and providers through seed data or explicit migrations.
+Manage assistants through the [assistant registry API](assistants.md).
+Downstream products supply their own assistant UI and operator workflows.
 
 ## See also
 

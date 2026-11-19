@@ -8,9 +8,9 @@ Thanks for your interest in contributing. This document explains how to set up t
 
 1. **Clone and install** — See [README → Quick Start](README.md#quick-start) for prerequisites, clone, `pnpm install`, Docker, and migrations.
 2. **Environment** — Copy `.env.example` to `.env` at the repository root.
-   That file configures `apps/api`. `apps/web` does not read this root `.env`: export
-   `WEB_FRONTEND_CONTEXT_KEY` and `REDIS_URL` in your shell
-   ([README → Quick Start](README.md#quick-start)). There is no separate `apps/web/.env.example`.
+   That file configures `apps/api`. Web does not read root `.env`: export
+   `WEB_FRONTEND_CONTEXT_KEY` and `REDIS_URL` in the shell, as described in
+   [README Quick Start](README.md#quick-start). There is no separate `apps/web/.env.example`.
 3. **Run locally** — `pnpm dev` starts API and web in development mode.
 
 See [the lint policy guide](packages/eslint-config/README.md) for engine ownership,

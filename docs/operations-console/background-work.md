@@ -2,11 +2,10 @@
 
 [Operations Console](README.md) → Background work
 
-Background work shows what is waiting in the application's background queues:
-emails to send, wake-up signals for notifications and AI runs, and any queue your
-own code adds. Open it when something feels late, for example "emails are slow",
-and you want to know whether work is piling up, stuck behind a pause, or cannot
-be read at all. Registered work also exposes safe job diagnostics and the actions
+Background work shows queue state and registered database-owned tasks. Use it
+to investigate delayed work, a pause or unavailable observations. Queue counts
+and business outcomes are separate: notification and AI wake queues do not show
+the complete delivery or run backlog. Registered work also exposes safe job diagnostics and the actions
 its policy supports: pause, resume, retry, cancel and cleanup. Unsupported actions
 show a reason. The [queue board](queue-board.md) remains read-only; controlled
 actions belong to the native Console.
@@ -14,8 +13,11 @@ actions belong to the native Console.
 Jobs that run on a schedule, such as nightly cleanups, are on
 [Scheduled jobs](scheduled-jobs.md).
 
-Console access requires a current platform `SUPER_ADMIN`. API keys cannot read
-this screen, and an organization role does not grant access. The page is at
+Console access requires a current personal platform `SUPER_ADMIN` session under
+the [current MFA protocol](../auth/mfa-foundation.md). API keys cannot read this
+screen, and an organization role does not grant access. Controlled actions also
+require current personal reauthentication; follow
+[account security](account-security.md), not a password-only legacy shortcut. The page is at
 `/admin/background-work` in path mode and at `/background-work` on the Console
 host. With several served languages a locale prefix comes first (for example
 `/en/admin/background-work`); with one language there is none.
@@ -49,15 +51,15 @@ If a section fails, its older data and error remain visible and a page-level
 partial-refresh notice explains that the timestamp does not certify that section.
 The status icon describes data availability, not worker activity.
 
-| Column            | What it means                                                                                                                                                                                                                                                                                     |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Queue             | A readable name, the technical name (for example `email`), and what the queue is for.                                                                                                                                                                                                             |
-| State             | **Paused** or **Not paused**. A queue with nothing in it also says **Empty**. A queue that could not be read says **Unavailable**.                                                                                                                                                                |
-| Waiting           | Jobs ready to run but not yet taken. This includes jobs with a priority.                                                                                                                                                                                                                          |
-| Active            | Jobs a worker is running right now.                                                                                                                                                                                                                                                               |
-| Delayed           | Jobs scheduled for later, including jobs waiting to be retried. Delayed work is normal and not a problem on its own.                                                                                                                                                                              |
-| Failed            | Failed jobs that are still kept. A queue trims old failures by age and count (by default the last 1,000, for 24 hours), but only when other jobs finish, so a quiet queue can keep older ones, and a job can carry its own setting. This is not a lifetime total and not a strict 24-hour window. |
-| Oldest queued job | How long ago the oldest queued job was created, rounded down, shown as "At least …". It is a lower bound, not the time the job has been waiting.                                                                                                                                                  |
+| Column            | What it means                                                                                                                                                                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Queue             | A readable name, the technical name (for example `email`), and what the queue is for.                                                                                                                                                                           |
+| State             | **Paused** or **Not paused**. A queue with nothing in it also says **Empty**. A queue that could not be read says **Unavailable**.                                                                                                                              |
+| Waiting           | Jobs ready to run but not yet taken. This includes jobs with a priority.                                                                                                                                                                                        |
+| Active            | Jobs a worker is running right now.                                                                                                                                                                                                                             |
+| Delayed           | Jobs scheduled for later, including jobs waiting to be retried. Delayed work is normal and not a problem on its own.                                                                                                                                            |
+| Failed            | Retained failed jobs, not a lifetime total. Managed registration owns the age policy and keeps at most1,000 failures when trimming runs. Trimming occurs when jobs finish, so a quiet queue can retain older failures. External queues follow their own policy. |
+| Oldest queued job | How long ago the oldest queued job was created, rounded down, shown as "At least …". It is a lower bound, not the time the job has been waiting.                                                                                                                |
 
 A dash means "not measured". Nothing is ever shown as zero when the queue could
 not be read.
@@ -281,11 +283,8 @@ Attempt timestamps explicitly label Started and Finished, even when both round
 to the same displayed second. Registered boolean values display Yes/No; empty
 technical values do not produce an empty disclosure.
 
-**Not paused** means the queue is not paused; it does not prove a worker
-is running. **Paused** prevents workers taking another job,
-while already active work can finish and the application can continue adding jobs.
-Some kinds of work do not support queue-wide pause/resume; this is a capability
-restriction, not a fault. Individual job actions are also policy-dependent.
+Use the queue state and capability explanations above; action eligibility is
+checked again when the captured command is admitted.
 
 Choose eligible jobs. The batch action buttons appear after you select a job.
 When there is only one available page, pagination is hidden. While a job list
@@ -462,9 +461,9 @@ the same copy control as other Console details. Captured versions and execution
 identities are available under Technical details; they still travel in the
 command and remain part of stale-state validation.
 
-Each job has one manual retry, separate from automatic attempts. A retry that
-has already been requested remains unavailable while its grant is reserved; a
-spent grant cannot authorize another manual start. Never create a replacement
+Retry follows the captured work's [policy](#controlled-actions), not a universal
+guarantee for every job. A reserved grant cannot authorize a second request;
+a spent grant cannot authorize another manual start. Never create a replacement
 command when the previous administrative outcome is unknown.
 
 The required reason is an operator explanation recorded in strict audit. It
@@ -496,9 +495,7 @@ notification wake card only shows processing signals. Those signals reduce dispa
 latency; a periodic database scan recovers when signals are absent or lost.
 Notification email is sent directly by this delivery worker, without a second
 email queue job. The email queue serves separate, explicitly queueable emails.
-This separation is the production architecture, not a preview-only fixture.
-Counts describe the database
-backlog and show `+` when the10000-row bound is reached. Choose the registered
+Counts describe the database backlog and show `+` when the10000-row bound is reached. Choose the registered
 channel filter and a state. Native states distinguish delivered, skipped and cancelled
 rows within Completed. Open one **Attempt history** disclosure to inspect the
 latest16 attempts; list reads never fetch every row's history. Dates use the existing

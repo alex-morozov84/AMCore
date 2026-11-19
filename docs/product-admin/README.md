@@ -38,12 +38,12 @@ project choices before generating consumers.
 
 Choose the public path alias or separate admin host with the
 [placement and sessions guide](placement-and-sessions.md). Path mode shares the
-website session; host mode isolates staff login. The default login is
-`/ru/manage/login`; a separate admin host exposes `/ru/login`.
+website session; host mode isolates staff login. For Russian in a multi-locale build, login is
+`/ru/manage/login`; a separate admin host exposes `/ru/login`. Single-locale
+builds omit the locale prefix.
 
 The ready routes, menus, recovery, invitations and email destinations use that
-source placement. The sidebar keeps icons when collapsed and places the website
-link at the bottom. The header retains the
+source placement. The header retains the
 [account menu with profile and avatar editing](account-menu-and-profile.md).
 
 See [integration](integration.md) for custom-shell, nonhierarchical and headless

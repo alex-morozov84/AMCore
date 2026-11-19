@@ -20,14 +20,12 @@ bucket.
 
 ## Publish the public files
 
-MWS has dropped object ACLs (the documentation calls them deprecated) and supports bucket policies
-and IAM roles. Use the default `external` mode and publish with a **bucket policy** on a separate
+The retained provider material describes object ACLs as deprecated and describes
+bucket policies and IAM roles. Confirm current support in your account. Use the default `external` mode and publish with a **bucket policy** on a separate
 public bucket. Do not use `acl` mode.
 
-Publishing only `public/` in one bucket with a prefix policy is **not verified** on MWS. A policy
-alone may not publish anything: on Yandex an AWS-shaped prefix policy published nothing until a
-second setting was added (see [Yandex](yandex.md#2-publishing-a-prefix-needs-the-bucket-flag-and-the-policy)).
-If you try it, run `storage:check`; if the public check fails, use a separate public bucket.
+The single-bucket prefix layout remains unverified. Use the separate public
+bucket above unless you verify the narrower policy in a test account.
 
 ## Limits to know
 
@@ -35,5 +33,4 @@ If you try it, run `storage:check`; if the public check fails, use a separate pu
 
 ## Sources
 
-- [MWS: using the AWS CLI](https://mws.ru/docs/s3/util-awscli.html)
 - [MWS blog post (Habr)](https://habr.com/ru/companies/mws/articles/979254/)

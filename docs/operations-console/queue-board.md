@@ -22,7 +22,8 @@ browser never receives an API token.
 | Host mode                     | `https://<console-host>/api/bull-board`         |
 | Direct to the API (see below) | `https://<api-host>/api/v1/admin/queues/`       |
 
-The addresses have no trailing slash; the web server redirects one that has it.
+The Console addresses are canonical without a trailing slash; the web server
+redirects a trailing slash. The direct API entry above uses its mounted root.
 A queue's page is `…/queue/<name>`, for example `…/queue/email`; a job's is
 `…/queue/<name>/<job-id>`. You can bookmark them. A page always carries a **READ-ONLY** mark in
 its header, including when you open it from a bookmark.
@@ -40,14 +41,14 @@ Only a current platform `SUPER_ADMIN`. An organization role does not grant acces
 are rejected. The check runs on **every** request the page makes (page, assets and data), against
 the database, not a cache.
 
-| What happens                                          | When the board stops answering                                                                            |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| You sign out of the Console                           | At once for new requests. A tab that is already open keeps what it shows and its next refresh is refused. |
-| Your sessions are revoked from somewhere else         | On the next request: current family/browser authority is checked before access.                           |
-| Your access token expires while your session is valid | Never visibly: the Console renews it.                                                                     |
-| You are demoted from `SUPER_ADMIN`                    | On the next request.                                                                                      |
-| You are promoted to `SUPER_ADMIN`                     | After your next sign-in. Refresh never upgrades an earlier USER credential to administrator.              |
-| Your account is deleted                               | On the next request.                                                                                      |
+| What happens                                          | When the board stops answering                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| You sign out of the Console                           | At once for new requests. A tab that is already open keeps what it shows and its next refresh is refused.                 |
+| Your sessions are revoked from somewhere else         | On the next request: current family/browser authority is checked before access.                                           |
+| Your access token expires while your session is valid | The Console attempts normal refresh. Revocation, failed verification or unavailable dependencies can still refuse access. |
+| You are demoted from `SUPER_ADMIN`                    | On the next request.                                                                                                      |
+| You are promoted to `SUPER_ADMIN`                     | After your next sign-in. Refresh never upgrades an earlier USER credential to administrator.                              |
+| Your account is deleted                               | On the next request.                                                                                                      |
 
 Both Board credentials require current family, account security version and verified
 browser binding. Family revocation or browser replacement refuses the next request;
@@ -73,12 +74,13 @@ guide. That message appears only when the API confirmed that this is the cause. 
 cannot be opened for any other reason, Background work says that it could not be opened and does
 not suggest a setting.
 
-### `BULL_BOARD_READ_ONLY` has been removed
+<a id="bull_board_read_only-has-been-removed"></a>
 
-Earlier versions let `BULL_BOARD_READ_ONLY=false` turn on retry, promote, clean and remove. That
-option is gone, and so is the ability. The variable is **ignored whatever its value**; the API
-logs one warning at start while it is still set (the warning event is
-`bull_board.legacy_read_only_flag_ignored`). Delete it from your environment.
+### Remove the ignored variable
+
+Delete `BULL_BOARD_READ_ONLY` from the process environment. Its value is ignored;
+it cannot enable mutations. If it remains set, startup logs
+`bull_board.legacy_read_only_flag_ignored`.
 
 Use the native [Background work controls](background-work.md) for supported actions. They require
 confirmation and record administrative intent and receipts; the board remains a separate view.
@@ -163,7 +165,7 @@ names, tokens or free text, and add tests like those beside the shipped ones.
 
 ## Related
 
-- [Background work](background-work.md): counts and states of every queue, without job details.
+- [Background work](background-work.md): queue summaries, safe job diagnostics and policy-controlled actions.
 - [Configuration and deployment](configuration.md): topology, edge and session settings.
 - [Email security](../email/security.md): what is allowed in a queue.
 

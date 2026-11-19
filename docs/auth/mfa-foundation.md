@@ -157,8 +157,10 @@ JWT admission checks current primary account, family and actual private browser
 binding before constructing privileges. Refresh keeps the same family and account
 version. It rotates the token row and preserves both proof identities and
 verification times. Issuance also records a conservative retention boundary; it
-does not extend authentication proofs. A changed family or browser returns terminal `409 SESSION_CHANGED`;
-it cannot select another credential or become an automatic refresh retry.
+does not extend authentication proofs. Refresh or sensitive admission can return
+terminal `409 SESSION_CHANGED`. Browser JWT request admission instead reports
+`401 AUTH_CONTEXT_CHANGED` for changed authority. Neither result permits
+selecting another credential or entering automatic refresh retry.
 Sensitive and command admission uses the signed family, even after refresh rotates
 or removes a historical token row. That row cannot become an alternative authority.
 

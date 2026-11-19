@@ -138,9 +138,8 @@ PASS  public delivery and private exposure
 PASS  delete many and cleanup
 ```
 
-We also made a deliberate mistake to prove the alarm works. With an extra statement that let `*`
-read the whole bucket, the private test file answered 200 without signing in, and the check
-reported `private_exposed`. See the [runbook](../../operations/runbooks/storage.md#private-exposure).
+An anonymous read of the private canary is an exposure. If the check reports
+`private_exposed`, follow the [runbook](../../operations/runbooks/storage.md#private-exposure).
 
 ## Recipe: `acl` mode (executed 2026-10-15)
 
@@ -181,8 +180,9 @@ the presigned address used the `<bucket>.storage.yandexcloud.net` host, and that
 ## Cost
 
 Yandex bills requests and storage. A full `storage:check` makes a modest number of requests and
-writes one multipart file of a few megabytes, then deletes everything. Check the
-[current prices](https://yandex.cloud/ru/docs/storage/pricing) before you schedule it. The
+writes a 6 MiB multipart test file. It checks cleanup of temporary objects and
+keeps two diagnostic canaries. Check [current prices](https://yandex.cloud/ru/docs/storage/pricing)
+before running this on-demand check. The
 application's own periodic checks are listed in the [configuration guide](../configuration.md).
 
 ## Clean up after a test

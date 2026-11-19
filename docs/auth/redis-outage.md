@@ -26,7 +26,7 @@ never lets it through "just in case".
 | API key or invitation failure counters     | Yes: abuse counters                   | `503` with its own message, as before                     |
 | Public routes that never touch Redis       | No                                    | Work                                                      |
 
-Only the personal user check lost its Redis dependency. A handler, the rate limiter and other
+The personal user check reads the primary database without Redis. A handler, the rate limiter and other
 protections that use Redis keep their own behavior.
 
 Admission and OAuth refusals use this body. "Exact" below means the same `errorCode` and `message`;
@@ -99,10 +99,6 @@ connection and capacity, not as guarantees:
 
 - Target: a stall is noticed within about 3.3 s; after the cause clears, requests succeed again
   within about 3.5 s, or up to about 8.5 s when stalls repeat within 30 s.
-- Observed in the probe prototype (injected faults, one machine): recovery from 0.1 to 2.95 s, and
-  4.17 s for the repeated-stall case.
-- Asserted by the production tests: the supervisor serves again within 4.5 s of a stall clearing,
-  and the whole API serves an organization request again within 12 s of Redis resuming.
 - No recovery promise applies while Redis stays down or when retirement capacity is exhausted;
   requests keep getting the fast `503`.
 
@@ -119,16 +115,12 @@ session vault store, the session lock factory and the refresh. The lock factory 
 invitation owner lease, so that lease runs on the supervised connection too: a held lease still
 answers "busy", an unreachable connection is a temporary failure, and acquisition waits at most 3 s.
 Every other web-server Redis record store (invitation, MFA and OAuth attempt records, Console return
-entries) stays on the shared connection. The 3 s admission budget does not cover them. In the
-real-stack check an invitation link opened during an 8 s stall answered after about 8.4 s and then
-opened the flow normally, with no membership created. The owner lease's own 3 s limit does not
-change that: it caps only the lease step, not the page. The check looked at the membership only,
-so other records the flow creates were not examined. A product-administration OAuth sign-in started
-during the same stall also waited and then signed in. When the stall begins after a healthy start,
-at the moment the provider returns the browser, the callback goes straight to the API: the one-time
-state step is refused fast, the browser lands on the sign-in page with a provider error, no backend
-session is created, and starting the sign-in again after recovery works. Other pages that use these
-stores were not measured.
+entries) stays on the shared connection. The 3 s admission budget does not cover them. An invitation page or a sign-in
+start can therefore wait longer than 3 s even when the owner lease is bounded.
+Do not apply the vault-admission budget to the whole page or to all MFA/OAuth
+record work. A callback's API state step has its own bound, but an unavailable
+shared store elsewhere can delay the surrounding flow. After an uncertain
+callback result, start sign-in again rather than replaying its one-use work.
 
 **What a request sees.** Session admission has one absolute budget of 3 s: vault read, the
 browser-binding check and, when a refresh is needed, waiting for the refresh. Nothing starts once the
@@ -178,10 +170,9 @@ nothing else: no navigation, no data and no operator identity. The page is not a
 discloses one fact. A request that carries any non-empty value in the session cookie, even an invented
 one, can see the temporary page and learn that the Console route exists. A request without a cookie
 still gets the plain `404`. After recovery the ordinary denial returns for absent, invented and
-non-operator sessions, and an authorized `SUPER_ADMIN` gets the Console again. This was verified for
-the path-mode Console. In host mode the Console host gave the same temporary refusal to copied
-product and staff cookies and to an invented cookie, and still answered a request without a cookie
-as it does in a healthy system.
+non-operator sessions, and an authorized `SUPER_ADMIN` gets the Console again. Host mode uses its separate Console cookie and the same distinction between
+no cookie and a non-empty unverified cookie during vault unavailability.
+Copied product/staff cookies do not become Console authority.
 
 **What to watch in the web server.** It logs `Vault Redis client generation replaced` with the reason,
 `Vault Redis alert` (with the same alert names as the API list below; lines that start with `Vault Redis` come from the web server, lines that start with `Auth Redis` from the API) and `Vault Redis client error`. It exports no metric for this connection and

@@ -69,9 +69,7 @@ CLAUDE.local.md
 !/.claude/
 /.claude/*
 !/.claude/skills/
-/.claude/skills/*
-!/.claude/skills/amcore-data-patterns
-!/.claude/skills/amcore-fork-update
+!/.claude/skills/**
 
 # Local Prisma generated client (will be in node_modules)
 generated/

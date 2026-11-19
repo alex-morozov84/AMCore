@@ -117,13 +117,18 @@ returns `preview: null`, `disclosure: "unavailable"`; retained legacy approvals
 have `disclosure: "legacy"`. Stored preview evidence is preserved. Responses are
 `private, no-store` and never expose raw arguments or the private envelope.
 
-Submit the exact hash returned for the displayed action:
+Set `API_BASE` to the API URL including `/api/v1`. Set `USER_JWT` to the
+owner's bearer token and `APPROVAL_ID` to the selected approval ID.
+Set `INTENT_HASH` to the exact `intentHash` returned for the displayed action.
+Keep the token out of logs.
 
 ```bash
-curl -X POST /ai/approvals/<approval-id>/decision \
-  -H 'Authorization: Bearer <owner-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/approvals/${APPROVAL_ID}/decision" \
+  -H "Authorization: Bearer ${USER_JWT}" \
   -H 'Content-Type: application/json' \
-  -d '{"decision":"approve","intentHash":"<displayed-intent-hash>"}'
+  --data-binary @- <<JSON
+{"decision":"approve","intentHash":"${INTENT_HASH}"}
+JSON
 ```
 
 `reject` also requires that hash; a bounded optional `reason` is supported. Missing

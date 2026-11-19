@@ -4,9 +4,8 @@ AMCore is closed to search engines by default. A product with public pages opens
 production deployment and exactly the pages it chooses. A product without public pages, such as
 an internal tool or a CRM, does nothing and stays closed.
 
-This guide tells you what to do, why each rule exists, how to check it, and what breaks if you
-ignore it. Rules are labelled **enforced** (a test or the start-up check fails when it breaks) or
-**convention** (nothing fails; the guide and review are the control).
+Rules labelled **enforced** have a test or startup check. Rules labelled
+**convention** rely on review.
 
 Paths such as `src/app/…` are relative to `apps/web`; message catalogues are
 `apps/web/messages/<locale>.json`.
@@ -180,8 +179,8 @@ check that they match.
    Google's Rich Results Test. Links from a public page to the login or application pages need no
    `nofollow`: those pages are `noindex`.
 
-6. **Test it if you want a browser test.** `e2e/mocked/seo-headers.spec.ts` covers the closed
-   defaults. A product adds its own test for its public pages.
+6. **Verify the public page.** Use [Verify](#verify) on your deployment.
+   The starter’s `e2e/mocked/seo-headers.spec.ts` covers the closed defaults.
 
 ## Make a page private
 
@@ -328,10 +327,22 @@ changed environment):
 ```bash
 AMCORE_STAND_WEB_SITE_ORIGIN=https://shop.example.test \
 AMCORE_STAND_WEB_SEO_INDEXING=enabled pnpm stand up
-pnpm stand status                      # prints the stand's product URL, used as $STAND below
-curl -sI -H 'Host: shop.example.test' $STAND/en/pricing | grep -i x-robots-tag    # nothing: open
-curl -sI -H 'Host: other.example.test' $STAND/en/pricing | grep -i x-robots-tag   # noindex, nofollow
+pnpm stand status
 ```
+
+Set `STAND` to the product URL printed by `pnpm stand status`. Set `PUBLIC_PATH`
+to an actual public page in your product for the configured locale. The starter
+ships with an empty public-page list.
+
+```bash
+curl -sSI -H 'Host: shop.example.test' "${STAND}${PUBLIC_PATH}"
+curl -sSI -H 'Host: other.example.test' "${STAND}${PUBLIC_PATH}"
+```
+
+Both requests must succeed and return HTTP 200. On the site host, expect no
+`X-Robots-Tag` header. On the other host, expect `X-Robots-Tag: noindex, nofollow`.
+A connection error, redirect or other status does not confirm the result.
+This check covers the HTTP header only. Use the checks below for HTML metadata.
 
 Without the stand, set both variables and `WEB_TRUSTED_ORIGINS` yourself on a production build and
 use the same `-H 'Host: …'` trick. See [local stands](../operations/local-stands.md).
@@ -368,7 +379,7 @@ curl -s -A 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.h
 # 5. Googlebot must receive the tags inside <head>, even when generateMetadata is slow.
 curl -s -A 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' \
   https://shop.example.com/en/pricing |
-  sed 's#</head>.*##' |
+  awk '{ end = index(tolower($0), "</head>"); if (end) { print substr($0, 1, end - 1); exit } print }' |
   grep -oE '<(link rel="(canonical|alternate)"|meta name="robots")[^>]*>'
 ```
 

@@ -4,8 +4,9 @@ AMCore's backend API is bearer-first. Most routes authenticate with an explicit
 `Authorization: Bearer ...` header, so they are not vulnerable to classic CSRF:
 an attacker's page cannot cause the browser to invent that header.
 
-For direct `apps/api` browser consumers, the only ambient browser credential is
-the `refresh_token` cookie. The bundled Next.js app (`apps/web`) adds a second
+For direct `apps/api` browser consumers, the ordinary refresh credential is
+the `refresh_token` cookie. OAuth and restricted browser flows also use
+short-lived binding and continuation cookies. The bundled Next.js app (`apps/web`) adds a second
 browser boundary of its own: the browser holds an opaque `amcore_session` cookie
 for `apps/web`, while the backend access/refresh tokens live in the web
 server's Redis session vault (ADR-068). That shifts CSRF protection for
@@ -14,12 +15,16 @@ same-origin `/api/*` web calls to the browser→Next layer; see
 
 ## What is actually in scope
 
-Cookie-backed browser surfaces are intentionally narrow:
+The legacy refresh-cookie and queue surfaces include:
 
 - `POST /auth/logout`
 - `POST /auth/refresh`
 - `POST /auth/oauth/exchange`
 - Bull Board at `/admin/queues` (view-only, `GET`/`HEAD` only)
+
+OAuth state, publication, MFA and invitation flows have additional browser-bound
+contracts. This list is not a complete cookie inventory. Follow the owning
+[OAuth](oauth.md), [MFA](mfa-foundation.md) and [invitation](invites.md) guides.
 
 The backend refresh cookie is `httpOnly` and `SameSite=Strict`, so browsers do
 not send it on normal cross-site requests. That is the primary CSRF layer for
@@ -55,20 +60,15 @@ AMCore adds a narrow `Origin` / `Referer` check on the cookie-auth POST endpoint
   `Referer`.
 - If both are absent, the request is allowed by design.
 
-This allow-on-missing policy is a deliberate, **frontend-agnostic** choice, not a
-Next.js-specific one. CSRF is a browser-only threat: it relies on the browser
-auto-attaching the cookie, and browsers always send `Origin` on cross-origin POST
-(and on same-origin non-GET). It follows that:
+The missing-header branch applies only to direct requests without the confidential
+frontend proof. It supports native, CLI and server-to-server integrations.
+Missing headers do not establish that a caller is not a browser. Do not use
+this branch as a general browser-security guarantee.
 
-- A **plain React / SPA** frontend always sends `Origin` on its API calls, so the
-  check fully enforces and the "both absent" branch is never reached.
-- A request that carries the cookie but **no** `Origin`/`Referer` is necessarily a
-  non-browser caller — SSR server-to-server, native/mobile, or CLI. Those cannot
-  mount CSRF (they don't ride a victim's ambient cookie), so allowing them removes no
-  protection, while blocking them would only break legitimate clients.
-
-The enforced guarantee is therefore: **any browser cross-origin POST must come from an
-allowlisted origin** — which is exactly the situation where cookie-CSRF is possible.
+Malformed headers and the literal `Origin: null` are rejected. A proved frontend
+request must resolve to that frontend's exact origin; it cannot use the
+missing-header branch. Bundled browser mutation contracts can be stricter still.
+Keep SameSite, exact origins and each flow's browser binding together.
 
 ## Invitation browser mutations
 

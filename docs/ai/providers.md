@@ -4,9 +4,8 @@ AMCore uses a DB-backed provider/model catalog plus env-based credentials. The
 catalog is seeded so a fresh fork sees the intended shape without storing any
 secret in the database.
 
-Provider/model/policy admin HTTP endpoints are intentionally deferred to the
-future admin-console phase. Until then, customize providers/models through seed
-data or explicit Prisma/data migrations.
+Configure providers and models through seed data or explicit Prisma/data
+migrations. The assistant registry manages assistant versions.
 
 ## Seeded Catalog
 
@@ -94,8 +93,7 @@ The supported conformance entry point is
 It uses the actual provider list seam, primary PostgreSQL catalogue and installed
 SDK adapters with fake fetch; it verifies frozen wire identity, live secret
 rotation, revocation-before-fetch, slot refusal and bounded accounting. Extend it
-for a new family rather than only mocking an adapter's return value. Keep the
-PR3 receipt, endpoint, cache-degradation and shutdown tests as well:
+for a new family rather than only mocking an adapter's return value. Also keep the receipt, endpoint, cache-degradation and shutdown coverage:
 
 ```bash
 pnpm --filter api test:e2e --runTestsByPath \
@@ -151,8 +149,8 @@ Fallback has one physical PG load, 64 detachable waiters, a 2 s caller budget,
 at most one new start per second and 1 s reuse of a healthy result. A caller's
 exhausted selection budget or catalogue overflow returns HTTP 503 with
 `catalogue_unavailable`, without dispatching a provider request. A caller's
-abort never cancels another waiter. No remaining waiter, invalidation or shutdown
-prevents further application queries and cache fills. A generation token captured
+abort never cancels another waiter. The loader stops starting queries and cache fills when no waiters remain,
+when invalidated, or during shutdown. A generation token captured
 before loading and Redis Lua compare-and-set prevent an old fill from undoing a
 successful invalidation. Failed cross-process invalidation retains ordinary soft
 TTL staleness; fresh primary execution permission still applies.
@@ -169,7 +167,7 @@ The application-owned `ModelGateway.generateObject(request, schema)` capability 
 the public AI SDK `generateText` with `Output.object`. SDK types stay inside the adapter.
 The successful result type is `AiObjectResult<Exclude<T, null | undefined>>`.
 The entire validated result must be present: root `null` and `undefined` produce
-non-retryable `output_validation_failed`. This is an intentional extension-contract change.
+non-retryable `output_validation_failed`.
 Nullable and optional fields inside a result remain governed by its schema. Non-nullish
 branches of nullable schemas, supported unions, arrays and transforms remain supported.
 A nullable schema is not rejected merely because one branch permits root null.

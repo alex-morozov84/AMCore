@@ -9,9 +9,9 @@ TypeScript checks types separately. Shared retains its ESM and CommonJS exports.
 Use the declared Node and pnpm versions and install frozen dependencies:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm --filter @amcore/shared build
-pnpm --filter api db:generate
+pnpm install --frozen-lockfile &&
+pnpm --filter @amcore/shared build &&
+pnpm --filter api db:generate &&
 pnpm --filter api build
 ```
 
@@ -35,12 +35,9 @@ Direct package commands require the shared build above. The E2E preparation
 receipt covers Prisma generation and shared outputs; it does not prove API
 JavaScript freshness. Build API explicitly before consuming its compiled output.
 
-Configure the documented environment before starting a process:
-
-```bash
-pnpm --filter api start
-pnpm --filter api start:prod
-```
+Configure the documented environment, then choose one command:
+`pnpm --filter api start` to use the current environment, or
+`pnpm --filter api start:prod` to set `NODE_ENV=production`.
 
 Both commands execute `dist/main.js`. Production does not run Nest CLI, tsx or a
 compiler. Keep API `package.json` with `type: module` beside its `dist` directory;
@@ -67,10 +64,10 @@ graph; it does not inherit this API build or move client generation to rollout.
 Use [managed local development](../operations/local-stands.md) when another
 checkout runs or ordinary environment files point at remote resources. For a
 manually configured local environment, `pnpm --filter api dev` runs stock
-`nest start --watch`. The root `pnpm dev` builds shared first (Turborepo `dev`
-depends on `^build`), then starts API and web; web needs the shell exports in the
-[README Quick Start](../../README.md#quick-start). When you start packages separately, run
-`pnpm --filter @amcore/shared build` first.
+`nest start --watch`. Root `pnpm dev` builds shared before dependent dev
+processes through `dependsOn: ["^build"]`. Web requires the shell exports in
+[README Quick Start](../../README.md#quick-start). For separate package starts,
+run `pnpm --filter @amcore/shared build` first.
 
 Nest/SWC's development checker reports diagnostics asynchronously. A listening
 HTTP endpoint or a restarted process does not prove a fresh TypeScript 7 check.

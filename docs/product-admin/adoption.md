@@ -31,8 +31,7 @@ organization selection. Registration alone grants no staff membership.
 
 The ready composition demonstrates the shell, organization selection and management
 modules. The custom composition demonstrates a fixed company and a different visual
-style. The existing host and invitation fixtures cover independent
-sessions and recipient consent; they do not require a third example product.
+style.
 
 A hidden selector still uses the backend organization model. Use the
 [trusted setup](organization-establishment.md) or
@@ -94,12 +93,18 @@ An empty membership list permits creation only when policy allows it. One member
 opens that organization; `?view=list` retains explicit selection. Several memberships
 show the selector. Every selected page still checks current membership and authority.
 
+The custom shop, member, role and invitation generators require `"mode": "path"`
+in `packages/shared/src/config/product-admin.json`. For host placement, use the
+[ready host recipe](placement-and-sessions.md#configure-or-move-the-administration-area).
+Do not change a real host deployment to run these examples.
+
 The custom shop demonstration (`node scripts/fixtures/organization-shop-headless.mjs
 --preview`) needs a single-language product without the Operations Console: one locale in
 `locales.json` and `"mode": "disabled"` in `admin-console.json`. The generator stops with
-an error when you pass `--preview` and the build is configured otherwise. Run it
-without that flag. It creates a disposable directory itself, prepares the custom code
-there and prints the directory and the commands to run.
+an error when you pass `--preview` and the build is configured otherwise. For other selected builds, omit
+`--preview`. This relaxes only the locale/Console requirements; product-admin
+path mode is still required. The generator creates a disposable directory, prepares the custom
+code there and prints the directory and commands to run.
 
 The fixed ID in a generated demonstration is not a production setup mechanism.
 For a real product, substitute your trusted organization ID in the server mount.
@@ -158,5 +163,6 @@ never raw credentials, response/DOM attachments or secret-bearing errors. Mail/t
 fixtures retain their stricter step-free list reporter without HTML. Keep one-time
 secrets in memory, acknowledge/clear them, and close every credential-bearing page safely.
 
-Use `pnpm stand down --id custom-team` to stop the preview while retaining its data.
-Delete owned demo data only deliberately with the documented `--purge` command.
+Stop the preview with `pnpm stand down --id <preview-id>`, replacing the placeholder
+with the exact ID used to start that preview. Use the ID printed by the generator
+when applicable. Add `--purge` only when deliberately deleting that preview's owned data.

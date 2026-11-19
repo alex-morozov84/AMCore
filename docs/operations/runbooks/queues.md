@@ -24,7 +24,7 @@ for 30m) or `AMCoreQueueBacklogPage` (>1000 for 15m) is firing. Both already
 gate on the queue not being deliberately paused
 (`amcore_queue_paused{queue=...} == 0`) — see [Paused](#paused) below.
 
-**Likely causes, ranked:**
+**Possible causes:**
 
 1. Worker throughput has genuinely dropped (fewer worker replicas, worker
    crash-looping, or a slow downstream dependency the job handlers call into).
@@ -47,9 +47,10 @@ gate on the queue not being deliberately paused
    a healthy producer surge shows `active` keeping pace with `waiting`; a
    worker-throughput problem shows `active` flat or falling while `waiting`
    climbs.
-3. Check whether `worker`/`all`-role process replica count and health look
-   normal (container/pod status) — a drop in worker count is the single most
-   common cause.
+3. Check the `worker`/`all` process replicas and health. For the shipped `default`
+   queue, first confirm that the product registered a business worker: the starter
+   only observes this external queue. More stock worker replicas do not add its
+   missing handler.
 4. If handler failures are suspected, check [Dead-letter](#dead-letter) below
    for a correlated rise in dead-lettered jobs on the same queue.
 
@@ -75,7 +76,7 @@ organization's on-call process.
 **Symptom:** `AMCoreQueuePausedUnexpected` is firing (`{{ $labels.queue }}`
 has been paused for at least a minute).
 
-**Likely causes, ranked:**
+**Possible causes:**
 
 1. Someone paused the queue deliberately through the shared control API (the queue
    board is view-only and cannot pause) and this alert is a confirmation, not a
@@ -122,7 +123,7 @@ be a non-event.
 `AMCoreOutboxBacklogPage` (above 500 for 15m) is firing, for either the
 `notifications` or `ai-runs` source (`{{ $labels.source }}`).
 
-**Likely causes, ranked:**
+**Possible causes:**
 
 1. The dispatcher for that source is falling behind real load.
 2. The metrics collector for the underlying gauge (`amcore_notification_delivery_due`
@@ -172,11 +173,11 @@ escalate per your organization's on-call process.
 
 ## Dead-letter
 
-**Symptom:** `AMCoreQueueDeadLetterTicket` (any dead-letter signal) or
+**Symptom:** `AMCoreQueueDeadLetterTicket` (increase greater than 0 over 15 minutes) or
 `AMCoreQueueDeadLetterBurstPage` (>10 signals in 5m) is firing for
 `{{ $labels.queue }}`.
 
-**Likely causes, ranked:**
+**Possible causes:**
 
 1. A single email job exhausted its retries, a notification delivery became
    permanently failed, or a notification/AI-run wake job failed its one
@@ -186,10 +187,18 @@ escalate per your organization's on-call process.
 
 **Diagnostic steps:**
 
-1. Query directly:
+1. Use the query for the alert that fired. Both alerts have `for: 0m`.
+
+   **Ticket** checks for an increase greater than 0 over 15 minutes:
 
    ```promql
-   increase(amcore_queue_events_total{event="dead_letter"}[5m])
+   increase(amcore_queue_events_total{event="dead_letter"}[15m]) > 0
+   ```
+
+   **BurstPage** checks for an increase greater than 10 over 5 minutes:
+
+   ```promql
+   increase(amcore_queue_events_total{event="dead_letter"}[5m]) > 10
    ```
 
 2. Branch on the `queue` label and structured event. For `email`, the view-only
@@ -207,13 +216,18 @@ escalate per your organization's on-call process.
 
 **Mitigation:**
 
-- If isolated: fix or discard the durable row/job data according to the
-  queue-specific event; do not assume every signal has a Bull Board record.
-- If a burst: identify the shared cause (a handler bug, a downstream
-  dependency outage during the burst window) and fix that. Manually retry a
-  retained BullMQ job with the BullMQ API through your controlled operational
-  tooling, only while the job remains valid (the Bull Board is view-only);
-  durable notification/AI work is recovered by its dispatcher cron.
+- Identify the queue or durable work and inspect its safe failure reason,
+  retained effect evidence and command receipt. A dead-letter signal does not
+  prove that no external effect occurred or that a Bull Board record remains.
+- Correct the cause before considering another attempt. For supported registered
+  work, use [Background work controls](../../operations-console/background-work.md#controlled-actions)
+  or their shared authenticated API with captured identity/revision, current
+  personal reauthentication and a reason. Retry must pass that work's policy;
+  unknown or accepted effects are not made retryable by a broker failure.
+- Do not use raw BullMQ retry/remove or direct database edits to bypass policy,
+  lifetime grants or strict audit. Read an uncertain command's existing receipt;
+  do not create a replacement command. Database recovery polling does not grant
+  unlimited business retries or erase provider uncertainty.
 
 **Escalation:** `Ticket` (any single signal) — inspect the queue-specific
 record while available, but not urgent otherwise. `Page` (>10 in 5m) means a
@@ -226,11 +240,15 @@ process.
 `amcore_ai_run_admission_total{outcome="lease_lost"}` is rising, or a run ended
 `tool_effect_unknown` / `tool_state_inconsistent`.
 
-**What the system guarantees:** a worker holds a run only through a lease. A
-worker that stalls past it is replaced, and its late writes are refused (they show
-as `lease_lost`); the reaper requeues or ends the run. A run is never left
-`running` forever: a lost lease is reclaimed within the reaper interval plus the
-lease length (10 minutes).
+**Recovery boundary:** a worker holds a run through a 10-minute lease. Guarded
+writes from an expired or replaced lease are refused. A ready recovery worker
+with database access examines expired leases in bounded batches and requeues or
+ends runs according to their deadline, attempts and effect state.
+
+Lease expiry alone does not update a row or prove that a provider call stopped.
+A worker/database outage, contention or a recovery backlog can delay reclamation;
+there is no unconditional 10-minute wall-clock completion guarantee. Check the
+scheduled recovery result and database availability before assuming it ran.
 
 **Diagnostic steps:**
 

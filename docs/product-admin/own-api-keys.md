@@ -5,7 +5,7 @@ see [placement and sessions](placement-and-sessions.md).
 
 Use **My API keys** to give your integration a personal, organization-bound key.
 You must sign in. You can inspect and revoke your own keys after losing membership.
-The first ready creation form requires current full team administration.
+The ready creation form requires current full team administration.
 Other organization members can create their own keys through the bearer API or custom UI.
 An administrator cannot issue a personal key for someone else.
 

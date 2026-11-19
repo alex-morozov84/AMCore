@@ -6,19 +6,26 @@ from run input by id; bytes never ride inside JSON content parts.
 
 ## Upload and Use an Artifact
 
+Set `API_BASE` to your API URL including `/api/v1` (for example,
+`http://localhost:5002/api/v1` if your API listens on port 5002).
+Set `CONV_ID` to your conversation ID and `USER_JWT` to its owner’s token.
+Use a synthetic local `invoice.pdf`. Confirm the upload returns an artifact ID
+before creating the run.
+
 ```bash
 ARTIFACT_ID=$(
-  curl -s -X POST /ai/conversations/<conversation-id>/artifacts \
-    -H 'Authorization: Bearer <owner-jwt>' \
-    -F 'file=@./invoice.pdf;type=application/pdf' | jq -r '.id'
-)
+  set -o pipefail
+  curl -fsS -X POST "${API_BASE}/ai/conversations/${CONV_ID}/artifacts" \
+    -H "Authorization: Bearer ${USER_JWT}" \
+    -F 'file=@./invoice.pdf;type=application/pdf' | jq -er '.id | strings | select(length > 0)'
+) &&
 
-curl -X POST /ai/runs \
-  -H 'Authorization: Bearer <owner-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/runs" \
+  -H "Authorization: Bearer ${USER_JWT}" \
   -H 'Content-Type: application/json' \
   --data-binary @- <<JSON
 {
-  "conversationId": "<conversation-id>",
+  "conversationId": "${CONV_ID}",
   "inputParts": [
     { "type": "text", "text": "Summarize this PDF." },
     { "type": "artifact_ref", "artifactId": "$ARTIFACT_ID" }
@@ -28,11 +35,16 @@ curl -X POST /ai/runs \
 JSON
 ```
 
-Repeating the request with the same `idempotencyKey` and the same `inputParts`
-(artifact ids and their order included) returns the original run — even after the
-artifact has since been bound, consumed or the run finished — and binds nothing
-again; the same key with different parts is `409 AI_RUN_IDEMPOTENCY_CONFLICT`
-(see [Runs](./runs.md#idempotent-creation)).
+If the upload fails or returns no ID, the block skips run creation. If the
+upload outcome is unclear, it may already have stored the file. Resolve that
+outcome before deciding whether to upload again.
+
+Repeat the same `idempotencyKey` and ordered `inputParts` after a lost
+response. If the conversation still admits AI runs, the API returns the
+existing run without binding the artifact again. After human takeover or
+closure, replay of a run that still exists returns an admission conflict
+(`409`). A matching archived request returns `410 AI_RUN_ARCHIVED`.
+See [Idempotent creation](runs.md#idempotent-creation) for conflict handling.
 
 An artifact-only run input is valid:
 

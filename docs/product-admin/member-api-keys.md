@@ -3,7 +3,7 @@
 Use **Organizations → Members → member menu → API keys** to inspect and revoke
 integration credentials. The caller must currently belong to the selected
 organization and have full TeamAccess. A live SUPER_ADMIN still needs membership
-for these new routes. A role named ADMIN is not itself an authorization check.
+for these routes. A role named ADMIN is not itself an authorization check.
 The Operations Console is separate and is not needed for this interface.
 
 ## Inspect and revoke
@@ -16,10 +16,6 @@ The Operations Console is separate and is not needed for this interface.
    organization-scoped set. Review the confirmation; Cancel changes nothing.
 4. Confirm the permanent action. Consumers using revoked keys cannot authenticate
    on subsequent verification. Requests already admitted may finish.
-
-The dialog keeps a stable height while filters and pages load. Card-shaped skeletons
-replace the results; the shared pager stays in the footer. Status labels combine
-text and icons with semantic colors: unexpired, expired and revoked.
 
 Unexpired describes lifecycle, not effective access. Owner membership, current
 permissions, scopes and route admission still apply. Last use is approximate and
@@ -76,7 +72,7 @@ User/organization deletion can cascade sooner. Audit has separate retention.
 
 ## API contract
 
-All new routes below require a personal bearer credential and selected org
+All routes below require a personal bearer credential and selected org
 context. API-key authentication is rejected even for SUPER_ADMIN-owned keys.
 Base: `/api/v1/organizations/:orgId/members/:userId/api-keys`.
 
@@ -189,7 +185,3 @@ BFF uses session binding, strict Origin on mutations, runtime schemas and privat
 when supplying your own layout. Shared primitives and contracts remain usable when
 Console is disabled. [Integration](integration.md) and
 [extension rules](extending-modules.md) explain placement and ownership.
-
-The Members row menu also offers [confirmed member removal](organization-members.md#remove-a-member).
-Its warning is unconditional. Removal and permanent key revocation commit together;
-there is no separate partially completed revoke step.

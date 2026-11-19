@@ -2,8 +2,9 @@
 
 Open **Access** on a row of the Members tab to see what one person can do in this organization and
 **why**: which roles give each ability, where roles add up to more than any one of them, and which deny
-rule takes something away. The server works it out from the same rules, normalization and decisions it
-uses to authorize, so the explanation cannot describe a policy the API would not apply.
+rule takes something away. The server uses the same policy normalization and decision rules as authorization.
+The result distinguishes exact record decisions from configured policy; it does not
+predict every handler's additional checks.
 
 The view is read-only. It changes nothing and writes no audit entry.
 
@@ -131,8 +132,7 @@ The ready screens call `GET /api/product-access/organizations/:id/members/:userI
 organization reads (`{binding, data}`, `private, no-store`). A custom screen can use the same hook and
 render the response however it likes.
 
-The ready dialog keeps its header and footer in place while the body scrolls. It lists what the person can
-do, what is configured for some records and what is blocked, grouped by area; what no role gives is
+The ready dialog lists what the person can do, what is configured for some records and what is blocked, grouped by area; what no role gives is
 collapsed under "Not allowed", and "Not evaluated" is its own group. A configured row shows each area with
 its roles, the limits by cause and, when it cannot prove the reading it needs, says so. A note states that
 configured access is not a check of a specific record. "Why" names the roles that allow, restrict and block

@@ -13,7 +13,7 @@ operations a starter needs without tying application code to one cloud.
 
 ## S3-Compatible Driver
 
-The S3 driver speaks the S3 API, so it targets any S3-compatible provider. Each
+The S3 driver speaks the S3 API, so it can target providers that support the operations your product uses. Each
 provider has a page with its settings, how to publish `public/`, and its status:
 see the [provider matrix](providers/README.md). Yandex Object Storage was verified
 on 2026-10-15. Every other cloud provider is provider-documented only: the
@@ -75,10 +75,10 @@ There is no open `GET /storage/objects/*` route. A generic bearer-auth route
 would allow any authenticated user to fetch any private object by key.
 
 Instead, `StorageDownloadService` is an unauthorized primitive. Feature
-controllers must perform ownership/scope checks first, then call:
+controllers must perform ownership/scope checks first, then return the Nest-managed file:
 
 ```ts
-await storageDownload.streamObject(key, response)
+return storageDownload.streamObject(key, response)
 ```
 
 This keeps authorization close to the domain that owns the object.
@@ -97,9 +97,8 @@ read time. For public avatars, AMCore stores `User.avatarKey` and computes `avat
 use versioned keys under `public/avatars/{userId}/v-{version}/`, so a published
 URL is immutable and can be cached safely.
 
-To move to another provider or CDN, copy all objects with their keys unchanged
-(`public/...` keeps its prefix), then set the new `STORAGE_PUBLIC_BASE_URL`. Responses
-use the new host at once: no stored URL needs rewriting.
+Follow [Moving providers or a CDN](migration.md) to preserve keys, verify the copy and
+switch all consumers. AMCore derives new public URLs from the active configuration.
 
 ## Media Processing
 

@@ -10,76 +10,30 @@
 
 ## Overview
 
-[Operator MFA](docs/auth/mfa-browser.md) supports authenticator apps and one-use
-backup codes. [Deployment and recovery](docs/auth/mfa-deployment.md) require
-separate activation approval. The mechanism is account-owned; see
-[extending MFA to other users](docs/auth/mfa-foundation.md#extend-mfa-to-other-users).
+AMCore is a backend-first starter for SaaS products, internal tools and AI-enabled
+applications. It combines a NestJS API, a Next.js frontend and shared TypeScript
+contracts in one pnpm workspace.
 
-[Create an organization for another person](docs/product-admin/organization-provisioning.md) through Console or the protected API, with invitation recovery.
+The API includes authentication, organizations, scoped API keys, storage, media,
+notifications, background work and AI capabilities. The frontend provides localized
+sign-in flows, shared UI, theming and reusable organization administration.
+Product-specific screens and business rules belong to your product.
 
-**Building your own product from a fork of this starter?** Read the note “Building a product from
-this starter?” at the end of [Quick Start](#quick-start) first: fork identity, then the build
-settings (served languages, Operations Console, product administration), then the first deploy.
-The rest of Quick Start runs the starter itself.
-For repository choice, release support and subsequent updates, use
-[Create and update a product](docs/operations/updating-a-fork.md).
-If AMCore helps your project, consider giving it a star on GitHub.
+The optional [Operations Console](docs/operations-console/README.md) serves
+platform operators with `SUPER_ADMIN` access. It is separate from
+[product administration](docs/product-admin/README.md).
+[Operator MFA](docs/auth/mfa-browser.md) needs separately approved
+[deployment and recovery](docs/auth/mfa-deployment.md).
 
-AMCore is a production-oriented application starter for building secure, modular
-SaaS products, internal tools, and AI-enabled systems. The reusable surface is
-backend-first: a NestJS API foundation with strong application and security
-primitives, broad tests, and a completed production-readiness baseline,
-including a documented [production deploy
-profile](docs/operations/production-deploy-profile.md) (build-once/
-promote-by-digest, staging/production GitHub Environments). Specific hosting
-targets and CD credentials remain adopter-specific.
+**Creating a product?** Start with [Create and update a product](docs/operations/updating-a-fork.md).
+No supported starting release exists yet; older tags and this branch's Quick Start
+are not a supported product base. The Quick Start below runs the starter for evaluation.
 
-The repository also contains a Next.js frontend/admin starter workspace. It now
-ships the frontend foundations a downstream product should inherit rather than
-recreate: locale-routed UI, localized API/form errors, design tokens with
-light/dark/system theme support, FSD boundaries, lint-enforced styling
-guardrails, a shadcn/Base UI Sidebar app shell, BFF/Token-Handler auth with
-the full email/password reference flow (login, register, forgot/reset
-password, email verification/resend) plus an active-sessions screen, and
-documented hooks for consuming media, notifications, and AI through the BFF.
-Feature-specific admin surfaces remain intentionally product-owned.
-For downstream data loading, start with the [server display, interactive Query
-and domain-rule recipes](docs/frontend/api-consumption.md#data-ownership-for-interactive-pages).
+Start with [Quick Start](#quick-start), or use the [documentation map](docs/README.md)
+to find a specific task.
 
-The optional [Operations Console](docs/operations-console/README.md) is a
-separate `SUPER_ADMIN` control plane. It ships **Overview** for
-recorded problems with diagnostic links, instance readiness, deployment identity, local resource snapshots and storage probe interval editing, **Background work** safe diagnostics and audited queue/job controls, **Scheduled jobs** recorded results of periodic jobs, **Integrations** safe state of outside services and a self-addressed test email, **Users** inventory, sign-in setup diagnostics, verification/recovery mail, system-role changes and session revocation, **Organizations** inventory, first-admin provisioning, and bounded **Audit** browsing. Path/host topology,
-isolated host sessions, deployment guidance, and a
-safe extension recipe are included. Session views show parsed devices and
-approximate IP locations; see [session management](docs/operations-console/users.md#manage-sessions)
-and [GeoIP setup](docs/operations/geoip-setup.md). It is not a product backoffice or a
-catalog/content admin UI.
-
-The [background-work registration contract](docs/backend/background-work.md) connects
-managed producers, worker handlers and policy-aware diagnostics/control through one
-registration. Its backend recipes remain usable without the optional frontend.
-The [notification delivery adapter](docs/notifications/control.md) adds durable
-pause state, conservative provider evidence and one lifetime manual retry grant.
-
-The retained [runtime settings foundation](docs/backend/settings.md) provides
-code-owned typed ordinary configuration, revision-checked writes with atomic audit,
-and API/worker adoption without restart. It survives Console frontend removal.
-
-The [product administration foundation](docs/product-admin/README.md) includes a
-minimal [organization selector and read-only context
-overview](docs/frontend/organization-context.md), separate from Operations Console.
-Its headless lifecycle and ready blocks can be mounted in a downstream shell;
-member lists, atomic multi-role assignment and the
-[invitation management and recipient journey](docs/product-admin/invitations.md)
-are reusable with ready pages and replaceable presentation. A
-[role definitions API](docs/product-admin/role-definitions.md) saves a whole custom role
-atomically; the ready Roles tab (list and role page) uses it, and product-specific screens
-remain downstream-owned. [Member API keys](docs/product-admin/member-api-keys.md) provides scoped inventory,
-explicit single/all revocation and permanent invalidation on member removal.
-[Confirmed member removal](docs/product-admin/organization-members.md#remove-a-member) includes identity review, permanent-key warning and unknown-result inspection.
-The API also publishes a bounded [implemented-action catalogue and access
-hints](docs/auth/capability-catalogue.md) for future product role editors and
-record controls. Catalogue metadata never grants a permission.
+Production deployment requires your own infrastructure, secrets, endpoint checks
+and release approval. The included guides and templates do not certify your target.
 
 ## Backend Starter Capabilities
 
@@ -119,22 +73,12 @@ record controls. Catalogue metadata never grants a permission.
 
 ### Product Modules
 
-The [product administration foundation](docs/product-admin/README.md) ships the
-organization selector, read-only overview and headless integration points.
-[My API keys](docs/product-admin/own-api-keys.md) provides personal creation,
-one-time secret display and owner-wide inventory/revocation.
-Product-specific domain modules remain downstream-owned; forks can add their
-bounded areas without inheriting an unrelated sample domain.
-
-[Adopt product administration](docs/product-admin/adoption.md) covers shop,
-CRM/ERP and SaaS recipes, clean fork initialization and a custom cosmic interface
-over the same headless operations.
-
-The [capability catalogue](docs/auth/capability-catalogue.md) describes only
-implemented actions and supported permission presets. Selected organization
-context provides current-employee and actual-record access hints for UI decisions;
-the API still checks each operation. The ready organization overview shows the
-verified team-access status without adding a role editor.
+Start with [product administration adoption](docs/product-admin/adoption.md) to
+choose ready pages or custom UI. Read [placement and sessions](docs/product-admin/placement-and-sessions.md)
+before choosing path or host login. Then use the
+[integration guide](docs/product-admin/integration.md) for your composition.
+The [feature reference](docs/product-admin/README.md) covers organizations, members,
+roles, invitations and API keys. Add your domain modules downstream.
 
 ## Tech Stack
 
@@ -153,30 +97,13 @@ verified team-access status without adding a role editor.
 
 ## Project Structure
 
-```
-amcore/
-├── apps/
-│   ├── api/        # NestJS backend — see apps/api/README.md
-│   └── web/        # Next.js frontend (FSD)
-├── packages/
-│   ├── shared/     # Zod schemas, types, constants (used by api + web)
-│   ├── eslint-config/
-│   └── typescript-config/
-├── docs/
-│   ├── backend/        # Backend module boundaries and extension conventions
-│   ├── frontend/       # Frontend architecture, i18n, theme, and guardrails
-│   ├── product-admin/   # Organization access, member roles and downstream integration
-│   ├── auth/           # Authentication & authorization documentation
-│   ├── ai/             # AI capability layer (assistants, runs, tools, artifacts, providers, security)
-│   ├── email/          # Email extension contract (templates, queueing, secret-bearing sends)
-│   ├── notifications/  # Versioned notifications, channel registration, durable dispatch, realtime SSE, preferences
-│   ├── media/          # Image derivative/media processing documentation
-│   ├── operations-console/ # SUPER_ADMIN console usage, configuration, deployment, and extension
-│   ├── operations/     # Deployment, observability, security, and production runbooks
-│   └── storage/        # File storage documentation
-├── docker/         # Caddy edge profile; Postgres/local-files backup/restore and restore-drill scripts and the DB role-separation SQL; the optional Prometheus/Grafana/Alertmanager monitoring profile
-├── scripts/        # Fork init (init:brand), repo-security setup, dependency-freshness, the observability-contract CI checks
-└── .github/        # CI, Dependabot, issue/PR templates, and a non-active deploy workflow template
+```text
+apps/api/       NestJS API and worker
+apps/web/       Next.js frontend
+packages/shared/  Shared schemas, types and configuration
+docs/           Task guides and references
+docker/         Deployment and recovery configuration
+scripts/        Repository and operator tools
 ```
 
 Root also carries `docker-compose.yml` (the reference full stack) and
@@ -189,45 +116,17 @@ The backend starter includes the core application, security, and operations
 primitives needed for a product-grade API. Production deployment still requires
 adopter-owned infrastructure, secrets, environments, and capacity choices.
 
-| Area                                                         | Start here                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| All docs by intent                                           | [`docs/README.md`](docs/README.md) — the documentation map                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Backend architecture                                         | [`apps/api/README.md`](apps/api/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Add a backend module                                         | [`docs/backend/architecture-and-conventions.md`](docs/backend/architecture-and-conventions.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Frontend architecture                                        | [`docs/frontend/architecture-and-conventions.md`](docs/frontend/architecture-and-conventions.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Add frontend search                                          | [`docs/frontend/search/README.md`](docs/frontend/search/README.md) — local filtering, URL-backed discovery, and shared search APIs                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Frontend guardrails                                          | [`docs/frontend/fsd-boundaries-and-guardrails.md`](docs/frontend/fsd-boundaries-and-guardrails.md) — layer/import rules, token-only styling and the banned inline `style` prop, CSS Modules                                                                                                                                                                                                                                                                                                                                                                      |
-| Theming, design tokens & contrast                            | [`docs/frontend/brand-theme-and-tokens.md`](docs/frontend/brand-theme-and-tokens.md) — token architecture, light/dark/system modes, the automated WCAG AA contrast test, and the downstream rebrand checklist                                                                                                                                                                                                                                                                                                                                                    |
-| Shared UI and shadcn                                         | [`docs/frontend/shared-ui-and-shadcn.md`](docs/frontend/shared-ui-and-shadcn.md) — reusing `shared/ui`, safely adding shadcn primitives, adapting generated output to the lint/i18n/token contract                                                                                                                                                                                                                                                                                                                                                               |
-| Frontend testing                                             | [`docs/frontend/testing.md`](docs/frontend/testing.md) — Vitest/MSW, Storybook, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Integrate product administration pages or custom headless UI | [Product administration foundation](docs/product-admin/README.md) — organization creation, selector and overview, trusted first-ADMIN setup and one-placement integration, and custom headless UI; member roles, confirmed removal and member-key inventory/revocation with ready and custom headless UI                                                                                                                                                                                                                                                         |
-| Operations Console                                           | [`docs/operations-console/`](docs/operations-console/README.md) — using Overview, Background work (diagnostics and safe controls), Scheduled jobs (results of periodic jobs), Integrations (outside services and a test email), user and organization details, Users sign-in setup, verification/recovery mail, role management, session viewing/revocation and Audit browsing; topology, session security, deployment, verification, and extension contract                                                                                                     |
-| Storybook                                                    | [`docs/frontend/storybook.md`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Route bundle budgets                                         | [`docs/frontend/bundle-budget.md`](docs/frontend/bundle-budget.md) — per-page first-load JavaScript limits, the CI check and how to change a limit                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Top route progress bar                                       | [`docs/frontend/route-progress.md`](docs/frontend/route-progress.md) — what starts/finishes it, the `RouteProgressLink`/`useRouteProgressRouter()` adapters, and the `ROUTE_PROGRESS_ENABLED` dev/agent flag                                                                                                                                                                                                                                                                                                                                                     |
-| Add an env variable                                          | [`docs/backend/architecture-and-conventions.md#adding-an-environment-variable`](docs/backend/architecture-and-conventions.md#adding-an-environment-variable)                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Auth, OAuth, sessions                                        | [`docs/auth/`](docs/auth/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| RBAC / authorization                                         | [`docs/auth/rbac.md`](docs/auth/rbac.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Upgrade organization permissions                             | [`docs/auth/authorization-upgrade.md`](docs/auth/authorization-upgrade.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Email                                                        | [`docs/email/`](docs/email/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| i18n & error copy                                            | [`docs/frontend/i18n-and-errors.md`](docs/frontend/i18n-and-errors.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Notifications                                                | [`docs/notifications/`](docs/notifications/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| AI capability layer                                          | [`docs/ai/`](docs/ai/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Storage and media                                            | [`docs/storage/`](docs/storage/README.md), [`docs/media/`](docs/media/README.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Frontend BFF API consumption                                 | [`docs/frontend/api-consumption.md`](docs/frontend/api-consumption.md) — the hooks that consume media/notifications/AI through the BFF, the shared `EventSource` realtime pattern, and the frontend retry policy                                                                                                                                                                                                                                                                                                                                                 |
-| Production operations                                        | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Observability / metrics & alerting                           | [`docs/operations/observability.md`](docs/operations/observability.md) — Prometheus metric families, an optional Grafana/Alertmanager dev harness, shipped alert rules with an off-by-default SLO burn-rate layer, per-category [runbooks](docs/operations/runbooks/), a safe extension recipe, and a static + live CI contract that proves the metric↔alert↔dashboard↔runbook chain stays correct                                                                                                                                                               |
-| Production deploy profile                                    | [`docs/operations/production-deploy-profile.md`](docs/operations/production-deploy-profile.md) — build-once/promote-by-digest contract, `staging`/`production` GitHub Environments setup, and the secrets/variables checklist                                                                                                                                                                                                                                                                                                                                    |
-| VPS/Compose production overlay                               | [`docs/operations/deployment.md`](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path) — `docker/compose/prod.yml`: immutable digest pinning, restart policies, bounded/rotating logs, and honest zero/low-downtime rollout guidance                                                                                                                                                                                                                                                                                                   |
-| Open tabs after web deployments                              | [Deployment recovery](docs/operations/deployment.md#open-tabs-after-a-web-deployment) — automatic refresh, immutable build identity, draft loss and freshness requirements                                                                                                                                                                                                                                                                                                                                                                                       |
-| TLS / reverse proxy                                          | [`docs/operations/deployment.md`](docs/operations/deployment.md) — bring-your-own proxy (nginx example) or the optional bundled Caddy `edge` compose profile                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Rate limiting / BFF client identity                          | [`docs/backend/architecture-and-conventions.md#cross-cutting-decision-points`](docs/backend/architecture-and-conventions.md#cross-cutting-decision-points), [`docs/operations/deployment.md`](docs/operations/deployment.md#bff-client-ip-relay-appsweb--appsapi--a-separate-contract-from-trust_proxy), [`docs/frontend/api-consumption.md`](docs/frontend/api-consumption.md#retry-policy-429-and-retry-after-adr-073) — Redis-backed GCRA global rate limiting with burst tolerance, opt-in verified BFF client-IP relay, and frontend `Retry-After` handling |
-| Browser security headers / CSP                               | [`docs/frontend/browser-security-and-csp.md`](docs/frontend/browser-security-and-csp.md) — static header baseline, nonce-based CSP, enforcement mode, HSTS, adding a third-party origin, downstream route-scoping, and the CSP violation-reporting endpoint                                                                                                                                                                                                                                                                                                      |
-| Backup & restore                                             | [`docs/operations/backup-restore.md`](docs/operations/backup-restore.md) — managed-provider PITR, self-hosted WAL archiving, the bundled compose `backup`/`restore` profiles, and the `restore-drill` profile that rehearses an actual restore                                                                                                                                                                                                                                                                                                                   |
-| Database role separation                                     | [`docs/operations/database-role-separation.md`](docs/operations/database-role-separation.md) — a migrator/owner role for `prisma migrate deploy` vs. a DML-only runtime role for the running app                                                                                                                                                                                                                                                                                                                                                                 |
-| Secret rotation                                              | [`docs/operations/secret-rotation.md`](docs/operations/secret-rotation.md) — `JWT_SECRET`, database/Redis credentials, OAuth secrets, and third-party API keys: what breaks, what doesn't, and how to bound or avoid a maintenance window for each                                                                                                                                                                                                                                                                                                               |
-| Deployment platforms                                         | [`docs/operations/deployment-platforms.md`](docs/operations/deployment-platforms.md) — decision matrix (not recipes): how AMCore's api/worker/Redis/Postgres/SSE map onto Kubernetes, Cloud Run, Fly, Render, Railway, and (web-only) Vercel                                                                                                                                                                                                                                                                                                                     |
-| API surface                                                  | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Area                               | Start here                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All docs by intent                 | [`docs/README.md`](docs/README.md) — the documentation map                                                                                                                                                                                                                                                                                                                                         |
+| Backend architecture               | [`apps/api/README.md`](apps/api/README.md)                                                                                                                                                                                                                                                                                                                                                         |
+| Frontend architecture              | [`docs/frontend/architecture-and-conventions.md`](docs/frontend/architecture-and-conventions.md)                                                                                                                                                                                                                                                                                                   |
+| Frontend testing                   | [`docs/frontend/testing.md`](docs/frontend/testing.md) — Vitest/MSW, Storybook, Playwright mocked/server-mocked/real-stack lanes, and automated a11y scans                                                                                                                                                                                                                                         |
+| Storybook                          | [`docs/frontend/storybook.md`](docs/frontend/storybook.md) — component workshop, story conventions, a11y gate, and maintenance procedures                                                                                                                                                                                                                                                          |
+| Route bundle budgets               | [`docs/frontend/bundle-budget.md`](docs/frontend/bundle-budget.md) — per-page first-load JavaScript limits, the CI check and how to change a limit                                                                                                                                                                                                                                                 |
+| Production operations              | [`docs/operations/`](docs/operations/README.md) — deployment, observability, CI security                                                                                                                                                                                                                                                                                                           |
+| Observability / metrics & alerting | [`docs/operations/observability.md`](docs/operations/observability.md) — Prometheus metric families, an optional Grafana/Alertmanager dev harness, shipped alert rules with an off-by-default SLO burn-rate layer, per-category [runbooks](docs/operations/runbooks/), a safe extension recipe, and a static + live CI contract that proves the metric↔alert↔dashboard↔runbook chain stays correct |
+| API surface                        | Swagger/OpenAPI at `/docs` in development, including JWT/API-key bearer schemes, multipart uploads, and CI-guarded success-response inventory                                                                                                                                                                                                                                                      |
 
 Tests use Jest + SWC for backend unit tests and API E2E suites with Testcontainers.
 API build requires type checking before SWC emission; unit tests do not check types.
@@ -247,51 +146,74 @@ signup, Console-disabled installations and recovery after lost responses.
 
 ## Quick Start
 
-Use Node 24 from `.nvmrc`, with the minimum patch version in `package.json`
-(currently 24.15.0). Use the exact pnpm version in `packageManager`
-(currently 12.18.0). Check `node --version` and `pnpm --version` before installation.
+Install Docker with Compose v2.20.2 or newer, Git and OpenSSL.
+The Docker build supplies its own Node and pnpm; host installation is not required.
+
+Use a fresh checkout and disposable local PostgreSQL/Redis instances. The commands
+can write to the selected database; Docker runs migrations automatically.
+Review `.env` and active profiles first. Keep `DATABASE_URL`/`REDIS_URL` and
+`COMPOSE_DATABASE_URL`/`COMPOSE_REDIS_URL` pointed at those disposable local services.
+Do not use production, a retained database or another checkout's resources.
+These manual commands do not enforce isolation; agents use
+[managed local development](docs/operations/local-stands.md).
+
+The bundled `amcore` database credentials are local-development values, not an
+application login or production credentials. Review the [environment example](.env.example)
+and supply the generated shared web/API proof below. Use the
+[first organization and administrator guide](docs/product-admin/organization-establishment.md)
+for guarded seed, account setup and registration policies; a listening stack alone
+is not that result. Never copy the development credentials into production.
 
 ```bash
-# Prerequisites: Node.js 24.15+, pnpm 12.18.0 (exact), Docker (Compose v2.20.2+)
+# Prerequisites: Git, Docker (Compose v2.20.2+), OpenSSL
 
 git clone https://github.com/alex-morozov84/AMCore.git
 cd AMCore
 cp .env.example .env          # COMPOSE_PROFILES=local-infra is the default
-# Use the same confidential web-to-API proof in both processes.
+# For the Docker command below, use the same confidential proof in web and API.
 export WEB_FRONTEND_CONTEXT_KEY="$(openssl rand -hex 32)"
 ```
 
-**Option A — full stack in Docker** (bundled Postgres + Redis, schema migrated for you):
+**Run the full stack in Docker** (bundled Postgres + Redis, schema migrated for you):
 
 ```bash
 FRONTEND_URL=http://localhost:3000 WEB_TRUSTED_ORIGINS=http://localhost:3000 docker compose up
 # API: http://localhost:5002 · Swagger: http://localhost:5002/docs · Web: http://localhost:3000
 ```
 
-**Option B — run the app on the host** (hot reload):
+**Host development:** use [managed local development](docs/operations/local-stands.md)
+for an isolated development environment. Agents must use that workflow for database
+writes and previews.
+
+For host package commands, use Node 24 from `.nvmrc` with the minimum patch in
+`package.json` (currently 24.15.0) and its exact `packageManager` pnpm version
+(currently 12.18.0). Check both versions before installing frozen dependencies.
+
+For manual native development, configure only disposable local services and
+use the same API/web proof exported above. With the bundled PostgreSQL, set
+`DATABASE_URL="postgresql://amcore:amcore@localhost:5432/amcore?schema=public"`
+in root `.env` before migrating.
 
 ```bash
-pnpm install --frozen-lockfile
-docker compose up -d postgres redis   # or point DATABASE_URL/REDIS_URL at your own
-# first set DATABASE_URL in .env for the bundled Postgres (see below)
-pnpm --filter api db:migrate          # prisma migrate dev (LOCAL development only)
-export REDIS_URL="redis://localhost:6379"   # the same value as in .env (web does not read the root .env)
+# Migrate only a disposable local development database.
+pnpm install --frozen-lockfile &&
+docker compose up -d postgres redis &&
+pnpm --filter api db:migrate &&
+export REDIS_URL="redis://localhost:6379" &&
 pnpm dev
 ```
 
-The web app does not read the root `.env`, so export `WEB_FRONTEND_CONTEXT_KEY` (above) and
-`REDIS_URL` in the shell that runs `pnpm dev`. The API reads the root `.env`, and a value
-exported in the shell overrides it. With the bundled Postgres, first set
-`DATABASE_URL="postgresql://amcore:amcore@localhost:5432/amcore?schema=public"` in `.env`;
-the migration command reads it there. Turborepo passes five variables from your shell to the
-dev processes: those two, `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN` and `WEB_TRUSTED_ORIGINS`.
-`FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` name the address where you open the web app (default
-`http://localhost:3002`; the web port is fixed at 3002 in the web dev script). Change them only
-if you reach web through another address, such as a proxy. Then export every origin variable you
-changed so web sees the same origins as the API, and keep `WEB_TRUSTED_ORIGINS` equal to the
-web origin. Without the key, web refuses to start. Without `REDIS_URL`, or when its key differs
-from the API's, web starts, but its authentication endpoints (for example session bootstrap)
-answer 503.
+The API reads root `.env`; exported values override it. Web does not read that
+file, so export `WEB_FRONTEND_CONTEXT_KEY` and `REDIS_URL` in the shell running
+`pnpm dev`. Strict Turbo passes those and `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN`,
+`WEB_TRUSTED_ORIGINS`; it builds shared before dependent dev processes.
+Native web listens on port 3002. `FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` must
+name the address where you open web (normally `http://localhost:3002`), not the
+Docker web address above. Export changed origin settings so API and web agree.
+Without a key, web refuses startup. With mismatched keys or missing web Redis
+configuration, startup can succeed but session bootstrap returns 503. A listening
+process is not working authentication. For separate package starts, follow
+[API development](docs/backend/api-build.md#development).
 
 > Production uses `prisma migrate deploy` from the CLI-capable migrator image as
 > a one-shot step before rolling out the slim app image — never `db:migrate`
@@ -328,6 +250,13 @@ integration guide](docs/product-admin/integration.md). The Console setting in `p
 configures only the separate `SUPER_ADMIN` Operations Console; it does not
 create product administration pages or choose their placement.
 
+If startup fails, retain the first error and stop before retrying migrations or
+changing database state. Check [API development](docs/backend/api-build.md#development)
+and the [deployment guide](docs/operations/deployment.md). A listening process
+alone does not prove sign-in, email delivery or organization setup.
+Use [first organization and administrator](docs/product-admin/organization-establishment.md)
+when you need those accounts and policies.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 ## Going to production
@@ -335,47 +264,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 Use [Lighthouse audits](docs/frontend/testing.md#lighthouse-audits) to inspect loaded pages and individual accessibility defects.
 [Open complete HTML reports](docs/frontend/testing.md#find-and-open-lighthouse-reports) from local indexes or CI artifacts.
 
-The Quick Start above is a development stack. For one production server, follow
-[Single-host setup](docs/operations/single-host-compose.md), including its registry
-branch when images are already approved. The references below cover each concern.
+The Quick Start is for local evaluation. For one production server, follow
+[Single-host production](docs/operations/single-host-compose.md). For another
+platform, use the [platform decision guide](docs/operations/deployment-platforms.md).
 
-1. **[Production deploy profile](docs/operations/production-deploy-profile.md)** —
-   the contract everything else assumes: build the image once, promote the same
-   digest, `staging` from `main`, `production` from a `v*` tag behind a required
-   reviewer. Includes the GitHub Environments and secrets/variables checklist.
-   A non-active workflow template implementing it ships at
-   [`.github/workflows/deploy-template.yml`](.github/workflows/deploy-template.yml).
-2. **[VPS/Compose rollout](docs/operations/deployment.md#production-rollout-via-registry-image-pull-path)** —
-   apply `docker/compose/prod.yml` over the base file to pin application services to
-   immutable digests, add restart policies, and bound container logs. The same
-   page covers TLS/reverse proxy, process roles, the one-shot migration
-   contract, the [migration image endpoint preflight](docs/operations/migrator-image.md#process-and-database-lifecycle),
-   and [what "zero-downtime" honestly
-   costs](docs/operations/deployment.md#zerolow-downtime-rollout--stated-honestly).
-3. **[Database role separation](docs/operations/database-role-separation.md)** —
-   a migrator/owner role used only by `prisma migrate deploy`, and a DML-only
-   runtime role for the running app. Works against a managed provider's
-   non-superuser admin, not just a real superuser.
-4. **[Backup & restore](docs/operations/backup-restore.md)** — pick a strategy,
-   then schedule the `restore-drill` profile so you find out a backup is
-   unrestorable before an incident does.
-5. **[Secret rotation](docs/operations/secret-rotation.md)** — per secret class,
-   what breaks and what doesn't, and how to bound or avoid a maintenance window.
-6. **[Deployment platforms](docs/operations/deployment-platforms.md)** — if you
-   are _not_ on a VPS: how AMCore's api/worker/Redis/Postgres/SSE map onto
-   Kubernetes, Cloud Run, Fly, Render, Railway, and why Vercel can host only the
-   web app. A decision matrix, not recipes — VPS/Compose is the one path this
-   repo owns end to end.
+The [operations index](docs/operations/README.md) routes deployment, migrations,
+role separation, backups, recovery and secret rotation. The
+[production deploy profile](docs/operations/production-deploy-profile.md) defines
+artifact promotion; its workflow template requires an adopter implementation.
+Production remains closed to indexing until you deliberately configure
+[search-engine indexing](docs/frontend/seo.md).
 
-Building on one server instead of pulling from a registry? Follow
-[Single-host production](docs/operations/single-host-compose.md) end to end (TLS
-database, HTTPS edge, restore and certificate procedures), and size the host with
-[Capacity](docs/operations/capacity.md).
+## Help and contributions
 
-Production stays closed to search engines until you open it on purpose; see
-[Search-engine indexing](docs/frontend/seo.md).
-
-Full operations index: [`docs/operations/`](docs/operations/README.md).
+Use the [documentation map](docs/README.md) for task instructions and
+[GitHub issues](https://github.com/alex-morozov84/AMCore/issues) for reproducible bugs.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before contributing.
+Report vulnerabilities privately through [SECURITY.md](SECURITY.md), not public issues.
 
 ## Author
 
@@ -384,5 +289,3 @@ Full operations index: [`docs/operations/`](docs/operations/README.md).
 ## License
 
 [MIT](LICENSE)
-
-[Place product administration and isolate host sessions](docs/product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.

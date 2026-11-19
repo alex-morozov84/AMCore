@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+The [release procedure](CONTRIBUTING.md#changelog--releases) explains how to
+prepare a release from `[Unreleased]`. Apply upgrade instructions to the
+versions they name. For current source-update instructions, see
+[Updating a fork](docs/operations/updating-a-fork.md).
+
 ## [Unreleased]
+
+### Added
+
+- Add a skill for outside-service status, reviewed checks and inbound webhooks.
+
+- Add a background-work skill for registered asynchronous and database-owned work.
+
+- Add repository task skills for backend modules, authorization, authentication
+  integration, admin placement, audit events, deployment, recovery, secret rotation
+  and MFA operations.
 
 ### Fixed
 

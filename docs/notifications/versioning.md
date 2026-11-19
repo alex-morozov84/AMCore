@@ -59,8 +59,8 @@ refuses an unavailable historical version rather than using current content.
 Detailed external renderers receive only `projectExternal(channel, payload)` and
 are registered under `renderExternal[channelId]`.
 
-Retirement requires a data check proving that no retained notifications or active
-external deliveries reference the version. Age alone is insufficient: retention
+Before retiring a version, check retained notification and delivery references.
+Keep its definition while it still serves retained feed history or delivery work. Age alone is insufficient: retention
 preserves active deliveries, unresolved external effects and legacy-unverified
 history even beyond ordinary read/unread retention windows. Manual grants preserve
 the original stored version; neither grant nor cleanup authorizes current-version substitution.

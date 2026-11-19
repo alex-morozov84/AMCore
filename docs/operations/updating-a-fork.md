@@ -10,10 +10,9 @@ A **merge commit** records both histories, so Git can recognize changes already 
 > Do not substitute an old tag for the placeholders below. Commit-based experiments
 > do not establish release support.
 
-A disposable independent-copy product completed two updates with full PR and post-merge CI.
-Its test user and order survived; fresh-database replay and runtime checks also passed.
-The private flexible route and GitHub Fork-specific behavior are not rehearsed.
-Do not treat the examples as evidence of a tested production upgrade.
+Rehearsal covers only disposable independent-copy scenarios.
+The private flexible route and GitHub Fork-specific behavior remain unverified.
+Validate your product's migrations and deployment separately; examples do not prove a production upgrade.
 
 ```text
 Supported AMCore tag -> product update branch -> resolve and validate
@@ -193,10 +192,10 @@ confirm Actions enablement and Dependabot state during the first actual run.
 
    ```sh
    TARGET_TAG='vX.Y.Z'
-   git show "refs/tags/amcore/$TARGET_TAG:CHANGELOG.md"
-   git rev-parse "refs/tags/amcore/$TARGET_TAG^{commit}"
-   git merge-base HEAD "refs/tags/amcore/$TARGET_TAG^{commit}"
-   git switch -c update/amcore-example
+   git show "refs/tags/amcore/$TARGET_TAG:CHANGELOG.md" &&
+   git rev-parse "refs/tags/amcore/$TARGET_TAG^{commit}" &&
+   git merge-base HEAD "refs/tags/amcore/$TARGET_TAG^{commit}" &&
+   git switch -c update/amcore-example &&
    git merge --no-ff --no-commit "refs/tags/amcore/$TARGET_TAG^{commit}"
    ```
 
@@ -287,10 +286,8 @@ Before rollout, use owned disposable databases and a verified backup/restore pro
 4. Stop before application rollout on any migration failure. A duplicate table/column can fail even when Git merged cleanly.
    Restore a known-good snapshot and verify data and ledger using the [recovery runbook](backup-restore.md).
 
-Disposable fixtures at the pinned Prisma version exercised fresh and upgraded databases,
-out-of-order migration application, `migrate dev`, failure on a duplicate column and chained backup restoration.
-These checks cover the fixtures, not your product's migrations, production volume or custom grants.
-Repeat the relevant scenarios for your product before rollout.
+Before rollout, validate your product's migrations, production volume and custom grants.
+Starter fixtures do not prove these product-specific properties.
 Use product-owned tables/fields where suitable, but prefixes do not prove collision safety.
 A later compensating migration cannot repair a fresh replay that fails before reaching it.
 `migrate resolve` changes bookkeeping, not data: never mark an upstream migration applied merely because one column exists.
@@ -329,7 +326,6 @@ AMCore remains 0.x until a deliberate stability decision; no 1.0 date is promise
 
 There is no beta update bot or codemod. Reconsider codemods when a real product needs repetitive, deterministic edits
 that type errors/manual instructions cannot adequately guide, and customized fixtures demonstrate a benefit.
-That decision does not imply reuse of any retained initializer engine.
 
 ## Optional thanks
 

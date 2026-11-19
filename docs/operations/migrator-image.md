@@ -35,8 +35,9 @@ existing behavior. Managed stands use a separate API-build seed service; they do
 not execute seed through this image. The final image needs no package or engine downloads.
 
 The operating-system user and the database role are separate controls. Use the
-schema-owning migrator database role only for this job, through
-`MIGRATION_DATABASE_URL`. API and worker connections use the runtime role.
+schema-owning migrator database role for this job through
+`MIGRATION_DATABASE_URL`. Other explicitly authorized owner operations are
+separate. API and worker connections use the runtime role.
 See [database role separation](database-role-separation.md).
 
 ## Process and database lifecycle
@@ -162,8 +163,7 @@ selection for both commands:
 
 ```sh
 docker compose run --rm --no-deps migrate \
-  ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
-# Only after the preflight exits zero:
+  ./node_modules/.bin/prisma db execute --file ./migrator-check.sql &&
 docker compose run --rm --no-deps migrate
 ```
 
@@ -371,8 +371,9 @@ Docker engine. It uses no checkout database URL. The migrator joins only an inte
 fixture network; the host observer uses PostgreSQL's published port separately.
 The image architecture must match the engine architecture. TERM and INT each
 interrupt a confirmed PostgreSQL `PgSleep`, with and without an explicit transaction.
-The original45-second natural-exit deadline and200ms session/lock observation from
-the attached process's `exit` event remain fixed; diagnostic disposal cannot produce a pass.
+The check requires natural exit within 45 seconds and observes sessions/locks
+200 ms after the attached process's `exit` event. Scheduler delay is recorded
+separately; diagnostic disposal cannot produce a pass.
 This command checks cancellation and transactional rollback. Dependency updates
 also require the broader CLI, roles, TLS, migration-history and recovery checks above.
 The case without an explicit transaction does not prove partial-commit recovery.
@@ -448,7 +449,7 @@ path when that environment variable is set. CI chooses separate files under
 `migrator-interrupt.json.sigterm`, `.sigint`, `.sigkill` with the same prefix.
 
 `negative` deliberately bypasses Tini or the image configuration. It requires
-the original45-second or200ms admission to fail. These are test fixtures,
+the documented 45-second or 200 ms admission to fail. These are test fixtures,
 not supported production alternatives. `advisory` interrupts the CLI while it
 waits for a deliberately held Prisma advisory lock. Its200ms observation permits
 only the known blocker; the separate lifecycle command still requires zero

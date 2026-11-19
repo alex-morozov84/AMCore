@@ -26,8 +26,9 @@ does not change the policy on another replica.
 | `false`       | `false`               | Closed installation with trusted initial setup                    |
 
 `AUTH_PUBLIC_SIGNUP_ENABLED` and `ORG_SELF_SERVICE_CREATION_ENABLED` both default
-to `true`. Creation admission preserves ordinary bearer JWT behavior; self-service
-does not add email verification, recent authentication or a live-session requirement.
+to `true`. Self-service creation requires personal bearer admission and its current
+[session/MFA checks](../auth/mfa-foundation.md#session-admission). It adds no
+creation-specific email-verification or fresh-authentication requirement.
 Trusted initial setup requires verified email and self-service creation disabled.
 
 For the reference Compose deployment, set these values in the project's `.env`
@@ -72,7 +73,7 @@ deployment's normal maintenance discipline. Seed refuses changed system template
 it does not repair installed permissions. Investigate drift and use a controlled
 migration. See [deployment](../operations/deployment.md).
 
-The runtime database role needs DML access to the new result tables and permission
+The runtime database role needs DML access to the result tables and permission
 to lock `core.organizations` in `SHARE ROW EXCLUSIVE` mode. PostgreSQL permits that
 mode with `UPDATE` or `DELETE` privilege. Initial setup uses a short transaction;
 the ordinary Console operator does not stop writers or confirm a maintenance box.
@@ -111,9 +112,11 @@ repeating setup does not restore them. Never clear its completion marker to retr
 Prerequisites: initialize canonical roles and enable self-service creation. Enable
 public signup if new people should register without invitations.
 
-Use the PRODUCT **Organizations** page, not Operations Console. In the default
-path topology it is `/en/organizations`; `/en/admin/organizations` is the separate
-platform SUPER_ADMIN area. An ordinary creator does not need or receive Console access.
+Use the PRODUCT **Organizations** page, not Operations Console. In the shipped multi-locale
+path topology it is `/en/manage/organizations`; `/en/admin/organizations` is the separate
+platform SUPER_ADMIN area. Aliases and locale prefixes follow the
+[placement settings](placement-and-sessions.md); a single-locale build omits `/en`.
+An ordinary creator does not need or receive Console access.
 
 1. Register or sign in to a personal account.
 2. Open **Organizations**, then **Create organization**.
@@ -142,7 +145,8 @@ unavailable current access is a recovery state, not a rolled-back creation.
 ## Closed signup and the first organization ADMIN
 
 Prerequisites: no organization or prior initial completion; both policies `false`;
-roles initialized; mail delivery and normal recovery pages available.
+roles initialized; mail delivery and normal recovery pages available. Examples
+use `en`; for a one-language build, use its served locale instead.
 
 ```sh
 pnpm --filter api organization:setup -- prepare-account --email anna@example.test --locale en
@@ -343,7 +347,7 @@ authentication. Account lookup after completion is restricted to its original us
 API keys cannot use these or the self-service creation handlers.
 
 Preparation takes `{"email":"anna@example.test","locale":"en"}`; locale is optional
-and accepts `en` or `ru`. Bootstrap takes
+and accepts a `SERVED_LOCALES` value (`en` or `ru` in the shipped default). Bootstrap takes
 `{"name":"North shop","slug":"north-shop","adminUserId":"<verified-user-id>"}`.
 Save these exact non-secret inputs securely before sending if recovery must survive
 a browser/session change. Bootstrap has no operation ID.

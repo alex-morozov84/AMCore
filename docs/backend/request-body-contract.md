@@ -1,6 +1,8 @@
 # Request body admission
 
-The API parses a request before route validation. Parser acceptance does not bypass auth or promise success.
+The API parses transport input before route validation. Parser acceptance does not bypass auth or promise success.
+After transport parsing, Nest guards authenticate and authorize before parameter pipes validate route input.
+The handler runs only after those checks. Parser refusals can occur before authentication.
 The queue board has its own early admission boundary. Its fixed responses take precedence over this parser.
 
 ## Responses
@@ -18,7 +20,7 @@ The queue board has its own early admission boundary. Its fixed responses take p
 Refusals use the existing error envelope: status, bounded message, timestamp, sanitized path and method.
 Correlation ID is included when application context supplies it. Transport400/415 have no domain error code.
 Validation errors and domain responses retain their existing metadata. Messages/logs do not echo request bytes.
-Recognized parser failures previously reported as500 now use400/413/415. Arbitrary status fields are not trusted.
+Recognized parser failures use400/413/415. Arbitrary status fields are not trusted.
 
 ## Encodings and forms
 
@@ -36,7 +38,7 @@ an empty or unsupported charset returns415. Case, quoted values and unrelated pa
 
 Content-Encoding supports identity, gzip, deflate and br, case-insensitively. Coding chains and zstd return415.
 Encoding refusals advertise supported codings in `Accept-Encoding`; charset refusals do not add that header.
-Limits count decoded bytes. Webhook rawBody retains the exact decoded bytes. Scoped invitation/role/member/
+Limits count decoded bytes. Webhook rawBody retains the exact decoded bytes. Scoped MFA/invitation/role/member/
 background caps remain separate from the ordinary100000-byte cap. The Fastify reader additionally caps encoded
 bytes at262144; decoded route caps still apply. Multipart uploads use their separate file limits.
 

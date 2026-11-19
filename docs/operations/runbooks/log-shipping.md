@@ -9,11 +9,9 @@ risk is losing log lines after they rotate out of Docker's files
 These alerts exist only if you load the rules into a Prometheus that scrapes the overlay (see
 [Alerts](../log-search.md#alerts)); the overlay ships none. Without one, run these checks by hand.
 
-Commands below use this shorthand; run them from the repository root on the Docker host:
-
-```sh
-export COMPOSE_LOGS="docker compose -f docker-compose.yml -f docker/compose/prod.yml -f docker/compose/logs.yml"
-```
+Run the Compose commands from the repository root on the Docker host. Load
+the running deployment's project name, environment file, profiles and complete
+`COMPOSE_FILE` list, including the logs overlay. See [install](../log-search.md#install).
 
 ## Collector down
 
@@ -32,8 +30,8 @@ export COMPOSE_LOGS="docker compose -f docker-compose.yml -f docker/compose/prod
 1. Check the container and its last output:
 
    ```sh
-   $COMPOSE_LOGS ps alloy
-   $COMPOSE_LOGS logs --tail 50 alloy
+   docker compose ps alloy
+   docker compose logs --tail 50 alloy
    ```
 
 2. If it restarts, the log names the faulty line of `docker/log-search/alloy/config.alloy`.
@@ -41,7 +39,7 @@ export COMPOSE_LOGS="docker compose -f docker-compose.yml -f docker/compose/prod
    list it (how to attach: [Alerts](../log-search.md#alerts)). Attach only a Prometheus you
    control, because it can read all logs there.
 
-**Resolution:** fix the configuration or network, then `$COMPOSE_LOGS up -d alloy`. Alloy resumes
+**Resolution:** fix the configuration or network, then `docker compose up -d alloy`. Alloy resumes
 from its stored positions, so lines still inside Docker's rotation window are sent without gaps or
 duplicates. Lines that rotated away while it was down are not recovered.
 
@@ -61,16 +59,16 @@ duplicates. Lines that rotated away while it was down are not recovered.
 1. Check the container, its health and its output:
 
    ```sh
-   $COMPOSE_LOGS ps loki
-   $COMPOSE_LOGS logs --tail 80 loki
-   $COMPOSE_LOGS exec logs-grafana wget -q -O- http://loki:3100/ready
+   docker compose ps loki
+   docker compose logs --tail 80 loki
+   docker compose exec logs-grafana wget -q -O- http://loki:3100/ready
    ```
 
    The Loki image has no shell, so readiness is checked from the Grafana container.
 
 2. `no space left on device` means [Disk low](#disk-low) is also true.
 
-**Resolution:** fix the cause and `$COMPOSE_LOGS up -d loki`. Alloy retries with backoff while
+**Resolution:** fix the cause and `docker compose up -d loki`. Alloy retries with backoff while
 Loki is away and sends the backlog afterwards.
 
 ## Shipping retrying
@@ -86,8 +84,8 @@ minutes. A healthy pipeline never retries.
 
 **Diagnostic steps:**
 
-1. `$COMPOSE_LOGS logs --tail 50 alloy` shows the send errors and their cause.
-2. `$COMPOSE_LOGS exec logs-grafana wget -q -O- http://loki:3100/ready` must print `ready`.
+1. `docker compose logs --tail 50 alloy` shows the send errors and their cause.
+2. `docker compose exec logs-grafana wget -q -O- http://loki:3100/ready` must print `ready`.
 3. If no application line reaches Loki at all, inspect the service's log options. The output must
    show `json-file` with `labels`:
 
@@ -95,8 +93,7 @@ minutes. A healthy pipeline never retries.
    docker inspect <container> --format '{{ .HostConfig.LogConfig }}'
    ```
 
-   A container created before the overlay was applied keeps its old log driver; recreate it with
-   `$COMPOSE_LOGS up -d api worker web`. Alloy drops every line that carries no service label.
+   A container created before the overlay was applied keeps its old log driver; [recreate the application containers](../log-search.md#recreate-the-application-containers) using the overlay. Alloy drops every line that carries no service label.
 
 ## Lines stop after a Docker upgrade
 
@@ -110,12 +107,10 @@ fires. No alert covers this case: Alloy keeps reading but may find nothing it ca
 2. Docker's data root moved from `/var/lib/docker`.
 3. The Docker upgrade changed the log file format, which needs a change to the Alloy configuration.
 
-The steps below use the `$COMPOSE_LOGS` shorthand defined at the top of this page.
-
 **Diagnostic steps:**
 
 1. Check the containers still use the overlay's log driver (the output must show `json-file` with
-   `labels`). If not, recreate them with `$COMPOSE_LOGS up -d api worker web`:
+   `labels`). If not, [recreate the application containers](../log-search.md#recreate-the-application-containers):
 
    ```sh
    docker inspect <container> --format '{{ .HostConfig.LogConfig }}'
@@ -125,12 +120,12 @@ The steps below use the `$COMPOSE_LOGS` shorthand defined at the top of this pag
    `time` and, for these services, `attrs`:
 
    ```sh
-   ID=$($COMPOSE_LOGS ps -q worker)
+   ID=$(docker compose ps -q worker)
    docker run --rm -v /var/lib/docker/containers:/c:ro alpine tail -n 1 /c/$ID/$ID-json.log
    ```
 
 3. Confirm the data root is still `/var/lib/docker` (`docker info --format '{{ .DockerRootDir }}'`).
-4. `$COMPOSE_LOGS logs --tail 50 alloy` shows which files it tails and any parse error.
+4. `docker compose logs --tail 50 alloy` shows which files it tails and any parse error.
 
 **Resolution:** if the file format changed, `docker/log-search/alloy/config.alloy` must be adapted to it;
 until then the lines are available only through `docker logs`.
@@ -145,7 +140,7 @@ failures.
 
 **Diagnostic steps:** read the `reason` label of `loki_write_dropped_entries_total` in
 Prometheus, or without one with
-`$COMPOSE_LOGS exec logs-grafana wget -q -O- http://alloy:12345/metrics`, and the Alloy log. The usual causes are a long Loki outage ([Log store
+`docker compose exec logs-grafana wget -q -O- http://alloy:12345/metrics`, and the Alloy log. The usual causes are a long Loki outage ([Log store
 down](#log-store-down)) and Loki refusing lines ([Store refusing lines](#store-refusing-lines)).
 
 ## Store refusing lines
@@ -177,7 +172,7 @@ successful pushes. Lines are being lost and Loki's memory grows until the cause 
 
 **Diagnostic steps:**
 
-1. `$COMPOSE_LOGS logs --tail 30 loki` shows `failed to flush` with the reason, normally
+1. `docker compose logs --tail 30 loki` shows `failed to flush` with the reason, normally
    `no space left on device` or `permission denied`.
 2. For a full volume follow [Disk low](#disk-low). For `permission denied`, the volume must be
    writable by uid 10001 (Loki's user).
@@ -197,9 +192,16 @@ On Docker Desktop and OrbStack it describes the virtual machine's disk, not the 
 
 **Resolution, in order:**
 
-1. Check the store size: `docker run --rm -v <project>_loki_data:/d:ro alpine du -sh /d` (the project
-   name is the Compose project, usually the checkout directory name).
-2. Lower `LOGS_RETENTION_PERIOD` in `.env` and recreate Loki (`$COMPOSE_LOGS up -d loki`). The
+1. Identify the existing `loki_data` volume from the Loki container's mount.
+   Set `LOKI_VOLUME` to its exact name and verify its project label. Then check
+   the size:
+
+   ```sh
+   docker volume inspect "$LOKI_VOLUME" >/dev/null &&
+   docker run --rm -v "$LOKI_VOLUME:/d:ro" alpine du -sh /d
+   ```
+
+2. Lower `LOGS_RETENTION_PERIOD` in `.env` and recreate Loki (`docker compose up -d loki`). The
    compactor applies it when it next runs, deletes expired data after `retention_delete_delay` (2h)
    and then on its 10-minute cycle, so space returns gradually and this is not an emergency lever.
 3. Find what grew: a service that started logging heavily shows as a jump in its stream.
@@ -207,10 +209,20 @@ On Docker Desktop and OrbStack it describes the virtual machine's disk, not the 
    cheaper than a bigger disk when the extra history is not needed.
 
 There is no safe manual delete inside the store. If the volume is completely full and you cannot grow
-it, the last resort is to discard the whole store: `$COMPOSE_LOGS stop loki alloy`, then remove the
-`loki_data` volume (`docker volume rm <project>_loki_data`), then `$COMPOSE_LOGS up -d loki alloy`.
-This **deletes every stored log line**. Alloy keeps its read positions, so it does not resend lines
-it already read; remove the `alloy_data` volume too if you want it to resend what Docker's files still
-hold. In every other case, free space first (freeing space elsewhere on the same disk, such as unused
+it, the last resort is to discard the whole store. This deletes every stored
+log line. Confirm the loss and verify the volume identity before proceeding.
+With the saved Compose selection and `LOKI_VOLUME` from step 1:
+
+```sh
+docker compose stop alloy loki &&
+docker compose rm -f alloy loki &&
+docker volume rm "$LOKI_VOLUME" &&
+docker compose up -d loki alloy
+```
+
+Stop on error. If another container still holds the volume, verify its owner
+before acting. Alloy keeps its read positions in a separate volume. Keep that
+volume unless you deliberately plan to replay surviving Docker logs.
+In every other case, free space first (freeing space elsewhere on the same disk, such as unused
 images, also helps), then restart Loki. Lowering the retention needs a running Loki, so it cannot help
 when Loki cannot start on a completely full volume.

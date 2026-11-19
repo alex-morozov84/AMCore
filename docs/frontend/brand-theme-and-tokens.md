@@ -95,99 +95,17 @@ prefersDark)`, `applyTheme(resolved)`, storage helpers, and
 `getThemeInitScript()` (below). `apps/web/src/shared/store/providers/ThemeProvider.tsx`
 exposes it to React via `useTheme()` (`setting`, `resolvedTheme`, `setTheme`).
 
-## Why a hand-rolled module, not `next-themes`
-
-The obvious library choice for this problem was evaluated and rejected —
-`next-themes` currently carries confirmed, open compatibility risk for this
-starter's React 19 / Next 16 baseline:
-
-- [`pacocoursey/next-themes#367`](https://github.com/pacocoursey/next-themes/issues/367)
-  tracks React 19 TypeScript incompatibility.
-- [`pacocoursey/next-themes#375`](https://github.com/pacocoursey/next-themes/issues/375)
-  tracks stale theme state under Next/React suspend-resume behavior.
-- [`pacocoursey/next-themes#369`](https://github.com/pacocoursey/next-themes/issues/369)
-  and
-  [`#370`](https://github.com/pacocoursey/next-themes/issues/370) track
-  production minification breakage.
-- [`pacocoursey/next-themes#385`](https://github.com/pacocoursey/next-themes/issues/385)
-  and
-  [`#387`](https://github.com/pacocoursey/next-themes/issues/387) track React 19
-  warnings around the library's script-tag pattern.
-
-The primitive itself isn't complicated enough to justify the dependency
-risk: Tailwind's own dark-mode documentation describes the exact mechanism
-needed directly (class toggle + `localStorage` + `matchMedia`), and React's
-`useSyncExternalStore` (not a manual `useState`/`useEffect` pair) is the
-correct primitive for "read a browser API that can differ between server and
-client" — see `ThemeProvider.tsx`'s implementation.
-
 ## No-flash: the pre-hydration script
 
-`app/[locale]/layout.tsx` renders a **raw `<script dangerouslySetInnerHTML={{ __html:
-getThemeInitScript() }} />`** as the first thing inside `<body>` — deliberately
-_not_ `next/script`. This looks unusual (it bypasses a built-in Next.js
-primitive that exists for exactly this "load a script" job) and is worth
-justifying explicitly rather than leaving future readers to wonder if it's a
-workaround:
+The locale layout runs `getThemeInitScript()` as an inline script at the
+start of the body. It applies the stored choice or the system preference
+before the page content paints. Keep the script code-owned and pass the
+request nonce. See [Browser security headers and CSP](./browser-security-and-csp.md).
 
-- **`next/script strategy="beforeInteractive"` does not actually run before
-  first paint** — verified by reading Next's own client bootstrap source
-  (`next/dist/esm/client/app-bootstrap.js`, current as of Next 16.2.11): it
-  registers the script via `self.__next_s.push(...)`, and a separate function
-  (`loadScriptsInSequence`) creates the real `<script>` element and injects it
-  — but that function only runs once Next's own client bootstrap chunk has
-  loaded, and that chunk is fetched with `async`, i.e. _after_ the browser may
-  already have painted the initial HTML. "Before hydration" (what
-  `beforeInteractive` actually guarantees) is a real but weaker guarantee than
-  "before paint." Confirmed empirically too: a production build's raw HTML
-  response shows the script content wrapped in `self.__next_s.push(...)`, not
-  as a literal executable `<script>` tag.
-- **A raw inline `<script>` tag has no such gap.** The browser executes it
-  synchronously as it parses the document — nothing after it in the DOM can
-  paint until it finishes. This is also independently corroborated by several
-  unrelated write-ups of this exact problem (Next.js App Router + Tailwind
-  dark mode), not just this project's own source-reading.
-- **This does knowingly go against a real, if opt-in, Vercel best practice.**
-  Vercel's Conformance tooling has a rule, `NEXTJS_USE_NEXT_SCRIPT`
-  (disabled by default), that specifically flags raw
-  `dangerouslySetInnerHTML` script tags in favor of `next/script` — for good
-  general reasons (script deduplication, loading-priority optimization) that
-  don't apply to a single, tiny, synchronous, no-external-resource script
-  whose entire job is "run before anything else." Treat this file as a
-  deliberate, documented exception if that rule is ever enabled repo-wide,
-  not an oversight to "fix" back to `next/script`.
-- **`dangerouslySetInnerHTML` is safe here specifically because the content
-  has no external input.** `getThemeInitScript()` is a pure function of two
-  hardcoded string constants (`THEME_STORAGE_KEY`, `DEFAULT_THEME_SETTING`) —
-  no props, no request data, nothing user-controlled. The API's "dangerous"
-  framing is about untrusted content, which this isn't.
-
-`<html suppressHydrationWarning>` is required and correct here: the script
-legitimately changes `<html>`'s class before React hydrates, so its
-class attribute will differ from what the server rendered. That's expected,
-not a bug.
-
-**One caveat for anything that renders differently by theme** (e.g. a
-toggle's sun/moon icon): `ThemeProvider`'s `resolvedTheme` assumes the
-SSR-safe default on the very first render (matching the server, so React
-hydration itself never mismatches) and corrects to the real value
-immediately after mount. Page _styling_ never flashes (the script already
-applied it before paint), but a component that branches its _rendered
-content_ on `resolvedTheme` will render once with the SSR assumption, then
-immediately re-render with the real value. If you build that kind of
-component, this one extra render is expected — don't try to "fix" it by
-reading the DOM directly in `useState`'s initializer, which reintroduces a
-real React hydration-mismatch warning instead.
-
-**AMCore ships a real CSP by default** (Track 3, ADR-074) — this script
-already receives the per-request nonce `src/proxy.ts` generates
-(`app/[locale]/layout.tsx`'s `<script nonce={nonce}>`), never
-`unsafe-inline`. The same nonce is threaded further down the provider tree
-(`Providers` → `QueryProvider`) as `styleNonce` for `ReactQueryDevtools`,
-which otherwise injects its own un-nonced inline `<style>` in development.
-See
-[Browser security headers and CSP](./browser-security-and-csp.md) for the
-full policy, enforcement mode, and how to extend it.
+Keep `suppressHydrationWarning` on the root HTML element. The script can
+change its class before hydration. Components that render different text
+or icons by theme start with the server-safe value and update after mount.
+Verify initial paint and these controls separately in the running product.
 
 ## Cookie-backed SSR theme (advanced variant)
 

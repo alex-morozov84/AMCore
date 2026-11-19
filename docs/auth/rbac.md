@@ -1,7 +1,7 @@
 # RBAC — Roles, Permissions & Organizations
 
-The single guide to authorization in AMCore: how the system decides what an
-authenticated caller is allowed to do, and how to extend it for your own domain.
+Use this guide to check organization permissions and extend authorization for
+a product domain.
 Authentication (proving _who_ you are) is covered in
 [Concepts](./concepts.md); this doc is about _what you can do_ once authenticated.
 
@@ -13,8 +13,8 @@ guide covers the model and the invariants OpenAPI does not express.
 
 ## The two layers
 
-Every request is evaluated against two independent layers. **Both must pass**,
-with an internal `SUPER_ADMIN` owner grant for admitted human JWT sessions.
+Protected handlers apply their declared system-role and organization policies.
+An admitted human `SUPER_ADMIN` JWT can receive an internal owner grant.
 API keys always have effective system role `USER` and use explicit organization
 grants intersected with key scopes. Organization management requires matching
 organization context.
@@ -30,13 +30,13 @@ Layer 1 — System role      USER        → normal access, continue to layer 2
 Layer 2 — Org permissions  org membership + roles + permissions, evaluated by CASL
 ```
 
-|                  | System role                      | Org permission                       |
-| ---------------- | -------------------------------- | ------------------------------------ |
-| **Scope**        | Platform-wide                    | Within one organization              |
-| **Stored**       | User record + JWT claim          | Database + Redis cache               |
-| **Granularity**  | Coarse (2 levels)                | Fine (action + subject + conditions) |
-| **Changed by**   | `SUPER_ADMIN`                    | Explicit full `TeamAccess` holder    |
-| **Takes effect** | Next login (see freshness below) | Next request                         |
+|                  | System role                                       | Org permission                       |
+| ---------------- | ------------------------------------------------- | ------------------------------------ |
+| **Scope**        | Platform-wide                                     | Within one organization              |
+| **Stored**       | User record + JWT claim                           | Database + Redis cache               |
+| **Granularity**  | Coarse (2 levels)                                 | Fine (action + subject + conditions) |
+| **Changed by**   | `SUPER_ADMIN`                                     | Explicit full `TeamAccess` holder    |
+| **Takes effect** | Demotion: next request; promotion: new credential | Next request                         |
 
 ---
 
@@ -115,16 +115,60 @@ for this same endpoint, not a separate contract — see [its user
 guide](../operations-console/users.md#change-a-users-system-role)
 for the confirmation/step-up/session-revocation behavior a browser operator
 sees. Both the API and the Console enforce the same self-change and
-last-`SUPER_ADMIN` guards described above.
+last-`SUPER_ADMIN` guards: an administrator cannot demote themselves or the last
+remaining platform administrator.
 
-**Bootstrapping the first admin** has no API path — set it directly in the
-database:
+**Bootstrapping the first platform administrator** is a trusted offline operation.
+There is no unauthenticated promotion API. Use it only when no platform
+administrator exists; organization `ADMIN` is a different role.
 
-```sql
-UPDATE core.users
-SET "systemRole" = 'SUPER_ADMIN'
-WHERE email = 'admin@yourdomain.com';
-```
+1. Obtain the database owner's approval and identify the intended verified account
+   by its immutable user ID. Verify the person's identity outside this procedure.
+   Prepare the supported [MFA deployment](./mfa-deployment.md) and the account's
+   local-password access. Never-protected ordinary users cannot enroll a factor
+   before promotion; initial enrollment follows the new operator sign-in.
+2. Select the database explicitly, take a restorable backup, and pause application
+   processes and all other user/role writers. Verify the database and account:
+
+   ```sql
+   SELECT current_database(), current_user;
+   SELECT id, "emailVerified", "systemRole"
+   FROM core.users WHERE id = '<verified-user-id>';
+   SELECT count(*) FROM core.users WHERE "systemRole" = 'SUPER_ADMIN';
+   ```
+
+   Stop unless the target is the approved verified `USER` and the count is zero.
+   Replace `<verified-user-id>` with that account's exact ID in both examples.
+
+3. While writers remain paused, grant the initial role:
+
+   ```sql
+   UPDATE core.users
+   SET "systemRole" = 'SUPER_ADMIN'
+   WHERE id = '<verified-user-id>'
+     AND "emailVerified" = true
+     AND "systemRole" = 'USER'
+     AND NOT EXISTS (
+       SELECT 1 FROM core.users WHERE "systemRole" = 'SUPER_ADMIN'
+     )
+   RETURNING id, "systemRole";
+   ```
+
+   Require exactly one returned row for the approved ID. Zero rows or an error
+   means stop and investigate; do not remove predicates or promote another account.
+
+4. Record the operator, target and result privately. Resume the supported deployment,
+   sign in again and complete [factor setup](./mfa-browser.md) when requested.
+   Verify the access probe above
+   returns `204`. An old `USER` token cannot gain platform authority. If admission
+   fails, keep administrative access closed and use the documented MFA recovery
+   path or obtain a separately reviewed database recovery plan; do not disable guards.
+
+This initial SQL does not perform the admin API's security-version increment,
+session revocation or application audit. Once an administrator exists, use the
+admin API for role changes. Do not reuse this bootstrap for normal promotion,
+demotion or emergency recovery. Restoring the backup requires the database
+owner's recovery decision; it can lose later writes.
 
 `SUPER_ADMIN` also unlocks the view-only Bull Board queue dashboard at `/admin/queues`.
 **Bull Board is disabled in production unless `ENABLE_BULL_BOARD=true` is set in the API
@@ -140,9 +184,10 @@ policy — see [CSRF Posture](./csrf.md).
 ## Layer 2 — Organizations, roles & permissions
 
 An **organization** is a shared workspace. It is optional — a `USER` can work
-solo. Without an org context, a caller can only read and update their own
-profile. Create an org when several people need to collaborate with different
-levels of access. A user can belong to multiple orgs, each with its own roles.
+solo. Without organization context, the ordinary CASL ability grants only scoped
+read/update access to the caller's own profile. This is not an inventory of personal
+endpoints: each handler applies its own contract. A user can belong to multiple
+organizations, each with its own roles.
 
 Organization `ADMIN` comes from explicit creation, trusted initial setup or an
 existing authorized role/invitation workflow. Signup alone grants no membership.
@@ -173,10 +218,14 @@ Organization exchange preserves the parent's absolute `exp`: repeated `/switch`
 calls never renew access. A parent without a valid future expiry returns `401`.
 A-to-B exchange remains supported when the actor currently belongs to B; the
 response remains `{accessToken}`. Use ordinary refresh or login to renew access.
-The signed `sid` is preserved for existing step-up checks, not live-session proof.
-Revoking a session does not instantly expire an already issued JWT; derived tokens
-cannot extend that residual window beyond their parent. Login, refresh and step-up
-retain their ordinary issuance rules.
+The exchange preserves `sid`, `fid`, `securityVersion` and `browserBound` when
+present. It cannot remove family, account-version or browser-binding checks.
+A signed session ID alone is not proof of current authority. Browser-bound and
+protected-account requests use the current authority checks described in
+[sessions](./sessions.md) and [MFA foundation](./mfa-foundation.md). Independent
+unprotected credentials retain their documented expiry limits; do not apply that
+residual window to a revoked browser family. Login, refresh and step-up retain
+their own issuance rules.
 
 The org creator automatically becomes its `ADMIN`.
 
@@ -618,15 +667,7 @@ key can never exceed its creator's access even if scoped broadly, and
 
 ---
 
-## See also
-
-- [Controlled authorization upgrade](./authorization-upgrade.md) — audit, maintenance, recovery.
-- [Concepts](./concepts.md) — tokens, sessions, the authentication model.
-- [Sessions](./sessions.md) — rotation and revocation (incl. role-change revoke).
-- [CSRF Posture](./csrf.md) — cookie surfaces and CSRF handling.
-- [Auth API contracts](./reference.md) — error codes and environment variables.
-
-### Complete organization member role sets
+## Complete organization member role sets
 
 The [member assignment API and headless UI](../product-admin/organization-members.md)
 require full TeamAccess and current organization membership, including for
@@ -656,3 +697,11 @@ Browser [confirmed member removal](../product-admin/organization-members.md#remo
 uses supported personal JWT issuance, so the existing resolver and locked transaction require membership,
 including for SUPER_ADMIN. The browser's organization header cannot turn that credential into an original-bound JWT.
 The optional direct DELETE membership precondition does not change legacy credential admission.
+
+## See also
+
+- [Controlled authorization upgrade](./authorization-upgrade.md) — audit, maintenance, recovery.
+- [Concepts](./concepts.md) — tokens, sessions, the authentication model.
+- [Sessions](./sessions.md) — rotation and revocation (incl. role-change revoke).
+- [CSRF Posture](./csrf.md) — cookie surfaces and CSRF handling.
+- [Auth API contracts](./reference.md) — error codes and environment variables.

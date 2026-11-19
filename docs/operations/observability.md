@@ -503,7 +503,7 @@ password itself into a command, which would otherwise leak it into shell
 history and process listings:
 
 ```bash
-docker compose --profile monitoring up -d --no-deps --force-recreate grafana
+docker compose --profile monitoring up -d --no-deps --force-recreate grafana &&
 docker compose --profile monitoring exec grafana sh -c \
   'printf "%s" "$GF_SECURITY_ADMIN_PASSWORD" | grafana cli admin reset-admin-password --password-from-stdin'
 ```

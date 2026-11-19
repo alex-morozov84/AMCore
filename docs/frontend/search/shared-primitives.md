@@ -22,10 +22,12 @@ a second native search clear control.
 | `value`, `onValueChange(value)`      | Current text and edit callback                            |
 | `onClear()`                          | Feature-owned reset or immediate search action            |
 | `label`, `placeholder`, `clearLabel` | Caller-supplied, localized accessible copy                |
+| `onKeyDown?`                         | Optional keyboard handler on the input                    |
+| `disabled?`                          | Disables the input and clear button                       |
 | `maxLength?`, `className?`           | Optional presentation constraints                         |
 
 The field creates no form, request, debounce, URL, or results. Put its copy in
-every live message catalogue (`messages/en.json` is the base); do not put
+every shipped message catalogue (`messages/en.json` is the base); do not put
 English strings inside the shared component. Its co-located tests cover the
 controlled behavior and refocus; its Storybook story shows empty and populated
 states.
@@ -88,8 +90,7 @@ export function ItemFilter({ items, labels, locale }: Props) {
 }
 ```
 
-The example's matching rule is only a feature choice; pass the current locale
-from the feature and choose its real matching/collation policy. If results come
+Pass the current locale and choose a matching rule for the list. If results come
 from a server, follow the [URL-backed recipe](./url-backed-search.md) instead.
 
 ## useDebouncedDraft

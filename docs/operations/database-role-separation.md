@@ -1,295 +1,192 @@
 # Production Database Role Separation
 
-A single Postgres role that can both run migrations and serve app traffic
-means a bug or compromise in the running `api`/`worker` process has DDL
-rights over your entire schema — it can `DROP TABLE`, `ALTER TABLE`, or grant
-itself more access, not just read/write rows. This guide sets up two roles
-instead: a **migrator/owner** role used only by `prisma migrate deploy`, and
-a **runtime** role the app actually connects as, which can do DML and
-nothing else.
-
-**This is AMCore's own prescription of standard Postgres least-privilege
-practice, not a Prisma-endorsed pattern.** Prisma's own `migrate deploy`
-documentation covers only storing `DATABASE_URL` as a CI secret; a Prisma
-maintainer's own community-discussion answer on this exact question is
-"grant all privileges on the database." The mechanics below come from
-Postgres's own privilege model — [`GRANT`](https://www.postgresql.org/docs/16/sql-grant.html)
-and [`CREATE ROLE`](https://www.postgresql.org/docs/16/sql-createrole.html) —
-not from anything Prisma publishes.
+Use separate PostgreSQL credentials for schema ownership and normal API/worker
+traffic. The runtime role can modify permitted application rows without owning
+the application schema. Keep owner credentials out of long-running services.
 
 ## The two roles
 
-| Role              | Used by                              | Wired via                | Can                                                                                                                                                                                                                                                        |
-| ----------------- | ------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `amcore_migrator` | `prisma migrate deploy` only         | `MIGRATION_DATABASE_URL` | Everything needed to create/alter/drop schema objects — it **owns** every table/sequence it creates. Postgres ties `ALTER`/`DROP` rights to object ownership, not to a separately grantable privilege, so there is no narrower DDL grant to hand out here. |
-| `amcore_runtime`  | the running `api`/`worker` processes | `DATABASE_URL`           | `SELECT`/`INSERT`/`UPDATE`/`DELETE` on tables, `USAGE`/`SELECT` on sequences (for `serial`/identity columns). No `CREATE`, no ownership, no DDL of any kind.                                                                                               |
+| Role              | Use                                                                                              | Connection configuration                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `amcore_migrator` | One-shot migrations and explicitly authorized owner operations, such as guarded seed and restore | `MIGRATION_DATABASE_URL` in the reference Compose setup                                      |
+| `amcore_runtime`  | Normal API/worker data access                                                                    | Native `DATABASE_URL`; Compose `COMPOSE_DATABASE_URL` becomes the container's `DATABASE_URL` |
 
-**`TRUNCATE` is deliberately not part of that DML grant.** It's a separate
-privilege from `DELETE` in Postgres, and this setup never grants it to
-`amcore_runtime` — verified `has_table_privilege` shows `INSERT`/`UPDATE`/
-`DELETE` all `true` but `TRUNCATE` `false` after step 3, and a `TRUNCATE`
-attempt fails with `permission denied for table`. A compromised or buggy
-runtime connection can delete rows, including all of them with a `DELETE`
-statement, but cannot instantly empty a table via `TRUNCATE` (which also
-skips per-row triggers — including ADR-045's `audit_log` append-only
-trigger — where `DELETE` does not).
+The template grants runtime `SELECT`, `INSERT`, `UPDATE` and `DELETE` on application
+tables, plus schema `USAGE` and sequence `USAGE`/`SELECT`. It does not grant runtime
+ownership, schema `CREATE`, table `TRUNCATE` or membership in the owner role.
+Existing table guards can reject operations despite those grants.
 
-This maps directly onto env vars this repo already has —
-[`MIGRATION_DATABASE_URL`](deployment.md#migration-contract) was originally
-documented purely as a pooler-bypass mechanism (a direct connection for the
-one-shot migration step); in a role-separated production environment it
-takes on a second job at the same time: carrying the migrator role's
-credentials. If unset, the migration step falls back to `DATABASE_URL` — in
-a role-separated setup that means it would try to migrate using the
-_runtime_ role's credentials, which has no `CREATE`, so a misconfiguration
-here fails loudly at migration time rather than silently under-provisioning
-the runtime role.
+These are permissions on the managed application schemas, not a complete database
+sandbox. Review existing memberships, direct grants and `PUBLIC` privileges when
+adopting the template. PostgreSQL grants database `TEMPORARY` and function `EXECUTE`
+to `PUBLIC` by default; this template does not revoke every such privilege.
+Do not describe it as prohibiting all DDL or every possible operation elsewhere.
+See [PostgreSQL privileges](https://www.postgresql.org/docs/18/ddl-priv.html).
 
-**AMCore's Prisma schema uses `multiSchema`** (`apps/api/prisma/schema.prisma`
-→ datasource `schemas = [...]`) — every model lives in `core`,
-`notifications`, or `ai`, never in the default `public` schema. That
-datasource array actually names six schemas (it also reserves `fitness`,
-`finance`, and `subscriptions` for downstream use), but as shipped no model
-uses `@@schema(...)` with any of those three, so the reference script
-intentionally grants on only the populated three. Every statement below
-that names a schema needs one line per schema your fork actually uses — if
-you add the first model to one of the reserved three (or a new schema
-name entirely), add a matching block before that migration reaches
-production: a forgotten grant here doesn't fail at migration time, it fails
-silently until the running app actually queries that schema.
+The shipped Prisma models use `core`, `notifications` and `ai`.
+`apps/api/prisma/schema.prisma` also lists reserved schemas with no shipped models.
+When a fork starts using another schema, extend its reviewed grants/default privileges
+before admitting application traffic. A successful migration does not prove runtime access.
 
 ## Migration connection lifecycle
 
 The [migration image](migrator-image.md#process-and-database-lifecycle) adds
-`client_connection_check_interval=50ms` only to its selected datasource URL.
-The role template does not set this role default. Existing roles need no
-additional `ALTER ROLE` for this image setting. Setting a role default would
-also affect future API/worker connections when Compose shares one role.
+`client_connection_check_interval=50ms` to its selected datasource URL. The role
+template does not set this role default. Do not add `ALTER ROLE` as a substitute:
+that can affect unrelated consumers, including shared-role installations.
 
-For an external database, use a direct endpoint and run the image's documented
-preflight with the migration credential. Role provisioning and successful TLS
-alone do not prove that the endpoint applies the required session setting.
-Stop rollout if the preflight fails or the effective value is unknown.
+Use a direct endpoint and run the image's [exact-endpoint preflight](migrator-image.md#endpoint-preflight)
+with the selected owner credential, image, network and TLS configuration.
+Role provisioning and an ordinary successful connection do not establish endpoint
+capability. Unknown or failed preflight blocks rollout.
 
 ## Setup
 
-[`docker/postgres/setup-roles.sql`](../../docker/postgres/setup-roles.sql)
-is the reference script — a template to review and run against whatever
-Postgres you're actually using (which may not even be the compose stack's
-bundled instance), not an automated compose service. It has three steps,
-because AMCore's schemas don't exist until Prisma creates them:
+Before running the [reference SQL template](../../docker/postgres/setup-roles.sql):
 
-1. **Before the first `prisma migrate deploy` ever runs against this
-   database:** create both roles **as `NOLOGIN`** (not merely "without a
-   password" — see below) and grant `amcore_migrator` `CREATE`/`CONNECT` on
-   the database, **plus** `CREATE` on the `public` schema specifically —
-   even though no AMCore model lives there. Prisma's
-   own bookkeeping table, `_prisma_migrations`, is created in whatever
-   schema `MIGRATION_DATABASE_URL`'s connection defaults to, which is
-   `public` per this repo's own `.env.example`. Verified against a real
-   `prisma migrate deploy` run of every migration in this repo: without this
-   grant, the very first migration fails immediately with `permission
-denied for schema public`, before applying anything — Postgres 15+ no
-   longer grants schema `CREATE` to `PUBLIC` by default, and this is a
-   role-specific grant to `amcore_migrator`, not a schema this setup
-   otherwise needs. It doesn't conflict with `public`'s `CREATE` being
-   revoked from `PUBLIC` later in step 3 — that revokes the separate,
-   pseudo-role ACL entry, verified not to affect this role-specific one.
-   `core`/`notifications`/`ai` themselves don't exist yet on a brand-new
-   database, so nothing else schema-specific belongs in this step.
+- Obtain authority for the selected database and confirm its identity and backup/recovery plan.
+- Use an administrator able to create/manage the roles and grant the database/schema
+  rights below. `CREATEROLE` alone does not grant ownership of the selected database,
+  arbitrary objects or predefined monitoring roles. Check provider-specific capabilities.
+- Review the database name, schemas and existing roles. The template is not an
+  idempotent installer. Run only the applicable stages, not the whole file blindly.
+- For the bundled production stack, follow [single-host role setup](single-host-compose.md#5-start-infrastructure-and-create-the-roles)
+  and its complete saved overlays. The template does not configure network authentication or TLS.
 
-   **`NOLOGIN`, not "`LOGIN` with no password" — verified these are
-   meaningfully different.** A `LOGIN` role with no password is still
-   admitted by any _non-password_ auth method your `pg_hba.conf` allows —
-   reproduced live against the bundled Postgres image's own default config,
-   where local `trust` connections let a passwordless `LOGIN` role straight
-   in, no password prompt at all. `NOLOGIN` is checked as a role attribute
-   **before** any `pg_hba.conf` method is even consulted — verified
-   rejected identically under both `trust` and `scram-sha-256`, with
-   `FATAL: role "..." is not permitted to log in`, not an
-   auth-method-specific error. That's genuinely fail-closed.
+1. **Create both roles before the first migration.** Run template Step1 while the
+   roles remain `NOLOGIN`. Grant the owner `CONNECT`/`CREATE` on the selected database
+   and `CREATE` on `public`, where the reference connection keeps Prisma's ledger.
+   New application schemas do not exist yet. Keep runtime without schema ownership.
 
-   Immediately after this step, before step 2, set each role's password
-   interactively **while it's still `NOLOGIN`** (verified `\password` works
-   on a `NOLOGIN` role — setting a password doesn't itself grant the
-   ability to log in). Generate a strong, unique, random value from a
-   password manager's own generator for each — never a memorized or reused
-   one — and enter it directly at the prompt:
+   Assign separate generated passwords through interactive `psql` while `NOLOGIN`:
 
-   ```
+   ```text
    \password amcore_migrator
    \password amcore_runtime
    ```
 
-   Never as inline SQL (`ALTER ROLE ... PASSWORD '...'` or a `PASSWORD`
-   clause on `CREATE ROLE`) — verified live that PostgreSQL's own
-   `pg_stat_statements` extension, when its default `track_utility` setting
-   is left on, captures that literal text (password included) for any
-   `pg_monitor`-holding role to read; `\password` hashes client-side and
-   never sends the cleartext to the server at all. See [`pg_stat_statements`
-   security settings](pg-stat-statements-security.md) for the full rationale and
-   [Secret rotation](secret-rotation.md) for using the same command to
-   rotate these passwords later.
+   A passwordless `LOGIN` role can still connect through non-password authentication;
+   it is not equivalent to `NOLOGIN`. Setting a password does not enable login.
+   `\password` avoids sending a cleartext password in SQL. Do not put passwords
+   in literal SQL, command arguments, logs or reports; see
+   [query-statistics security](pg-stat-statements-security.md).
 
-   **Only now, with a real password already set, lift `NOLOGIN`:**
+   Only after both passwords are set:
 
    ```sql
    ALTER ROLE amcore_migrator LOGIN;
    ALTER ROLE amcore_runtime LOGIN;
    ```
 
-   Verified end to end: both roles reject every connection attempt (a real
-   network connection, any password or none, and the bundled image's own
-   local `trust` auth) right up until this `ALTER ROLE` runs — never a
-   passwordless-but-reachable window at any point.
+2. **Apply migrations as the owner.** Configure its direct connection, complete the
+   endpoint preflight, then run the one-shot migrator before API/worker startup.
+   Preserve the image's Tini entrypoint and strict native-CLI TLS settings.
+   If migration fails or its result is unknown, stop rollout and follow
+   [migration recovery](deployment.md#rollback). Do not substitute runtime credentials.
+   Guarded seed is a separate owner operation, not an implicit migration side effect;
+   follow [seeding](deployment.md#seeding) before initial organization setup.
+3. **Grant runtime access after schemas exist.** Apply template Step3 to every used
+   schema: schema `USAGE`, current table/sequence grants and default privileges for
+   future objects created by `amcore_migrator`. Keep the temporary membership,
+   `SET ROLE amcore_migrator`, `RESET ROLE` and reviewed membership removal in order.
+   Do not rerun the optional `CREATE ROLE` sections over existing roles.
 
-2. **Run `prisma migrate deploy`**, with `MIGRATION_DATABASE_URL` wired to
-   `amcore_migrator`'s credentials. This is what actually creates the three
-   schemas and every table in them; `amcore_migrator` becomes their owner
-   automatically, the same as table ownership above.
-3. **Once the schemas exist** (either from step 2, or immediately if you're
-   [adopting this on an existing database](#adopting-this-on-an-existing-database)):
-   for each schema, grant `amcore_runtime` `USAGE` on the schema, DML on all
-   its tables, `USAGE`/`SELECT` on all its sequences, and set
-   `ALTER DEFAULT PRIVILEGES` so **future** tables/sequences in that schema
-   auto-grant too, with no manual `GRANT` needed per migration.
+Default privileges belong to the object-creating role. Running
+`ALTER DEFAULT PRIVILEGES` as the administrator without selecting the migrator
+can succeed while configuring the wrong future owner. `SET ROLE` makes the creator
+explicit; it requires actual ability to assume that role. Review any pre-existing
+membership before revoking it. If it already exists, prepare a reviewed equivalent
+to the template's temporary grant/revoke pair; do not remove unrelated standing access.
+A role-creator's provider/PostgreSQL administration membership is separate from
+this temporary data-access membership. Inspect actual memberships rather than
+claiming that this procedure removes every administrator capability.
+See [default privileges](https://www.postgresql.org/docs/18/sql-alterdefaultprivileges.html).
 
-Step 3's statements act on objects `amcore_migrator` owns — issuing a
-`GRANT` on someone else's object requires the session to actually hold that
-role's privileges, whether by inheritance or by `SET ROLE`, not merely by
-being a member of it in a non-inheriting way. A plain
-`GRANT amcore_migrator TO CURRENT_USER` (no `WITH` clause) already defaults
-to a membership that inherits amcore_migrator's privileges (verified: a bare
-`GRANT` defaults to `INHERIT true, SET true`), which alone is already enough
-for both the schema/table `GRANT`s and `ALTER DEFAULT PRIVILEGES` below. The
-script uses `SET ROLE amcore_migrator` unconditionally anyway — not because
-of some split in what each statement needs, but because it's the one form
-that works correctly regardless of how a _specific_ admin connection's
-membership happens to be configured (verified: a membership granted
-elsewhere `WITH INHERIT false` makes **both** kinds of statement fail
-without `SET ROLE`, not just one). `RESET ROLE` plus revoking the temporary
-membership at the end leaves no standing grant behind — verified the grants
-and `ALTER DEFAULT PRIVILEGES` rules set up in between persist.
+Supply the two resulting URLs through the deployment's approved secret mechanism.
+Native API/worker use `DATABASE_URL`; Compose runtime uses `COMPOSE_DATABASE_URL`.
+Compose migrate selects `MIGRATION_DATABASE_URL`, falling back to its runtime URL
+if absent. The guarded seed requires an explicit migration URL; restore also uses
+the owner URL. Omission is not a supported role-separated migration configuration.
 
-Separately: omitting `FOR ROLE`/`SET ROLE` entirely and just running
-`ALTER DEFAULT PRIVILEGES IN SCHEMA core ...` as the admin succeeds with
-**no error** but silently sets the rule for the admin's own future objects,
-not `amcore_migrator`'s — a silent no-op, not a loud failure, and the reason
-this script never relies on "whichever role is currently connected"
-implicitly.
+Application/seed/restore and native Prisma CLI use different strict TLS parameters.
+Use the [single-host connection settings](single-host-compose.md#3-complete-env)
+and its private migration-only override. Do not weaken verification to fix a refusal.
+A successful CLI connection alone does not prove certificate or hostname rejection.
 
-This whole approach works whether your admin connection is a true Postgres
-superuser or a managed provider's `CREATEROLE`-holding admin user (verified
-against both). If your admin connection has `CREATEROLE` rather than true
-superuser, PostgreSQL 16+ itself _separately_ leaves you with a permanent,
-built-in admin-only membership over roles you create — verified this grants
-no `SET ROLE`/data access on its own, only the ability to further manage the
-role (e.g. change its password or drop it); reverified against PostgreSQL
-18.6. This script neither adds to nor removes that separate, Postgres-native
-grant; it's an unavoidable property of `CREATEROLE`, not a gap here.
-
-Wire the resulting connection strings, using the passwords you set via
-`\password` above (never the literal text you'd have typed into `CREATE
-ROLE`/`ALTER ROLE` — there isn't any):
-
-```bash
-MIGRATION_DATABASE_URL="postgresql://amcore_migrator:<migrator-password>@<host>:5432/amcore?sslmode=require"
-DATABASE_URL="postgresql://amcore_runtime:<runtime-password>@<host>:5432/amcore?sslmode=require"
-```
-
-These examples identify the roles; `sslmode=require` alone does not establish
-certificate verification. For the reference production setup, use the distinct
-[application/seed and migration CLI TLS settings](single-host-compose.md#3-complete-env).
-
-Per [Production deploy profile](production-deploy-profile.md)'s secrets
-checklist, the migrator role's URL is a `production` GitHub Environment
-secret only — never `staging`, never a repo secret.
+Staging and production need their own credentials. Keep the production owner URL
+in production's secret scope; never give that production credential to staging or
+the running application. See [promotion secrets](production-deploy-profile.md#secrets-and-variables-checklist).
 
 ## Adopting this on an existing database
 
-If you're retrofitting role separation onto a database that already has
-`core`/`notifications`/`ai` populated (owned by whatever single role you
-used before this guide existed), step 2 above is irrelevant — the schemas
-already exist. Instead, run `REASSIGN OWNED BY <existing_role> TO
-amcore_migrator;` (as a superuser, or as the role that currently owns the
-objects) **before** step 3 — verified this transfers ownership of every
-existing object across every schema in one statement, letting
-`amcore_migrator` `ALTER`/`DROP` a table it didn't originally create. Then
-run step 3 as usual: `REASSIGN OWNED BY` only moves ownership of objects
-that already exist, not the `ALTER DEFAULT PRIVILEGES` rule for ones that
-don't yet.
+Close affected writers and verify a restorable backup before changing ownership,
+roles or connection settings. Inventory the existing owners, grants, memberships
+and migration ledger. If schemas already exist, do not recreate them or rerun
+migrations merely to transfer ownership; reconcile actual ledger state separately.
+
+`REASSIGN OWNED BY <existing_role> TO amcore_migrator` is a broad administrative
+operation. It can affect all objects owned by that role in the current database
+and shared objects such as databases/tablespaces, not only AMCore tables.
+It does not transfer objects inside other databases, default privileges or grants
+on objects the old role does not own. Review the full affected ownership first.
+If the old role also owns unrelated resources, prepare a narrower reviewed transfer.
+
+Use a superuser or an administrator with the ownership privileges required for
+all affected objects and ability to `SET ROLE` to the new owner. Merely connecting
+as the old owner is insufficient. Follow
+[PostgreSQL ownership transfer](https://www.postgresql.org/docs/18/sql-reassign-owned.html)
+and stop if authority or scope is unknown; do not broaden runtime privileges.
+
+After the reviewed transfer, apply Step3 for current and future objects. Recreate
+API/worker connections with the runtime credential. Verify ownership, runtime DML
+and sequence use, denial of owner-role assumption, schema DDL and table `TRUNCATE`.
+Check default privileges with the disposable-object method in
+[role-separated restore verification](backup-restore.md#verify-a-role-separated-restore),
+only on an isolated target. Do not add probe tables to production.
+Keep traffic closed on any missing grant, unknown ownership or failed verification.
 
 ## What this doesn't need
 
-- **The Prisma shadow database.** It's used only by `prisma migrate dev` for
-  drift detection during local development; `migrate deploy` and `migrate
-resolve` never touch it. The production migrator role needs no shadow-DB
-  create/drop rights at all.
-- **A runtime-role grant for `_prisma_migrations`.** Prisma creates and owns
-  this bookkeeping table itself, under `amcore_migrator` — the running app
-  never queries it, so `amcore_runtime` needs no access to it. (The migrator
-  role itself does need `CREATE` on the `public` schema this table lands
-  in — see step 1 above; this bullet is about the runtime role only.)
+- **A production shadow database.** Production `migrate deploy` and `migrate resolve`
+  do not need the development shadow-database create/drop capability.
+- **Runtime access to `public._prisma_migrations`.** Migration bookkeeping and
+  owner-only maintenance read it; normal application traffic does not need that
+  grant. MFA deployment maintenance checks the ledger through its approved owner
+  connection. Do not widen the runtime role for maintenance or backups.
 
 ## Interaction with other parts of this repo
 
-- **The `restore-drill` profile does not verify this.** It restores into a
-  fresh scratch cluster with none of your roles, so it runs `pg_restore
---no-owner --no-privileges` — deliberately skipping ownership/ACL restore
-  entirely (see [Backup & restore](backup-restore.md#restore-drill-rehearsing-a-restore-not-just-taking-one)).
-  It proves your data and schema restore cleanly; it does not prove that
-  restoring into a role-separated target reproduces these grants. That's a
-  separate thing to verify in its own right if you rely on both.
-- **The audit log is already append-only without this.** ADR-045's
-  `core.audit_log` table uses a `BEFORE UPDATE/DELETE/TRUNCATE` trigger that
-  blocks mutation for every role, including the table owner — so role
-  separation is not a prerequisite for that guarantee. Once you have
-  `amcore_runtime` set up, you _may_ additionally
-  `REVOKE UPDATE, DELETE ON core.audit_log FROM amcore_runtime;` as defense
-  in depth (a second, independent layer alongside the trigger), but it is
-  optional hardening, not something this guide requires.
+- The scratch `restore-drill` skips ownership/ACLs. It does not verify restored
+  role separation. Use [role-separated restore verification](backup-restore.md#verify-a-role-separated-restore)
+  with the actual archive and target capabilities; synthetic fixtures are not that proof.
+- Audit-log triggers reject ordinary `UPDATE`/`DELETE`/`TRUNCATE` while enabled.
+  They are not protection against a schema owner or superuser who can change or
+  disable them. Keep that credential out of runtime. Optional
+  `REVOKE UPDATE, DELETE ON core.audit_log FROM amcore_runtime` is additional
+  hardening, not a replacement for the trigger or a complete owner threat boundary.
 
 ## A backup reader role
 
-`pg_dump` needs read access to every table, including Prisma's
-`public._prisma_migrations`, which `amcore_runtime` deliberately cannot read (so
-it also cannot run migrations). Do not widen the runtime role for backups. The
-optional last section of `setup-roles.sql` creates `amcore_backup` instead: it is a
-member of PostgreSQL's predefined `pg_read_all_data` role (PostgreSQL 14+), so it
-reads every table and sequence and can write nothing. Set its password with
-`\password amcore_backup` while it is `NOLOGIN`, then `ALTER ROLE amcore_backup
-LOGIN`, and point the bundled `backup` profile at it with `BACKUP_DATABASE_URL`.
-Granting a predefined role needs a superuser or a provider admin allowed to grant
-it.
+The optional template section creates `amcore_backup` with `pg_read_all_data` for
+full table/sequence reads, including Prisma's ledger. It grants no write permissions
+by itself and does not bypass row-level security. Check other direct/inherited
+privileges and any downstream RLS before claiming a complete read-only backup.
+Provision this role through an administrator allowed to grant it, set its password
+while `NOLOGIN`, then enable login. Set `BACKUP_DATABASE_URL` to this role; do not
+widen runtime access. See [PostgreSQL predefined roles](https://www.postgresql.org/docs/18/predefined-roles.html).
 
 ## A third role for query investigation
 
-`setup-roles.sql` also provisions `amcore_observer` — a read-only role for
-querying Postgres's own `pg_stat_statements` slow-query statistics, distinct
-from both roles above. It needs no schema/table access at all; its one grant
-(`pg_monitor`) is deliberately made through a self-hosted superuser or
-provider-authorized equivalent, in a separate step, not by this script's own
-`CREATEROLE`-level admin connection — see the full guide for why.
-`amcore_runtime` is not the right credential for this
-role's purpose: it only shows the queries it itself ran (every AMCore
-process connects as that one role, so this happens to include everything
-the app runs), and granting it broader stats access would widen the exact
-role this guide's own separation narrowed. See [the `amcore_observer`
-role](pg-stat-statements-observer-role.md) for the full guide, including
-what it can and cannot do, verified empirically.
+`amcore_observer` is separate from application, migrator and backup credentials.
+Its `pg_monitor` grant needs an administrator authorized to delegate that capability;
+`CREATEROLE` alone is not proof. Do not grant the runtime role broader query-statistics
+access. Follow [the observer guide](pg-stat-statements-observer-role.md) for setup,
+security and recovery.
 
 ## See also
 
-- [Deployment & migrations](deployment.md#migration-contract) — the one-shot
-  migration contract this role split plugs into.
-- [Production deploy profile](production-deploy-profile.md) — the secrets
-  checklist that places the migrator role's URL in the `production`
-  environment only.
-- [Backup & restore](backup-restore.md) — what the `restore-drill` profile
-  does and does not verify about roles, per above.
-- [Secret rotation](secret-rotation.md) — rotating `amcore_migrator`'s and
-  `amcore_runtime`'s passwords once they're already set up here.
-- [Deployment platforms](deployment-platforms.md) — this guide's own testing
-  against both a true superuser and a `CREATEROLE`-holding non-superuser
-  admin connection is why "our managed provider doesn't give us a
-  superuser" isn't a reason to skip role separation on any platform there.
+- [Deployment](deployment.md#migration-contract) — one-shot ordering and recovery.
+- [Migration image](migrator-image.md) — exact endpoint, TLS and process contract.
+- [Backup & restore](backup-restore.md) — archives, ownership and admission.
+- [Secret rotation](secret-rotation.md) — replacing credentials across consumers.
+- [Deployment platforms](deployment-platforms.md) — mappings require actual target qualification.

@@ -3,6 +3,12 @@
 Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-node-runtime`
 group.
 
+Use the firing instance and process role to select the affected target.
+After mitigation, confirm the instance still reports metrics under comparable
+load. Check that lag, post-GC heap or descriptor use stabilizes, and verify
+request handling or worker progress for that role. A restart alone does not
+confirm recovery.
+
 ## Event loop lag
 
 **Symptom:** `AMCoreEventLoopLagElevated` (p99 > 50ms for 30m) or
@@ -38,16 +44,19 @@ group.
   process or reduce per-process concurrency instead of moving it to another
   handler on the same event loop.
 - If GC-pressure-shaped: see [Heap usage](#heap-usage) below.
-- If deploy-correlated: roll back per `docs/operations/production-deploy-profile.md`.
+- If deploy-correlated: roll back per [the rollback procedure](../deployment.md#rollback).
 
 **Escalation:** `Elevated` is a rising-trend ticket, worth investigating
-before it worsens. `Critical` means requests are visibly queuing behind
-blocked JS execution — escalate per your organization's on-call process.
+before it worsens. `Critical` indicates sustained lag on the affected process. Check
+request latency or worker progress and escalate per your on-call process.
 
 ## Heap usage
 
-**Symptom:** `AMCoreHeapApproachingLivenessCeiling` is firing (heap used above
-90% of the 1.5GiB liveness threshold for 5m).
+**Symptom:** `AMCoreHeapApproachingLivenessCeiling` is firing. The shipped
+rule checks heap usage above 90% of 1.5 GiB for 5 minutes. Compare with the
+actual health thresholds if the deployment overrides them. A lower
+`HEALTH_MEMORY_HEAP_BYTES` can make readiness or liveness fail before the
+alert fires. The override does not change the alert threshold.
 
 **Likely causes, ranked:**
 
@@ -55,9 +64,6 @@ blocked JS execution — escalate per your organization's on-call process.
    releases).
 2. Sustained high load pushing heap usage up without a leak (check whether it
    plateaus or keeps climbing).
-3. `HEALTH_MEMORY_HEAP_BYTES` was lowered without updating this alert's
-   threshold to match (a fork-configuration drift, not a real production
-   issue) — see the alert's own comment in `amcore-alerts.yml`.
 
 **Diagnostic steps:**
 
@@ -79,7 +85,9 @@ blocked JS execution — escalate per your organization's on-call process.
   a rolling restart buys time but does not resolve the underlying leak. An
   orchestrator restarts it automatically only if `/health/live` is configured
   as a liveness probe; the shipped Compose healthcheck uses `/health/ready`
-  and does not restart a merely unhealthy container.
+  and does not restart a merely unhealthy container. The default readiness
+  limit is 1 GiB, separate from the 1.5 GiB liveness limit. The environment
+  override changes both.
 
 **Escalation:** this is `severity: page` — a configured liveness probe may
 restart the process. Escalate per your organization's on-call process if a

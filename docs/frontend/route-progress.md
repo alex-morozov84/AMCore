@@ -1,8 +1,6 @@
 # Top Route Progress Bar
 
-A first-party, YouTube-style progress bar fixed to the top of the viewport,
-shown while a navigation is pending. No dependency was added for it — see
-"Why first-party, not a dependency" below.
+The bar appears at the top of the viewport while a supported navigation is pending.
 
 ## Semantics
 
@@ -23,9 +21,13 @@ accessible route-change announcement.
 | Browser Back/Forward (`popstate`) to a different pathname/query                                                                   | Yes             |
 | A caller cancelling a Link in `onClick` or `onNavigate`                                                                           | No              |
 | Modifier/right click, a non-self `target`, `download`, or an external URL                                                         | No              |
-| The current pathname/query, including `#section` or the same query via `?tab=x`                                                   | No              |
+| A `RouteProgressLink` to the current pathname/query, including a hash-only change                                                 | No              |
 | `router.refresh()` / `router.prefetch()`                                                                                          | No              |
 | A native `<a>`, `window.location`, hard reload, or server-side redirect (the browser owns these full-document/server transitions) | No              |
+
+With the flag enabled, programmatic `push()` and `replace()` start the
+progress timer even for the current pathname/query. If no destination commits,
+the bar can appear after the reveal delay and then clear on the safety timer.
 
 A navigation that never commits self-clears: the bar reveals after 120ms and
 begins completing roughly six seconds later by default.
@@ -67,7 +69,7 @@ import { useRouteProgressRouter } from '@/shared/lib/route-progress/use-route-pr
 
 export function DashboardButton({ children }: { children: ReactNode }) {
   const router = useRouteProgressRouter()
-  return <button onClick={() => router.push('/dashboard')}>{children}</button>
+  return <button onClick={() => router.push('/')}>{children}</button>
 }
 ```
 
@@ -78,14 +80,6 @@ safety timer clears the bar.
 An Oxlint rule bans importing `Link` or `useRouter` directly from
 `@/i18n/navigation` anywhere except these two adapters' own implementation
 files, so a new call site cannot silently bypass the bar.
-
-## Why first-party, not a dependency
-
-`nextjs-toploader` was evaluated and rejected: it injects runtime CSS, has no
-reduced-motion handling, leaves a patched `History` behind on unmount, treats
-`popstate` only as completion, and still needs a separate router integration.
-Next's `loading.tsx`/`<Suspense>` and `useLinkStatus` remain complementary
-route/per-Link tools, not replacements for this global indicator.
 
 ## Reduced motion, tokens, and CSP
 

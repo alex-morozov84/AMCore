@@ -170,7 +170,7 @@ budget (2,000 rows / 512 KiB) instead of reading an unbounded set of rules.
 
 ## Upgrading an existing installation
 
-The release that adds these routes also adds one index, `member_roles_roleId_memberId_idx` on
+These routes use the index `member_roles_roleId_memberId_idx` on
 `core.member_roles ("roleId", "memberId")`. It serves holder counts and samples and the
 foreign-key lookup that runs when a role is deleted (the existing unique index starts with
 `memberId`). Building a plain `CREATE INDEX` blocks writes to the table while it runs
@@ -268,7 +268,8 @@ public hooks and reaches the app through the composition layer's public server e
 prints commands for frozen installation, artifact preparation, lint, type checks
 and the managed real-stack browser run. It replaces the existing admitted mount,
 while retaining its server admission. Initialize the product first; the generator
-preserves selected project choices. See the [adoption guide](adoption.md). The browser
+preserves build settings. It requires product-admin `path` mode; use the ready
+host recipe for host placement. See the [generator prerequisites](adoption.md#connect-the-chosen-interface). The browser
 run exercises list with holder counts, create (`201`), save (`200`) followed by an observable reread and a reload that
 shows the persisted preset, a failed role read that hides the stale snapshot and its commands
 until the next successful read, delete, the absence of any bearer credential in the browser, and
@@ -283,15 +284,17 @@ contracts above when those workflows are required.
 
 ## Ready role screens
 
-Organization administrators with full team access get a fourth organization tab, **Roles**, next to
+Organization administrators with full team access use **Roles**, next to
 Overview, Members and Invitations. The four tabs come from one navigation widget that shows a tab only
-when its destination is passed, so a downstream app can leave one out.
+when its destination is passed, so a downstream app can leave one out. The paths
+below use default path placement; multi-locale builds add a locale prefix. See
+[placement and sessions](placement-and-sessions.md) for custom aliases and host mode.
 
-- `/organizations/[id]/roles` lists the roles. Built-in roles (ADMIN, MEMBER, VIEWER) are a separate
+- `/manage/organizations/[id]/roles` lists the roles. Built-in roles (ADMIN, MEMBER, VIEWER) are a separate
   read-only block. Custom roles are a table with name and a two-line description, rule count, holders
   and notes (**Advanced rules**, **Full control**), with name search and pages of 20. **Create role**
   asks for a name and an optional description and opens the new role.
-- `/organizations/[id]/roles/[roleId]` is one role: details, **Capabilities** grouped by area with
+- `/manage/organizations/[id]/roles/[roleId]` is one role: details, **Capabilities** grouped by area with
   one checkbox per level the descriptor offers (own, assigned, all) (a catalogue of more than 12
   capabilities gains a search, collapsible areas with an "N of M configured" count and an **Only
   configured** filter; a small one keeps the flat list), the read-only **Advanced rules**,
@@ -334,7 +337,7 @@ provider nothing links, so every ready component also works in a headless compos
 screen can supply another address or ignore the context. Picker links open a new tab so a selection in
 progress is not lost.
 
-**Routes in the app.** `app/[locale]/(organization-access)/organizations/[id]/roles/page.tsx` and
+**Routes in the app.** `app/[locale]/(product-admin)/manage/(protected)/organizations/[id]/roles/page.tsx` and
 `.../roles/[roleId]/page.tsx` render `OrganizationRolesMount` and `OrganizationRoleMount` from the
 composition layer's public server entry; placement provides `rolesHref(id)` and
 `roleHref(id, roleId)`. To try the screens with a large organization, run

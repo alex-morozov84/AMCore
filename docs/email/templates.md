@@ -41,8 +41,7 @@ Rules:
 - Add every message key for every shipped catalogue locale (`LOCALE_CATALOGUES`).
 - **Keep user-facing copy in message catalogs, not service methods** — including
   units. Pass a _number_ (`expiresInHours`) and let the catalogue phrase it;
-  building `${hours} часов` in a service hardcodes one language into every
-  recipient's email, which is a defect this starter already shipped once.
+  formatting a duration in the service hardcodes one language for every recipient.
 - **Pluralize with ICU in the message**, never a helper in code:
   `{hours, plural, one {# час} few {# часа} many {# часов} other {# часа}}`.
   Russian needs four CLDR categories; supplying only `one`/`other` renders with
@@ -65,14 +64,8 @@ When adding or changing templates, update tests in the same PR:
   categories**.
 - `email.schema.spec.ts` for queue schema changes.
 - `email.service.spec.ts` for render/queue/direct behavior.
-- `processors/email.processor.spec.ts` for worker semantics.
+- `queued-email.handler.spec.ts` for worker semantics.
 - `templates/*.integration.spec.ts` for real React Email render in supported
   locales, HTML, plaintext, and template-specific assertions.
 - `apps/api/test/email-secrets.e2e-spec.ts` when touching secret boundaries.
 - Notification specs when using `NotificationsService` or changing definitions.
-
-## Registry Follow-Up
-
-A typed template registry may replace the explicit switch/union model later.
-Until that happens, downstream products should follow the current enum + union +
-schema + render-switch contract.

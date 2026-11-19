@@ -12,7 +12,7 @@ constructor(private readonly storage: StorageService) {}
 await storage.upload({
   key: 'public/avatars/user-123/v-1-abc/avatar-256.webp',
   body: file.buffer,
-  contentType: 'image/png',
+  contentType: 'image/webp',
   cacheControl: 'public, max-age=31536000',
 })
 ```

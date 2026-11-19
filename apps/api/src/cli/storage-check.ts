@@ -12,8 +12,8 @@ import { pathToFileURL } from 'node:url'
  * Reads the same environment as the API (no database, no Redis), then exercises private
  * upload/download/delete, presigned download and upload, multipart, copy, list, anonymous
  * delivery of the public namespace and the refusal of the private one. It writes only under
- * the reserved diagnostic folder, removes what it created and never prints credentials,
- * endpoints or provider messages. Exit code 0 means every step passed or was skipped.
+ * the reserved diagnostic folders. It checks cleanup of temporary objects and keeps
+ * two fixed delivery canaries. Reports use step names, statuses and error classes. Exit code 0 means every step passed or was skipped.
  */
 import { validate } from '../env.js'
 import { readAnonymously } from '../infrastructure/storage/storage-anonymous-read.js'

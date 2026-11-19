@@ -1,6 +1,6 @@
 # Sessions
 
-Every login starts an independent refresh-token family. Each Session row is
+Each completed sign-in starts an independent refresh-token family. Each Session row is
 one token generation with descriptive request metadata, not a verified device
 or an activity history.
 
@@ -8,7 +8,8 @@ or an activity history.
 
 ## How sessions work
 
-When you log in, the backend creates a **session** in the database:
+Completed sign-in creates a **session** in the database. A login `202` is
+a restricted continuation, not this completed result:
 
 ```
 Session {
@@ -39,12 +40,14 @@ manual login) creates a second, independent session, and a single browser
 session can itself later carry an approximate location alongside its device
 info (see [Listing active sessions](#listing-active-sessions)).
 
-UA/IP are captured on registration, login, OAuth login callback and each refresh
-generation. The bundled BFF preserves current visitor UA; missing UA is null.
+UA/IP are captured when registration or completed password/OAuth admission
+issues credentials, and on each refresh generation. The OAuth identity callback
+alone does not issue a session. The bundled BFF preserves current visitor UA; missing UA is null.
 Stored IP uses an opt-in peer-verified visitor claim when configured, otherwise
 req.ip/socket fallback. See [GeoIP setup](../operations/geoip-setup.md#capturing-visitor-ip-through-the-bff).
-This does not change password-login rate-limit identity, global Fastify proxy
-trust, audit IP or authorization. Historical Node UA/internal peer IP is not
+The password limiter also uses the peer-verified visitor IP when configured.
+Descriptive session metadata does not grant authorization or change global
+Fastify proxy trust or audit-IP policy. Historical Node UA/internal peer IP is not
 backfilled; its original visitor metadata cannot be reconstructed reliably.
 
 ## Product administration placement
@@ -90,7 +93,9 @@ Day 3:  Refresh → old "abc123..." revoked → refresh_token = "xyz789..."
 Day 5:  Refresh → old "xyz789..." revoked → refresh_token = "qrs456..."
 ```
 
-**Why this matters:** If someone intercepts your refresh token (from a log, a compromised network, etc.), they have a very short window to use it. The moment the real client refreshes, the stolen token becomes worthless.
+Rotation limits reuse; it does not guarantee a short theft window. A stolen
+current token can be used before the legitimate client rotates it. Protect raw
+tokens in transit, cookies, server-side vaults and backups.
 
 Revoked refresh tokens are kept briefly in the session family so the backend can detect replay. If a rotated token is used again, the whole token family is invalidated and the current session is signed out.
 
@@ -103,7 +108,7 @@ Revoked refresh tokens are kept briefly in the session family so the backend can
 No body needed — the refresh token is read from the `refresh_token` cookie.
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/refresh \
+curl -X POST https://api.example.com/api/v1/auth/refresh \
   --cookie "refresh_token=abc123..."
 ```
 
@@ -121,7 +126,8 @@ A new `refresh_token` cookie is set with the rotated token.
 
 | Code              | HTTP | When                                                                                                 |
 | ----------------- | ---- | ---------------------------------------------------------------------------------------------------- |
-| `TOKEN_INVALID`   | 401  | Cookie missing, token not found in DB, or session expired                                            |
+| `TOKEN_INVALID`   | 401  | Present token not found, reused or expired                                                           |
+| `UNAUTHORIZED`    | 401  | Refresh cookie missing                                                                               |
 | `SESSION_CHANGED` | 409  | Internal family/account/browser authority changed; do not refresh again or select another credential |
 
 ---
@@ -137,7 +143,7 @@ Sessions are ordered newest first (`createdAt DESC, id ASC`) so page
 boundaries are deterministic.
 
 ```bash
-curl 'https://api.amcore.dev/api/v1/auth/sessions?page=1&limit=20' \
+curl 'https://api.example.com/api/v1/auth/sessions?page=1&limit=20' \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
@@ -200,7 +206,7 @@ The optional Console also displays this metadata; see the
 **Endpoint:** `DELETE /api/v1/auth/sessions/:sessionId`
 
 ```bash
-curl -X DELETE https://api.amcore.dev/api/v1/auth/sessions/sess_def456 \
+curl -X DELETE https://api.example.com/api/v1/auth/sessions/sess_def456 \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
@@ -220,7 +226,7 @@ restore protected access or its session-derived continuations.
 Signs out all devices except the current one. Useful for "sign out everywhere" functionality.
 
 ```bash
-curl -X DELETE https://api.amcore.dev/api/v1/auth/sessions \
+curl -X DELETE https://api.example.com/api/v1/auth/sessions \
   -H "Authorization: Bearer eyJhbGci..." \
   --cookie 'refresh_token=<current-refresh-token>'
 ```
@@ -264,7 +270,7 @@ counts active families across all pages. Reads use `Cache-Control: private,
 no-store`. Send `Accept-Language` for city localization:
 
 ```bash
-curl 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions?page=1&limit=20' \
+curl 'https://api.example.com/api/v1/admin/users/<target-user-id>/sessions?page=1&limit=20' \
   -H 'Authorization: Bearer <super-admin-access-token>' \
   -H 'Accept-Language: en'
 ```
@@ -272,17 +278,20 @@ curl 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions?page=1
 Use the returned admin `sessionId`, not a self-service row `id`, to revoke one:
 
 ```bash
-curl -i -X DELETE 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions/<session-id-from-list>' \
+curl -i -X DELETE 'https://api.example.com/api/v1/admin/users/<target-user-id>/sessions/<session-id-from-list>' \
   -H 'Authorization: Bearer <super-admin-access-token>'
 
-curl -i -X DELETE 'https://api.amcore.dev/api/v1/admin/users/<target-user-id>/sessions' \
+curl -i -X DELETE 'https://api.example.com/api/v1/admin/users/<target-user-id>/sessions' \
   -H 'Authorization: Bearer <super-admin-access-token>'
 ```
 
 Both return `204` without a response body on success. A `403 STEP_UP_REQUIRED`
 requires re-authentication with the operator's own password at
 `POST /api/v1/auth/step-up`; direct API clients use its returned access token
-when retrying. OAuth-only accounts receive `STEP_UP_METHOD_UNAVAILABLE`.
+when retrying only after completed proof. Protected accounts can receive `202`
+with missing second-factor proofs; that result is not permission to retry the
+admin action. OAuth-only accounts without a password receive
+`403 STEP_UP_METHOD_UNAVAILABLE`.
 A `404` on revoke-one means the family is absent or does not belong to the
 target; invalid IDs/pagination return `400`, missing bearer credentials or
 API keys return `401`, insufficient system role returns `403`, and privileged
@@ -292,20 +301,15 @@ freshness or authorization error.
 Both `DELETE` routes require step-up (a recently re-authenticated admin
 session) and reject a target equal to the admin's own account — an admin
 manages their own sessions through the self-service endpoints above, not
-these. Revoking blocks future refresh immediately; an access token already
-issued before the revoke can remain valid until its own expiry (default 15
-minutes, configurable via `JWT_ACCESS_EXPIRATION`) — the same residual-access
-caveat documented for [system-role changes](#when-sessions-are-automatically-invalidated).
+these. Revocation blocks future refresh. Browser and protected-account
+credentials fail their next current-family authority check. Only never-protected
+independent clients retain the residual lifetime of already issued JWTs
+(default 15 minutes, configurable via `JWT_ACCESS_EXPIRATION`).
 Every successful list read is itself audited (`admin.user.sessions_viewed`,
 bounded page/limit/result-count metadata only — no IP/user-agent/location
 values), hidden from Audit browsing by default the same way
 `admin.audit_logs.viewed` is; revoke actions are audited as
 `admin.user.session_revoked` / `admin.user.sessions_revoked`.
-
-This is a starter-owned recovery/security control, distinct from instant
-access-token invalidation (an already-issued access token is never
-force-expired) — that remains a separately tracked possible future
-enhancement, not part of this feature.
 
 ---
 
@@ -319,8 +323,7 @@ their own issuance lifetime.
 ## When sessions are automatically invalidated
 
 Password reset commits password, token consumption, account security version and
-existing family/session revocation together. Physical cleanup and profile-cache
-invalidation follow the commit. A follow-up failure can leave an error response
+existing family/session revocation together. Physical cleanup follows the commit; current user reads use the primary database. A follow-up failure can leave an error response
 after the change. Revoked rows can remain if cleanup fails; a new sign-in after
 the reset survives that cleanup.
 Try ordinary sign-in with the chosen password, then inspect/revoke sessions if
@@ -330,17 +333,17 @@ expiry. Browser and protected credentials also require the current account versi
 
 Sessions don't just expire — they can be invalidated by specific events:
 
-| Event                      | What gets invalidated                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------------------------- |
-| Password reset             | All sessions (every device signs out)                                                               |
-| Protected OAuth linking    | All previous sessions and pending continuations; [sign in again](oauth.md#after-successful-linking) |
-| Session revoked by user    | That specific session only                                                                          |
-| "Sign out everywhere"      | All sessions except current                                                                         |
-| Logout                     | Current session only                                                                                |
-| System-role change         | All sessions of the affected user                                                                   |
-| Admin-revoked session      | That specific session only                                                                          |
-| Admin-revoked all sessions | All sessions of the target user                                                                     |
-| Session expired (7 days)   | Cleaned up by nightly job                                                                           |
+| Event                                  | What gets invalidated                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Password reset                         | All sessions (every device signs out)                                                               |
+| Protected OAuth linking                | All previous sessions and pending continuations; [sign in again](oauth.md#after-successful-linking) |
+| Session revoked by user                | That specific session only                                                                          |
+| "Sign out everywhere"                  | All sessions except current                                                                         |
+| Logout                                 | Current session only                                                                                |
+| System-role change                     | All sessions of the affected user                                                                   |
+| Admin-revoked session                  | That specific session only                                                                          |
+| Admin-revoked all sessions             | All sessions of the target user                                                                     |
+| Session token expired (default 7 days) | Refused by expiry checks; physical rows swept by the cleanup job                                    |
 
 A **system-role change** (e.g. a `SUPER_ADMIN` promotion or demotion via the
 admin API) revokes **all** of the target user's sessions, so they must
@@ -395,6 +398,12 @@ binding marker and organization scope. No new session or refresh token is create
 
 ## Nightly cleanup
 
-Expired sessions are cleaned up automatically by a scheduled job that runs every night. The cleanup uses indexed queries (by `expiresAt`) to stay fast even with millions of sessions.
+The scheduled `cleanup` job removes expired Session rows daily at 02:00 in the
+process time zone. It runs on worker/all roles through the scheduled-jobs
+executor and singleton lock. A web-only API process does not run scheduled jobs.
 
-You don't need to worry about this — it's fully automatic.
+Expiry checks refuse expired credentials independently of row deletion. Check
+the job's recorded outcome and `schedule.cleanup_partial_failure` logs when
+reclamation fails. Indexes support the expiry query; no throughput or
+million-session completion guarantee follows from them. See
+[scheduled jobs](../backend/scheduled-jobs.md) for roles and outcome monitoring.

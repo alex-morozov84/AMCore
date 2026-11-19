@@ -80,10 +80,8 @@ import { LocaleSwitcher } from '@/features/locale-switcher' // ✗ cross-slice
 
 Grouped layers are the one exception: a group's own barrel may re-export the
 slices inside it — `_pages/auth/index.ts` re-exports `LoginPage`/`RegisterPage`,
-which the login/register routes import as `@/_pages/auth`. `features` has no
-grouped slices today (Track 9 flattened `auth`/`sessions`, the only two that
-existed) — the mechanism (`sameGroup` in the `boundaries` policy) stays in
-place for `pages` and for whichever `features` group appears next.
+which the login/register routes import as `@/_pages/auth`. The boundaries
+policy uses `sameGroup` to constrain these re-exports.
 
 ### `shared` is a collection of modules
 
@@ -181,10 +179,8 @@ const value = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value // always undefi
 ```
 
 Put the constant in its own plain module (`shared/ui/sidebar-cookie.ts`) and
-import it from both sides. This shipped as a real defect in Track 9: the
-cookie was written correctly, arrived on the request, and the server still
-rendered the sidebar expanded — caught only by a real-stack E2E assertion on
-the state surviving a reload, not by typecheck, lint, or a component test.
+import it from both sides. Verify sidebar state after reload in the
+running application.
 
 ## Styling: the palette is a source, tokens are the public API
 

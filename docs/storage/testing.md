@@ -16,7 +16,7 @@ everything. The last layer is yours to run, because only you have your provider 
 | --------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Unit and contract     | Every driver follows the same rules (visibility by key, copy never changes it, errors, metadata).       | Anything about a real network or provider.                                                      |
 | S3 wire tests         | Real requests and responses: presigned URLs, multipart, delete many, a prefix policy, the public check. | ACLs, CDNs and provider quirks (see below).                                                     |
-| `storage:check`       | The setup you configured works on the real provider, end to end, right now.                             | That it keeps working. Run it after each change.                                                |
+| `storage:check`       | The operations marked PASS worked with the configured driver and endpoints.                             | That it keeps working. Run it after each change.                                                |
 | Public-delivery check | The public namespace stays readable and the private namespace stays closed.                             | Anything outside the two test files (see [Verify the setup](public-files.md#verify-the-setup)). |
 
 ### Why an emulator cannot prove ACLs
@@ -39,8 +39,8 @@ node dist/cli/storage-check.js       # from the production image
 ```
 
 From a checkout, the API environment must validate. The simplest way is to start from
-`.env.example` and override the storage variables. This is the pattern we used on Yandex
-(`my-storage.env` holds your `STORAGE_*` values and keys; keep it outside the repository):
+`.env.example` and override the storage variables. Keep your trusted storage environment file outside the repository. It supplies
+your `STORAGE_*` values and keys:
 
 ```bash
 cd apps/api
@@ -74,8 +74,11 @@ PASS  delete many and cleanup
 | public delivery and private exposure | The public location is not published, or **private files are exposed**. See [Public Files](public-files.md#verify-the-setup).                                                |
 | delete many and cleanup              | The account cannot delete, or the provider rejects `DeleteObjects`.                                                                                                          |
 
-A `SKIP` means the driver does not have that feature (for example the local driver has no signed
-URLs).
+A `SKIP` means the operation was not checked. The local driver skips signed URLs.
+The delivery step also skips when no public base URL is configured.
+
+The command sends requests from Node. To verify CORS, separately check a browser
+upload from the deployed web origin.
 
 ### Things to know before you run it
 
@@ -84,7 +87,7 @@ URLs).
 - It leaves two tiny canary files in place on purpose, so repeated runs are safe:
   `__amcore_probes__/private-canary` and `public/__amcore_probes__/public-canary`. A failed run may
   also leave a few objects of its own. A lifecycle rule on the probe prefix cleans those, and
-  deleting the bucket removes everything.
+  should apply only to diagnostic objects. Keep production buckets and user data intact.
 - The result is a snapshot. The running API repeats the public part every hour
   ([the public-delivery check](public-files.md#verify-the-setup)).
 
@@ -93,9 +96,8 @@ URLs).
 If you ran `storage:check` on a provider that is not verified in the
 [provider matrix](providers/README.md), send us the date, delivery mode, bucket layout and the
 output (never keys or endpoints that identify your account). A maintainer marks the provider
-**Verified** with your date. Yandex was recorded this way on 2026-10-15; see
-[its page](providers/yandex.md) for what a full record looks like, including the mistakes we made on
-purpose to prove the alarm works.
+**Verified** for the tested layout and mode, with the date. See the
+[Yandex evidence and limits](providers/yandex.md#what-was-not-verified).
 
 ## Run the S3 wire tests
 

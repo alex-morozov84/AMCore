@@ -18,6 +18,11 @@ import { buildBullConnection } from '../infrastructure/queue/redis-connection.co
 
 import { organizationSetupEnvironment } from './organization-setup-input.js'
 
+/**
+ * Follow docs/email/queued-upgrade.md. --mutators-stopped records the
+ * operator's maintenance assertion. Stop the mutators before using any mode.
+ * Status unconfirmed means keep maintenance in place and inspect the result.
+ */
 export async function runWelcomeUpgrade(
   args: string[],
   raw: Record<string, unknown>

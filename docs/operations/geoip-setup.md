@@ -78,7 +78,7 @@ for offline reader tests.
 - **Corrupt:** the updater's own validation step (opening the downloaded
   file with the real reader) rejects it before the atomic swap, so a corrupt
   download never reaches readers.
-- **Stale** (no successful update in over 45 days): the last good database
+- **Stale** (the loaded database's embedded build date is over 45 days old): the last good database
   keeps serving approximate labels rather than being hidden. Accuracy of stale data is not guaranteed. A bounded
   operator-facing warning is logged (`geoip.database_stale`); there is no
   separate "stale" indicator shown to a session viewer.
@@ -102,10 +102,13 @@ for offline reader tests.
 A worker/all process with no valid reader makes one nonblocking bootstrap
 attempt using the same Redis singleton lock as its daily check. API web-role
 processes only read; they never download. To retry immediately, run the
-compiled command in the writable updater container:
+compiled command in the writable updater container. Use the same project name,
+environment file and complete `COMPOSE_FILE` selection as the running installation.
+The worker must already be running; do not replace the selected overlays with
+`-f docker-compose.yml`. See [single-host setup](single-host-compose.md#1-get-the-source-and-select-the-overlays).
 
 ```bash
-docker compose -f docker-compose.yml exec worker node dist/cli/geoip-update.js
+docker compose exec worker node dist/cli/geoip-update.js
 ```
 
 The command creates no HTTP listener, scheduler or queue consumers, closes
@@ -122,10 +125,12 @@ WEB_TRUSTED_CLIENT_IP_HEADER on web and explicit TRUSTED_WEB_PEERS on API.
 Session capture validates the actual socket peer and the internal IP claim;
 disabled/untrusted/malformed claims fall back to req.ip/socket metadata.
 Registration, password login, OAuth login callbacks and refresh generations
-capture current request metadata. Password-login limiter addresses, global
-req.ip/TRUST_PROXY, audit, invite and step-up consumers remain unchanged.
-UA and location are descriptive data, never proof of a device or identity.
-No reliable backfill of historical Node UA/internal Docker IP is possible.
+capture current request metadata. Password login and password step-up also use the verified visitor IP for attempt
+accounting, with the same req.ip/socket fallback. The global rate limiter also uses
+the verified claim. Global req.ip/TRUST_PROXY, audit and invitation-abuse inputs
+remain unchanged.
+User-agent and location are descriptive data, never proof of a device or identity.
+Existing session metadata cannot reliably reconstruct past visitor IPs or user agents.
 
 ## Diagnose unavailable locations
 
@@ -139,4 +144,4 @@ No reliable backfill of historical Node UA/internal Docker IP is possible.
 
 No location can be promised for every public IP. VPNs, proxies, provider coverage
 and edition age can all affect the result; an unavailable match is not evidence
-of an invalid session. Historical addresses are not reconstructed.
+of an invalid session.

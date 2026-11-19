@@ -20,9 +20,7 @@ as shortcuts for a downstream product backoffice. Every backend data endpoint
 must perform its own live `SUPER_ADMIN` authorization; the page-level admission
 frame may mount chrome but never authorizes later data access.
 
-The Users panel's system-role promote/demote action is the console's first
-mutation, and its BFF plumbing is the reusable seam for the next one — don't
-re-derive it from scratch:
+Reuse the Users panel's role-change BFF pattern for a Console mutation:
 
 - **Session/origin resolution** lives in
   `shared/api/console/authenticated-proxy.ts`
@@ -37,11 +35,12 @@ re-derive it from scratch:
   the backend DTO uses, before forwarding. See
   `app/api/console/users/[id]/role/route.ts` for the reference shape.
 - **Token containment.** If a mutation's upstream success response can ever
-  carry a credential (an access/refresh token — `POST /auth/step-up` is the
-  first and, so far, only example), its Route Handler must **not** stream
+  carry an access or refresh token (for example, `POST /auth/step-up`), its Route Handler must **not** stream
   that response back verbatim the way an ordinary mutation proxy does: read
   the body server-side, discard the credential entirely, and respond without
-  it (`shared/api/console/step-up.ts` is the reference; it responds `204`).
+  it. `shared/api/console/step-up.ts` returns credential-free `204` only after
+  proof completion; required MFA instead returns a safe, source-bound `202`
+  continuation. A partial proof must not authorize the mutation retry.
   Getting this wrong hands a real backend bearer token to browser JavaScript
   — treat it as a security bug, not a style preference, and add a regression
   test asserting the response body never contains `accessToken`/
@@ -49,9 +48,11 @@ re-derive it from scratch:
 - **Step-up UX** is shared by role changes and session revocation through
   `shared/lib/console-step-up-mutation.ts` and
   `shared/ui/console-step-up-dialog.tsx`. Each feature owns its mutation and
-  success handling; the shared hook performs password re-authentication and
-  exactly one retry, with terminal handling for repeated freshness rejection
-  or unavailable password step-up. Reuse these shared modules for the same
+  success handling. The hook collects the required password and second-factor
+  proofs, then makes at most one retry after confirmed reauthentication.
+  It never retries from a partial `202` or an unknown mutation result. Changed
+  session/account authority, repeated freshness rejection and unavailable
+  password step-up methods are terminal. Reuse these shared modules for the same
   interaction contract; do not import a sibling feature's internals.
 
 This preserves the [step-up re-authentication
@@ -173,26 +174,12 @@ replace it with a token hash or infer authorization from the displayed device.
    shell after an admitted sibling navigation, so it must also read the
    existing non-sensitive `sidebar_state` preference and pass it to
    `ConsoleShell`; this preserves the operator's collapsed/expanded choice
-   without ever participating in admission. Pass the frame a page-specific
-   skeleton that mirrors the final page's desktop and narrow-screen layout —
-   **and keep it that way**: a skeleton is written once against the page as
-   it looks that day, and every later PR that changes the page's visible
-   structure (a new control, a changed column set, a reflowed header) must
-   update the skeleton in the same PR, or it silently drifts into a shape
-   the real page no longer has. Do not add a protected-route `loading.tsx`:
-   it resolves outside the frame and can replace the shell before admission.
-   Only the part of the page that actually depends on the backend fetch
-   should sit behind a `<Suspense>` at all — static chrome (a heading, a
-   search box that only reads already-parsed `searchParams` props) belongs
-   outside it, rendered by the page immediately. Users is the worked
-   example: `UsersPage` and `OrganizationsPage` render their `<h1>` and
-   `SearchInput` directly, then wrap only their async results component in a
-   results-specific `<Suspense>` — nested inside the full page skeleton used
-   by `ConsolePageFrame` for the cold/first-load case. Gating static chrome
-   behind the fetch instead, as a single async component that awaits before
-   rendering anything, means the heading and search box unmount and remount
-   — losing the search box's own in-progress typed value — on every
-   search/sort/page navigation, not just on first load. A panel with any genuinely
+   without ever participating in admission. Pass a page-specific desktop/mobile skeleton to `ConsolePageFrame` and update
+   it when the page layout changes. Do not add a protected-route `loading.tsx`:
+   it can replace the shell before admission. Put only async results behind nested
+   `<Suspense>`; keep headings and URL-driven search controls outside that boundary
+   so navigation preserves the typed draft and focus. Users and Organizations
+   provide the reference structure. A panel with any genuinely
    **browser-initiated** call (a mutation, a client-side poll, anything a
    `'use client'` component fetches on its own after load, as opposed to
    just navigating) still needs its own handler under `app/api/console/**`,
@@ -238,8 +225,8 @@ replace it with a token hash or infer authorization from the displayed device.
    uses `withConsoleHostGuard()` and topology-aware session/origin resolution.
    The log list is a Server Component read with the console-aware token and
    `cache: 'no-store'`; Audit links disable prefetch so merely seeing one does
-   not create a privileged read-audit event. T002's discovery URL and numbered
-   page contract do not apply to Audit; its generic field may be reused only
+   not create a privileged read-audit event. The discovery URL and numbered-page
+   contract do not apply to Audit; its generic field may be reused only
    where the interaction contract matches.
 
    User and organization detail pages use separate backend `GET` endpoints and
@@ -383,15 +370,6 @@ The safe inventory reads directly in RSC with the console-aware token/no-store;
 fixed revoke BFF routes use the existing origin/session seam. Optional Console
 removal leaves backend admin endpoints, core lifecycle and shared API contracts.
 
-The storage snapshot includes `nextScheduledAt` (nullable ISO timestamp from the
-server scheduler) and `inProgress`. Never derive scheduling from `checkedAt` plus
-cadence: it records result publication, including timeout, rather than start time.
-During an active or stopped probe, no next transaction start is promised.
-
-The overview response also carries a `publicDelivery` object (state, off reason, delivery
-mode, bucket layout, public base URL, last check time, stage and failure) mapped from
-the public check service. It never carries bucket names, endpoints or credentials.
-
 ## Runtime interval editor
 
 Overview's File storage editor is a client leaf in `features/console-storage-setting`.
@@ -406,6 +384,15 @@ persistence, atomic audit and runtime reconciliation. Disabling Console closes a
 this editor and its BFF while retaining their source. Shared contracts, backend API,
 migration and API/worker reader remain usable independently. Organization capability catalogue/permissions
 remain separate from personal platform settings rights.
+
+The storage snapshot includes `nextScheduledAt` (nullable ISO timestamp from the
+server scheduler) and `inProgress`. Never derive scheduling from `checkedAt` plus
+cadence: it records result publication, including timeout, rather than start time.
+During an active or stopped probe, no next transaction start is promised.
+
+The overview response also carries a `publicDelivery` object (state, off reason, delivery
+mode, bucket layout, public base URL, last check time, stage and failure) mapped from
+the public check service. It never carries bucket names, endpoints or credentials.
 
 ## Support-mail interaction and safety
 

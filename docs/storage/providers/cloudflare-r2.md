@@ -23,8 +23,7 @@ R2 has **no S3 bucket policy** and **no object ACLs**. It publishes a **whole bu
 2. Attach a **custom domain** to it. That gives you caching and WAF rules.
 3. Set `STORAGE_PUBLIC_BASE_URL` to the custom domain.
 
-Use the default `external` mode. Do not use `acl`: R2 does not support `x-amz-acl`. Reports show it
-answers `501 NotImplemented` for any value other than `private`.
+Use the default `external` mode. R2 does not support object ACLs.
 
 The `r2.dev` public address is rate-limited and meant for development only. Do not use it in
 production.

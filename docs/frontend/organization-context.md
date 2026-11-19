@@ -12,13 +12,12 @@ a single-organization redirect loop. Multiple memberships use cards and URL
 pagination, 20 per page. The organization selector has no search, table or
 organization edit/delete UI; the separate members page supplies member search and roles.
 
-`/[locale]/organizations/[id]` confirms the company and signed-in account. Its
+The selected organization overview confirms the company and signed-in account. Its
 read-only “Your access” / “Ваш доступ” card shows the verified
 “Team access management” / “Управление доступом команды” decision as
 “Permitted” / “Разрешено” or “Not permitted” / “Не разрешено”, followed by a
 reminder that actions are checked again. It makes no claim about assigned
-records. It is a read-only landing point for future downstream
-work. The [members page](../product-admin/organization-members.md) adds role assignment;
+records. The overview is read-only. The [members page](../product-admin/organization-members.md) adds role assignment;
 [invitations](../product-admin/invitations.md) add management and a separate recipient
 journey. The [Roles tab](../product-admin/role-definitions.md#ready-role-screens) edits custom roles through the
 [role definitions API](../product-admin/role-definitions.md); product-specific screens remain downstream-owned. A missing/removed target stays unavailable at that URL; it never
@@ -43,11 +42,10 @@ the heading; they do not loop back through their own HTTP routes. This initial
 server-authorized name remains visible during the first client verification.
 It is not reused after a terminal authority observation. Client mount verifies
 bootstrap and reads its active list or selected context; it does not exchange
-organization tokens. This heading admission adds a server context read, rather
-than promising the earlier list-only request count.
+organization tokens. Heading admission includes a server context read.
 
 Focus, visible visibilitychange and persisted pageshow suspend old content
-immediately and coalesce through one100ms trailing scheduler. Manual Refresh
+immediately and coalesce through one 100 ms trailing scheduler. Manual Refresh
 uses the same scheduler; an in-flight cycle is joined. Bootstrap must match
 the admitted login/actor binding before current authority is reread. Changed
 binding displays Reload, with no old authority request. Same binding with
@@ -58,7 +56,7 @@ reads. They never independently refetch, retry or poll. Dependent resource lists
 use the shared native Query reader instead. Cached rows do not grant command
 permission. Idle causes no requests.
 
-A429 respects Retry-After; recovery is explicit, not polling. Transport/schema
+A `429` respects Retry-After; recovery is explicit, not polling. Transport/schema
 failures never appear as an empty list or stale authorized content. One bounded
 list recovery handles an inconsistent/out-of-range envelope; persistent
 inconsistency displays an explicit recovery message. Total and rows are not

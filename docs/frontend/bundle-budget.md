@@ -1,8 +1,7 @@
 # Route bundle budgets
 
-Every web page has a limit on its first-load JavaScript. CI fails a change that
-pushes a page over its limit, so bundle growth is a reviewed decision instead of
-a slow drift.
+CI checks first-load JavaScript for each web page. It fails when a page exceeds
+its budget. Pages with a `report-only` row are measured without a byte limit.
 
 [Lighthouse audits](./testing.md#lighthouse-audits) separately inspect loaded-page defects. Their route coverage does not replace these JavaScript byte limits.
 
@@ -23,10 +22,12 @@ included. The translation payload in HTML has its own check, described in
 ## Run the check
 
 ```bash
-pnpm build                    # or: pnpm exec turbo run build --filter=@amcore/web
+pnpm build &&
 pnpm check:route-budgets
 ```
 
+To build only the web app and its dependencies, replace `pnpm build` with
+`pnpm exec turbo run build --filter=@amcore/web`.
 The check reads the build output and never builds. Run it right after the web
 build, in the same checkout. CI does exactly this in the **Build** job.
 
@@ -48,16 +49,30 @@ change, build again before you run the check.
 
 1. Find what grew. `next analyze` runs its own analysis build of the current
    checkout and saves a named snapshot under `.next/diagnostics/analyze`. A later
-   `next build` keeps it. In `apps/web`, run:
+   `next build` keeps it. Use one clean checkout dedicated to the comparison.
+   From `apps/web`, set `BASE_COMMIT` and `CANDIDATE_COMMIT` to the distinct
+   commits you want to compare. Use the same route for both exports.
+
+   Capture and export the baseline:
 
    ```bash
-   # base branch checked out, then: pnpm install
-   pnpm exec next analyze --output --snapshot before
-   # your branch checked out, then: pnpm install
-   pnpm exec next analyze --output --snapshot after
+   git switch --detach "$BASE_COMMIT" &&
+   pnpm install --frozen-lockfile &&
+   pnpm exec next analyze --output --snapshot before &&
    pnpm exec next analyze export --snapshot before --route '/[locale]/login' > before.jsonl
+   ```
+
+   After the baseline succeeds, capture and export the candidate:
+
+   ```bash
+   git switch --detach "$CANDIDATE_COMMIT" &&
+   pnpm install --frozen-lockfile &&
+   pnpm exec next analyze --output --snapshot after &&
    pnpm exec next analyze export --snapshot after --route '/[locale]/login' > after.jsonl
    ```
+
+   If either stage fails, stop. Resolve the error and rerun that stage.
+   Compare the files only after both stages succeed.
 
    Each export line is one JSON record. Compare the `size` of the records per
    `source_path` in the two files to find the new or larger modules. To see why a
@@ -136,10 +151,9 @@ silently when it sums a row. The check therefore also fails when:
 
 ## Upgrading Next
 
-`SUPPORTED_NEXT` in `scripts/lib/route-budget-inputs.mjs` is a regular expression
-for the Next versions whose stats format was checked, for example
-`/^16\.4\.\d+$/`. After an upgrade the check stops with an unsupported-version
-message.
+`SUPPORTED_NEXT` in `scripts/lib/route-budget-inputs.mjs` defines the supported
+Next versions. The current pattern accepts 16.4.x. The check rejects versions
+outside that range.
 
 1. Read the installed `apps/web/node_modules/next/dist/build/route-bundle-stats.js`.
    Confirm that a row still has the fields `route`, `firstLoadUncompressedJsBytes`

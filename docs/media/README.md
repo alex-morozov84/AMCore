@@ -31,8 +31,7 @@ generic public image-transform endpoint (e.g. `/images?url=…&w=…`) — only 
 presets produced for owned storage objects.
 
 `MediaService` does **not** authorize. `ownerId` is key-derivation context only;
-callers must prove the caller owns `sourceKey`/`ownerId` first (the avatar route
-does this via bearer auth on `/auth/me/...`).
+callers must prove the caller owns `sourceKey`/`ownerId` first (the bearer-authenticated avatar route derives the user and source key server-side).
 
 ## Avatar Flow (the shipped example)
 
@@ -49,15 +48,16 @@ POST /api/v1/auth/me/avatar   (multipart, bearer)
 -> { avatarUrl }
 ```
 
-`DELETE /auth/me/avatar` removes every object under `avatars/{userId}/` and
-`public/avatars/{userId}/` plus the
-legacy flat `avatars/{userId}` object, then clears `avatarKey`. Delete is
-**fail-closed**: `avatarKey` is cleared only after storage cleanup succeeds, so a
-failed delete never advertises removal of a still-reachable public object.
+If `avatarKey` exists, `DELETE /auth/me/avatar` takes the current generation
+plus one. It sweeps older versions under `avatars/{userId}/` and
+`public/avatars/{userId}/`, including the current avatar and legacy flat object.
+It clears `avatarKey` only after cleanup succeeds and the database update wins
+the generation check. On cleanup failure, this operation leaves the pointer
+alone. Some objects may already be gone. Cached copies may outlive deletion
+at the storage origin.
 
-Per-upload versioned keys let derivatives carry immutable cache headers without
-serving stale content after a re-upload: a new upload publishes a new
-`v-{version}/` URL, and the previous version is swept.
+A new version uses a new URL and can use immutable cache headers. Cleanup of
+superseded versions after upload is best effort.
 
 ### Concurrency
 
@@ -69,9 +69,11 @@ fence in the database**, not by the lock alone (see ADR-049):
   generation is still older. A request that lost the race to a newer concurrent
   mutation matches no row and fails closed — it can never overwrite the newer state.
 - **Generation-bounded sweep.** Versions are stored as `v-<generation>-<rand>`, and
-  a mutation only ever deletes versions **strictly older than its own generation**.
-  Since committed generations strictly increase, a request can never delete the
-  current or a newer version — even if its process paused and lost the lock lease.
+  the sweep deletes only versions **strictly older than the operation's generation**.
+  It preserves versions at that generation or newer, even if the lock lease expires.
+  A delete can remove files still referenced by the database before it clears the pointer.
+  If cleanup fails partway, the pointer can still reference a removed file.
+  A failed upload can separately clean up the files it created.
 
 A per-user **Redis lock** still serializes the common case to avoid duplicate image
 work, but it is best-effort and not relied on for correctness. Under lock

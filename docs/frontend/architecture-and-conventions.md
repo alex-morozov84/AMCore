@@ -528,19 +528,21 @@ already defaults to `credentials: 'same-origin'`). `ApiRequestError`/
 2. Build the actual page composition under `src/_pages/<route>/`, importing
    whatever `widgets`/`features`/`entities` it needs through their public
    APIs.
-3. If the route needs new server state, add a query (and query keys) in the
-   owning `entities/` slice, following `entities/user/api/user-queries.ts`.
-4. If the route needs new local UI state, add it to `shared/store` or a
-   feature-local store — only promote it to `shared` if more than one feature
-   needs it.
+3. Decide whether the page is public or private. Follow the
+   [indexing guide](seo.md#start-here-your-situation) and check session and
+   domain access for protected data. Choose
+   [server display or browser-owned data](api-consumption.md#data-ownership-for-interactive-pages)
+   before adding a Query hook.
+4. Keep local UI state with its owning component or feature. Use a shared
+   store only for state that multiple features own together.
 5. Decide Server vs Client for each new component per
    [Server/Client Component defaults](#serverclient-component-defaults)
    before defaulting to `'use client'`.
 6. Add copy to **every** catalogue under `apps/web/messages/`, starting from
    `en.json` — the parity test fails a key that exists in one locale only.
    Never inline user-facing text in a component.
-7. Update this guide's tables only if the route introduces a new pattern, not
-   for routine additions.
+7. Apply the [UI/UX checklist](ux-checklist.md) and verify the changed
+   journey in a [running app](testing.md).
 
 ## Downstream adoption
 

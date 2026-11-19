@@ -66,18 +66,23 @@ Keep its verified off-host recovery set throughout this transition.
 On the generator:
 
 ```bash
-mkdir -m 700 ~/lt-work && cd ~/lt-work
+(
+umask 077
+mkdir -m 700 "$HOME/lt-work" && cd "$HOME/lt-work" &&
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 7 \
-  -subj /CN=amcore-load-test-ca -keyout ca.key -out ca.crt
+  -subj /CN=amcore-load-test-ca -keyout ca.key -out ca.crt &&
 openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj /CN=k6 \
-  -keyout client.key -out client.csr
-openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 7 -out client.crt
+  -keyout client.key -out client.csr &&
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 7 -out client.crt &&
+fixture_random=$(openssl rand -hex 12) &&
+printf 'Lt%s9' "$fixture_random" > fixture-password &&
 rm ca.key ca.srl client.csr
-printf 'Lt%s9' "$(openssl rand -hex 12)" > fixture-password
-chmod 600 client.key fixture-password
+)
 ```
 
-Copy the CA certificate and the password to the host; the client key stays here:
+Continue only after certificate and password creation succeeds. If it fails,
+remove the incomplete directory only after confirming it belongs to this attempt.
+Copy the CA certificate and password to the host. Keep the client key on the generator.
 
 ```bash
 sudo mkdir -p /srv/amcore-loadtest/ca /srv/amcore-loadtest/secrets                # host
@@ -88,8 +93,7 @@ scp ~/lt-work/fixture-password <user>@<host>:/srv/amcore-loadtest/secrets/      
 
 ## 2. Prepare the host
 
-Follow single-host steps 1–4. On a disposable host you may delete the database CA key.
-Set these keys together with single-host step 3, before its `docker compose config`
+Follow single-host steps 1–4. Set these keys together with single-host step 3, before its `docker compose config`
 check (this `COMPOSE_FILE` replaces the one of step 1; no other mail keys are needed):
 
 ```bash
@@ -112,14 +116,13 @@ parameters; query overrides for host, port, credentials or other connection sett
 are refused. Run the exact-endpoint certificate preflight before
 migration; configuration validation alone cannot verify CA/hostname enforcement.
 
-Then:
+Build the fixture loader with `sh scripts/load-test/fixture.sh build`. Stop if
+the build fails. If you added swap for the build, disable it before measuring.
+If you built the images on the host, reboot and reconnect before continuing.
 
-```bash
-sh scripts/load-test/fixture.sh build      # the fixture loader image
-sudo swapoff -a                            # if you added swap for the build
-sudo reboot                                # if you built the images on this host
-sh scripts/load-test/preflight.sh plan     # changes nothing
-```
+Run `sh scripts/load-test/preflight.sh plan`. It renders configuration and
+uses disposable validation containers. It does not start the test project.
+Stop if preflight fails.
 
 Expected: `preflight plan: ok (run …, project …, route prefix '/en', generator …)`. Note
 the route prefix (empty without locale routing). Rebooting after a build gives every
@@ -140,20 +143,20 @@ LT_SERVER_IP=<host address the generator connects to; the names are sent there, 
 LT_PREFIX=/en                        # the route prefix from preflight plan
 ```
 
-Then:
+Complete each check before moving to the next one. Commands run on different machines.
 
-```bash
-sh scripts/load-test/admission.sh probe     # generator: PASS
-sh scripts/load-test/preflight.sh live      # host: preflight live: ok
-sh scripts/load-test/fixture.sh             # host: load-fixture: created run …
-```
+1. On the generator run `sh scripts/load-test/admission.sh probe`. Require PASS.
+2. On the host run `sh scripts/load-test/preflight.sh live`. Require `preflight live: ok`.
+3. On the host run `sh scripts/load-test/fixture.sh`. Require a successful exit and the expected run ID.
 
 The fixtures are one owner (`SUPER_ADMIN`), one organization, 200 members (1–20 are
 organization admins) and 1,000 audit rows. Before writing, `fixture.sh` proves that the
 volume, the rendered database URLs and the running postgres, API, worker and web
 containers all belong to this run's project; shell variables such as
-`COMPOSE_PROJECT_NAME` are ignored with a warning. Any refusal writes nothing; the remedy
-is `docker compose down -v` and single-host step 5 again. Never relabel or adopt a volume.
+`COMPOSE_PROJECT_NAME` are ignored with a warning. An ownership or freshness refusal prevents fixture loading. Investigate the
+reported target first. For an owned disposable project that must be discarded,
+use the scoped cleanup in [section 7](#7-remove-the-test-entry-and-clean-up), then
+start a fresh project. Never relabel or adopt a volume.
 
 ## 4. Admission
 
@@ -163,8 +166,11 @@ Every check must pass before any load:
 sh scripts/load-test/admission.sh run       # generator
 ```
 
-It proves on both domains that a missing or foreign client certificate is refused, that
-each request needs exactly one synthetic IPv4 visitor address, that visitors have
+Confirm the generator can still reach the test entry with its valid certificate.
+The refusal checks expect no HTTP response on both test domains. A missing
+response alone does not distinguish TLS refusal from a transport failure. The API checks
+cover missing, malformed or repeated visitor addresses. Budget checks cover
+both API and web. They verify that visitors have
 separate rate budgets, and that `X-AMCore-Client-Ip` and `X-Real-IP` are ignored.
 
 From a machine that is not the generator (`curl`, an AMCore checkout of the same commit),
@@ -177,20 +183,25 @@ LT_ENV=<path>/load-test.env sh scripts/load-test/admission.sh outside
 ```
 
 It proves that forged address headers on the normal edge change no rate budget (API and
-web app). Its first line only shows that 8443 is not open to that machine; the
-certificate proof is `run`. Each admission command waits up to 90 s for budgets to refill.
+web app). Its first line shows only that this machine received no HTTP response
+on port 8443. The generator uses `run` to check the missing and foreign
+certificate cases. Those checks also report whether an HTTP response arrived.
+Use TLS diagnostics to establish the cause of a refusal. Each admission command
+waits up to 90 s for budgets to refill.
 
 ## 5. Measure
 
 On the generator, inside `tmux`:
 
 ```bash
-sh scripts/load-test/protocol.sh prepare     # signs in the 200 members once
-sh scripts/load-test/protocol.sh smoke       # optional, repeatable; never blocks the campaign
-sh scripts/load-test/protocol.sh campaign    # about 45 minutes
+sh scripts/load-test/protocol.sh prepare   # signs in the 200 members once
 ```
 
-`prepare` keeps live session cookies in `~/lt-work/sessions.json`. `smoke` writes to
+Continue only after `prepare` succeeds. It stores live session cookies in
+`~/lt-work/sessions.json`. For an optional functional check, run
+`sh scripts/load-test/protocol.sh smoke` and inspect its report. For the full
+measurement run `sh scripts/load-test/protocol.sh campaign` (about 45 minutes).
+`smoke` writes to
 `~/lt-work/out-smoke`; it is valid only if every action answered as expected. The
 campaign writes to `~/lt-work/out` and first prints the recovery commands (also in
 `out/RECOVERY.txt`). For the next campaign see section 8.
@@ -222,8 +233,16 @@ A matching harness identifies the test scripts, not the application revision. Fo
 a functional smoke from a source archive, record a separate verified chain of
 archive checksums, deployed files and image IDs. Keep the original report unchanged.
 That chain does not establish a reference-capacity comparison. Whether the host
-and data match Capacity remains your comparison of those fields. The `out`
-directory holds no key, cookie or password.
+and data match Capacity remains your comparison of those fields. The report and manifest omit keys, cookies and passwords. Keep the work
+directory private and review raw artifacts before sharing them.
+
+For each step, compare both `out/steps/<step>/containers.before` and
+`containers.after` with the expected container inventory for the recorded
+project and Compose profiles. Record that inventory before measuring. The
+collector can leave a partial list if `docker inspect` fails. Matching lists
+do not establish completeness. If either list is incomplete or its
+completeness is unknown, exclude the step from capacity estimates even if
+the report marks it `valid`.
 
 | Class                 | When                                                                                                                                                              | Use it as                                            |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -231,6 +250,8 @@ directory holds no key, cookie or password.
 | `invalid measurement` | Missing or broken data (samples, server records of an action, k6/server disagreement beyond requests in flight and clock bound), or generator CPU idle < 10 %     | Nothing; fix the cause, new campaign on a fresh host |
 | `observed overload`   | Server p95 > 1 s, > 1 % failed requests overall or of admin reads, dropped iterations, a container restart, recreation or OOM, or < 100 MiB available host memory | Achieved rate under overload, not capacity           |
 
+- When missing data and an overload signal occur together, the classifier
+  reports `invalid measurement`. Preserve the evidence and investigate the missing data.
 - Report `valid` steps as results, also those before a later stop; there is no result for
   steps after the stop. Do not repeat campaigns until one passes.
 - **Reference** compares valid ladder steps with Capacity: 5, 10 and 20 iterations/s
@@ -244,12 +265,13 @@ directory holds no key, cookie or password.
 
 ## 7. Remove the test entry and clean up
 
-On the host, also after any failure or lost generator connection:
+On the dedicated test host, also after any failure or lost generator connection:
+confirm the operating-system account has no sampler files from another campaign.
+Recovery checks sampler PID files under that account before recreating Caddy.
 
 ```bash
-sh scripts/load-test/recover.sh        # drops load-test.yml from COMPOSE_FILE, recreates Caddy
-                                       # (other services and data volumes stay unchanged; repeatable)
-sh scripts/load-test/remove-check.sh   # only PASS lines, incl. ":8443 refuses connections"
+sh scripts/load-test/recover.sh &&
+sh scripts/load-test/remove-check.sh
 ```
 
 Recovery uses only the normal Caddy service and its existing volumes and network.
@@ -274,25 +296,41 @@ runs), that the normal site answers, and that the normal edge ignores forged add
 Then close 8443 in the firewall (closing it first is safe; then rely on `remove-check.sh`).
 A campaign still running fails its next step as `invalid measurement`.
 
-Delete what belongs to this run only, from the deployment checkout, exactly as written
-(`--profile` flags would replace `COMPOSE_PROFILES` and leave Postgres, Redis and Caddy):
+Before deleting anything, save needed reports and verify the recorded run ID,
+Docker context, project, Compose files, profiles and volume inventory. Use the
+deployment checkout and its saved configuration after recovery. Clear conflicting
+shell overrides. Stop if any resource belongs to another run or to a retained
+recovery project. Keep the verified recovery set outside the paths you delete.
+
+Run the following from the test deployment checkout after verifying those facts.
+Set `project` to the verified project name in this shell before running the block.
 
 ```bash
-docker compose ls                     # amcore-loadtest-<run id>
-docker compose down -v
-docker volume ls --filter label=com.docker.compose.project=amcore-loadtest-<run id>   # empty
-sudo rm -rf /srv/amcore-loadtest && rm -rf ~/amcore-load-test   # recover backups, samples
+if [[ ${project:-} =~ ^amcore-loadtest-[a-z0-9]{4,32}$ ]]; then
+  docker compose --project-name "$project" down -v &&
+  docker volume ls --filter "label=com.docker.compose.project=$project"
+else
+  printf 'Set project to the verified load-test project name.\n' >&2
+  false
+fi
 ```
 
-Also delete `~/lt-work` on the generator (copy `out` away first if you want it) and the
-password copy on the `outside` machine. Still on the host: the checkout with its `.env`
-(this run's secrets), `/srv/amcore-tls`, the built images
-(`amcore-loadtest-<run id>-*`), `/swapfile` and the DNS records. Then either:
+Require a successful exit and an empty volume list. Save the reports you need.
+Remove only the current campaign's client CA copy, fixture password and sample
+files on the host, its `~/lt-work` on the generator, and its password copy on
+the outside machine. Preserve all retained recovery volumes, backups, saved
+configuration and TLS materials from the prior recovery project.
 
-- **measure again later** on the same VMs — keep them and follow section 8; or
-- **hand the host to someone else** — remove `.env` (or the checkout), `sudo rm /swapfile`
-  and `docker image rm` the `amcore-loadtest-<run id>-*` images; or
-- **finish** — delete the VMs.
+### Keep the VMs or retire them
+
+For another campaign, keep the VMs and the test checkout. Keep the database TLS
+materials and role settings needed for section 8. Rebuild or remove old test
+images by their recorded project identity when appropriate.
+
+If you retire the test deployment, remove its protected configuration,
+dedicated TLS materials, images and DNS records only after verifying ownership.
+Delete a VM only after confirming it holds no retained recovery resources or
+after moving and verifying those resources elsewhere.
 
 Never run `docker system prune` on a shared host.
 
@@ -300,15 +338,15 @@ Never run `docker system prune` on a shared host.
 
 For a new commit or a repeat, start like a new host but keep the VMs:
 
-1. Finish section 7 for the previous run (its `out` copied away, `~/lt-work` deleted).
+1. Complete campaign cleanup in section 7. Keep the VMs and the settings needed below.
 2. Check out the new commit on both VMs and repeat section 1 (new certificates and
    password; section 7 deleted the host copies).
 3. Restore the load-test settings in `.env` before any build: `recover.sh` removed
    `load-test.yml` from `COMPOSE_FILE`, so set `COMPOSE_FILE` again exactly as in
    section 2, check the other section 2 keys, and set a new `LOAD_TEST_RUN_ID` and
    `COMPOSE_PROJECT_NAME`. The database certificates and role passwords can stay.
-4. Rebuild the images (single-host step 4 and `fixture.sh build`), reboot,
-   `preflight.sh plan`.
+4. Rebuild the images (single-host step 4 and `fixture.sh build`). Reboot,
+   reconnect and require `preflight.sh plan` to succeed.
 5. Open TCP 8443 in the provider firewall again, to the generator only.
 6. Continue with section 3 (single-host steps 5–7 on the empty new project, not the
    upgrade procedure), then sections 4–7.
@@ -319,7 +357,7 @@ For a new commit or a repeat, start like a new host but keep the VMs:
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `preflight live`: test-entry peers differ                             | The host sees another generator address (NAT, public address); the message names it. Set it as `LOAD_TEST_GENERATOR_IP`, `docker compose up -d --force-recreate --no-deps caddy`, then probe and `preflight live` again. |
 | `fixture.sh`: running service uses another URL than the configuration | The container was created from an older `.env`: `docker compose up -d --force-recreate <service>`.                                                                                                                       |
-| `fixture.sh`: not a fresh database or partial fixtures                | `docker compose down -v` in this project and repeat from single-host step 5.                                                                                                                                             |
+| `fixture.sh`: not a fresh database or partial fixtures                | Verify the owner and use the scoped cleanup in section 7, then start a fresh project.                                                                                                                                    |
 | No certificate, or Docker Hub times out, on a new host                | That public address may have poor outward connectivity. Give the host another address, update names and `.env`, then `docker compose up -d --wait`.                                                                      |
 | `clock offset … not provably within 1 s`                              | Enable NTP on both VMs; if the offset is small but its bound is large, check the generator–host connection.                                                                                                              |
 | Admission: another identity gets `429`                                | The visitor address does not reach the limiter: `bff-relay.yml` must be in `COMPOSE_FILE` and `COMPOSE_WEB_IPV4` must match `web`.                                                                                       |

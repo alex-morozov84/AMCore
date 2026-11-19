@@ -138,8 +138,9 @@ The typed executor captures one session and reuses its first vault read with
 the existing refresh single-flight/CAS protocol. It strips browser credentials,
 organization and binding headers and rebuilds the declared upstream selector.
 Fresh selected operations issue zero switches, one domain call and zero refreshes;
-a refresh-needed operation uses the existing one-refresh path. Five seconds bounds
-waiting through vault, refresh, fetch and response-body parsing. If a supplied
+a refresh-needed operation uses the existing one-refresh path. The default five-second deadline bounds
+waiting through vault, refresh, fetch and response-body parsing. Code-owned operations
+can set a longer deadline; member removal uses fifteen seconds. If a supplied
 caller signal aborts, publication retires. Shared refresh may safely finish CAS
 after retirement; a completed SQL write is not undone. Infrastructure/deadline
 failure uses the existing safe `503` transport response.
@@ -152,7 +153,9 @@ There is no server-global active organization or dependency on Console pages.
 
 Member PATCH uses the shared web-owned Origin policy: an exact trusted-origin
 check, an origin-reduced Referer fallback, and allowance when both headers are
-absent for non-browser callers. See [CSRF posture](./csrf.md) for this boundary.
+absent. Missing headers do not prove that a caller is not a browser. This
+compatibility allowance does not apply to strict-Origin operations such as member
+removal. See [CSRF posture](./csrf.md) for this boundary.
 It requires JSON content type, no query parameters and no Content-Encoding. Its strict body is
 `{expectedMemberId, expectedAclVersion, roleIds}`. Successful reads and writes
 return `{binding, data}` through the BFF; the direct API returns the DTO without

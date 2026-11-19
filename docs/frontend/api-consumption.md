@@ -208,12 +208,9 @@ This starter's default instead:
 - **Never retries a 4xx, except 429.** A rate-limit refusal is retryable by
   definition ("try again later"); every other 4xx means the request itself
   is wrong and retrying it changes nothing.
-- **Retries a 429 up to 3 times, honouring a real `Retry-After` header**
-  (RFC 9110) when the backend sent one — `apps/api`'s global rate limiter
-  always does (ADR-073). `ApiRequestError.retryAfterSeconds`
-  (`http-client.ts`) captures it; `getRetryAfterMs()` (`errors.ts`) reads
-  it back. No `Retry-After` (a 429 from somewhere else, or a 5xx/network
-  error) falls back to TanStack Query's own exponential backoff.
+- **Retries a 429 up to three times. A parsed `Retry-After` sets the delay
+  up to a maximum of 30 seconds.** For example, `Retry-After: 60` gives a
+  30-second delay. Without a parsed delay, Query uses exponential backoff.
 - `<ApiErrorAlert>`/`useApiError()` already localize `RATE_LIMIT_EXCEEDED`
   in both catalogues — nothing else to wire up for a query that exhausts
   its retries and surfaces the error to a component.
@@ -674,25 +671,11 @@ non-default network setup.
 The starter includes two different kinds of frontend surface:
 
 - **Default UI:** email/password login and registration, the full
-  password-reset/email-verification email-link flow (`/forgot-password`,
-  `/reset-password`, `/verify-email`, `/resend-verification` — the
-  backend has supported these since the auth foundation was built; the
-  frontend reference flows landed later), Google OAuth entry point when the
-  backend reports Google as configured, logout, current-user reads/updates,
-  locale switching, and the active-sessions page at
-  `/{locale}/settings/sessions`.
-- **Reference consumption hooks, deliberately no product UI:** avatar
-  upload/delete, notifications feed/preferences/realtime, and AI
-  conversations/runs/messages. These hooks are production-quality examples
-  of how a downstream product should consume the backend through the BFF,
-  but AMCore does not guess the product UI that should sit on top of
-  notifications or AI — that would mean inventing a UI shape with no real
-  consumer driving it, exactly the kind of speculative design this starter
-  avoids elsewhere. This is a standing decision, not a placeholder waiting
-  to be filled in: `entities/ai`/`entities/notifications` having zero
-  internal consumers in `apps/web` is intentional, confirmed at Track 9's
-  closeout, not an oversight to "finish." Build the product UI in the
-  owning product slice and reuse the hooks below.
+  password-reset and verification flows, Google OAuth when configured,
+  logout, account updates, locale switching, and active sessions.
+- **Reusable hooks:** notifications feed/preferences/realtime and AI
+  conversations/runs/messages. Add product screens in the owning slice
+  and reuse the hooks below.
 
 ## Media — avatar upload/delete
 
@@ -708,11 +691,8 @@ const { mutate: upload } = useUploadAvatar()
 upload(file) // File from an <input type="file">
 ```
 
-Uploading needs a `multipart/form-data` body, which `shared/api/http-client.ts`
-didn't support until this surface needed it — `apiClient.postForm(path, formData)`
-sends the `FormData` object with **no** manually-set `Content-Type`; the
-browser sets its own `multipart/form-data; boundary=...`, which a header set
-ahead of time would silently break.
+Pass `FormData` to `apiClient.postForm(path, formData)` without setting
+`Content-Type`. The browser sets the multipart content type and boundary.
 
 ## Notifications
 

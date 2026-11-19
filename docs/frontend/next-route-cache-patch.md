@@ -58,8 +58,8 @@ After editing the reviewed dependency version, patch registration and files, use
 running installation hooks. The following frozen install runs the normal hooks:
 
 ```bash
-pnpm install --frozen-lockfile
-node scripts/migrator-contract.mjs
+pnpm install --frozen-lockfile &&
+node scripts/migrator-contract.mjs &&
 pnpm stand e2e --lane real-stack -- route-fragment.spec.ts
 ```
 
@@ -85,8 +85,13 @@ exact version. Remove the obsolete version's registration/file before updating t
 
 ```bash
 pnpm patch 'next@<reviewed-version>' --edit-dir .amcore/next-patch
-# Edit the extracted CJS and ESM modules; review their current implementation first.
-pnpm patch-commit .amcore/next-patch
+```
+
+After extraction succeeds, review the implementation and edit the CJS and ESM modules.
+Then commit the patch and verify that the frozen install accepts it:
+
+```bash
+pnpm patch-commit .amcore/next-patch &&
 pnpm install --frozen-lockfile
 ```
 

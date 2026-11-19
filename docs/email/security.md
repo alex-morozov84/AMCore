@@ -147,14 +147,11 @@ their own filters and checks.
 See Caddy's [global logger](https://caddyserver.com/docs/caddyfile/options#log) and
 [log filters](https://caddyserver.com/docs/caddyfile/directives/log#filter).
 
-## Bull Board Implication
+## Bull Board
 
 Bull Board lists queued jobs for authorized operators. It is view-only and
 shows a closed list of fields (for a welcome email: template, locale and the
-user id; never the recipient, the name, a failure message or a stack trace), but
-that list is a second line of defence. The primary safety rule is stronger than
-"protect Bull Board" or "filter what it shows": secret-bearing templates must never
-be enqueued at all.
+user id; never the recipient, the name, a failure message or a stack trace), so use the board for metadata only. Keep secret-bearing templates out of all queues.
 
 ## Extension Checklist
 

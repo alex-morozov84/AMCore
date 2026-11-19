@@ -3,8 +3,8 @@
 A scheduled job is a method that runs on a timer in the `worker` or `all` process
 role, such as a nightly cleanup or a recovery pass that runs every 30 seconds.
 Register it once and the optional Operations Console shows its schedule, last result
-and freshness on its Scheduled jobs screen. You write no page, controller, table or
-permission.
+and freshness. No additional Console page, controller, evidence table or permission
+is needed. The business service still owns its data and effect safety.
 
 Use this guide to add a job or to change how one reports its result. Queue work
 (BullMQ) is separate: see [Registering background work](background-work.md).
@@ -19,7 +19,7 @@ worker-only module (see [Register in the correct process role](architecture-and-
    and add it to `SCHEDULED_JOBS`. Use one of the two helpers:
 
    ```ts
-   // Runs once a day on one replica (a Redis lock picks the winner).
+   // Coordinates replicas with a Redis lock for the configured TTL.
    export const REPORT_JOB = daily('report-cleanup', CronExpression.EVERY_DAY_AT_4AM, {
      family: 'singleton',
      lock: { key: 'amcore:report:cleanup:lock', ttlMs: 30 * 60 * 1000, logName: 'report.cleanup' },
@@ -34,7 +34,7 @@ worker-only module (see [Register in the correct process role](architecture-and-
    schedule constants. For `frequent`, the third argument is the period in
    milliseconds; the helper derives the stale threshold from it. A cron job runs in
    the process time zone unless the `daily` options give a `timeZone`; the screen
-   shows the zone the worker reported.
+   shows that zone for daily clock-time schedules.
 
    The `id` is a lowercase slug and never changes meaning. A `singleton` job needs a
    `lock`; a `per-replica` job must not have one. Keep `lock.ttlMs` at most the
@@ -70,8 +70,10 @@ worker-only module (see [Register in the correct process role](architecture-and-
    provides the service). For a `singleton` job the executor takes the Redis lock
    described by `lock`; your service takes no lock itself. If the lock service cannot
    be asked, the executor records a `lock_unavailable` skip and does not run the task;
-   losing the race to another replica is normal and is not recorded. A resolved promise is **not** success: the task must say
-   what happened.
+   losing the race to another replica is normal and is not recorded. The lock is not
+   renewed by this runner: expiry can admit another replica while the earlier task
+   is still running. Keep the business operation safe under overlap and repetition.
+   A resolved promise is **not** success: the task must say what happened.
 
 The job now appears on the screen. Add `name` and `purpose` under
 `console.scheduledJobs.jobs.<id>` in `apps/web/messages/en.json` and every other
@@ -89,9 +91,11 @@ catalogue; an id with hyphens is used as it is, for example `"report-cleanup": {
 
 ### Throw or return
 
-`return failed('code')` ends the run normally: nothing is rethrown. A thrown error is
-recorded as `failed` and then rethrown to the scheduler as before, so choose one of
-the two. A thrown error carries its class name as the code only when the name is on a
+`return failed('code')` records the classified failure without throwing. If the task
+throws, the executor records `failed` and rethrows. For `per-replica` work it reaches
+the scheduler. The singleton runner catches it, logs the failure and returns; it
+does not rethrow to the scheduler. Neither path schedules a replacement attempt.
+Choose return or throw to match the task's error contract. A thrown error carries its class name as the code only when the name is on a
 closed list (database, timeout and standard JavaScript error classes); any other name is
 recorded as `unexpected`, because a name chosen by a library or by input could carry
 content. Return `failed('your_code')` yourself when the Console should show a specific
@@ -111,6 +115,16 @@ The optional `summary` is always `{ counts, codes }`, never a bare object of num
   [Observability](../operations/observability.md#structured-logs)): an event name, ids and
   counters, with the redaction the logger already applies. Never copy the message, an email
   address or row content into a log field of your own.
+
+The built-in cleanup and singleton-runner log paths currently copy exception
+messages into custom fields. Do not copy those fields into new jobs. Use bounded
+safe events/codes and counters; treat existing logs as potentially sensitive.
+The reporting result does not sanitize a separate log call.
+
+Built-in invitation cleanup can commit some deletions before its bucket throws.
+The current cleanup result then marks the bucket failed but leaves its counter
+at zero. Treat that zero as incomplete observation, not proof of no deletions.
+New jobs must preserve known progress and distinguish an unknown remainder.
 
 ```ts
 // A frequent job: finished its pass, checked 12 items. Nothing failed.
@@ -182,10 +196,12 @@ with the catalogue, so a catalogue entry without its job fails there; the source
   a job at its start or its end. One background writer does one write at a time
   (the event lane at most once a second, the summary lane at most once a minute).
   It starts a write only when the pool has an idle connection or can open one
-  without making a request wait, and it needs `DATABASE_POOL_MAX` of at least 2. A write that hangs holds that one connection until the pool's
-  `DATABASE_QUERY_TIMEOUT_MS` cuts it off, so with a pool of 2 a stuck write takes half of
-  the pool for that time (measured: recovery passes were about 50% slower at p95); with a
-  pool of 10 the effect on other work was within measurement noise.
+  without existing pool waiters, and it needs `DATABASE_POOL_MAX` of at least 2.
+  An admitted write still uses the shared pool; admission is not a reservation
+  against later business queries. A hung write can hold one connection until the
+  configured query/connection timeout or transaction failure releases it. Small
+  pools are especially exposed to that capacity loss. Nonblocking `begin`/`finish`
+  do not guarantee unchanged business throughput.
   Memory is bounded: at most 3 tracked unfinished runs and 10 run records per job,
   and the newest evidence of each kind per job. A lost write loses an observation,
   never a run. After five failed writes only failures and partial results are kept

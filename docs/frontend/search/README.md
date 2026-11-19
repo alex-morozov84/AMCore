@@ -30,8 +30,8 @@ provider-free. Choosing a suggestion returns an ID, rather than submitting list 
 | Search through an API that may apply superseded responses | `SearchField`; add the draft controller only after enforcing latest-response-wins | Request cancellation or response ordering, API errors, and result state       |
 
 The draft controller requires **last-navigation-wins** behavior from its
-caller. The shipped Next.js 16.3.5 App Router discards a pending navigation
-when a newer navigation or Back/Forward restore starts. A transport that can
+caller. The installed App Router behavior and the scope of that requirement are
+described in [Reconcile navigation](./navigation-and-verification.md#reconcile-navigation). A transport that can
 apply every old response does not satisfy that contract on its own.
 
 ## Before shipping

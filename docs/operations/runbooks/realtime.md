@@ -1,9 +1,13 @@
 # Realtime runbooks
 
 Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-realtime`
-group. Every alert here is `or`-combined across the notification and AI-run
-streams (`amcore_notification_realtime_*` / `amcore_ai_run_realtime_*`) since
-both share the same underlying SSE transport and failure modes.
+group. The rules cover notification and AI-run SSE streams. Use the stream and
+instance labels in the diagnostic queries to locate the signal.
+
+**Verify recovery:** Confirm new streams open and an affected client receives
+a fresh update for the relevant stream. Compare with the persisted state or
+read it directly if the live hint is missing. Falling counters alone do not
+confirm delivery.
 
 ## Rejected
 
@@ -39,11 +43,9 @@ firing.
 2. Open the **"Events by type (notifications)"** / **"Events by type (AI
    runs)"** dashboard panels (Realtime row) and look at the `rejected_user`/
    `rejected_global` series directly.
-3. Check the **"Open connections"** dashboard panel (Realtime row, a gauge —
-   dashboard-only, not alerted; see `docs/operations/observability.md`'s
-   Operator Interpretation notes) to see whether the rejection is happening
-   at genuinely high overall connection counts (surge-shaped) or a low
-   overall count concentrated on one user (reconnect-storm-shaped).
+3. Check the **"Open connections"** dashboard panel (Realtime row) for load.
+   The gauge cannot identify a user or IP. Confirm client reconnect behavior
+   separately before attributing the signal to a particular cause.
 4. For the per-user case, this is a rate of _sustained_ rejection, not a
    single occurrence — a 6th tab from the same user is ordinary and expected,
    not an incident by itself.
@@ -56,8 +58,8 @@ firing.
 - If legitimate usage is regularly hitting the per-user cap: raise
   `NOTIFICATIONS_REALTIME_MAX_PER_USER` / `AI_REALTIME_MAX_PER_USER` to match
   real client behavior.
-- If a genuine global surge: scale `web`/`all`-role replica count if the cap
-  is infrastructure-bound, or raise the global cap if capacity allows.
+- If a genuine global surge: check capacity and traffic distribution before
+  scaling API replicas with the `web` or `all` role, or changing the per-process cap.
 - If concentrated abuse from one actor: address at the application/auth layer
   (this alert only observes the SSE admission effect, not the actor).
 
@@ -68,9 +70,8 @@ updates at all — escalate per your organization's on-call process.
 ## Dropped
 
 **Symptom:** `AMCoreRealtimeDroppedTicket` (any drop in 15m) or
-`AMCoreRealtimeDroppedPage` (dropping for 5m straight) is firing — arguably
-the highest-severity realtime signal, since it means a client that _was_
-connected silently missed an update.
+`AMCoreRealtimeDroppedPage` (dropping for 5m straight) is firing. The publisher skipped a live update hint. The counter cannot
+identify an affected client or establish a durable data loss.
 
 **Likely causes, ranked:**
 
@@ -104,52 +105,32 @@ connected silently missed an update.
   and capacity; it is a process-wide concurrency guard, not a per-client
   buffer.
 
-**Escalation:** `Ticket` (any drop in 15m) — investigate; every drop is a
-missed update for a connected client. `Page` (sustained 5m) — escalate per
-your organization's on-call process; treat this as a real user-facing gap in
-delivery, not a cosmetic metric.
+**Escalation:** Investigate a ticket. Escalate a page through your on-call
+process and confirm the effect on the affected stream.
 
 ## Invalid envelope
 
 **Symptom:** `AMCoreRealtimeInvalidEnvelopeTicket` (any invalid envelope in
 15m) or `AMCoreRealtimeInvalidEnvelopePage` (sustained for 15m) is firing.
 
-**Likely causes, ranked:**
+**Diagnostics:**
 
-1. A rolling deploy across a namespace/version skew — **expected** during a
-   normal rolling deploy and should self-resolve within the deploy's own
-   timeframe, well under this alert's 15m windows.
-2. A genuine namespace/version mismatch outside of any deploy (a
-   misconfigured `*_REALTIME_NAMESPACE` on one replica but not others).
-
-**Diagnostic steps:**
-
-1. Query directly:
+1. Identify stream and instance with the 15-minute increase in invalid
+   envelopes.
 
    ```promql
    label_replace(increase(amcore_notification_realtime_events_total{event="invalid_envelope"}[15m]), "stream", "notifications", "", "") or label_replace(increase(amcore_ai_run_realtime_events_total{event="invalid_envelope"}[15m]), "stream", "ai-runs", "", "")
    ```
 
-2. Open the **"Events by type (notifications)"** / **"Events by type (AI
-   runs)"** dashboard panels (Realtime row) and look at the
-   `invalid_envelope` series to confirm the trend and duration.
-3. Check whether a rolling deploy was in progress in the same window (deploy
-   timeline vs. alert firing time) — if so, and it has since completed, this
-   is expected and should already be clearing.
-4. If no deploy was in progress, check `*_REALTIME_NAMESPACE` configuration
-   consistency across all `web`/`all`-role replicas.
+2. Check the deployed versions and producer/subscriber configuration. A
+   subscriber counts oversize or rejected messages it receives on its channel.
+   A namespace mismatch can instead prevent messages from reaching it at all.
+3. Check the deploy timeline for a producer or format change. A rolling deploy
+   alone does not establish the cause or make invalid envelopes expected.
 
-**Mitigation:**
-
-- If deploy-correlated and the deploy has completed: none needed; confirm the
-  alert clears on its own shortly.
-- If a genuine namespace mismatch: fix the configuration drift across
-  replicas and redeploy consistently.
-
-**Escalation:** `Ticket` (any occurrence) — expected during a rolling deploy,
-so check the deploy timeline before treating as an incident. `Page` (15m
-sustained) is longer than a rolling deploy should take — escalate per your
-organization's on-call process and check for a genuine mismatch.
+**Mitigation and escalation:** Correct confirmed namespace or format drift
+using a compatible deployment. Escalate a sustained page. Verify delivery
+after the change even if the invalid-envelope series goes quiet.
 
 ## Startup failure
 
@@ -166,7 +147,13 @@ stream was admitted (passed the connection cap) but died before opening.
 
 **Diagnostic steps:**
 
-1. Query directly:
+1. For a ticket, check increases over the full 15-minute window:
+
+   ```promql
+   label_replace(increase(amcore_notification_realtime_events_total{event="startup_failure"}[15m]), "stream", "notifications", "", "") or label_replace(increase(amcore_ai_run_realtime_events_total{event="startup_failure"}[15m]), "stream", "ai-runs", "", "")
+   ```
+
+   For a page, check the 5-minute rate and its 5-minute hold:
 
    ```promql
    label_replace(rate(amcore_notification_realtime_events_total{event="startup_failure"}[5m]), "stream", "notifications", "", "") or label_replace(rate(amcore_ai_run_realtime_events_total{event="startup_failure"}[5m]), "stream", "ai-runs", "", "")
@@ -186,7 +173,7 @@ admission` or `AI run SSE stream failed to start after admission`, then
 - If client/proxy-disconnect-related: correct intermediary timeouts or client
   reconnect behavior; the failure occurs after admission but while the
   response is being opened.
-- If deploy-correlated: roll back per `docs/operations/production-deploy-profile.md`.
+- If deploy-correlated: roll back per [the rollback procedure](../deployment.md#rollback).
 
 **Escalation:** `Ticket` (any occurrence in 15m) — investigate. `Page` (5m
 sustained) means realtime streams are repeatedly failing to start —

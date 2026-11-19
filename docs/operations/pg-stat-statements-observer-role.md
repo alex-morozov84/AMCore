@@ -11,7 +11,7 @@ separation](database-role-separation.md).
 ## Provision fail-closed
 
 [`setup-roles.sql`](../../docker/postgres/setup-roles.sql) creates
-`amcore_observer` as `NOLOGIN` and grants only database connectivity:
+`amcore_observer` as `NOLOGIN` and adds only an explicit database connectivity grant:
 
 ```sql
 CREATE ROLE amcore_observer WITH NOLOGIN;
@@ -66,11 +66,12 @@ contract](pg-stat-statements-setup.md#required-capability).
 - `pg_stat_scan_tables` — monitoring functions that may hold `ACCESS SHARE`
   locks for a long time.
 
-It does not grant `SELECT` on application tables. It also does not grant
+This role grant adds no `SELECT` privilege on application tables. Check any
+separate grants, inherited roles and privileges granted to `PUBLIC`. It also does not grant
 `EXECUTE` on `pg_stat_statements_reset`; [Recovery](pg-stat-statements-recovery.md)
 uses a privileged incident-response connection for resets by default.
 
-Without `pg_monitor`, another role's `pg_stat_statements` row remains visible,
+Without statistics-reading privileges, another role's `pg_stat_statements` row remains visible,
 but its `queryid` is `NULL` and its text is `<insufficient privilege>`.
 
 ## Cluster-wide sensitivity

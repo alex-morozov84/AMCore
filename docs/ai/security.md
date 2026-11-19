@@ -55,9 +55,8 @@ integration.
   (see [Tools and approvals](./tools-and-approvals.md#replay-effects-and-uncertain-outcomes)).
 - Approval previews are immutable plain text bound to the action hash. Only the
   owner with current domain read rights sees the preview; approval and execution
-  recheck current rights. SUPER_ADMIN cannot decide for another owner. Raw intent,
-  arguments and prepared notification requests remain private and outside admin
-  diagnostics and queue payloads.
+  recheck current rights. SUPER_ADMIN cannot decide for another owner. Raw tool intent and arguments remain private and outside admin diagnostics
+  and queue payloads.
 - Attempt history and terminal reasons carry bounded codes without prompt,
   output or tool arguments. History is keyed by run and epoch; the guard's
   admission metric has no run, conversation or user identifiers in its labels.
@@ -153,8 +152,8 @@ settlement and credential-destination admission.
 
 A structured result that is entirely `null` or `undefined` fails with non-retryable
 `output_validation_failed`; nullable/optional fields remain valid when the schema allows them.
-This deliberately changes the provider extension contract. Available provider receipts/usage
-remain accountable even when output access or validation fails. Cancellation and timeout
+The worker can record available provider receipts and usage even when output access
+or validation fails. Cancellation and timeout
 remain distinct errors; no schema failure enables an automatic SDK retry.
 Anthropic uses an explicit code-owned public base URL, ignoring `ANTHROPIC_BASE_URL`.
 The generic compatible family retains its canonical endpoint binding and redirect refusal.

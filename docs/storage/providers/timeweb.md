@@ -22,10 +22,8 @@ console (the bucket root, with no trailing slash).
 Timeweb documents bucket ACL methods and bucket policies. Use a **separate public bucket**, publish
 that whole bucket the way the console describes, and use the default `external` mode.
 
-Publishing only `public/` in one bucket with a bucket policy is **not verified** on Timeweb. A
-policy alone may not publish anything: on Yandex an AWS-shaped prefix policy published nothing until
-a second setting was added (see [Yandex](yandex.md#2-publishing-a-prefix-needs-the-bucket-flag-and-the-policy)).
-If you try it, run `storage:check`. If the public check fails, use a separate public bucket.
+The single-bucket prefix layout remains unverified. Use the separate public
+bucket above unless you verify the narrower policy in a test account.
 
 Timeweb supports signature versions v2 and v4. AMCore uses v4.
 
