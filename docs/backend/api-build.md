@@ -61,13 +61,49 @@ graph; it does not inherit this API build or move client generation to rollout.
 
 ## Development
 
-Use [managed local development](../operations/local-stands.md) when another
-checkout runs or ordinary environment files point at remote resources. For a
-manually configured local environment, `pnpm --filter api dev` runs stock
-`nest start --watch`. Root `pnpm dev` builds shared before dependent dev
-processes through `dependsOn: ["^build"]`. Web requires the shell exports in
-[README Quick Start](../../README.md#quick-start). For separate package starts,
-run `pnpm --filter @amcore/shared build` first.
+Agents use [managed local development](../operations/local-stands.md) for database writes and previews.
+Use managed local development when another checkout is running or your checkout points to remote resources.
+For manual setup, start in a fresh checkout with Git, OpenSSL and Docker Compose v2.20.2 or newer.
+Copy `.env.example` to `.env`. Keep `COMPOSE_PROFILES=local-infra` and leave `COMPOSE_DATABASE_URL`,
+`COMPOSE_REDIS_URL` and `MIGRATION_DATABASE_URL` unset in the shell and the file.
+Use only disposable local services.
+
+For host package commands, use Node 24 from `.nvmrc` with the minimum patch in
+`package.json` (currently 24.15.0) and its exact `packageManager` pnpm version
+(currently 12.18.0). Check both versions before installing frozen dependencies.
+
+For the bundled PostgreSQL, set `DATABASE_URL="postgresql://amcore:amcore@localhost:5432/amcore?schema=public"`
+in root `.env`. An exported `DATABASE_URL` takes precedence. Check the file value first.
+The shell guard below stops before installation or migration if an exported value differs.
+Use the same shell for the shared web/API key, native frontend origins and startup:
+
+```bash
+test "${DATABASE_URL-postgresql://amcore:amcore@localhost:5432/amcore?schema=public}" = 'postgresql://amcore:amcore@localhost:5432/amcore?schema=public' &&
+WEB_FRONTEND_CONTEXT_KEY="$(openssl rand -hex 32)" &&
+test -n "$WEB_FRONTEND_CONTEXT_KEY" &&
+export WEB_FRONTEND_CONTEXT_KEY &&
+export FRONTEND_URL=http://localhost:3002 WEB_TRUSTED_ORIGINS=http://localhost:3002 &&
+# Migrate only a disposable local development database.
+pnpm install --frozen-lockfile &&
+docker compose up -d postgres redis &&
+pnpm --filter api db:migrate &&
+export REDIS_URL="redis://localhost:6379" &&
+pnpm dev
+```
+
+The API reads root `.env`; exported values override it. Web does not read that
+file, so export `WEB_FRONTEND_CONTEXT_KEY` and `REDIS_URL` in the shell running
+`pnpm dev`. Strict Turbo passes those and `FRONTEND_URL`, `PRODUCT_ADMIN_ORIGIN`,
+`WEB_TRUSTED_ORIGINS`; it builds shared before dependent dev processes.
+Native web listens on port 3002. `FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` must
+name the address where you open web (normally `http://localhost:3002`), not the
+Docker web address (http://localhost:3000). Export changed origin settings so API and web agree.
+Without a key, web refuses startup. With mismatched keys or missing web Redis
+configuration, startup can succeed but session bootstrap returns 503. A listening
+process is not working authentication. For separate package starts,
+run `pnpm --filter @amcore/shared build` first. Then `pnpm --filter api dev` runs Nest in watch mode.
+
+On failure, retain the first error and stop before retrying migrations or changing database state.
 
 Nest/SWC's development checker reports diagnostics asynchronously. A listening
 HTTP endpoint or a restarted process does not prove a fresh TypeScript 7 check.
