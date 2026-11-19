@@ -41,13 +41,15 @@ results. Bulk accepts at most100 distinct IDs. Expired keys can be explicitly
 revoked; historical revoked keys offer Audit only.
 
 Confirmation captures the names, owners, organizations and IDs. Targets stay
-fixed through password step-up. Revocation destroys the verifier and cannot be
+fixed through reauthentication, including required password and second-factor proof. Revocation destroys the verifier and cannot be
 undone. Consumers lose access on verification after commit; an already admitted
 request may finish. Success reports actual affected/requested counts. A known
 already-revoked key is a no-op and keeps its first revoker, time and reason.
 
 An unknown or purged target returns404 and rolls back the entire bulk request.
-The screen refreshes and asks you to select again. Other errors preserve selection
+The screen refreshes and asks you to select again. Rollback covers this request,
+not concurrent changes by other writers; review the refreshed keys before selecting.
+Other errors preserve selection
 for an explicit retry.429 includes Retry-After; no automatic revoke retry occurs.
 Single revoke uses20 requests/minute with burst20; bulk uses5/minute with burst5.
 Read uses30/minute with burst20. These are the existing API rate policies.

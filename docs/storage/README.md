@@ -84,7 +84,7 @@ Publish the public location as described in [Public Files](./public-files.md). S
 - [Testing](./testing.md) — test layers, `storage:check` against your real provider.
 - [Troubleshooting](./troubleshooting.md) — symptom, cause, fix.
 - [Security](./security.md) — private by default, least privilege, presigned URLs, CORS.
-- [Moving providers or a CDN](./migration.md) — copy keys, change one setting.
+- [Moving providers or a CDN](./migration.md) — preserve keys, verify the copy and coordinate the switch.
 
 ## HTTP upload and download integration
 

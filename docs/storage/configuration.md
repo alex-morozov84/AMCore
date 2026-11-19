@@ -82,9 +82,9 @@ Only keys under `public/` have a public URL; asking for the URL of any other key
 
 ## Provider Examples
 
-These blocks show which variables each provider needs. They come from the
-providers' own documentation and were **not** run against the real services by
-the maintainers; see the evidence level on each [provider page](providers.md).
+These are provider-specific overrides. Supply both credentials from the S3 reference
+above. See the [provider matrix](providers/README.md) for each recipe’s evidence,
+including the dated Yandex checks.
 Replace every `<...>` value. Making `public/` readable is a separate step on the
 provider side: follow [Public files](public-files.md).
 
@@ -200,7 +200,7 @@ STORAGE_PUBLIC_BUCKET=<public-bucket>
 STORAGE_REGION=ru-central-1
 STORAGE_ENDPOINT=https://s3.cloud.ru
 STORAGE_ACCESS_KEY_ID=<tenant-id>:<key-id>
-STORAGE_PUBLIC_BASE_URL=https://<public-bucket>.s3.cloud.ru
+STORAGE_PUBLIC_BASE_URL=https://global.s3.cloud.ru/<global-name>
 ```
 
 The access key id has the form `<tenant_id>:<key_id>`.
@@ -235,7 +235,7 @@ access to private files. The web starter's CSP allows images only from its own o
 plus the single origin set in `WEB_PUBLIC_FILES_ORIGIN`: set it to the origin of
 `STORAGE_PUBLIC_BASE_URL`, or expose this endpoint under the web origin through the product
 reverse proxy. A public API response does not override the page's CSP.
-Private objects, metadata and probes are never served. Never expose the
+Private objects and metadata are never served. Public delivery canaries use deliberately public keys. Never expose the
 `objects/` directory or the storage root through a static file server.
 
 ### Local production
@@ -306,11 +306,8 @@ Normal S3 traffic is one PUT, one GET and one DELETE per check per process.
 Over 30 days, one API and one worker therefore perform **8,640 operations of each
 type** (25,920 requests in total), excluding startup checks, retries and cleanup
 after failures. Replicas multiply this traffic; application traffic shares any
-provider free allowance. For example, Yandex Object Storage currently includes
-10,000 standard write operations and 100,000 reads per month; DELETE is free.
-These checks alone use about 86% of its free write allowance for that topology.
-Check current [provider pricing](https://yandex.cloud/ru/docs/storage/pricing)
-before deployment; other S3-compatible providers have different terms.
+provider allowances. Compare these counts with your provider’s current pricing
+and applicable quotas before deployment.
 Each instance tests its own credentials/mount, including worker. Increasing
 the interval reduces cost but delays detection: with checks completing on schedule,
 a failure just after a successful check is not seen for about ten minutes at the
@@ -355,14 +352,15 @@ The optional Console displays the cached file-check result; it does not send ale
 
 The file check above covers private storage. The `s3` driver adds a second, independent
 observation of the public boundary: after one idempotent write of two fixed canary
-objects at start-up it only **reads**, so it adds no write cost and needs no cleanup.
-Each check makes two or three small anonymous GET requests:
+objects at start-up it usually reads. It can recreate missing canaries.
+Each cycle first attempts an authenticated existence check for the private
+canary. It then uses these anonymous GET requests:
 
 1. the public canary (`public/<STORAGE_PROBE_PREFIX>/public-canary`) at
    `STORAGE_PUBLIC_BASE_URL`;
 2. the private canary (`<STORAGE_PROBE_PREFIX>/private-canary`) through the storage API
    without credentials, which must be refused (401, 403 or 404);
-3. with one bucket only, the private canary at the public base, which must be refused.
+3. with one bucket or the API route form, the private canary at the public base, which must be refused.
 
 Defaults run it once an hour per API process (a dedicated worker skips it); `STORAGE_PUBLIC_CHECK_ENABLED=false`
 turns it off (not allowed in `acl` mode). The result appears as the metrics

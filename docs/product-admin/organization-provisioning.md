@@ -33,15 +33,13 @@ links, including when Console has a separate hostname. Never use the Console ori
 for the recipient link. The reference Compose forwards these settings to API and
 worker services. Apply changes consistently to every API replica.
 
-```sh
-docker compose run --rm migrate
-docker compose up -d --build worker
-docker compose up -d --build api web
-```
-
-These commands apply migrations and start matching containers, workers first. They do not seed
-roles or establish the first platform administrator. Follow the deployment guide
-for a fresh installation; ordinary rollouts must not run seed as a repair command.
+For a first deployment from a registry, follow
+[first registry startup](../operations/deployment.md#first-registry-startup).
+For an existing installation, follow the
+[upgrade procedure](../operations/deployment.md#upgrades-new-migrations-in-a-release)
+or [registry upgrades](../operations/deployment.md#registry-upgrades), depending
+on how you deploy. Stop after any failed step. Run the initial seed only for a
+fresh installation. Use the upgrade procedure for an existing installation.
 
 `EMAIL_PROVIDER` still defaults to `mock`. With `NODE_ENV=production`, operator provisioning refuses
 new create/reissue/replace requests before saving changes when email is mocked.
@@ -59,7 +57,7 @@ Open **Organizations** and choose **Create organization**. This path can create 
 
 1. Enter **Organization name**. Optionally enter **Short identifier**, such as
    `north-shop`. It identifies the organization in URLs; it is not an email address.
-2. Enter **Administrator email** and choose **Invitation language** (`en` or `ru`). This names the
+2. Enter **Administrator email** and choose **Invitation language** from the served locales. This names the
    invitation recipient. It does not prepare a password or verify their mailbox.
 3. Check the organization, email and Administrator role. Select **Create and invite**.
    Complete the existing fresh-authentication prompt if needed.
@@ -195,62 +193,51 @@ a successful policy read does not prove that a later write is fresh. Keep the
 saved operation ID/input while renewing authentication; never create a new command
 just because authentication expired. Silent token refresh does not renew freshness.
 
-For an account with a password, confirm the current password:
+Use an MFA-capable native API client for direct provisioning. Prepare the client's
+supported login and proof flow before starting; see
+[MFA credential and publication transport](../auth/mfa-foundation.md#password-and-publication-transport)
+and the installed OpenAPI contract. Protected login can return credential-free
+`202`; complete required proofs, credential issuance and exact publication
+acknowledgement before using the personal access token. A prepared deployment
+refuses protected access; password-only fallback is not supported.
 
-```http
-POST /api/v1/auth/step-up
-Authorization: Bearer <personal-super-admin-access-token>
-Content-Type: application/json
-
-{"password":"<test-current-password>"}
-```
-
-Use the returned `200 {"accessToken":"<new-personal-access-token>"}` for the
-same command. This refreshes the current session; it does not rotate its refresh
-cookie. Invalid credentials or a revoked session require their normal recovery.
-
-OAuth-only accounts return `403 STEP_UP_METHOD_UNAVAILABLE` for password step-up.
-A completed OAuth login creates a NEW session with a fresh local authentication
-time. AMCore does not require the provider to ask for a password again or verify
-its authentication age. Provider single sign-on may complete without a new password
-prompt. This does not renew another client's old session.
+For stale authentication, `POST /api/v1/auth/step-up` may return `202` with missing
+proofs instead of `200` with an access token. For a protected operator, use
+[original-session reauthentication](../auth/mfa-foundation.md#source-session-continuation):
+start `/api/v1/auth/mfa/session-flow` with purpose `reauthenticate` using the original
+bearer token. Complete the required password/factor proofs and
+`/api/v1/auth/mfa/reauthenticate` using the restricted continuation and strict
+OpenAPI bodies. This updates only that family's proofs and issues no new credentials.
+Do not send bearer or session cookies to restricted continuation commands. A changed
+family/account requires a new supported login; retain the organization operation
+reference/input and reconcile its result, never transfer an old continuation.
 
 Choose the client you will actually use:
 
-- **Bundled product website:** normal OAuth sign-in creates a BFF browser session.
-  It supplies neither a command-line bearer token nor a Console-disabled operator
-  UI. Do not extract backend tokens from the browser/vault. This login alone is
-  not a direct-API provisioning procedure.
-- **Custom direct OAuth client:** implement the existing [callback and ticket
-  exchange](../auth/oauth.md#exchanging-the-login-ticket). Start the provider login,
-  preserve browser-bound cookies and own the callback at
-  `{FRONTEND_URL}/{locale}/auth/callback`. AMCore has no per-client callback override.
-  The bundled website already handles that route; a separate client must arrange
-  deployment routing for its own handler, not intercept the website's tickets or
-  change the shared `FRONTEND_URL` just for one operator. Send the ticket with its
-  matching `refresh_token` cookie to
-  `POST /auth/oauth/exchange` within 60 seconds. Use the returned `accessToken` for
-  provisioning in that new personal session. Protect the callback/cookie jar;
-  never copy tickets/cookies into shared terminal output or logs.
-- **Personal password API client:** if the deployment permits password login,
-  an OAuth-only account's owner can deliberately set a password using the existing
-  [Forgot password / Reset password](../auth/email-auth.md#password-reset) email
-  recovery. `POST /auth/forgot-password` takes `{"email":"operator@example.test"}`;
-  the owner opens the mail link and supplies their chosen password. This works
-  even without an old password, verifies the mailbox and revokes ALL existing
-  sessions. It keeps the account's platform role and OAuth links. The owner then
-  calls `POST /auth/login` with their email/password and uses its returned personal
-  `accessToken`. Preserve the original operation ID/input across this new login.
-  The operator chooses this additional login method; provisioning never sets it.
+- **Bundled website or Console:** the BFF owns browser credentials. Its login does
+  not export a command-line bearer or renew another client's family. Reuse the
+  existing Console confirmation flow when Console is available; never extract vault tokens.
+- **Custom direct OAuth client:** implement the
+  [callback and ticket exchange](../auth/oauth.md#exchanging-the-login-ticket),
+  including current local MFA proofs and publication. Provider single sign-on
+  alone does not satisfy those proofs. The callback uses the shared `FRONTEND_URL`;
+  arrange the supported handler/routing without intercepting the bundled BFF's
+  tickets or changing the shared origin for one operator. Protect its cookie jar,
+  ticket and pending credentials. AMCore has no OAuth CLI or BFF-token export.
+- **Personal password client:** if downstream policy permits, an OAuth-only account
+  owner can deliberately use [password recovery](../auth/email-auth.md#password-reset)
+  to add that login method. Reset verifies the mailbox and revokes all existing
+  sessions while preserving platform role and OAuth links. Then complete supported
+  login, required MFA and publication in that client. Reset is not an MFA bypass.
+  AMCore has no built-in password-login disable switch; permission is downstream policy.
 
-AMCore has no built-in password-login disable switch. “Permits password login”
-means the downstream product and deployment policy allow this method.
-
-AMCore has no standalone OAuth CLI login or BFF-token export. If policy requires
-OAuth-only AND no direct OAuth client is configured, direct API provisioning is
-not available to that operator yet. Configure that client or have another current,
-properly authenticated SUPER_ADMIN perform authorized operations. Do not bypass
-freshness with an API key, another person's token or raw database credentials.
+If the client cannot complete required authentication, stop before issuing a new
+command. Configure the supported client or ask another currently authorized
+SUPER_ADMIN to act under their own authority. Keep an unresolved operation for
+[the documented handover](#save-and-send-a-creation-request); another operator
+cannot replay the original creator's write. Do not bypass freshness/MFA with an
+API key, another person's token or database credentials. Keep passwords, tickets,
+continuations and tokens out of URLs, history, logs and shared terminal output.
 
 ### Save and send a creation request
 
@@ -404,8 +391,9 @@ The initial-setup CLI remains available; it does not create later organizations.
   remains available. Missing mail is repaired in that organization, not by opening signup.
 - **SaaS:** configure signup and self-service independently. Anna uses the PRODUCT
   **Organizations** page, not the SUPER_ADMIN Operations Console.
-  In the default path topology these are `/en/organizations` and
-  `/en/admin/organizations` respectively. The ordinary account cannot use Console.
+  In the shipped multi-locale path topology these are `/en/manage/organizations`
+  and `/en/admin/organizations` respectively. Placement aliases can differ;
+  single-locale builds omit the locale prefix. The ordinary account cannot use Console.
   Users can explicitly create
   their own companies if enabled; operators can separately create one for another person.
   Each deliberate new organization uses a new request ID; uncertain retries keep the old ID.

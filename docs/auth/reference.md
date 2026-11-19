@@ -143,7 +143,8 @@ refinements such as the API-key scope grammar:
 **Localization:** translate by `errorCode` when present, else by the Zod `code`
 for field issues. **`message` is diagnostic, not display text** — it is English,
 written for developers, and may change between releases without notice;
-`errorCode` is stable across API versions.
+use `errorCode` as the machine-readable localization key. Handle unknown codes
+with the fallback below instead of assuming every future code is known.
 
 For an unrecognised code, show a generic localized message plus the
 `correlationId` rather than falling through to `message`: the correlation ID is
@@ -166,11 +167,10 @@ Returned in the response root `errorCode`:
 | `EMAIL_ALREADY_EXISTS`          | 409  | Registration: email already in use                                                                                                     |
 | `REGISTRATION_SIGN_IN_REQUIRED` | 503  | Web BFF only, not the API: account created, sign-in unavailable                                                                        |
 | `INVALID_CREDENTIALS`           | 401  | Login: wrong email or password                                                                                                         |
-| `TOKEN_INVALID`                 | 400  | Reset/verify token expired, used, or not found                                                                                         |
+| `TOKEN_INVALID`                 | 401  | Reset/verify token expired, used, or not found; invalid refresh token                                                                                         |
 | `RATE_LIMIT_EXCEEDED`           | 429  | Too many requests (login, reset, resend, API key, invitation accept)                                                                   |
-| `SERVICE_UNAVAILABLE`           | 503  | A failure-protection counter could not be checked; repeat later                                                                        |
-| `SESSION_NOT_FOUND`             | 404  | Refresh: no matching session                                                                                                           |
-| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT                                                                                                                 |
+| `SERVICE_UNAVAILABLE`           | 503  | Dependency/protection unavailable; use route-specific retry and unknown-outcome rules                                                                        |
+| `UNAUTHORIZED`                  | 401  | Missing or invalid JWT, or missing refresh cookie                                                                                                                 |
 | `SESSION_CHANGED`               | 409  | Family, account version or actual browser authority changed; stop the operation without refresh fallback                               |
 | `OAUTH_STATE_INVALID`           | 400  | OAuth: state expired or already consumed                                                                                               |
 | `OAUTH_PROVIDER_ERROR`          | 502  | OAuth: provider returned an error                                                                                                      |
@@ -220,7 +220,7 @@ not the top-level field). See [API Keys](./api-keys.md) for the scope grammar.
 | `DATABASE_URL` | PostgreSQL connection string                    |
 | `REDIS_URL`    | Redis connection string                         |
 | `JWT_SECRET`   | Minimum 32 characters                           |
-| `FRONTEND_URL` | e.g. `https://amcore.dev` — for OAuth redirects |
+| `FRONTEND_URL` | e.g. `https://app.example.com` — for OAuth redirects |
 
 ### Optional (with defaults)
 

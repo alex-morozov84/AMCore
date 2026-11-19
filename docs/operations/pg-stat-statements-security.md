@@ -18,7 +18,7 @@ pg_stat_statements.track_utility = off
 ```
 
 Never put passwords in SQL literals. Use psql's interactive `\password`, which
-hashes client-side and sends a SCRAM verifier instead of cleartext. With utility
+hashes client-side and sends a verifier instead of cleartext. With utility
 tracking enabled, that verifier can still enter the statistics cache and become
 material for offline password guessing. Keep `track_utility=off` as the primary
 control and use strong, unique, randomly generated passwords as defense in
@@ -27,14 +27,9 @@ depth.
 If the module must first load with PostgreSQL's default, perform no
 password-bearing operation until the live-SQL path's `pg_reload_conf()` step
 completes and a connection confirms `SHOW pg_stat_statements.track_utility`
-returns `off`. `track_utility` is a `context=superuser` setting, so a
-configuration reload propagates the change to every already-open backend
-session, not only new ones — verified live against real PostgreSQL 16 and
-PostgreSQL 18 containers (a backend's session held open across the reload
-observed its own value flip without reconnecting). A reload is sufficient
-here; no restart is required beyond the one already needed to load the
-module itself. See bootstrap's [live-SQL
-path](pg-stat-statements-setup.md#path-b-live-sql-only).
+returns `off`. Reloading applies the configured default without another restart. Check the
+effective value in the session you will use. Session-level overrides can
+differ from the server default. See [the live SQL path](pg-stat-statements-setup.md#path-b-live-sql-only).
 
 ## Keep the remaining defaults
 
@@ -48,6 +43,6 @@ that planning statistics can add noticeable overhead under concurrent load.
 
 ## If tracking was unsafe
 
-If utility tracking was enabled during any inline password operation, follow
-[Recovery](pg-stat-statements-recovery.md). Disabling tracking prevents new
-exposure but does not remove entries already collected.
+If utility tracking may have recorded an inline password or a verifier sent
+by `\password`, follow [Recovery](pg-stat-statements-recovery.md). Disabling
+utility tracking leaves entries already collected in place.

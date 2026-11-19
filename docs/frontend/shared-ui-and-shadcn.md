@@ -48,7 +48,7 @@ for why.
 | `spinner.tsx`                        | AMCore-authored                             | Not a shadcn generate. shadcn _does_ now ship an official `Spinner` under the same filename — see [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                                                                                                                             |
 | `api-error-alert.tsx`                | AMCore-authored                             | Not a shadcn generate; built on `alert.tsx`, wired to `useApiError()`. See [Protected files](#protected-files-check-before-every-run).                                                                                                                                                                                                                                                                                                    |
 | `search-field.tsx`                   | AMCore-authored                             | Controlled text-search presentation with caller-supplied accessible copy, one custom clear action, and refocus after clear. It deliberately owns no debounce, URL, form, router, query name, or domain policy.                                                                                                                                                                                                                            |
-| `sidebar.tsx`                        | shadcn (Base UI), customized                | Added Track 9 for the dashboard app shell. `Sidebar` requires caller-provided `mobileTitle`/`mobileDescription`; `SidebarTrigger`/`SidebarRail` require a caller-provided `toggleLabel` — the generated version hardcoded all four as English text, same fix pattern as `DialogContent`'s `closeLabel`. Composition (`widgets/app-shell`) lives outside `shared/ui`, per [Architecture & conventions](./architecture-and-conventions.md). |
+| `sidebar.tsx`                        | shadcn (Base UI), customized                | `Sidebar` requires caller-provided `mobileTitle`/`mobileDescription`; `SidebarTrigger`/`SidebarRail` require a caller-provided `toggleLabel` — the generated version hardcoded all four as English text, same fix pattern as `DialogContent`'s `closeLabel`. Composition (`widgets/app-shell`) lives outside `shared/ui`, per [Architecture & conventions](./architecture-and-conventions.md). |
 | `sheet.tsx`                          | shadcn (Base UI), customized                | Pulled in as `sidebar.tsx`'s mobile-breakpoint dependency. `SheetContent` requires a caller-provided `closeLabel`, mirroring `dialog.tsx`.                                                                                                                                                                                                                                                                                                |
 | `tooltip.tsx`, `separator.tsx`       | shadcn (Base UI), stock                     | Pulled in as `sidebar.tsx` dependencies (`SidebarMenuButton`'s collapsed-state tooltip, `SidebarSeparator`). No customization needed.                                                                                                                                                                                                                                                                                                     |
 
@@ -313,7 +313,7 @@ them; a named token can still fail contrast when opacity or compositing changes.
 ## Token changes stay surgical
 
 `globals.css`'s color tokens are governed by
-[Brand, theme & tokens](./brand-theme-and-tokens.md) and Track 2's WCAG AA
+[Brand, theme & tokens](./brand-theme-and-tokens.md) and the WCAG AA
 contrast test suite (`apps/web/src/shared/lib/theme.test.ts`). A shadcn
 preset switch touches this file wholesale — see the chart-color and
 `--font-sans` regressions above. When a token genuinely needs to change:
@@ -415,62 +415,12 @@ file in the same PR; `test:storybook` is a CI gate in strict upstream mode.
 
 ## Sidebar
 
-**Toast** was deferred until a real mutation flow existed and has since been
-added: the sessions list's revoke action (Track 6) was that first trigger.
-Re-verified live at add-time that shadcn's current docs describe **Toast**,
-not the older Sonner naming/API (`/docs/components/sonner` now redirects to
-`/docs/components/toast`; the API is `toast.add(...)`, not `toast(...)`) —
-worth re-checking again before any future shadcn primitive add, since this
-had already changed once mid-project (Track 5's carry-in note).
-
-**Sidebar** was deferred the same way — no concrete consumer existed until
-Track 9's `(dashboard)/layout.tsx` route-thinness fix needed one — and has
-now been added via `shadcn add sidebar` through the scratch-worktree
-procedure above. Confirmed findings from that spike, kept here for the next
-time this file is touched:
-
-- **`sidebar` pulls in `button.tsx`, `input.tsx`, and `skeleton.tsx` as
-  overwrite targets.** The `button.tsx` diff would have reverted PR1's
-  (#294) `--destructive-foreground` token, `cursor-pointer`, and
-  `data-variant`/`data-size` — declined outright, exactly the CLI-safety
-  risk this page's procedure exists to catch. `input.tsx`'s diff was an
-  unrelated Base UI migration (still on the Radix-era generation per the
-  inventory above) — declined as out of scope for this change, not because
-  it's wrong; migrate it opportunistically like `form.tsx`/`alert.tsx`/
-  `card.tsx` when it's next customized. `skeleton.tsx`'s diff was a trivial
-  unused-import removal with no behavioral change — also declined, since
-  the existing file already works and touching it wasn't this change's job.
-- **Hardcoded English copy, again.** `SidebarTrigger`'s sr-only "Toggle
-  Sidebar", `SidebarRail`'s `aria-label`/`title="Toggle Sidebar"`, the
-  mobile `Sheet`'s `SheetTitle`/`SheetDescription` ("Sidebar"/"Displays the
-  mobile sidebar."), and `sheet.tsx`'s own `SheetContent` close button
-  ("Close") were all generated with literal English text. Fixed the same
-  way as `DialogContent`'s `closeLabel`: `Sidebar` requires
-  `mobileTitle`/`mobileDescription`, `SidebarTrigger`/`SidebarRail` require
-  `toggleLabel`, `SheetContent` requires `closeLabel` (discriminated union,
-  same shape as `DialogContent`'s). This is now the fourth shadcn
-  registry item to ship with baked-in English (`dialog.tsx`, `toast.tsx`,
-  now `sheet.tsx`/`sidebar.tsx`) — check every new primitive add for this
-  before it ships, not just the ones that already burned us.
-- **Known open upstream issues on the Base UI variant, not fixed here:**
-  [shadcn-ui/ui#9668](https://github.com/shadcn-ui/ui/issues/9668) — in the
-  collapsed state, `SidebarGroupLabel`/menu icon elements can render
-  off-center because Base UI's generated markup wraps them in
-  `sidebar-group` (`p-2`) where the Radix variant used `sidebar-menu`.
-  [shadcn-ui/ui#9049](https://github.com/shadcn-ui/ui/issues/9049) confirms
-  `SidebarMenuButton`/`DropdownMenuTrigger`-style `asChild` composition
-  doesn't exist under Base UI even though some shadcn docs pages still show
-  it — consistent with `button.tsx` having already dropped it. This repo's
-  copy of `sidebar.tsx` never uses `asChild` (it uses Base UI's own
-  `render`/`useRender`/`mergeProps`), so #9049 doesn't apply here; #9668 is
-  a real upstream layout quirk to watch for once a consumer adds icons to
-  collapsed-state menu items — not reproduced or worked around yet since
-  AMCore's own `widgets/app-shell` composition doesn't currently use
-  `collapsible="icon"`.
-- **No new dependency.** `pnpm-lock.yaml`/`package.json` were untouched by
-  the real invocation — every package `sidebar.tsx`'s dependency chain
-  needs (`@base-ui/react/merge-props`, `@base-ui/react/use-render`,
-  `class-variance-authority`, `lucide-react`) was already installed.
+Use the shared Base UI sidebar. Its trigger and rail require a localized
+`toggleLabel`. Provide `mobileTitle` and `mobileDescription` for the mobile
+navigation sheet. The sidebar hides the sheet’s built-in close button. Check the
+collapsed desktop and mobile states, including keyboard navigation and labels.
+See [the product shell](architecture-and-conventions.md#product-application-shell)
+for placement and navigation.
 
 ## See also
 

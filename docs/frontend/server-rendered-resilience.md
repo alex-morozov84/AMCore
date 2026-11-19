@@ -14,12 +14,12 @@ records the design and the rejected error-serialization approaches.
   may hide or disable only that section, or show a small inline note. The caller
   owns that choice; do not show a global toast.
 
-`fetchBackend(path, schema, { auth, timeoutMs?, signal?, tokenResolver? })`
+`fetchBackend(path, schema, { auth, timeoutMs?, signal?, cache?, tokenResolver? })`
 calls `apps/api` directly and returns a Zod-validated `DataOutcome<T>`. Omit
 `tokenResolver` for the product session (the default); a caller with its own
-isolated session — the Operations Console is the only one today — passes
-its own resolver instead, e.g. `getConsoleAwareAccessToken` (never a
-fallback to the product session, even when it resolves `null`):
+isolated session passes its own resolver. For example, the Operations Console
+passes `getConsoleAwareAccessToken`. If that resolver returns `null`, the
+transport does not fall back to the product session:
 
 ```ts
 type DataOutcome<T> =
@@ -51,9 +51,13 @@ return <FacetList facets={facets.data} />
 ```
 
 ```tsx
-const product = resolvePrimary(await fetchProductDetail(id), {
-  source: 'product-detail',
-})
+import { notFound } from 'next/navigation'
+
+// Resolve the route's authoritative read before streaming starts.
+const outcome = await fetchProductDetail(id)
+if (outcome.status === 'not-found') notFound()
+
+const product = resolvePrimary(outcome, { source: 'product-detail' })
 if (product.status === 'unavailable') {
   return <PrimaryUnavailableFallback reason={product.reason} />
 }
@@ -66,11 +70,11 @@ it never renders the raw reason, retry delay, or an exception. Its button calls
 that does not start the bar), requesting a new Server Component payload without
 resetting unaffected client state.
 
-`router.refresh()` does **not** invalidate the server-side cache. Next 16.3.4
-does not cache `fetch` by default, so the transport above retries fresh data. If
-a downstream loader opts into caching, pair recovery with an appropriate
-`revalidatePath` or `revalidateTag` policy or the refresh may reproduce the same
-cached result.
+`router.refresh()` does not invalidate the server-side cache. For a read that
+must reach the backend on every request, pass `cache: 'no-store'` to
+`fetchBackend()`. If a loader opts into caching, use a matching
+`revalidatePath` or `revalidateTag` policy. Refresh can return the same cached
+result until it is invalidated.
 
 ## Catch unexpected exceptions per section
 
@@ -127,27 +131,13 @@ The starter deliberately does not add:
 - stale-if-error data, which needs a real cache and invalidation policy;
 - a fake catalog/demo route.
 
-The Operations Console's Organizations panel is the first real in-repo
-consumer of the primary path (`resolvePrimary`/`PrimaryUnavailableFallback`,
-via `shared/api/console/organizations.ts`), using its own `tokenResolver`
-rather than the product session. Its queue, AI-approval, and audit panels
-are the planned first consumers of the **secondary** path
-(`degradeSecondary`) and must reuse these primitives with durable browser
-coverage over real sections.
+The Operations Console's Organizations results use `resolvePrimary()` for
+the primary read. Its Overview reads several sources independently through
+`readOverviewSources()`. An unavailable source can degrade without hiding
+data from the other sources.
 
-The console's Overview panel (`shared/api/console/overview.ts`) adds a
-distinction the resilience framework itself does not model: a _successfully
-observed_ degraded dependency is not the same failure as _failing to observe
-it at all_. `GET /admin/overview` always answers `200` with a typed
-`readiness: 'ready' | 'not_ready'` payload when the request itself succeeds —
-even a fully degraded instance is `DataOutcome<'success'>` here, and
-`resolvePrimary` only ever sees `'unavailable'` for a real transport failure
-(network error, timeout, an actual 5xx from the endpoint). The page branches
-on `readiness` itself for the observed case (`OverviewNotReadyAlert`, a small
-dedicated presentation — reusing `PrimaryUnavailableFallback`'s generic copy
-here would have collapsed the two distinct failure modes into one message)
-and only reaches `PrimaryUnavailableFallback` for the unavailable case. Any
-future panel that surfaces another service's own health/degraded state
-should follow the same shape: model "observed degraded" as typed success
-data, and reserve `DataOutcome`'s `'unavailable'` strictly for "could not
-observe it."
+A successful `GET /admin/overview` response contains a typed readiness value:
+`ready`, `degraded` or `not_ready`. Overview renders that value as observed
+service state. If the read itself is unavailable, it shows the unavailable
+source separately and still renders the other results. Apply the same
+distinction when you add dependency health to another page.

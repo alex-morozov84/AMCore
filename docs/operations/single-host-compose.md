@@ -196,6 +196,12 @@ before deployment. Never disable certificate verification to make it pass.
 
 ## 4. Build the images
 
+Set `BUILD_SOURCE_COMMIT` in `.env` to the reviewed full commit before building
+deployment-capable API/worker/web images. Verify the checkout matches that commit;
+a label does not attest local modifications. Unpinned local builds do not satisfy
+[MFA deployment preflight](../auth/mfa-deployment.md).
+Check the linked guide's artifact requirements before protocol activation.
+
 On a host with less than about 6 GB of RAM, add swap and a build-only heap size
 first (the reference 2 GiB host needed both; see
 [Capacity → Building the images](capacity.md#building-the-images)):
@@ -217,17 +223,20 @@ docker compose build migrate
 docker compose --profile seed build system-seed
 ```
 
-`worker` and `system-seed` use the same build as `api` and come from the build cache in
-seconds. Build every service on each upgrade too: `up` builds only images that are
-missing, so it would keep running an old `worker` image. The web build takes the
-longest (about 18 minutes on the reference host).
+`worker` and `system-seed` use the same build as `api` and can reuse its cache.
+Build every service on each upgrade too: `up` can keep an old worker image.
+Build duration depends on host resources and cache state; see the capacity guide
+for the measured reference environment.
 
 ## 5. Start infrastructure and create the roles
 
 ```bash
-docker compose up -d --no-build --wait --wait-timeout 180 postgres redis
-sed -n '1,/^-- Step 2:/p' docker/postgres/setup-roles.sql \
-  | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
+docker compose up -d --no-build --wait --wait-timeout 180 postgres redis &&
+(
+  set -o pipefail
+  sed -n '1,/^-- Step 2:/p' docker/postgres/setup-roles.sql \
+    | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
+) &&
 docker compose exec postgres psql -U amcore -d amcore
 ```
 
@@ -261,9 +270,12 @@ docker compose run --rm --no-deps migrate ./node_modules/.bin/prisma db execute 
 Stop on failure. After a successful preflight:
 
 ```bash
-docker compose run --rm --no-deps migrate
-sed -n '/^-- Step 3:/,/^-- Optional query-statistics observer/p' docker/postgres/setup-roles.sql \
-  | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
+docker compose run --rm --no-deps migrate &&
+(
+  set -o pipefail
+  sed -n '/^-- Step 3:/,/^-- Optional query-statistics observer/p' docker/postgres/setup-roles.sql \
+    | docker compose exec -T postgres psql -U amcore -d amcore -v ON_ERROR_STOP=1
+) &&
 docker compose --profile seed run --rm system-seed
 ```
 
@@ -275,9 +287,9 @@ the host. See [Seeding](deployment.md#seeding) for refusals and repeated runs.
 ## 7. Start the stack
 
 ```bash
-docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
-docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
-docker compose up -d --no-build --no-deps --wait --wait-timeout 180 caddy
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker &&
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web &&
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 caddy &&
 docker compose ps
 ```
 
@@ -381,8 +393,11 @@ socket address ([BFF client-IP relay](deployment.md#bff-client-ip-relay-appsweb-
   visitor budget; audit/invite inputs remain unchanged.
 - To change the subnet or address of a running deployment, plan a short downtime
   and take a backup first. Edit `.env`, check `docker compose config --quiet`, then
-  run `docker compose down` followed by `docker compose up -d`. The network is
-  recreated; volumes and data stay. Never use `down -v`: it deletes the database.
+  close ingress and stop every writer before `docker compose down`. The network
+  is recreated; volumes and data stay. Never use `down -v`: it deletes the database.
+  Recreate infrastructure, run the exact-endpoint preflight, then follow the
+  [ordered upgrade](#upgrades), starting the edge last after verification.
+  Do not use bare `up` to bypass migration and readiness stops.
 
 ## Database TLS
 
@@ -443,8 +458,9 @@ the clients need no restart.
    docker compose logs --since 2m postgres | grep -i ssl || echo NO_SSL_ERRORS
    ```
 
-   The last command must print `NO_SSL_ERRORS`: an SSL line there means Postgres kept
-   the old files.
+   Inspect any SSL error before continuing. `NO_SSL_ERRORS` only means this log
+   search found none; it does not prove Postgres loaded the new certificate.
+   Step 4 verifies the served certificate and client connection.
 
 4. Verify, from `/srv/amcore`:
    `openssl s_client -starttls postgres -connect 127.0.0.1:5432 </dev/null 2>/dev/null | openssl x509 -noout -enddate`
@@ -522,9 +538,10 @@ few minutes; announce a maintenance window.
    docker compose run --rm --no-deps migrate
    ```
 
-4. If `migrate` ends with `No pending migrations to apply.`, start the clients with
-   `docker compose up -d --wait` (and `docker compose up -d backup` if you use it), then
-   run the checks from [step 8](#8-verify). The replacement is complete when they pass.
+4. If `migrate` ends with `No pending migrations to apply.`, start worker,
+   then API/web, then edge using the explicit commands in
+   [step 7](#7-start-the-stack). Stop after any failure and run
+   [step 8](#8-verify) before restarting `backup`. The replacement is complete when they pass.
 
 5. If `migrate` fails with a certificate or TLS error, roll back to the old files, then
    check that the old setup works again:
@@ -537,7 +554,7 @@ few minutes; announce a maintenance window.
    docker compose run --rm --no-deps migrate ./node_modules/.bin/prisma db execute --file ./migrator-check.sql
    # Continue only after the preflight exits zero.
    docker compose run --rm --no-deps migrate
-   docker compose up -d --wait
+   # After successful preflight/migration, follow step 7's ordered startup.
    ```
 
    Keep `rotate/` and find the cause before the old CA expires.
@@ -633,7 +650,7 @@ from the `postgres_backups` volume (`/backups` in the container).
    Check each command succeeds before running the next:
 
    ```sh
-   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker
+   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker &&
    docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api
    ```
 
@@ -645,7 +662,7 @@ from the `postgres_backups` volume (`/backups` in the container).
 9. Start web, verify health, then open the edge last:
 
    ```sh
-   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 web
+   docker compose up -d --no-build --no-deps --wait --wait-timeout 180 web &&
    docker compose up -d --no-build --no-deps --wait --wait-timeout 180 caddy
    ```
 
@@ -663,7 +680,8 @@ do not repeat CREATE ROLE over existing roles. Any failure keeps ingress closed.
 - Docker restarts a container whose process exits, including after a reboot. It
   does not restart a container that only reports `unhealthy`.
 - Watch service health and disk latency from outside the host. A network disk can
-  stall for minutes; the stack recovers by itself, but you need to know it happened.
+  stall for minutes. Do not assume recovery: inspect health, pending effects and
+  database state before admitting traffic or retrying uncertain work.
 - Cloud instances sold as preemptible or spot can be stopped by the provider at any
   time; do not use them for production.
 - Back up the database and local files: [Backup & restore](backup-restore.md). To

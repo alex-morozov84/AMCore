@@ -29,9 +29,9 @@ arbitrary dimensions/quality; only named, server-defined preset variants exist.
 
 ## Limits
 
-- **Source bytes** are capped (`MEDIA_MAX_SOURCE_BYTES`) by reading object
-  metadata **before** downloading into memory — an oversized stored object is
-  rejected without being pulled in full.
+- The media service checks stored object size against `MEDIA_MAX_SOURCE_BYTES`
+  before downloading. Give it a stable source that cannot change during processing.
+  A metadata check alone cannot bound a later read of a replaceable object.
 - **Decoded dimensions/pixels** are enforced after `sharp` reads metadata
   (`MEDIA_MAX_WIDTH/HEIGHT/PIXELS`), with a tighter per-preset cap for avatars
   (`MEDIA_AVATAR_MAX_PIXELS`, 8 MP).

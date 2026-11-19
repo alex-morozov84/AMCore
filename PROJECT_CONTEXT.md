@@ -8,8 +8,7 @@ separate product from the starter.
 
 - **Mode:** `upstream-starter`
 - **Product:** AMCore
-- **Purpose:** Continue development of AMCore and its reusable, production-oriented
-  NestJS API starter.
+- **Purpose:** Continue development of AMCore and its reusable, production-oriented NestJS API starter.
 - **Canonical upstream:** https://github.com/alex-morozov84/AMCore
 - **Upstream sync policy:** N/A — this checkout is the canonical upstream.
 - **Workflow mode:** `strict` (protected `main`, PR-only, squash-only, required CI).

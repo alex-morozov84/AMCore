@@ -10,7 +10,7 @@ caps enforced in
 
 | Variable                         | Default                               | Purpose                                                             |
 | -------------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
-| `MEDIA_MAX_SOURCE_BYTES`         | `5242880` (5 MB)                      | Reject a source object larger than this **before** download.        |
+| `MEDIA_MAX_SOURCE_BYTES`         | `5242880` (5 MB)                      | Check stored source size before download. Use a stable source object.        |
 | `MEDIA_MAX_WIDTH`                | `8000`                                | Reject sources wider than this (px).                                |
 | `MEDIA_MAX_HEIGHT`               | `8000`                                | Reject sources taller than this (px).                               |
 | `MEDIA_MAX_PIXELS`               | `40000000` (40 MP)                    | Global decoded-pixel cap (`width × height`).                        |

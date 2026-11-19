@@ -85,8 +85,8 @@ later send the browser back to the search target.
 
 `useDebouncedDraft` stores only the **latest** expected self identity. It is
 appropriate when a newer navigation prevents an older unapplied response from
-becoming the view. The installed Next.js 16.3.5 App Router discards a pending
-navigation when a newer navigate or Back/Forward restore starts. If a
+becoming the view. In Next.js 16.4.5, a new navigate or Back/Forward restore discards the
+pending App Router action. Recheck that behavior when changing Next.js. If a
 different transport may apply old responses, its feature adapter must first
 enforce this ordering; the shared hook does not cancel network requests.
 
@@ -117,6 +117,12 @@ Use `pnpm --filter web test:e2e:real-stack` when the change depends on the
 actual auth/BFF/cookie/Redis/App Router stack. The full verification loop and
 lane selection live in [Frontend testing](../testing.md).
 
+For an API-backed listing, count API reads during search, filtering and Back in
+a production build. Include server-side calls in the count. If the reset link
+prefetches the unfiltered listing and adds an unnecessary API read, set
+`prefetch={false}` on that `RouteProgressLink`. Compare the request counts,
+URLs and rendered results with and without the change.
+
 ## Console discovery filters
 
 The Console discovery adapter accepts optional `extraQuery` state. A panel
@@ -127,7 +133,7 @@ or fragment. Every sort, paging, search and recovery call preserves the extras;
 search and sort reset the page. The same canonical state defines view identity,
 including filters and page size, so filter-only navigation reconciles drafts.
 
-`SearchInput` accepts `maxLength` (default255); set it to the panel's backend
+`SearchInput` accepts `maxLength` (default 255); set it to the panel's backend
 search bound. Its GET fallback carries extras as hidden fields. Existing panels
 without extra state retain their current URL behavior. Do not put domain validation
 in the shared draft controller or encode filters into the base href.

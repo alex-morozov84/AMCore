@@ -79,7 +79,6 @@ simulation, a call that did not start, and uncertainty. Resend's parsed error
 names lack an independent no-effect HTTP witness, so negative responses remain
 unknown with a safe reason. An accepted response requires a bounded, valid
 provider ID and no contradictory error. It does not prove delivery or completion.
-This does not change the public `sendNow()` compatibility contract.
 
 Attempt bindings use SHA-256 to compare the canonical recipient and non-secret
 policy metadata. The password-reset setting in that metadata is a numeric link
@@ -141,7 +140,7 @@ actual body, key, headers and signal; a new provider needs equivalent coverage.
 A byte-preserving provider adapter forwards all three prepared inputs to its transport:
 
 ```ts
-import type { EmailProvider, SendEmailResult } from './email.types'
+import type { EmailProvider, SendEmailResult } from './email.types.js'
 
 type PreparedTransport = (
   body: string,
@@ -180,7 +179,7 @@ development/tests and logs metadata only.
 
 ## First-administrator invitation recovery
 
-[Organization provisioning](../product-admin/organization-provisioning.md) commits the organization before direct invitation mail. It records only a safe last-attempt outcome, never a secret body/link in a queue. Provider acknowledgment is not delivery. An unknown send leaves the organization saved; explicit reissue rotates the invitation. Production mock blocks new operator invitation sends before commit, while reads and exact replay remain available. The global mock default and ordinary email APIs are unchanged.
+[Organization provisioning](../product-admin/organization-provisioning.md) commits the organization before direct invitation mail. It records only a safe last-attempt outcome, never a secret body/link in a queue. Provider acknowledgment is not delivery. An unknown send leaves the organization saved; explicit reissue rotates the invitation. Production mock blocks new operator invitation sends before commit, while reads and exact replay remain available.
 
 ## Verify delivery on a deployed stack
 

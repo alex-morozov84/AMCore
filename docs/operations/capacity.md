@@ -29,7 +29,7 @@ results allowed. Times are server-side (edge access log), from request to respon
 | ≈ 90 offered      | > 6 s      | 0      | Overloaded: the generator could not reach the rate                             |
 
 - The limit is CPU: at ≈ 61 requests/s the web app and the API together use both
-  vCPUs. A host with more CPU is the first step to grow.
+  vCPUs. If your measurements show the same CPU limit, try a host with more CPU.
 - Memory was not the limit. Peak container memory: API ≈ 530 MiB, worker ≈ 380 MiB,
   web ≈ 350 MiB, Postgres ≈ 100 MiB, Caddy ≈ 120 MiB, Redis < 10 MiB. Available host
   memory stayed above 160 MiB, also when overloaded.
@@ -46,7 +46,7 @@ results allowed. Times are server-side (edge access log), from request to respon
 
 Building needs much more memory than running. In the reference run, the web build
 alone used about 3 GB of Node.js heap, and the build needed about 4.6 GB of RAM plus
-swap in total. A 2 GiB host without help fails with `JavaScript heap out of memory`.
+swap in total. The reference 2 GiB host needed swap and a build-only heap setting.
 
 - Preferred: build in CI or on another machine, and pull the images
   ([registry rollout](deployment.md#production-rollout-via-registry-image-pull-path)).
@@ -103,7 +103,7 @@ with the restart policies of `docker/compose/supervise.yml`):
 
 | Service | Observed result                                                                                                                                                        |
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| web     | Killed and restarted; during the restarts about 12 % of requests got `502`. No data is lost: sessions live in Redis.                                                   |
+| web     | Killed and restarted; during the restarts about 12 % of requests got `502`. Web restarts did not clear sessions stored in Redis.                                                   |
 | worker  | Restarts in a loop while the limit is too low. Three jobs queued during the loop waited and completed once the limit was raised. Repeated deliveries were not checked. |
 | api     | Restarts in a loop; the API answers `502` until the limit is raised. Back in about 15 s after that.                                                                    |
 
@@ -116,4 +116,4 @@ not be separated from the variation between runs.
 Measure again before relying on these numbers after a Next.js or NestJS major
 upgrade, a new always-on module or background job, a change of process roles, a
 failed route budget check, or a different host class. [Load testing](load-testing.md)
-repeats this measurement with the same mix, steps and result rules.
+uses the same traffic mix and a fixed campaign with explicit stop conditions.

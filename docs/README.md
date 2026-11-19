@@ -10,20 +10,12 @@ here — the Swagger/OpenAPI document at `/docs` in development is their source 
 truth. These guides cover the model, extension points, and invariants OpenAPI
 does not express.
 
-Going to production for the first time? The root README's [Going to
-production](../README.md#going-to-production) walks the six operations runbooks
-in the order you actually need them, rather than leaving you to pick from the
-list below.
+For a first production deployment, start with the
+[operations index](operations/README.md) and its single-host or platform path.
 
-**On `ADR-NNN` citations — a known gap.** Code comments and guides cite
-decisions as `ADR-041`, `ADR-072`, and so on. Those records currently live in
-the maintainer's own repository and are **not** part of a fork, so today a
-citation is a dead reference for anyone but the maintainer. That is a
-documentation defect, not a design choice, and publishing them is tracked
-work. Until then: every rule you must actually follow is stated here in
-`docs/` or in the comment doing the citing — a citation only points at the
-recorded rationale behind it. If a citation is the only explanation you can
-find for something, that page is under-documented; please open an issue.
+`ADR-NNN` citations identify maintainer decision records that are not distributed
+with this checkout. Required rules must be stated in the public guide or source
+comment. If a rule is available only through an unavailable record, report the gap.
 
 ## Find the right guide
 
@@ -38,7 +30,7 @@ find for something, that page is under-documented; please open an issue.
 | Extend or operate the API HTTP runtime                                                   | [`backend/http-runtime.md`](backend/http-runtime.md) — Fastify plugins, upgrade checks and rollback.                                    |
 | Understand request parsing, decoded limits and transport errors                          | [`backend/request-body-contract.md`](backend/request-body-contract.md)                                                                  |
 | Build, develop or extend the ESM API                                                     | [`backend/api-build.md`](backend/api-build.md)                                                                                          |
-| Build and maintain the isolated migration image                                          | [`operations/migrator-image.md`](operations/migrator-image.md)                                                                          |
+| Build the migration image or recover an interrupted migration                                          | [`operations/migrator-image.md`](operations/migrator-image.md)                                                                          |
 | Build or verify shared package distribution                                              | [`backend/shared-package-build.md`](backend/shared-package-build.md)                                                                    |
 | Add a backend module the AMCore way                                                      | [`backend/architecture-and-conventions.md`](backend/architecture-and-conventions.md)                                                    |
 | Register background work, an idempotent handler or a database-owned control adapter      | [`backend/background-work.md`](backend/background-work.md)                                                                              |
@@ -123,39 +115,15 @@ It covers repository choice, release support, merge delivery and recovery.
 - **[Backend architecture & conventions](backend/architecture-and-conventions.md)** —
   how to add a backend module: Prisma, shared contracts, NestJS wiring, auth,
   process roles, and required tests.
-- **[Frontend architecture & conventions](frontend/architecture-and-conventions.md)** —
-  FSD layer boundaries, route thinness, Server/Client Component defaults,
-  state model, and how the frontend consumes the backend.
-- **[Frontend search](frontend/search/README.md)** — pattern selection,
-  shared field/draft APIs, a typed URL-backed adapter, and race verification.
-- **[Boundaries & guardrails](frontend/fsd-boundaries-and-guardrails.md)** —
-  what the layer, import, server/client and token rules are, which tool enforces
-  each, what is deliberately not covered, and how to add a guard.
-- **[Brand, theme, and design tokens](frontend/brand-theme-and-tokens.md)** —
-  token architecture, light/dark/system modes, the no-flash mechanism, the
-  downstream rebrand checklist, and initializing a fork's identity, assets and
-  theme with `pnpm init:brand`.
-- **[Shared UI & shadcn](frontend/shared-ui-and-shadcn.md)** — the `shared/ui`
-  reuse rule, the current primitive inventory, and the safe procedure for
-  running the shadcn CLI (why a bare `shadcn add` against the live tree isn't
-  safe).
-- **[i18n & error localization](frontend/i18n-and-errors.md)** — where copy
-  lives, adding strings/locales/error codes, ICU plurals, localized form
-  validation, locale-aware links from the backend, and running a fork
-  single-locale.
-- **[Frontend API consumption](frontend/api-consumption.md)** — how `apps/web`
-  hooks consume the media, notifications, and AI backend surfaces through the
-  BFF, why the realtime hooks use native `EventSource` instead of the custom
-  fetch-stream reader a direct (non-BFF) SSE consumer needs, the frontend
-  `429`/`Retry-After` retry policy, and the opt-in client-IP relay that lets
-  `apps/api`'s rate limiter tell BFF visitors apart.
-- **[Browser security headers and CSP](frontend/browser-security-and-csp.md)** —
-  the static header baseline, nonce-based CSP, enforcement mode, HSTS,
-  adding a third-party origin, downstream route-scoping, and the CSP
-  violation-reporting endpoint.
-- **[Search-engine indexing](frontend/seo.md)** — closed by default; the two
-  run-time variables, making a page public with `buildPageMetadata`, the
-  sitemap list, verification commands, the traps and recovery after a leak.
+- [Frontend architecture & conventions](frontend/architecture-and-conventions.md).
+- [Frontend search](frontend/search/README.md).
+- [Boundaries & guardrails](frontend/fsd-boundaries-and-guardrails.md).
+- [Brand, theme, and design tokens](frontend/brand-theme-and-tokens.md).
+- [Shared UI & shadcn](frontend/shared-ui-and-shadcn.md).
+- [i18n & error localization](frontend/i18n-and-errors.md).
+- [Frontend API consumption](frontend/api-consumption.md).
+- [Browser security headers and CSP](frontend/browser-security-and-csp.md).
+- [Search-engine indexing](frontend/seo.md).
 - **[Lighthouse audits](frontend/testing.md#lighthouse-audits)** — local production audits, downloadable HTML reports, complete page inventory and safe evidence.
 - **[Frontend testing](frontend/testing.md)** — the test taxonomy
   (Vitest unit/component, MSW integration, Playwright mocked/server-mocked/
@@ -167,37 +135,15 @@ It covers repository choice, release support, merge delivery and recovery.
 - **[Route bundle budgets](frontend/bundle-budget.md)** — the CI check
   that limits each page's first-load JavaScript, how to investigate a
   failure and how to change a limit.
-- **[Top route progress bar](frontend/route-progress.md)** — the global
-  navigation-progress indicator: what starts/finishes it, the
-  `RouteProgressLink`/`useRouteProgressRouter()` adapters, reduced motion,
-  and the `ROUTE_PROGRESS_ENABLED` dev/agent flag.
-- **[Product administration foundation](product-admin/README.md)** — the
-  organization selector and read-only overview, one-placement integration and
-  headless extension path, members/roles, the [role definitions API and ready Roles tab](product-admin/role-definitions.md), the
-  [member access explanation](product-admin/member-access.md), [confirmed member removal](product-admin/organization-members.md#remove-a-member), [member API-key control](product-admin/member-api-keys.md), the
-  [account menu, profile and avatar](product-admin/account-menu-and-profile.md)
-  and [invitations](product-admin/invitations.md);
-  product-domain management UI remains downstream-owned.
-- **[Operations Console](operations-console/README.md)** — the optional
-  `SUPER_ADMIN` control plane: Overview readiness, API/web identity, local
-  resources and links to your monitoring tools, Background work diagnostics and policy-eligible controls, user and organization details,
-  Users system-role changes, bounded Audit browsing, topology,
-  host-session boundary, deployment, verification,
-  and safe extension rules.
-- **[Auth](auth/README.md)** — authentication and authorization: concepts,
-  sessions, OAuth, [RBAC](auth/rbac.md), [capability catalogue and access
-  hints](auth/capability-catalogue.md), [API keys](auth/api-keys.md), [invitations](auth/invites.md),
-  CSRF, and the [auth contracts reference](auth/reference.md).
-- **[Email](email/README.md)** — `EmailService` vs `NotificationsService`, React
-  Email templates, delivery classes, and secret-link rules. Existing installations
-  use the [welcome policy upgrade](email/queued-upgrade.md) for offline conversion.
-- **[Notifications](notifications/README.md)** — the per-user feed, preferences,
-  durable email/Telegram channels, and the realtime SSE stream.
-- **[AI capability layer](ai/README.md)** — conversations, durable runs,
-  providers/models, assistants, tools/approvals, human takeover, and multimodal
-  artifacts.
-- **[Storage](storage/README.md)** & **[Media](media/README.md)** — the
-  cloud-agnostic file layer and the image-derivative layer on top of it.
+- [Top route progress bar](frontend/route-progress.md).
+- [Product administration foundation](product-admin/README.md), [role definitions API and ready Roles tab](product-admin/role-definitions.md), [member access explanation](product-admin/member-access.md), [confirmed member removal](product-admin/organization-members.md#remove-a-member), [member API-key control](product-admin/member-api-keys.md), [account menu, profile and avatar](product-admin/account-menu-and-profile.md), [invitations](product-admin/invitations.md).
+- [Operations Console](operations-console/README.md).
+- [Auth](auth/README.md), [RBAC](auth/rbac.md), [capability catalogue and access
+  hints](auth/capability-catalogue.md), [API keys](auth/api-keys.md), [invitations](auth/invites.md), [auth contracts reference](auth/reference.md).
+- [Email](email/README.md), [welcome policy upgrade](email/queued-upgrade.md).
+- [Notifications](notifications/README.md).
+- [AI capability layer](ai/README.md).
+- [Storage](storage/README.md), [Media](media/README.md).
 - **[Operations](operations/README.md)** — deployment, migrations, process
   roles, TLS/reverse-proxy setup (nginx or the optional bundled Caddy
   profile), the production deploy profile (build-once/promote-by-digest,
@@ -208,6 +154,7 @@ It covers repository choice, release support, merge delivery and recovery.
   the deployment platforms decision matrix (Kubernetes, Cloud Run, Fly,
   Render, Railway, Vercel), observability, CI/repo security, audit log,
   webhooks, and idempotency.
+
 
 ## Common extension tasks
 
@@ -237,3 +184,10 @@ there, not here.
 - Add or change an alert, dashboard panel, runbook, or receiver → [Operations · Change or extend observability](operations/observability.md#change-or-extend-observability)
 
 [Place product administration and isolate host sessions](product-admin/placement-and-sessions.md) — configurable path alias, canonical addresses, login/logout boundaries and deployment.
+
+## Help and contributions
+
+Read [CONTRIBUTING.md](../CONTRIBUTING.md) before contributing.
+Use [GitHub issues](https://github.com/alex-morozov84/AMCore/issues) for reproducible bugs.
+Report vulnerabilities privately through [SECURITY.md](../SECURITY.md).
+See the root README for [author](../README.md#author) and [license](../README.md#license).

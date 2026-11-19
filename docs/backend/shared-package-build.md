@@ -1,7 +1,7 @@
 # Shared package build contract
 
 `@amcore/shared` uses tsdown with Rolldown for JavaScript and TypeScript 5.9
-for declarations. The maintained builder replaces tsup. Declaration generation retains TypeScript 5.9.
+for declarations. Declaration generation retains TypeScript 5.9.
 `pnpm --filter @amcore/shared typecheck` checks sources with the pinned native
 TypeScript 7 CLI. This partial adoption does not migrate frontend checks,
 compiler API tools or declaration generation.
@@ -13,12 +13,10 @@ Run `pnpm --filter @amcore/shared dev` to rebuild on source changes.
 Each build cleans `dist` before emitting dual ES2022 Node formats. The build is
 unbundled: `dist` mirrors `src` module by module.
 
-`dev` does not clean on rebuilds (`--no-clean`). The ESM and CommonJS builds run in
-parallel, and a per-rebuild clean could delete a file the other build had just written:
-`dist` then lacked `index.d.cts` until the next edit. The cost is that `dev` keeps the
-output of a deleted source module. Nothing reaches it, because the package exports only
-the root entry. Run `build` to clear `dist`. `scripts/lib/shared-package-watch.test.mjs`
-covers this behavior.
+`dev` does not clean on rebuilds (`--no-clean`). ESM and CommonJS builds run in
+parallel; cleaning during a rebuild can delete the other build's output.
+Deleted source modules can leave stale output in watch mode. Only the root entry
+is exported; run `build` to clear `dist` before validating a deliverable.
 
 - ESM: `dist/index.js`, `dist/index.d.ts` and one `.js`/`.d.ts` per source module.
 - CommonJS: `dist/index.cjs`, `dist/index.d.cts` and one `.cjs`/`.d.cts` per module.

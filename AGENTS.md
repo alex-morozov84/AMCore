@@ -138,8 +138,8 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
 - **Documentation writing:** before creating or changing documentation, read
   [`docs/documentation-guide.md`](docs/documentation-guide.md). Use its reader,
   scope, verification and brevity rules; do not add a new review gate for routine edits.
-- **Docs impact check is required.** Before editing, identify which public docs
-  the task can affect. When behavior, API contracts, extension points, security
+- **Docs impact check is required.** Before editing, identify which public guides and agent skills
+  the task can affect. Check how a user or agent would find the instructions for the changed action. When behavior, API contracts, extension points, security
   invariants, operations, commands, or contributor workflow change, update the
   relevant `docs/` and `CONTRIBUTING.md` in the same PR, and answer every line of
   the "Where this change must be visible" block of the PR template (README, doc
@@ -396,6 +396,14 @@ before rollout. Do not change API/worker role defaults to satisfy image checks.
 - **Docs example tokens must be obviously fake** (truncate `...`, bracket
   `<...>`/`{...}`, or reuse the canonical fake key) — real-shaped secrets fail the
   gitleaks gate.
+
+## Skills for project actions
+
+Read `.agents/skills/amcore-<name>/SKILL.md` for the requested action:
+`backend-module`, `frontend-page`, `authorization-extension`, `auth-integration`, `admin-placement`,
+`audit-events`, `deployment`, `recovery`, `secret-rotation`, `mfa-operations`, `background-work`, `integration-extension`.
+Use current local guides. Skills grant no execution permission.
+Invoke `$amcore-<name>` in Codex or `/amcore-<name>` in Claude Code.
 
 ## Where the docs are
 

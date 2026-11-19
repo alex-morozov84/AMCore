@@ -11,7 +11,7 @@ without that organization access cannot manage its invitations.
 
 ## Invite someone
 
-Use **Invite** in the search toolbar (on small screens it wraps below search), enter the email and select roles. `MEMBER` is selected by
+Use **Invite** in the search toolbar, enter the email and select roles. `MEMBER` is selected by
 default. For example, select `MEMBER` and your custom `Analyst` role to give the
 recipient both roles upon acceptance. Role badges expose descriptions by hover
 or keyboard focus. Search role choices without losing earlier selections; select
@@ -52,7 +52,8 @@ version before deciding again; do not silently submit the old selection.
 
 ## Follow the recipient link
 
-1. Open the original email link. Sign in with the invited account or register
+1. Open the original email link. Complete required MFA setup or proofs when offered;
+   password success alone does not complete a protected login. Sign in with the invited account or register
    with its fixed email. Password fields support show/hide. An incorrect password
    shows an error and allows retry once the current invitation state is synchronized.
    A rate-limit rejection also synchronizes the state; wait as instructed before
@@ -81,9 +82,8 @@ match the invitation email and the configured provider verification rules.
 
 ## When the connection or permissions change
 
-Loading uses structural skeletons; role-choice search preserves the form draft.
-Mobile layouts use cards instead of the wide table. Keyboard controls, localized
-errors and reduced-motion placeholders apply in both languages.
+Role-choice search preserves the form draft. Keep localized errors, keyboard
+controls and loading states when replacing the ready presentation.
 
 A timeout may follow a committed write. **Recover** checks the same operation;
 it does not start a different invitation or acceptance. Unknown means the result

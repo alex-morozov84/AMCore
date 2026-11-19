@@ -4,17 +4,19 @@ import { pathToFileURL } from 'node:url'
 
 /* oxlint-disable no-console -- a deploy CLI reports progress to stdout (mirrors prisma/seed.ts) */
 /**
- * Deploy-time Telegram `setWebhook` (Arc D / D.3). Compiled into the production artifact
+ * Deploy-time Telegram `setWebhook`. Compiled into the production artifact
  * (`dist/cli/telegram-setup.js`); run once per deploy with **plain Node**, no pnpm/tsx:
  *
  *   node dist/cli/telegram-setup.js          # production (from the runner image)
  *   pnpm --filter api telegram:setup         # local dev (tsx)
  *
  * NOT run at replica startup. Registers our `/webhooks/telegram` endpoint with the bot, attaching
- * the shared secret and narrowing to `allowed_updates:['message']`. Config is validated up front
- * (URLs through `z.url()`, the secret through its official grammar) so a typo can't send the
- * token-bearing request to an unintended URL. Never prints the bot token or the secret, and reuses
- * the client's sanitized fetch so a failure never surfaces the token-bearing URL. Secret rotation:
+ * the shared secret and narrowing to `allowed_updates:['message']`. Validation checks URL
+ * syntax and the webhook secret format. Verify the bot API endpoint and webhook destination
+ * against the deployment before running. The bot token is sent to the configured API endpoint.
+ * Pending updates are preserved by default. Set TELEGRAM_DROP_PENDING=true only when discarding
+ * those updates is intended. The CLI reports configuration field names or a generic failure.
+ * Secret rotation:
  * set a new WEBHOOK_TELEGRAM_SECRET, redeploy, then re-run this command.
  */
 import { z } from 'zod'

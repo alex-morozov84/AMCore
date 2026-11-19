@@ -173,8 +173,8 @@ File storage shows a compact **Check every [number] seconds** field. Enter
 30–3600 seconds; **Save** and **Cancel** appear only after the value changes.
 Save shows a loading indicator and prevents duplicate submission. Cancel restores
 the saved interval without sending a write. The heading help explains what the check does. Field help explains the allowed
-range, application delay and precedence over the deployment baseline. A password
-step-up may be required. There is no separate Settings page or reset button.
+range, application delay and precedence over the deployment baseline. Required
+password and second-factor confirmation may be requested. There is no separate Settings page or reset button.
 
 The editor reads authoritative saved configuration, independently of the cached
 storage observation. A saved acknowledgement can precede application; a short

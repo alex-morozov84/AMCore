@@ -6,7 +6,7 @@ a module's ordinary destinations, menu insertion and physical routes. A custom
 headless consumer imports its public entity contract and shared primitives, never
 ready pages or shell. The server entry is explicit and cannot enter client code.
 
-Initialize product identity and selected project choices before generating custom
+Initialize product identity and choose the build settings before generating custom
 consumers. The [adoption guide](adoption.md) describes this sequence and the
 boundary between product-owned JSX/CSS/tokens and reusable headless operations.
 
@@ -30,7 +30,7 @@ client and universal claims must hold through transitive reexports as well as
 ordinary imports.
 
 Reference-only omission must preserve typed context routes, headless consumers and
-retained generic family closure. Removing Console via its initializer does not
+retained generic family closure. Disabling Console in `admin-console.json` does not
 remove product context. No product-admin/headless-only initializer flag is supplied;
 a custom omission needs its own dependency inventory, source and runtime proof.
 
@@ -53,9 +53,11 @@ Each later module review checks:
 - Retained safety, mixed ownership/removal, catalogue/story/test dependencies.
 - Updated product-admin discovery and executed integration examples.
 
-## Acceptance for the first mutation module
+<a id="acceptance-for-the-first-mutation-module"></a>
 
-The members module is the first mutation module. Each additional write slice must supply a code-owned
+## Mutation module contract
+
+Each write slice must supply a code-owned
 typed operation with binding, target and signal; strict BFF input and Origin checks;
 and each operation's actual response, including `204` without a JSON body.
 
@@ -70,10 +72,9 @@ consent; product-specific management journeys remain downstream-owned.
 
 ## Member-key integration
 
-Use the [member-key guide](member-api-keys.md#custom-presentation-without-ready-ui)
-for `useMemberApiKeys`, named server operations and explicit unknown-result
-handling. Pass the existing organization controller. Do not add a context provider
-inside a dialog or couple product controls to Operations Console.
+Use the [member-key contract](member-api-keys.md#custom-presentation-without-ready-ui)
+and [composition rules](integration.md#member-key-integration). The existing
+organization controller owns the dialog's authority and operation lifecycle.
 
 ## Member removal integration
 
@@ -83,11 +84,7 @@ a new membership requires a new selection. The domain layer imports no ready fea
 
 ## Own-key integration
 
-See [own-key custom presentation](own-api-keys.md#custom-presentation) for actor-bound
-entity hooks and the independent settings mount. These operations require no
-organization controller; inventory/revocation survives membership loss. Keep one
-transient page host per binding, with no credential persistence or MutationCache.
-The optional placement `ownApiKeysPath` controls the personal navigation entry.
-Own-key entity, feature and widget roots belong to the product surface, independently
-of Console. Shared catalogue metadata, BFF primitives, translations and route wiring
-retain their explicit consumers when omitting a ready screen.
+Own-key controls belong to personal settings and remain usable after organization
+membership loss. Follow [own-key integration](integration.md#own-key-integration)
+for the independent page host, navigation entry and explicit removal boundaries.
+These operations do not require an organization controller.

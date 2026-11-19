@@ -17,14 +17,6 @@ configuration, cookies, callback registration and coordinated upgrade/rollback.
 Native development defaults to web port3002; Compose publishes3000. Override both
 `FRONTEND_URL` and `WEB_TRUSTED_ORIGINS` to the actual Compose browser origin.
 
-The API Dockerfile refreshes `perl-base` from Debian security repositories in
-build/migrator and runner targets. API build/runner use Bookworm; the independent
-migrator uses Trixie. Remove a refresh only after that target's base includes the
-fixes and its final image scan confirms them. The API builder updates the whole
-npm distribution from a checksum-pinned archive; its remaining toolchain risk is
-separate from the final migrator inventory. Existing deployed images need a rebuild
-and rollout to receive the update.
-
 For password-accounting upgrades, the [stopped-writer procedure](#password-limiter-upgrade-and-rollback)
 overrides general rolling/blue-green examples below.
 
@@ -149,7 +141,7 @@ STORAGE_DRIVER=s3
 STORAGE_BUCKET=…  STORAGE_ACCESS_KEY_ID=…  STORAGE_SECRET_ACCESS_KEY=…  # + region/endpoint
 STORAGE_PUBLIC_BASE_URL=https://cdn.example.com   # root of the public bucket (see public files)
 WEB_PUBLIC_FILES_ORIGIN=https://cdn.example.com   # same origin: lets the web app load avatars (CSP img-src)
-# MIGRATION_DATABASE_URL=…              # only if COMPOSE_DATABASE_URL points at a pooler
+# MIGRATION_DATABASE_URL=…              # separate owner role; direct endpoint, not a pooler
 ```
 
 ```bash
@@ -642,66 +634,38 @@ Plain Compose replacement can return 502 until the new service is ready.
 
 ### Zero/low-downtime rollout — stated honestly
 
-Plain `docker compose up -d`, with or without the overlay above, is **not**
-zero-downtime: Compose stops the old container and starts the new one, so
-there is a real gap during which `api`/`web` refuse connections. Two
-escalation paths, in order of how much they cost to run:
+Plain Compose replacement stops the old container before starting the new one.
+Readiness waiting detects a failed replacement; it does not preserve service
+through the gap or automatically restore the previous release.
 
-1. **Health-gated rolling restart (routine deploys).** Put `api`/`web`
-   behind a reverse proxy rather than relying on `api`'s published port
-   directly, then cut traffic over only after the new container's own
-   readiness healthcheck passes.
+Two independently designed alternatives are possible. Neither ships as an
+AMCore rollout script:
 
-   - **The two proxy options this repo documents are not interchangeable for
-     this specific pattern.** The shipped nginx config (above, `proxy_pass
-http://api:5002`) resolves that hostname once, at nginx startup/reload,
-     and caches the IP for the worker process's lifetime — recreating the
-     `api` container mid-rollout gives it a new IP nginx doesn't know about,
-     so nginx keeps sending traffic to the dead container until it's
-     reloaded (`nginx -s reload`, or the container is restarted). Add
-     `resolver 127.0.0.11 valid=10s;` and put the upstream in a variable
-     (`set $upstream_api http://api:5002; proxy_pass $upstream_api;`) if you
-     want nginx to actually resolve per this pattern. The optional Caddy
-     `edge` profile does not have this problem: Caddy uses Go's default
-     per-connection DNS resolution rather than resolving once at startup, so
-     a new connection after the old container is gone naturally re-resolves
-     to the new one via Docker's embedded DNS — no reload needed (documented
-     Caddy community consensus, not a guarantee in Caddy's own reference
-     docs; see [Caddy Community — proxy DNS resolver
-     mechanism](https://caddy.community/t/proxy-dns-resolver-mechanism/5934)).
-   - **The community tool [`docker-rollout`](https://github.com/wowu/docker-rollout)**
-     implements this pattern for plain Compose (scale to two replicas, wait
-     for the new one's healthcheck, remove the old one) — but it does **not**
-     work against this repo's services as shipped: `docker-rollout`'s own
-     README requires a service to have neither `ports:` nor `container_name:`,
-     since it scales to two replicas and a fixed host port mapping can't be
-     held by both at once. `api` (`127.0.0.1:5002:5002`) and `web`
-     (`3000:3000`) both publish one. Using it requires your own overlay that
-     resets those (`ports: !reset []`) and reaches the service only through
-     your reverse proxy on the Compose network (`api:5002`/`web:3000`) — the
-     network-name access the bundled Caddy `edge` profile already gives you
-     for free, and that the nginx config needs the resolver fix above to do
-     safely under this pattern. Not bundled or required by this starter;
-     evaluate it once you've made that change, not before.
+1. **Health-gated parallel replacement.** Keep a healthy old replica serving
+   while a new replica passes readiness. Route to the new replica before removing
+   the old one. The bundled API/web host ports and the single-web fixed-address
+   BFF overlay cannot simply scale to two replicas. Plan private addressing,
+   exact trusted peers, health-aware routing and old/new compatibility first.
+   Verify proxy name resolution after container replacement; the static nginx
+   upstream can require reload or an explicitly configured dynamic resolver.
+   Do not infer continuous service from Caddy or a passed container healthcheck.
+2. **Blue-green.** Prepare a separate stack and verify its routing and state
+   before switching ingress. A shared database migration changes the database
+   used by blue too. Old and new versions may overlap only with compatible
+   schema, jobs and control protocols. A separate database requires coordinated
+   data transfer and a write boundary; changes after cutover prevent a blind
+   switch back. Define recovery before migrating or admitting new writers.
 
-2. **Blue-green (releases that also carry a migration).** Run a second full
-   Compose project (`-p amcore-green` against the new images), apply the
-   migration against it, verify it, then flip your reverse proxy's upstream
-   from the "blue" project to "green." This is the escalation path
-   specifically because a same-stack rolling restart does not address
-   migration ordering for a schema-changing release the way a fully separate
-   stack does — "blue" stays untouched and is your instant rollback target.
+Stopped-writer procedures override both alternatives, including
+[password accounting](#password-limiter-upgrade-and-rollback),
+[MFA](../auth/mfa-deployment.md) and release-specific compatibility instructions.
+A new Compose project also gets separate local-storage and infrastructure volumes.
+With local files, coordinate writes and provide the matching durable files before
+traffic. S3 avoids that file-volume split but does not solve database rollback.
 
-   With `STORAGE_DRIVER=local`, the default `local_storage` volume is scoped to
-   each Compose project. A new green project therefore starts with a different,
-   empty file volume. Do not switch traffic until both deployments use a planned
-   shared durable store or files have been copied and writes coordinated. S3
-   avoids this project-volume split.
-
-Neither path is bundled as a script in this starter; both are documented
-patterns to apply with your own reverse proxy, since the correct choice
-depends on infrastructure this repo does not own (see [Production deploy
-profile](production-deploy-profile.md) → "Who this is for").
+If you cannot establish these conditions, use a maintenance window and the
+[ordered rollout](#upgrades-new-migrations-in-a-release). Keep ingress closed on
+unknown migration or compatibility results; use [Rollback](#rollback).
 
 ## Production rollout (without compose)
 
@@ -721,16 +685,22 @@ The migrator's connection options and direct database capability requirements
 also apply to Jobs. See [migration image lifecycle](migrator-image.md#process-and-database-lifecycle).
 Do not replace the image entrypoint with Kubernetes `command` or a shell wrapper.
 
-An init container is a simpler but caveated alternative (it runs per Pod and
-relies on Prisma's advisory lock to serialize replicas, which can hang under
-PgBouncer transaction pooling). Prefer "run once before rollout."
+Do not use a per-Pod migration init container. Run one coordinated job before
+replicas start, and block app admission when preflight or migration fails.
 
-Manual one-off (any Docker host):
+Manual one-off (any Docker host): have the secret manager export `DATABASE_URL`
+without printing it or placing its value in command arguments. Use the same image,
+network, TLS mounts and URL that passed the [endpoint preflight](migrator-image.md#endpoint-preflight):
 
 ```bash
-docker run --rm -e DATABASE_URL="postgresql://…?sslmode=require" \
-  <amcore-api-migrator-image>
+# Default Docker network and system trust only. For a private network/custom CA,
+# retain the --network/--mount options from the linked preflight procedure.
+docker run --rm -e DATABASE_URL <amcore-api-migrator-image>
 ```
+
+Require exit0 and a successful migration result (`All migrations have been
+successfully applied.` or `No pending migrations to apply.`). A failed or unknown
+result keeps app admission blocked; inspect [Rollback](#rollback) before retrying.
 
 ## Telegram webhook registration (one-shot, optional)
 
@@ -740,16 +710,36 @@ If the Telegram notification channel is enabled (`TELEGRAM_BOT_TOKEN` +
 startup) with the same production image — plain Node, no pnpm/tsx:
 
 ```bash
+# Have the secret manager export these values without printing them.
 # Same image as the Deployment; needs TELEGRAM_BOT_TOKEN, WEBHOOK_TELEGRAM_SECRET,
-# TELEGRAM_WEBHOOK_URL (the public URL of POST /webhooks/telegram). Optional:
-# TELEGRAM_DROP_PENDING=true to drop the backlog. Prints no token/secret.
-docker run --rm -e TELEGRAM_BOT_TOKEN=… -e WEBHOOK_TELEGRAM_SECRET=… \
-  -e TELEGRAM_WEBHOOK_URL="https://api.example.com/webhooks/telegram" \
+# TELEGRAM_WEBHOOK_URL (https://api.example.com/api/v1/webhooks/telegram). Optional:
+# TELEGRAM_API_BASE_URL for an operator-owned relay; TELEGRAM_DROP_PENDING defaults false.
+# Set drop-pending true only with explicit approval to discard pending updates.
+docker run --rm -e TELEGRAM_BOT_TOKEN -e WEBHOOK_TELEGRAM_SECRET \
+  -e TELEGRAM_WEBHOOK_URL -e TELEGRAM_API_BASE_URL -e TELEGRAM_DROP_PENDING \
   <amcore-api-image> node dist/cli/telegram-setup.js
 ```
 
-It calls `setWebhook` with the secret and `allowed_updates:['message']`. **Secret
-rotation:** set a new `WEBHOOK_TELEGRAM_SECRET`, redeploy, then re-run this command.
+The runtime channel requires the bot username too; this setup CLI validates only
+its token, webhook secret, webhook URL and optional relay/drop-pending settings.
+Ensure API/worker receive their runtime channel settings through the selected
+platform configuration; a host `.env` alone does not inject arbitrary container variables.
+
+Require exit0 and `telegram:setup ok — webhook registered (drop_pending_updates=false)`
+for the default non-destructive path. This confirms `setWebhook` acceptance, not
+receipt or delivery of a notification. With an approved destructive request, the
+same line reports `true`: pending updates may have been discarded.
+
+On invalid configuration, correct the named fields without printing their values.
+On provider rejection or transport failure, keep channel-dependent admission blocked
+and inspect the sanitized failure. A lost response can leave remote configuration
+changed. Verify its actual state through an authorized provider administration path
+before deciding whether to repeat registration; never blindly repeat a request
+that discards pending updates. Do not infer delivery failure or safely replay messages.
+
+For webhook-secret rotation, configure the new value on every receiver, redeploy,
+then register it with the provider. Keep channel traffic controlled until both
+sides agree; use the [webhook guide](webhooks.md).
 
 ## Production environment requirements
 
@@ -758,7 +748,11 @@ The dev-friendly Compose defaults are not a production configuration. With
 
 - `DATABASE_URL` includes `sslmode=require` or `sslmode=verify-full`;
 - S3 credentials when the selected driver is `s3`, and `STORAGE_PUBLIC_BASE_URL` for `s3` and for `local`;
-- `JWT_SECRET` is a real secret ≥ 32 chars (`openssl rand -base64 32`).
+- `JWT_SECRET` contains at least 32 characters. This length check does not detect
+  a copied example or establish randomness. Generate a distinct production secret
+  (`openssl rand -base64 32`) and replace the development value before deployment.
+  For an already serving installation, follow [JWT rotation](secret-rotation.md#jwt_secret)
+  for fleet order, existing sessions and compromise handling before replacing it.
 
 Choose `STORAGE_DRIVER` explicitly for production. Without Compose, an unset
 driver resolves to S3. Compose supplies `local` by default, including in
@@ -810,8 +804,10 @@ for the volume/backup/public-file contract and independent monitoring settings.
 
 ## Adopting on an existing database
 
-If the target DB already has the schema, baseline it once so Prisma records the
-applied migrations instead of trying to re-create them:
+For an existing database, first compare its actual schema and data with every
+intended effect of the migrations being adopted. A ledger entry does not perform
+or verify SQL. Stop if the database differs or its state is unknown.
+After confirming those effects, record only the migrations actually present:
 
 ```bash
 prisma migrate resolve --applied <migration_name>   # repeat per already-applied migration
@@ -1022,15 +1018,15 @@ execution additionally requires independent PG evidence and an immutable Redis
 request. See [queued-email safety](../email/queued-safety.md) for local freshness checks,
 transport limits, retention and non-evicting uncertainty capacity.
 
-Multi-instance safety is already in place, and the two cron flavors are
-deliberate. The nightly **cleanup** and **notification-retention** sweeps are
+The nightly **cleanup** and **notification-retention** sweeps are
 Redis-lock-guarded (only one replica runs each; a skipped run self-repairs the
 next night). The **notification-dispatch recovery** cron is the exception: it runs
 on **every** worker replica and is _not_ lock-guarded — that is intentional
 (`SingletonCronRunner` is fail-closed on a Redis hiccup, exactly when recovery is
 needed), and Postgres `FOR UPDATE SKIP LOCKED` is the coordinator, so replicas
 drain disjoint rows without double-sending. The throttler is Redis-backed and
-BullMQ workers consume one shared queue. Add worker replicas freely. Each process
+BullMQ workers consume one shared queue. Size additional workers against database,
+Redis and provider budgets; inspect each job's concurrency contract before scaling. Each process
 records the result of its scheduled jobs for the Console
 Scheduled jobs screen of the optional Console. Recording is
 best-effort: one background write at a time, started only when the pool has a
@@ -1168,7 +1164,7 @@ and the CSP nonce-propagation requirement below.
 
 The proxy is **bring-your-own** — nginx, Caddy, Traefik, an ALB/GCP HTTPS LB, or
 an Ingress controller all work. This guide documents **nginx** as the
-first-class example because it fronts the majority of compose/VPS deployments
+reference example for Compose/VPS deployments
 of this starter; a cloud LB/Ingress applies the same two rules below through
 its own listener/annotation configuration instead of an `nginx.conf`.
 
@@ -1188,8 +1184,10 @@ its own listener/annotation configuration instead of an `nginx.conf`.
    the app's opt-in **`TRUST_PROXY`** setting (`.env.example`, default
    `false`). The app never parses forwarded headers itself — `req.ip`/
    `req.protocol` reflect them **only** once `TRUST_PROXY` is configured for
-   your exact proxy topology (e.g. `TRUST_PROXY=loopback` for an nginx on the
-   same host, or the exact trusted hop count/CIDR for a managed LB), which
+   your exact proxy topology. Use `loopback` only when the API actually receives
+   the connection from a loopback peer, such as a native API and native proxy
+   in the same network namespace. Physical co-location alone is insufficient.
+   Select the exact trusted peer or hop count for the actual topology, which
    makes Fastify trust the configured proxies rather than the whole
    `X-Forwarded-For` chain. Leaving `TRUST_PROXY=false` behind a proxy that
    already sanitizes headers is safe, but audit/request logs then record the
@@ -1199,14 +1197,14 @@ its own listener/annotation configuration instead of an `nginx.conf`.
 ### BFF client-IP relay (`apps/web` → `apps/api`) — a separate contract from `TRUST_PROXY`
 
 `TRUST_PROXY` above governs only the edge → app hop. Browser traffic
-proxied through `apps/web`'s BFF (ADR-068) is a _second_, internal hop
+proxied through `apps/web`'s BFF is a _second_, internal hop
 (`apps/web`'s Route Handler → `apps/api`, typically over the compose/private
 network) that `TRUST_PROXY` says nothing about — without additional
 configuration, the global throttler sees every BFF-proxied visitor as the
 same address (the `web` container's), and `req.ip`/audit-log IP for that hop
 reflect the same limitation.
 
-ADR-072 adds an **independent, opt-in** two-key contract for this hop,
+Configure an **independent, opt-in** two-key contract for this hop,
 disabled by default so a fresh checkout is unaffected:
 
 - **`WEB_TRUSTED_CLIENT_IP_HEADER`** (`apps/web`) — names a single inbound
@@ -1223,7 +1221,7 @@ disabled by default so a fresh checkout is unaffected:
   `TRUST_PROXY`'s presets). The global `RateLimitGuard`'s tracker resolver
   trusts `X-AMCore-Client-Ip` only when the inbound request's actual TCP
   peer (not a forwarded header) matches this set; otherwise it falls back
-  to stock `req.ip`, identical to before ADR-072.
+  to `req.ip`.
 
 **Both must be set for either to have an effect.**
 
@@ -1246,8 +1244,7 @@ abuse keep their existing inputs; global req.ip is not rewritten.
 `apps/web`'s Content Security Policy nonces Next's own framework-injected
 scripts. Next extracts that nonce from the
 **request's** `Content-Security-Policy` / `-Report-Only` header, not the
-response — this is a Next.js implementation detail, verified against the
-installed framework source, not a configuration choice AMCore made.
+response. Preserve that request header between Proxy and rendering.
 
 `src/proxy.ts` generates this CSP request header after deleting any
 hostile or stray inbound CSP headers. A normal outer reverse proxy in front
@@ -1285,6 +1282,16 @@ yourself and must firewall the port independently; don't pair a broad
 `TRUSTED_WEB_PEERS` range with that override unless you have.
 
 ### Reference nginx config
+
+This example runs nginx attached to the API's Compose network, where `api:5002`
+resolves to the API service. Its connection reaches the API from a network peer,
+not the API container's loopback. Keep the API private and choose `TRUST_PROXY`
+from the actual API-side proxy peer or verified hop topology. Do not trust a broad
+network merely because both containers use it.
+
+A host-native nginx cannot assume Compose service-name resolution. Connecting
+through a published container port also does not establish a loopback peer inside
+the API container. That topology needs its own upstream and trust configuration.
 
 ```nginx
 server {
@@ -1331,9 +1338,10 @@ server {
 }
 ```
 
-Then set `TRUST_PROXY=loopback` (nginx on the same host) or the appropriate
-subnet/hop count, and see "Realtime SSE behind a proxy" below for the full
-streaming-specific rules (buffering, timeouts, connection caps).
+Set `TRUST_PROXY` from that verified topology; do not use `loopback` just because
+nginx shares the Docker host. Preserve the header sanitization above and private
+API reachability. See "Realtime SSE behind a proxy" below for buffering, timeouts
+and connection caps.
 
 ### Cloud load balancer / Ingress
 
@@ -1571,9 +1579,7 @@ processors are out of scope for this starter — extend per your platform.
 
 ## See also
 
-This page is the VPS/Compose entry point; the rest of the production
-readiness surface lives in sibling docs rather than growing this one
-indefinitely:
+Use these guides for related operations:
 
 - [Production deploy profile](production-deploy-profile.md) — the
   build-once/promote-by-digest contract and GitHub Environments/secrets
@@ -1590,8 +1596,8 @@ indefinitely:
   credentials, `REDIS_URL`, OAuth secrets, and third-party API keys once
   they're already running in production.
 - [Deployment platforms](deployment-platforms.md) — a decision matrix for
-  Kubernetes, Cloud Run, Fly, Render, Railway, and (with a hard caveat)
-  Vercel, if VPS/Compose isn't your target.
+  Kubernetes, Cloud Run, Fly, Render, Railway and Vercel when Compose is not
+  your target. Provider capabilities do not establish an AMCore recipe.
 
 ## AMCore API keys
 

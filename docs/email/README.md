@@ -15,7 +15,7 @@ and logs.
 | Safety    | Compile-time and runtime guards that prevent secret templates from entering the queue     |
 | Tests     | Unit, schema, processor, render integration, and secret-boundary e2e coverage             |
 
-## Mental Model
+## Choose a delivery path
 
 ```text
 Product/domain code
@@ -48,17 +48,8 @@ A 202 acknowledgment is not delivery proof. Disable provider link tracking and
 redact initial query tokens in ingress logs; see
 [invitation security and operations](../auth/invites.md#security-limits-and-operations).
 
-## Quick Decision Table
-
-| Need                                                        | Use                                            |
-| ----------------------------------------------------------- | ---------------------------------------------- |
-| In-app feed, preferences, mandatory channels, retry history | `NotificationsService.notify()` / `notifyTx()` |
-| Non-secret transactional email with bounded recovery        | `EmailService.queue()`                         |
-| Email with a token URL or other secret payload              | `EmailService.sendNow()`                       |
-| Worker adapter with already-rendered safe content           | `EmailService.send()`                          |
-
-New product emails are not queueable by default. Classify each email before
-adding code.
+New product emails are queueable only after explicit classification.
+Follow [the delivery decision tree](delivery.md#product-decision-tree).
 
 ## Check that the provider accepts mail
 
@@ -96,7 +87,3 @@ email-client compatibility certification. These tests do not send mail.
 - Auth email flows — [`docs/auth/email-auth.md`](../auth/email-auth.md)
 - Organization invites — [`docs/auth/invites.md`](../auth/invites.md)
 - Email source — [`apps/api/src/infrastructure/email/`](../../apps/api/src/infrastructure/email/)
-
-Welcome unknown results stop automatic recovery, including current Resend429 results.
-See [queued safety](queued-safety.md) and the [offline policy upgrade](queued-upgrade.md).
-Direct-secret and notification delivery retain their separate recovery contracts.

@@ -34,7 +34,10 @@ distribution's domain (or your own domain on it). The bucket stays private to th
 
 ## Option 2: publish only `public/` with a bucket policy
 
-Turn off the "policy" settings of Block Public Access for that one bucket and attach:
+Use this option only when your effective organization, account and bucket policies
+permit it. If higher-level Block Public Access forbids public policies, use the
+CloudFront option. For an approved public prefix, adjust the bucket-level policy
+settings as needed and attach:
 
 ```json
 {

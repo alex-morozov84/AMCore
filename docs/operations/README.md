@@ -1,83 +1,50 @@
 # Operations
 
-For source updates before deployment, start with [Create and update a product](updating-a-fork.md).
+Runbooks and references for deploying and operating AMCore. For source integration,
+start with [Create and update a product](updating-a-fork.md).
 
 [Local development, previews and browser tests](local-stands.md). Agents use managed commands for local DB writes and previews.
 
-Runbooks and contracts for deploying, running, and operating AMCore in
-production.
+## First deployment
 
-**One server, with approved registry images or building on the host?** Follow
-[Single-host production with Docker Compose](single-host-compose.md) end to end,
-and size the host with [Capacity](capacity.md). For a bounded measurement on a
-disposable host, use [Load testing](load-testing.md).
+For one server, follow [Single-host production](single-host-compose.md), using
+approved registry images or its host-build path. Use [Capacity](capacity.md) to
+size the host. For another topology, start with [Deployment platforms](deployment-platforms.md);
+the matrix does not certify a provider or supply a complete platform recipe.
 
-The following guides cover deployment contracts and operating concerns:
+- [Production deploy profile](production-deploy-profile.md): artifact promotion,
+  environment capabilities and adopter-owned pipeline implementation.
+- [Deployment and migrations](deployment.md): complete overlays, runtime configuration,
+  migration-before-rollout order, TLS, proxy trust and recovery limits.
+- [Migration image](migrator-image.md): official CLI, exact-endpoint preflight,
+  dependency maintenance and interrupted/unknown migration recovery.
+- [Database role separation](database-role-separation.md): owner operations,
+  runtime grants and safe adoption on an existing database.
+- [First organization and administrator](../product-admin/organization-establishment.md):
+  registration policy, trusted setup and recovery after an unknown result.
+- [Operations Console](../operations-console/README.md): optional operator UI,
+  topology, sessions and deployment. [Host proxy mappings](deployment.md#operations-console-host-mode-reference).
 
-1. [Production deploy profile](production-deploy-profile.md) — the
-   build-once/promote-by-digest contract and the GitHub Environments/secrets
-   checklist everything else assumes.
-2. [Deployment & migrations](deployment.md#production-rollout-via-registry-image-pull-path) —
-   the `docker/compose/prod.yml` overlay, TLS/reverse proxy, process roles, and
-   the migration contract.
-3. [Database role separation](database-role-separation.md) — a migrator role
-   distinct from the app's runtime role.
-4. [Backup & restore](backup-restore.md) — backup strategy, coordinated database/local-file
-   recovery and `restore-drill` checks for the selected database archive.
-5. [Secret rotation](secret-rotation.md) — before you need it, not during.
-6. [Deployment platforms](deployment-platforms.md) — only if you are not on a
-   VPS.
+## Maintain and recover
 
-Already running? Reach for whichever concern below applies.
+- [Interrupted or unknown migration](migrator-image.md): stop rollout, establish
+  actual ledger/SQL state and follow the linked recovery contract.
 
-- **[Migration image](migrator-image.md)** — isolated Prisma CLI packaging,
-  frozen lock maintenance, version guards, security reports and recovery boundaries.
+- [Backup and restore](backup-restore.md): database/local-file consistency,
+  role-aware verification and the limits of scratch restore drills.
+- [PostgreSQL major-version upgrade](postgresql-major-upgrade.md): choose a transfer
+  method, close writers and respect rollback limits. Application/consumer validation
+  must follow the guide; a restored database alone is insufficient.
+- [Secret rotation](secret-rotation.md): affected consumers, replacement order,
+  refusal handling and recovery limits for each secret class.
+- [Open tabs after deployment](deployment.md#open-tabs-after-a-web-deployment):
+  browser freshness and unsaved-input limits.
+- [GeoIP setup](geoip-setup.md): optional approximate locations, update/storage
+  requirements and missing or stale database behavior.
+- [Load testing](load-testing.md): bounded capacity measurement on a disposable host.
 
-- **[Deployment & migrations](deployment.md)** — clone → migrate → run, locally
-  and in production. One-shot `prisma migrate deploy`, production env
-  requirements, the `web` / `worker` / `all` process roles, TLS/reverse-proxy
-  setup (nginx example, the optional bundled Caddy `edge` profile, and
-  `TRUST_PROXY`), the opt-in BFF client-IP relay that lets the global
-  rate limiter tell visitors apart (`WEB_TRUSTED_CLIENT_IP_HEADER` +
-  `TRUSTED_WEB_PEERS`), the Redis-backed GCRA rate limiter's production
-  assumptions, the Redis queue profile, database pool sizing,
-  SSE-behind-a-proxy guidance, and the `docker/compose/prod.yml` image-pull
-  rollout (immutable digests, restart policies, log rotation, honest
-  zero/low-downtime guidance).
-- **[Operations Console](../operations-console/README.md)** — optional
-  `SUPER_ADMIN` control-plane topology, host session boundary,
-  proxy deployment, verification, and extension rules. The detailed nginx/Caddy
-  host-mode mappings remain in [Deployment & migrations](deployment.md#operations-console-host-mode-reference).
-- **[Production deploy profile](production-deploy-profile.md)** — the
-  build-once/promote-by-digest contract, the `staging`/`production` GitHub
-  Environments setup, and the secrets/variables checklist that gates a
-  registry-based production deploy.
-- **[Backup & restore](backup-restore.md)** — which backup strategy fits your
-  deployment (managed-provider PITR, self-hosted WAL archiving, or the
-  logical-dump fallback), the optional compose `backup`/`restore` profiles
-  this repo ships, the `restore-drill` profile that rehearses an actual database
-  restore on a schedule instead of only taking backups, and coordinated
-  backup/restore of locally stored files.
-- **[Database role separation](database-role-separation.md)** — a
-  migrator/owner role for `prisma migrate deploy` versus a DML-only runtime
-  role for the running app, the setup script, and adopting it on an existing
-  database.
-- **[PostgreSQL major-version upgrade](postgresql-major-upgrade.md)** — why a
-  major bump (e.g. 16 → 18) is not just an image-tag change, the storage
-  contract the official image changed in 18, which migration mechanism fits
-  your deployment (managed-provider native upgrade, AMCore's own
-  dump/restore, or `pg_upgrade`), the restore procedure for both the default
-  and role-separated setups, and the write-freeze/rollback boundary.
-- **[Secret rotation](secret-rotation.md)** — what actually happens (verified
-  against this repo's real request path and a real Postgres) when you rotate
-  `JWT_SECRET`, database credentials, `REDIS_URL`, OAuth secrets, or
-  third-party API keys: what breaks, what doesn't, and how to bound or avoid a
-  maintenance window for each.
-- **[Deployment platforms](deployment-platforms.md)** — a decision matrix, not
-  a recipe collection: how AMCore's `api`/`worker`/Redis/Postgres/SSE actually
-  map onto Kubernetes, Cloud Run, Fly, Render, Railway, and (with a hard
-  web-only caveat) Vercel, sourced and dated against each platform's own docs.
-  VPS/Compose remains the one platform with a full owned recipe.
+## Diagnose incidents
+
 - **[Observability](observability.md)** — Prometheus metric families, safe-label
   rules, structured logging and redaction, operator interpretation of the key
   metrics, the optional dev-only `monitoring` compose profile
@@ -93,42 +60,24 @@ Already running? Reach for whichever concern below applies.
   dashboard↔runbook chain from silently drifting; the guide's "Change or
   extend observability" recipe shows how to update every linked artifact
   without weakening that contract.
-- **[Search application logs](log-search.md)** — the opt-in Alloy + Loki + Grafana reference
-  overlay: install, find everything one request did by `correlationId`, retention and disk,
-  failure behavior, the security model of the collector, and its alerts and
-  [runbooks](runbooks/log-shipping.md).
-- **`pg_stat_statements`** — [Bootstrap](pg-stat-statements-setup.md) (a
-  one-time privileged step, never a migration), [security
-  settings](pg-stat-statements-security.md), [the `amcore_observer`
-  role](pg-stat-statements-observer-role.md) (fail-closed `NOLOGIN` →
-  `\password` → `LOGIN`), and [Recovery](pg-stat-statements-recovery.md) if
-  a password may have leaked through it.
-- **[Slow query investigation](slow-query-investigation.md)** — triage
-  queries once the above is set up — the tool the DB runbook's Slow queries
-  entry points to for "which query," not just "that queries are slow."
-- **[File storage monitoring](runbooks/storage.md)** — local/S3 probe failures,
-  permissions, sampling delay and recovery; see
-  [storage configuration](../storage/configuration.md#active-file-monitoring-and-readiness)
-  for cadence, operation budget and production setup.
-- **[Telegram check](runbooks/telegram.md)** — the workers' `getMe` check of Telegram: metric
-  states, the two alerts, network/token/relay causes and recovery.
+- [Search application logs](log-search.md): request correlation, the optional log
+  overlay, retention and [log-shipping recovery](runbooks/log-shipping.md).
+- Query statistics: [bootstrap](pg-stat-statements-setup.md),
+  [security](pg-stat-statements-security.md), [observer role](pg-stat-statements-observer-role.md),
+  [exposure recovery](pg-stat-statements-recovery.md) and [slow-query investigation](slow-query-investigation.md).
+- [File storage monitoring](runbooks/storage.md): local/S3 probe failures and recovery;
+  [probe configuration](../storage/configuration.md#active-file-monitoring-and-readiness).
+- [Telegram check](runbooks/telegram.md): provider reachability, token/relay failures and recovery.
+
+## Extend safely
+
+- [Audit log](audit-log.md): event shape, sensitive-data restrictions and write/read policy.
+- [Webhooks](webhooks.md): inbound verification, replay protection and request limits.
+- [Idempotency](idempotency.md): request fingerprinting, replay and failure behavior.
 - **[Adding tests](adding-tests.md)** — discovery, local execution and CI group ownership.
 - **[CI & repo security](ci-security.md)** — the CI security gates, what a fork
   inherits (and what it doesn't), the `strict`-mode `setup-repo-security.sh` step,
   the action-pin rules, and the local pre-commit size advisory.
-- **[Audit log](audit-log.md)** — the append-only privileged-action trail: row
-  shape, sensitive-data rules, write modes, and read-access policy.
-- **[Webhooks](webhooks.md)** — the inbound webhook verification primitive:
-  raw-body signature/secret verification, replay protection, body-size limits,
-  and the error contract.
-- **[Idempotency](idempotency.md)** — the opt-in HTTP idempotency primitive for
-  unsafe `POST`s: fingerprinting, replay semantics (first result wins, including
-  `5xx`), and fail-open/closed behavior.
-- **[GeoIP setup](geoip-setup.md)** — the optional approximate-location lookup
-  behind the Console and Settings Sessions panels: provider, updater
-  scheduling, storage/topology, and missing/corrupt/stale behavior.
 
-Endpoint shapes live in the Swagger/OpenAPI document at `/docs`; these runbooks
-cover operation, not request/response schemas.
-
-[First organization and administrator](../product-admin/organization-establishment.md) — deployment prerequisites, production commands and recovery.
+In development, API processes with the `web` or `all` role serve Swagger UI at `/docs` for request and response contracts.
+These guides explain operation and extension requirements.

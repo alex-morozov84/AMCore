@@ -19,8 +19,8 @@ and `sortOrder` already include the effective defaults chosen by the feature.
 It receives two forms of the same route: `routeHref` is locale-independent,
 such as `/catalog`, for the locale-aware navigation helpers; `formAction` is
 the browser-visible path, such as `/en/catalog` with several served locales
-or `/catalog` with one, for native
-GET submission and canonical identity.
+or `/catalog` with one, for native GET submission and canonical identity.
+Supply paths without a query or fragment. The feature builds the query.
 
 ## Feature adapter
 

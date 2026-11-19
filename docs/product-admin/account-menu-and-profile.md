@@ -14,10 +14,10 @@ block is built from a public headless operation, so a downstream can move, resty
 | `features/avatar-edit`  | `AvatarEditor` (ready)                              | File picker with the size and type hint, confirmed removal, messages by outcome                                                                                                                                               |
 | `widgets/account-menu`  | `AccountMenu`, `ProfileDialog` (ready)              | Menu and controlled dialog; the dialog has no trigger of its own and closes when the signed-in user changes. The trigger's accessible name is the visible name plus "Account menu" (WCAG 2.5.3)                               |
 | `widgets/app-shell`     | `headerEnd` slot                                    | The shell renders whatever the application passes; it never imports the account blocks                                                                                                                                        |
-| Application composition | `(dashboard)/layout.tsx` and the organization frame | One placement per shell composition (two today): each passes `<AccountMenu />` into `headerEnd`                                                                                                                               |
+| Application composition | `OrganizationAccessFrame` and its callers | The frame supplies `<AccountMenu />` by default; product administration passes its own header through `headerEnd`                                                                                                                               |
 
 The header holds the locale switcher next to the account menu. Product administration
-places its website link in the sidebar footer. **Log out is now in the account menu**: if you
+places its website link in the sidebar footer. **Log out is in the account menu**: if you
 remove the menu, provide your own logout control (`useLogout` from `features/auth-logout`).
 
 ## The headless operation
@@ -38,10 +38,13 @@ Every call returns one outcome, also kept in `editor.outcome`:
 | `committed`                                       | The server stored or removed the avatar; the cached user already has the new `avatarUrl`                                                             | Show success                                         |
 | `rejected` (`too_large`, `invalid_type`, `other`) | Refused (by the pre-check or by the server); nothing changed                                                                                         | Show the reason; `other` takes `ApiErrorAlert`       |
 | `busy`                                            | Another avatar change is running, in this editor or on the server (another tab or device; `503`/`429`)                                               | Ask the person to retry shortly                      |
-| `unknown`                                         | Network loss or a server error: the change may or may not have happened. The hook rereads the current user once, so the shown avatar is the real one | Say the result is not confirmed; never retry blindly |
-| `retired`                                         | The signed-in user changed while the request was in flight; the result was dropped                                                                   | Nothing: the new identity's state was not touched    |
+| `unknown`                                         | Network loss or a server error: the change may or may not have happened. The hook invalidates the current-user Query to request a reread; that read may fail or observe a still-running change | Say the result is not confirmed; never retry blindly |
+| `retired`                                         | The captured session changed while the request was in flight; the result was dropped                                                                   | Nothing: the new identity's state was not touched    |
 
-A result that arrives after the user changed never writes state or cache for the new person. The
+A result that arrives after the captured session changes never writes state or cache
+for the replacement session, including another login to the same account.
+An unknown result remains unknown even after a read: it neither confirms completion
+nor proves rollback. Retain the uncertainty and do not automatically resend upload/remove. The
 pre-check uses `AVATAR_LIMITS` (2 MB; JPEG, PNG or WebP) only to save a round trip; the server
 re-checks the real bytes. Failures are sorted by HTTP status, never by message text.
 

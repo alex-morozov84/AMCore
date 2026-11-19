@@ -41,9 +41,7 @@ Read 2026-10-14. The maintainers did not run these.
 
 ## Closed: MinIO
 
-The community MinIO is source-only since October 2025 and in maintenance mode since December 2025.
-Two secondary sources report the repository as archived in April 2026. AMCore does not test against
-it and does not recommend it for new setups.
+The community MinIO repository is archived. AMCore does not test against it.
 
 ## Settings
 
@@ -58,4 +56,4 @@ address of the public bucket in `STORAGE_PUBLIC_BASE_URL`, and see
 - [Garage S3 compatibility](https://garagehq.deuxfleurs.fr/documentation/reference-manual/s3-compatibility/)
 - [Versity: incompatibilities with AWS S3](https://github.com/versity/versitygw/wiki/Incompatibilities-With-AWS-S3)
 - [LocalStack 2026.03 release](https://blog.localstack.cloud/localstack-for-aws-release-2026-03-0/)
-- [MinIO status (Pinggy)](https://pinggy.io/blog/minio_archived_self_hosted_s3_alternatives/)
+- [MinIO community repository](https://github.com/minio/minio)

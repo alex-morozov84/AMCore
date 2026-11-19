@@ -1,64 +1,34 @@
 # Email runbooks
 
-Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-email` group.
-
 ## Dead-letter
 
-**Symptom:** `AMCoreEmailDeadLetterTicket` (any dead-lettered email in 15m) or
-`AMCoreEmailDeadLetterBurstPage` (>5 in 15m) is firing, for template
-`{{ $labels.template }}`.
+`AMCoreEmailDeadLetterTicket` fires for any recorded dead letter in 15 minutes.
+`AMCoreEmailDeadLetterBurstPage` fires when one time series increases by more than five in 15 minutes.
 
-**Likely causes, ranked:**
-
-1. A template-specific local render failure, or provider rejection caused by
-   the rendered content or addresses.
-2. A provider-wide outage or credential/config problem, affecting every
-   template roughly evenly.
-3. A burst of recipient-side bounces (invalid/nonexistent addresses) — less
-   likely to cluster by template unless that template is tied to a specific
-   flow with unusually stale addresses (e.g. a re-engagement email).
-
-**Diagnostic steps:**
-
-1. Query directly:
+1. Check the labels on the firing alert to identify the affected series.
+   Use this query to find affected templates across sources:
 
    ```promql
-   increase(amcore_email_dead_letters_total[15m])
+   sum by (template) (increase(amcore_email_dead_letters_total[15m]))
    ```
 
-   Break down by `template` to see whether one template or several are
-   affected — several at once points at a provider-wide or credential
-   problem rather than a template-specific one.
+   The query sums series by template for diagnosis. The alert evaluates each
+   series separately. Two series that each increase by three give a template
+   total of six without crossing the page threshold on either series.
 
-2. The exact recipient is deliberately not in the metric (redacted by
-   design) — check structured logs in your deployment's log destination
-   (correlate by `template` and timestamp) or, when Bull Board is enabled, its
-   job record (the view-only board shows the template, locale and user id, not the
-   recipient or the error). Failed jobs are retained for only 24h or 1000 jobs,
-   whichever comes first.
-3. Open the **"Dead-letter rate"** dashboard panel (Email row) for the trend
-   and scale, and the **"Operations by result"** panel (Email row) for the
-   surrounding `send`/`dispatch` error rate — a correlated rise there points
-   at a provider-wide problem rather than isolated bounces. Check the email
-   provider's own status page/dashboard directly too — this alert only
-   observes the effect from the application side.
+2. Check the **Dead-letter rate** and **Operations by result** panels for the
+   affected window. Correlate bounded logs by template and time. When Bull
+   Board is available, inspect the retained job there. The board shows only
+   safe metadata and offers no retry action. Failed email jobs are subject
+   to the 24-hour and 1,000-job retention limits.
+3. Inspect the recorded failure and delivery certainty. Compare with provider
+   health and check sender or credential configuration if several templates
+   fail. Use provider evidence to establish a recipient bounce. The dead-letter
+   count alone cannot establish that a provider accepted or bounced a message.
+4. Fix a render or configuration problem for future sends. Retained jobs keep
+   their frozen request. Follow the [managed retry policy](../../email/queued-safety.md#retry-window-and-cooldown)
+   for eligible retries. Leave `unknown` and `accepted` outcomes alone.
+   A separate business reissue requires a duplicate-risk decision.
 
-**Mitigation:**
-
-- If provider-wide: this is outside AMCore's control beyond waiting out the
-  provider's incident; confirm no application-side retry storm is making it
-  worse in the meantime.
-- If template-specific: fix the template for future messages. Retained jobs keep
-  their frozen request; a template edit does not replace it. Use only the registered
-  [managed retry policy](../../email/queued-safety.md#retry-window-and-cooldown),
-  never stock BullMQ requeue. `unknown` or `accepted` certainty forbids retry.
-  A business reissue needs a separate duplicate/loss decision. The queue board is view-only.
-- If bounce-driven: this is expected steady-state noise for the affected
-  flow, not an incident — no mitigation needed beyond normal address-hygiene
-  practices upstream of AMCore.
-
-**Escalation:** `Ticket` (any single dead letter) — inspect the retained job
-before its retention window expires when Bull Board is available, but not
-urgent otherwise. `Page` (>5 in 15m) means a likely
-provider-wide or template-wide failure — escalate per your organization's
-on-call process.
+Inspect a ticket while evidence remains available. Escalate a page through
+your on-call process.

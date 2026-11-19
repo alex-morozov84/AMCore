@@ -1,10 +1,8 @@
 # PostgreSQL Major-Version Upgrade
 
-How to move an AMCore deployment from one PostgreSQL major version to
-another — for example, from the PostgreSQL 16 this starter originally
-shipped on to the PostgreSQL 18 it ships on now. Read this before touching
-any real data; the storage-format and role/ACL details below are not
-optional.
+Move an AMCore deployment between PostgreSQL major versions using a verified
+migration. The examples migrate PostgreSQL 16 to PostgreSQL 18. Check storage
+layout, role ownership and rollback limits before touching retained data.
 
 ## Why this is not just an image-tag change
 
@@ -32,20 +30,18 @@ that true:
 
 `docker-compose.yml`'s `postgres` service already mounts the new major at
 `/var/lib/postgresql` on a **new, distinct volume**
-(`postgres_data_pg18`). Your existing `postgres_data` volume (PostgreSQL 16
-data) is never touched, repointed, or read by the new service definition —
-it sits there, inert, until you either migrate it (below) or deliberately
-remove it once you've confirmed you no longer need it.
+(`postgres_data_pg18`). A retained `postgres_data` volume from an older bundled deployment is not
+mounted by that definition. Confirm the actual project, volume names and mounts;
+do not delete the source until migration and backup retention permit it.
 
 ## Choose your migration path
 
 Not every deployment should use the same mechanism. Pick one:
 
 1. **Managed production database (RDS, Cloud SQL, Neon, Supabase, etc.) —
-   use the provider's native major-upgrade mechanism.** Every major managed
-   provider has a rehearsed, supported in-place or blue/green major-upgrade
-   path with its own PITR/rollback contract. Prefer it over anything below;
-   it's tested at a scale and frequency this repo cannot replicate.
+   use the provider's native major-upgrade mechanism.** Confirm that the provider supports your exact source/target versions,
+   extensions, maintenance window and recovery requirements. This guide does
+   not establish a provider-specific upgrade or rollback guarantee.
 2. **AMCore's bundled Compose stack, or a small self-hosted deployment —
    dump/restore, below.** This is AMCore's own fully runnable path: stock
    official images, the existing `backup`/`restore` compose profiles'
@@ -55,10 +51,8 @@ Not every deployment should use the same mechanism. Pick one:
    with a multi-hundred-GB production database.
 3. **Large self-hosted deployment — `pg_upgrade`.** Follow PostgreSQL's own
    [`pg_upgrade` documentation](https://www.postgresql.org/docs/current/pgupgrade.html)
-   (`--link`/`--clone`/`--copy` mode as your filesystem permits). It's
-   materially faster and avoids doubling disk usage during the migration
-   window, at the cost of needing both the old and new major's server
-   binaries available to run it — the stock `postgres:18-alpine` image
+   (`--link`/`--clone`/`--copy` mode as your filesystem permits). Time and disk requirements depend on the selected mode. It needs both
+   the old and new major's server binaries available to run it — the stock `postgres:18-alpine` image
    ships only PostgreSQL 18's binaries, so this means either a custom image
    with both majors installed or running `pg_upgrade` outside Docker
    entirely. AMCore does not ship or maintain such an image; this path
@@ -74,13 +68,12 @@ path AMCore actually ships tooling for.
 
 ## Client/server version direction
 
-`pg_dump`/`pg_restore` from a **newer** major can dump/restore against an
-**older** server. The reverse does not work: a PostgreSQL 16 client cannot
-dump a PostgreSQL 18 server, and dump output is never guaranteed to load
-into an _older_ major than the one that produced it. Always run the
-migration's dump step using the **new** major's client (the `postgres:18-alpine`
-image, same as this guide's examples) against the **old** (PostgreSQL 16)
-server.
+Use the target major's clients for this migration. PostgreSQL 18 `pg_dump`
+can read a PostgreSQL 16 server; PostgreSQL 16 `pg_dump` refuses a PostgreSQL 18
+server. Loading output into an older server is not guaranteed.
+Use PostgreSQL 18 `pg_restore` to read the resulting archive. Newer archive
+formats need a compatible restore client; client/server compatibility alone
+is insufficient. See [PostgreSQL pg_dump](https://www.postgresql.org/docs/18/app-pgdump.html).
 
 ## Before you start
 
@@ -90,7 +83,8 @@ server.
   window — see [Backup & restore](backup-restore.md).
 - **Declare a write freeze.** Pick a point after which nothing writes to the
   PostgreSQL 16 database — put the application in maintenance/read-only
-  mode, or simply stop the `api`/`worker` services. Hold the freeze through
+  mode that blocks every writer, or stop all application services, one-off
+  jobs and external writers. Follow the [write-stop sequence](single-host-compose.md#restore-a-database-dump). Hold the freeze through
   the dump, restore, and verification steps below, until you explicitly
   declare cutover complete. The freeze is what makes rollback (see below)
   possible; skipping it does not save real time, since verification still
@@ -107,26 +101,44 @@ server.
 1. **Dump the PostgreSQL 16 source**, using the PostgreSQL 18 client so the
    dump format matches what you'll restore with:
 
+   Prepare a protected libpq password file at `/absolute/private/pgpass` with
+   mode 0600. Use the [libpq password-file format](https://www.postgresql.org/docs/18/libpq-pgpass.html)
+   for its source host, port, database, user and password; enter values privately.
+   Never put the password in command arguments. Replace the network/host/user
+   placeholders. Run from a new private backup directory:
+
    ```bash
+   set -eu
+   umask 077
+   set -C
    docker run --rm --network <your-network> \
-     -e PGPASSWORD=<source-password> \
+     --mount type=bind,src=/absolute/private/pgpass,dst=/run/secrets/pgpass,readonly \
+     -e PGPASSFILE=/run/secrets/pgpass \
      postgres:18-alpine \
-     pg_dump -Fc -h <pg16-host> -U <source-user> -d amcore -f /dev/stdout \
-     > amcore-pg16-migration.dump
+     pg_dump -Fc -h <pg16-host> -U <source-user> -d amcore \
+     > amcore-pg16-migration.dump.tmp
+   mv amcore-pg16-migration.dump.tmp amcore-pg16-migration.dump
    ```
 
-   (Adjust host/network/credentials to your actual topology — the bundled
-   `backup` compose profile's `docker/postgres/backup.sh` is a template for
-   a scheduled dump; this is a one-shot migration dump, not the scheduled
-   loop.)
+   `set -C` refuses an existing temporary output. Choose a fresh directory so
+   neither filename already exists. A failed dump must not become the final
+   archive; keep the source frozen and inspect the failure before retrying.
+   Verify the archive/checksum and retain it with the source revision and
+   captured data expectations. Treat dumps as confidential executable inputs.
 
-2. **Boot a scratch PostgreSQL 18 instance against a fresh, empty volume.**
+2. **Boot the isolated PostgreSQL 18 validation target against a fresh, empty volume.**
    For the bundled Compose stack this is exactly the new `postgres` service
    definition, pointed at an empty `postgres_data_pg18` volume (the default
    after this repo's own image bump — nothing extra to configure if you're
    starting from a clean checkout).
 
 3. **Restore, by source-state path:**
+
+   Before either restore, inspect `pg_restore --list amcore-pg16-migration.dump`
+   with the PostgreSQL 18 client. Inventory extensions, publications,
+   subscriptions and custom roles/ACLs against the prepared isolated target.
+   Configure target credentials privately through libpq; confirm the selected
+   host, database and role before running destructive commands.
 
    ### Default bundled single-role Compose
 
@@ -176,11 +188,16 @@ server.
 
       `--no-privileges` deliberately skips replaying the dump's ACLs —
       those describe the _old_ cluster's roles and would fail the same way
-      unqualified `--no-owner` restore does. Once the restore completes:
+      unqualified `--no-owner` restore does. Whether restore succeeds or fails,
+      revoke the temporary membership from the administrator session:
 
       ```sql
       REVOKE amcore_migrator FROM <admin-user>;
       ```
+
+      Verify that membership was removed before repairing or retrying a failure.
+      If the result is unknown, keep ingress closed and inspect membership through
+      an authorized administrator; do not continue on an assumed cleanup.
 
    3. Reapply [`setup-roles.sql`](../../docker/postgres/setup-roles.sql)
       **Step 3** through the restore administrator to recreate the canonical
@@ -190,23 +207,30 @@ server.
       an already-set `amcore_migrator` session. This _replaces_ Step 2 of the
       normal onboarding flow (which assumes `prisma migrate deploy` created
       the objects) — do not also rerun the historical migration history over
-      already-restored objects.
+      already-restored objects. After any wrapper outcome, verify that its
+      temporary membership was removed too. If the wrapper fails, disconnects
+      or leaves an unknown outcome, keep ingress closed. Inspect and remove
+      retained temporary membership through a fresh authorized administrator
+      session before repair or retry; never assume the wrapper reached cleanup.
    4. Provision `pg_stat_statements` and `pg_monitor` for `amcore_observer`
       separately, following [Bootstrap](pg-stat-statements-setup.md) and
       [the `amcore_observer` role](pg-stat-statements-observer-role.md) —
       a per-database dump carries neither the extension's preload state nor
       cluster role memberships.
-   5. Inspect the dump's table of contents (`pg_restore --list
-amcore-pg16-migration.dump`) for extensions, publications,
-      subscriptions, or other cluster-dependent entries beyond the
-      standard three-role model before restoring, rather than letting
-      `--exit-on-error` discover an avoidable conflict partway through.
-   6. **A fork with additional roles, ACLs, row-level-security policies,
+   5. **A fork with additional roles, ACLs, row-level-security policies,
       extensions, or provider-owned objects beyond this repo's own
       `amcore_migrator`/`amcore_runtime`/`amcore_observer` model must
       inventory and migrate those explicitly.** This procedure only
       promises to reconstruct AMCore's own canonical three-role setup, not
       whatever a specific downstream product added on top of it.
+
+   If either restore fails, keep all product writers blocked. The target can be
+   partly restored; an error exit does not undo earlier statements. Preserve the
+   source, archive and independent backup. Correct the cause, verify the target's
+   identity/ownership, then discard and recreate only that disposable PostgreSQL18
+   target with fresh empty storage. Reprovision its required roles/prerequisites
+   and repeat restoration. Never remove the source or its backup volume, retry
+   over partial data, or run migrations/seed to hide a failed restore.
 
 4. **Verify on a validation copy — before cutover, not after.** The database
    you restored in steps 2 and 3 is the _validation copy_. Never cut over to
@@ -263,8 +287,9 @@ amcore-pg16-migration.dump`) for extensions, publications,
 
    A fresh-database test or e2e run does not replace this step. It proves the
    code against a database created by the current migrations, not a restored
-   copy of your data. Run it for regression if you want, but only the restored
-   copy shows whether your data and the application work together.
+   copy of your data. Verify the application has passed its required regression tests on supported
+   fixtures. Reuse applicable accepted results; only the restored copy shows
+   whether your data and the application work together.
 
 5. **Cut over.** Only once every check in step 4 passed:
 
@@ -276,6 +301,14 @@ amcore-pg16-migration.dump`) for extensions, publications,
       comparison from step 4.1 on it. If it differs, start no application:
       discard this database, find the cause (the dump, the restore command,
       the target) and restore again. Do not reuse the validation copy.
+   Verify the actual isolated cutover target separately, including existing
+   owners/grants/default privileges. Use the
+   [isolated role probes](backup-restore.md#verify-a-role-separated-restore)
+   before opening ingress. Use uniquely named disposable tables/sequences,
+   remove only those probes as owner and recompare original data/history/sequence
+   evidence. A passing validation copy does not certify the final target. Unknown
+   cleanup or comparison keeps ingress closed; repair or rebuild that target.
+
    2. **Keep ingress and every writer to the source closed** until the end
       of this step. Once the new processes start (step 5.4), do not return
       to the source.

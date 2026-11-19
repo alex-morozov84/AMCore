@@ -82,8 +82,8 @@ acknowledges durable saved state, not application by every process.
 
 Both require a personal bearer JWT and current platform `SUPER_ADMIN`.
 Organization-exchanged JWTs, API keys and organization roles cannot authorize
-these operations. Writes additionally require fresh authentication and the
-privileged mutation rate policy. An organization selector header is rejected.
+these operations. Writes additionally require fresh authentication with the required password
+and second-factor proofs, plus the privileged mutation rate policy. An organization selector header is rejected.
 The optional Console editor uses these same retained endpoints; removing the
 administrative frontend leaves the backend, contracts, migration and reader.
 
@@ -91,7 +91,9 @@ administrative frontend leaves the backend, contracts, migration and reader.
 
 Use the API origin in `API_URL` (for example, `https://api.example.com`, without
 `/api/v1`) and a fresh personal JWT in `PERSONAL_ACCESS_TOKEN`. Obtain the token
-through the normal auth flow; do not embed it in scripts, shell history or logs.
+through the normal auth flow, completing the required
+[MFA protocol](../auth/mfa-foundation.md). A password-only token does not complete
+protected admission. Do not embed credentials in scripts, shell history or logs.
 These Bash examples require `curl` and `jq`. Development `/docs` exposes the
 complete OpenAPI contract; the optional Console uses its session BFF instead of
 exposing this bearer token to browser JavaScript.
@@ -159,7 +161,7 @@ interval. The responding API's baseline does not describe other processes.
 | Response / symptom                        | Operator action                                                                                                                                   |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 400                                       | Check the strict body, integer range and revision. Extra fields are rejected.                                                                     |
-| 401 / 403                                 | Check personal authentication and the current platform role. For `STEP_UP_REQUIRED`, complete fresh authentication before a new deliberate write. |
+| 401 / 403                                 | Check personal authentication and the current platform role. For `STEP_UP_REQUIRED`, complete the required password and factor proofs before a new deliberate write. |
 | 409 `SETTING_REVISION_CONFLICT`           | Reread saved state and decide whether the proposed value is still intended. Never overwrite using a guessed revision.                             |
 | 429                                       | Respect the privileged mutation rate limit; do not create a retry loop.                                                                           |
 | 500 / 503 or an ambiguous network timeout | There is no success receipt. Reread before deciding on another write; a missing response alone does not prove that no commit occurred.            |

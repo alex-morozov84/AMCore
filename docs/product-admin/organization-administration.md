@@ -103,8 +103,9 @@ never proves delivery to the inbox. A failed read never confirms acceptance.
 Disabling Console removes its frontend, not these backend APIs or the product
 recipient journey. Paths below are relative to `/api/v1`. Use a personal bearer
 session with current platform `SUPER_ADMIN`, never an API key or organization
-context token. Writes require recent authentication. Use existing password step-up
-or a new supported interactive OAuth login when required.
+context token. Writes require current password and required second-factor proofs.
+Follow [operator authentication](organization-provisioning.md#refresh-operator-authentication);
+password submission, token refresh or provider sign-on alone does not prove MFA completion.
 
 Save a fresh UUIDv7 operation ID and exact input before each deliberate command.
 Generate an ID with the runtime command shown in the provisioning guide. Keep the
@@ -325,12 +326,10 @@ Do not add it to those strict requests. Recipient acceptance needs no operator r
 The value must contain 1–500 trimmed characters, at most 2000 UTF-8 bytes and no
 control characters. It is saved in SECURITY audit metadata. Current audit reads
 require a live personal platform SUPER_ADMIN, not organization ADMIN or an API key.
-In practical terms, the raw stored reason is available to authorized database/
-backup administrators, not through the Console API even to SUPER_ADMIN.
-The existing Console audit API returns a redacted projection; it does NOT currently
-expose the raw reason for these organization-administrator events. There is no
-built-in raw-audit export endpoint. Authorized database/backup administrators can
-read retained metadata under deployment policy. Audit has no automatic pruning
+The Console audit API returns a redacted projection and does not expose these raw
+reasons, even to SUPER_ADMIN. There is no built-in raw-audit export endpoint.
+Authorized database/backup administrators can read retained metadata under
+deployment policy. Audit has no automatic pruning
 job; invitation/receipt 30-day retention does not erase its reason. See
 [audit read access](../operations/audit-log.md#read-access) and its retention policy.
 

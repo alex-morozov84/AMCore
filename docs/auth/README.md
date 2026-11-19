@@ -1,8 +1,7 @@
 # Authentication & Authorization
 
-AMCore uses a layered security system. At its core, it's straightforward: users prove who they are (authentication), and the system decides what they're allowed to do (authorization).
-
-This guide covers everything — from "how do I log a user in" to "how do I restrict a button to org admins only."
+Use this index to choose a sign-in, session or authorization guide.
+Authentication identifies the caller. Authorization decides which actions that caller may perform.
 
 ---
 
@@ -26,7 +25,7 @@ approval; the default prepared protocol does not enable MFA or operator grants.
 | [Concepts](./concepts.md)                             | How tokens, sessions, and the security model work                                  |
 | [CSRF Posture](./csrf.md)                             | Which cookie surfaces exist and how CSRF is handled                                |
 | [Email Auth](./email-auth.md)                         | Register, login, password reset, email verification                                |
-| [OAuth](./oauth.md)                                   | Social login (Google, GitHub, Apple, Telegram) + account linking                   |
+| [OAuth](./oauth.md)                                   | Google/GitHub/Apple login, provider linking and link-only Telegram                   |
 | [Sessions](./sessions.md)                             | Own/admin session listing and revocation, rotation, device/IP/location metadata    |
 | [RBAC](./rbac.md)                                     | System roles, organizations, permissions, CASL — the auth-z guide                  |
 | [Redis outage behavior](./redis-outage.md)            | What authentication does when Redis is slow or down: `503`, deadlines, recovery    |
@@ -46,15 +45,17 @@ For direct API consumers (mobile apps, scripts, or a custom frontend that talks
 to `apps/api` itself), AMCore is a bearer-token API:
 
 ```
-Who are you?  →  Authentication  →  JWT access token (15 min)
-                                     + refresh token in cookie (7 days)
+Who are you?  →  Authentication  →  JWT access token (default 15 min)
+                                     + refresh token in cookie (default 7 days)
 
 What can you do?  →  Authorization  →  System role (USER / SUPER_ADMIN)
                                         + Organization roles (custom)
                                         + CASL permission rules
 ```
 
-You send the access token with every request. When it expires, the refresh token silently gets you a new one — no re-login needed.
+Send the access token on protected API requests. Request refresh before continuing
+with an expired token. Refresh can fail after expiry, revocation or authority changes;
+follow [session recovery](./sessions.md#refresh-the-access-token).
 
 The bundled Next.js app (`apps/web`) deliberately wraps that API contract in a
 BFF / Token Handler layer (ADR-068): the browser never receives the backend
@@ -62,7 +63,7 @@ access token or long-lived refresh token. It holds only `amcore_session`, an
 opaque httpOnly cookie for `apps/web`; Next Route Handlers keep the backend
 tokens in a Redis session vault and attach `Authorization: Bearer ...`
 server-side. The only short exception is the OAuth callback handoff described in
-[OAuth](./oauth.md), where a temporary httpOnly `refresh_token` cookie is relayed
+[OAuth](./oauth.md), where a temporary HttpOnly callback-binding nonce, named `refresh_token`, is relayed
 onto the selected frontend origin. The localized completion document submits
 its native form to a dedicated same-origin POST handler, which consumes/deletes
 the temporary cookie. The GET document itself never exchanges or publishes a
@@ -82,41 +83,13 @@ routes; conversely, `amcore_session` cannot admit the console. See
 
 ## Quick start
 
-**1. Register a user**
-
-```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "alex@example.com", "password": "Test1234Secure"}'
-```
-
-Response:
-
-```json
-{
-  "user": { "id": "cm...", "email": "alex@example.com" },
-  "accessToken": "eyJhbGci..."
-}
-```
-
-A `refresh_token` cookie is also set automatically.
-
-**2. Make an authenticated request**
-
-```bash
-curl https://api.amcore.dev/api/v1/auth/me \
-  -H "Authorization: Bearer eyJhbGci..."
-```
-
-**3. Refresh the access token when it expires**
-
-```bash
-# The browser sends the refresh_token cookie automatically
-curl -X POST https://api.amcore.dev/api/v1/auth/refresh \
-  --cookie "refresh_token=..."
-```
-
-Response gives you a new `accessToken` and rotates the cookie.
+1. Choose the client boundary. Direct clients call the API; bundled web clients
+   use the same-origin BFF and never handle backend credentials in browser code.
+2. Follow [email registration and login](./email-auth.md), or
+   [OAuth login](./oauth.md#initiating-oauth-login). A login `202` is an intermediate
+   continuation, not ordinary access. It can occur without a human MFA challenge.
+3. Follow [sessions](./sessions.md) for refresh, logout and revocation. For protected
+   accounts, read the linked MFA guidance; deployment activation requires separate approval.
 
 ---
 

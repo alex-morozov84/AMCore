@@ -2,17 +2,16 @@
 
 [Operations Console](README.md) → Scheduled jobs
 
-Scheduled jobs shows the results that worker processes recorded for the jobs that
-run on a schedule: nightly cleanups, the GeoIP database update and the recovery
-passes that run every few seconds. Open it to check that these jobs keep running,
-for example when a table grows or a notification is late and you want to know
-whether the maintenance job behind it still works. Queues and commands are on
+Use Scheduled jobs to inspect recorded results and freshness of periodic work,
+such as cleanup, GeoIP updates and recovery passes. The screen reports evidence;
+it does not prove that a worker is still running. Queues and commands are on
 [Background work](background-work.md).
 
-Console access requires a current platform `SUPER_ADMIN`. API keys cannot read
-this screen, and an organization role does not grant access. The page is at
+Console access requires a current personal platform `SUPER_ADMIN` session under
+the [current MFA protocol](../auth/mfa-foundation.md). API keys cannot read this
+screen, and an organization role does not grant access. The page is at
 `/admin/scheduled-jobs` in path mode and at `/scheduled-jobs` on the Console host,
-With several served languages a locale prefix comes first (for example
+with several served languages a locale prefix comes first (for example
 `/en/admin/scheduled-jobs`); with one language there is none. The screen only
 reads: it has no button that starts, stops or edits a job.
 
@@ -23,15 +22,16 @@ explanation above the current list; ordinary refresh does not repeat the focus.
 ## What you see
 
 One row per job (one card per job on a narrow screen). Above the rows, **Data as
-of** is the time of the latest successful read, and **Refresh** and
-**Auto-refresh** reload this page's data every 30 seconds while the tab is visible
-and online. They never change a job.
+of** is the time of the latest successful read. **Refresh** requests a new read;
+**Auto-refresh**, when enabled, reads every30 seconds while the tab is visible,
+online and outside the shared cooldown. Both honor Retry-After and neither
+starts or changes a job.
 
 | Column           | What it tells you                                                                                          |
 | ---------------- | ---------------------------------------------------------------------------------------------------------- |
 | **Job**          | The name and a one-line purpose. A job added by your own code without a translation shows its id.          |
-| **Schedule**     | When it runs, in words (**Daily at 02:00**, **Every 30 seconds**), with the time zone the worker reported. |
-| **Last result**  | How the latest run that finished ended.                                                                    |
+| **Schedule**     | When it runs: a recognized phrase or the raw cron expression. Daily clock-time schedules show the reported time zone. |
+| **Last result**  | The recorded outcome, or a daily run whose end has not been recorded.                                                                    |
 | **Freshness**    | Whether a successful run has happened when one was due.                                                    |
 | **Last success** | When the last successful run started, in the display time zone of the header.                              |
 | **Took**         | How long the latest finished run took.                                                                     |
@@ -57,9 +57,13 @@ They answer different questions, so a job can show both **Partly done** and
 | Freshness      | Meaning                                                                                                                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **On time**    | A success has been recorded for the latest due time, or the next one is not due yet.                                                                                                                                |
-| **Overdue**    | No success was recorded by the time one was due plus a grace period (30 minutes for daily jobs). For jobs that run every few seconds: no successful pass for 5 minutes (10 minutes for jobs that run every minute). |
+| **Overdue**    | No success was recorded by the time one was due plus a grace period (30 minutes for daily jobs). For frequent jobs, no successful completed pass within the configured threshold: max(10 × period, 5 minutes). |
 | **Not known**  | Freshness cannot be established: for example, no worker configuration or no usable due time is available. An enabled job can still have an earlier success.                                                         |
 | **Turned off** | A worker reported the job as turned off by configuration, for example GeoIP when `GEOIP_ENABLED` is `false`. The note says why.                                                                                     |
+
+A frequent job with a 5-minute period has a 50-minute threshold. Before its
+first success, the threshold starts at its first recorded worker report.
+**On time** during that interval does not prove that a pass completed.
 
 **Overdue** means no fresh confirmation was recorded. It can sit beside a last result
 of **Success**: that success is older than the one that was due. It does not prove the
@@ -83,8 +87,9 @@ start, end, duration, result and what the run counted (for example _expired
 sessions: 12_). An open history is refreshed together with the page; if that fails,
 it keeps the older runs and says when they were read. If the server asks the
 page to wait (HTTP 429 with Retry-After), the history is not read again before that time,
-not even by closing and opening it, and says **Available in N seconds**. Per job, the page keeps at most
-30 finished runs, none older than 30 days, and a few unfinished ones. Old runs are
+not even by closing and opening it, and says **Available in N seconds**. The backend
+retains at most30 finished runs per job, none older than30 days when trimming runs,
+and a few unfinished ones; this page displays at most20. Old runs are
 removed when that job records its next run, so a job that no longer runs keeps its
 last rows. Jobs that run every few seconds have no history: their row is a summary of
 the latest completed pass.
@@ -97,25 +102,28 @@ If the notes give no cause, ask the service operator to check worker configurati
 and result recording, using the job name and observation times. Refresh after that
 investigation; do not assume the job stopped or start recovery based on this state alone.
 
-1. **Overdue, last result Failed or Partly done.** The job ran and did not
-   complete. Read the note and the history, then search the worker logs around the
-   run time.
-2. **Overdue, last result Success, Failed or No runs yet.** No success was recorded
+1. **Overdue, last result Failed or Partly done.** The job ran without full
+   success. Some work may already have committed. A zero cleanup counter for a
+   failed bucket does not prove that no rows changed. Read the note and history,
+   then search the worker logs around the run time.
+2. **Overdue without a recent full success.** No success was recorded
    in time. This does not prove the job did not run. Check, in this order: that a
    worker process is running (see the process roles in
    [Deployment](../operations/deployment.md)); that it can reach the database; whether
-   an earlier run is still working, because a long run holds the job's lock; and
+   an earlier run is still working; and
    whether the row's note says observations were lost, which means results could not
    be written. Search the worker logs around the due time before you conclude that
    it did not start.
-3. **Result not recorded.** Check whether a worker restarted around the start time.
-   A nightly job that never finishes can also hold its lock for up to 30 minutes.
+3. **Result not recorded.** Check worker restarts, lost observations and the actual
+   task state around the start time. A singleton lock expires after its configured
+   TTL; expiry does not stop the old task or prove that another replica cannot
+   overlap it. Do not infer safe replay from a missing result.
 4. **No worker has reported these jobs yet** (banner, shown only when no job has any
    report; a job that reported once keeps its row and shows no banner). Start a worker, or check
    its database connection. Also check `DATABASE_POOL_MAX`: with a pool of one a
    worker records nothing, not even its first report, so a new installation stays
    in this state until the pool is at least two. The page shows the jobs of the code catalogue, so the
-   absence of rows is never a sign of "no jobs".
+   absence of worker evidence does not remove the catalogue rows.
 5. **Turned off.** The job is switched off by configuration. Change the setting
    in the [environment](../operations/geoip-setup.md) if it should run.
 
@@ -138,7 +146,9 @@ investigation; do not assume the job stopped or start recovery based on this sta
 Workers record results in the background. A job does not wait for the database to
 start or to finish, so a slow or unreachable database can delay or lose a record
 but does not hold a job at its start or end. A worker writes only when the
-connection pool has a free connection and does not make a request wait for one.
+connection pool has an idle slot or can open one without existing waiters.
+The admitted write still consumes shared capacity; with a small pool, a hung
+write can slow business work even though result recording is asynchronous.
 After repeated failed writes a worker keeps only failures and partly done runs
 for five minutes. The row's note says when observations were lost under load.
 Recording needs a database pool of at least two connections

@@ -188,10 +188,12 @@ reset revokes sessions; sign in again and reopen, without a revocation bypass.
 Server BFF clients can opt into durable authentication handoff using paired
 `X-Invitation-Auth-Attempt-Id` and `X-Invitation-Handoff-Key`, alongside valid scoped
 continuation. OAuth start also requires matching `X-Invitation-Attempt-Id`.
-New session/account and the handoff record commit together. The newly published
-browser cookie must be explicitly acknowledged before
-`POST /auth/invites/auth-handoffs/{attemptId}/confirm`, using cleanup key and the
-exact new personal session. Abort with the cleanup key revokes only an
+New session/account and the handoff record commit together. Legacy handoff clients confirm with
+`POST /auth/invites/auth-handoffs/{attemptId}/confirm`, using the cleanup key and
+exact newly issued personal session. Current private browser adapters instead use
+[MFA combined publication](mfa-foundation.md#browser-adapter-contract), which
+confirms the invitation handoff and publishes its exact family in one transaction.
+The legacy confirmation endpoint alone cannot finish that protected publication. Abort with the cleanup key revokes only an
 unconfirmed tagged session; confirmed abort conflicts. Confirmation expires in
 60 seconds and a database-only minute sweep revokes overdue pending sessions.
 Pending/aborted sessions cannot refresh into an ordinary child or use personal
@@ -217,7 +219,8 @@ Unknown outcomes retain the same operation ID and complete command.
 | ------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------ |
 | `GET context`                                                 | None                                                        | `200 {binding,data:{email,expiresAt}}` or pending auth state       |
 | `GET inspect`                                                 | None                                                        | `200 {binding,data:<private inspect state>}` or pending auth state |
-| `POST login`                                                  | `{binding,email,password}`                                  | `200 {binding,data:{user},handoff:{attemptId}}`                    |
+| `POST auth-context` | `{}` | Neutral browser attempt, including `attemptId`; no login or membership |
+| `POST login` | `{binding,email,password}`, `X-AMCore-Login-Attempt` | Completed `200` auth envelope, or `202 {kind:"mfa",flowBinding}` requiring continuation |
 | `POST register`                                               | `{binding,password,name?,locale?}`                          | Same envelope,201; server selects email                            |
 | `POST auth-handoffs/{attemptId}/ack`                          | `{binding}`                                                 | Same auth envelope,200; confirms current new cookie                |
 | `POST accept`                                                 | `{binding,operationId,expectedInviteId,expectedGeneration}` | `200 {binding,data:<acceptance result>}`                           |
@@ -225,6 +228,15 @@ Unknown outcomes retain the same operation ID and complete command.
 | `POST oauth/{provider}`                                       | `{binding}`                                                 | `200 {binding,authorizeHref}` for a code-owned local redirect      |
 | `POST verification-status`                                    | `{binding}`                                                 | `200 {binding,data:{user,inspection}}`                             |
 | `POST verification-return`                                    | `{binding}`                                                 | `200 {verifyHref}`; explicit same-browser return selector          |
+
+Before browser login or registration, the typed client completes `POST auth-context`
+and sends its returned `attemptId` as `X-AMCore-Login-Attempt`. Preserve that attempt
+and its cookies; do not invent another attempt to recover an unknown credential result.
+A login `202` is not a published session or an invitation acknowledgment. Use the
+existing MFA browser flow to complete required proofs and exact combined publication;
+keep backend tokens and restricted continuation secrets in the BFF. A changed
+owner/family/flow requires the supported recovery or original-link reopen, never
+an automatic password replay. Publication still does not accept membership.
 
 Pending reads return `{state:"authenticating",binding}` or
 `{state:"completing_signin",binding,handoff:{attemptId}}`. They never confirm
@@ -262,7 +274,7 @@ selector is bound to owner, origin, epoch, flow revision and current session;
 ordinary verification email contains no such selector. Navigation is returned only after fresh
 verified-account observation; an invalid/expired selector requires reopening.
 
-The initial `/{locale}/invite/accept?token=<invitation-token>` ingress exchanges
+The legacy site `/{locale}/invite/accept?token=<invitation-token>` ingress exchanges
 its token server-side and redirects 303 through an optional cookie-confirming
 bootstrap to a clean flow address. GET never joins. Raw tokens do not enter
 rendered props, query-cache keys or Redis owner records. The initial URL still
@@ -363,7 +375,7 @@ For a managed initial or additional administrator invitation, an existing member
 ## Frontend destination and session isolation
 
 Existing invitation rows and already-issued root links stay site-owned. All new
-organization invitation writers, including management, initial setup, provisioning
+organization invitation writers, including management, provisioning
 and administrator recovery, issue admin-bound rows with the current placement
 fingerprint. The email CTA uses the matching public admin origin/path and locale.
 Registration and mailbox verification happen before membership acceptance, even

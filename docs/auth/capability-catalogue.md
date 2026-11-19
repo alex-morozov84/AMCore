@@ -49,12 +49,12 @@ unsupported operators and principal placeholders receive distinct 400 codes:
 `PERMISSION_RULE_UNSUPPORTED`, `PERMISSION_FIELD_UNSUPPORTED` and
 `PERMISSION_PLACEHOLDER_UNSUPPORTED`. The preset route additionally returns
 `CAPABILITY_UNSUPPORTED` for an unknown capability/preset pair. Existing valid
-stored rules keep their IDs and meaning; a future editor must display custom
-rules read-only rather than silently replacing them. An incompatible historical
+stored rules keep their IDs and meaning. The role editor displays custom rules
+read-only and preserves them on save. An incompatible historical
 rule fails ability construction closed and needs privileged audit and controlled
 repair. Do not repair by deleting or ignoring a DENY during a request.
 
-Condition paths are known public scalar fields of User, Organization, Role and
+Condition paths are declared stored scalar fields of User, Organization, Role and
 Permission. Direct typed equality, `not`, `in`, `notIn`, numeric/date
 `gt/gte/lt/lte`, string `contains/startsWith/endsWith` and bounded nonempty
 `AND/OR/NOT` are supported. Relation, JSON/list and unknown fields/operators
@@ -71,12 +71,16 @@ signed 32-bit integer range, including negative comparison thresholds such as
 actor hints. These limits are checked separately
 from the route's tenant, immutable-field and response-field policy.
 
-| Subject        | Accepted condition and field names                                                                                                        |
+| Subject        | Permission field names (conditions exclude derived fields)                                                                                |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `User`         | `id`, `email`, `emailVerified`, `name`, `avatarUrl`, `phone`, `locale`, `timezone`, `createdAt`, `updatedAt`, `lastLoginAt`, `systemRole` |
 | `Organization` | `id`, `name`, `slug`, `aclVersion`, `createdAt`, `updatedAt`                                                                              |
 | `Role`         | `id`, `name`, `description`, `isSystem`, `organizationId`                                                                                 |
 | `Permission`   | `id`, `action`, `subject`, `inverted`, `organizationId`                                                                                   |
+
+`User.avatarUrl` is a derived response field. It is allowed in `fields`, but
+conditions on it are rejected with `PERMISSION_RULE_UNSUPPORTED`. The table lists
+the permission vocabulary, not additional stored database columns.
 
 For these four subjects, `fields` may also be omitted, `[]` or `['*']` for all
 fields. `TeamAccess` supports only `manage` with no condition and unrestricted
@@ -177,6 +181,6 @@ literal code-point order. There is no transitive dependency graph. Malformed sco
 PATCH Organization requires update plus read for its response. DELETE requires delete
 plus `manage:TeamAccess`, without read. Field-name metadata does not imply a read grant.
 Prove these requirements against handlers, independently of descriptor validation.
-This new metadata is code-only and explicitly omitted from the unchanged strict HTTP
+This metadata is code-only and omitted from the strict HTTP
 catalogue projection. Custom key UI uses compiled descriptors, not `/capabilities`
 as a complete key-option endpoint. See [own keys](../product-admin/own-api-keys.md).

@@ -39,16 +39,21 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
    LOGS_GRAFANA_PORT=3002                                    # optional, published on 127.0.0.1 only
    ```
 
-2. Apply the overlay after the files you already use. It recreates `api`, `worker` and `web`, because
-   the log driver is set when a container is created:
+2. For a new installation, finish the [deployment procedure](deployment.md)
+   and verify the application first. On a running installation, keep its
+   Compose project, environment file, profiles and complete ordered
+   `COMPOSE_FILE` list. Append `docker/compose/logs.yml` last. Load that
+   selection and start only the log services:
 
    ```sh
-   docker compose -f docker-compose.yml -f docker/compose/prod.yml -f docker/compose/logs.yml up -d
+   docker compose config --quiet &&
+   docker compose up -d --no-deps --wait --wait-timeout 180 loki alloy logs-grafana
    ```
 
-   Leave out `-f docker/compose/prod.yml` if you do not use the production overlay.
-   Expected result: `loki`, `alloy` and `logs-grafana` are running, and `docker inspect` of `api`
-   shows the `json-file` log driver with the `labels` option.
+   Check that Loki and Alloy are ready. Then
+   [recreate the application containers](#recreate-the-application-containers).
+   Verify that their log driver is `json-file` with the `labels` option.
+   Use the same Compose selection for the checks below.
 
 3. Open Grafana from your own machine through an SSH tunnel; nothing else is reachable:
 
@@ -61,6 +66,21 @@ api / worker / web  --stdout-->  Docker json-file logs  --read-only-->  Alloy  -
 4. Choose **Explore**, keep the **AMCore Loki** data source and run `{service=~"api|worker|web"}`.
    Switch the query editor to **Code** (next to **Builder**) before you paste a query, and turn **Live** off; Builder rewrites a pasted query.
    You should see recent lines of all three services.
+
+### Recreate the application containers
+
+Use the saved Compose selection and the installation's existing images.
+Keep PostgreSQL and Redis running. Follow the
+[deployment readiness order](deployment.md#upgrades-new-migrations-in-a-release):
+wait for the worker before starting API and web.
+
+```sh
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker &&
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
+```
+
+Stop on failure. `--no-deps` keeps this log driver change from starting
+the migrator or other dependencies.
 
 ## Find a request
 
@@ -106,10 +126,14 @@ Limits of the link between a request and its jobs:
 
 ## Give a colleague access
 
-Two things are needed, and neither is on the overlay's public side. First, an SSH account on the Docker
-host that may open the tunnel and nothing else; a key line in `authorized_keys` such as
-`restrict,port-forwarding,permitopen="127.0.0.1:3002" <public key>` does that in OpenSSH (not run
-here), and the colleague opens the tunnel with `ssh -N -L ...`. Second, a Grafana user: sign in as `admin`, open **Administration**,
+Use a dedicated SSH account with server-side restrictions. Allow local TCP
+forwarding only to the configured Grafana loopback address and port. Disable
+shell, command and subsystem sessions, and disable other forwarding. Verify
+that the tunnel works and that the server refuses those other operations
+before granting access. See [sshd_config(5)](https://man.openbsd.org/sshd_config.5).
+The client can then use `ssh -N -L` to open the tunnel.
+
+In Grafana, sign in as `admin`, open **Administration**,
 **Users and access**, **Users**, and create a user with the **Viewer** role. A Viewer can run Explore
 queries against the Loki data source (tested), so every Grafana user can read **all** stored logs;
 there is no per-user or per-service restriction. Set the user's password when you create it and delete
@@ -123,7 +147,7 @@ the user, and the SSH key, when access ends. Give the `admin` password to nobody
 - Loki has no size-based retention. Growth is bounded by the retention period and the ingestion
   limits in `docker/log-search/loki/loki.yml` (4 MB/s, 3 MB/s per stream). Size the volume for your
   traffic and keep the [disk alert](#alerts).
-- To see how much the store uses, run `docker run --rm -v <project>_loki_data:/d:ro alpine du -sh /d`.
+- To measure the store, [check the actual Loki volume](runbooks/log-shipping.md#disk-low).
   Docker's own files stay bounded by `COMPOSE_LOG_MAX_SIZE` and `COMPOSE_LOG_MAX_FILE`
   (20m × 5 per service by default). They are your safety net while the pipeline is down.
 - Measured on an idle Compose stack: Loki about 80 MiB, Alloy about 50 MiB, Grafana about 210 MiB.
@@ -134,13 +158,15 @@ The application never waits for the pipeline: it writes to stdout.
 
 | Event                        | Effect on the application | Effect on logs                                                                                     |
 | ---------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------- |
-| Loki stops                   | None                      | Alloy retries; lines still in Docker's files are delivered when Loki returns                       |
-| Alloy stops                  | None                      | Alloy resumes from its stored position; nothing is lost or repeated                                |
+| Loki stops                   | None                      | Alloy retries. If it exhausts retries, some lines may remain only in Docker's files.                       |
+| Alloy stops                  | None                      | Alloy resumes from its stored position. Check for gaps or duplicate lines.                                |
 | Outage longer than the files | None                      | Lines that rotated out of Docker's files meanwhile are lost                                        |
 | Volume full                  | None                      | Loki fails to flush, retries, then drops chunks; see [Disk low](runbooks/log-shipping.md#disk-low) |
 | A container logs over 16 KiB | None                      | Docker splits the line; fragments are stored and only the first holds the `correlationId`          |
 
-Tested: Loki stopped and started again, and Alloy stopped and started again, while requests kept
+Check [Entries dropped](runbooks/log-shipping.md#entries-dropped) after an outage.
+
+In the reference rehearsal, Loki stopped and started again, and Alloy stopped and started again, while requests kept
 arriving (every line arrived once); about 60,000 numbered lines across ten rotations of the Docker
 file (none lost, none repeated); a full size-bounded volume (Loki errors, both disk alerts fired).
 A container that rotates its first file before Alloy discovers it, within about ten seconds of its
@@ -232,13 +258,12 @@ host, or outside Docker, cannot be attached; use the second choice.
 
 | Alert it replaces       | Manual check                                                                                             |
 | ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| collector or store down | `$COMPOSE_LOGS ps alloy loki`                                                                            |
-| retrying, dropped       | `$COMPOSE_LOGS exec logs-grafana wget -q -O- http://alloy:12345/metrics`, look at `loki_write_*`         |
-| refusing, flush failing | `$COMPOSE_LOGS logs --tail 50 loki` (look for `failed to flush`, `rate limit`) and the Alloy log         |
-| disk low, critical      | `docker run --rm -v <project>_loki_data:/d:ro alpine du -sh /d`, compared with the free disk of the host |
+| collector or store down | `docker compose ps alloy loki`                                                                            |
+| retrying, dropped       | `docker compose exec logs-grafana wget -q -O- http://alloy:12345/metrics`, look at `loki_write_*`         |
+| refusing, flush failing | `docker compose logs --tail 50 loki` (look for `failed to flush`, `rate limit`) and the Alloy log         |
+| disk low, critical      | [Check the log-store volume](runbooks/log-shipping.md#disk-low) and compare its size with the host’s free disk |
 
-Until you do one of the two choices, nobody is notified. `$COMPOSE_LOGS` is defined in the
-[runbook](runbooks/log-shipping.md).
+Until you configure and verify alert delivery, these checks do not notify anyone.
 
 ## Use a managed Loki instead
 
@@ -272,17 +297,36 @@ names used by the alert rules, and a search for a known request.
 
 If you run the Operations Console, it can show a **Find in logs** link beside job, request and
 delivery IDs. Set `ADMIN_CONSOLE_LOGS_GRAFANA_URL=http://localhost:3002` in the `web` service
-environment and recreate it (`$COMPOSE_LOGS up -d web`, with `COMPOSE_LOGS` as defined in the
-[runbook](runbooks/log-shipping.md)). The link opens this Grafana while your
+environment. Use the same deployment selection and recreate only web:
+
+```sh
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 web
+```
+
+Check that web is healthy before using the link. The link opens this Grafana while your
 SSH tunnel is open. See [Find in logs links](../operations-console/configuration.md#find-in-logs-links).
 
 ## Turn it off
 
+Use the current deployment selection, including the logs overlay. Stop and
+remove only the three log-search containers:
+
 ```sh
-docker compose -f docker-compose.yml -f docker/compose/prod.yml up -d --remove-orphans
+docker compose stop alloy loki logs-grafana &&
+docker compose rm alloy loki logs-grafana
 ```
 
-Without the overlay file this recreates `api`, `worker` and `web` with the production log driver and
-removes `loki`, `alloy` and `logs-grafana`. Their volumes (`loki_data`, `alloy_data`,
-`logs_grafana_data`, prefixed with the Compose project name) stay until you remove them with
-`docker volume rm`; do that only when you no longer need the stored logs.
+After both commands succeed, remove only `docker/compose/logs.yml` from the saved
+`COMPOSE_FILE` list. Keep the same project, environment, profiles and other
+overlays. Validate the configuration and recreate the three application
+services to restore their log driver settings:
+
+```sh
+docker compose config --quiet &&
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 worker &&
+docker compose up -d --no-build --no-deps --wait --wait-timeout 180 api web
+```
+
+Stop on failure. Verify the resulting log driver on those containers. The log-search volumes
+remain. Remove a volume only after confirming its project and that you no
+longer need its data.

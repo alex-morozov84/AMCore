@@ -18,23 +18,23 @@ name: Deploy Template (Registry + Digest Promotion)
 # The two paths are structurally different, not just gated differently:
 # - Choosing `main` runs the BUILD path: it builds the api/api-migrator/web
 #   images for main's current commit and pushes them to GHCR tagged
-#   sha-<commit>, then deploys that fresh output to `staging`.
+#   sha-<commit>. The staging job prints instructions; it does not deploy.
 # - Choosing a `v*` tag runs the PROMOTE path: it does NOT build anything. It
 #   resolves the digest already published for that tag's commit (from a prior
-#   run of the build path against that same commit) and deploys that digest to
-#   `production`. If that commit was never published via the build path, this
-#   fails loudly instead of silently building one — promoting an artifact that
-#   staging never actually ran would defeat the entire point of this pattern.
+#   run of the build path against that same commit). Production also only prints
+#   instructions. If that commit was never published via the build path, lookup
+#   fails instead of rebuilding. Lookup alone does not prove staging validation;
+#   compare the resolved digests with retained successful staging evidence.
 #
 # The build job needs no secret beyond the workflow's own GITHUB_TOKEN
 # (`packages: write` to push, `packages: read` to resolve). The two deploy
 # jobs' final step is an intentionally illustrative placeholder — replace it
-# with your real deploy command (SSH + `docker compose pull && up -d`, or your
-# platform's deploy API) once you have a real target. The printed Compose sketch is
-# illustrative, not an executable runbook, and no job here validates staging: green
-# jobs prove only that images were built, pushed and their digests resolved. All three
-# builds receive BUILD_SOURCE_COMMIT (the full commit), which MFA deployment artifacts
-# need from the api and web images. A fork that goes live
+# with the complete ordered deployment procedure from the guide or the target
+# platform API. The printed Compose sketch is not an executable runbook: it omits
+# installation-specific overlays, endpoint preflight and readiness/failure stops.
+# All three builds receive the full source commit through BUILD_SOURCE_COMMIT.
+# Image publication/digest lookup does not prove actual staging validation,
+# deployment, fleet completeness or approved MFA activation. A fork that goes live
 # should also replace the `workflow_dispatch` trigger below with real `push`
 # triggers (branches: [main] for the build path, tags: ['v*'] for the promote
 # path).

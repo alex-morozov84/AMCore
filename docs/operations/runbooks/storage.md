@@ -55,7 +55,7 @@ container recreation or capacity of S3. Public delivery has its own check, see [
 `AMCoreStoragePublicDeliveryFailed` (ticket) fires when the public-delivery check has
 been failed, stale or unmeasured for five minutes. The check runs on every API process
 with the `s3` driver (a dedicated worker skips it). After one idempotent write of two fixed canary
-objects at start-up it only **reads**, once per `STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS`
+objects at start-up it normally reads, once per `STORAGE_PUBLIC_CHECK_INTERVAL_SECONDS`
 (one hour by default): it fetches the public canary from `STORAGE_PUBLIC_BASE_URL` as an
 anonymous browser would, and it asks the storage API for the private canary without
 credentials. It never affects API readiness.
@@ -116,8 +116,8 @@ amcore_storage_private_exposed == 1
 1. Read the `storage_public_check_failed` event: `stage=private_exposed_api` means the
    private bucket itself answers anonymous requests through the storage API
    (a public ACL or policy on the whole bucket); `stage=private_exposed_base` means the
-   public base also serves private keys because one bucket holds both namespaces and
-   the published rule or domain covers more than `public/`.
+   public base also serves the private canary. Inspect the published rule or domain
+   for a shared bucket, or the route and proxy mapping in `api` mode.
 2. Remove the public grant first, investigate second: restore the private bucket
    policy or ACL, or narrow the rule to the `public/` prefix, or move the public files
    to their own bucket. Confirm with an unsigned request that the private canary now

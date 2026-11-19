@@ -1,6 +1,6 @@
 # S3-compatible providers
 
-AMCore talks to any provider that speaks the S3 API. Providers differ in how they **publish files
+AMCore uses the S3 API. Compatible providers can differ in supported operations. Providers differ in how they **publish files
 to the internet**, and that is the part you must set up yourself. This page shows the differences
 side by side. Each provider has its own page.
 
@@ -18,7 +18,7 @@ modes and the bucket layouts that the columns below refer to.
 
 "Provider-documented" is not a promise that it works. It means the setup below is what the provider
 says should work. Run [`storage:check`](../testing.md#check-a-real-provider-with-storagecheck)
-against your own account; it takes a minute and tells you if anything is wrong.
+against your own account and assess each required step. The testing guide explains what the command covers.
 
 ## Matrix
 
@@ -34,7 +34,7 @@ only `public/` inside one bucket.
 | [Backblaze B2](backblaze-b2.md)                             | Whole bucket                 | Bucket level only                     | —             | Provider-documented                    |
 | [DigitalOcean Spaces](digitalocean-spaces.md)               | Object or policy             | Yes                                   | Yes           | Provider-documented                    |
 | [Wasabi](wasabi.md)                                         | Needs a support request      | —                                     | Required      | Provider-documented                    |
-| [Hetzner](hetzner.md)                                       | Unclear                      | Unclear                               | Partial       | Provider-documented                    |
+| [Hetzner](hetzner.md)                                       | Whole bucket                 | Unclear                               | Partial       | Provider-documented                    |
 | [Scaleway](scaleway.md)                                     | Object or bucket             | Yes                                   | Yes           | Provider-documented                    |
 | [Selectel](selectel.md)                                     | Whole bucket                 | No                                    | Yes           | Provider-documented                    |
 | [VK Cloud](vk-cloud.md)                                     | Whole bucket (ACL)           | Yes                                   | No            | Provider-documented                    |

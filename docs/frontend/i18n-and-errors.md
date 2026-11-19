@@ -209,11 +209,8 @@ const url = localizedFrontendUrl(this.env.get('FRONTEND_URL'), userLocale, 'veri
 // → https://app.example.com/ru/verify-email?token=…
 ```
 
-With several served locales, an unprefixed link would be resolved by cookie or
-`Accept-Language`, and these
-links cannot rely on either. An emailed link may be opened in a browser that has
-never visited the app; an OAuth callback lands in a browser mid-sign-in that has
-no locale cookie yet. A Russian user would get an English page in both cases.
+With several served locales, the prefix selects the intended language.
+A mail recipient or OAuth visitor may have no locale cookie yet.
 
 With one served locale, the helper emits no prefix; the build supplies the language.
 Test the exact URL for the configured locale list: the correct prefix with several
@@ -223,13 +220,11 @@ The helper lives in `packages/shared` because the prefix strategy is a contract
 both apps must agree on — if the frontend changes it, the backend follows from
 one place.
 
-A test enforces this rather than leaving it to review, and it checks **each
-read**, not each file: the env value must appear _inside_ a
-`localizedFrontendUrl(...)` argument list. Do not assign `FRONTEND_URL` to a
-variable first — a file-level check would pass a bare link added next to a
-correct one, and the files most likely to grow a new link are exactly the ones
-that already contain correct ones. `.ts` and `.tsx` are both scanned, since
-React Email templates live in `.tsx`.
+The URL coverage test checks that `FRONTEND_URL` reads in covered API
+source files appear in arguments to `localizedFrontendUrl()`. It skips
+generated files, specs, and explicit exceptions. Pass the env read directly
+to the helper. Check the resulting URL separately for the configured
+locales. A URL without a locale prefix is correct for a single served locale.
 
 ## Task: choose the served locales
 
@@ -374,11 +369,11 @@ Re-test any change here against the standalone build (`node server.js`), never o
 | `e2e/mocked/message-payload.spec.ts`         | Unexpected namespaces in serialized client message payloads                  |
 | `src/shared/api/error-messages.test.ts`      | A shared error code with no translation, or an orphaned message              |
 | `apps/api/.../messages.spec.ts`              | The same, for email copy                                                     |
-| `apps/api/.../frontend-url-coverage.spec.ts` | A backend module building a link from `FRONTEND_URL` without a locale prefix |
+| `apps/api/.../frontend-url-coverage.spec.ts` | A covered API source reading `FRONTEND_URL` outside `localizedFrontendUrl()` arguments |
 | Oxlint + ESLint                              | Non-ASCII literals in code, locale-unaware navigation, `z.config`            |
 
-None of them can tell you a translation is _wrong_ — only that it is missing.
-Reviewing the actual wording is still a human job.
+Review the wording in the rendered journey. These checks cover keys,
+message shape and selected boundaries.
 
 Frontend email/OAuth destinations also carry the selected site/admin surface.
 Continue to build locale-aware URLs through the shared helper; use the configured

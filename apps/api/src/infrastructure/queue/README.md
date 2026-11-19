@@ -63,8 +63,9 @@ roles; managed hosts remain stopped until infrastructure and policy readiness.
 Producer failures propagate to callers. A business mutation already committed
 must decide explicitly whether an optional queue hint is best-effort; durable
 business recovery remains its poller's responsibility. Secret email uses direct
-send rather than the queue. PG provider safety and audit are required before
-possible queued effects; broker outage prevents broker admission.
+send rather than the queue. Provider-effect work requires independent PG safety and audit before send
+admission. Ordinary idempotent work uses its business deduplication authority;
+framework PG execution rows are not required. Broker outage prevents broker admission.
 
 Producer Redis failures emit `queue.redis_error`; reconnects emit
 `queue.redis_reconnecting`. Registered email worker hooks emit

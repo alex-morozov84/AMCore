@@ -35,7 +35,8 @@ registered contract. Provider configuration must match the private saved scope.
 Email requires the same currently verified canonical recipient. Telegram requires
 the same active connection generation, recipient and chat. Relinking the same chat
 creates a new generation and refuses the old delivery. The worker repeats these
-checks at actual-start admission. Ordinary email snapshot delivery is unchanged.
+checks at actual-start admission. Ordinary email delivery uses the original snapshot. The same-recipient
+check above applies to manual retry.
 
 ## External-effect evidence
 

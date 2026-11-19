@@ -123,8 +123,9 @@ Important areas:
 ## Module Boundaries
 
 AMCore is a modular monolith. Add product domains as bounded modules, usually
-with their own Prisma schema. Cross-module access goes through exported NestJS
-services, not direct reads of another area's tables.
+with their own Prisma schema. Cross-area access goes through exported NestJS
+services. Shared `core` foundation modules may read each other's tables; product
+areas must use exported services.
 
 For the full recipe — Prisma, shared Zod contracts, DTOs, controllers, process
 roles, auth, tests, OpenAPI inventory — use

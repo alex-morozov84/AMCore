@@ -14,7 +14,9 @@ after:   avatarKey = (unchanged)
          avatarUrl = https://new.example.com/public/avatars/<user>/v-1-x/avatar-256.webp
 ```
 
-Published avatar keys are versioned and immutable, so a copy never goes stale.
+The contents of a published avatar version stay the same, but its object can be
+deleted. Reconcile the object list before switching providers, including
+deletions since the first copy.
 
 ## Move to a new provider
 
@@ -30,14 +32,24 @@ Published avatar keys are versioned and immutable, so a copy never goes stale.
 4. **Re-apply ACLs if you use `acl` mode.** Copying an object does not carry its ACL on every
    provider. After the copy, new uploads are public again, but old objects may need their ACL set.
    `external` mode has no per-object step.
-5. **Switch the configuration at once.** Set the new `STORAGE_*` values on the API and the worker and
-   restart both. Public addresses change to the new host immediately. Private files keep working,
-   because their access is generated at read time.
-6. **Verify.** Run `storage:check` again. Open an avatar in a private browser window.
-7. **Keep the old buckets for a while.** Delete them after you are sure nothing reads them.
-
-Objects written between the copy and the switch exist only in the old bucket. Either stop writes for
-the moment of the switch, or run the copy a second time just after it.
+5. **Pause writes and reconcile the copy.** Stop writers on the API and worker. Account for
+   direct uploads already granted through signed URLs. Stop issuing new upload URLs.
+   Wait for outstanding grants to expire or verify that the source rejects them.
+   Wait for in-flight uploads to settle. Reconcile additions, overwrites and deletions
+   since the first pass. Verify keys, bytes and metadata before switching.
+6. **Switch all consumers while writes remain paused.** Set the new `STORAGE_*` values
+   on the API and worker. Apply any web origin change described below. Restart the consumers
+   and verify their actual targets.
+7. **Verify access before reopening writes.** Check public delivery and private access with
+   representative objects. Run the diagnostic in [Testing](testing.md) and check the results
+   for the features you use. Keep the old storage available for recovery.
+8. **Reopen writes after verification.** If verification fails before writes resume, keep
+   writes paused and restore the previous configuration. If the new storage has accepted writes, repeat steps 5–7 in reverse. Stop writers
+   and stop issuing upload URLs. Wait for in-flight uploads to finish and for outstanding
+   grants to expire, or verify that the new storage rejects those grants. Reconcile changes
+   back to the old storage, including deletions, and resolve conflicts. Verify access to the
+   old storage and confirm every consumer targets it before reopening writes. Keep the old buckets until consumers and any
+   outstanding signed URLs no longer need them.
 
 ## Move to a CDN
 

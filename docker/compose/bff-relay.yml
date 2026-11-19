@@ -10,7 +10,8 @@
 # fixed IPv4 address in a fixed project subnet. Both values are required and must agree:
 # COMPOSE_WEB_IPV4 inside COMPOSE_NETWORK_SUBNET, not its first address (the gateway),
 # and the subnet free on this host (no overlap with host, VPN or other Docker networks).
-# Changing them on a running deployment: `docker compose down` (never -v), then `up -d`.
+# For a running deployment, follow the guide's maintenance and ordered restart
+# procedure. Never use down -v or a bare up to bypass migration/readiness stops.
 #
 # Scope: one web replica, IPv4. The edge in front must overwrite X-Forwarded-For and strip
 # X-AMCore-Client-Ip; the bundled Caddyfiles do both (Caddy replaces X-Forwarded-For from

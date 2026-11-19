@@ -1,19 +1,15 @@
-# PWA Icons
+# PWA icons
 
-- `icon-192x192.png` — 192×192, referenced in `manifest.ts`.
-- `icon-512x512.png` — 512×512, referenced in `manifest.ts`.
-- `icon-512x512-maskable.png` — 512×512, `purpose: 'maskable'` — extra
-  padding so OS launchers can safely crop it to a circle/squircle without
-  clipping the logo (the maskable-icon "safe zone").
+`apps/web/src/app/manifest.ts` references three PNG files:
 
-The current set is the AM monogram (`../logo-light.png`) centered on a solid
-`#fafafa` background (matches `globals.css`'s light-mode `--background`),
-generated deterministically with `sharp` — no AI image generation.
+| File | Size | Purpose |
+| --- | --- | --- |
+| `icon-192x192.png` | 192 × 192 | General |
+| `icon-512x512.png` | 512 × 512 | General |
+| `icon-512x512-maskable.png` | 512 × 512 | Maskable |
 
-## Regenerating (e.g. after a downstream rebrand)
-
-Composite your own square-cropped logo onto a solid background at the sizes
-above, keeping maskable content within roughly the inner 80% of the canvas.
-Any deterministic tool works: `sharp`, ImageMagick, or a manual export from a
-design tool. See `docs/frontend/brand-theme-and-tokens.md`'s rebrand
-checklist.
+Extend the solid background to the edges of the maskable icon. Keep
+important artwork inside a central circle with a diameter of 80% of the
+icon's side length so launcher cropping preserves it.
+Follow the [downstream rebrand checklist](../../../../docs/frontend/brand-theme-and-tokens.md#downstream-rebrand-checklist)
+for validation, copying and manifest colors.

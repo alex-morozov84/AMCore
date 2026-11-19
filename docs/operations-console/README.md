@@ -34,15 +34,17 @@ Your account must already have the platform `SUPER_ADMIN` system role. There is
 no first-admin or self-promotion screen. A current `SUPER_ADMIN` can change a
 user's role in [Users](users.md#change-a-users-system-role); the first admin is
 created through the [bootstrap procedure](../auth/rbac.md#administering-super_admin).
-Organization roles alone do not grant access.
+Organization roles alone do not grant access. Complete required
+[MFA setup and proofs](../auth/mfa-browser.md); a password or role alone does
+not complete protected admission.
 
 The sign-in address depends on how the Console was configured:
 
 - **Path mode:** Sign in through the product's normal login, then open its
   Console path. In the upstream multi-locale setup, use `/en/admin` or
   `/ru/admin`.
-- **Host mode:** Open `https://<ADMIN_CONSOLE_HOSTNAME>/{locale}/login` and sign in
-  with your email and password.
+- **Host mode:** Open `https://<ADMIN_CONSOLE_HOSTNAME>/{locale}/login` and complete
+  password and required MFA. Single-locale builds omit `/{locale}`.
   A product login on another host does not sign you into the Console. Use
   **Sign out** in the Console to end only its session. Console OAuth sign-in
   is not supported.

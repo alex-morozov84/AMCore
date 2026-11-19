@@ -261,21 +261,11 @@ group today — but the supported pattern for a fork that does is:
 
 ## Known conflict: Cache Components / Partial Prerendering
 
-Next 16's Cache Components (`cacheComponents: true`, formerly Partial
-Prerendering) is not enabled in AMCore, and turning it on conflicts with
-nonce-based CSP as currently implemented: generating a nonce means reading
-`headers()`, which under `cacheComponents` must happen inside a
-`<Suspense>` boundary — but a pre-paint script (the theme-init script in
-`app/[locale]/layout.tsx`, and Next's own inline Flight-payload script)
-needs its nonce before first paint, not after a Suspense boundary resolves.
-This is a genuine upstream limitation, not an AMCore gap:
-[vercel/next.js#89754](https://github.com/vercel/next.js/issues/89754)
-tracks the exact shape (confirmed, open as of this writing).
-
-If your fork wants to adopt Cache Components, budget time to resolve this
-conflict first (or track the upstream issue for a fix) — do not assume the
-two features compose cleanly just because both are documented
-independently.
+AMCore leaves Cache Components disabled. The nonce comes from request headers.
+The locale layout uses it for the pre-paint theme script, and Next uses it
+for framework scripts. Verify nonce propagation and first paint before changing
+the rendering boundary. Test enforcement on the deployed artifact
+before using the new configuration.
 
 ## CSP violation reports
 

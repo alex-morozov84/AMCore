@@ -1,11 +1,8 @@
 # Backend Architecture & Conventions
 
-How to add a backend module to AMCore **the same way the existing ones are built**.
-
-This guide is about _decisions and wiring_ — the sequence across Prisma, shared
-contracts, NestJS modules, authorization, process roles, and tests. It deliberately
-does **not** re-explain features that already have a home; it links them. If you want
-to _use_ a built-in capability, start from [the feature docs](#see-also) instead.
+Add a backend module through Prisma, shared contracts, NestJS composition,
+authorization, process roles and tests. For an existing capability, use its
+[feature guide](#see-also).
 
 For the high-level module tree, tech stack, and runtime layers, read
 [`apps/api/README.md`](../../apps/api/README.md) first.
@@ -77,11 +74,14 @@ AMCore is a **modular monolith**. The rules that keep it modular:
     disconnect idle subscriber connections. Do not create a client with bare `createClient`
     for code that production injects; tests use `appClientOptions()` (a convention, not a lint rule).
   - **What the 5000 ms limit does not bound:** connecting, a command already written (if
-    its reply is lost, its effect can be unknown), a `MULTI` or pipeline batch (the user cache uses `MULTI` for
-    tags and invalidation, and it waits in a reconnect backoff without a limit), the whole
-    HTTP request, or the total number of queued commands. A Redis error in the user or
-    permissions cache is not caught: it reaches the caller and the global filter answers
-    `500`. Only lock contention falls back to the database.
+    its reply is lost, its effect can be unknown), a `MULTI` or pipeline batch,
+    the whole HTTP request, or the total number of queued commands. Authentication
+    permission-cache calls use `AuthRedis.call` and their admission deadline:
+    proven Redis unavailability returns `503 SERVICE_UNAVAILABLE`; programming
+    errors remain `500`. Cache misses and exhausted lock-contention attempts may
+    load Postgres; a Redis outage is not permission to bypass current authority.
+    See [authentication Redis failures](../auth/redis-outage.md).
+
 
 `core/` holds domain modules (auth, organizations, api-keys, admin).
 `infrastructure/` holds cross-cutting providers (email, queue, storage, redis,
@@ -91,20 +91,12 @@ webhooks, idempotency, schedule, observability). Put a new product module under
 
 ### Do I need CQRS?
 
-**No — not as a default.** AMCore does **not** use a global command/query bus
-(`@nestjs/cqrs`), and adopting one is not required to build a module "the right
-way". The default shape is `Controller → Service → Prisma`. You already get the
-healthy part of the split for free: keep methods side-effect-honest (a method
-changes state _or_ returns data) and decompose a module into focused,
-single-responsibility services rather than one god-service.
+Use `Controller → Service → Prisma` by default. Keep read and mutation
+responsibilities clear and services focused. AMCore has no global CQRS bus.
 
-_Local_ command/query separation — distinct read vs. write services, or a
-purpose-built read model — is fine **where read/write complexity actually
-justifies it** (e.g. reporting, audit-log search, a support inbox). That is a
-per-context judgement, not a mandate, and it needs no framework. Reach for a full
-CQRS bus only in a bounded context with a large, measured read/write asymmetry
-that must scale independently, or an event-sourcing requirement — decide that for
-that context alone, never globally.
+Separate read/write services or a read model when a domain needs them. Adopt a
+CQRS framework only for a concrete independently scaled read/write or
+event-sourcing requirement; it is not a prerequisite for adding a module.
 
 The [runtime settings foundation](settings.md) covers code-owned ordinary
 platform settings, typed definitions, CAS/audit and local runtime reconciliation.
@@ -134,8 +126,9 @@ and datasource live in `schema.prisma`). Tag every model with `@@schema("<area>"
 
 AMCore uses Prisma 7's source-generated client (`provider = "prisma-client"`,
 `output = "../src/generated/prisma"`). Runtime API code imports Prisma enums,
-types, and `PrismaClient` from `@/generated/prisma/client`, not from the
-deprecated `@prisma/client` generated package surface. The generated directory is
+types, and `PrismaClient` from the generated client using relative `.js` imports
+(for example, `../../generated/prisma/client.js` from `src/core/things/`).
+Do not use the deprecated `@prisma/client` generated package surface. The generated directory is
 created by `pnpm --filter api db:generate` / API `postinstall` before
 typecheck/build/test.
 
@@ -284,7 +277,7 @@ The same image runs as `web`, `worker`, or `all`. Composition lives in
 the **right** list — a misplaced processor runs in the wrong process:
 
 - **Business HTTP module** (controllers) → `webImports`.
-- **`@Processor` / `@Cron`** → a **worker-only** module → `workerImports`. A periodic
+- **`@Processor` / `@ScheduledJob`** → a **worker-only** module → `workerImports`. A periodic
   job is declared once in the scheduled-jobs catalogue and uses `@ScheduledJob`, never a
   raw `@Cron` or `@Interval` (a test fails otherwise): see
   [Scheduled jobs](scheduled-jobs.md). NestJS
@@ -320,7 +313,8 @@ and [tool registration and approvals](../ai/tools-and-approvals.md).
 Env is validated once at boot by a Zod schema. It is split into domain sections
 under [`apps/api/src/env/schema/`](../../apps/api/src/env/schema) (one `*.env.ts`
 per area), composed flat in `base.ts`, with cross-field logic in `refinements/`.
-`apps/api/src/env.ts` is a re-export shim, so consumers keep importing from `@/env`.
+`apps/api/src/env.ts` re-exports the composed schema. New runtime imports use
+relative `.js` paths; an alias without an extension is not an ESM import recipe.
 Nest Config reads only validated values (`skipProcessEnv: true`). This preserves
 schema normalization: an optional empty value stays absent instead of falling back
 to its raw environment string. Environment variables are still loaded and validated
@@ -429,8 +423,7 @@ Apply these only when your module needs them:
   `@RateLimit`/`@SkipRateLimit`.** `infrastructure/throttling/` owns the
   entire mechanism (ADR-039/ADR-073): a GCRA (Generic Cell Rate Algorithm)
   limiter, Redis-backed with an in-memory degrade path, its own guard —
-  there is no third-party rate-limit library at all, so there is nothing
-  to learn beyond this decorator pair.
+  use the decorators rather than adding a second global limiter.
   - **Override a route** with `@RateLimit(policy)` — either a named policy
     from `RATE_LIMIT_POLICIES` (`PRIVILEGED_MUTATION`, `EXPENSIVE_ACTION`)
     or an inline `{ rate, per, burst? }` (see the Telegram webhook
@@ -456,17 +449,15 @@ Apply these only when your module needs them:
     "Client-IP relay to `apps/api`"; without them every BFF-proxied visitor
     still shares one bucket.
   - **A policy has a sustained `rate` and an instantaneous `burst`** (the
-    number of requests admitted immediately from idle, above the sustained
-    rate — defaults to `rate` when omitted). This is what makes normal
+    number of requests admitted immediately from idle; it defaults to
+    `rate` when omitted). This is what makes normal
     browsing safe by default: one real visitor's page firing several
     parallel calls to the same route, or clicking through a filterable
     list quickly across a few page visits, is absorbed by `burst` without
     tripping the backstop — while a route called continuously well above
     its sustained `rate` still gets throttled. `DEFAULT`'s `burst: 50`
     means an idle visitor can fire up to 50 requests to one route
-    instantly and still be admitted; a fixed-window algorithm cannot
-    express this distinction at all (see "Why GCRA, not fixed-window"
-    below).
+    instantly and still be admitted.
   - **Classifying a new route** (stop at the first match):
     1. Does it need per-actor/per-identity protection rather than a
        per-visitor volumetric one (login, invite-accept, password reset)?
@@ -490,18 +481,6 @@ Apply these only when your module needs them:
   - **Never widen the global `DEFAULT` policy** to work around a specific
     route's fan-out — that weakens the backstop for every route to fix a
     problem only one route has; narrow a specific route's policy instead.
-  - **Why GCRA, not fixed-window.** A fixed-window counter (what this
-    mechanism used before ADR-073) can only express one number — a limit
-    per window — so it cannot distinguish a one-time burst from an idle
-    visitor from the same request count arriving continuously, request
-    after request, from an attacker. No amount of `@RateLimit` tuning
-    fixes that; only a capacity-aware algorithm can. GCRA is that
-    algorithm — see ADR-073 for the full rationale, the default policy
-    table, and a measured before/after (the exact originally-reported
-    production symptom this mechanism exists to prevent: 28 of 60
-    requests refused under the old fixed-window defaults, 0 of 60 under
-    this one, for the identical traffic pattern — permanent regression
-    coverage in `apps/api/test/rate-limit-symptom-reproduction.e2e-spec.ts`).
 
 ## Tests
 

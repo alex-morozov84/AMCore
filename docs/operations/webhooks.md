@@ -1,17 +1,19 @@
 # Webhook Verification
 
-AMCore ships an inbound webhook verification primitive for signed requests. It
-verifies the request signature against the raw request body, not a bearer token
-or a re-serialized JSON payload.
+AMCore provides inbound webhook verification. Stripe and generic signatures use
+the raw request body. Telegram uses a static secret header instead. Verification
+does not prove that a business event was committed.
 
-Use it on public webhook routes together with explicit public auth:
+For a new public webhook route, use explicit public auth and a dedicated rate
+limit. This is an illustrative Stripe route, not a shipped endpoint:
 
 ```ts
 @Post('webhooks/stripe')
+@HttpCode(200)
 @Auth(AuthType.None)
 @RateLimit({ rate: 5, per: 60_000, burst: 5 })
 @VerifyWebhook('stripe')
-handleStripe(@Req() req: RawBodyRequest<Request>) {
+handleStripe() {
   return { received: true }
 }
 ```
@@ -58,7 +60,8 @@ uniform `401`.
 **Replay/dedupe is owned by the handler, not the primitive**, for Telegram: its
 `update_id` can outlive any Redis TTL, so the provider's `replayId` returns `undefined`
 (the Redis dedupe layer is a deliberate no-op) and the `/webhooks/telegram` handler dedupes
-durably on `update_id` in Postgres (effect-once). The webhook route is excluded from the
+on `update_id` in Postgres under its own transaction and retention policy. This
+does not promise that every business side effect is globally effect-once. The webhook route is excluded from the
 client OpenAPI surface.
 
 All signature/secret comparisons use a constant-time comparison helper.
@@ -77,30 +80,42 @@ WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS=300
 
 Notes:
 
-- `WEBHOOK_<PROVIDER>_SECRET` maps provider names to secrets.
+- Only the three registered names above are wired. Adding an environment variable
+  does not install a new provider adapter.
 - `WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS` defaults to `300`.
 - `WEBHOOK_REPLAY_DEDUPE_TTL_SECONDS` defaults to the timestamp tolerance when
   omitted.
 
 ## Replay Protection
 
-Replay protection has two layers:
+The built-in Stripe and generic verifiers enforce timestamp tolerance. The
+custom raw-body HMAC mode has no timestamp check; Telegram also has none.
+Adding a raw-body mode requires a reviewed adapter and an explicit replay policy.
 
-- timestamp tolerance is always enforced;
-- Redis event-ID dedupe is used when the provider exposes a stable event ID.
-
-Redis dedupe keys use the versioned keyspace:
+For Stripe and generic events with a stable event ID, the guard also uses:
 
 ```text
 webhook:v1:{provider}:{eventId}
 ```
 
-Behavior:
+Signature verification does not depend on Redis. Event-ID dedupe fails open if
+Redis is unavailable or times out. A provider without an ID gets no Redis dedupe;
+only that verifier family's actual signature/timestamp checks still apply.
 
-- signature verification does not depend on Redis;
-- if Redis is unavailable or times out, replay dedupe fails open;
-- if the provider does not expose a stable event ID, only timestamp tolerance is
-  applied.
+**The guard marks an ID before the handler runs.** If the handler then fails,
+a retry can be rejected until the Redis TTL expires. Conversely, Redis failure,
+expiry or data loss can admit the event again. A dedupe record proves neither
+successful processing nor an atomic commit with business data.
+
+For durable effects, the handler must own the event identity, authorized target,
+transaction/result and retention policy. Choose provider acknowledgement and retry
+behavior around that durable result. The built-in pre-handler Redis marker can
+block recovery before your handler is reached. If provider retries are required
+for correctness, the route needs an explicitly reviewed admission/recovery design;
+a durable handler alone does not remove this earlier gate. Do not invent a new event ID or clear the
+Redis marker to retry an unknown business outcome. If processing is deferred,
+use the [background-work contract](../backend/background-work.md); enqueueing alone
+is not proof of the completed effect.
 
 Current replay-ID extraction:
 
@@ -119,40 +134,17 @@ unthrottled public ingress is an open volumetric target.
 
 ## Request body size limit
 
-AMCore applies a default request-body size limit in the Nest
-bootstrap: **100 000 bytes** (decimal, not 100 KiB) for both JSON and
-urlencoded parsers, including raw-body webhook routes. The limit is centralized
-in `apps/api/src/bootstrap/request-body-policy.ts` (`REQUEST_BODY_LIMIT_BYTES`)
-and shared by production and the e2e bootstrap so the contract is identical in
-both.
+Webhook JSON and urlencoded bodies use the default **100 000 decoded bytes**
+limit. Exactly 100 000 bytes is admitted by size; 100 001 is rejected. Other
+validation and signature checks can still reject an admitted body.
 
-The sole larger JSON exception is `PATCH /api/v1/organizations/:orgId/members/:userId/roles`: **262 144 decoded bytes**,
-for complete replacement of up to 1000 role IDs. Its exact route/method parser
-runs before the default parser. Other methods, encoded paths and urlencoded
-bodies keep the default limit. Webhook limits and raw-body handling are unchanged.
+An oversized body returns `413 PAYLOAD_TOO_LARGE` before guards run. Verification
+uses the decoded, post-inflation `req.rawBody` buffer, not re-serialized JSON.
+Multipart has separate route limits and `FILE_TOO_LARGE` behavior.
 
-The limit is measured against the **decoded** body — bytes after any
-`Content-Encoding` inflation, not bytes on the wire (`inflate` defaults to true).
-For an uncompressed request the decoded size equals the wire size; for a
-gzip/deflate request the limit bounds the inflated size, so a small compressed
-body that inflates past the limit is still rejected.
-
-Behavior:
-
-- a decoded body of exactly `100 000` bytes is accepted; `100 001` is rejected;
-- an oversized body is rejected by the parser **before** the route's guards run,
-  so a webhook signature is never evaluated for a too-large payload;
-- the rejection surfaces as `413 Payload Too Large` with
-  `errorCode: "PAYLOAD_TOO_LARGE"` (see _Error Contract_ below);
-- signature verification is unaffected: the verifier hashes `req.rawBody`, the
-  decoded (post-inflation) body buffer, and the explicit limit does not change
-  those bytes;
-- multipart uploads are **not** governed by this value; they have their own
-  per-route Fastify multipart limit and `FILE_TOO_LARGE` contract.
-
-There is intentionally no separate, larger webhook limit: no current provider
-payload requires one. Raise `REQUEST_BODY_LIMIT_BYTES` only against a measured
-need.
+See [the request-body contract](../backend/request-body-contract.md) for current
+route exceptions, encoding, parser order and limits. Exceptions on other routes
+do not enlarge the webhook limit.
 
 ## Error Contract
 
@@ -177,7 +169,7 @@ distinct machine-readable `errorCode` values:
 AMCore redacts:
 
 - signature headers such as `stripe-signature`, `webhook-signature`, and
-  `x-hub-signature-256`;
+  `x-hub-signature-256`, plus the Telegram secret header;
 - the entire request body for routes under the `/webhooks/` path convention.
 
 If you want automatic webhook body redaction in logs, mount the route under a
@@ -185,7 +177,9 @@ If you want automatic webhook body redaction in logs, mount the route under a
 
 ## Example
 
-Example Stripe-style request shape:
+Illustrative request shape for an implemented route (not an executable signed
+request): the timestamp and HMAC below are placeholders. A real request needs
+a current timestamp and a signature of its exact bytes using the configured secret:
 
 ```bash
 curl -X POST http://localhost:5002/api/v1/webhooks/stripe \
@@ -196,6 +190,7 @@ curl -X POST http://localhost:5002/api/v1/webhooks/stripe \
 
 Expected outcomes:
 
-- valid signature + acceptable timestamp + first event ID -> `200`
+- valid signature + acceptable timestamp + first event ID -> handler runs;
+  the illustrative handler above returns `200`, while your domain handler can fail
 - invalid signature -> `401` with `errorCode: "WEBHOOK_SIGNATURE_INVALID"`
 - duplicate event ID -> `401` with `errorCode: "WEBHOOK_REPLAY_REJECTED"`

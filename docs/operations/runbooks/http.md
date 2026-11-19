@@ -1,9 +1,8 @@
 # HTTP runbooks
 
-Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-http-errors`
-group and the optional `docs/operations/prometheus/optional/amcore-slo-burn-rate.yml`.
-Every query below excludes health-check probe traffic
-(`route!~"/api/v1/health.*"`), matching the alert expressions themselves.
+Use this runbook for [HTTP error-ratio alerts](../prometheus/amcore-alerts.yml)
+and [optional SLO burn-rate alerts](../prometheus/optional/amcore-slo-burn-rate.yml).
+The ratio excludes health probes.
 
 ## 5xx error ratio
 
@@ -20,8 +19,9 @@ Every query below excludes health-check probe traffic
 **Diagnostic steps:**
 
 1. Break the alert's own aggregate query down by route to find which route(s)
-   are driving it — the alert sums across every route, so this is always the
-   first step:
+   have elevated error ratios. Compare the request rate and absolute 5xx rate
+   before choosing which route to investigate. An infrequent route can have a
+   high ratio and contribute few errors to the aggregate:
 
    ```promql
    sum(rate(amcore_http_requests_total{status_code=~"5..",route!~"/api/v1/health.*"}[5m])) by (route)
@@ -42,7 +42,8 @@ Every query below excludes health-check probe traffic
 **Mitigation:**
 
 - If correlated with a recent deploy: roll back to the last known-good image
-  digest per `docs/operations/production-deploy-profile.md`.
+  digest using the [rollback procedure](../deployment.md#rollback). Confirm
+  schema and worker compatibility before choosing an image-only rollback.
 - If correlated with a downstream dependency: mitigate that dependency first
   (see the linked runbook); the 5xx ratio should recover once it does.
 - If isolated to one route with no recent deploy or dependency signal: treat
@@ -51,10 +52,15 @@ Every query below excludes health-check probe traffic
 
 **Escalation:** `AMCoreHttp5xxRatioTicket` is a non-urgent follow-up — file a
 ticket and investigate before the ratio grows. Either page-severity alert
-(`Fast` or `Sustained`) means an ongoing, real outage; escalate per your
+(`Fast` or `Sustained`) means the error ratio crossed the page threshold;
+check impact and escalate per your
 organization's on-call process. This starter ships no default paging
 integration (see `docker/monitoring/alertmanager/alertmanager.yml`) — wire one
 before relying on paging in production.
+
+**Verify recovery:** Confirm traffic still reaches the affected routes. Compare
+5xx rate, error ratio and latency with the pre-incident baseline. An empty
+series or a quiet notification channel cannot confirm recovery.
 
 ## SLO burn-rate
 
@@ -63,21 +69,10 @@ firing. These only exist if a fork has enabled the optional
 `docs/operations/prometheus/optional/amcore-slo-burn-rate.yml` file (off by
 default — see that file's header for how to enable it).
 
-**Likely causes and diagnostics:** the same underlying 5xx elevation as
-above, viewed through a monthly error-budget lens instead of the fixed
-percentages above — if either burn-rate alert fires, one or more of the
-5xx-error-ratio alerts in the previous section is very likely firing too (or
-about to). Start with that section's diagnostic steps; there is no separate
-burn-rate-specific diagnostic beyond the multiwindow condition the alert
-itself already evaluates (see the file's own header comment for the burn-rate
-math).
+**Diagnostics and mitigation:** Use [5xx error ratio](#5xx-error-ratio).
+A burn-rate alert can fire independently of the fixed-ratio alerts.
 
-**Mitigation:** identical to [5xx error ratio](#5xx-error-ratio) above — the
-SLI being burned is the same one.
-
-**Escalation:** `AMCoreErrorBudgetPageBurn` combines the fast (1h/5m) and slow
-(6h/30m) page-severity windows into one alert by design (see the file's
-header) specifically so a severe outage never sends two separate page
-notifications for the same incident — treat it as a single page regardless of
-which window pair tripped it. `AMCoreErrorBudgetTicketBurn` is a non-urgent
+**Escalation:** `AMCoreErrorBudgetPageBurn` uses one rule for the fast
+(1h/5m) and slow (6h/30m) conditions. The fixed-ratio alerts are separate rules.
+`AMCoreErrorBudgetTicketBurn` is a non-urgent
 budget-consumption signal, not a page.

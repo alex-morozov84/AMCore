@@ -20,13 +20,10 @@ From the Console home page, select **Organizations** in the left navigation.
 The creation action and **Needs attention** appear above the search field.
 Trusted initial setup appears only while eligible/relevant or needed to recover an
 unknown request. The default create action invites an administrator. For **First organization**, follow **Administrator → Organization → Confirmation**.
-Enter the employee's email and select **Continue**. An existing confirmed account can continue immediately;
-the page explains when the employee must confirm their email first. **Back** preserves entered details.
-The final action is **Create organization**. The result explains who has access and provides **Open organization**.
-If the selected account was deleted before completion, choose **Change recipient**
-and select another administrator. Organization details remain saved. Confirm the
-new account's mailbox before continuing. An unknown creation result must be checked
-first; completed setup never replaces its original administrator through this panel.
+Follow the [initial-setup steps](../product-admin/organization-establishment.md#use-console-after-trusted-platform-access)
+for mailbox confirmation, preserved drafts and deliberate recipient replacement.
+Check an unknown result before changing the recipient; completed setup never
+replaces its original administrator through this panel.
 Once an organization exists, the redundant initial-only unavailable card is hidden.
 An unresolved trusted setup stays visible until its result is reconciled.
 

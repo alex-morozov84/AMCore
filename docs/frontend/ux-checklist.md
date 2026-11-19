@@ -27,6 +27,6 @@ and again before the owner preview:
    Inspect text and button bounds inside dialogs, not only page overflow.
 
 Before handoff, record the relevant pattern choice, actual checks and remaining gaps
-in the project's work record or PR. Owner means the person accepting the product; preview is not the first usability check.
+in the project's work record or PR. Use the owner preview after you have walked the changed journey yourself.
 Technical details: [interaction patterns](./architecture-and-conventions.md#interaction-patterns-buttons-tabs-and-lists)
 and [runtime verification](./testing.md).

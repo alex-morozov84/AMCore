@@ -40,9 +40,8 @@ raster images.
 
 ## Avatar Flow
 
-The shipped avatar consumer is the one example that publishes files. As of the
-media-processing arc it runs the validated upload through the
-[Media](../media/README.md) pipeline rather than storing the raw upload.
+The avatar endpoint sends validated images through the [media pipeline](../media/README.md).
+It keeps the original private and publishes generated WebP derivatives.
 
 ```http
 POST /api/v1/auth/me/avatar
@@ -65,17 +64,18 @@ The implementation:
 
 The HTTP response shape is unchanged: `{ avatarUrl }`. The URL is derived from the stored key, so it changes with `STORAGE_PUBLIC_BASE_URL` and must not be persisted by clients.
 
-Delete is idempotent and **fail-closed** — it removes every object under
+Delete is idempotent and **fail-closed** — it sweeps older versions under
 `avatars/{userId}/` and `public/avatars/{userId}/` plus the legacy flat object, and clears `avatarKey` only
-after storage cleanup succeeds:
+after storage cleanup succeeds. A failure can leave a partial cleanup. See the
+[avatar lifecycle](../media/README.md#avatar-flow-the-shipped-example):
 
 ```http
 DELETE /api/v1/auth/me/avatar
 Authorization: Bearer <accessToken>
 ```
 
-Avatar uploads are rate-limited per IP (`5/min`) for the synchronous image
-decode. See [Media](../media/README.md) for presets, limits, and security.
+Avatar uploads use the expensive-action policy (5/min sustained, burst 5 per
+route and tracker). See [Media](../media/README.md) for presets, limits, and security.
 
 Concurrent avatar mutations for the same user are fenced by a monotonic
 `User.avatarGeneration` (conditional update + generation-bounded sweep), so a
@@ -90,7 +90,8 @@ or a Redis outage the upload/delete **fails closed** with a retriable
 For private user files, use a key outside `public/`. Do not
 return `getPublicUrl`. Use either:
 
-- `getSignedDownloadUrl({ key })` for a time-limited S3 URL, or
+- `getSignedDownloadUrl({ key })` for a time-limited S3 URL after the same ownership
+  and scope checks, or
 - an authorized route that checks ownership/scope and then calls
   `StorageDownloadService.streamObject(key, res)`.
 
@@ -102,12 +103,22 @@ mapping, and leak-free generic 500s, but it performs no authorization by design.
 `getSignedUploadUrl()` exists for advanced flows, but it bypasses server-side
 byte validation because the browser uploads directly to the provider.
 
-Use it only with a complete post-upload policy:
+The shipped avatar flow uses server-side multipart. A direct-upload feature
+owns its upload grant, object ownership, expiry, finalization and cleanup policy.
+Completing validation does not revoke an outstanding URL.
+
+Use a complete post-upload policy:
 
 1. upload into a quarantine/private prefix;
-2. verify size, type, and ownership after upload;
-3. move/copy into the final key only after verification;
-4. delete failed uploads;
+2. verify size, decoded type, and ownership after upload. A signed PUT does
+   not enforce these properties. Use a stable snapshot of the verified bytes
+   for processing and promotion, since an outstanding upload URL may replace
+   the quarantine object;
+3. use the verified bytes for final storage. For a public output, generate the
+   allowed derivative and upload it under `public/`. Storage copy and move
+   reject crossing the private/public boundary;
+4. clean up failed or abandoned uploads, including objects uploaded again
+   before the grant expires;
 5. never trust the client-supplied MIME type.
 
 For most app features, use server-side validated upload first.

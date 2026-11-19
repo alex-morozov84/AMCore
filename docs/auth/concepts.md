@@ -1,6 +1,7 @@
 # Core Concepts
 
-Before diving into specific flows, here's how the pieces fit together. You don't need to memorize this — come back when something doesn't make sense.
+Read this explanation before integrating direct API credentials or choosing
+between API and bundled browser sessions. Procedures live in the linked guides.
 
 ---
 
@@ -10,8 +11,7 @@ The system uses two tokens that work together. They serve completely different p
 
 ### Access token (JWT)
 
-Think of it as a **day pass**. It's short-lived (15 minutes), self-contained,
-and fast to verify. After signature validation, AMCore also resolves the current
+The access token is a short-lived signed credential (default 15 minutes). After signature validation, AMCore also resolves the current
 user from the primary database. This is the same read that checks the session's
 authority, so a request costs one user read and no Redis call for this step.
 
@@ -41,12 +41,15 @@ renew access, including through repeated exchanges. See [RBAC](./rbac.md).
 
 ### Refresh token (opaque)
 
-Think of it as a **membership card**. It lasts 7 days and obtains a new access token.
+A refresh token obtains new credentials. Each issued token expires after
+`JWT_REFRESH_DAYS` (default 7 days); a successful rotation starts a new token lifetime.
 Direct API clients receive an httpOnly refresh cookie. AMCore web instead keeps
 the refresh token in its server-side Redis vault; the browser receives an opaque
 session cookie and never receives the backend token in JavaScript.
 
-When you use it, the old one is immediately revoked and a new one is issued. This is called **token rotation** — if someone steals an old refresh token, it's already worthless.
+Successful refresh replaces the old token. This is **token rotation**.
+Reusing a retained rotated token revokes its whole family, including the new token.
+Rotation does not prevent use of a stolen token before the legitimate client rotates it.
 
 The API stores a SHA-256 hash of the refresh token in SQL. The web vault stores
 the raw token in Redis. Redis persistence and backups can therefore contain vault
@@ -56,7 +59,8 @@ credentials; protect their access and storage accordingly.
 
 ## Sessions
 
-A session represents one logged-in device. Every login creates a new session:
+A session family represents one completed sign-in, not a verified device.
+A restricted login continuation does not yet grant an ordinary session:
 
 ```
 User "alex"
@@ -67,7 +71,10 @@ User "alex"
 
 Each session has its own refresh token. Logging out on one device doesn't affect the others. A user can view and revoke sessions from their account settings.
 
-When a password is reset, **all sessions are destroyed** — every device gets signed out.
+Password reset revokes existing families and advances account authority atomically.
+Physical row cleanup follows. Browser and protected credentials fail their next
+authority check; only never-protected independent clients retain issued JWT expiry.
+See [reset completion failures](./email-auth.md#completion-and-session-failures).
 
 ---
 
@@ -78,10 +85,10 @@ script, or a custom frontend talking to the backend itself). The bundled
 `apps/web` frontend does **not** work this way — see
 [README → The 30-second mental model](./README.md#the-30-second-mental-model)
 for why: the browser uses an opaque BFF session cookie; backend tokens stay
-server-side apart from the documented temporary HttpOnly OAuth handoff.
+server-side. The temporary OAuth handoff contains a nonce, not either backend token.
 
 ```
-LOGIN
+COMPLETED LOGIN (an intermediate 202 is not completion)
   │
   ▼
 Backend creates:
@@ -102,7 +109,7 @@ Backend:
   ├── revokes old refresh token
   └── issues new access token + new refresh token (rotation)
 
-  After 7 days → must log in again
+  After refresh-token expiry or refusal → sign in again
 ```
 
 ---
@@ -113,7 +120,7 @@ Backend:
 
 | Method           | Mechanism                                     |
 | ---------------- | --------------------------------------------- |
-| Email + password | Argon2id hash (64 MB memory, 3 iterations)    |
+| Email + password | Argon2id password hash    |
 | OAuth            | Provider identity verified via OIDC/OAuth 2.0 |
 | API key          | Scoped token, hashed in DB                    |
 
@@ -132,7 +139,7 @@ There are two independent layers:
 | Role          | What it means                         |
 | ------------- | ------------------------------------- |
 | `USER`        | Normal user, default for everyone     |
-| `SUPER_ADMIN` | Full platform access, can do anything |
+| `SUPER_ADMIN` | Platform role, subject to route and current-authority checks |
 
 **2. Organization permissions** — fine-grained rules within an org context (see [RBAC](./rbac.md)).
 
@@ -142,9 +149,9 @@ These two layers are checked independently. A user needs to pass both.
 
 ## Passwords
 
-Passwords are hashed with **Argon2id** — currently the gold standard for password hashing. The parameters (64 MB memory cost, 3 time cost) make brute-force attacks impractical even with specialized hardware.
-
-The raw password is never stored, logged, or transmitted after the initial request.
+AMCore hashes passwords with **Argon2id**. Use HTTPS when submitting a password.
+Keep passwords out of logs, telemetry and stored request bodies; a hash does not
+protect a password exposed before hashing.
 
 Users who signed up via OAuth don't have a password — they can set one later through account settings.
 
@@ -220,7 +227,7 @@ the credential itself is never stored or logged.
   after the caller gave up. When all slots are held, new calls are refused at once
   (`503`, and nothing was sent). A client that stops answering is replaced; see
   [authentication when Redis is slow or unavailable](redis-outage.md) for the triggers
-  and the measured, scoped recovery times.
+  and recovery targets and their limits.
 - A clear that timed out can still run later and remove fingerprint failures
   recorded in the meantime. The source-address counter is never cleared by it.
 
@@ -228,9 +235,12 @@ the credential itself is never stored or logged.
 
 ## What "verified email" means
 
-`emailVerified: false` doesn't prevent login — it's a soft flag. The application can use it to gate certain features (like sending messages to others, or accessing premium content).
+`emailVerified: false` does not by itself block ordinary sign-in. It is not a
+universal permission: invitation acceptance and protected-account setup can
+require verified email. Follow the owning journey rather than treating login as verification.
 
-Verification tokens expire after 48 hours and are single-use.
+Verification tokens are single-use and expire after `EMAIL_VERIFICATION_EXPIRY_HOURS`
+(default 48 hours).
 
 ---
 
@@ -240,19 +250,21 @@ The refresh token lives in a cookie with these flags:
 
 | Flag       | Value                | Why                                        |
 | ---------- | -------------------- | ------------------------------------------ |
-| `httpOnly` | `true`               | JavaScript cannot read it (XSS protection) |
+| `httpOnly` | `true`               | JavaScript cannot directly read this cookie |
 | `secure`   | `true` in production | Only sent over HTTPS                       |
 | `sameSite` | `strict`             | Primary CSRF layer for the refresh cookie  |
 | `path`     | `/`                  | Available to all paths                     |
 | `maxAge`   | 7 days               | Browser discards it after this             |
 
-The access token is stored in application memory (never in `localStorage`) and cleared on page close.
+A custom browser client should keep access tokens out of persistent browser storage.
+Bundled web clients keep them server-side, not in browser memory.
 
 This cookie table describes `apps/api`'s own `refresh_token` cookie for a
 direct API consumer. `apps/web` additionally sets its own `amcore_session`
 cookie on its own origin — see
-[Sessions → How sessions work](./sessions.md#how-sessions-work) — and never
-receives `apps/api`'s cookie or either token itself.
+[Sessions → How sessions work](./sessions.md#how-sessions-work) — and keeps backend tokens server-side.
+The brief OAuth callback nonce is the exception to ordinary cookie routing;
+it is not a refresh credential.
 
-See [CSRF Posture](./csrf.md) for the narrow cookie-surface policy, the
+See [CSRF Posture](./csrf.md) for the cookie-surface policy, the
 Origin/Referer second layer, and the frontend-agnostic rationale for allow-on-missing.

@@ -23,7 +23,16 @@ browser-context transport on API/web as described in
 [placement and sessions](../product-admin/placement-and-sessions.md).
 Never put key values, recovery tickets or database passwords in command arguments.
 
-The final binary allows ordinary users while the protocol is `prepared`, but
+The administrative CLI reads its process environment; neither compiled nor
+`auth:mfa` source commands load root `.env` automatically. Supply the administrative
+`DATABASE_URL` and required MFA keys through your approved private environment.
+Set the intended `NODE_ENV`; in production the database URL must select
+`sslmode=require` or `sslmode=verify-full`. Do not copy the runtime DML-only URL
+when owner authority is required. Run compiled commands from the API image's
+working directory (`/app`), or from `apps/api` in a prepared compiled checkout.
+An ordinary API process reading `.env` does not configure this separate command.
+
+The compatible MFA-capable binary allows ordinary users while the protocol is `prepared`, but
 refuses operator grants. Operators cannot use password-only access during this
 maintenance boundary. Initial setup becomes available after activation.
 

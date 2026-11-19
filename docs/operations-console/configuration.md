@@ -1,7 +1,9 @@
 # Operations Console Configuration and Deployment
 
 Start with the [Operations Console user guide](README.md) for the capability and
-access boundary. This page covers topology and deployment.
+access boundary. This page covers topology and deployment. Complete required
+[MFA setup and sign-in](../auth/mfa-browser.md); a system role alone does not
+grant access from a prepared deployment.
 
 ## Topology
 
@@ -256,7 +258,7 @@ refused:
 - addresses with a user name or password (`https://user:pw@host/`);
 - wildcard hosts such as `https://*.example.com`, and relative or scheme-less
   values (`//host/d/x`, `host/d/x`);
-- values with spaces or control characters, or longer than 2048 characters;
+- values with embedded whitespace or control characters, or longer than 2048 characters;
 - other schemes, such as `javascript:` or `ftp:`;
 - `http` addresses of any other host, such as `http://grafana.internal:3000`.
 
@@ -492,8 +494,10 @@ the Console's own server; it has no setting of its own besides the API's `ENABLE
   security policy. The generic product proxy refuses that path.
 - **Session.** In host mode the Console's own session is used and the product session is not
   accepted; in path mode the product session is used, as for every other Console route. A
-  `SUPER_ADMIN` demotion applies on the next request; revoking the API session from elsewhere can
-  take up to the access token's lifetime (see [who can open it](queue-board.md#who-can-open-it)).
+  `SUPER_ADMIN` demotion applies on the next request. The bridge and API also
+  validate current browser/family/account authority; do not assume a revoked
+  browser session keeps board access until JWT expiry. See
+  [session admission](../auth/mfa-foundation.md#session-admission).
 
 ## Troubleshooting
 

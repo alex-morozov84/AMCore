@@ -11,7 +11,7 @@ and privileged session step-up.
 
 Actions are a **closed, code-owned taxonomy**. Every action is a dotted
 `area.event` string in the `AUDIT_ACTIONS` tuple, which is the single source of
-truth and the `AuditAction` type — the recorder only accepts values from it:
+truth and the `AuditAction` type. The recorder's typed interface accepts these values:
 
 - source: [`shared/constants/audit-actions.ts`](../../packages/shared/src/constants/audit-actions.ts)
 - per-action metadata allowlist: [`core/audit/audit-log.metadata.ts`](../../apps/api/src/core/audit/audit-log.metadata.ts)
@@ -98,10 +98,10 @@ AMCore writes audit rows one of three ways:
 
 Current examples:
 
-- In-transaction: admin system-role change, invite create/accept/revoke, API key
+- In-transaction: admin system-role change and session revocation, invite create/accept/revoke, API key
   create/revoke, AI approval lifecycle events (`ai.approval.requested`,
   `ai.approval.approved`, `ai.approval.rejected`, `ai.approval.expired`).
-- Best-effort: admin cleanup, admin session revocation, step-up
+- Best-effort: admin cleanup, step-up
   success/failure, AI tool execution events (`ai.tool.invoked`,
   `ai.tool.execution_failed`).
 
@@ -150,14 +150,28 @@ that file) that accepts only in-grammar values and drops the rest. Keep every
 field **bounded and content-free** — a coded id, count, or classification, never
 free text outside an explicitly approved bounded operational reason, and never
 anything from [Sensitive Data Rules](#sensitive-data-rules).
-`emailHash` and `pinoEvent` are allowed for every action by the common metadata
-spec, so add them at the call site only when that action actually has those
-bounded values.
+`true` checks only that a value is primitive; it does not limit string length,
+redact content or validate an identifier. Arrays likewise filter element types,
+not count or content. Use a bounded-value function for new string/count fields.
+`emailHash` and `pinoEvent` are common primitive fields; producers must supply
+only their intended bounded values, never raw addresses or arbitrary text.
+
+Declare the helpers outside the existing `specs` object. Choose bounds and
+grammar for the action's actual values:
 
 ```ts
-// in specs — reuse a bounded builder for id/code shapes, `true` for a plain primitive:
+const invoiceId = boundedString(64, /^[A-Za-z0-9_-]+$/)
 const code = boundedString(64, /^[a-z][a-z0-9_]*$/)
-'billing.refund_issued': { invoiceId: true, amountCents: true, reasonCode: code },
+const amountCents = (value: unknown) =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined
+```
+
+Insert this property inside the existing `specs` object. Keep its other entries:
+
+```ts
+'billing.refund_issued': { invoiceId, amountCents, reasonCode: code },
 ```
 
 **3. Record it** by injecting `AuditLogService` and calling `record(entry, opts)`.
@@ -209,12 +223,9 @@ AMCore enforces this with Postgres triggers that reject:
 - `DELETE`
 - `TRUNCATE`
 
-Why trigger-based:
-
-- the current app DB role is effectively powerful enough that `REVOKE` alone is
-  not a strong boundary;
-- the trigger blocks ordinary mutations even for the owner role;
-- the migration is shadow-database safe with Prisma.
+The triggers reject ordinary table mutations even when a role has DML privileges.
+Keep [runtime and owner database roles separate](database-role-separation.md);
+the trigger does not establish that the runtime role has appropriate privileges.
 
 Residual caveat:
 
@@ -231,7 +242,7 @@ Current policy:
 
 - audit rows are intended to be durable records;
 - hard-delete flows must not delete audit rows indirectly;
-- retention automation and external export are future work.
+- no automatic retention or external export is supplied.
 
 ## Read Access
 
@@ -284,9 +295,7 @@ The `cursorKey` migration adds a volatile UUID default and unique index to
 every existing audit row. It can rewrite and lock a large table. Rehearse
 `prisma migrate deploy` against a production-sized copy and schedule a
 maintenance window if necessary; do not disable the append-only trigger.
-The local PostgreSQL 18 rehearsal on 100,001 rows took 227 ms, preserved
-the trigger and yielded query probes below the 2-second statement timeout.
-That fixture does not predict a production table's lock time or workload.
+
 
 ## API-key lifecycle events
 

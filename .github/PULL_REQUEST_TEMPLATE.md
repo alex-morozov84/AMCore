@@ -41,7 +41,9 @@
 
 ## Where this change must be visible
 
-Tick each line, or write "not needed, because …". Skip the block only for a change with no user-visible effect.
+Tick each line, or write "not needed, because …". Skip this block when the change affects neither users nor developer or agent workflows.
+
+How will a user or agent find the instructions for the changed action, and what did you verify?
 
 - [ ] `README.md`: capability table or "Going to production"
 - [ ] Doc maps: `docs/README.md` and the section README (for example `docs/frontend/README.md`)

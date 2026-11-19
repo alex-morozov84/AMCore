@@ -1,11 +1,8 @@
 # Backup & Restore
 
-Postgres is this starter's system of truth — users, organizations, auth,
-audit log, notifications, AI conversation history, and more all live there.
-Losing it without a way back is a data-loss incident, not an inconvenience.
-This guide has three parts: which backup strategy fits your deployment, the
-optional compose `backup`/`restore` profiles this repo ships, and what's
-deliberately out of scope.
+Postgres stores the application's durable data. Choose a backup strategy below,
+then verify recovery before relying on it. The bundled Compose profiles provide
+logical snapshots and restore drills; they do not provide point-in-time recovery.
 
 For MFA-protected deployments, retain the matching keyring and compatible image/
 protocol policy with each database backup. Follow [MFA restore and key maintenance](../auth/mfa-deployment.md#unknown-results-and-repair)
@@ -16,9 +13,8 @@ before reopening ingress. A database copy alone cannot decrypt stored factors.
 ### Managed database (recommended default)
 
 If you run Postgres on a managed provider (RDS, Cloud SQL, Neon, Supabase,
-etc.), use the provider's own backups — this is almost always the right
-choice: continuous WAL archiving, tested restore tooling, and no extra
-operational burden on you.
+etc.), use its supported backup and recovery tooling. Confirm the selected plan's
+retention, point-in-time recovery and restore limits; these differ by provider.
 
 - Enable automated backups / point-in-time recovery (PITR) in the provider
   console.
@@ -33,13 +29,12 @@ operational burden on you.
 
 If you run Postgres yourself in production — not just the compose-bundled
 instance below — a periodic dump only gives you a snapshot at dump time; a
-crash between dumps loses everything since the last one. For real
-point-in-time recovery, set up continuous WAL archiving:
+crash between dumps loses everything since the last one. For
+point-in-time recovery, configure base backups and continuous WAL archiving:
 
 - [pgBackRest](https://pgbackrest.org/) — full/incremental/differential
-  backups, parallelism, backup validation, retention policies. The more
-  complete option.
-- [WAL-G](https://github.com/wal-g/wal-g) — simpler, S3/GCS-native archiving.
+  backups, parallelism, backup validation and retention policies.
+- [WAL-G](https://github.com/wal-g/wal-g) — backup and WAL archiving tooling.
 
 Configuring either is environment-specific (archive destination, retention,
 restore drill) and out of scope for what this starter ships — treat this
@@ -52,20 +47,25 @@ For a small self-hosted deployment (e.g. a single VPS running the reference
 `docker-compose.yml`) where PITR infrastructure is overkill, this repo ships
 optional compose profiles that take periodic `pg_dump` snapshots.
 
-**Honesty caveat: a logical dump is not point-in-time recovery.** It captures
-data only at the moment the dump ran — anything written between the last dump
-and a failure is lost. Use this when that RPO is acceptable (dev/staging, or
-a low-write hobby deployment), or as a defense-in-depth supplement alongside
-real PITR — never as your sole backup strategy for anything that matters.
+A logical dump captures one database snapshot. Writes after that snapshot are
+absent from the dump. Use this only when the resulting data-loss window is
+acceptable, or alongside a separate PITR strategy.
 
 ## Using the compose backup/restore profiles
 
 ### Enable scheduled backups
 
-Add `backup` to `COMPOSE_PROFILES` (alongside `local-infra` and/or `edge`):
+Add `backup` to the saved `COMPOSE_PROFILES` in the installation's environment
+file. Preserve its existing profiles, project and complete Compose file selection.
+For example, if the installation currently uses only `local-infra`:
+
+```dotenv
+COMPOSE_PROFILES=local-infra,backup
+```
+
+Then start the backup service with that saved configuration:
 
 ```bash
-COMPOSE_PROFILES=local-infra,backup
 docker compose up -d backup
 ```
 
@@ -78,9 +78,9 @@ With [role separation](database-role-separation.md) the runtime role cannot read
 Prisma's history table, so the dump fails; set `BACKUP_DATABASE_URL` to the
 read-only [backup reader role](database-role-separation.md#a-backup-reader-role).
 
-**This is an interval, not a wall-clock schedule.** `BACKUP_INTERVAL_SECONDS`
-(default `86400`, i.e. once a day) is how long the container sleeps between
-dumps — it counts from container start, not from midnight. There is no
+**This is an interval, not a wall-clock schedule.** The first dump starts when
+the container starts. After each dump attempt and pruning, the container sleeps
+for `BACKUP_INTERVAL_SECONDS` (default `86400`). Dump duration adds to the interval. There is no
 "run at 03:00 daily" cron here; if you need a specific time of day, restart
 the `backup` service at that time (e.g. via your host's own cron/systemd
 timer running `docker compose restart backup`) or replace this profile with
@@ -109,6 +109,15 @@ volumes:
       o: bind
 ```
 
+Scheduled dumps use `amcore-<UTC timestamp>.dump`. The service writes to the
+same name with `.tmp` appended, then renames it only after `pg_dump` succeeds.
+A failed attempt discards its temporary output; an interrupted process can leave
+`.tmp` behind. Never select that incomplete file for restoration.
+
+Without an explicit filename, `restore-drill` selects the lexically latest
+`amcore-*.dump` regular file. Select a filename explicitly when verifying a
+particular recovery set; a missing explicit archive fails without fallback.
+
 See "Store dumps offsite" below for why you'd want to.
 
 ### Logs
@@ -124,9 +133,9 @@ docker compose logs -f backup
 
 ### Restore
 
-Restore is a **one-shot**, like the `migrate` service — it never runs on a
-normal `docker compose up`. It requires its own profile _and_ an explicit
-`run`, so it cannot fire by accident:
+Use the restore service only for an explicit one-shot operation. Keep `restore`
+out of persistent `COMPOSE_PROFILES`, and do not start it with `compose up`.
+The profile separates it from ordinary startup; it is not an authorization guard.
 
 Before running restore, prepare and verify the target database, stop all writers,
 and follow the full [recovery sequence](single-host-compose.md#restore-a-database-dump).
@@ -151,18 +160,8 @@ it, and never run it against a database you don't intend to overwrite.
 
 ### Restore-drill (rehearsing a restore, not just taking one)
 
-**A backup nobody has restored is not a verified backup.** GitLab's own
-public postmortem of its January 2017 database incident is the canonical
-example of why: they had four separate backup/replication mechanisms in
-place (a daily `pg_dump` to S3, a daily LVM snapshot, disk snapshots for
-other servers, and Postgres replication), and none of them were usable when
-the incident hit. The `pg_dump`-based backups turned out not to exist at
-all — a Postgres major-version mismatch between the backup tooling (9.2) and
-production (9.6) had been silently making every dump fail — so recovery fell
-back to a manual snapshot taken about six hours before the outage, and
-copying that data back took roughly 18 hours. Every one of those failures
-was findable in advance by simply trying a restore.
-([GitLab's postmortem](https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/))
+A successful dump does not establish that recovery works. Rehearse restoration
+and verify the expected data before relying on that backup.
 
 The `restore-drill` profile automates exactly that check for the logical-dump
 fallback above — it is **not** available for managed-provider PITR or
@@ -386,9 +385,11 @@ public keys already start `public/`, so public copies can live under
    [recovery admission order](single-host-compose.md#restore-a-database-dump).
    Decide Redis/queue/credential reconciliation before reopening; DB/files alone
    do not restore queues or prevent replay of outside effects.
-2. Copy the verified set to a private directory on the isolated target. If the
-   selected dump already exists in its backup volume, compare its SHA-256 with
-   the exported `database.dump` and skip import. Otherwise import without overwrite:
+2. Copy the verified set to a private directory on the isolated target. Use the
+   target's saved configuration and an explicitly verified database URL.
+   Choose one path based on whether the dump already exists in the backup volume.
+
+   If the dump is absent, import it without overwriting an existing file:
 
    ```sh
    docker compose --profile restore run --rm --no-deps \
@@ -396,11 +397,27 @@ public keys already start `public/`, so public copies can live under
        set -eu; umask 077
        test ! -e /backups/recovery.dump
        cp /import/database.dump /backups/recovery.dump
-     '
+     ' &&
    docker compose --profile restore run --rm --no-deps restore recovery.dump
    ```
 
-   Use the target's saved configuration and an explicitly verified database URL.
+   If the dump already exists, verify it against the exported `database.dump`
+   from the verified set before restoring:
+
+   ```sh
+   docker compose --profile restore run --rm --no-deps \
+     --volume /absolute/private/recovery-set:/import:ro --entrypoint sh restore -c '
+       set -eu
+       exported=$(sha256sum /import/database.dump)
+       existing=$(sha256sum /backups/recovery.dump)
+       test "${exported%% *}" = "${existing%% *}"
+     ' &&
+   docker compose --profile restore run --rm --no-deps restore recovery.dump
+   ```
+
+   If either path fails, stop and inspect the error. Check the dump before
+   retrying. A failed import can leave a partial file.
+
    Do not start migrations, seed or application services. Verify selected rows,
    migration names/checksums and [target role/grant behavior](#verify-a-role-separated-restore).
 

@@ -1,8 +1,9 @@
 -- AMCore production database roles.
 -- Review docs/operations/database-role-separation.md before running this
 -- manual template. Replace `amcore` if the target database has another name.
--- Run as an administrator with CREATEROLE. The separate pg_monitor grant needs
--- the stronger capability documented in
+-- Use an administrator able to create the roles and grant the selected
+-- database/schema privileges. CREATEROLE alone does not establish those rights.
+-- Predefined-role grants also require actual delegation authority; see
 -- docs/operations/pg-stat-statements-observer-role.md.
 --
 -- AMCore models currently use core, notifications, and ai. If a fork adds a
@@ -36,6 +37,8 @@ GRANT CONNECT ON DATABASE amcore TO amcore_runtime;
 -- Step 3: run after Step 2, or immediately when adopting existing schemas.
 -- Temporary membership plus SET ROLE ensures default privileges are recorded
 -- for objects amcore_migrator will create, not for the connected administrator.
+-- Review existing membership first. If this access already exists, prepare an
+-- equivalent that preserves standing membership; do not blindly revoke it.
 GRANT amcore_migrator TO CURRENT_USER;
 SET ROLE amcore_migrator;
 
@@ -73,8 +76,13 @@ REVOKE amcore_migrator FROM CURRENT_USER;
 -- from older dumps; AMCore does not use public for application models.
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
--- Existing database only: before Step 3, run as the current object owner or a
--- superuser, replacing the placeholder. Step 3 is still required afterward.
+-- Existing database only: close affected writers and verify a restorable backup.
+-- Review all affected ownership: REASSIGN OWNED includes unrelated objects in
+-- this database and shared databases/tablespaces. Use a narrower reviewed
+-- transfer when needed. The executor needs ownership-transfer authority and
+-- ability to SET ROLE to the new owner; old-owner access alone is insufficient.
+-- This does not transfer default privileges or grants on unowned objects.
+-- Replace the placeholder only after review. Step 3 is still required afterward.
 --   REASSIGN OWNED BY <existing-role> TO amcore_migrator;
 
 -- Optional query-statistics observer. This grants no application-table access.
@@ -87,9 +95,10 @@ GRANT CONNECT ON DATABASE amcore TO amcore_observer;
 --   GRANT pg_monitor TO amcore_observer;
 
 -- Optional backup reader for the bundled backup profile (BACKUP_DATABASE_URL).
--- pg_read_all_data (PostgreSQL 14+) can read every table and sequence, including
--- Prisma's history in public, and can write nothing. The runtime role gets no
--- such access, so it still cannot run migrations.
+-- pg_read_all_data grants table/view/sequence reads, including Prisma's ledger,
+-- but does not bypass row-level security or itself grant writes. Review other
+-- direct/inherited rights and downstream RLS before claiming read-only access
+-- or complete backup coverage. Keep this broad read grant out of runtime.
 CREATE ROLE amcore_backup WITH NOLOGIN;
 GRANT CONNECT ON DATABASE amcore TO amcore_backup;
 GRANT pg_read_all_data TO amcore_backup;

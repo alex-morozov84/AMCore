@@ -329,9 +329,9 @@ replay is permitted; stock queue history retention cannot provide that guarantee
 
 ## Request correlation
 
-A job started during an HTTP request stores that request's `correlationId` in its
-envelope. The worker runs the job in a log context, so every worker log line of the
-run carries `correlationId`, `workId` and `jobId`. Idempotent and wake runs also carry
+A non-wake job enqueued during an HTTP request stores that request's
+`correlationId` in its envelope. The worker uses that ID, `workId` and `jobId`
+in the run's log context. Wake jobs omit the request ID, as described below. Idempotent and wake runs also carry
 `invocationId` inside the handler; a queued email (`conservative`) does not.
 Searching the log store for the request ID therefore finds the API lines and the
 worker lines of the same job.
@@ -364,10 +364,18 @@ Plan every envelope change around that.
 | Add an optional, bounded key                               | `protocolVersion` stays `1` | Deploy workers first, then the API                  | Roll back the API first, drain, then roll back workers                         |
 | Remove a key, change its type or meaning, make it required | New `protocolVersion`       | Release a reader for both versions, then the writer | Keep the dual reader until no job of the new version can exist (queue drained) |
 
-To drain before a rollback, count jobs that carry the new key in every queue state:
-waiting, prioritized, active, retrying with backoff, and delayed (a delay can be up
-to 30 days). The queue board (`/api/v1/admin/queues`, off in production until `ENABLE_BULL_BOARD=true`; see [deployment](../operations/deployment.md)) shows the counts. A job you do not wait for fails
-terminally on the old worker.
+Before rollback, stop producers of the new envelope and establish that no job
+requiring the new reader can run later. Include waiting, prioritized, active,
+retry-backoff and delayed jobs; a delay can be up to30 days. Account for retained
+failed jobs that could be retried later.
+
+The read-only [queue board](../operations-console/queue-board.md) shows state
+counts, not counts filtered by envelope key or version. Its bounded job window
+cannot prove that no incompatible job remains outside that window. Keep a
+compatible reader until the installation's complete inventory and controlled
+drain or policy-approved disposition establish safety. Do not delete unknown
+evidence or use raw queue mutations to make a rollback appear safe.
+An incompatible job fails terminally on the old worker.
 
 With the shipped Compose topology, `api` and `worker` run from one image. Recreate the
 worker first, then the API and web (`up -d --no-deps worker`, then

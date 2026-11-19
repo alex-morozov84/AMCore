@@ -2,25 +2,30 @@
 
 AI conversations are owner-scoped durable transcripts. A run is one user turn
 plus the worker execution that produces an assistant turn, parks for approval, or
-terminates with a bounded reason. Postgres owns every run's state; a worker holds
-a run only through a short lease and can lose it at any time without corrupting
-anything.
+terminates with a bounded reason. Postgres owns run state. Only the current
+worker lease allows execution writes.
 
 ## Create a Conversation and Run
 
+Set `API_BASE` to your API URL including `/api/v1` (for example,
+`http://localhost:5002/api/v1` if your API listens on port 5002).
+Use an authenticated test user. Set `USER_JWT` in your shell without logging it.
+
 ```bash
 CONV_ID=$(
-  curl -s -X POST /ai/conversations \
-    -H 'Authorization: Bearer <user-jwt>' \
+  set -o pipefail
+  curl -fsS -X POST "${API_BASE}/ai/conversations" \
+    -H "Authorization: Bearer ${USER_JWT}" \
     -H 'Content-Type: application/json' \
-    -d '{"title":"Support question"}' | jq -r '.id'
-)
+    -d '{"title":"Support question"}' | jq -er '.id | strings | select(length > 0)'
+) &&
 
 RUN_ID=$(
-  curl -s -X POST /ai/runs \
-    -H 'Authorization: Bearer <user-jwt>' \
+  set -o pipefail
+  curl -fsS -X POST "${API_BASE}/ai/runs" \
+    -H "Authorization: Bearer ${USER_JWT}" \
     -H 'Content-Type: application/json' \
-    --data-binary @- <<JSON | jq -r '.id'
+    --data-binary @- <<JSON | jq -er '.id | strings | select(length > 0)'
 {
   "conversationId": "$CONV_ID",
   "inputParts": [{ "type": "text", "text": "Summarize my options." }],
@@ -30,11 +35,13 @@ JSON
 )
 ```
 
-Fetch status and transcript:
+Fetch status and transcript only after the block succeeds. If either request
+fails or an ID is missing, check accessible state before repeating a create
+request whose outcome is unclear.
 
 ```bash
-curl /ai/runs/$RUN_ID -H 'Authorization: Bearer <user-jwt>'
-curl /ai/conversations/$CONV_ID/messages -H 'Authorization: Bearer <user-jwt>'
+curl -fsS "${API_BASE}/ai/runs/$RUN_ID" -H "Authorization: Bearer ${USER_JWT}"
+curl -fsS "${API_BASE}/ai/conversations/$CONV_ID/messages" -H "Authorization: Bearer ${USER_JWT}"
 ```
 
 `inputParts` is always a structured array. Text uses:
@@ -51,21 +58,28 @@ Send an `idempotencyKey` (up to the schema limit) when a client may retry a
 create — a lost response, a double click, a queue redelivery. The key is scoped
 to the conversation.
 
-| Request                                 | Result                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| New key                                 | A new run is queued.                                                     |
-| Same key, **same** `inputParts`         | The original run is returned. Nothing is created, bound or woken.        |
-| Same key, **different** `inputParts`    | `409 AI_RUN_IDEMPOTENCY_CONFLICT`. Use a new key or repeat the original. |
-| Same key and input after narrow cleanup | `410 AI_RUN_ARCHIVED` with bounded archived identity.                    |
+The first three rows apply when the conversation still admits AI runs.
 
-"Same input" means the same ordered `inputParts`, artifact ids included
-(object key order is irrelevant; part order is not). The comparison never
-depends on the model, the assistant or the artifact bindings as they look today,
-so a replay after a configuration change still returns the original run.
-If the original run was archived, replay checks the retained validated input
-before new-run admission. It returns `410` even when the conversation is now
-human-controlled or closed. A foreign or missing run ID returns `404`; a different
-input under the archived key returns `409` without archived details.
+| Request | Result |
+| --- | --- |
+| New key | A new run is queued if its input passes validation. |
+| Same key and same `inputParts` | The original run is returned. Nothing is created, bound or woken. |
+| Same key and different `inputParts` | `409 AI_RUN_IDEMPOTENCY_CONFLICT`. |
+| Same archived key and input | `410 AI_RUN_ARCHIVED` with bounded archived identity. |
+
+"Same input" means the same ordered `inputParts`, including artifact IDs.
+Object key order does not matter. For an admitted replay, the comparison does
+not depend on the current model, assistant or artifact bindings.
+
+The API checks an archived key before checking conversation admission. A
+matching archived request returns `410` even after human takeover or closure.
+Different input under that archived key returns `409` without archived details.
+For a run that still exists, a human-controlled or closed conversation returns
+an admission conflict (`409`) before the API looks up the existing run.
+
+If the create response is lost, keep the original key and input. If admission
+changed, check the conversation and any known run that you can access.
+Keep the original key when investigating an admission conflict.
 
 ## Operator run control
 
@@ -333,8 +347,8 @@ one usage row, a canned refusal and the terminal outcome in one guarded
 transaction. If a stop wins, spend remains recorded but no assistant turn is
 written. Stale/expired leases or a shutdown seal write nothing. A rollback rolls
 back the entire settlement; repeated/concurrent finalization cannot double-write.
-A response arriving after the local call bound remains the existing PR2 residual:
-no unobserved receipt or global exactly-once billing guarantee is invented.
+A provider may complete or bill a call after the local timeout.
+The ledger cannot record a response the worker did not observe.
 
 New usage rows use `usageVersion: 2`. Their `providerReportedUsage` has independent
 nullable input/output/total counts, `source` (`reported`, `estimated`, `unavailable`)

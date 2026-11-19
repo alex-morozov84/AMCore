@@ -14,8 +14,9 @@ grant `pg_monitor`; verify those capabilities in the provider's current docs.
 A plain `CREATEROLE` connection, including the one used for
 [`setup-roles.sql`](../../docker/postgres/setup-roles.sql), cannot do either.
 
-If the provider permits neither operation, do not widen `amcore_runtime`.
-Use its supported query tooling instead, such as [Amazon CloudWatch Database
+If either operation is unavailable, stop this setup. Keep
+`amcore_runtime` privileges unchanged. Use the provider’s supported query
+tooling instead, such as [Amazon CloudWatch Database
 Insights](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights.html)
 or [Cloud SQL Query
 Insights](https://cloud.google.com/sql/docs/postgres/using-query-insights).
@@ -91,17 +92,12 @@ so this path has a short exposure window and must run in this order:
    ```
 
    `pg_stat_statements.track_utility` and `.track` are `context=superuser`
-   settings, unlike `shared_preload_libraries` in Step 3
-   (`context=postmaster`, which genuinely needs a restart). A reload
-   propagates a `context=superuser` change to every already-open backend
-   immediately, not only to new connections — verified live against real
-   PostgreSQL 16 and PostgreSQL 18 containers, holding one backend's session
-   open across the reload and observing its own `SHOW` output flip without
-   reconnecting.
+   settings. Reloading applies their configuration defaults without a second
+   server restart. A session-level override can still affect the effective value.
 
-6. Verify before performing any password-bearing operation (any already-open
-   session, or a fresh connection, will now correctly report the hardened
-   values):
+6. Verify the hardened values before any password-bearing operation. Check the
+   session you will use and confirm that existing operator sessions have no
+   override:
 
    ```sql
    SHOW pg_stat_statements.track_utility; -- must be off

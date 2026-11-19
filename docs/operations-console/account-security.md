@@ -12,5 +12,5 @@ uses its own secure cookie and session. Pending setup uses the minimal `/mfa`
 page and does not require the admitted Console shell. The backend verifies current
 account, family and browser authority on every protected request.
 
-Removing optional Console removes its entry only. The website and product
+Disabling optional Console closes its entrypoints while retaining source. The website and product
 administration retain account-security journeys for eligible or protected accounts.

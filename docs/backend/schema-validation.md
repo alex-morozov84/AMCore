@@ -11,7 +11,7 @@ Custom issues carry `params: { errorCode }`; the frontend translates that code.
 Wrap the schema to retain a named DTO and its parsed TypeScript type:
 
 ```ts
-import { createSchemaDto } from '../../common/schemas/schema-dto'
+import { createSchemaDto } from '../../common/schemas/schema-dto.js'
 
 export class CreateThingDto extends createSchemaDto(createThingSchema) {}
 ```

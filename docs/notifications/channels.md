@@ -103,8 +103,9 @@ pnpm --filter api test:e2e --runTestsByPath \
 
 A downstream channel should retain these checks for registration identity, role
 capabilities, transaction-local subscriptions, immutable targets, replay, request
-freeze, revoked generations and zero-I/O refusals. Real transports also need an
-installed SDK or fake-fetch assertion of the actual body/key and cancellation.
+freeze, revoked generations and zero-I/O refusals. Verify the actual body, key and cancellation at the transport boundary with
+the installed SDK or a controlled fetch. The synthetic channel proves its own
+registration contract, and your product still needs checks for its transport.
 
 ## Run the conformance lane
 

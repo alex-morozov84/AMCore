@@ -7,12 +7,17 @@ id; future versions do not retroactively change existing conversations.
 
 ## Create and Enable an Assistant
 
+Set `API_BASE` to the API URL including `/api/v1`. Set `ADMIN_JWT` to a freshly
+authenticated SUPER_ADMIN token and `USER_JWT` to the conversation owner's
+bearer token. Keep both tokens out of logs. Confirm creation returns an ID
+before enabling that version.
+
 ```bash
 ASSISTANT_ID=$(
-  curl -s -X POST /admin/ai/assistants \
-    -H 'Authorization: Bearer <fresh-admin-jwt>' \
+  curl -fsS -X POST "${API_BASE}/admin/ai/assistants" \
+    -H "Authorization: Bearer ${ADMIN_JWT}" \
     -H 'Content-Type: application/json' \
-    --data-binary @- <<'JSON' | jq -r '.id'
+    --data-binary @- <<'JSON' | jq -er '.id | strings | select(length > 0)'
 {
   "slug": "support",
   "displayName": "Support assistant",
@@ -24,9 +29,13 @@ ASSISTANT_ID=$(
 }
 JSON
 )
+```
 
-curl -X PATCH /admin/ai/assistants/$ASSISTANT_ID \
-  -H 'Authorization: Bearer <fresh-admin-jwt>' \
+Enable the returned version:
+
+```bash
+curl -fsS -X PATCH "${API_BASE}/admin/ai/assistants/$ASSISTANT_ID" \
+  -H "Authorization: Bearer ${ADMIN_JWT}" \
   -H 'Content-Type: application/json' \
   -d '{"enabled":true}'
 ```
@@ -34,8 +43,8 @@ curl -X PATCH /admin/ai/assistants/$ASSISTANT_ID \
 Bind it when creating a conversation:
 
 ```bash
-curl -X POST /ai/conversations \
-  -H 'Authorization: Bearer <user-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/conversations" \
+  -H "Authorization: Bearer ${USER_JWT}" \
   -H 'Content-Type: application/json' \
   --data-binary @- <<JSON
 {
@@ -51,8 +60,8 @@ Behavioral config is immutable. Change prompt/model/tools/modalities by publishi
 a new version:
 
 ```bash
-curl -X POST /admin/ai/assistants/support/versions \
-  -H 'Authorization: Bearer <fresh-admin-jwt>' \
+curl -fsS -X POST "${API_BASE}/admin/ai/assistants/support/versions" \
+  -H "Authorization: Bearer ${ADMIN_JWT}" \
   -H 'Content-Type: application/json' \
   --data-binary @- <<'JSON'
 {

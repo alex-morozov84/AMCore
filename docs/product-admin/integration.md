@@ -13,8 +13,11 @@ Its default path is `/manage`; host mode exposes the same pages at the staff hos
 The adapter examples below apply to custom organization integrations, not a second
 source of deployment placement. Keep their custom login gate and API family aligned.
 
-Change `organizationAccessPlacement` once as shown in the
-[entry guide](README.md#connect-the-ready-pages). `organizationsPath` is a
+For custom destinations, edit `organizationAccessPlacement` in
+`apps/web/src/_app/organization-access/model/placement.ts`, or pass one shared
+`OrganizationAccessPlacement` object to your composed consumers. Application
+wiring imports its public contract from `@/_app/organization-access/index.config`.
+Do not change this adapter instead of the bundled JSON/physical-route/edge setup. `organizationsPath` is a
 locale-neutral, nonroot absolute path with literal `[A-Za-z0-9_-]+` segments;
 `homeHref` uses the same syntax or `/`. A single trailing slash is normalized at the application source and when deriving
 destinations, including the home destination. Queries,
@@ -271,6 +274,11 @@ The account menu and avatar editor have the same kind of fixture:
 `scripts/fixtures/account-avatar-headless.mjs` (see the
 [account menu guide](account-menu-and-profile.md#executed-custom-ui-example)).
 
+The custom member, role, invitation and shop generators require product-admin
+`"mode": "path"`, including when `--preview` is omitted. For host placement, use
+the ready host recipe; do not change a real deployment for these examples. See
+[generator prerequisites](adoption.md#connect-the-chosen-interface) before running them.
+
 The executable `scripts/fixtures/organization-members-headless.mjs` includes an inline member-key panel using the same controller and explicit revoke confirmation. It creates a
 separate disposable consumer with a list and inline editor instead of the ready
 table/dialog. By default it preserves the source's selected project choices.
@@ -340,8 +348,8 @@ The executable example creates a separate sanitized source fixture:
 node scripts/fixtures/organization-shop-headless.mjs
 ```
 
-The generator preserves the source's project choices; `/shop-team` is prefixed with
-each locale of the source.
+The generator preserves the source's build settings. Multi-locale builds prefix
+`/shop-team` with each served locale; single-locale builds use the bare path.
 The shop example independently composes the public organization-context hooks into
 a crew directory, personnel dossier and separate role, key and membership sections.
 Local CSS and product-owned semantic tokens define its appearance. See the

@@ -32,8 +32,6 @@ Use the default `external` mode.
 
 - ACLs exist only at the bucket level (`private` or `public-read`). An object ACL must equal the
   bucket ACL. Do not use `acl` mode.
-- An older community report says `x-amz-acl` was rejected on multipart uploads. Another reason to
-  stay on `external`.
 - With the AWS SDK's default checksum behavior, some S3-compatible providers reject the extra
   checksum headers. AMCore sets the SDK to send checksums only when required, so you do not need to
   change anything.

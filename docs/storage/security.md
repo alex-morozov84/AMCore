@@ -35,7 +35,8 @@ Give the application account only what it needs:
 | ------------------------------------ | ------------------------------------------------------------------------------------- |
 | Normal operation                     | Read, write, delete and list on the bucket (and the public bucket, if any)            |
 | `acl` delivery mode                  | Also the permission to set object ACLs (for example `s3:PutObjectAcl` on AWS)         |
-| `storage:check` and the hourly check | Write and read under the probe prefix (`STORAGE_PROBE_PREFIX`) and its `public/` twin |
+| Scheduled public-delivery check | Use application credentials for `HeadObject` on the private canary and `PutObject` on both canary keys during creation or repair. The delivery requests are anonymous GETs. |
+| Operator `storage:check` | Read, write, list and delete its diagnostic objects. See [Testing](testing.md#check-a-real-provider-with-storagecheck). |
 
 It does **not** need permission to change bucket policies or public-access settings, and on some
 providers it cannot have it. On Yandex the application key could not read or delete the bucket

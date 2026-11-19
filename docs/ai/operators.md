@@ -6,40 +6,51 @@ stale bot runs from writing after takeover.
 
 ## Owner Flow
 
+Set `API_BASE` to your API URL including `/api/v1` (for example,
+`http://localhost:5002/api/v1` if your API listens on port 5002).
+Set `CONV_ID` to the conversation ID and `USER_JWT` to its owner’s token.
+Confirm takeover succeeds before posting a human turn.
+
 ```bash
-curl -X POST /ai/conversations/<conversation-id>/takeover \
-  -H 'Authorization: Bearer <owner-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/conversations/${CONV_ID}/takeover" \
+  -H "Authorization: Bearer ${USER_JWT}" \
   -H 'Content-Type: application/json' \
-  -d '{}'
+  -d '{}' &&
 
-curl -X POST /ai/conversations/<conversation-id>/messages \
-  -H 'Authorization: Bearer <owner-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/conversations/${CONV_ID}/messages" \
+  -H "Authorization: Bearer ${USER_JWT}" \
   -H 'Content-Type: application/json' \
-  -d '{"content":[{"type":"text","text":"I will handle this manually."}]}'
+  -d '{"content":[{"type":"text","text":"I will handle this manually."}]}' &&
 
-curl -X POST /ai/conversations/<conversation-id>/release \
-  -H 'Authorization: Bearer <owner-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/conversations/${CONV_ID}/release" \
+  -H "Authorization: Bearer ${USER_JWT}" \
   -H 'Content-Type: application/json' \
   -d '{}'
 ```
+
+If takeover or posting the message fails, the block skips release. Check who
+controls the conversation and whether the message appears in the transcript.
+Release control separately if you intend to resume AI handling.
 
 The owner can always reclaim/release their own conversation, even from a
 cross-user SUPER_ADMIN holder.
 
 ## Cross-user SUPER_ADMIN Flow
 
+Set `ADMIN_JWT` to the freshly authenticated operator’s token.
+
 Cross-user support access requires bearer auth, fresh auth, and a bounded reason
 or ticket reference. Transcript-read reason is sent in a header so it does not
 leak into query-string logs.
 
 ```bash
-curl -X POST /ai/conversations/<conversation-id>/takeover \
-  -H 'Authorization: Bearer <fresh-admin-jwt>' \
+curl -fsS -X POST "${API_BASE}/ai/conversations/${CONV_ID}/takeover" \
+  -H "Authorization: Bearer ${ADMIN_JWT}" \
   -H 'Content-Type: application/json' \
   -d '{"reason":"SUPPORT-1234"}'
 
-curl /ai/conversations/<conversation-id>/messages \
-  -H 'Authorization: Bearer <fresh-admin-jwt>' \
+curl -fsS "${API_BASE}/ai/conversations/${CONV_ID}/messages" \
+  -H "Authorization: Bearer ${ADMIN_JWT}" \
   -H 'x-amcore-operator-reason: SUPPORT-1234'
 ```
 

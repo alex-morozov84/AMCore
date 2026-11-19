@@ -16,31 +16,34 @@ through it before you locked it down.
 
 ## Triage queries
 
-Connected as `amcore_observer`. **Every query below filters `dbid` to the
-current database** — required, not optional: `pg_stat_statements` is
+If you suspect credential exposure, complete [recovery](pg-stat-statements-recovery.md)
+before reading statement text. Connect as `amcore_observer`. The two queries
+against `pg_stat_statements` filter `dbid` to the current database — required, not optional: `pg_stat_statements` is
 cluster-wide, not per-database (see the sensitivity note in [the
 `amcore_observer` role](pg-stat-statements-observer-role.md#cluster-wide-sensitivity)) —
 omitting it silently mixes in any other database's queries on a shared
 Postgres server:
 
 ```sql
--- Worst offenders by total time contributed (calls × mean_exec_time),
--- the number that actually matters for "what is costing the most."
+-- Rank entries by accumulated execution time.
 SELECT query, calls, mean_exec_time, calls * mean_exec_time AS total_time_ms
 FROM pg_stat_statements
 WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
 ORDER BY total_time_ms DESC
 LIMIT 20;
 
--- Cache-miss-heavy queries: a high shared_blks_read relative to
--- shared_blks_hit points at a missing index or a query reading far more
--- of the table than it needs, not at Postgres's I/O layer itself.
+-- Queries that read the most shared blocks. Compare hits and calls
+-- before investigating plan, workload or cache behavior.
 SELECT query, calls, shared_blks_hit, shared_blks_read
 FROM pg_stat_statements
 WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
 ORDER BY shared_blks_read DESC
 LIMIT 20;
 ```
+
+These rankings cover the accumulated statistics. A fast query that runs often
+can rank first. Confirm that a candidate relates to the incident window. Check
+its plan or blocking evidence before changing an index or a query.
 
 `dealloc` — how many statement entries have been evicted because
 `pg_stat_statements.max` (default `5000`) was exceeded — is **not** a column
@@ -61,16 +64,13 @@ it is queried directly, by design — see [Observability](observability.md)).
 
 ## What this cannot tell you
 
-**`pg_stat_statements` aggregates by `(userid, dbid, queryid, toplevel)` —
-never by `application_name`.** (`toplevel` distinguishes a statement run
-directly from one nested inside a function/procedure; verified against the
-view's real column list on PostgreSQL 16 and reverified on PostgreSQL 18 —
-not four independent dimensions to reason about, just the actual composite
-key PostgreSQL uses.)
+`pg_stat_statements` groups results by user, database, query ID and
+whether the statement is top-level. It does not group by `application_name`.
 
 Since every AMCore process (`web` **and** `worker`) connects as the same
 `amcore_runtime` role, `pg_stat_statements` cannot attribute a slow query to
-one process role over the other; every row you see is a mix of both. If you
+one process role over the other. A row can contain calls from either process
+or both. If you
 need that distinction, `pg_stat_activity` (ADR-029/ADR-041's
 `application_name` tagging —
 [Observability](observability.md#operator-interpretation)) is the tool for

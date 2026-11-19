@@ -70,9 +70,9 @@ stops the web server at start-up. See [Browser security and CSP](../frontend/bro
 ## Browser uploads fail with a CORS error
 
 A presigned `PUT` from a browser needs a CORS rule on the bucket that allows your web origin and the
-`PUT` method. Without it the browser blocks the request before it leaves. Check with a preflight
-request (`OPTIONS`) from the allowed origin: it must answer 200 with
-`access-control-allow-origin`. A request from another origin should be refused. The Yandex page shows
+`PUT` method and the headers the client sends. The browser sends an `OPTIONS` preflight
+before the upload. Check for a successful status and matching CORS response headers.
+An unapproved origin must not receive permission to upload from the browser. The Yandex page shows
 an executed example: [CORS](providers/yandex.md#browser-uploads-cors-executed-2026-10-15). Remember
 that a presigned `PUT` does not enforce size or type; see [Uploads](uploads.md#presigned-direct-uploads).
 

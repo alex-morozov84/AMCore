@@ -1,6 +1,9 @@
 # Email Authentication
 
-Standard username/password auth — register, log in, reset your password, verify your email.
+Use the backend API to register, sign in, reset a password or verify an email.
+Examples use fake values and example deployment hosts. Replace the hosts with your
+API/frontend origins. Do not put real passwords, cookies or mail tokens in shared
+terminal history, logs or reports.
 
 This page documents the backend API contract at `/api/v1/auth/*`. The bundled
 Next.js app (`apps/web`) calls same-origin BFF routes from the browser:
@@ -34,7 +37,7 @@ canonical key.
 **Endpoint:** `POST /api/v1/auth/register`
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/register \
+curl -X POST https://api.example.com/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -H "Accept-Language: en" \
   -d '{
@@ -64,7 +67,7 @@ unsupported body `locale` is a `400` validation error.
 
 1. Email is trimmed and checked for canonical uniqueness — duplicate emails
    across case variants return `EMAIL_ALREADY_EXISTS`
-2. Password is hashed with Argon2id (~100ms intentionally)
+2. Password is hashed with Argon2id
 3. One database transaction creates the user (`systemRole: USER`,
    `emailVerified: false`, the resolved `locale`), its first session and its
    email-verification token. If the transaction fails, its writes roll back. When
@@ -73,7 +76,9 @@ unsupported body `locale` is a `400` validation error.
 4. After the commit, the welcome email is queued and the verification email is
    sent directly; see [queued email](../email/delivery.md#queued-email). A failed
    email never undoes the signup
-5. The access token and the `refresh_token` cookie are returned
+5. A direct client receives the access token and `refresh_token` cookie.
+   Browser registration additionally coordinates a pending publication; the BFF
+   must finish publication before exposing an ordinary opaque app session
 
 The transaction contains no Redis, email or other HTTP call. An error after the
 commit, or a lost response, can hide a committed account: sign in or reset the
@@ -110,7 +115,7 @@ The `refresh_token` cookie is set automatically.
 **Endpoint:** `POST /api/v1/auth/login`
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/login \
+curl -X POST https://api.example.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "alex@example.com",
@@ -120,14 +125,19 @@ curl -X POST https://api.amcore.dev/api/v1/auth/login \
 
 **What happens:**
 
-1. Rate limit is checked (5 failed attempts per canonical email+IP per hour)
-2. User is looked up by canonical email
-3. Password is verified against the Argon2 hash
-4. `lastLoginAt` is updated
-5. A new session is created (previous sessions on other devices remain active)
-6. Tokens are issued
+1. Check both password-attempt limits and verify the credentials. See
+   [brute-force protection](concepts.md#brute-force-protection).
+2. An ordinary independent client completes sign-in, updates `lastLoginAt` and
+   receives a new session and credentials. Other families remain active.
+3. Browser admission and accounts requiring further proof return `202` with a
+   restricted continuation, without an access token or refresh cookie. Ordinary
+   browser users can receive this result without a human MFA challenge.
+4. Complete the required proofs and exact publication before treating the user
+   as signed in. Protected accounts return `503` while deployment is prepared.
+   Follow [password and publication transport](mfa-foundation.md#password-and-publication-transport);
+   do not fall back to an ordinary credential path.
 
-**Success response** `200 OK`:
+**Completed ordinary independent-client response** `200 OK`:
 
 ```json
 {
@@ -145,10 +155,13 @@ curl -X POST https://api.amcore.dev/api/v1/auth/login \
 
 | Code                  | HTTP | When                                                             |
 | --------------------- | ---- | ---------------------------------------------------------------- |
-| `INVALID_CREDENTIALS` | 401  | Wrong email or password (same message for both — no enumeration) |
+| `INVALID_CREDENTIALS` | 401  | Wrong email or password; same credential error message |
 | `RATE_LIMIT_EXCEEDED` | 429  | Too many failed attempts                                         |
 
-> **Note:** The error message is intentionally vague — "Invalid credentials" rather than "Wrong password" or "Email not found." This prevents attackers from discovering which emails are registered.
+The shared error message avoids disclosing account existence through that message.
+It does not promise constant-time execution or indistinguishable email delivery.
+Protection/dependency failures can return `503`; a status alone is not proof
+that a multi-step authentication operation completed.
 
 ---
 
@@ -159,7 +172,7 @@ curl -X POST https://api.amcore.dev/api/v1/auth/login \
 No authentication required — the refresh token cookie is used to identify and revoke the session.
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/logout \
+curl -X POST https://api.example.com/api/v1/auth/logout \
   --cookie "refresh_token=..."
 ```
 
@@ -169,7 +182,11 @@ curl -X POST https://api.amcore.dev/api/v1/auth/logout \
 2. The matching session is deleted from the database
 3. The cookie is cleared
 
-If no valid refresh token is provided, the endpoint still returns `204` — logout is always safe to call.
+A direct legacy call without a cookie returns `204`. Origin checks still apply.
+Browser-bound logout requires the actual browser generation; changed authority
+can return terminal `409 SESSION_CHANGED`. Dependency failure can also refuse
+logout. Do not switch credentials or assume every logout response is successful.
+See [logout semantics](reference.md#security-relevant-response-semantics).
 
 **Success response:** `204 No Content`
 
@@ -184,7 +201,7 @@ This is a two-step flow: request a reset link, then use the link to set a new pa
 **Endpoint:** `POST /api/v1/auth/forgot-password`
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
+curl -X POST https://api.example.com/api/v1/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email": "alex@example.com"}'
 ```
@@ -196,8 +213,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/forgot-password \
 2. If the email exists, a reset token is generated (32 random bytes, encoded as
    64 hexadecimal characters, then SHA-256 hashed for storage)
 3. An email is sent with a link built by `localizedFrontendUrl()`. With several served locales,
-   it is `https://amcore.dev/{locale}/reset-password?token={raw_token}`. With one, it is
-   `https://amcore.dev/reset-password?token={raw_token}`. A stored locale no longer served
+   it is `https://app.example.com/{locale}/reset-password?token={raw_token}`. With one, it is
+   `https://app.example.com/reset-password?token={raw_token}`. A stored locale no longer served
    falls back to the configured default; the link does not depend on a browser cookie
 4. Token expires in **15 minutes**
 
@@ -205,7 +222,7 @@ SHA-256 stores a lookup key for the 256-bit random token, not a human password.
 Password values use Argon2id. A slow password KDF is unnecessary for these random tokens;
 changing their digest format would invalidate existing links.
 
-**Success response** `200 OK` (always the same, regardless of whether the email exists):
+**Successful response** `200 OK` (same body regardless of whether the email exists):
 
 ```json
 {
@@ -213,7 +230,9 @@ changing their digest format would invalidate existing links.
 }
 ```
 
-> **Why the same response?** If we returned different messages for existing vs non-existing emails, an attacker could use this endpoint to find out which emails are registered. The vague response protects your users' privacy.
+The same body avoids disclosing account existence through that response. It is
+not a delivery receipt. Rate limits and dependency errors can still refuse the
+request; an unknown outcome does not justify automatic resend.
 
 **Rate limit:** Three requests per canonical email and email type. Each admitted
 request renews the one-hour window; refusals do not extend it. Operator requests
@@ -229,7 +248,7 @@ use the same recipient budget. After that:
 The frontend extracts the token from the URL and submits it with the new password:
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
+curl -X POST https://api.example.com/api/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{
     "token": "a3f8b2...",
@@ -245,7 +264,8 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 3. Consume the unused, unexpired token, update the password and `emailVerified`,
    advance the account security version and revoke existing families/sessions
    together in one transaction.
-4. Delete revoked session rows and invalidate the cached profile after commit.
+4. Delete revoked session rows after commit. The current user is read from
+   the primary database; there is no profile-cache invalidation step.
 5. Emit the password-changed notification best-effort.
 
 **Success response:** `204 No Content`
@@ -258,10 +278,10 @@ curl -X POST https://api.amcore.dev/api/v1/auth/reset-password \
 
 ### Completion and session failures
 
-Physical session cleanup and cache invalidation follow the security transaction.
-If either fails, the endpoint can return an error although the password changed
+Physical session cleanup follows the security transaction.
+If it fails, the endpoint can return an error although the password changed
 and the link was consumed. Revoked session rows can remain when cleanup fails;
-a cache failure can leave stale profile data. Neither restores revoked authority.
+this does not restore revoked authority.
 Notification failure alone does not
 reject the committed reset. There is no automatic replay of these follow-ups.
 
@@ -287,7 +307,7 @@ Email verification is sent automatically on registration. Users can also request
 The frontend extracts the token from the link and sends it:
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/verify-email \
+curl -X POST https://api.example.com/api/v1/auth/verify-email \
   -H "Content-Type: application/json" \
   -d '{"token": "b7c9a1..."}'
 ```
@@ -315,12 +335,12 @@ curl -X POST https://api.amcore.dev/api/v1/auth/verify-email \
 **Endpoint:** `POST /api/v1/auth/resend-verification`
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/resend-verification \
+curl -X POST https://api.example.com/api/v1/auth/resend-verification \
   -H "Content-Type: application/json" \
   -d '{"email": "alex@example.com"}'
 ```
 
-**Success response** `200 OK` (always the same):
+**Successful response** `200 OK` (same body for existing, absent and already verified accounts):
 
 ```json
 {
@@ -339,7 +359,7 @@ use the same recipient budget.
 **Endpoint:** `GET /api/v1/auth/me`
 
 ```bash
-curl https://api.amcore.dev/api/v1/auth/me \
+curl https://api.example.com/api/v1/auth/me \
   -H "Authorization: Bearer eyJhbGci..."
 ```
 
@@ -372,7 +392,7 @@ self-check endpoint). Updating the profile is Bearer-only — see below.
 **Endpoint:** `PATCH /api/v1/auth/me` (Bearer JWT only)
 
 ```bash
-curl -X PATCH https://api.amcore.dev/api/v1/auth/me \
+curl -X PATCH https://api.example.com/api/v1/auth/me \
   -H "Authorization: Bearer eyJhbGci..." \
   -H "Content-Type: application/json" \
   -d '{

@@ -4,12 +4,13 @@ Covers `docs/operations/prometheus/amcore-alerts.yml`'s `amcore-redis` group.
 Note the inhibition rule in `docker/monitoring/alertmanager/alertmanager.yml`:
 `AMCoreRedisReconnectingPage` suppresses the queue/outbox backlog alerts in
 [`queues.md`](queues.md) — if you see this alert, expect the backlog alerts to
-be suppressed even though the underlying backlog is very likely building.
+be suppressed regardless of whether backlog is growing. The shipped rule matches across
+instances without requiring equal labels.
 
 ## Reconnecting
 
-**Symptom:** `AMCoreRedisReconnectingTicket` (any reconnect in 5m) or
-`AMCoreRedisReconnectingPage` (reconnecting for 5m straight) is firing for a
+**Symptom:** `AMCoreRedisReconnectingTicket` (positive 5-minute reconnect rate for 1 minute) or
+`AMCoreRedisReconnectingPage` (same rate condition for 5 minutes) is firing for a
 queue-critical client (`{{ $labels.client }}` — `queue_producer` or
 `queue_worker`).
 
@@ -38,8 +39,8 @@ queue-critical client (`{{ $labels.client }}` — `queue_producer` or
    provider's status/metrics) — this alert only observes the effect from the
    application side, not Redis's own state.
 4. Check the **"Queue jobs by state"** and **"Outbox due-now"** dashboard
-   panels (Queues & outbox row) — a sustained reconnect almost always means
-   jobs stop flowing, visible there as `waiting`/due-now counts climbing.
+   panels (Queues & outbox row). Check waiting and due-now counts against
+   work completion. Reconnect metrics show a client symptom, not queue state.
 
 **Mitigation:**
 
@@ -52,16 +53,17 @@ queue-critical client (`{{ $labels.client }}` — `queue_producer` or
   will just reconnect and hit the same overloaded instance.
 - If a configuration issue: fix `REDIS_URL` and redeploy.
 
-**Escalation:** `Ticket` is any single reconnect in 5m — worth a look, not
-urgent. `Page` means 5m of sustained reconnecting with jobs not flowing —
-escalate per your organization's on-call process. Expect the queue/outbox
-backlog alerts to be inhibited while this fires (see the note at the top of
-this file) — do not treat their silence as "queues are fine."
+**Verify recovery:** Check that the affected client has reconnected and that
+work completes. If a backlog accumulated, verify it starts draining. Check
+the affected instance even if Redis responds to PING elsewhere.
+
+**Escalation:** Investigate a ticket. Escalate a page through your on-call
+process. Inhibited backlog alerts do not establish queue health.
 
 ## Throttler degraded
 
-**Symptom:** `AMCoreRedisThrottlerDegradedTicket` (any degrade in 5m) or
-`AMCoreRedisThrottlerDegradedPage` (degraded for 15m straight) is firing.
+**Symptom:** `AMCoreRedisThrottlerDegradedTicket` (positive 5-minute fallback rate for 1 minute) or
+`AMCoreRedisThrottlerDegradedPage` (same rate condition for 15 minutes) is firing.
 
 **Likely causes, ranked:**
 
@@ -85,24 +87,24 @@ this file) — do not treat their silence as "queues are fine."
 3. Check Redis's own health the same way as [Reconnecting](#reconnecting)
    above — this is very likely the same underlying Redis issue observed
    through a different client.
-4. If running more than one replica, be aware the effective global rate limit
-   silently becomes N times the configured value while degraded — check
-   `rate_limit_decisions_total` (`amcore_rate_limit_decisions_total`) and the
-   **"Decisions by policy/outcome"** dashboard panel (Rate limiting row) for
-   an unexpected rise in `allowed` outcomes during the same window as evidence
-   this is actually happening, not just theoretically possible.
+4. If multiple replicas fall back, each enforces its own budget. Aggregate
+   allowance can grow if requests reach several replicas. Check policy/outcome
+   and traffic distribution before inferring impact from an increase in
+   allowed decisions.
 
 **Mitigation:**
 
 - Restore Redis availability for the `throttler` client the same way as
   [Reconnecting](#reconnecting) above.
-- If abuse is a concern while degraded (since the effective limit is now N×
-  across N replicas), reduce abusive traffic externally or temporarily scale
+- If abuse is a concern while degraded, reduce abusive traffic externally
+  or temporarily scale
   to one API replica only if availability and capacity permit. Changing
   `RATE_LIMIT_POLICIES` requires a code change and redeploy; both sustained
   `rate` and `burst` must account for replica count, not only `burst`.
 
-**Escalation:** `Ticket` is a single degrade — not urgent, but a real gap in
-abuse control while it lasts. `Page` means 15m of sustained in-memory
-fallback — an ongoing abuse-control regression, not graceful degradation;
-escalate per your organization's on-call process.
+**Verify recovery:** Confirm requests still reach the affected replicas and
+the throttler stops falling back under traffic. Check policy decisions before
+removing temporary controls.
+
+**Escalation:** Investigate a ticket. Escalate a sustained page through your
+on-call process.

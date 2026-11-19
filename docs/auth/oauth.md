@@ -1,6 +1,6 @@
 # OAuth — Social Login & Account Linking
 
-OAuth lets users sign in with accounts they already trust — Google, GitHub, Apple, or Telegram — without creating a separate password for ordinary unprotected accounts. Protected
+OAuth lets users sign in with accounts they already trust — Google, GitHub or Apple — without creating a separate password for ordinary unprotected accounts. Protected
 accounts must also prove their local password and app or backup code. MFA requires the separately approved
 [deployment activation](mfa-deployment.md).
 
@@ -65,11 +65,6 @@ Revocation, expiry or a browser change refuses the link; a newer session cannot
 replace the original authority. Telegram is link-only. See [placement and sessions](../product-admin/placement-and-sessions.md)
 for hostname isolation, old links and coordinated deployment.
 
-The signed Apple protocol fixture exercises the real OIDC client and provider
-against discovery without UserInfo. It checks bad signatures, issuer/audience,
-expiry and malformed claims. It does not prove browser publication or live Apple
-client registration; those checks remain distinct.
-
 ### Apple identity verification
 
 Apple publishes token and signing-key endpoints, but no UserInfo endpoint.
@@ -107,7 +102,7 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 3. Browser redirects to Google:
    https://accounts.google.com/o/oauth2/v2/auth
      ?client_id=...
-     &redirect_uri=https://api.amcore.dev/api/v1/auth/oauth/google/callback
+     &redirect_uri=https://api.example.com/api/v1/auth/oauth/google/callback
      &scope=openid email profile
      &state=<random>
      &code_challenge=<hash>
@@ -124,7 +119,7 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
 6. Backend:
    - Validates state (retrieves from Redis, deletes after use — one-time)
    - Exchanges code for tokens (with PKCE code_verifier)
-   - Fetches user profile from ID token
+   - Resolves the provider profile through its verified protocol
    - Finds existing user by (provider + providerId) or email
    - Creates user if new
    - Captures account identity and security version, without creating a session
@@ -132,7 +127,7 @@ The flow involves three parties: your app, the user's browser, and the OAuth pro
    │
    ▼
 7. Redirects to frontend:
-   https://amcore.dev/{locale}/auth/callback?ticket=...
+   https://app.example.com/{locale}/auth/callback?ticket=...
    + sets a60-second HttpOnly callback-binding nonce in refresh_token
    │
    ▼
@@ -300,7 +295,7 @@ record.
 Production deployments should avoid logging query strings for OAuth callback
 routes, because callback URLs still contain short-lived login tickets.
 
-> **Note:** On login, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. Linking an existing account by email requires the provider to verify that email. An unverified email claim cannot create that link. Protected accounts must attach a new provider from a locally confirmed signed-in session; verified provider email alone cannot create that attachment. Ordinary admin login cannot create a new account; a validated invitation can permit it.
+> **Note:** Login first requires a provider email, even for an already linked identity. After that check, the backend searches for an existing user by `provider + providerId` first, then falls back to email matching. Linking an existing account by email requires the provider to verify that email. An unverified email claim cannot create that link. Protected accounts must attach a new provider from a locally confirmed signed-in session; verified provider email alone cannot create that attachment. Ordinary admin login cannot create a new account; a validated invitation can permit it.
 
 ---
 
@@ -309,7 +304,7 @@ routes, because callback URLs still contain short-lived login tickets.
 **Endpoint:** `POST /api/v1/auth/oauth/exchange`
 
 ```bash
-curl -X POST https://api.amcore.dev/api/v1/auth/oauth/exchange \
+curl -X POST https://api.example.com/api/v1/auth/oauth/exchange \
   -H "Content-Type: application/json" \
   --cookie "refresh_token=..." \
   -d '{"ticket":"..."}'
@@ -337,7 +332,7 @@ exact publication before using ordinary credentials; see
 Returns only the providers that are configured (have valid env vars):
 
 ```bash
-curl https://api.amcore.dev/api/v1/auth/oauth/providers
+curl https://api.example.com/api/v1/auth/oauth/providers
 ```
 
 ```json
@@ -356,7 +351,7 @@ directly.
 
 ## Account linking
 
-Account linking lets an authenticated user connect additional OAuth providers to their account. After linking, they can sign in with any of their connected providers.
+Account linking lets an authenticated user connect additional OAuth providers to their account. Login-capable linked providers can be used for sign-in. Telegram remains link-only.
 
 ### When to use linking
 
@@ -370,11 +365,21 @@ Account linking lets an authenticated user connect additional OAuth providers to
 
 Requires a valid JWT — the user must already be logged in.
 
-```bash
-# Redirect the user's browser to this URL with the Authorization header
-# In practice, the frontend just navigates to this URL while the user is authenticated
+A browser navigation cannot add a Bearer header. Do not place a token in a
+link or query string to work around that limitation.
+
+The bundled product-administration browser flow uses
+`/api/product-admin/auth/oauth/:provider/link`. Its BFF validates the mutation
+origin, loads the selected session and supplies Bearer credentials and browser
+binding server-side. Retain the selected frontend's exact callback registration.
+
+A custom direct client must explicitly authenticate the start request, retain
+the returned browser-binding cookie and follow the provider redirect in that
+same browser flow. The API request contract is:
+
+```http
 GET /api/v1/auth/oauth/google/link
-Authorization: Bearer eyJhbGci...
+Authorization: Bearer <access-token>
 ```
 
 The flow is identical to regular OAuth login, except:
@@ -433,7 +438,7 @@ Backend:
 
 - Uses OIDC discovery (auto-fetches config from `accounts.google.com`)
 - Scopes: `openid email profile`
-- Email is always provided and verified
+- Email can be absent; `emailVerified` follows the provider claim, never an assumed `true`
 - Required env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
 
 ### GitHub
@@ -473,62 +478,29 @@ Telegram is link-only because it doesn't provide an email address — only a pho
 
 ## Adding a new provider
 
-Adding a provider (Microsoft, Discord, GitLab, …) is a self-contained extension:
-implement one interface, register it behind config, and declare its env vars. The
-shared machinery — one-time `state`, PKCE, the browser-binding cookie, the login
-ticket, and account linking — is owned by `OAuthService` and applies to every
-provider automatically. **A provider never touches those controls;** it only
-builds URLs, exchanges the code, and normalizes the profile.
+A provider extension needs backend configuration, profile validation and
+frontend integration. Backend registration alone does not add a browser button
+or extend the BFF provider allowlists.
 
 **1. Implement `OAuthProvider`** in
 [`core/auth/oauth/providers/<name>.provider.ts`](../../apps/api/src/core/auth/oauth/providers/).
-The interface
-([`oauth-provider.interface.ts`](../../apps/api/src/core/auth/oauth/providers/oauth-provider.interface.ts))
-is three methods; [`github.provider.ts`](../../apps/api/src/core/auth/oauth/providers/github.provider.ts)
-is the smallest reference:
+The [interface](../../apps/api/src/core/auth/oauth/providers/oauth-provider.interface.ts)
+has three methods: `getAuthorizationURL`, `exchangeCode` and `getUserProfile`.
+Use [GitHub](../../apps/api/src/core/auth/oauth/providers/github.provider.ts)
+or [Google](../../apps/api/src/core/auth/oauth/providers/google.provider.ts) as an
+implemented reference, after reading the selected provider's current protocol.
 
-```ts
-export class DiscordProvider implements OAuthProvider {
-  readonly name = 'discord'
-  constructor(private readonly config: OAuthProviderConfig) {}
-
-  getAuthorizationURL(state: string, codeVerifier: string): Promise<URL> {
-    const url = new URL('https://discord.com/oauth2/authorize')
-    url.searchParams.set('client_id', this.config.clientId)
-    url.searchParams.set('redirect_uri', this.config.redirectUri)
-    url.searchParams.set('response_type', 'code')
-    url.searchParams.set('scope', 'identify email')
-    url.searchParams.set('state', state) // state is generated for you — just echo it
-    // If the provider supports PKCE, derive the challenge from codeVerifier:
-    //   url.searchParams.set('code_challenge', sha256Base64Url(codeVerifier))
-    //   url.searchParams.set('code_challenge_method', 'S256')
-    return Promise.resolve(url)
-  }
-
-  async exchangeCode(code: string, codeVerifier: string): Promise<OAuthTokens> {
-    // POST to the token endpoint; throw AppException(..., OAUTH_PROVIDER_ERROR) on failure.
-    // Pass codeVerifier whenever this provider's authorization used PKCE.
-    return { accessToken: '...' }
-  }
-
-  async getUserProfile(tokens: OAuthTokens): Promise<OAuthUserProfile> {
-    // Fetch the provider's userinfo and normalize to the shared profile shape.
-    return {
-      providerId: '...', // the provider's stable internal user id — never the email
-      provider: 'discord',
-      email: '...', // or null if the provider returns none (see login vs link-only)
-      emailVerified: true,
-      displayName: '...',
-      avatarSourceUrl: null,
-    }
-  }
-}
-```
-
-`OAuthTokens` and `OAuthUserProfile` are the shared contracts in
-[`packages/shared`](../../packages/shared/src) — every provider normalizes to the
-same profile shape ([What user data is collected](#what-user-data-is-collected)),
-so nothing downstream is provider-specific.
+- Preserve the supplied one-time state. Implement the matching PKCE challenge
+  and verifier exchange when supported; receiving a verifier does not apply PKCE automatically.
+- Validate provider responses and identity proofs. Use the provider's stable subject
+  as `providerId`; email is not a substitute.
+- Set `emailVerified` only from validated provider evidence. Missing or false
+  claims must not become `true`; they cannot authorize automatic email linking.
+- Return a profile satisfying the shared `OAuthUserProfile` contract. Its `phone`
+  field is optional and nullable (`phone?: string | null`).
+  Never substitute constant access tokens or placeholder identities in runtime code.
+- Keep browser-state, ticket, account-link authority and publication policy in
+  their existing owners. A provider must not bypass those controls.
 
 **2. Register it behind config** in
 [`oauth-provider.factory.ts`](../../apps/api/src/core/auth/oauth/providers/oauth-provider.factory.ts).
@@ -542,7 +514,14 @@ uses `response_mode=form_post`, also add it to `isFormPostProvider()` in
 [`oauth-binding-cookie.ts`](../../apps/api/src/core/auth/oauth/oauth-binding-cookie.ts)
 so the POST callback and `SameSite=None` browser-binding cookie are selected.
 
-**3. Declare the env vars** in the env schema's OAuth section
+**3. Extend persisted provider identity.** Add the provider to the Prisma
+`OAuthProvider` enum in
+[`user.prisma`](../../apps/api/prisma/user.prisma), with a new migration and
+regenerated client. Review stored identity mapping and rollback constraints;
+factory registration cannot make a new enum value persistable. Also extend the
+factory's `callbackUri()` mapping for the website callback.
+
+**4. Declare the env vars** in the env schema's OAuth section
 ([`oauth.env.ts`](../../apps/api/src/env/schema/oauth.env.ts)): add the keys as
 `optionalEnvString()` / `optionalEnvUrl()`. Then add a `requireAllIfAny('Discord
 OAuth', [...])` group in
@@ -550,13 +529,16 @@ OAuth', [...])` group in
 so a partially-configured provider fails fast at startup rather than at the first
 login. Mirror them in [`.env.example`](../../.env.example).
 
-**Login vs link-only.** A provider that cannot return an email (as with Telegram)
-**cannot back standalone login** — the callback resolves `OAUTH_EMAIL_REQUIRED`
-when no email and no existing linked account are found. Such providers are
-link-only. Everything else — one-time `state`, the browser-binding cookie that
-prevents login-CSRF, PKCE where supported, and the single-use login ticket — is
-enforced centrally and needs no per-provider code. Add a provider spec alongside
-the implementation (the existing `*.provider.spec.ts` files are the pattern).
+**Login vs link-only.** Login requires a provider email, including for an
+already linked identity. Without it, the callback returns `400 OAUTH_EMAIL_REQUIRED`
+before account lookup. Explicit authenticated linking follows its separate branch
+and can accept a provider without email. Telegram therefore remains link-only.
+One-time state, browser binding and ticket handling remain centrally owned.
+PKCE URL construction and code exchange remain provider responsibilities.
+Review web provider allowlists, login/link buttons, callback method and cookie
+relay before exposing the extension. Add focused provider tests using the
+existing `*.provider.spec.ts` patterns; do not run against a live provider merely
+to validate a documentation change.
 
 ## What user data is collected
 
@@ -570,7 +552,7 @@ All providers are normalized to the same profile shape before the user record is
   emailVerified: boolean
   displayName: string | null
   avatarSourceUrl: string | null // provider-hosted picture; copied once into our storage, never stored
-  phone: string | null // Telegram only
+  phone?: string | null // optional; Telegram supplies this field
 }
 ```
 
@@ -582,8 +564,7 @@ AMCore never stores or serves a provider picture URL. The API copies the provide
 into its own public storage (see [media](../media/README.md)), and only when a sign-in creates the
 account or links this provider to an existing account by email. Linking a provider on purpose from
 account settings does not copy. The user must have no avatar and the provider must return
-`avatarSourceUrl`. The copy runs after the sign-in response is decided, so it adds
-no sign-in latency. It is not retried: a failed copy leaves the user without an avatar, and the user
+`avatarSourceUrl`. The copy runs after the sign-in response is decided, and is best-effort. Sign-in success does not prove avatar storage. It is not retried: a failed copy leaves the user without an avatar, and the user
 can upload one. A repeat sign-in never copies again, so an avatar the user removed stays removed,
 and the copy never replaces an avatar the user uploaded.
 
@@ -607,7 +588,7 @@ a failure class, never the URL.
 | ------------------------------- | ---- | ----------------------------------------------------------------- |
 | `OAUTH_STATE_INVALID`           | 400  | State missing, expired (>5 min), or already used                  |
 | `OAUTH_PROVIDER_ERROR`          | 502  | Provider returned an error or unexpected response                 |
-| `OAUTH_EMAIL_REQUIRED`          | 400  | Provider didn't return an email and no existing account was found |
+| `OAUTH_EMAIL_REQUIRED`          | 400  | Login: provider returned no email |
 | `OAUTH_PROVIDER_NOT_CONFIGURED` | 400  | Provider is not set up (missing env vars)                         |
 | `OAUTH_ACCOUNT_ALREADY_LINKED`  | 409  | Linking: that provider account belongs to a different user        |
 

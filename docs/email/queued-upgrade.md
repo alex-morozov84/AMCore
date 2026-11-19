@@ -1,8 +1,8 @@
 # Upgrade the welcome-email policy
 
-Use this procedure when upgrading an installation containing policy1 EMAIL work
-to conservative policy2. A policy is the versioned rule that permits or refuses
-a job's execution. Fresh installations use2 automatically.
+Use this procedure when upgrading an installation containing policy 1 EMAIL work
+to conservative policy 2. A policy is the versioned rule that permits or refuses
+a job's execution. Fresh installations use policy 2 automatically.
 The command changes only proven untouched jobs. It never sends mail.
 
 ## Prerequisites
@@ -14,7 +14,7 @@ This procedure does not authorize a deployment or a business reissue.
 Here, a mutator is any process or administrative action that can change EMAIL work.
 
 1. Stop ingress/account actions, producers, schedulers, control mutators and workers
-   that can touch EMAIL. Stop API and worker containers gracefully, allowing60 seconds:
+   that can touch EMAIL. Stop API and worker containers gracefully, allowing 60 seconds:
 
    ```sh
    docker compose stop --timeout 60 api worker
@@ -65,8 +65,8 @@ docker compose run --rm --no-deps api node dist/cli/welcome-upgrade.js \
   --after '<nextEvidenceCursor>'
 ```
 
-When the broker cursor reaches0, add `--skip-broker` on remaining PG pages.
-When the PG cursor is null, omit `--after` and add `--skip-evidence` on remaining
+When the broker cursor reaches `0`, add `--skip-broker` on remaining PG pages.
+When the PG cursor is `null`, omit `--after` and add `--skip-evidence` on remaining
 broker pages. Stop when both finish. Duplicate broker IDs are harmless. Record PG-only evidence even when its
 broker job has expired. The flag attests your verified maintenance state; it does
 not discover or stop other processes.
@@ -80,7 +80,7 @@ docker compose run --rm --no-deps api node dist/cli/welcome-upgrade.js \
 
 | Result                     | Required action                                                                                 |
 | -------------------------- | ----------------------------------------------------------------------------------------------- |
-| `eligible`                 | Untouched policy1 job: zero starts, no evidence, body, grant or history ambiguity. May convert. |
+| `eligible`                 | Untouched policy 1 job: zero starts, no evidence, body, grant or history ambiguity. May convert. |
 | `converted` / `already_v2` | Record the result. Repeating the original command does not reset identity or attempts.          |
 | `protected`                | Retain original evidence. Accepted suppresses sending; unknown remains blocked. No conversion.  |
 | `blocked` / `unconfirmed`  | Keep maintenance active. Investigate the safe reason; never force metadata to fit.              |
@@ -94,7 +94,7 @@ docker compose run --rm --no-deps api node dist/cli/welcome-upgrade.js \
 
 Save each ID/result and conversion identity/version in your private manifest.
 After an interruption, classify the same IDs again. A failed or ambiguous command
-is not a completed conversion. Started policy1 work with stored `none` results
+is not a completed conversion. Started policy 1 work with stored `none` results
 returns `protected` with `VERSION_UNSUPPORTED`. Record `retain-blocked/no-reissue`
 in the manifest and retain its PG evidence. This default disposition needs no
 database update and does not block restart. It is not proof of failed delivery.
@@ -108,11 +108,11 @@ helper does not provide restore/reissue authority. Never invent `none` history.
 
 ## Resume or stop
 
-Verify every broker item is version2 or has a recorded `protected` result.
+Verify every broker item is version 2 or has a recorded `protected` result.
 Retain PG-only evidence without recreating its missing broker job. A protected
 record remains execution-disabled; it does not block the maintenance exit.
 Any actual CLI `blocked` or `unconfirmed` result keeps maintenance active.
-The new consumer refuses remaining policy1 execution. Do not reset firstDispatchAt,
+The new consumer refuses remaining policy 1 execution. Do not reset firstDispatchAt,
 key, body, manual grant or unknown counts. Preserve PG uncertainty after broker TTL.
 
 Resume the queue while mutators remain stopped:
@@ -127,7 +127,7 @@ rollout. Verify readiness and welcome diagnostics before reopening ingress.
 Apply the [delivery scenario](delivery.md#verify-delivery-on-a-deployed-stack) only
 under a separate approved recipient/send budget.
 
-Rollback requires stopping all version2 mutators first. Do not restart a policy1
+Rollback requires stopping all version 2 mutators first. Do not restart a policy 1
 replay executor against converted or protected records. Restore/reconciliation
 requires a separate reviewed recovery operation and permission. Keep maintenance
 active when the inventory or outcome cannot be confirmed.
