@@ -14,9 +14,9 @@ function assertOrderedStarts(text, expected) {
   for (const [index, service] of expected.entries()) {
     assert.match(lines[index], /--no-build\b/)
     assert.match(lines[index], /--no-deps\b/)
-    assert.match(lines[index], /--wait\b/)
+    assert.match(lines[index], /(?:^|\s)--wait(?=\s|$)/, 'expected standalone --wait')
     assert.match(lines[index], /--wait-timeout 180\b/)
-    assert.ok(lines[index].endsWith(` ${service}`), `expected ${service}`)
+    assert.ok(lines[index].replace(/ &&$/, '').endsWith(` ${service}`), `expected ${service}`)
   }
 }
 
@@ -53,11 +53,25 @@ for (const [name, text] of [
   })
 
 test('single-host first start waits without revisiting completed migration', () => {
-  assertOrderedStarts(section(singleHost, '## 7. Start the stack', '## 8. Verify'), [
-    'worker',
-    'api web',
-    'caddy',
-  ])
+  const firstStart = section(singleHost, '## 7. Start the stack', '## 8. Verify')
+  assertOrderedStarts(firstStart, ['worker', 'api web', 'caddy'])
+  assert.match(
+    firstStart,
+    / worker &&\n^docker compose up .* api web &&\n^docker compose up .* caddy &&\n^docker compose ps$/m
+  )
+})
+
+test('single-host startup requires --wait alongside --wait-timeout', () => {
+  const firstStart = section(singleHost, '## 7. Start the stack', '## 8. Verify')
+  const regression = firstStart.replace(
+    ' --wait --wait-timeout 180 worker &&',
+    ' --wait-timeout 180 worker &&'
+  )
+  assert.notEqual(regression, firstStart)
+  assert.throws(
+    () => assertOrderedStarts(regression, ['worker', 'api web', 'caddy']),
+    /expected standalone --wait/
+  )
 })
 
 test('migrator preflight examples retain the complete installation overlay selection', () => {
@@ -86,8 +100,8 @@ test('single-host starts bundled Redis before no-deps worker startup', () => {
   const infrastructure = section(singleHost, '## 5. Start infrastructure', '## 6. Migrate')
   const starts = infrastructure.split('\n').filter((line) => /^docker compose up /.test(line))
   assert.equal(starts.length, 1)
-  assert.match(starts[0], /--no-build --wait --wait-timeout 180 postgres redis$/)
+  assert.match(starts[0], /--no-build --wait --wait-timeout 180 postgres redis &&$/)
   assert.throws(() =>
-    assert.match(starts[0].replace(' postgres redis', ' postgres'), /postgres redis$/)
+    assert.match(starts[0].replace(' postgres redis', ' postgres'), /postgres redis &&$/)
   )
 })
