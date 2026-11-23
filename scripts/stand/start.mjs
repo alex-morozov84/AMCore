@@ -1,12 +1,13 @@
 import { isOrganizationMailFixture } from './organization-setup-fixture.mjs'
 import { initializeMarker } from './bootstrap-marker.mjs'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { compose, docker, inspect } from './docker.mjs'
 import { configuration, builtServices } from './config.mjs'
 import { dataAdmission, cleanup } from './ownership.mjs'
 import { runBuild } from './build-intent.mjs'
 import { save } from './state.mjs'
-import { pullWithRetry } from './registry-pull.mjs'
+import { pullMigratorBase, pullWithRetry } from './registry-pull.mjs'
 
 // The stand purges itself after a failed start, which removes the containers and
 // their logs. Print a bounded tail first so an unhealthy service can be diagnosed.
@@ -28,6 +29,10 @@ export async function start(m) {
   await configuration(m)
   m.state = 'configured'
   await save(m)
+  if (!m.images) {
+    const dockerfile = await readFile(join(m.snapshot, 'apps/api/Dockerfile'), 'utf8')
+    await pullMigratorBase(dockerfile, (args) => docker(m, args, { capture: true }))
+  }
   await pullWithRetry(() => compose(m, ['pull', '--quiet', 'postgres', 'redis'], { capture: true }))
   await compose(m, ['up', '-d', '--wait', '--no-deps', 'postgres', 'redis'])
   if (m.fixtureProfile === 'client-ip') {
