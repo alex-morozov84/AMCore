@@ -22,3 +22,16 @@ export async function pullWithRetry(pull, { attempts = 4, wait = delay } = {}) {
     }
   }
 }
+
+export async function pullMigratorBase(dockerfile, docker, retryOptions) {
+  const image = /^FROM (ghcr\.io\/pnpm\/pnpm:[^\s@]+@sha256:[a-f0-9]{64}) AS migrator-pnpm$/m.exec(
+    dockerfile
+  )?.[1]
+  if (!image) throw new Error('Expected a digest-pinned pnpm image in the migrator Dockerfile')
+  try {
+    await docker(['image', 'inspect', image])
+  } catch (error) {
+    if (!/No such image/i.test(error.message)) throw error
+    await pullWithRetry(() => docker(['pull', '--quiet', image]), retryOptions)
+  }
+}
