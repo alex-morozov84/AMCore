@@ -1214,7 +1214,6 @@ jobs:
         env:
           NODE_OPTIONS: --import=${{ github.workspace }}/scripts/lighthouse/action-deadline.mjs
           AMCORE_ACTION_DEADLINE: ${{ env.AMCORE_AGG_RETRIEVAL_END }}
-        timeout-minutes: 1
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: web-e2e-lane-${{ github.run_id }}-${{ github.run_attempt }}-*
