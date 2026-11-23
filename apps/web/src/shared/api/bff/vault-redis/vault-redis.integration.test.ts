@@ -70,10 +70,12 @@ describe('supervised vault connection against a real server', () => {
     const id = `it-${crypto.randomUUID()}`
     await store.create(id, entry())
     await expect(store.get(id)).resolves.toMatchObject({ version: 1 })
-    const token = await lock.acquire(id, 5000)
+    const leaseMs = 15_000
+    const token = await lock.acquire(id, leaseMs)
     expect(token).not.toBeNull()
-    await expect(lock.acquire(id, 5000, { deadlineMs: 600 })).resolves.toBeNull()
-    await expect(lock.renew(id, token!, 5000)).resolves.toBe(true)
+    // Allow all retries under CI load while the original lease is still held.
+    await expect(lock.acquire(id, leaseMs, { deadlineMs: 8000 })).resolves.toBeNull()
+    await expect(lock.renew(id, token!, leaseMs)).resolves.toBe(true)
     await lock.release(id, token!)
     await expect(lock.acquire(id, 5000)).resolves.not.toBeNull()
   }, 30_000)
