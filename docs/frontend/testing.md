@@ -181,7 +181,7 @@ For product URLs use `productPath` and match text with `messages` or
 `messagesForLocale(locale)`. For example, navigate to `productPath('/login')`
 and use `messages.auth.email` to find the email field.
 
-For example, add a case to a real-stack spec:
+For example, create `apps/web/e2e/real-stack/sign-in-email.spec.ts` with this test:
 
 ```ts
 import { expect, test } from '@playwright/test'
