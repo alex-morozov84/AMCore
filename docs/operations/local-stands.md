@@ -709,6 +709,10 @@ managed local commands do not replace those deployment contracts.
 
 ## Image build cache and network use
 
+Before building stand images, the managed runner checks for the digest-pinned
+pnpm image used by the migrator. If the image is missing, the runner pulls it and
+retries transient registry failures before starting the build.
+
 The `apps/api` and `apps/web` Dockerfiles keep the pnpm store (and, for the api
 `deploy` step, pnpm's registry-metadata cache) in BuildKit cache mounts
 (`id=pnpm-store`, `id=pnpm-metadata`), not in image layers. The mounts are shared by

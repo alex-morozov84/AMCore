@@ -1,9 +1,32 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isTransientPullFailure, pullWithRetry } from './registry-pull.mjs'
+import { readFileSync } from 'node:fs'
+import { isTransientPullFailure, pullMigratorBase, pullWithRetry } from './registry-pull.mjs'
 
 const registry502 = new Error('docker failed (1): received unexpected HTTP status: 502 Bad Gateway')
 const noWait = async () => undefined
+
+test('a cold stand retries pulling the exact migrator image after a manifest timeout', async () => {
+  const dockerfile = readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8')
+  const calls = []
+  await pullMigratorBase(
+    dockerfile,
+    async (args) => {
+      calls.push(args)
+      if (calls.length === 1) throw new Error('No such image')
+      if (calls.length === 2) throw new Error('failed to resolve source metadata: i/o timeout')
+    },
+    { wait: noWait }
+  )
+  const image = calls[0][2]
+  assert.match(image, /^ghcr\.io\/pnpm\/pnpm:[^@]+@sha256:[a-f0-9]{64}$/)
+  assert.ok(dockerfile.includes(`FROM ${image} AS migrator-pnpm`))
+  assert.deepEqual(calls, [
+    ['image', 'inspect', image],
+    ['pull', '--quiet', image],
+    ['pull', '--quiet', image],
+  ])
+})
 
 test('a registry 502 is retried until the pull succeeds', async () => {
   let calls = 0
